@@ -1,0 +1,2626 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+/* Header, then a row (sidebar + map), then the histogram footer. */
+.app-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 56px;
+  padding: 0 20px;
+  background: #fff;
+  border-bottom: 1px solid rgb(0 0 0 / 10%);
+  /* Its own stacking context, above the map. Both things that hang out of this bar — the
+     account dropdown and the upload widget's status popover — overlap the map canvas, and
+     MapLibre's own controls sit at a z-index of their own that would otherwise win. */
+  position: relative;
+  z-index: 5;
+}
+
+.app-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  color: #1a1a1a;
+}
+
+/* Only ProfilePage renders the brand as a button (Header's onBrandClick) — reset every
+   button default so "go back to the map" looks identical to the map screen's plain, inert
+   brand mark rather than looking like a new control. */
+.app-header__brand--button {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.app-header__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid #3a6ea5;
+  border-radius: 5px;
+}
+
+.app-header__mark-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 2px solid #3a6ea5;
+}
+
+/* Donate, the upload control and the account menu, pushed to the trailing end together. */
+.app-header__actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Colors match docs/UI/exports/fitmap-map-screen-standalone.html's live prototype exactly
+   (read via getComputedStyle, not eyeballed) — orange rather than the app's usual blue
+   specifically so Donate doesn't read as just another neutral nav action; it's how FitMap
+   is funded (business_plan.md §6), not a footnote. */
+.donate-button {
+  border: 1px solid #a85412;
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: #a85412;
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  color: #f2f2f3;
+  cursor: pointer;
+}
+
+.donate-button:hover {
+  background: #8f470f;
+  border-color: #8f470f;
+}
+
+/* `position: relative` is what the dropdown anchors to, so it hangs under the avatar rather
+   than under the whole bar — same arrangement as the upload widget's status popover. */
+.user-menu {
+  position: relative;
+  display: flex;
+}
+
+.user-menu__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid rgb(0 0 0 / 15%);
+  border-radius: 50%;
+  background: #fff;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+.user-menu__avatar:hover {
+  background: rgb(0 0 0 / 4%);
+}
+
+/* Stroked, not filled: the glyph is two shapes (head and shoulders) that only read as a
+   person with a gap between them. */
+.user-menu__avatar svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+/* A real avatar (SettingsPage.tsx) fills the whole circle, not just the glyph's own smaller
+   box — this is the one place the button shows a photo instead of an icon. */
+.user-menu__avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.user-menu__dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 12rem;
+  padding: 4px;
+  background: #fff;
+  border: 1px solid rgb(0 0 0 / 10%);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
+}
+
+.user-menu__email {
+  padding: 7px 10px 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgb(0 0 0 / 8%);
+  font-size: 12px;
+  color: rgb(0 0 0 / 55%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-menu__item {
+  border: 0;
+  border-radius: 5px;
+  padding: 7px 10px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: #1a1a1a;
+  text-align: left;
+  cursor: pointer;
+}
+
+.user-menu__item:hover {
+  background: rgb(0 0 0 / 6%);
+}
+
+.user-menu__item:disabled {
+  color: rgb(0 0 0 / 45%);
+  cursor: default;
+}
+
+/* The demo-session entry point into requestUpgrade() (App.tsx swaps to AuthGate) — same
+   shape as any other item, just tinted so it reads as the one worth noticing over
+   Profile/Sign out. */
+.user-menu__item--accent {
+  color: #2f6fb0;
+  font-weight: 600;
+}
+
+/* PlaceholderNotice.tsx — the shared "not built yet" dialog behind Donate and every account
+   menu item. A real <dialog>, so the centring and the dimmed backdrop are the only things
+   left to style. */
+.placeholder-notice {
+  width: min(26rem, calc(100vw - 40px));
+  margin: auto;
+  padding: 20px;
+  border: 1px solid rgb(0 0 0 / 10%);
+  border-radius: 12px;
+  background: #fff;
+  color: #1a1a1a;
+  box-shadow: 0 24px 60px rgb(0 0 0 / 25%);
+}
+
+.placeholder-notice::backdrop {
+  background: rgb(0 0 0 / 35%);
+}
+
+.placeholder-notice__title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.placeholder-notice__message {
+  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgb(0 0 0 / 70%);
+}
+
+.placeholder-notice__dismiss {
+  border: 1px solid rgb(0 0 0 / 15%);
+  border-radius: 8px;
+  padding: 6px 14px;
+  background: #fff;
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+.placeholder-notice__dismiss:hover {
+  background: rgb(0 0 0 / 4%);
+}
+
+/* EditActivityDialog.tsx (§4.7.4) — same real-<dialog>/showModal() shape as
+   .placeholder-notice above, just wider (the description field needs the room) and its own
+   form-field layout reuses .settings-page__* classes rather than duplicating them. */
+.edit-activity-dialog {
+  width: min(28rem, calc(100vw - 40px));
+  margin: auto;
+  padding: 20px;
+  border: 1px solid rgb(0 0 0 / 10%);
+  border-radius: 12px;
+  background: #fff;
+  color: #1a1a1a;
+  box-shadow: 0 24px 60px rgb(0 0 0 / 25%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.edit-activity-dialog::backdrop {
+  background: rgb(0 0 0 / 35%);
+}
+
+.edit-activity-dialog__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.edit-activity-dialog__subtitle {
+  margin: -10px 0 0;
+  font-size: 12.5px;
+  color: rgb(0 0 0 / 55%);
+}
+
+.edit-activity-dialog__description {
+  resize: vertical;
+  min-height: 4.5em;
+  font: inherit;
+}
+
+/* ConfirmDialog.tsx — same real-<dialog>/showModal() shape as .placeholder-notice, sized for
+   a short title+message rather than a form. Generic, not delete-specific, but the one caller
+   today (§4.7.5's Delete button) is what the red confirm button is tuned for — a future
+   non-destructive use of this component can still override confirmLabel/styling as needed. */
+.confirm-dialog {
+  width: min(24rem, calc(100vw - 40px));
+  margin: auto;
+  padding: 20px;
+  border: 1px solid rgb(0 0 0 / 10%);
+  border-radius: 12px;
+  background: #fff;
+  color: #1a1a1a;
+  box-shadow: 0 24px 60px rgb(0 0 0 / 25%);
+}
+
+.confirm-dialog::backdrop {
+  background: rgb(0 0 0 / 35%);
+}
+
+.confirm-dialog__title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.confirm-dialog__message {
+  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgb(0 0 0 / 70%);
+}
+
+/* Reuses .settings-page__error's #a33 red — the same tone this app already uses for
+   destructive/error states, not a new color introduced just for this button. */
+.confirm-dialog__confirm {
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 18px;
+  background: #a33;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.confirm-dialog__confirm:hover {
+  background: #8a2a2a;
+}
+
+.confirm-dialog__confirm:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* A permanent left sidebar now (docs/UI/main-screen-v2.png), not a dropdown floating over
+   the map — there is always at least one activity to show once anything's been uploaded, so
+   there was nothing to gain by hiding the list behind an open/close toggle. Width is inline
+   style now (ActivitiesPanel.tsx's own `panelWidth` state, draggable — see the resize handle
+   below), not this fixed 320px — a full "Sep 11, 2026, 09:00 AM" title plus its TYPE label
+   was clipping at that width, and a fixed default couldn't fit every row either. `position:
+   relative` is for the handle, which is positioned against this element, not the viewport. */
+.activities-panel {
+  position: relative;
+  flex: none;
+  width: var(--panel-width);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-right: 1px solid rgb(0 0 0 / 10%);
+  overflow: hidden;
+}
+
+/* A slim strip along the panel's own right edge — wider than the 1px border it sits on so
+   it's actually easy to grab, but not so wide it eats into the map underneath. Transparent
+   until hovered, so it doesn't read as a visible UI element sitting on top of the map when
+   the pointer isn't there. */
+.activities-panel__resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  /* Fully inside the panel's own box, not straddling its edge — `.activities-panel` has
+     `overflow: hidden` for its scrolling list, which clips (and makes unclickable) anything
+     positioned outside that box, which a `right: -3px` offset used to do. */
+  right: 0;
+  width: 6px;
+  cursor: ew-resize;
+  touch-action: none;
+  z-index: 1;
+}
+
+.activities-panel__resize-handle:hover,
+.activities-panel__resize-handle:active {
+  background: rgb(58 110 165 / 35%);
+}
+
+.activities-panel__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 16px 16px 4px;
+}
+
+.activities-panel__heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.activities-panel__heading-text {
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #1a1a1a;
+}
+
+.activities-panel__badge {
+  background: #e7effa;
+  color: #2f6fb0;
+  border-radius: 5px;
+  padding: 1px 7px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* A <button> now (ActivitiesPanel.tsx — the mobile bottom sheet's own peek-strip tap
+   target), reset to look exactly like the plain text it used to be at desktop width:
+   `cursor: default` here, not `pointer` — only the mobile media query below makes it look
+   and behave like a control, so clicking it at desktop width is an invisible no-op rather
+   than a behavior change. */
+.activities-panel__subtext {
+  display: block;
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 0 16px;
+  border: 0;
+  background: none;
+  color: rgb(0 0 0 / 55%);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: default;
+}
+
+/* Hidden at desktop width — only meaningful once the subtext button above becomes the
+   bottom sheet's own expand/collapse indicator (mobile media query below). */
+.activities-panel__sheet-chevron {
+  display: none;
+}
+
+/* DistanceFilter.tsx — the DISTANCE dual slider, standalone and always visible (§4.7.6)
+   between the subtext line and the header toolbar, not hidden behind any toggle. TYPE moved
+   out to its own dropdown (checkboxes inline in ActivitiesPanel.tsx, reusing
+   .activity-filters__type-* below directly). */
+.activity-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 16px 14px;
+  border-bottom: 1px solid rgb(0 0 0 / 8%);
+}
+
+.activity-filters__section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.activity-filters__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.activity-filters__label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(0 0 0 / 50%);
+}
+
+.activity-filters__readout {
+  font-size: 11.5px;
+  color: rgb(0 0 0 / 55%);
+}
+
+/* A real checkbox list, scrollable rather than collapsing behind "Show all (N)" — the Type
+   dropdown already has a natural height budget a scrollbar fits inside cleanly. Checked means
+   "shown", unchecked means excluded — the same toggle this always was, just a real checkbox
+   input instead of a click-to-toggle-a-✕-box chip. */
+.activity-filters__type-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.activity-filters__type-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 2px;
+  font-size: 13px;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+.activity-filters__type-item input[type='checkbox'] {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  accent-color: #3a6ea5;
+  cursor: pointer;
+}
+
+.activity-filters__type-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-filters__type-count {
+  flex: none;
+  font: 400 11px ui-monospace, Menlo, monospace;
+  color: rgb(0 0 0 / 50%);
+}
+
+/* Two overlapping native range inputs sharing one track — a well-known dual-thumb-slider
+   technique. Each input's own track/fill is made transparent so only .activity-filters__fill
+   below shows through, and pointer-events is disabled on the input everywhere except its
+   thumb, so a click between the two thumbs falls through to whichever is actually closer
+   rather than always grabbing one specific input. */
+.activity-filters__track-wrap {
+  position: relative;
+  height: 20px;
+}
+
+.activity-filters__track {
+  position: absolute;
+  top: 9px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgb(0 0 0 / 12%);
+  border-radius: 1px;
+}
+
+.activity-filters__fill {
+  position: absolute;
+  top: 9px;
+  height: 2px;
+  background: #3a6ea5;
+  border-radius: 1px;
+}
+
+.activity-filters__range {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  margin: 0;
+  background: transparent;
+  appearance: none;
+  pointer-events: none;
+}
+
+.activity-filters__range::-webkit-slider-runnable-track {
+  background: transparent;
+}
+
+.activity-filters__range::-moz-range-track {
+  background: transparent;
+}
+
+.activity-filters__range::-webkit-slider-thumb {
+  appearance: none;
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  margin-top: -7px;
+  border-radius: 50%;
+  border: 2px solid #3a6ea5;
+  background: #fff;
+  cursor: pointer;
+}
+
+.activity-filters__range::-moz-range-thumb {
+  pointer-events: auto;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #3a6ea5;
+  background: #fff;
+  cursor: pointer;
+}
+
+.activity-filters__bounds {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: rgb(0 0 0 / 40%);
+}
+
+.activity-filters__reset {
+  align-self: flex-start;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: #2f6fb0;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.activities-panel__list {
+  flex: 1;
+  min-height: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  border-top: 1px solid rgb(0 0 0 / 8%);
+}
+
+.activities-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgb(0 0 0 / 6%);
+}
+
+/* Reached via the checkbox (adds/removes just this row) or the row's own text (replaces the
+   whole selection with just this row) — both land in the same selected set, so one treatment
+   covers whichever put a row in it. */
+.activities-panel__row--selected {
+  background: #eaf1fb;
+  box-shadow: inset 3px 0 0 #2f6fb0;
+}
+
+.activities-panel__checkbox {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: #2f6fb0;
+  cursor: pointer;
+}
+
+.activities-panel__icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
+  border: 1px solid rgb(0 0 0 / 12%);
+  border-radius: 5px;
+  color: rgb(0 0 0 / 55%);
+}
+
+/* A button, because clicking it flies the map — but it has to keep looking like the row
+   text it replaced, so every button default is reset here rather than styled around. */
+.activities-panel__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  /* Not flex-start: that sizes each line to its own content width (shrink-to-fit) rather
+     than this box's actual available width, which is exactly what let a long line overflow
+     into .activities-panel__type instead of respecting its own overflow/ellipsis rules —
+     text-align: left below already left-aligns the text regardless of the box's width. */
+  align-items: stretch;
+  gap: 2px;
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.activities-panel__text:hover .activities-panel__title {
+  text-decoration: underline;
+}
+
+/* The reverse direction of the hover above: hovering this activity's *track on the map*
+   (not the row itself) also underlines the title, via MapView's shared hoveredActivityId
+   state rather than a real `:hover` here — the pointer isn't over this row at all. */
+.activities-panel__title--hovered {
+  text-decoration: underline;
+}
+
+.activities-panel__title {
+  /* Without this, a flex item's default min-width:auto keeps it from shrinking below its
+     content's natural width even inside a column flex container — the same rule applies
+     independently at every flex nesting level, not just on .activities-panel__text's own
+     row — so overflow/ellipsis below had nothing to actually clip against until this was
+     added (confirmed: without it, long metadata visibly overlapped .activities-panel__type
+     instead of eliding). */
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1a1a1a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activities-panel__meta {
+  /* See .activities-panel__title's comment just above — same nested-flex min-width gotcha. */
+  min-width: 0;
+  max-width: 100%;
+  font-size: 11.5px;
+  color: rgb(0 0 0 / 55%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activities-panel__type {
+  flex: none;
+  max-width: 5.5rem;
+  font-size: 12px;
+  color: rgb(0 0 0 / 50%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* §4.7.4's edit affordance and §4.7.5's delete affordance — same box/hover treatment as
+   .activities-panel__visibility right next to them, so all three read as one family of
+   row-action icon buttons. Delete gets its own muted-red resting color (not just on hover)
+   since a full purge with no undo is worth reading as "different" from Edit/Visible at a
+   glance, not only once the pointer's already over it. */
+.activities-panel__edit {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0;
+  background: none;
+  color: rgb(0 0 0 / 40%);
+  cursor: pointer;
+}
+
+.activities-panel__edit:hover {
+  background: rgb(0 0 0 / 6%);
+  color: #1a1a1a;
+}
+
+.activities-panel__delete {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0;
+  background: none;
+  color: rgb(170 51 51 / 55%);
+  cursor: pointer;
+}
+
+.activities-panel__delete:hover {
+  background: rgb(170 51 51 / 10%);
+  color: #a33;
+}
+
+.activities-panel__visibility {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0;
+  background: none;
+  color: rgb(0 0 0 / 55%);
+  cursor: pointer;
+}
+
+.activities-panel__visibility:hover {
+  background: rgb(0 0 0 / 6%);
+  color: #1a1a1a;
+}
+
+/* Hidden from the map, not from the list — the row itself stays fully legible, only the
+   eye glyph and (via tracks.ts's layer filter) the track on the map change. */
+.activities-panel__row--hidden .activities-panel__visibility {
+  color: rgb(0 0 0 / 30%);
+}
+
+.activities-panel__note {
+  padding: 14px 16px;
+  font-size: 12.5px;
+  color: rgb(0 0 0 / 50%);
+}
+
+.activities-panel__note--error {
+  color: #a33;
+}
+
+/* §4.7.6's header toolbar — right above the row list, deliberately mirroring
+   .activities-panel__row's own flex layout (same gap/padding) column for column, so it reads
+   as that list's header rather than a floating control strip: the select-all checkbox sits
+   above the row checkboxes, the Type trigger above the TYPE column, Group visible above the
+   row's own Visible icon, and Delete group above Delete. No flex-wrap here on purpose — the
+   whole point is staying column-aligned with the list beneath it, and the text-spacer's own
+   flex:1/min-width:0 (same as .activities-panel__text) absorbs narrowness at the panel's
+   260px minimum the same way a row's own title text does. */
+.activities-panel__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgb(0 0 0 / 8%);
+}
+
+/* Matches .activities-panel__icon/.activities-panel__edit's own widths (28px/24px) exactly —
+   there is no bulk equivalent for the row icon or the per-row Edit button, so these columns
+   stay empty rather than collapsing, which is what keeps Delete group aligned under Delete. */
+.activities-panel__toolbar-spacer {
+  flex: none;
+}
+
+.activities-panel__toolbar-spacer--icon {
+  width: 28px;
+}
+
+.activities-panel__toolbar-spacer--text {
+  flex: 1;
+  min-width: 0;
+}
+
+.activities-panel__toolbar-spacer--edit {
+  width: 24px;
+}
+
+/* Anchors the dropdown panel under its trigger — same arrangement .upload-panel/.user-menu
+   already use for their own dropdowns. Fixed width matching .activities-panel__type's own
+   max-width exactly, so the trigger sits directly above where TYPE labels render in the rows
+   below rather than floating at whatever width its own label happens to need. */
+.activities-panel__type-dropdown {
+  position: relative;
+  flex: none;
+  width: 5.5rem;
+}
+
+.activities-panel__type-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  border: 1px solid rgb(0 0 0 / 18%);
+  border-radius: 7px;
+  padding: 5px 6px;
+  background: #fff;
+  color: #1a1a1a;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.activities-panel__type-trigger:hover {
+  background: rgb(0 0 0 / 4%);
+}
+
+/* A plain dot, not a count — the trigger's own label already says "Type"; a badge repeating
+   "filters active" as a number would just be noise next to one word. */
+.activities-panel__type-trigger-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3a6ea5;
+}
+
+.activities-panel__type-trigger-caret {
+  flex: none;
+  font-size: 10px;
+  color: rgb(0 0 0 / 45%);
+}
+
+/* Right-aligned to the trigger, not left — the trigger sits mid-row now (above the TYPE
+   column, not at the panel's left edge), so anchoring the panel's right edge to the
+   trigger's is what keeps it from overflowing the panel's own narrow end. */
+.activities-panel__type-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 3;
+  width: 15rem;
+  max-width: calc(100vw - 32px);
+  border: 1px solid rgb(0 0 0 / 12%);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
+  padding: 10px 12px;
+}
+
+.activities-panel__type-panel-empty {
+  margin: 0;
+  padding: 4px 2px;
+  font-size: 12.5px;
+  color: rgb(0 0 0 / 55%);
+}
+
+.activities-panel__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid rgb(0 0 0 / 8%);
+}
+
+.activities-panel__footer-summary {
+  font-size: 12.5px;
+  color: rgb(0 0 0 / 65%);
+}
+
+.activities-panel__footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The footer's own action button — "Fit map" is automatic (see MapView's checked-group
+   auto-fly effect), so this is what's left: a manual re-trigger of that same fly, for after
+   panning away from the group. Select all/Clear moved to the header toolbar's master
+   checkbox (§4.7.6) and no longer lives here. */
+.activities-panel__show-selected {
+  border: 1px solid rgb(0 0 0 / 18%);
+  border-radius: 7px;
+  padding: 6px 12px;
+  background: #fff;
+  color: #1a1a1a;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.activities-panel__show-selected:disabled {
+  color: rgb(0 0 0 / 30%);
+  border-color: rgb(0 0 0 / 10%);
+  cursor: not-allowed;
+}
+
+/* A column now, not a row: the header (selection info + pan window + Earlier/Later) sits
+   above the chart rather than beside it, so RangePicker.tsx's chart can span the footer's
+   full width instead of sharing it with a fixed-width sidebar and two button columns. */
+.activity-histogram {
+  /* There's no global box-sizing: border-box reset in this app, so a bare `height` here would
+     be the content box alone and the padding below would add 28px on top of it — border-box
+     locally is what makes `height` mean what it looks like it means. */
+  box-sizing: border-box;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Taller than the flanking-buttons layout this replaced (124px): the header used to sit
+     beside the chart, costing it no vertical space; stacked above it now, it needs some
+     back or the bars themselves would be squeezed down to a sliver. */
+  height: 142px;
+  padding: 14px 20px;
+  background: #fff;
+  border-top: 1px solid rgb(0 0 0 / 10%);
+}
+
+.activity-histogram__header {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.activity-histogram__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.activity-histogram__range-label {
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: #1a1a1a;
+}
+
+.activity-histogram__stats {
+  font-size: 12px;
+  color: rgb(0 0 0 / 55%);
+}
+
+/* The pan window and the Earlier/Later buttons that page it, grouped together on the
+   header's right — see ActivityHistogram.tsx's doc comment for why the pan window and the
+   selection are laid out as two independent corners instead of one column, and why the
+   buttons live up here rather than flanking the chart below. */
+.activity-histogram__window {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.activity-histogram__window-label {
+  font-size: 10.5px;
+  color: rgb(0 0 0 / 40%);
+  white-space: nowrap;
+}
+
+.range-picker__page {
+  flex: none;
+  align-self: center;
+  border: 1px solid rgb(0 0 0 / 15%);
+  border-radius: 7px;
+  padding: 6px 10px;
+  background: #fff;
+  color: #1a1a1a;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.range-picker__page:hover:not(:disabled) {
+  border-color: #3a6ea5;
+  color: #2f6fb0;
+}
+
+.range-picker__page:disabled {
+  color: rgb(0 0 0 / 30%);
+  border-color: rgb(0 0 0 / 8%);
+  cursor: not-allowed;
+}
+
+/* The chart itself: bars, the draggable selection band and its handles, and the month
+   labels, all absolutely positioned within this one relative box. touch-action: none keeps
+   a touchscreen drag from also trying to scroll the page while dragging a handle. */
+.range-picker__chart {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  touch-action: none;
+  /* Belt-and-braces alongside RangePicker.tsx's beginDrag preventDefault(): stops a drag that
+     wanders near the month labels' text from starting a browser text selection at all, which
+     is what let Firefox reinterpret a later drag (a handle included) as "drag the selection"
+     instead of delivering it to us as pointer events. */
+  user-select: none;
+  cursor: grab;
+}
+
+.range-picker__chart:active {
+  cursor: grabbing;
+}
+
+/* The selected sub-range, drawn over the bars rather than replacing them. Stays
+   pointer-events: none deliberately — RangePicker.tsx's onChartPointerDown does the
+   "is this click inside the band" hit-test in JS instead, specifically so this div never
+   captures a bar's hover underneath it (a selection commonly covers most of the strip, so
+   most bars would otherwise never show their own tooltip while selected). Its two children
+   are the edge-resize handles, each `pointer-events: auto` on its own — a child can opt back
+   into pointer events even under a `none` parent, so they stay grabbable regardless. */
+.range-picker__selection {
+  position: absolute;
+  top: 0;
+  bottom: 20px;
+  z-index: 2;
+  background: rgb(58 110 165 / 14%);
+  border-left: 2px solid #3a6ea5;
+  border-right: 2px solid #3a6ea5;
+  pointer-events: none;
+}
+
+.range-picker__handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  cursor: ew-resize;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.range-picker__handle--start {
+  left: -7px;
+}
+
+.range-picker__handle--end {
+  right: -7px;
+}
+
+/* One slot per day *that has activity* — empty days get nothing, so bars are packed.
+   justify-content: flex-end is what pushes a short history's bars against the right edge
+   (the most-recent end) instead of stretching them across the whole width — RangePicker.tsx
+   measures the packed group's actual rendered width (`packedFraction`) and uses it, not a
+   flat `days.length` share of the full chart, to place the selection band and month ticks so
+   they still land exactly on the (now right-aligned) bars. */
+.range-picker__bars {
+  position: absolute;
+  inset: 4px 0 20px;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 1px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* flex-grow: 0 — a slot never grows past its own bar's width even when there's leftover
+   room, which is what stops a sparse history from spreading its few bars across the full
+   width (previously flex: 1, the "weird" look this replaced). flex-shrink: 1 is kept: once
+   more days are on screen than fit at full width (a long, dense history), slots still
+   compress together exactly as before rather than overflowing. */
+.range-picker__slot {
+  flex: 0 1 10px;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+/* Capped width so a six-day history draws six bars rather than six slabs; the slot around
+   it still carries the layout, so capping this changes nothing about the band's alignment.
+   12px (was 22px) to match docs/UI/main-screen-v6.png's own thin, tightly-packed bars —
+   paired with useActivityDays.ts's BARS_PER_VIEW increase, which is what keeps a full
+   screen's slots close to this width instead of each bar floating in a much wider one.
+   pointer-events back on for the per-bar date tooltip. */
+.range-picker__bar {
+  width: 100%;
+  max-width: 10px;
+  background: rgb(0 0 0 / 18%);
+  border-radius: 1px 1px 0 0;
+  pointer-events: auto;
+}
+
+/* No transition on either rule — the response has to be instant, not eased in, since this is
+   the only feedback a hover gets before the native title tooltip's own delay catches up. */
+.range-picker__bar:hover {
+  background: rgb(58 110 165 / 55%);
+}
+
+.range-picker__bar--selected {
+  background: rgb(58 110 165 / 75%);
+}
+
+.range-picker__bar--selected:hover {
+  background: #3a6ea5;
+}
+
+/* Month labels sit under the first bar of their month, at that bar's real slot position —
+   never spread evenly, which with packed bars would imply an even spacing through time that
+   isn't there. RangePicker drops any label too close to the previous one. */
+.range-picker__months {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 20px;
+  border-top: 1px solid rgb(0 0 0 / 10%);
+  /* Takes pointer events so it can be grabbed to pan — see RangePicker's note on why the
+     chart needs one surface a selection band can never cover. The labels on it stay inert
+     so a drag that starts on a label still reaches this rail. */
+  cursor: grab;
+}
+
+.range-picker__month {
+  position: absolute;
+  top: 4px;
+  pointer-events: none;
+  font-size: 10px;
+  color: rgb(0 0 0 / 45%);
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.map-root {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.map-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.map-mode-toggle {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 3;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 25%);
+}
+
+.map-mode-toggle__btn {
+  border: 0;
+  border-radius: 5px;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: #1a1a1a;
+  background: transparent;
+  cursor: pointer;
+}
+
+.map-mode-toggle__btn:hover {
+  background: rgb(0 0 0 / 7%);
+}
+
+.map-mode-toggle__btn--active {
+  background: #1a1a1a;
+  color: #fff;
+}
+
+/* Speed/heart-rate colored zone segments (trackBands.ts) — bottom-left of the map, the one
+   corner .map-mode-toggle (top-left), the coverage notice (top-center), and MapLibre's own
+   zoom/geolocate controls (top-right) all leave free. */
+.track-metric-toggle {
+  position: absolute;
+  /* Stacked above MapLibre's own ScaleControl (useMapInstance.ts, also 'bottom-left') rather
+     than sharing its exact corner — the original bottom:10px placed both at the same
+     coordinates. */
+  bottom: 56px;
+  left: 10px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 25%);
+}
+
+/* The straight-line pace/HR + elevation profile (TrackProfile.tsx) — deliberately small and
+   unlabeled (no axis ticks), a general overlook alongside the toggle already in this same
+   floating card, not a separate detailed instrument. */
+.track-profile {
+  position: relative;
+  margin-top: 4px;
+  width: 100%;
+}
+
+.track-profile__strip {
+  display: flex;
+  height: 8px;
+  border-radius: 2px;
+  overflow: hidden;
+  cursor: crosshair;
+}
+
+.track-profile__segment {
+  height: 100%;
+}
+
+.track-profile__elevation {
+  display: block;
+  width: 100%;
+  height: 28px;
+  margin-top: 2px;
+  cursor: crosshair;
+}
+
+.track-profile__elevation-fill {
+  fill: rgb(58 110 165 / 15%);
+  stroke: none;
+}
+
+.track-profile__elevation-line {
+  fill: none;
+  stroke: rgb(0 0 0 / 45%);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Always rendered (see TrackProfile.tsx's own comment on why) — min-height reserves its row
+   regardless of hover state, so the card's total height never changes and the strip/chart
+   the cursor is over never shifts out from under it. */
+.track-profile__tooltip {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  min-height: 14px;
+  font-size: 11px;
+  color: rgb(0 0 0 / 70%);
+  white-space: nowrap;
+}
+
+/* §4.0.1's upload control — a dropdown panel now, not a hover popover (docs/UI/exports/
+   fitmap-map-screen-standalone.html's live prototype). `position: relative` anchors the
+   dropdown under the trigger button, the same arrangement as .user-menu's own dropdown. */
+.upload-panel {
+  position: relative;
+}
+
+.upload-panel__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgb(0 0 0 / 15%);
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: #fff;
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+.upload-panel__trigger:hover {
+  background: rgb(0 0 0 / 4%);
+}
+
+.export-button-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.export-button {
+  border: 1px solid rgb(0 0 0 / 15%);
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: #fff;
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+.export-button:hover:not(:disabled) {
+  background: rgb(0 0 0 / 4%);
+}
+
+.export-button:disabled {
+  color: rgb(0 0 0 / 40%);
+  cursor: default;
+}
+
+/* A rare failure (network/timeout) — positioned so it doesn't push the rest of the header
+   down, the same floating-note treatment .upload-panel's own popovers already use. */
+.export-button__error {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  max-width: 20rem;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 20%);
+  font-size: 12.5px;
+  color: #a33;
+  z-index: 5;
+}
+
+/* This session's in-flight count plus every pending job for this user globally (see
+   useUploadHistory's own comment on why the latter isn't scoped to whichever page happens
+   to be open) — visible even with the dropdown closed, so progress doesn't disappear the
+   moment it's collapsed. */
+.upload-panel__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #3a6ea5;
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.upload-panel__caret {
+  font-size: 10px;
+  color: rgb(0 0 0 / 45%);
+}
+
+.upload-panel__dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: min(24rem, calc(100vw - 40px));
+  max-height: min(32rem, calc(100vh - 100px));
+  padding: 14px;
+  background: #fff;
+  border: 1px solid rgb(0 0 0 / 10%);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
+  overflow-y: auto;
+}
+
+.upload-panel__title {
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.upload-panel__hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: rgb(0 0 0 / 55%);
+}
+
+.upload-panel__dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 64px;
+  border: 1px dashed rgb(0 0 0 / 25%);
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: rgb(0 0 0 / 55%);
+  cursor: pointer;
+  text-align: center;
+}
+
+.upload-panel__dropzone--drag {
+  border-color: #3a6ea5;
+  background: rgb(58 110 165 / 6%);
+  color: #3a6ea5;
+}
+
+.upload-panel__input {
+  display: none;
+}
+
+.upload-panel__notices {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.upload-panel__notice {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  background: rgb(58 110 165 / 8%);
+  font-size: 12px;
+  line-height: 1.4;
+  color: #1a1a1a;
+}
+
+.upload-panel__notice--error {
+  background: rgb(170 51 51 / 8%);
+  color: #a33;
+}
+
+.upload-panel__notice-dismiss {
+  flex: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.upload-panel__list-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 16px 0 6px;
+}
+
+.upload-panel__list-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(0 0 0 / 50%);
+}
+
+.upload-panel__list-summary {
+  font-size: 11.5px;
+  color: rgb(0 0 0 / 50%);
+}
+
+.upload-panel__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid rgb(0 0 0 / 8%);
+}
+
+.upload-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgb(0 0 0 / 6%);
+}
+
+.upload-panel__row-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1a1a1a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-panel__row-size {
+  flex: none;
+  font-size: 11px;
+  color: rgb(0 0 0 / 45%);
+  min-width: 3.2rem;
+  text-align: right;
+}
+
+.upload-panel__row-detail {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  min-width: 6.5rem;
+}
+
+.upload-panel__row-status {
+  font-size: 11px;
+  color: rgb(0 0 0 / 55%);
+}
+
+.upload-panel__row-status--error {
+  color: #a33;
+}
+
+.upload-panel__row-status--ready {
+  color: #2f8a4e;
+}
+
+.upload-panel__row-meta {
+  font-size: 10.5px;
+  color: rgb(0 0 0 / 45%);
+}
+
+.upload-panel__progress {
+  display: block;
+  width: 6.5rem;
+  height: 4px;
+  border-radius: 2px;
+  background: rgb(0 0 0 / 8%);
+  overflow: hidden;
+}
+
+.upload-panel__progress-fill {
+  display: block;
+  height: 100%;
+  background: #3a6ea5;
+  transition: width 120ms linear;
+}
+
+.upload-panel__note {
+  padding: 10px 0;
+  font-size: 12px;
+  color: rgb(0 0 0 / 50%);
+}
+
+.upload-panel__note--error {
+  color: #a33;
+}
+
+.upload-panel__pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 8px;
+  font-size: 11.5px;
+  color: rgb(0 0 0 / 50%);
+}
+
+.upload-panel__pager-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.upload-panel__pager-buttons button {
+  border: 1px solid rgb(0 0 0 / 15%);
+  border-radius: 5px;
+  width: 24px;
+  height: 24px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.upload-panel__pager-buttons button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.version-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 16px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #1a1a1a;
+  background: rgb(255 244 214 / 96%);
+  box-shadow: 0 1px 6px rgb(0 0 0 / 28%);
+}
+
+.version-banner__refresh {
+  padding: 4px 10px;
+  border: 1px solid rgb(0 0 0 / 20%);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.coverage-notice {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  max-width: min(34rem, calc(100% - 2rem));
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #1a1a1a;
+  background: rgb(255 244 214 / 96%);
+  box-shadow: 0 1px 6px rgb(0 0 0 / 28%);
+}
+
+/* §4.8's Profile screen — a normal scrolling page, unlike the map screen's fixed-height
+   .app-body (sidebar + map splitting one viewport). */
+.profile-page__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px clamp(16px, 4vw, 48px) 60px;
+}
+
+.profile-page__back {
+  display: inline-block;
+  margin-bottom: 20px;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: #2f6fb0;
+  cursor: pointer;
+}
+
+/* SettingsPage.tsx — Avatar, Name, Country, Privacy Trim. Shares .profile-page__body/
+   __back above for the page shell (same "private, full-screen detour from the map" shape),
+   its own classes below only for what's actually different: a form, not a grid. */
+.settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.settings-page__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.settings-page__section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-page__label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgb(0 0 0 / 60%);
+}
+
+.settings-page__input {
+  padding: 9px 10px;
+  border: 1px solid rgb(0 0 0 / 18%);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 14px;
+  color: #1a1a1a;
+  background: #fff;
+}
+
+.settings-page__input:focus {
+  outline: 2px solid #3a6ea5;
+  outline-offset: 1px;
+}
+
+.settings-page__input--narrow {
+  max-width: 140px;
+}
+
+.settings-page__hint {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: rgb(0 0 0 / 55%);
+  line-height: 1.5;
+}
+
+.settings-page__avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.settings-page__avatar-drop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  border: 1px dashed rgb(0 0 0 / 25%);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgb(0 0 0 / 3%);
+}
+
+.settings-page__avatar-drop--over {
+  border-color: #3a6ea5;
+  background: rgb(58 110 165 / 8%);
+}
+
+.settings-page__avatar-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.settings-page__avatar-placeholder {
+  font-size: 28px;
+  color: rgb(0 0 0 / 25%);
+}
+
+.settings-page__avatar-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.settings-page__button {
+  border: 1px solid rgb(0 0 0 / 18%);
+  border-radius: 7px;
+  padding: 6px 12px;
+  background: #fff;
+  color: #1a1a1a;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.settings-page__button:disabled {
+  color: rgb(0 0 0 / 30%);
+  border-color: rgb(0 0 0 / 10%);
+  cursor: not-allowed;
+}
+
+.settings-page__error {
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgb(170 51 51 / 8%);
+  color: #a33;
+  font-size: 12.5px;
+}
+
+.settings-page__save-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-page__submit {
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 18px;
+  background: #3a6ea5;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.settings-page__submit:hover {
+  background: #2f5c8a;
+}
+
+.settings-page__submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.settings-page__saved {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #2e7d32;
+}
+
+.activity-graph {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.activity-graph__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1px;
+  margin-bottom: 28px;
+  background: rgb(0 0 0 / 8%);
+  border: 1px solid rgb(0 0 0 / 8%);
+}
+
+.activity-graph__card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  background: #fff;
+}
+
+.activity-graph__card-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(0 0 0 / 50%);
+}
+
+.activity-graph__card-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.activity-graph__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.activity-graph__title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(0 0 0 / 60%);
+}
+
+.activity-graph__subtext {
+  margin: 0;
+  font-size: 13px;
+  color: rgb(0 0 0 / 55%);
+}
+
+.activity-graph__shade {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.activity-graph__shade-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(0 0 0 / 50%);
+}
+
+.activity-graph__shade-btn {
+  border: 1px solid rgb(0 0 0 / 20%);
+  background: #fff;
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 12.5px;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+.activity-graph__shade-btn:first-of-type {
+  border-radius: 5px 0 0 5px;
+  border-right: 0;
+}
+
+.activity-graph__shade-btn:last-of-type {
+  border-radius: 0 5px 5px 0;
+}
+
+.activity-graph__shade-btn[aria-pressed='true'] {
+  background: #3a6ea5;
+  border-color: #3a6ea5;
+  color: #fff;
+}
+
+.activity-graph__error {
+  color: #a33;
+  font-size: 13px;
+}
+
+.activity-graph__legend {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 18px 0 0;
+  font-size: 11.5px;
+  color: rgb(0 0 0 / 50%);
+}
+
+.trends {
+  max-width: 960px;
+  margin: 36px auto 0;
+  padding-top: 24px;
+  border-top: 1px solid rgb(0 0 0 / 8%);
+}
+
+.trends__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.trends__title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(0 0 0 / 60%);
+}
+
+.trends__subtext {
+  margin: 0;
+  font-size: 13px;
+  color: rgb(0 0 0 / 55%);
+}
+
+.trends__bucket {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.trends__bucket-btn {
+  border: 1px solid rgb(0 0 0 / 20%);
+  background: #fff;
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 12.5px;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+.trends__bucket-btn:first-of-type {
+  border-radius: 5px 0 0 5px;
+  border-right: 0;
+}
+
+.trends__bucket-btn:last-of-type {
+  border-radius: 0 5px 5px 0;
+}
+
+.trends__bucket-btn[aria-pressed='true'] {
+  background: #3a6ea5;
+  border-color: #3a6ea5;
+  color: #fff;
+}
+
+.trends__error {
+  color: #a33;
+  font-size: 13px;
+}
+
+.trends__empty {
+  color: rgb(0 0 0 / 50%);
+  font-size: 13px;
+}
+
+.trends__chart {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.trends__bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 140px;
+  border-bottom: 1px solid rgb(0 0 0 / 12%);
+}
+
+.trends__bar {
+  flex: 1 1 0;
+  min-height: 2px;
+  background: #3a6ea5;
+  border-radius: 2px 2px 0 0;
+}
+
+.trends__bar:hover {
+  background: #274d78;
+}
+
+.trends__axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: rgb(0 0 0 / 50%);
+}
+
+.trends__tooltip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: rgb(0 0 0 / 4%);
+  border-radius: 5px;
+  font-size: 12.5px;
+  color: #1a1a1a;
+}
+
+.trends__tooltip-date {
+  font-weight: 700;
+}
+
+.best-efforts {
+  max-width: 960px;
+  margin: 36px auto 0;
+  padding-top: 24px;
+  border-top: 1px solid rgb(0 0 0 / 8%);
+}
+
+.best-efforts__chart {
+  position: relative;
+  padding-bottom: 22px;
+}
+
+.best-efforts__svg {
+  width: 100%;
+  height: 140px;
+  display: block;
+}
+
+.best-efforts__line {
+  fill: none;
+  stroke: #3a6ea5;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.best-efforts__point {
+  fill: #3a6ea5;
+  cursor: pointer;
+}
+
+.best-efforts__point:hover {
+  fill: #274d78;
+}
+
+.best-efforts__axis {
+  position: relative;
+  height: 16px;
+}
+
+.best-efforts__axis-label {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: rgb(0 0 0 / 50%);
+  white-space: nowrap;
+}
+
+.personal-bests {
+  max-width: 960px;
+  margin: 36px auto 0;
+  padding-top: 24px;
+  border-top: 1px solid rgb(0 0 0 / 8%);
+}
+
+.personal-bests__card-date {
+  font-size: 11px;
+  color: rgb(0 0 0 / 45%);
+}
+
+.year-grid {
+  margin-bottom: 30px;
+  padding-top: 16px;
+  border-top: 1px solid rgb(0 0 0 / 8%);
+}
+
+.year-grid__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.year-grid__year {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #1a1a1a;
+}
+
+.year-grid__stats {
+  font-size: 12.5px;
+  color: rgb(0 0 0 / 55%);
+}
+
+.year-grid__body {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.year-grid__row-labels {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 16px;
+}
+
+.year-grid__row-label {
+  height: 12px;
+  font-size: 9.5px;
+  line-height: 12px;
+  color: rgb(0 0 0 / 45%);
+}
+
+.year-grid__chart {
+  flex: none;
+}
+
+.year-grid__months {
+  display: grid;
+  grid-auto-flow: column;
+  height: 14px;
+  margin-bottom: 2px;
+}
+
+.year-grid__month {
+  font-size: 9.5px;
+  color: rgb(0 0 0 / 45%);
+  white-space: nowrap;
+}
+
+.year-grid__cells {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 12px);
+  gap: 3px;
+}
+
+.year-grid__cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: rgb(0 0 0 / 6%);
+}
+
+.year-grid__cell--pad {
+  background: transparent;
+}
+
+.year-grid__cell--level-0 {
+  background: rgb(0 0 0 / 6%);
+}
+
+.year-grid__cell--level-1 {
+  background: #bcdcf7;
+}
+
+.year-grid__cell--level-2 {
+  background: #5a9bd4;
+}
+
+.year-grid__cell--level-3 {
+  background: #1a4c78;
+}
+
+/* AuthGate.tsx — the whole screen App.tsx renders in place of the app until getCurrentUser()
+   confirms a session. Its own root, not nested in .app-shell: there is no header/map chrome
+   to sit inside of, since signing in is a precondition for either existing. */
+.auth-gate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  background: #f2f3f5;
+}
+
+.auth-gate__card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 22rem;
+  padding: 28px;
+  background: #fff;
+  border: 1px solid rgb(0 0 0 / 10%);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 10%);
+}
+
+.auth-gate__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  color: #1a1a1a;
+}
+
+.auth-gate__title {
+  margin: 4px 0 6px;
+  font-size: 19px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.auth-gate__field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12.5px;
+  color: rgb(0 0 0 / 60%);
+}
+
+.auth-gate__field input {
+  padding: 9px 10px;
+  border: 1px solid rgb(0 0 0 / 18%);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 14px;
+  color: #1a1a1a;
+}
+
+.auth-gate__field input:focus {
+  outline: 2px solid #3a6ea5;
+  outline-offset: 1px;
+}
+
+.auth-gate__error {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgb(170 51 51 / 8%);
+  color: #a33;
+  font-size: 12.5px;
+}
+
+.auth-gate__submit {
+  margin-top: 6px;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px;
+  background: #3a6ea5;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.auth-gate__submit:hover {
+  background: #2f5c8a;
+}
+
+.auth-gate__submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.auth-gate__toggle {
+  align-self: center;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12.5px;
+  color: #2f6fb0;
+  cursor: pointer;
+}
+
+.auth-gate__toggle:disabled {
+  color: rgb(0 0 0 / 40%);
+  cursor: default;
+}
+
+/* Sits right under the password field, so it reads as "trouble with that?" rather than a
+   general nav link — same treatment as .auth-gate__toggle, just right-aligned to stay out of
+   the vertical flow of field -> field -> submit. */
+.auth-gate__forgot {
+  align-self: flex-end;
+  margin-top: -6px;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: #2f6fb0;
+  cursor: pointer;
+}
+
+.auth-gate__forgot:disabled {
+  color: rgb(0 0 0 / 40%);
+  cursor: default;
+}
+
+/* The "check your email" confirmation — plain body copy, same width/rhythm as the form it
+   replaces so the card doesn't visibly resize between screens. */
+.auth-gate__hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgb(0 0 0 / 65%);
+}
+
+.auth-gate__divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0;
+  font-size: 11.5px;
+  color: rgb(0 0 0 / 40%);
+}
+
+.auth-gate__divider::before,
+.auth-gate__divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgb(0 0 0 / 10%);
+}
+
+.auth-gate__demo {
+  border: 1px solid rgb(0 0 0 / 15%);
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff;
+  color: #1a1a1a;
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.auth-gate__demo:hover {
+  background: rgb(0 0 0 / 4%);
+}
+
+.auth-gate__demo:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ============================================================================
+   Mobile browsers (~768px and narrower — phones and small tablets).
+   ============================================================================
+   One layer, isolated here rather than scattered inline through the file above — every
+   rule above this point is the desktop layout, unmodified and unaffected outside this
+   query. Scope is "core flows fully touch-usable," a direct decision, not full parity with
+   every desktop interaction: two hover-only features stay mouse-only on purpose —
+   TrackProfile.tsx's colored-band/elevation exact values (FR-4.9) and the map-track-hover
+   ↔ Activities-row-underline two-way highlight (FR-4.1/FR-5.4) — both are continuous-
+   position hover reads with no discrete point to tap, unlike Trends.tsx/BestEfforts.tsx's
+   bar/point tooltips below, which do get a tap fallback (in those files directly, not
+   here). See functional_specification.md's mobile-support note and
+   technical_implementation_plan.md §5.9 for the full account. */
+@media (max-width: 768px) {
+  /* Defensive backstop, not a fix for a specific known overflow (those are fixed at their
+     own source below, e.g. the histogram header) — a few elements deliberately extend
+     slightly past their own logical box on purpose here (the range-picker handles' widened
+     hit area is `left: -15px`/`right: -15px` by design), and a phone browser turns any
+     stray horizontal overflow into a rubber-banding scroll the whole page shouldn't have. */
+  html,
+  body {
+    overflow-x: hidden;
+  }
+
+  /* The Activities panel becomes a bottom sheet: `position: fixed` removes it from
+     `.app-body`'s flex row entirely, so `.map-root` (the only flex child left in that row,
+     `flex: 1`) naturally expands to the full width with no `.app-body`/`.map-root` change
+     needed at all. Collapsed by default (ActivitiesPanel.tsx's `sheetExpanded`, `false`
+     initially) to a slim peek strip — the map stays fully interactive around and under it;
+     expanding it (tapping the subtext button) grows it to cover most of the screen. No
+     `map.resize()` call is needed either way, since the map's own container dimensions
+     never change — only what's drawn on top of it does. */
+  .activities-panel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 68px;
+    border-right: none;
+    border-top: 1px solid rgb(0 0 0 / 10%);
+    box-shadow: 0 -2px 10px rgb(0 0 0 / 18%);
+    /* Above the map's own floating widgets (mode toggle/track-metric-toggle, z-index: 3)
+       and MapLibre's own controls, below the app header (z-index: 5). */
+    z-index: 4;
+    transition: height 0.15s ease;
+  }
+
+  .activities-panel--sheet-expanded {
+    height: 78vh;
+  }
+
+  /* The width-drag resize handle is meaningless once the panel is full-width and
+     bottom-anchored — no JS branching needed, the handle simply never renders visibly or
+     receives pointer events once hidden. */
+  .activities-panel__resize-handle {
+    display: none;
+  }
+
+  /* The peek strip's own tap target — cursor/appearance-only; ActivitiesPanel.tsx's onClick
+     is already wired unconditionally (see its own comment for why that's safe). */
+  .activities-panel__subtext {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .activities-panel__sheet-chevron {
+    display: inline;
+    flex: none;
+    color: rgb(0 0 0 / 40%);
+  }
+
+  /* Collapsed: the list/filters/footer need no rule of their own here at all — they're
+     simply clipped by the panel's own 68px height plus `overflow: hidden` (already set in
+     the base rule), same `flex: 1; min-height: 0; overflow-y: auto` they already have on
+     desktop. Not unmounted, so a mid-scroll collapse doesn't lose the list's own scroll
+     position, and expanding just gives that same flex child more height to actually use.
+
+     Bigger touch targets for the four per-row controls that stay at their desktop size
+     otherwise (15px/24px/24px/24px — comfortably clickable with a mouse, tight with a
+     finger). The header toolbar's select-all checkbox and its Group visible/Delete group
+     buttons reuse these exact same classes (.activities-panel__checkbox/__visibility/
+     __delete), so they already inherit the same larger touch targets with no rule of their
+     own needed here. */
+  .activities-panel__checkbox {
+    width: 20px;
+    height: 20px;
+  }
+
+  .activities-panel__edit,
+  .activities-panel__delete,
+  .activities-panel__visibility {
+    width: 34px;
+    height: 34px;
+  }
+
+  .activities-panel__type-trigger {
+    padding: 8px 6px;
+  }
+
+  /* MapLibre's own control positioning (maplibre-gl.css, not this file) anchors the scale
+     control and attribution at the literal viewport edge via its own stylesheet — `bottom:
+     0`/`right: 0` on `.maplibregl-ctrl-bottom-left`/`-right`. That's a real cascade-order
+     risk (its CSS import and this file's aren't guaranteed to land in a specific order
+     relative to each other in the bundled output), so this is the one deliberate
+     `!important` in this file — overriding a third-party library's own stylesheet is
+     exactly the justified exception, not an internal specificity fight. Both need to clear
+     the collapsed peek strip's 68px height, or they'd render underneath/behind it. */
+  .maplibregl-ctrl-bottom-left,
+  .maplibregl-ctrl-bottom-right {
+    bottom: 78px !important;
+  }
+
+  /* Same reasoning, for this app's own floating card (not a MapLibre control, so no
+     !important needed — ordinary specificity/cascade already wins here). */
+  .track-metric-toggle {
+    bottom: 124px;
+  }
+
+  /* The header: Donate/Upload/Export/the account menu at their desktop padding don't
+     reliably fit a ~360px-wide phone alongside the brand mark. Tighter padding/gaps first;
+     Donate (still a placeholder today — the least "core" of the four) is what's allowed to
+     wrap or shrink further if a specific device still runs tight, rather than crowding
+     Upload/Export/the account menu, which are the real functional core. */
+  .app-header {
+    padding: 0 10px;
+    gap: 8px;
+  }
+
+  .app-header__actions {
+    gap: 6px;
+  }
+
+  .app-header__brand {
+    font-size: 14px;
+    gap: 6px;
+  }
+
+  .donate-button,
+  .export-button {
+    padding: 6px 9px;
+    font-size: 12.5px;
+  }
+
+  /* RangePicker.tsx's drag handles are 14px wide at rest — mechanically draggable via touch
+     already (`touch-action: none` is set), but tight for a fingertip. Widened directly
+     rather than via a separate invisible overlay: at rest the handle renders nothing
+     visible (background only appears on hover/active), so a wider hitbox doesn't change
+     the resting appearance, and a wider active-state highlight during a real drag reads as
+     helpful feedback, not a visual bug. Not the full ~44px guideline — the chart itself is
+     often narrower than that on a small phone, and a handle that wide would routinely
+     overlap the opposite one on a short selected range. */
+  .range-picker__handle--start {
+    width: 30px;
+    left: -15px;
+  }
+
+  .range-picker__handle--end {
+    width: 30px;
+    right: -15px;
+  }
+
+  /* Found live, not anticipated in the initial pass: `.activity-histogram__header`'s two
+     sides (the range summary, and the pan window label + Earlier/Later buttons) are both
+     `white-space: nowrap`-ish content with no shrink/wrap behavior at all — at desktop
+     widths that's never been a problem, but on a ~390px phone the two together are wider
+     than the screen, which doesn't just clip locally: it forces the *whole page* wider than
+     the viewport (confirmed live — `document.documentElement.scrollWidth` exceeded
+     `clientWidth`), which in turn broke the Activities panel sheet's own `width: 100%`
+     above, since a `position: fixed` element's percentage width resolves against that same
+     widened layout viewport. Fixing the actual source (this) rather than symptom-patching
+     the sheet was the correct fix.
+     Letting the header wrap to two rows, and giving `.activity-histogram` itself a bit more
+     height to fit that second row without stealing space from `.range-picker__chart`
+     (`flex: 1` below it — reducing the histogram's own height instead would have shrunk the
+     chart, not just the header). */
+  .activity-histogram {
+    height: 168px;
+    padding: 10px 14px;
+  }
+
+  .activity-histogram__header {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .activity-histogram__summary {
+    min-width: 0;
+  }
+
+  .activity-histogram__window {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+}

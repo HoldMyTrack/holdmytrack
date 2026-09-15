@@ -1,0 +1,31 @@
+{
+  "name": "fitmap-web",
+  "private": true,
+  "license": "MIT",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "basemap": "./scripts/build-basemap.sh",
+    "verify:map": "node --test tests/smoke.mjs",
+    "verify:build": "node --test tests/build.mjs"
+  },
+  "dependencies": {
+    "@protomaps/basemaps": "5.7.2",
+    "maplibre-gl": "6.9.0",
+    "pmtiles": "4.5.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "playwright": "1.63.0",
+    "typescript": "~5.9.3",
+    "vite": "8.3.0"
+  }
+}

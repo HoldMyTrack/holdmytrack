@@ -1,0 +1,33 @@
+# https://editorconfig.org
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.go]
+indent_style = tab
+
+[Makefile]
+indent_style = tab
+
+[*.{md,markdown}]
+# Paragraphs in docs/ are one line each — the renderer reflows them, and a hard wrap
+# turns a one-word edit into a whole-paragraph diff. Trailing whitespace is still
+# trimmed, so a two-space hard break will not survive; use a blank line instead.
+max_line_length = off
+# AGENTS.md's "Markdown Formatting Style" — no trailing newline at EOF. Without this
+# override, the [*] section's insert_final_newline=true above would keep silently
+# re-adding one on every save.
+insert_final_newline = false
+
+[*.{sql,sh}]
+indent_size = 2
+
+[*.pbf]
+insert_final_newline = false
+trim_trailing_whitespace = false

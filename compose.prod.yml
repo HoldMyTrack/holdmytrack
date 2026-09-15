@@ -1,0 +1,140 @@
+# Minimal single-VPS production deployment. See docs/DEPLOY.md for the full
+# runbook (provisioning, R2 setup, DNS, first run). Run with:
+#
+#   docker compose -f compose.prod.yml --env-file .env.prod up -d
+#
+# Deliberately a separate, standalone file rather than a compose.yaml override: this stack
+# has one fewer service than the dev one (no `minio` — object storage is real Cloudflare
+# R2 here, reached over the public internet, not a container on this same network) and
+# different topology for the one it renames (`web` is Caddy + the built static frontend,
+# not the Vite dev server), so treating it as "compose.yaml plus a few tweaks" would be
+# more confusing than a clean second file that stands on its own.
+#
+# No bind mounts anywhere (unlike compose.yaml, which bind-mounts apps/web's source for
+# HMR) — every image is fully self-contained, built once, run as-is. `restart:
+# unless-stopped` everywhere so a VPS reboot brings the whole stack back without manual
+# intervention.
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # Not published to the host at all — only api/worker/migrate (same Docker network,
+    # reached by service name) ever need to reach this. A public VPS has no reason to
+    # expose Postgres to the internet, unlike compose.yaml's 127.0.0.1-only dev binding
+    # (which exists there for a developer's own local psql/GUI client to reach it).
+
+  # Applies migrations, then exits — api/worker depend on this completing, not on `db`
+  # alone, matching compose.yaml's own reasoning for the identical split there.
+  migrate:
+    build: { context: ./services/server, target: dev }
+    restart: "no"
+    command: ["migrate"]
+    environment: &server-env
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      # https:// here, not http:// — auth.go's startSession derives the session cookie's
+      # Secure flag from this exact value. Get this wrong and sign-in silently breaks (the
+      # browser drops a Secure cookie set over a connection it doesn't trust, or drops a
+      # non-Secure one it's suspicious of over HTTPS in some browsers) rather than erroring
+      # loudly, so it's worth double-checking in .env.prod before first run.
+      APP_BASE_URL: ${APP_BASE_URL}
+    depends_on:
+      db: { condition: service_healthy }
+
+  api:
+    build:
+      context: ./services/server
+      target: dev
+      # The build's git short-SHA — /healthz reports it (services/server/internal/httpapi/
+      # server.go) so VersionBanner.tsx can detect a browser tab left open across a deploy.
+      # migrate/worker don't need it: nothing reads a version from them.
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+    restart: unless-stopped
+    command: ["serve"]
+    environment: *server-env
+    depends_on:
+      db: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    # No published port — Caddy (the `web` service) reaches this over the Docker network
+    # by service name (`api:8080`), never directly from outside.
+
+  worker:
+    build: { context: ./services/server, target: dev }
+    restart: unless-stopped
+    command: ["work"]
+    environment: *server-env
+    depends_on:
+      db: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+
+  # Caddy + the built static frontend (apps/web/Dockerfile's `serve` stage) — the one
+  # publicly-reachable service. See apps/web/docker/Caddyfile for what it actually proxies
+  # versus serves directly.
+  web:
+    build:
+      context: ./apps/web
+      target: serve
+      # Empty (the default) means the basemap archive isn't baked into this image at all
+      # (apps/web/Dockerfile's own comment explains why) — see the commented bind mount
+      # below for the simplest fix, or set this to an R2/CDN origin and rebuild. Either
+      # way this is a *build*-time value (Vite bakes it into the bundle) — changing it
+      # needs `docker compose -f compose.prod.yml build web`, not just a restart.
+      args:
+        VITE_BASEMAP_ORIGIN: ${VITE_BASEMAP_ORIGIN:-}
+        # Same GIT_SHA as the api service's build args, below — baked into the bundle so
+        # VersionBanner.tsx can compare its own build against /healthz's version field.
+        GIT_SHA: ${GIT_SHA:-unknown}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+      # Flip via scripts/maintenance.sh (recreates just this container), not by hand — see
+      # docs/DEPLOY.md's "Maintenance mode" section and apps/web/docker/Caddyfile.
+      MAINTENANCE_MODE: ${MAINTENANCE_MODE:-false}
+    volumes:
+      # Caddy's own state: the ACME account key and issued certificates (caddy_data) and
+      # its config autosave (caddy_config). Without these as named volumes, every
+      # `docker compose up` after an image rebuild would re-issue a certificate from
+      # scratch against Let's Encrypt's rate limits instead of reusing the one it already
+      # has.
+      - caddy_data:/data
+      - caddy_config:/config
+      # Simplest way to actually serve the basemap with VITE_BASEMAP_ORIGIN left unset
+      # (same-origin): bind-mount the real archive (and, if you've customized them,
+      # fonts/sprites) into the built image's static root at the exact path
+      # apps/web/src/map/config.ts's PMTILES_PATH names. Uncomment and point at wherever
+      # you've put the real planet extract on this host — no rebuild needed to update it,
+      # just a container restart. See docs/DEPLOY.md.
+      # - /srv/fitmap/basemap/planet.pmtiles:/srv/web/basemap/ohio.pmtiles:ro
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

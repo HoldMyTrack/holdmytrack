@@ -1,0 +1,350 @@
+// Package httpapi is cmd/fitmap serve — currently just the Path 3 upload endpoint
+// (IMPLEMENTATION.md §4.0/§4.1 step 1). Uses stdlib net/http's ServeMux
+// method+pattern routing (Go 1.22+) rather than a router dependency — the "HTTP router and
+// database access" open decision in services/server/README.md, resolved toward the smallest
+// dependency set that does the job, per PostGIS being the deciding constraint on the DB side
+// (pgx directly, no ORM) rather than the router choice mattering much either way.
+package httpapi
+
+import (
+	"archive/zip"
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"path/filepath"
+	"strings"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/fitmap/fitmap/services/server/internal/ingest"
+	"github.com/fitmap/fitmap/services/server/internal/mail"
+	"github.com/fitmap/fitmap/services/server/internal/storage"
+)
+
+// maxUploadBytes bounds the single read into memory this handler does. The parse step
+// (worker, ingest.Process) streams the format from object storage without buffering — this
+// cap is specifically about not accepting an unbounded HTTP body here (§5.1: "cap file
+// size... before reading the body fully"), not a claim that the whole pipeline never
+// buffers. A single activity file is realistically well under this.
+const maxUploadBytes = 64 << 20 // 64 MiB
+
+// maxZipUploadBytes bounds a `.zip` archive's own compressed size — IMPLEMENTATION.md
+// §4.0.1's bulk-historical-import case (a Strava export can be thousands of files),
+// so this is deliberately much larger than a single activity file ever needs to be.
+const maxZipUploadBytes = 512 << 20 // 512 MiB
+
+// maxZipEntries bounds how many files inside one archive handleZipUpload will process — not
+// a claim that a real import can't have more, just where this server stops rather than
+// enqueueing an unbounded number of jobs from one request. §5.1's "one bad file in a bulk
+// import cannot abort the batch" still holds beneath this cap; this is a different, coarser
+// limit on the batch's total size.
+const maxZipEntries = 5000
+
+// maxZipEntryBytes bounds any single file *inside* a zip the same way maxUploadBytes bounds
+// a plain upload — checked against the entry's own declared size before it's decompressed at
+// all (§5.1's zip-bomb defense), and again against how much is actually read, since a
+// declared size is something a malformed or hostile archive can simply lie about.
+const maxZipEntryBytes = maxUploadBytes
+
+var allowedExt = map[string]bool{".gpx": true, ".fit": true, ".tcx": true}
+
+// PlaceholderUserID is the seeded demo user (migrations/0003_seed_demo_user.sql) real
+// accounts now grow out of rather than replace — see auth.go's claimOrCreateUser: the first
+// ever signup claims this row in place (setting its email/password_hash), so activity
+// history uploaded before accounts existed stays attached to the same id instead of being
+// orphaned. Only auth.go itself still references this constant directly; every other
+// handler reads the authenticated user from userIDFromContext instead (see requireAuth).
+const PlaceholderUserID = "00000000-0000-0000-0000-000000000001"
+
+// corsAllowedOrigins lists the origins a credentialed cross-origin request may come from —
+// needed now that sessions are cookies (see ServeHTTP's own doc comment for why "*" no
+// longer works once a request carries credentials). apps/web's dev server (5173), plus the
+// dev servers apps/web/tests/smoke.mjs and build.mjs spawn for themselves (5180, 4183) so
+// those suites can sign in the same way a real browser does; a production origin gets added
+// here the day one exists.
+var corsAllowedOrigins = map[string]bool{
+	"http://localhost:5173": true,
+	"http://localhost:5180": true,
+	"http://localhost:4183": true,
+}
+
+// apiPrefix and tilesPrefix are the sole place the API's major version lives — route() and
+// tileRoute() below are the only things that reference them, so a future /v2 (a real breaking
+// change; additive changes need no bump at all) is a matter of adding a second constant and a
+// second set of registrations, not a hunt-and-replace across every route below and every
+// frontend call site.
+const apiPrefix = "/v1"
+const tilesPrefix = "/tiles/v1"
+
+func route(method, path string) string     { return method + " " + apiPrefix + path }
+func tileRoute(method, path string) string { return method + " " + tilesPrefix + path }
+
+type Server struct {
+	pool       *pgxpool.Pool
+	store      *storage.Store
+	log        *slog.Logger
+	mux        *http.ServeMux
+	mailer     mail.Sender
+	appBaseURL string
+	version    string
+}
+
+func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail.Sender, appBaseURL, version string) *Server {
+	s := &Server{pool: pool, store: store, log: log, mux: http.NewServeMux(), mailer: mailer, appBaseURL: appBaseURL, version: version}
+	s.mux.HandleFunc(route("POST", "/auth/signup"), s.handleSignup)
+	s.mux.HandleFunc(route("POST", "/auth/login"), s.handleLogin)
+	s.mux.HandleFunc(route("POST", "/auth/logout"), s.handleLogout)
+	s.mux.HandleFunc(route("GET", "/auth/me"), s.handleMe)
+	s.mux.HandleFunc(route("POST", "/auth/demo"), s.handleDemoStart)
+	s.mux.HandleFunc(route("POST", "/auth/forgot-password"), s.handleForgotPassword)
+	s.mux.HandleFunc(route("POST", "/auth/reset-password"), s.handleResetPassword)
+	s.mux.HandleFunc(route("PATCH", "/account/settings"), s.requireAuth(s.handleUpdateSettings))
+	s.mux.HandleFunc(route("POST", "/account/avatar"), s.requireAuth(s.handleUploadAvatar))
+	s.mux.HandleFunc(route("GET", "/account/avatar"), s.requireAuth(s.handleGetAvatar))
+	s.mux.HandleFunc(route("DELETE", "/account/avatar"), s.requireAuth(s.handleDeleteAvatar))
+	s.mux.HandleFunc(route("POST", "/activities/upload"), s.requireAuth(s.handleUpload))
+	s.mux.HandleFunc(route("GET", "/activities"), s.requireAuth(s.handleListActivities))
+	s.mux.HandleFunc(route("PATCH", "/activities/{id}"), s.requireAuth(s.handleUpdateActivity))
+	s.mux.HandleFunc(route("DELETE", "/activities/{id}"), s.requireAuth(s.handleDeleteActivity))
+	s.mux.HandleFunc(route("GET", "/activities/summary"), s.requireAuth(s.handleActivitySummary))
+	s.mux.HandleFunc(route("GET", "/activities/histogram"), s.requireAuth(s.handleActivityHistogram))
+	s.mux.HandleFunc(route("GET", "/activities/graph-stats"), s.requireAuth(s.handleActivityGraphStats))
+	s.mux.HandleFunc(route("GET", "/activities/trends"), s.requireAuth(s.handleActivityTrends))
+	s.mux.HandleFunc(route("GET", "/activities/best-efforts"), s.requireAuth(s.handleBestEfforts))
+	s.mux.HandleFunc(route("GET", "/activities/personal-bests"), s.requireAuth(s.handlePersonalBests))
+	s.mux.HandleFunc(route("GET", "/activities/status/{external_id}"), s.requireAuth(s.handleActivityStatus))
+	s.mux.HandleFunc(route("GET", "/activities/track-metrics/{id}"), s.requireAuth(s.handleActivityTrackMetrics))
+	s.mux.HandleFunc(route("GET", "/uploads"), s.requireAuth(s.handleListUploads))
+	s.mux.HandleFunc(tileRoute("GET", "/tracks/{z}/{x}/{y}"), s.requireAuth(s.handleTracksTile))
+	s.mux.HandleFunc(tileRoute("GET", "/fog/{z}/{x}/{y}"), s.requireAuth(s.handleFogTile))
+	s.mux.HandleFunc(tileRoute("GET", "/heatmap/{z}/{x}/{y}"), s.requireAuth(s.handleHeatmapTile))
+	s.mux.HandleFunc("GET /healthz", s.handleHealthz)
+	return s
+}
+
+// ServeHTTP sets CORS headers before delegating to the mux. This has to happen here, not
+// just as a nice-to-have: apps/web (:5173) and this server (:8080) are different origins in
+// dev, and a cross-origin POST with a multipart/form-data body is a CORS "simple request" —
+// the browser sends it through with no preflight, the server processes it fully, but without
+// Access-Control-Allow-Origin the browser still blocks the JS from reading the response.
+// That surfaces as a generic NetworkError in fetch(), with no indication in the response
+// itself that anything went wrong — the request can be seen succeeding in the Network tab
+// while the calling code sees only a rejected promise.
+//
+// Every request now carries (or is trying to establish) a session cookie, so "*" no longer
+// works: browsers refuse to honour Access-Control-Allow-Credentials alongside a wildcard
+// origin, and a credentialed request without it just has its cookie silently dropped. This
+// reflects the request's own Origin back when it's on the allowlist instead — the standard
+// pattern for "credentialed CORS from a known set of origins" — rather than accepting any
+// origin with credentials, which would let any site ride a visitor's session.
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if origin := r.Header.Get("Origin"); corsAllowedOrigins[origin] {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Vary", "Origin")
+	}
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	s.mux.ServeHTTP(w, r)
+}
+
+type healthzResponse struct {
+	Status  string `json:"status"`
+	Version string `json:"version"`
+}
+
+func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
+	if err := s.pool.Ping(r.Context()); err != nil {
+		http.Error(w, "db unreachable", http.StatusServiceUnavailable)
+		return
+	}
+	writeJSON(w, http.StatusOK, healthzResponse{Status: "ok", Version: s.version})
+}
+
+type uploadResponse struct {
+	Status     string `json:"status"` // "enqueued" | "already_processed"
+	ExternalID string `json:"external_id"`
+	Filename   string `json:"filename"`
+}
+
+// handleUpload is §4.1 step 1 only: validate, compute the idempotency key, persist the raw
+// payload, enqueue an `ingest` job, return. No parsing happens here — see internal/ingest,
+// run by cmd/fitmap work.
+//
+// A `.zip` archive takes a different path entirely (handleZipUpload,
+// IMPLEMENTATION.md §4.0.1's bulk-import case) — bypassing §4.0.1's 20-file client-side
+// cap rather than being one more file subject to it, and producing many jobs from one
+// request instead of one. The body-size ceiling below has to accommodate whichever path a
+// given request turns out to need before the multipart form (and therefore the filename) has
+// even been parsed, which is why it's sized for a zip archive regardless of what's actually
+// uploaded — a single non-zip file is still bounded to maxUploadBytes once read (below), so
+// this only changes how much of a too-large *non-zip* body the server bothers reading before
+// rejecting it, not what it ultimately accepts.
+func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxZipUploadBytes+1<<20) // +1MiB of multipart overhead
+	if err := r.ParseMultipartForm(maxZipUploadBytes); err != nil {
+		http.Error(w, "file too large or malformed multipart body", http.StatusRequestEntityTooLarge)
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, `expected a multipart field named "file"`, http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	if ext == ".zip" {
+		// zip.NewReader needs an io.ReaderAt, which an HTTP body doesn't provide, so there is
+		// no streaming alternative here the way ingest.Process manages for a single file —
+		// read fully into memory (bounded by maxZipUploadBytes above), once, regardless of
+		// which zip-shaped branch below ends up handling it.
+		data, err := io.ReadAll(io.LimitReader(file, maxZipUploadBytes))
+		if err != nil {
+			http.Error(w, "failed reading upload", http.StatusBadRequest)
+			return
+		}
+		if len(data) == 0 {
+			http.Error(w, "empty file", http.StatusBadRequest)
+			return
+		}
+		zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+		if err != nil {
+			http.Error(w, "not a valid zip archive", http.StatusBadRequest)
+			return
+		}
+		if isTakeoutArchive(zr) {
+			// Needs the raw bytes on disk, not the parsed *zip.Reader — pathify reads the
+			// archive itself as a subprocess, it doesn't share this process's parsed entries.
+			s.handleTakeoutUpload(w, r, data, header.Filename)
+			return
+		}
+		s.handleZipUpload(w, r, zr, header.Filename)
+		return
+	}
+	if !allowedExt[ext] {
+		http.Error(w, fmt.Sprintf("unsupported file type %q (want .gpx, .fit, .tcx, or .zip)", ext), http.StatusUnsupportedMediaType)
+		return
+	}
+
+	// Read once into memory (bounded by maxUploadBytes above) so the same bytes can be
+	// hashed and then uploaded with a known Content-Length. See the maxUploadBytes doc
+	// comment for why this is a deliberate, bounded exception to "never buffer a file."
+	data, err := io.ReadAll(io.LimitReader(file, maxUploadBytes))
+	if err != nil {
+		http.Error(w, "failed reading upload", http.StatusBadRequest)
+		return
+	}
+	if len(data) == 0 {
+		http.Error(w, "empty file", http.StatusBadRequest)
+		return
+	}
+
+	externalID, alreadyProcessed, err := s.persistAndEnqueue(r.Context(), uploadFileParams{
+		UserID: userIDFromContext(r.Context()), Source: "upload", Filename: header.Filename, Ext: ext, Data: data,
+	})
+	if err != nil {
+		s.log.Error("upload persist/enqueue failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if alreadyProcessed {
+		writeJSON(w, http.StatusOK, uploadResponse{Status: "already_processed", ExternalID: externalID, Filename: header.Filename})
+		return
+	}
+	writeJSON(w, http.StatusAccepted, uploadResponse{Status: "enqueued", ExternalID: externalID, Filename: header.Filename})
+}
+
+// uploadFileParams is persistAndEnqueue's input — a struct rather than a run of positional
+// string parameters (source, filename, ext, activityType all being strings makes positional
+// args easy to transpose silently at a call site).
+type uploadFileParams struct {
+	// The authenticated caller (userIDFromContext) — every call site reads this from the
+	// request it's already handling rather than PlaceholderUserID now.
+	UserID string
+	// "upload" (a plain or zip-contained file) or "takeout" (handleTakeoutUpload) — the
+	// `activities.source` column's own provenance value, not just a label.
+	Source   string
+	Filename string
+	Ext      string
+	// Overrides whatever the parser itself detects, when non-empty. Only the Takeout path
+	// sets this today — see ingest.Job.ActivityType's own doc comment for why.
+	ActivityType string
+	Data         []byte
+}
+
+// persistAndEnqueue is handleUpload's idempotency-check-then-persist-then-enqueue core,
+// factored out so handleZipUpload's and handleTakeoutUpload's per-file loops can reuse
+// exactly the same logic a plain single-file upload uses — a file arriving inside a zip or
+// pulled out of a Takeout export is not a different kind of upload, just one of many arriving
+// from one request. Returns `alreadyProcessed` rather than a status string so callers can't
+// typo one of two states; the caller decides what to do with either.
+func (s *Server) persistAndEnqueue(ctx context.Context, p uploadFileParams) (externalID string, alreadyProcessed bool, err error) {
+	sum := sha256.Sum256(p.Data)
+	externalID = hex.EncodeToString(sum[:])
+	rawKey := fmt.Sprintf("raw/%s/%s%s", p.UserID, externalID, p.Ext)
+
+	// Fast-path idempotency check (IMPLEMENTATION.md §4.0's idempotency
+	// invariant): this is an optimization to skip a wasted job for an obvious repeat, not
+	// the guarantee — that lives in ingest.Process's ON CONFLICT DO NOTHING at persist
+	// time, which still fires correctly even if two identical uploads race each other past
+	// this check. Scoped by the same `source` the job itself will carry, matching the
+	// activities table's own `(user_id, source, external_id)` unique index — a Takeout import
+	// and a plain upload are different provenance even if (implausibly) they hashed the same.
+	var exists bool
+	if err := s.pool.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM activities WHERE user_id = $1 AND source = $2 AND external_id = $3)`,
+		p.UserID, p.Source, externalID,
+	).Scan(&exists); err != nil {
+		return "", false, fmt.Errorf("dedupe check: %w", err)
+	}
+	if exists {
+		return externalID, true, nil
+	}
+
+	if err := s.store.Put(ctx, rawKey, bytes.NewReader(p.Data), int64(len(p.Data))); err != nil {
+		return "", false, fmt.Errorf("raw payload upload: %w", err)
+	}
+
+	job := ingest.Job{
+		UserID:        p.UserID,
+		Source:        p.Source,
+		SourceDetail:  p.Filename,
+		ExternalID:    externalID,
+		RawPayloadKey: rawKey,
+		PrivacyTrimM:  200, // IMPLEMENTATION.md §7 default; see users.privacy_trim_m
+		ActivityType:  p.ActivityType,
+	}
+	payload, err := json.Marshal(job)
+	if err != nil {
+		return "", false, fmt.Errorf("job marshal: %w", err)
+	}
+	if err := enqueue(ctx, s.pool, p.UserID, "ingest", payload); err != nil {
+		return "", false, fmt.Errorf("enqueue: %w", err)
+	}
+	return externalID, false, nil
+}
+
+func enqueue(ctx context.Context, pool *pgxpool.Pool, userID, kind string, payload []byte) error {
+	_, err := pool.Exec(ctx,
+		`INSERT INTO jobs (kind, user_id, payload) VALUES ($1, $2, $3)`,
+		kind, userID, payload,
+	)
+	return err
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}

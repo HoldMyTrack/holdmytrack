@@ -1,0 +1,12 @@
+# The unfiltered build context is 798 MB (node_modules 124M, dist 347M, archive 311M,
+# fonts 14M). These four rules bring it to roughly 17 MB, which is the difference between
+# a build that is worth running and one that is not.
+node_modules
+dist
+
+# The basemap archive: the container reads it through the bind mount at runtime, never
+# from the image. Patterns need **/ — a bare *.pmtiles matches only the context root.
+**/*.pmtiles
+
+# Playwright output.
+tests/screenshots

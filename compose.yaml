@@ -1,0 +1,139 @@
+name: fitmap
+
+# `web`, `db`, `minio`, `api` and `worker` all start by default now that there is a binary
+# to run — only the `test` profile stays opt-in, since it rebuilds and re-runs a
+# multi-second Playwright suite that a plain `docker compose up` shouldn't pay for.
+#
+# No custom `networks:` block: Compose's default network already gives service-name DNS, so
+# `api`/`worker` reach `db:5432` and `minio:9000` by service name.
+
+services:
+  web:
+    build: { context: ./apps/web, target: dev }
+    init: true
+    # 1:1 port mapping is deliberate: the Vite HMR client derives its websocket URL from
+    # the page URL, so identical ports mean no clientPort override is ever needed.
+    # Bound to 127.0.0.1 — Docker bypasses the macOS firewall for published ports, and a
+    # dev server hosting a 326 MB basemap should not be reachable from a café network.
+    ports: ["127.0.0.1:5173:5173"]
+    volumes:
+      - ./apps/web:/app
+      - web-node-modules:/app/node_modules   # MUST shadow the host's darwin binaries
+    environment:
+      VITE_DEV_HOST: "0.0.0.0"
+      # VITE_WATCH_POLL: "1"                 # only if HMR goes deaf; see §4 of the doc
+    develop:
+      watch:
+        - { path: ./apps/web/package-lock.json, action: rebuild }
+        - { path: ./apps/web/package.json,      action: rebuild }
+
+  # Verification suites. They spawn their own Vite servers on 5180/4183 inside this
+  # container, so they need neither the web service nor any published port.
+  test:
+    profiles: ["test"]
+    build: { context: ./apps/web, target: test }
+    init: true
+    depends_on:
+      api: { condition: service_started }
+    # Shares the api container's network stack instead of reaching it over service-name DNS
+    # (`api:8080`) as a separate host. Auth's session cookie (services/server/internal/
+    # httpapi/auth.go) is SameSite=Lax, which browsers only attach to cross-*site* fetches
+    # when the two hosts are the same registrable domain — "localhost" vs "api" are not, so
+    # Chromium silently dropped the cookie on every request after sign-in and the app sat on
+    # AuthGate forever. Sharing api's network namespace makes both reachable as `localhost`
+    # (this container's own vite server on 5180/4183, api on 8080) at different ports only,
+    # exactly like running against the `web`/`api` services from the host — same-site, cookie
+    # attached. Also why apps/web/src/api.ts's plain localhost:8080 default now applies here
+    # unchanged, with no VITE_API_BASE_URL override needed.
+    network_mode: "service:api"
+    volumes:
+      - ./apps/web:/app
+      - web-node-modules:/app/node_modules
+    environment:
+      VITE_DEV_HOST: "0.0.0.0"
+      # No GPU in the container. Chromium >=130 refuses to fall back to SwiftShader for
+      # WebGL without an explicit flag, and MapLibre is WebGL. Without these the map
+      # never renders and the failure does not name its cause.
+      PW_CHROMIUM_ARGS: >-
+        --no-sandbox --disable-dev-shm-usage
+        --use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader
+      PW_SETTLE_MS: "20000"
+    shm_size: "1gb"      # Docker's 64 MB /dev/shm is not enough for a 1280x800 map
+
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fitmap}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fitmap}
+      POSTGRES_DB: ${POSTGRES_DB:-fitmap}
+    ports: ["127.0.0.1:${POSTGRES_PORT:-5432}:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fitmap}"]
+      interval: 5s
+      retries: 10
+
+  minio:                      # stands in for Cloudflare R2 locally
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-fitmap}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-fitmap-dev-secret}
+    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
+    volumes:
+      - miniodata:/data
+    # No healthcheck here: rather than assume a specific client binary ships in this image,
+    # cmd/fitmap retries its own Postgres and MinIO connections with backoff at startup
+    # (internal/config's callers), so api/worker/migrate tolerate minio still starting up.
+
+  # Applies migrations, then exits — api/worker depend on this completing, not on `db`
+  # alone, so a fresh `docker compose up` never races the schema.
+  migrate:
+    build: { context: ./services/server, target: dev }
+    command: ["migrate"]
+    environment: &server-env
+      POSTGRES_USER: ${POSTGRES_USER:-fitmap}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fitmap}
+      POSTGRES_DB: ${POSTGRES_DB:-fitmap}
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: ${S3_BUCKET:-fitmap-dev}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-fitmap}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-fitmap-dev-secret}
+      # Password reset (internal/mail) — SMTP_HOST empty is a valid, intentional default:
+      # `serve` logs the reset email (and its real link) instead of sending one, so the whole
+      # flow works in dev/test with no real credentials. Only `api` actually reads these
+      # (`serve`), but `migrate`/`worker` share this same anchor, and an unused env var in
+      # their process is harmless.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5173}
+    depends_on:
+      db: { condition: service_healthy }
+
+  api:                        # one binary, mode `serve`
+    build: { context: ./services/server, target: dev }
+    command: ["serve"]
+    environment: *server-env
+    ports: ["127.0.0.1:8080:8080"]
+    depends_on:
+      db: { condition: service_healthy }
+      minio: { condition: service_started }
+      migrate: { condition: service_completed_successfully }
+
+  worker:                     # the same binary, mode `work`
+    build: { context: ./services/server, target: dev }
+    command: ["work"]
+    environment: *server-env
+    depends_on:
+      db: { condition: service_healthy }
+      minio: { condition: service_started }
+      migrate: { condition: service_completed_successfully }
+
+volumes:
+  web-node-modules:
+  pgdata:
+  miniodata:

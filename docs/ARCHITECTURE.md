@@ -1,0 +1,96 @@
+# FitMap: Architecture
+
+The canonical reference for *how the system is put together* — the top-level shape, the key decisions behind it, the stack, and what's deliberately not built yet. `docs/ IMPLEMENTATION.md` picks up from here with the schema and the feature-by- feature "how it's built" detail (ingest, fog, tiles, accounts, deployment); this document does not duplicate that, and that document no longer duplicates this.
+
+> **Scope note.** FitMap ingests activities; it never records them. There is no in-app GPS capture, and no social graph — see `VISION.md` §1.1 and §5.6 for why both are out of scope.
+
+---
+
+## 1. Architecture Overview
+
+FitMap is a **modular monolith** backed by PostgreSQL/PostGIS, fed by three independent ingest paths. Coverage rendering is precomputed on ingest rather than assembled per request, which is the central architectural decision and the one that keeps the rest simple.
+
+A second constraint now shapes every decision: **the service is free and community-funded** (`VISION.md` §6), so per-user cost must be bounded by design. That is not a deployment concern to handle later; it changes the schema, the retention policy and the tile strategy. See `IMPLEMENTATION.md` §5.7.
+
+### 1.1 Key decisions and their reasons
+
+| Decision | Reason |
+| :--- | :--- |
+| One language, one deployable | Two stacks means two pipelines and two dependency trees for one maintainer, with no measured need |
+| Precomputed **raster fog pyramid**, not per-request `ST_Union()` | A union of thousands of polygons, per user, per viewport, is the #1 scaling bottleneck. Raster also gives smooth edges instead of hexagon serration — [ADR-0003](adr/0003-precomputed-raster-fog-pyramid.md) |
+| Coverage stored as **slippy tiles**, not H3 | H3 res 10 is ~130–150 m across, not the ~15 m originally assumed; slippy tiles align 1:1 with the MVT/raster grid — [ADR-0003](adr/0003-precomputed-raster-fog-pyramid.md) |
+| **Index raw points; simplify only for display** | Douglas-Peucker deletes intermediate points, leaving gaps in the fog trail |
+| **Segment-rasterized** coverage, not point-sampled | 1 Hz at 40 km/h is ~11 m between fixes — gappy at fine resolution |
+| Postgres job queue, no broker | Premature at this scale, and a broker is a recurring bill a free service should not carry |
+| Privacy applied **at ingest** | Fog maps point at people's homes; render-time filtering leaks through any downstream bug — [ADR-0002](adr/0002-privacy-applied-at-ingest.md) |
+| **Three independent ingest paths** | No single provider can revoke the product (`VISION.md` §4.1) — [ADR-0001](adr/0001-three-independent-ingest-paths.md) |
+| **Planet-wide basemap**, not a regional extract | Users are everywhere; a regional extract makes "blank map" the default outside one metro |
+
+### 1.2 Target architecture
+
+```mermaid
+graph TD
+    Files["Path 3: File upload (.GPX/.FIT/.TCX)"]
+    Cloud["Path 1: Garmin / Wahoo / COROS / Oura"]
+    Device["Path 2: Apple Watch, Galaxy Watch"]
+
+    Web["Web App (upload + view)"]
+    Mobile["Mobile Apps (sync + view)"]
+    Api["FitMap Server (single deployable)"]
+    Worker["Workers (same binary, queue mode)"]
+    CDN["CDN"]
+    Basemap["Protomaps planet .pmtiles"]
+    Store["Object Storage (R2)"]
+    PG[("PostgreSQL + PostGIS")]
+
+    Files --> Web
+    Device --> Mobile
+    Web -->|HTTPS| Api
+    Mobile -->|HTTPS| Api
+    Cloud -->|webhook / OAuth pull| Api
+    Web --> CDN
+    Mobile --> CDN
+    CDN --> Api
+    CDN --> Basemap
+    Api --> PG
+    Api -->|enqueue| PG
+    Worker -->|dequeue| PG
+    Worker --> Store
+    Worker --> PG
+    Basemap --- Store
+```
+
+Everything server-side runs as one binary in two modes (`serve` and `work`) against one database. A CDN in front of the tile, raster and basemap routes does the job Redis was originally assigned, with less to operate and nothing to pay monthly.
+
+**All three paths converge on one pipeline.** They differ only in how bytes arrive; from `IMPLEMENTATION.md` §4.1 step 2 onward the code is identical. This is the property that makes three paths affordable to maintain.
+
+**Today's actual deployable surface is smaller than this diagram** — Path 1/Path 2 and the mobile apps don't exist yet (`docs/ROADMAP.md` tracks that gap), and there is no production deployment running anywhere yet either (`docs/DEPLOY.md`/`IMPLEMENTATION.md` §5.8 is the scaffolding for one, not a live one). This diagram is the target the current Path-3-only web app is one slice of, not a claim about what's live today.
+
+### 1.3 Deliberately deferred
+
+| Component | Add it when |
+| :--- | :--- |
+| Redis | Tile cache-hit measurements show the CDN is insufficient |
+| Dedicated queue (SQS/RabbitMQ) | Postgres `FOR UPDATE SKIP LOCKED` throughput becomes the bottleneck |
+| Separate render service | Export rendering starves the API of CPU |
+| Read replicas | Read load, not write load, saturates the primary |
+| Social graph, feed, segments | Never, until `VISION.md` §5.6's condition is met |
+| In-app activity recording | Out of scope by product decision, not by sequencing |
+
+---
+
+## 2. Technical Stack
+
+* **Backend**: **Go** — one language for the API and the workers. The deciding factor is the `.FIT` binary parser: Path 3 is the unconditional ingest path (`VISION.md` §4.1) and it means streaming binary decode of tens of thousands of records per file, plus bulk-archive imports of thousands of files at once. Go also carries PostGIS-heavy tile serving under concurrency, the raster fog pipeline, and headless export rendering in a worker pool, from a single static binary in two modes. Routing is stdlib `net/http`'s `ServeMux` (Go 1.22+ method+pattern routing), not a router dependency — nothing this app needs justifies one. Postgres access is `pgx/v5` directly, no ORM — PostGIS geometry columns are the deciding constraint, not preference (`IMPLEMENTATION.md` §3.3–§3.7's own geometry-heavy queries would fight an ORM more than they'd benefit from one). Migrations run through a small embedded runner (`services/server/internal/db`), not `golang-migrate`/`goose`/`tern` — see `services/server/README.md`'s "Open decisions" for why a dependency wasn't worth it at this size.
+* **Database**: PostgreSQL 16 + PostGIS 3.4.
+* **Job queue**: Postgres table with `FOR UPDATE SKIP LOCKED`. No broker until measured.
+* **Frontend (web, Phase 1)**: React 19 + TypeScript; **MapLibre GL JS**. Vite 8; no SSR framework — a single WebGL page with no SEO surface. Verified versions (2026-09): `maplibre-gl` 6.9.0, `pmtiles` 4.5.0, `@protomaps/basemaps` 5.7.2. MapLibre is driven directly rather than through `react-map-gl`: the layer stack is imperatively ordered. **The web app is also an ingest client** — it owns Path 3 and the no-signup demo.
+* **Mobile (Phase 3, not started)**: native **Swift** (iOS/HealthKit) and **Kotlin** (Android/Health Connect). Both platforms' route APIs are native-only with no cross-platform escape hatch, so a wrapper framework would need native modules for the one thing that matters. **MapLibre Native** for rendering, consuming the same style document as the web client (§2.1).
+* **Basemap**: self-hosted **Protomaps**, planet-wide in the target architecture (§5.4 of `IMPLEMENTATION.md`) — today's dev/demo extract is a small regional cut, not the full planet (`docs/DEPLOY.md` covers both paths). Self-hosting is three artifacts, not one: the `.pmtiles` archive **plus** font glyph PBFs and the sprite sheet. The Protomaps examples hotlink these from `protomaps.github.io`; production must not.
+* **Object storage**: Cloudflare **R2** in production — the basemap archive and assets, raw ingest payloads from all three paths, fog raster pyramids, export renders, avatars. Locally, **MinIO** stands in for it via `minio-go/v7` (chosen over the AWS SDK — purpose-built for S3-compatible endpoints, far less to pull in for the put/get/remove this needs). R2 specifically, for zero egress; on a free service that is not a preference but a requirement.
+
+### 2.1 One style document, three renderers
+
+`buildStyle()` in the web client is deliberately pure and DOM-free (`apps/web/src/map/style.ts`). The same style must eventually drive MapLibre GL JS on web, MapLibre Native on mobile, and the headless export renderer (`IMPLEMENTATION.md` §5.5). **Serve the style as a document from the API** rather than reimplementing it per client — three hand-maintained copies of a 71-layer style would diverge.
+
+This also retrospectively justifies `IMPLEMENTATION.md` §4.2's decision to bake the fog inversion server-side: a custom WebGL shader would otherwise have to be written twice, against two MapLibre bindings, and kept pixel-identical.

@@ -1,0 +1,44 @@
+# Consolidated for the whole repository — this file replaces apps/web/.gitignore.
+# Patterns are deliberately unanchored where they should apply to any package at any
+# depth, so they keep working as the tree grows (apps/web today, services/server next).
+
+# Dependencies and build output
+node_modules/
+dist/
+
+# The basemap archive is a build artifact, not source: ~326 MB, reproducible from
+# apps/web/scripts/build-basemap.sh in about half a minute.
+**/public/basemap/*.pmtiles
+
+# Playwright output from `npm run verify:map` and `npm run verify:build`.
+**/tests/screenshots/
+
+# Compose variable interpolation only, never VITE_* — see .env.example for the three-tier
+# env-file convention. The example file is committed; the real one is not.
+/.env
+!/.env.example
+
+# compose.prod.yml's own env file — same reasoning, its own example file.
+/.env.prod
+!/.env.prod.example
+
+# Per-developer Vite overrides. apps/web/.env (committed, non-secret defaults) is not
+# ignored; apps/web/.env.local is.
+.env.local
+
+# Go build and test artifacts, for when services/server has code in it
+*.test
+*.out
+
+# OS cruft
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+
+# Editor cruft
+*~
+*.swp
+.idea/
+.vscode/
