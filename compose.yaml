@@ -118,7 +118,9 @@ services:
     build: { context: ./services/server, target: dev }
     command: ["serve"]
     environment: *server-env
-    ports: ["127.0.0.1:8080:8080"]
+    # API_PORT overrides the host-published port only; other containers always reach
+    # this one via service-name DNS at api:8080 regardless.
+    ports: ["127.0.0.1:${API_PORT:-8080}:8080"]
     depends_on:
       db: { condition: service_healthy }
       minio: { condition: service_started }

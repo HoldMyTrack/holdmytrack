@@ -38,7 +38,18 @@ services:
   # Applies migrations, then exits — api/worker depend on this completing, not on `db`
   # alone, matching compose.yaml's own reasoning for the identical split there.
   migrate:
-    build: { context: ./services/server, target: dev }
+    image: fitmap-server
+    build: &server-build
+      context: ./services/server
+      target: dev
+      # The build's git short-SHA — /healthz reports it (services/server/internal/httpapi/
+      # server.go) so VersionBanner.tsx can detect a browser tab left open across a deploy.
+      # migrate/api/worker all reference this same block (and the same `image:` tag above)
+      # so Compose builds the Rust/Go toolchains once, not three times — on a small VPS's
+      # disk, building three near-identical images of this Dockerfile is enough on its own
+      # to fill it (confirmed live: `no space left on device` mid-build before this fix).
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     restart: "no"
     command: ["migrate"]
     environment: &server-env
@@ -64,14 +75,8 @@ services:
       db: { condition: service_healthy }
 
   api:
-    build:
-      context: ./services/server
-      target: dev
-      # The build's git short-SHA — /healthz reports it (services/server/internal/httpapi/
-      # server.go) so VersionBanner.tsx can detect a browser tab left open across a deploy.
-      # migrate/worker don't need it: nothing reads a version from them.
-      args:
-        GIT_SHA: ${GIT_SHA:-unknown}
+    image: fitmap-server
+    build: *server-build
     restart: unless-stopped
     command: ["serve"]
     environment: *server-env
@@ -82,7 +87,8 @@ services:
     # by service name (`api:8080`), never directly from outside.
 
   worker:
-    build: { context: ./services/server, target: dev }
+    image: fitmap-server
+    build: *server-build
     restart: unless-stopped
     command: ["work"]
     environment: *server-env
@@ -130,7 +136,7 @@ services:
       # apps/web/src/map/config.ts's PMTILES_PATH names. Uncomment and point at wherever
       # you've put the real planet extract on this host — no rebuild needed to update it,
       # just a container restart. See docs/DEPLOY.md.
-      # - /srv/fitmap/basemap/planet.pmtiles:/srv/web/basemap/ohio.pmtiles:ro
+      - /srv/fitmap/basemap/ohio.pmtiles:/srv/web/basemap/ohio.pmtiles:ro
     depends_on:
       - api
 
