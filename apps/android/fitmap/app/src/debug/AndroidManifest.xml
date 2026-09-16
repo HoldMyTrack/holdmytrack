@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only. A dev API stack is plain http:// on the host (http://10.0.2.2:8080, or a port
+  forwarded with `adb reverse`), which Android blocks by default. Keeping this out of the
+  main manifest means release builds stay cleartext-free without anyone having to remember.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:usesCleartextTraffic="true" />
+</manifest>

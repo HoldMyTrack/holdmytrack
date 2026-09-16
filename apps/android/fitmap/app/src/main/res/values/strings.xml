@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FitMap</string>
+    <string name="map_load_failed">Map failed to load from %1$s\n%2$s</string>
+</resources>

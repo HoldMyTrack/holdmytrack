@@ -1,0 +1,14 @@
+[versions]
+agp = "9.4.0"
+# MapLibre Native for Android. 11.8.0 is where built-in `pmtiles://` support landed and
+# 13.3.0 added its ambient cache, so anything in the 13.x line already speaks the same URL
+# scheme the style document carries (apps/android/docs/ROADMAP.md, Phase 2).
+maplibre = "13.6.1"
+appcompat = "1.7.1"
+
+[libraries]
+maplibre = { module = "org.maplibre.gl:android-sdk", version.ref = "maplibre" }
+appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
