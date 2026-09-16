@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "basemap": "./scripts/build-basemap.sh",
+    "build:style": "node scripts/build-style.mjs",
+    "verify:style": "node scripts/build-style.mjs --check",
     "verify:map": "node --test tests/smoke.mjs",
     "verify:build": "node --test tests/build.mjs"
   },
