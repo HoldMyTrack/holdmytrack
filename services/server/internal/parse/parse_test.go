@@ -142,3 +142,57 @@ func TestParseTCX(t *testing.T) {
 		t.Fatalf("point 0 heart rate wrong: %+v", p)
 	}
 }
+
+const sampleSyncJSON = `{
+  "activity_type": "run",
+  "points": [
+    {"lat": 39.9612, "lon": -82.9988, "elevation_m": 240.1, "time": "2026-01-01T12:00:00Z", "heart_rate": 140},
+    {"lat": 39.9620, "lon": -82.9990, "time": "2026-01-01T12:00:10Z"}
+  ]
+}`
+
+func TestParseJSON(t *testing.T) {
+	act, err := ParseJSON(strings.NewReader(sampleSyncJSON))
+	if err != nil {
+		t.Fatalf("ParseJSON: %v", err)
+	}
+	if act.ActivityType != "run" {
+		t.Fatalf("want activity type run, got %q", act.ActivityType)
+	}
+	if len(act.Points) != 2 {
+		t.Fatalf("want 2 points, got %d", len(act.Points))
+	}
+	p := act.Points[0]
+	if p.Lat != 39.9612 || p.Lon != -82.9988 {
+		t.Fatalf("point 0 lat/lon wrong: %+v", p)
+	}
+	if p.Elevation == nil || *p.Elevation != 240.1 {
+		t.Fatalf("point 0 elevation wrong: %+v", p)
+	}
+	if p.HeartRate == nil || *p.HeartRate != 140 {
+		t.Fatalf("point 0 heart rate wrong: %+v", p)
+	}
+	if act.Points[1].HeartRate != nil {
+		t.Fatalf("point 1 heart rate should be absent, got %+v", act.Points[1].HeartRate)
+	}
+}
+
+func TestParseJSONNoType(t *testing.T) {
+	act, err := ParseJSON(strings.NewReader(`{"points": [{"lat": 1, "lon": 2, "time": "2026-01-01T12:00:00Z"}]}`))
+	if err != nil {
+		t.Fatalf("ParseJSON: %v", err)
+	}
+	if act.ActivityType != "unknown" {
+		t.Fatalf("want activity type unknown (no activity_type in this fixture), got %q", act.ActivityType)
+	}
+}
+
+func TestByExtensionJSON(t *testing.T) {
+	act, err := ByExtension("activity.json", strings.NewReader(sampleSyncJSON))
+	if err != nil {
+		t.Fatalf("ByExtension: %v", err)
+	}
+	if len(act.Points) != 2 {
+		t.Fatalf("want 2 points, got %d", len(act.Points))
+	}
+}
