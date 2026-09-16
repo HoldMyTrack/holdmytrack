@@ -208,8 +208,8 @@ Sequenced so the unconditional ingest path ships first and the ones that depend 
 * Free high-resolution export.
 
 ### 5.4 Phase 3: Mobile (Months 7–9)
+* Android app — Health Connect, with the Samsung route limitation surfaced honestly in the UI. Built first of the pair, so the Path 2 sync contract is designed against the more constrained platform.
 * iOS app — HealthKit and Apple Watch, the stronger of the two on-device paths.
-* Android app — Health Connect, with the Samsung route limitation surfaced honestly in the UI.
 * Explorer-tile gamification and coverage stats.
 
 ### 5.5 Phase 4: Social (not committed)
