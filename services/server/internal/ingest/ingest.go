@@ -172,40 +172,6 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 		return Result{}, fmt.Errorf("ingest: persist streams: %w", err)
 	}
 
-	if bests := computeBestEfforts(points, elapsedS, distM); len(bests) > 0 {
-		metricsCol := make([]string, len(bests))
-		windowsCol := make([]int32, len(bests))
-		valuesCol := make([]float32, len(bests))
-		for i, be := range bests {
-			metricsCol[i] = be.metric
-			windowsCol[i] = be.windowS
-			valuesCol[i] = be.value
-		}
-		_, err = pool.Exec(ctx, `
-			INSERT INTO activity_best_efforts (activity_id, metric, window_s, value)
-			SELECT $1, m, w, v FROM unnest($2::text[], $3::int[], $4::real[]) AS t(m, w, v)
-		`, activityID, metricsCol, windowsCol, valuesCol)
-		if err != nil {
-			return Result{}, fmt.Errorf("ingest: persist best efforts: %w", err)
-		}
-	}
-
-	if splits := computeSplits(elapsedS, distM); len(splits) > 0 {
-		distancesCol := make([]int32, len(splits))
-		secondsCol := make([]int32, len(splits))
-		for i, sp := range splits {
-			distancesCol[i] = sp.distanceM
-			secondsCol[i] = sp.seconds
-		}
-		_, err = pool.Exec(ctx, `
-			INSERT INTO activity_splits (activity_id, distance_m, seconds)
-			SELECT $1, d, s FROM unnest($2::int[], $3::int[]) AS t(d, s)
-		`, activityID, distancesCol, secondsCol)
-		if err != nil {
-			return Result{}, fmt.Errorf("ingest: persist splits: %w", err)
-		}
-	}
-
 	// §4.1 step 4: render this activity's own fog/heatmap masks and mark every z14 tile it
 	// touches dirty, both from `points` (pre-simplification), not the simplified trajectory
 	// just persisted — a straight line between two of Douglas-Peucker's surviving vertices
@@ -319,9 +285,7 @@ type metrics struct {
 	movingS        int
 	elevationGainM float64
 	avgSpeedMps    float64
-	// distM[i] is cumulative distance in meters at points[i]; distM[0] is always 0. Read by
-	// computeBestEfforts below for pace curves; personal bests (VISION.md §5.3, not
-	// yet built) will need it too.
+	// distM[i] is cumulative distance in meters at points[i]; distM[0] is always 0.
 	distM []float64
 }
 
@@ -356,133 +320,4 @@ func computeMetrics(points []parse.Point) metrics {
 		m.avgSpeedMps = 0
 	}
 	return m
-}
-
-// bestEffortWindowsS is VISION.md §5.3's best-effort curve: the maximal average pace
-// (or heart rate) sustained over each of these standard durations, 5 s to 1 h — the same
-// handful of windows Strava/TrainingPeaks use, not a user-configurable list.
-var bestEffortWindowsS = []int32{5, 10, 30, 60, 120, 300, 600, 1200, 1800, 3600}
-
-// bestEffort is one (metric, window) result, ready to persist into activity_best_efforts.
-type bestEffort struct {
-	metric  string
-	windowS int32
-	value   float32
-}
-
-// computeBestEfforts finds, for each window in bestEffortWindowsS, the best (highest)
-// average pace and average heart rate sustained over any span of at least that many seconds.
-// Reuses elapsedS/distM — the same arrays already built for persisting activity_streams, not
-// walked twice — and, only when every point has a HeartRate, a locally-built HR-weighted
-// cumulative array (not persisted; heart-rate curves are the only consumer).
-//
-// Heart-rate curves are skipped entirely, not just the gaps, when any point in the activity
-// has a nil HeartRate: a curve with silently-skipped points would understate effort rather
-// than reporting nothing, and partial sensor coverage is realistically all-or-nothing per
-// activity (a continuously-worn HR strap either recorded the whole thing or wasn't worn).
-func computeBestEfforts(points []parse.Point, elapsedS []int32, distM []float32) []bestEffort {
-	cumDist := make([]float64, len(distM))
-	for i, d := range distM {
-		cumDist[i] = float64(d)
-	}
-	results := bestEffortCurve("pace", elapsedS, cumDist)
-
-	hasFullHR := len(points) > 0 && points[0].HeartRate != nil
-	hrWeighted := make([]float64, len(points))
-	for i := 1; hasFullHR && i < len(points); i++ {
-		if points[i].HeartRate == nil {
-			hasFullHR = false
-			break
-		}
-		dt := float64(elapsedS[i] - elapsedS[i-1])
-		hrWeighted[i] = hrWeighted[i-1] + float64(*points[i].HeartRate)*dt
-	}
-	if hasFullHR {
-		results = append(results, bestEffortCurve("heartrate", elapsedS, hrWeighted)...)
-	}
-	return results
-}
-
-// bestEffortCurve is the two-pointer scan itself, shared by both metrics: `cum` is any
-// cumulative value parallel to elapsedS (cumulative distance for pace, HR-weighted-by-time
-// for heart rate) — "average over a window" is always (cum[r]-cum[l])/(elapsedS[r]-elapsedS[l])
-// regardless of which cumulative quantity it is.
-//
-// For each window, the right pointer walks every point once; the left pointer only ever
-// advances (never resets between right-pointer steps), because the tightest left bound
-// satisfying "window >= w" is monotonically non-decreasing as the right pointer moves
-// forward — so each window is one O(n) pass, not a nested O(n²) scan. A window longer than
-// the activity's own duration finds no valid position and is simply omitted, not stored as
-// zero.
-func bestEffortCurve(metric string, elapsedS []int32, cum []float64) []bestEffort {
-	var out []bestEffort
-	n := len(elapsedS)
-	for _, w := range bestEffortWindowsS {
-		l := 0
-		var best float64
-		found := false
-		for r := 0; r < n; r++ {
-			for l+1 <= r && elapsedS[r]-elapsedS[l+1] >= w {
-				l++
-			}
-			if elapsedS[r]-elapsedS[l] >= w {
-				dt := float64(elapsedS[r] - elapsedS[l])
-				avg := (cum[r] - cum[l]) / dt
-				if !found || avg > best {
-					best = avg
-					found = true
-				}
-			}
-		}
-		if found {
-			out = append(out, bestEffort{metric: metric, windowS: w, value: float32(best)})
-		}
-	}
-	return out
-}
-
-// standardDistancesM is VISION.md §5.3's personal-bests distances — the same five
-// Strava itself tracks as PRs, metric throughout (this app has no imperial distances
-// anywhere else). No per-activity-type split: activity_type has no controlled vocabulary
-// (IMPLEMENTATION.md §4.7), so bucketing by it would fragment the same
-// achievement across e.g. "run"/"running"/"trail_running" rather than unify it.
-var standardDistancesM = []float64{1000, 5000, 10000, 21097.5, 42195}
-
-// split is one (distance, fastest time) result, ready to persist into activity_splits.
-type split struct {
-	distanceM int32
-	seconds   int32
-}
-
-// computeSplits finds, for each distance in standardDistancesM, the fastest time this
-// activity covered at least that far — the inverse question of bestEffortCurve (minimize
-// time for a fixed distance, rather than maximize average for a fixed duration), so the
-// two-pointer roles swap: the right pointer walks every point, the left pointer advances
-// while the window still covers >= D meters after dropping one more point, monotonic in l
-// for the same reason as bestEffortCurve (the tightest left bound covering D only moves
-// forward as more distance accumulates to the right). An activity shorter than D simply
-// never finds a candidate and produces no row for it. Unlike heart-rate curves, this needs
-// no data-completeness gate — distance and elapsed time have no missing-sensor case.
-func computeSplits(elapsedS []int32, distM []float32) []split {
-	var out []split
-	n := len(elapsedS)
-	for _, d := range standardDistancesM {
-		l := 0
-		var best int32 = -1
-		for r := 0; r < n; r++ {
-			for l+1 <= r && float64(distM[r]-distM[l+1]) >= d {
-				l++
-			}
-			if float64(distM[r]-distM[l]) >= d {
-				dt := elapsedS[r] - elapsedS[l]
-				if best < 0 || dt < best {
-					best = dt
-				}
-			}
-		}
-		if best >= 0 {
-			out = append(out, split{distanceM: int32(d), seconds: best})
-		}
-	}
-	return out
 }

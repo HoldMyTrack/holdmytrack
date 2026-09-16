@@ -262,10 +262,9 @@ func (s *Server) handleUpdateActivity(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleDeleteActivity serves `DELETE /v1/activities/{id}` (§4.7.5) — a full purge, not a
-// soft delete: the DB cascade already handles activity_streams/activity_tile_masks/
-// activity_best_efforts/activity_splits (all `ON DELETE CASCADE` back to activities.id), and
-// Personal Bests/Best Efforts/Trends are live-aggregated over whatever rows remain, so none
-// of those need any explicit cleanup here. Two things genuinely do:
+// soft delete: the DB cascade already handles activity_streams/activity_tile_masks (both
+// `ON DELETE CASCADE` back to activities.id), and Trends is live-aggregated over whatever
+// rows remain, so neither needs any explicit cleanup here. Two things genuinely do:
 //
 //   - Object storage has no foreign keys (demo_purge.go's own reasoning), so the raw upload
 //     and this activity's rendered fog/heatmap masks have to be removed explicitly.
@@ -913,123 +912,6 @@ func (s *Server) handleActivityTrends(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// activityBestEffortsQuery is VISION.md §5.3's best-effort curve, all-time: the best
-// (highest) value any activity ever achieved, per window. `internal/ingest.computeBestEfforts`
-// already did the per-activity work at ingest time, so this is a plain MAX aggregate, not a
-// scan — the same "cheap aggregate rather than a scan" framing
-// IMPLEMENTATION.md §4.5 uses for this. Windows with no activity long/complete
-// enough for that metric are simply absent, same "missing means nothing to report" convention
-// activityHistogramQuery already uses for empty days.
-const activityBestEffortsQuery = `
-SELECT be.window_s, MAX(be.value)
-FROM activity_best_efforts be
-JOIN activities a ON a.id = be.activity_id
-WHERE a.user_id = $1 AND be.metric = $2
-GROUP BY be.window_s
-ORDER BY be.window_s`
-
-type bestEffortPoint struct {
-	WindowS int     `json:"window_s"`
-	Value   float64 `json:"value"`
-}
-
-type activityBestEffortsResponse struct {
-	Metric string            `json:"metric"`
-	Points []bestEffortPoint `json:"points"`
-}
-
-// handleBestEfforts serves `GET /v1/activities/best-efforts?metric=pace|heartrate`.
-func (s *Server) handleBestEfforts(w http.ResponseWriter, r *http.Request) {
-	metric := r.URL.Query().Get("metric")
-	if metric != "pace" && metric != "heartrate" {
-		http.Error(w, `invalid "metric", want "pace" or "heartrate"`, http.StatusBadRequest)
-		return
-	}
-
-	rows, err := s.pool.Query(r.Context(), activityBestEffortsQuery, userIDFromContext(r.Context()), metric)
-	if err != nil {
-		s.log.Error("activity best-efforts query failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-
-	points := make([]bestEffortPoint, 0)
-	for rows.Next() {
-		var p bestEffortPoint
-		if err := rows.Scan(&p.WindowS, &p.Value); err != nil {
-			s.log.Error("activity best-efforts scan failed", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-		points = append(points, p)
-	}
-	if err := rows.Err(); err != nil {
-		s.log.Error("activity best-efforts rows failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, http.StatusOK, activityBestEffortsResponse{Metric: metric, Points: points})
-}
-
-// personalBestsQuery is VISION.md §5.3's personal bests: the fastest time this user
-// has ever covered each standard distance, and which activity/date set it.
-// `internal/ingest.computeSplits` already did the per-activity work at ingest time, so this
-// is `DISTINCT ON` picking the winning row per distance, not a scan — Postgres's idiom for
-// "the row with the min value per group" in one pass, avoiding a self-join or a second
-// aggregate-then-lookup round trip the MAX-based best-efforts query didn't need (that one has
-// no "which activity" to report).
-const personalBestsQuery = `
-SELECT DISTINCT ON (s.distance_m) s.distance_m, s.seconds, s.activity_id, a.started_at
-FROM activity_splits s
-JOIN activities a ON a.id = s.activity_id
-WHERE a.user_id = $1
-ORDER BY s.distance_m, s.seconds ASC`
-
-type personalBest struct {
-	DistanceM  int       `json:"distance_m"`
-	Seconds    int       `json:"seconds"`
-	ActivityID string    `json:"activity_id"`
-	StartedAt  time.Time `json:"started_at"`
-}
-
-type personalBestsResponse struct {
-	PersonalBests []personalBest `json:"personal_bests"`
-}
-
-// handlePersonalBests serves `GET /v1/activities/personal-bests`. No query parameters — one
-// account has exactly one set of personal bests, unlike best-efforts' pace/heartrate toggle.
-func (s *Server) handlePersonalBests(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.pool.Query(r.Context(), personalBestsQuery, userIDFromContext(r.Context()))
-	if err != nil {
-		s.log.Error("personal bests query failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-
-	bests := make([]personalBest, 0)
-	for rows.Next() {
-		var b personalBest
-		if err := rows.Scan(&b.DistanceM, &b.Seconds, &b.ActivityID, &b.StartedAt); err != nil {
-			s.log.Error("personal bests scan failed", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-		bests = append(bests, b)
-	}
-	if err := rows.Err(); err != nil {
-		s.log.Error("personal bests rows failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, http.StatusOK, personalBestsResponse{PersonalBests: bests})
-}
-
 // trackMetricsQuery reads one activity's already-simplified display trajectory back out
 // (ST_DumpPoints, same shape simplifyXY already produces at ingest — this just reads it
 // instead of simplifying fresh) alongside its raw, full-resolution activity_streams arrays.
@@ -1119,9 +1001,8 @@ func (s *Server) handleActivityTrackMetrics(w http.ResponseWriter, r *http.Reque
 		speed[0] = speed[1]
 	}
 
-	// All-or-nothing, the same gate computeBestEfforts already applies to heart-rate curves
-	// (internal/ingest/ingest.go): a track with silently-missing segments would misrepresent
-	// effort (or, for elevation, shape) rather than just not offering the metric at all.
+	// All-or-nothing: a track with silently-missing segments would misrepresent effort (or,
+	// for elevation, shape) rather than just not offering the metric at all.
 	heartRateAvailable := len(heartrateRaw) > 0
 	for _, hr := range heartrateRaw {
 		if hr == nil {
