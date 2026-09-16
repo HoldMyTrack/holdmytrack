@@ -4,13 +4,13 @@ This document outlines the engineering and product roadmap for the native Androi
 
 As stated in `apps/android/README.md`, the Android development environment is not containerized and runs directly on the host machine.
 
-No Android code exists yet: `apps/android/` contains this file and a README. Some of the server-side work it depends on is built — see the prerequisites below.
+`apps/android/` holds two Gradle builds: `fitmap/`, the app itself, and `poc-healthconnect/`, the throwaway Phase 1 diagnostic that is deleted once its findings are all recorded here. Some of the server-side work the app depends on is built — see the prerequisites below.
 
 ## Where this sits in the wider plan
 
 Read `docs/ROADMAP.md` (Phase 2 — Mobile) first; this document expands one item of it and does not override it.
 
-- **The toolchain is not set up on this machine.** There is no Android SDK, no `gradle`, `adb` or `kotlinc`, and the installed JDK is 19, which the Android Gradle Plugin does not support (it wants 17 or 21). Nothing in Phase 2 onward can be compiled or run until Android Studio, the SDK and a supported JDK are installed on the host — which, per `apps/android/README.md`, is where they belong rather than in a container.
+- **The toolchain is on the host, not in a container** (`apps/android/README.md`), and it is installed: the Android SDK at `/opt/homebrew/share/android-commandlinetools` with platform 37, build-tools 37 and `adb` under `platform-tools/`, alongside JDK 21, which the Android Gradle Plugin supports. `ANDROID_HOME` is not exported by default, so export it (or write `sdk.dir` into `local.properties`) before invoking `./gradlew`. There is no Android Studio and no emulator system image, so anything that needs a screen runs on a physical device over `adb`.
 - **Android ships first of the two mobile apps**, so the Path 2 contract is designed against the more constrained platform. Android defines the payload shape and the sync-cursor semantics that `POST /v1/sync/activities` accepts, and iOS inherits them. Every server-side prerequisite below is on the critical path.
 - **The design freeze is Phase 3 of the root roadmap, after Mobile.** There is no icon set, type scale, or token system yet, and the root plan itself flags this ordering as diverging from `VISION.md` §5 and "not yet reconciled". The screens below — onboarding, sync rejection feedback, the sync dashboard — fall inside that pass. Either build them plainly and style them there, or schedule the UI-heavy items after the freeze.
 - **Cross-source deduplication is part of this phase, not a later one.** Root `ROADMAP.md` calls it "unavoidable once a second ingest source exists, which mobile sync is" — see Phase 4 below.
@@ -71,9 +71,10 @@ One throwaway app, one physical device, both platform questions answered togethe
 
 Set up the application scaffolding and map rendering. Auth comes first within this phase, not later: every tile route is wrapped in `requireAuth` (`services/server/internal/httpapi/server.go`), so no user-specific tile renders without a live session.
 
-- [ ] **Project setup & scaffolding**
-  - Create a Kotlin/Android Studio project. Set `minSdk` and `targetSdk` deliberately and separately: `minSdk` decides whether the pre-Android-14 Health Connect APK path must be handled at all (Health Connect is built into the platform from Android 14 / API 34, a separately-installed APK below that), while `targetSdk` tracks Play's annual requirement and must be checked against the current one rather than inherited from this document.
-  - Integrate MapLibre Native for Android.
+- [x] **Project setup & scaffolding** — `apps/android/fitmap`, a Kotlin/Gradle project with MapLibre Native 13.6.1 drawing the API's style document full-screen. Its own build rather than a module beside `poc-healthconnect`, which is throwaway; see `apps/android/fitmap/README.md` for how to build it and point it at an API. `./gradlew :app:assembleDebug` packages it against the host SDK; what it looks like on a screen is the next item's business, since a map with no session is not yet a useful thing to photograph.
+  - **`minSdk` is 34, `targetSdk` 37**, decided separately as this item asks. 34 (Android 14) is where Health Connect became part of the platform: below it, Health Connect is a Play-installed APK the app must detect, route the user into installing, and re-check — a second provider state machine, on a configuration Phase 1 never measured routes against. FitMap ingests GPS sessions from a watch, so the devices that cut off are not the ones it serves. 37 is the newest platform and matches `compileSdk`, comfortably above Play's current requirement of 36; that requirement rises annually and is re-checked per release rather than read off this document.
+  - The shell renders before any account exists, which is why it comes first: the style endpoint is unauthenticated and the basemap archive is a plain `pmtiles://` URL, so the map is on screen before there is a session to attach. Every *user* layer is behind `requireAuth` and arrives with the next item. Flavor follows the system day/night setting — `light` or `dark` of the five the API serves — rather than inventing a theme preference the design pass has not decided.
+  - Failures surface on screen, not only in logcat: a style or tile fetch that 404s otherwise leaves a plausible-looking blank map with nothing to say what went wrong, which is the failure mode every remaining item in this phase will hit while being wired up.
 - [ ] **Authentication & session persistence**
   - Implement login/signup against `POST /v1/auth/signup|login|logout` and `GET /v1/auth/me`, persisting the session per the prerequisite decision above.
   - MapLibre Native must attach the session to its *own* tile requests, which bypass the app's API client entirely — the same problem the web client solves with `transformRequest` in `useMapInstance.ts`.
