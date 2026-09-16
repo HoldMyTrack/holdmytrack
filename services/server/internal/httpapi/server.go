@@ -122,6 +122,7 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(route("GET", "/activities/status/{external_id}"), s.requireAuth(s.handleActivityStatus))
 	s.mux.HandleFunc(route("GET", "/activities/track-metrics/{id}"), s.requireAuth(s.handleActivityTrackMetrics))
 	s.mux.HandleFunc(route("GET", "/uploads"), s.requireAuth(s.handleListUploads))
+	s.mux.HandleFunc(route("POST", "/sync/activities"), s.requireAuth(s.handleSyncActivities))
 	s.mux.HandleFunc(tileRoute("GET", "/tracks/{z}/{x}/{y}"), s.requireAuth(s.handleTracksTile))
 	s.mux.HandleFunc(tileRoute("GET", "/fog/{z}/{x}/{y}"), s.requireAuth(s.handleFogTile))
 	s.mux.HandleFunc(tileRoute("GET", "/heatmap/{z}/{x}/{y}"), s.requireAuth(s.handleHeatmapTile))
@@ -289,6 +290,14 @@ type uploadFileParams struct {
 	// sets this today — see ingest.Job.ActivityType's own doc comment for why.
 	ActivityType string
 	Data         []byte
+	// ExternalID, when set, is used verbatim as the idempotency key instead of being derived
+	// from a content hash of Data. Only handleSyncActivities sets this: Path 2 activities
+	// already carry a stable id from the platform health store (a Health Connect record
+	// UUID), which is the record's real identity — hashing the synced JSON bytes instead
+	// would mint a new "activity" on every retry that happened to reserialize a field
+	// differently, defeating the idempotent-retry requirement rather than serving it. Path 3
+	// has no such id of its own, which is why it still hashes.
+	ExternalID string
 }
 
 // persistAndEnqueue is handleUpload's idempotency-check-then-persist-then-enqueue core,
@@ -298,9 +307,19 @@ type uploadFileParams struct {
 // from one request. Returns `alreadyProcessed` rather than a status string so callers can't
 // typo one of two states; the caller decides what to do with either.
 func (s *Server) persistAndEnqueue(ctx context.Context, p uploadFileParams) (externalID string, alreadyProcessed bool, err error) {
-	sum := sha256.Sum256(p.Data)
-	externalID = hex.EncodeToString(sum[:])
-	rawKey := fmt.Sprintf("raw/%s/%s%s", p.UserID, externalID, p.Ext)
+	var rawKey string
+	if p.ExternalID != "" {
+		externalID = p.ExternalID
+		// Scoped by source, unlike the content-addressed key below: a caller-supplied id is
+		// only unique within its own source's namespace (a Health Connect UUID and a
+		// HealthKit UUID could coincide in theory), whereas a hash collision across sources
+		// is intentionally shared storage (see handleDeleteActivity's doc comment).
+		rawKey = fmt.Sprintf("raw/%s/%s/%s%s", p.UserID, p.Source, externalID, p.Ext)
+	} else {
+		sum := sha256.Sum256(p.Data)
+		externalID = hex.EncodeToString(sum[:])
+		rawKey = fmt.Sprintf("raw/%s/%s%s", p.UserID, externalID, p.Ext)
+	}
 
 	// Fast-path idempotency check (IMPLEMENTATION.md §4.0's idempotency
 	// invariant): this is an optimization to skip a wasted job for an obvious repeat, not
