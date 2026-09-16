@@ -68,6 +68,21 @@ type authResponse struct {
 	PrivacyTrimM int    `json:"privacy_trim_m"`
 }
 
+// authResponseWithSession wraps authResponse with the freshly minted session id, for the
+// four endpoints that call startSession and therefore have a session to hand back — signup,
+// login, demo-start, reset-password. handleMe returns plain authResponse: it's "is my
+// existing credential still valid," not a place to reissue one.
+type authResponseWithSession struct {
+	authResponse
+	// SessionToken is the same value already set as the fitmap_session cookie in this same
+	// response — a browser client can ignore this field entirely, it already has the
+	// credential via Set-Cookie. A native client with no shared cookie jar (or one that needs
+	// to inject the credential into MapLibre Native's own tile requests, which bypass the
+	// app's own HTTP client — apps/android/docs/ROADMAP.md's "Decide the mobile auth
+	// surface") stores this and sends it back as `Authorization: Bearer <SessionToken>`.
+	SessionToken string `json:"session_token"`
+}
+
 // loadAuthResponse reads userID's current row and builds the shared authResponse shape —
 // signup, login, demo-start and reset-password all call this instead of hand-building a
 // response from just the fields they happened to already have, so a freshly created account
@@ -175,7 +190,8 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.startSession(w, ctx, userID, sessionTTL); err != nil {
+	sessionID, err := s.startSession(w, ctx, userID, sessionTTL)
+	if err != nil {
 		s.log.Error("session start failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -186,7 +202,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusCreated, resp)
+	writeJSON(w, http.StatusCreated, authResponseWithSession{authResponse: resp, SessionToken: sessionID})
 }
 
 // claimOrCreateUser: if no account anywhere has ever set a password, this signup claims the
@@ -236,16 +252,16 @@ func (s *Server) claimOrCreateUser(ctx context.Context, email string, hash []byt
 // returns it when that account is still an active demo (demo_expires_at IS NOT NULL) — a
 // real account's own session must never be mistaken for one here.
 func (s *Server) currentDemoUserID(r *http.Request) (string, bool) {
-	cookie, err := r.Cookie(sessionCookieName)
-	if err != nil {
+	sessionID, ok := sessionIDFromRequest(r)
+	if !ok {
 		return "", false
 	}
 	var userID string
-	err = s.pool.QueryRow(r.Context(), `
+	err := s.pool.QueryRow(r.Context(), `
 		SELECT u.id FROM sessions se
 		JOIN users u ON u.id = se.user_id
 		WHERE se.id = $1 AND se.expires_at > NOW() AND u.demo_expires_at IS NOT NULL
-	`, cookie.Value).Scan(&userID)
+	`, sessionID).Scan(&userID)
 	if err != nil {
 		return "", false
 	}
@@ -293,7 +309,8 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.startSession(w, ctx, userID, sessionTTL); err != nil {
+	sessionID, err := s.startSession(w, ctx, userID, sessionTTL)
+	if err != nil {
 		s.log.Error("session start failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -304,14 +321,17 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, resp)
+	writeJSON(w, http.StatusOK, authResponseWithSession{authResponse: resp, SessionToken: sessionID})
 }
 
 // handleLogout serves `POST /v1/auth/logout` — deletes the session server-side (not just
 // clearing the cookie), so a captured-but-not-yet-expired token stops working immediately.
+// Reads the session id via sessionIDFromRequest (cookie or bearer token), not r.Cookie
+// directly, so a mobile caller presenting only Authorization: Bearer actually revokes its
+// session here instead of this silently no-op'ing and clearing a cookie that was never set.
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	if cookie, err := r.Cookie(sessionCookieName); err == nil {
-		if _, err := s.pool.Exec(r.Context(), `DELETE FROM sessions WHERE id = $1`, cookie.Value); err != nil {
+	if sessionID, ok := sessionIDFromRequest(r); ok {
+		if _, err := s.pool.Exec(r.Context(), `DELETE FROM sessions WHERE id = $1`, sessionID); err != nil {
 			s.log.Error("session delete failed", "err", err)
 		}
 	}
@@ -372,7 +392,8 @@ func (s *Server) handleDemoStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.startSession(w, ctx, userID, demoSessionTTL); err != nil {
+	sessionID, err := s.startSession(w, ctx, userID, demoSessionTTL)
+	if err != nil {
 		s.log.Error("session start failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -383,7 +404,7 @@ func (s *Server) handleDemoStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusCreated, resp)
+	writeJSON(w, http.StatusCreated, authResponseWithSession{authResponse: resp, SessionToken: sessionID})
 }
 
 // demoLimiter caps how many demo accounts one address can create — 5 per hour is generous
@@ -518,7 +539,8 @@ func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 		s.log.Error("session cleanup failed", "err", err)
 	}
 
-	if err := s.startSession(w, ctx, userID, sessionTTL); err != nil {
+	sessionID, err := s.startSession(w, ctx, userID, sessionTTL)
+	if err != nil {
 		s.log.Error("session start failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -529,7 +551,7 @@ func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, resp)
+	writeJSON(w, http.StatusOK, authResponseWithSession{authResponse: resp, SessionToken: sessionID})
 }
 
 // forgotPasswordLimiter mirrors demoLimiter — 5 requests per hour per address is generous for
@@ -592,14 +614,19 @@ func clientIP(r *http.Request) string {
 	return host
 }
 
-func (s *Server) startSession(w http.ResponseWriter, ctx context.Context, userID string, ttl time.Duration) error {
+// startSession returns the new session id, alongside setting it as the fitmap_session
+// cookie — a browser client needs nothing more, but the four callers that mint a fresh
+// session (signup, login, demo-start, reset-password) also thread this value into
+// authResponseWithSession.SessionToken, apps/android/docs/ROADMAP.md's "Decide the mobile
+// auth surface" bearer-token path for a native client with no browser-style cookie handling.
+func (s *Server) startSession(w http.ResponseWriter, ctx context.Context, userID string, ttl time.Duration) (string, error) {
 	expiresAt := time.Now().Add(ttl)
 	var sessionID string
 	if err := s.pool.QueryRow(ctx,
 		`INSERT INTO sessions (user_id, expires_at) VALUES ($1, $2) RETURNING id`,
 		userID, expiresAt,
 	).Scan(&sessionID); err != nil {
-		return err
+		return "", err
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
@@ -616,21 +643,44 @@ func (s *Server) startSession(w http.ResponseWriter, ctx context.Context, userID
 		SameSite: http.SameSiteLaxMode,
 		Expires:  expiresAt,
 	})
-	return nil
+	return sessionID, nil
 }
 
-// currentUserID resolves the session cookie to a user id, or ("", false) if there is none,
-// or it doesn't match a live session. Expiry is checked in SQL (expires_at > NOW()), not
-// left to the browser dropping an expired cookie on its own — a client could replay an old
-// one past its stated expiry.
+// bearerPrefix is RFC 6750's scheme name for the Authorization header value —
+// sessionIDFromRequest strips exactly this before treating the remainder as a session id.
+const bearerPrefix = "Bearer "
+
+// sessionIDFromRequest reads the session id a caller presented: the fitmap_session cookie
+// for a browser (checked first — the long-established, higher-volume path), falling back to
+// `Authorization: Bearer <session-id>` for a native client. This is not a second credential
+// system — it's the same sessions.id value, just presented a second way, because a mobile
+// app needs to inject it into MapLibre Native's own tile requests via a per-request header
+// hook (apps/android/docs/ROADMAP.md's "Decide the mobile auth surface"), which a cookie
+// sitting in the app's own cookie jar wouldn't reach.
+func sessionIDFromRequest(r *http.Request) (string, bool) {
+	if cookie, err := r.Cookie(sessionCookieName); err == nil && cookie.Value != "" {
+		return cookie.Value, true
+	}
+	if auth := r.Header.Get("Authorization"); strings.HasPrefix(auth, bearerPrefix) {
+		if token := strings.TrimPrefix(auth, bearerPrefix); token != "" {
+			return token, true
+		}
+	}
+	return "", false
+}
+
+// currentUserID resolves the caller's session id (sessionIDFromRequest) to a user id, or
+// ("", false) if there is none, or it doesn't match a live session. Expiry is checked in SQL
+// (expires_at > NOW()), not left to the browser dropping an expired cookie on its own — a
+// client could replay an old one past its stated expiry.
 func (s *Server) currentUserID(r *http.Request) (string, bool) {
-	cookie, err := r.Cookie(sessionCookieName)
-	if err != nil {
+	sessionID, ok := sessionIDFromRequest(r)
+	if !ok {
 		return "", false
 	}
 	var userID string
-	err = s.pool.QueryRow(r.Context(),
-		`SELECT user_id FROM sessions WHERE id = $1 AND expires_at > NOW()`, cookie.Value,
+	err := s.pool.QueryRow(r.Context(),
+		`SELECT user_id FROM sessions WHERE id = $1 AND expires_at > NOW()`, sessionID,
 	).Scan(&userID)
 	if err != nil {
 		return "", false
