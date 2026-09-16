@@ -29,6 +29,14 @@ type Config struct {
 	// the same address corsAllowedOrigins (httpapi/server.go) already has to know, just on
 	// the sending side instead of the receiving one. Only read by `serve`.
 	AppBaseURL string
+	// BasemapOrigin is where the basemap archive, fonts and sprites actually live — the
+	// origin the served style document (internal/mapstyle, ARCHITECTURE.md §2.1) resolves
+	// its asset URLs against. Mirrors the web client's VITE_BASEMAP_ORIGIN
+	// (apps/web/src/map/config.ts's basemapOrigin) and defaults the same way it does: the
+	// app's own origin, since every deployment that bundles the basemap alongside itself
+	// serves it from there. Set it only for a deployment reading the archive from object
+	// storage or a CDN. Only read by `serve`.
+	BasemapOrigin string
 }
 
 func Load() (Config, error) {
@@ -45,6 +53,12 @@ func Load() (Config, error) {
 		SMTPPassword: env("SMTP_PASSWORD", ""),
 		SMTPFrom:     env("SMTP_FROM", ""),
 		AppBaseURL:   env("APP_BASE_URL", "http://localhost:5173"),
+	}
+	if c.BasemapOrigin = env("BASEMAP_ORIGIN", ""); c.BasemapOrigin == "" {
+		// Deliberately derived from AppBaseURL rather than given its own default, for the
+		// same reason auth.go derives the session cookie's Secure flag from it: two env
+		// vars that must agree are two env vars that can disagree.
+		c.BasemapOrigin = c.AppBaseURL
 	}
 	if c.DatabaseURL == "" {
 		// Built from the POSTGRES_* Compose-interpolation vars in .env.example, the same

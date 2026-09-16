@@ -91,6 +91,10 @@ Everything server-side runs as one binary in two modes (`serve` and `work`) agai
 
 ### 2.1 One style document, three renderers
 
-`buildStyle()` in the web client is deliberately pure and DOM-free (`apps/web/src/map/style.ts`). The same style must eventually drive MapLibre GL JS on web, MapLibre Native on mobile, and the headless export renderer (`IMPLEMENTATION.md` §5.5). **Serve the style as a document from the API** rather than reimplementing it per client — three hand-maintained copies of a 71-layer style would diverge.
+`buildStyle()` in the web client is deliberately pure and DOM-free (`apps/web/src/map/style.ts`), and it is the single definition of the style. The same style drives MapLibre GL JS on web, MapLibre Native on mobile, and the headless export renderer (`IMPLEMENTATION.md` §5.5). **The API serves it as a document** rather than each client reimplementing it — three hand-maintained copies of a 71-layer style would diverge.
+
+`GET /v1/map/style/{flavor}` (`services/server/internal/mapstyle`) answers with that document. The Go side holds no style definition at all: `apps/web/scripts/build-style.mjs` renders `buildStyle()` to one JSON file per flavor, embedded via `go:embed`, and `npm run verify:style` fails if the committed JSON has drifted from `style.ts` — the divergence this section exists to prevent is caught by a check rather than by discipline. Asset URLs carry a placeholder origin that the server substitutes from `BASEMAP_ORIGIN` per request, so one artifact serves both a deployment that bundles the archive alongside itself and one that reads it from a CDN. The endpoint is unauthenticated: the document is derived from the public Protomaps basemap and carries no per-user data.
+
+The web client still calls `buildStyle()` in-process rather than fetching this — it already has the function, and a round trip before first paint buys it nothing.
 
 This also retrospectively justifies `IMPLEMENTATION.md` §4.2's decision to bake the fog inversion server-side: a custom WebGL shader would otherwise have to be written twice, against two MapLibre bindings, and kept pixel-identical.

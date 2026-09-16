@@ -4,12 +4,13 @@ This document outlines the engineering and product roadmap for the native Androi
 
 As stated in `apps/android/README.md`, the Android development environment is not containerized and runs directly on the host machine.
 
-Nothing here is built yet: `apps/android/` contains this file and a README.
+No Android code exists yet: `apps/android/` contains this file and a README. Some of the server-side work it depends on is built — see the prerequisites below.
 
 ## Where this sits in the wider plan
 
 Read `docs/ROADMAP.md` (Phase 2 — Mobile) first; this document expands one item of it and does not override it.
 
+- **The toolchain is not set up on this machine.** There is no Android SDK, no `gradle`, `adb` or `kotlinc`, and the installed JDK is 19, which the Android Gradle Plugin does not support (it wants 17 or 21). Nothing in Phase 2 onward can be compiled or run until Android Studio, the SDK and a supported JDK are installed on the host — which, per `apps/android/README.md`, is where they belong rather than in a container.
 - **Android ships first of the two mobile apps**, so the Path 2 contract is designed against the more constrained platform. Android defines the payload shape and the sync-cursor semantics that `POST /v1/sync/activities` accepts, and iOS inherits them. It is also the platform that produces route-less activities, so representing those end to end is part of this phase rather than a later one. Every server-side prerequisite below is on the critical path.
 - **The design freeze is Phase 3 of the root roadmap, after Mobile.** There is no icon set, type scale, or token system yet, and the root plan itself flags this ordering as diverging from `VISION.md` §5 and "not yet reconciled". The screens below — onboarding, the honest-degrade state, the sync dashboard — fall inside that pass. Either build them plainly and style them there, or schedule the UI-heavy items after the freeze.
 - **Cross-source deduplication is part of this phase, not a later one.** Root `ROADMAP.md` calls it "unavoidable once a second ingest source exists, which mobile sync is" — see Phase 4 below.
@@ -32,12 +33,12 @@ Before implementing any UI or sync routines, we must design around two hard plat
 
 ## Server-side prerequisites
 
-These are **not Android work**, but no Android phase can complete without them, and none of them exist today. Each is listed against the phase it blocks so the dependency is visible when scheduling.
+These are **not Android work**, but no Android phase can complete without them. Each is listed against the phase it blocks so the dependency is visible when scheduling.
 
-- [ ] **Serve the basemap style as a document from the API** — *blocks Phase 2.*
-  `docs/ARCHITECTURE.md` §2.1 is an instruction, not a description of something shipped: "Serve the style as a document from the API rather than reimplementing it per client — three hand-maintained copies of a 71-layer style would diverge." Today `buildStyle()` is an in-process TypeScript function (`apps/web/src/map/style.ts`) and no style route is registered in `services/server/internal/httpapi/server.go`. Android has nothing to consume until this exists.
+- [x] **Serve the basemap style as a document from the API** (`docs/ARCHITECTURE.md` §2.1).
+  `GET /v1/map/style/{flavor}` serves it, for the five flavors `style.ts` defines. `buildStyle()` remains the only definition of the style: `apps/web/scripts/build-style.mjs` renders it to JSON, `services/server/internal/mapstyle` embeds and serves that, and `npm run verify:style` fails on drift between the two. Asset URLs resolve against `BASEMAP_ORIGIN` (defaulting to `APP_BASE_URL`) at request time. Unauthenticated, and `ETag`/`If-None-Match` revalidation is wired up so a phone re-fetches ~100 KB of layer definitions only when it actually changed.
 - [ ] **Decide how MapLibre Native reads the basemap archive** — *blocks Phase 2.*
-  The style's basemap source is a `pmtiles://` URL answered by the pmtiles **JavaScript** protocol plugin (`apps/web/src/map/style.ts`). MapLibre Native has no equivalent registered protocol, so this needs its own answer — a native PMTiles reader, or a server-side `{z}/{x}/{y}` endpoint over the archive. This is the largest open technical question in the Android plan and it is a shared-infrastructure decision, since the headless export renderer (`docs/IMPLEMENTATION.md` §5.5) hits the same wall.
+  The style the endpoint above serves carries a `pmtiles://` source URL, answered by the pmtiles **JavaScript** protocol plugin (`apps/web/src/map/style.ts`). MapLibre Native has no equivalent registered protocol, so this needs its own answer — a native PMTiles reader, or a server-side `{z}/{x}/{y}` endpoint over the archive. This is the largest open technical question in the Android plan and it is a shared-infrastructure decision, since the headless export renderer (`docs/IMPLEMENTATION.md` §5.5) hits the same wall.
 - [ ] **Build `POST /v1/sync/activities`** — *blocks Phase 4.*
   Specced in `docs/IMPLEMENTATION.md` §4.0 ("batched normalized points, Path 2") and unimplemented. The only ingest endpoint that exists is `POST /v1/activities/upload` — multipart, a single `.gpx`/`.fit`/`.tcx`/`.zip` file per request (Path 3). Must be idempotent on `(user_id, source, external_id)` like the other two, per §4.0's hard invariant.
 - [ ] **Accept route-less activities through ingest** — *blocks Phase 3's honest-degrade UI.*

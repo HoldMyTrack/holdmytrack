@@ -86,17 +86,18 @@ func route(method, path string) string     { return method + " " + apiPrefix + p
 func tileRoute(method, path string) string { return method + " " + tilesPrefix + path }
 
 type Server struct {
-	pool       *pgxpool.Pool
-	store      *storage.Store
-	log        *slog.Logger
-	mux        *http.ServeMux
-	mailer     mail.Sender
-	appBaseURL string
-	version    string
+	pool          *pgxpool.Pool
+	store         *storage.Store
+	log           *slog.Logger
+	mux           *http.ServeMux
+	mailer        mail.Sender
+	appBaseURL    string
+	basemapOrigin string
+	version       string
 }
 
-func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail.Sender, appBaseURL, version string) *Server {
-	s := &Server{pool: pool, store: store, log: log, mux: http.NewServeMux(), mailer: mailer, appBaseURL: appBaseURL, version: version}
+func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail.Sender, appBaseURL, basemapOrigin, version string) *Server {
+	s := &Server{pool: pool, store: store, log: log, mux: http.NewServeMux(), mailer: mailer, appBaseURL: appBaseURL, basemapOrigin: basemapOrigin, version: version}
 	s.mux.HandleFunc(route("POST", "/auth/signup"), s.handleSignup)
 	s.mux.HandleFunc(route("POST", "/auth/login"), s.handleLogin)
 	s.mux.HandleFunc(route("POST", "/auth/logout"), s.handleLogout)
@@ -124,6 +125,13 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(tileRoute("GET", "/tracks/{z}/{x}/{y}"), s.requireAuth(s.handleTracksTile))
 	s.mux.HandleFunc(tileRoute("GET", "/fog/{z}/{x}/{y}"), s.requireAuth(s.handleFogTile))
 	s.mux.HandleFunc(tileRoute("GET", "/heatmap/{z}/{x}/{y}"), s.requireAuth(s.handleHeatmapTile))
+	// Deliberately not behind requireAuth, unlike every /v1 route above it. The style
+	// document is derived entirely from the public Protomaps basemap and contains no
+	// per-user data — only layer definitions and the asset URLs a client would need
+	// anyway to fetch an archive this server already publishes unauthenticated. Requiring
+	// a session would also couple basemap rendering to session state on mobile, where the
+	// app can usefully draw a map before the user has signed in.
+	s.mux.HandleFunc(route("GET", "/map/style/{flavor}"), s.handleMapStyle)
 	s.mux.HandleFunc("GET /healthz", s.handleHealthz)
 	return s
 }
