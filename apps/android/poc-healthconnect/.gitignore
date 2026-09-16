@@ -1,0 +1,6 @@
+# Gradle/AGP build output and local caches. The wrapper itself (gradle/wrapper/) is
+# committed on purpose so the build pins its own Gradle version.
+.gradle/
+build/
+local.properties
+*.apk
