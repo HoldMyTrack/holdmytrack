@@ -10,8 +10,7 @@ import (
 )
 
 // ParseTCX streams Trackpoint elements. Garmin Training Center XML nests position/altitude/
-// heart-rate under a Trackpoint, and cadence/power under vendor Extensions in some exports —
-// this reads the common TPX extension shape but doesn't attempt every vendor variant.
+// heart-rate under a Trackpoint.
 func ParseTCX(r io.Reader) (Activity, error) {
 	dec := xml.NewDecoder(r)
 	act := Activity{ActivityType: "unknown"}
@@ -81,16 +80,6 @@ func ParseTCX(r io.Reader) (Activity, error) {
 						hr := int16(v)
 						cur.HeartRate = &hr
 					}
-				}
-			case "Cadence", "RunCadence":
-				if v, err := strconv.Atoi(text); err == nil {
-					c := int16(v)
-					cur.Cadence = &c
-				}
-			case "Watts":
-				if v, err := strconv.Atoi(text); err == nil {
-					w := int16(v)
-					cur.PowerW = &w
 				}
 			}
 		case xml.EndElement:

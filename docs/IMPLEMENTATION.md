@@ -102,7 +102,7 @@ CREATE INDEX idx_activities_type        ON activities (user_id, activity_type);
 
 ### 3.4 `activity_streams`
 
-Per-point sensor data, kept out of the hot query path so `activities` stays narrow. **This is where performance analysis (§4.5) actually lives**, so it is no longer speculative storage.
+Per-point sensor data, kept out of the hot query path so `activities` stays narrow. **This is where the per-activity pace/heart-rate profile (§4.5) actually lives.**
 
 ```sql
 CREATE TABLE activity_streams (
@@ -112,20 +112,15 @@ CREATE TABLE activity_streams (
     elapsed_s    INT[],
     elevation_m  REAL[],
     heartrate    SMALLINT[],
-    cadence      SMALLINT[],
-    power_w      SMALLINT[],
-    dist_m       REAL[]   -- cumulative distance at this point; migrations/0009. Persisted
-                           -- here for future reads, but pace curves and personal bests (§4.5)
-                           -- use the same in-memory array before it's ever written to this
-                           -- column — see §4.5's closing note on why derived-data reads
-                           -- re-parse raw payloads rather than reading activity_streams back
-                           -- out.
+    dist_m       REAL[]   -- cumulative distance at this point.
 );
 ```
 
+`cadence`/`power_w` columns existed here (migrations 0001–0012) but were never read back by any query, API response, or client — dropped in migration 0013 as dead weight. FitMap's scope is outdoor GPS tracking (`VISION.md` §1.1), not a sports-computer sensor product; `heartrate` and `elevation_m` stay because they feed the track-metrics pace/HR profile.
+
 **This table is the single largest storage line in the product** (`VISION.md` §4.3), so it is also the first place §5.7's retention policy applies.
 
-Availability varies by path: Path 1 and Path 3 deliver full sensor data — including GPX, since `parse/gpx.go` reads the `gpxtpx:TrackPointExtension` block now; earlier it silently dropped heart rate/cadence/power even when a GPX file carried them. Path 2 delivers partial data, since heart rate and cadence are separate record types with separate permissions on both platforms.
+Availability varies by path: Path 1 and Path 3 deliver full sensor data — including GPX, since `parse/gpx.go` reads the `gpxtpx:TrackPointExtension` block for heart rate. Path 2 delivers partial data, since heart rate is a separate record type with its own permissions on both platforms.
 
 ### 3.5 `user_tiles`
 
@@ -317,7 +312,7 @@ All three are idempotent on `(user_id, source, external_id)`, and this is a hard
 
 #### 4.0.3 `POST /v1/sync/activities` — Path 2's batched sync endpoint
 
-**Built.** `internal/httpapi/sync_activities.go`. Takes a JSON body `{source, activities: [{external_id, activity_type, points: [{lat, lon, elevation_m, time, heart_rate, cadence, power_w}]}]}` and returns one result per activity (`"enqueued"` / `"already_processed"` / `"rejected"`, with an error string on rejection) rather than a single pass/fail for the whole request — a batch is not all-or-nothing, the same "one bad entry doesn't abort the rest" treatment §4.0.1's zip upload already gives a mixed-quality archive. `source` is checked against an allowlist of exactly the two on-device platforms §4.0 names for Path 2 (`"healthconnect"`, `"healthkit"`) — Path 1 and Path 3 have their own endpoints and their own `source` values, so this list doesn't need to anticipate those.
+**Built.** `internal/httpapi/sync_activities.go`. Takes a JSON body `{source, activities: [{external_id, activity_type, points: [{lat, lon, elevation_m, time, heart_rate}]}]}` and returns one result per activity (`"enqueued"` / `"already_processed"` / `"rejected"`, with an error string on rejection) rather than a single pass/fail for the whole request — a batch is not all-or-nothing, the same "one bad entry doesn't abort the rest" treatment §4.0.1's zip upload already gives a mixed-quality archive. `source` is checked against an allowlist of exactly the two on-device platforms §4.0 names for Path 2 (`"healthconnect"`, `"healthkit"`) — Path 1 and Path 3 have their own endpoints and their own `source` values, so this list doesn't need to anticipate those.
 
 **No Path-2-specific branch in `ingest.Process`.** `internal/parse` gained a `.json` case (`ParseJSON`, dispatched by `ByExtension` the same way `.gpx`/`.tcx`/`.fit` already are) that decodes the wire shape above straight into the same `Activity`/`Point` structs the file parsers produce — there is no format-specific parsing left to do for Path 2 since the on-device app already read raw samples out of the platform health store itself, only a field-for-field reshape. Each activity's `{activity_type, points}` is re-marshaled and persisted to object storage exactly like a Path 3 raw file, then read back through the same `parseByExtensionReader` call `ingest.Process` already made — §4.0's "differ only in how bytes arrive, converge on §4.1 step 2" holds literally, not just in spirit.
 

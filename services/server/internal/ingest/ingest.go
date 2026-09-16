@@ -101,16 +101,12 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	elapsedS := make([]int32, len(points))
 	elevM := make([]*float32, len(points))
 	hr := make([]*int16, len(points))
-	cad := make([]*int16, len(points))
-	pw := make([]*int16, len(points))
 	distM := make([]float32, len(points))
 	t0 := points[0].Time.Unix()
 	for i, p := range points {
 		elapsedS[i] = int32(p.Time.Unix() - t0)
 		elevM[i] = p.Elevation
 		hr[i] = p.HeartRate
-		cad[i] = p.Cadence
-		pw[i] = p.PowerW
 		distM[i] = float32(m.distM[i])
 	}
 
@@ -165,9 +161,9 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	}
 
 	_, err = pool.Exec(ctx, `
-		INSERT INTO activity_streams (activity_id, point_count, elapsed_s, elevation_m, heartrate, cadence, power_w, dist_m)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-	`, activityID, len(points), elapsedS, elevM, hr, cad, pw, distM)
+		INSERT INTO activity_streams (activity_id, point_count, elapsed_s, elevation_m, heartrate, dist_m)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, activityID, len(points), elapsedS, elevM, hr, distM)
 	if err != nil {
 		return Result{}, fmt.Errorf("ingest: persist streams: %w", err)
 	}

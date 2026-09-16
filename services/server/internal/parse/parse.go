@@ -19,8 +19,6 @@ type Point struct {
 	Elevation *float32
 	Time      time.Time
 	HeartRate *int16
-	Cadence   *int16
-	PowerW    *int16
 }
 
 // Activity is the parsed result, before privacy trimming or simplification (§4.1 steps 3, 5).
@@ -56,8 +54,6 @@ type JSONPoint struct {
 	ElevationM *float32  `json:"elevation_m,omitempty"`
 	Time       time.Time `json:"time"`
 	HeartRate  *int16    `json:"heart_rate,omitempty"`
-	Cadence    *int16    `json:"cadence,omitempty"`
-	PowerW     *int16    `json:"power_w,omitempty"`
 }
 
 // JSONActivity is one activity's worth of JSONPoint, the unit both the sync request body and
@@ -80,7 +76,7 @@ func ParseJSON(r io.Reader) (Activity, error) {
 	for i, p := range a.Points {
 		points[i] = Point{
 			Lat: p.Lat, Lon: p.Lon, Elevation: p.ElevationM, Time: p.Time,
-			HeartRate: p.HeartRate, Cadence: p.Cadence, PowerW: p.PowerW,
+			HeartRate: p.HeartRate,
 		}
 	}
 	activityType := a.ActivityType

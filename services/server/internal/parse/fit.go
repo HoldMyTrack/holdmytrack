@@ -121,17 +121,6 @@ func ParseFIT(r io.Reader) (Activity, error) {
 						hr := int16(raw[0])
 						p.HeartRate = &hr
 					}
-				case 4: // cadence, uint8
-					if len(raw) > 0 && raw[0] != 0xFF {
-						c := int16(raw[0])
-						p.Cadence = &c
-					}
-				case 7: // power, uint16
-					v := def.order.Uint16(raw)
-					if v != 0xFFFF {
-						pw := int16(v)
-						p.PowerW = &pw
-					}
 				case 253: // timestamp, uint32 seconds since FIT epoch
 					v := def.order.Uint32(raw)
 					p.Time = time.Unix(int64(v)+fitEpoch, 0).UTC()

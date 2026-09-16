@@ -76,35 +76,6 @@ func TestParseGPXWithExtensions(t *testing.T) {
 	if p.HeartRate == nil || *p.HeartRate != 140 {
 		t.Fatalf("point 0 heart rate wrong: %+v", p)
 	}
-	if p.Cadence == nil || *p.Cadence != 82 {
-		t.Fatalf("point 0 cadence wrong: %+v", p)
-	}
-}
-
-const sampleGPXWithPower = `<?xml version="1.0"?>
-<gpx xmlns:gpxpx="http://www.garmin.com/xmlschemas/PowerExtension/v1"><trk><trkseg>
-<trkpt lat="39.9612" lon="-82.9988"><time>2026-01-01T12:00:00Z</time><extensions>
-  <gpxpx:PowerExtension><gpxpx:PowerInWatts>210</gpxpx:PowerInWatts></gpxpx:PowerExtension>
-</extensions></trkpt>
-<trkpt lat="39.9620" lon="-82.9990"><time>2026-01-01T12:00:10Z</time><extensions>
-  <power>215</power>
-</extensions></trkpt>
-</trkseg></trk></gpx>`
-
-func TestParseGPXWithPower(t *testing.T) {
-	act, err := ParseGPX(strings.NewReader(sampleGPXWithPower))
-	if err != nil {
-		t.Fatalf("ParseGPX: %v", err)
-	}
-	if len(act.Points) != 2 {
-		t.Fatalf("want 2 points, got %d", len(act.Points))
-	}
-	if act.Points[0].PowerW == nil || *act.Points[0].PowerW != 210 {
-		t.Fatalf("point 0 power wrong: %+v", act.Points[0])
-	}
-	if act.Points[1].PowerW == nil || *act.Points[1].PowerW != 215 {
-		t.Fatalf("point 1 power wrong: %+v", act.Points[1])
-	}
 }
 
 const sampleTCX = `<?xml version="1.0"?>

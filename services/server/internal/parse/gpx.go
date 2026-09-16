@@ -42,12 +42,10 @@ func ParseGPX(r io.Reader) (Activity, error) {
 					}
 				}
 				cur = &p
-			case "ele", "time", "hr", "cad", "power", "PowerInWatts":
-				// hr/cad are gpxtpx:TrackPointExtension's standard names; power and
-				// PowerInWatts are the two names different exporters use for the same
-				// value (Zwift/TrainingPeaks vs. Garmin's gpxpx extension). The decoder
-				// strips namespace prefixes (Name.Local), so no prefix matching is needed
-				// — and none of these names appear anywhere else inside a trkpt.
+			case "ele", "time", "hr":
+				// hr is gpxtpx:TrackPointExtension's standard name. The decoder strips
+				// namespace prefixes (Name.Local), so no prefix matching is needed — and
+				// none of these names appear anywhere else inside a trkpt.
 				if cur != nil {
 					curField = t.Name.Local
 				}
@@ -86,20 +84,10 @@ func ParseGPX(r io.Reader) (Activity, error) {
 					hr := int16(v)
 					cur.HeartRate = &hr
 				}
-			case "cad":
-				if v, err := strconv.Atoi(text); err == nil {
-					c := int16(v)
-					cur.Cadence = &c
-				}
-			case "power", "PowerInWatts":
-				if v, err := strconv.Atoi(text); err == nil {
-					pw := int16(v)
-					cur.PowerW = &pw
-				}
 			}
 		case xml.EndElement:
 			switch t.Name.Local {
-			case "ele", "time", "hr", "cad", "power", "PowerInWatts":
+			case "ele", "time", "hr":
 				curField = ""
 			case "type":
 				inType = false
