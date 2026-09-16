@@ -39,12 +39,12 @@ Checkboxes are the source of truth for progress; re-check them against the three
 
 Native apps whose core job is exporting device-recorded health data to FitMap (Path 2 on-device sync, `docs/adr/0001-three-independent-ingest-paths.md`) — reading the platform's own health store rather than a cloud API. Needed no licensing gate the way Phase 4's cloud connectors do: HealthKit/Health Connect access itself isn't in question, only how much of it (see the two confirmation items below, which are this phase's own first steps, not an external blocker).
 
-- [ ] Confirm `HKWorkoutRoute` access with a throwaway iOS app (`VISION.md` §4.1) — due diligence before committing engineering effort to the full iOS build, not resolving a real unknown: Apple's docs already say this works.
 - [ ] Confirm the Samsung Health Connect route-geometry limitation empirically, not just from documentation (`VISION.md` §4.1) — Samsung's own developer docs already state `EXERCISE_ROUTE` cannot be read via Health Connect; this is double-checking in case reality is better than documented, not an open question blocking the build.
-- [ ] iOS app: HealthKit sync, `HKWorkoutRoute` for full GPS geometry (the stronger of the two on-device paths — build this one first).
-- [ ] Android app: Health Connect sync, foreground-only (`READ_EXERCISE_ROUTES` can't be requested programmatically, and background route reads return `ConsentRequired` even with "Always allow" granted — a platform constraint, not an implementation shortcut), with the Samsung no-route-geometry limitation surfaced honestly in the UI rather than silently producing a map-less activity.
+- [ ] Confirm `HKWorkoutRoute` access with a throwaway iOS app (`VISION.md` §4.1) — due diligence before committing engineering effort to the full iOS build, not resolving a real unknown: Apple's docs already say this works.
+- [ ] Android app: Health Connect sync, foreground-only (`READ_EXERCISE_ROUTES` can't be requested programmatically, and background route reads return `ConsentRequired` even with "Always allow" granted — a platform constraint, not an implementation shortcut), with the Samsung no-route-geometry limitation surfaced honestly in the UI rather than silently producing a map-less activity. **Build this one first**, so the Path 2 sync contract is designed against the harder platform's constraints. `apps/android/docs/ROADMAP.md` carries this app's own phases and its server-side prerequisites.
+- [ ] iOS app: HealthKit sync, `HKWorkoutRoute` for full GPS geometry — the stronger of the two on-device paths, and the one that inherits the payload and sync-cursor design Android settles.
 
-### Cross-source deduplication (`VISION.md` §4.6) — unavoidable once a second ingest source exists, which mobile sync is, ahead of Phase 4's cloud connectors under this order
+### Cross-source deduplication (`IMPLEMENTATION.md` §4.6) — unavoidable once a second ingest source exists, which mobile sync is, ahead of Phase 4's cloud connectors under this order
 
 - [ ] `dedupe_key` computation at ingest: user, activity type, start time rounded to the nearest minute, distance bucketed to ~1%.
 - [ ] Superseded-record handling: prefer the richest record (geometry over none, more stream channels over fewer); mark others `superseded`, don't delete, so a user can see why an activity disappeared.
@@ -86,13 +86,13 @@ Connecting the app to third-party services, and the scoring/analysis work that b
 
 ### Explorer-tile gamification
 
-- [ ] `user_tiles` table exists, nothing reads it yet — scoring queries (total tiles, max square, max connected cluster, per-region coverage %, `VISION.md` §4.4) and a UI surface for them (a natural fit on the Profile page, alongside the activity grid).
+- [ ] `user_tiles` table exists, nothing reads it yet — scoring queries (total tiles, max square, max connected cluster, per-region coverage %, `IMPLEMENTATION.md` §4.4) and a UI surface for them (a natural fit on the Profile page, alongside the activity grid).
 
 ---
 
 ## Phase 5 — Cost control
 
-An engineering requirement, can land alongside any of the above (`VISION.md` §5.7).
+An engineering requirement, can land alongside any of the above (`IMPLEMENTATION.md` §5.7).
 
 - [ ] Retention/dormancy policy: tier `activity_streams` to cold storage or drop it after N months of inactivity (`users.last_seen_at`), keeping summaries and fog rasters so the map still renders; warn by email first; recoverable by re-upload.
 - [ ] Raw payload expiry schedule (object storage) — note this caps how far back a future `reprivacy` job or re-trim can reach; document the tradeoff wherever it's implemented.
