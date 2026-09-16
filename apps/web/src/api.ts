@@ -506,7 +506,7 @@ export async function updateActivity(
 
 /**
  * §4.7.5's `DELETE /v1/activities/{id}` — a full purge (track, fog/heatmap coverage,
- * best-efforts/splits, the raw upload), not a soft delete. `204 No Content` on success, same
+ * the raw upload), not a soft delete. `204 No Content` on success, same
  * convention `logout` already uses for "succeeded, nothing to say back" — nothing to parse or
  * return here either.
  */
