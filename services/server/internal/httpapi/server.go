@@ -117,8 +117,6 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(route("GET", "/activities/histogram"), s.requireAuth(s.handleActivityHistogram))
 	s.mux.HandleFunc(route("GET", "/activities/graph-stats"), s.requireAuth(s.handleActivityGraphStats))
 	s.mux.HandleFunc(route("GET", "/activities/trends"), s.requireAuth(s.handleActivityTrends))
-	s.mux.HandleFunc(route("GET", "/activities/best-efforts"), s.requireAuth(s.handleBestEfforts))
-	s.mux.HandleFunc(route("GET", "/activities/personal-bests"), s.requireAuth(s.handlePersonalBests))
 	s.mux.HandleFunc(route("GET", "/activities/status/{external_id}"), s.requireAuth(s.handleActivityStatus))
 	s.mux.HandleFunc(route("GET", "/activities/track-metrics/{id}"), s.requireAuth(s.handleActivityTrackMetrics))
 	s.mux.HandleFunc(route("GET", "/uploads"), s.requireAuth(s.handleListUploads))

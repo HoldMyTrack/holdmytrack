@@ -2091,65 +2091,6 @@ body,
   font-weight: 700;
 }
 
-.best-efforts {
-  max-width: 960px;
-  margin: 36px auto 0;
-  padding-top: 24px;
-  border-top: 1px solid rgb(0 0 0 / 8%);
-}
-
-.best-efforts__chart {
-  position: relative;
-  padding-bottom: 22px;
-}
-
-.best-efforts__svg {
-  width: 100%;
-  height: 140px;
-  display: block;
-}
-
-.best-efforts__line {
-  fill: none;
-  stroke: #3a6ea5;
-  stroke-width: 2;
-  vector-effect: non-scaling-stroke;
-}
-
-.best-efforts__point {
-  fill: #3a6ea5;
-  cursor: pointer;
-}
-
-.best-efforts__point:hover {
-  fill: #274d78;
-}
-
-.best-efforts__axis {
-  position: relative;
-  height: 16px;
-}
-
-.best-efforts__axis-label {
-  position: absolute;
-  transform: translateX(-50%);
-  font-size: 11px;
-  color: rgb(0 0 0 / 50%);
-  white-space: nowrap;
-}
-
-.personal-bests {
-  max-width: 960px;
-  margin: 36px auto 0;
-  padding-top: 24px;
-  border-top: 1px solid rgb(0 0 0 / 8%);
-}
-
-.personal-bests__card-date {
-  font-size: 11px;
-  color: rgb(0 0 0 / 45%);
-}
-
 .year-grid {
   margin-bottom: 30px;
   padding-top: 16px;
@@ -2435,8 +2376,8 @@ body,
    every desktop interaction: two hover-only features stay mouse-only on purpose —
    TrackProfile.tsx's colored-band/elevation exact values (FR-4.9) and the map-track-hover
    ↔ Activities-row-underline two-way highlight (FR-4.1/FR-5.4) — both are continuous-
-   position hover reads with no discrete point to tap, unlike Trends.tsx/BestEfforts.tsx's
-   bar/point tooltips below, which do get a tap fallback (in those files directly, not
+   position hover reads with no discrete point to tap, unlike Trends.tsx's bar/point
+   tooltips below, which do get a tap fallback (in that file directly, not
    here). See functional_specification.md's mobile-support note and
    technical_implementation_plan.md §5.9 for the full account. */
 @media (max-width: 768px) {

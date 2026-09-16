@@ -1,7 +1,5 @@
 import { ActivityGraph } from './ActivityGraph';
-import { BestEfforts } from './BestEfforts';
 import { Header } from './Header';
-import { PersonalBests } from './PersonalBests';
 import { Trends } from './Trends';
 
 export interface ProfilePageProps {
@@ -20,9 +18,8 @@ export interface ProfilePageProps {
  * related reason — there's nothing profile-specific about uploading, so it stays exactly
  * where it already lives, on the map screen this page is a detour from.
  *
- * `Trends`, `BestEfforts`, and `PersonalBests` (VISION.md §5.3) live here too, below
- * the grid — Performance Analysis, and the same "look back at what I did" territory as the
- * grid above them.
+ * `Trends` lives here too, below the grid — the same "look back at what I did" territory,
+ * how much ground was covered over recent weeks/months rather than a single day.
  */
 export function ProfilePage({ onBack, onOpenSettings }: ProfilePageProps) {
   return (
@@ -34,8 +31,6 @@ export function ProfilePage({ onBack, onOpenSettings }: ProfilePageProps) {
         </button>
         <ActivityGraph />
         <Trends />
-        <BestEfforts />
-        <PersonalBests />
       </main>
     </div>
   );

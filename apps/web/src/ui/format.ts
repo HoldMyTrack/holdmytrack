@@ -56,11 +56,9 @@ export function formatDistance(meters: number | null, system: UnitSystem): strin
   return `${distanceValue(meters, system)} ${unitLabel(system)}`;
 }
 
-/** "4:32/km" / "7:17/mi" — best-effort curves (BestEfforts.tsx) report speed in m/s, the
- *  unit a MAX aggregate treats consistently with heart rate ("higher is better"); this is
- *  the one place that gets converted back to the pace runners actually think in. Guards
- *  zero/negative input rather than dividing by it — a window with no data is simply absent
- *  upstream, but a stray zero shouldn't render as an infinite pace. */
+/** "4:32/km" / "7:17/mi" — TrackProfile.tsx's per-activity pace, converted from the raw
+ *  m/s speed value to the pace runners actually think in. Guards zero/negative input rather
+ *  than dividing by it — a stray zero shouldn't render as an infinite pace. */
 export function formatPace(metersPerSecond: number, system: UnitSystem): string {
   if (metersPerSecond <= 0) return EM_DASH;
   const perUnitMeters = system === 'imperial' ? METERS_PER_MILE : 1000;
@@ -68,18 +66,6 @@ export function formatPace(metersPerSecond: number, system: UnitSystem): string 
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
   return `${m}:${s.toString().padStart(2, '0')}/${unitLabel(system)}`;
-}
-
-/** "23:14" / "1:45:32" — a race-clock time, for PersonalBests.tsx. Distinct from
- *  formatDuration's "3h 52m": that one is a rounded summary line, this one is a precise time
- *  a runner compares directly against a stopwatch. Hours only appear once the time reaches
- *  an hour, matching how a race clock itself would display it. */
-export function formatSplitTime(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 /** "3h 52m" / "43m" / "20s". */

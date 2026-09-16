@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary
 
-FitMap is a **free, community-funded platform for tracking physical exercise, analysing performance, and seeing the accumulated shape of where you have been.** It aggregates the activity history you already have — from watches, from cloud services, from files — and turns it into analysis and into maps worth looking at.
+FitMap is a **free, community-funded platform for tracking outdoor activities and seeing the accumulated shape of where you have been** — how much ground you've covered, how well you've explored the places you live and travel through, and where you go most. It aggregates the activity history you already have — from watches, from cloud services, from files — and turns it into maps and exploration stats worth looking at.
 
 It targets people who already track workouts and want a better way to *see* the result, without adopting another real-time GPS tracker and without paying for the privilege.
 
@@ -14,12 +14,13 @@ FitMap's wedge is:
 
 ### 1.1 What FitMap is not
 
-Worth stating early, because the shorthand for this product is "a free Strava" and that overstates it in two specific ways:
+Worth stating early, because the shorthand for this product is "a free Strava" and that overstates it in three specific ways:
 
 * **FitMap does not record workouts.** There is no start button, no live GPS, no auto-pause. Your watch already does that well. FitMap begins where the recording ends.
 * **FitMap has no social network yet.** No feed, no follows, no kudos, no segments, no leaderboards. Athlete social networking is a stated direction (§5.5) and is deliberately out of scope until the core works — see §5.6 for why that ordering is not just caution.
+* **FitMap is not a health or fitness advisor.** No HR zones, no training load, no recovery or readiness scores, no sleep tracking. Pace and heart rate are shown per activity as context for the route, not analysed as a coaching product — an outdoor GPS tracker is what this is, not a health platform wearing a map as a skin.
 
-What is left is an aggregator, an analysis tool, and a map. That is a smaller product than Strava and a more defensible one: it competes on the axis Strava is weakest on rather than the axis where Strava has a decade of network effects.
+What is left is an aggregator and a map for exploring where you've been — not an analytics platform and not a coach. That is a smaller product than Strava and a more defensible one: it competes on the axis Strava is weakest on rather than the axis where Strava has a decade of network effects.
 
 ---
 
@@ -31,7 +32,7 @@ To let athletes, runners, cyclists and explorers see and keep the shape of where
 ### 2.2 Value Proposition
 * **No tracking friction** — fits existing workflows; FitMap never asks to record a workout.
 * **Bring everything** — one place for data scattered across a watch, a cloud service and a folder of old exports.
-* **Performance analysis** — filter, group and manipulate your data to build the report you want.
+* **Exploration insight** — how much ground you've covered this year versus last, how well a neighborhood is explored, and where you go most.
 * **Gamified exploration** — "Fog of War" and explorer-tile mechanics turn routine training into map discovery.
 * **Beautiful by default** — render quality is the differentiator, not feature count.
 * **Manual data manipulation** — stored data can be created, updated or deleted manually.
@@ -45,7 +46,7 @@ To let athletes, runners, cyclists and explorers see and keep the shape of where
 * **Endurance athletes** — cyclists, runners and hikers who already log meticulously.
 * **Urban explorers** — people who gamify coverage of their city.
 * **Casual smartwatch owners** — want a nice seasonal or annual summary, not analytics.
-* **The multi-device athlete** — a Garmin for rides, an Apple Watch for runs, an Oura ring for recovery, and no single place that shows all of it. This segment is served specifically by §4.1's three ingest paths and is underserved by every single-source competitor.
+* **The multi-device athlete** — a Garmin for rides, an Apple Watch for runs, and no single place that shows all of it. This segment is served specifically by §4.1's three ingest paths and is underserved by every single-source competitor.
 * **The subscription-fatigued** — people who already pay for Strava and resent it. Being free is not a discount here; it is the pitch.
 
 ### 3.2 Market Opportunity
@@ -84,16 +85,13 @@ The central structural decision. Each path has a different failure mode, and no 
 
 #### Path 1 — Cloud-to-cloud integration
 
-Server-side OAuth connections to services that hold the user's history. Target set: **Garmin, Wahoo, COROS, Oura.**
+Server-side OAuth connections to services that hold the user's history. Target set: **Garmin, Wahoo, COROS.**
 
 | Provider | What it gives | Constraint to verify before building |
 | :--- | :--- | :--- |
 | **Garmin** | Full activities with GPS, HR, power, cadence | Connect Developer Program historically requires a **paid commercial licence**. Whether a free, donation-funded service qualifies as commercial is the open question — get it in writing |
 | **Wahoo** | Rides with full sensor data | Partner API with an approval process |
 | **COROS** | Runs, rides, multisport | Partner API with an approval process |
-| **Oura** | Sleep, readiness, HRV — **no GPS** | Public API; feeds §4.2 performance analysis, contributes nothing to the map |
-
-**Oura is deliberately in a different category** and the docs should not blur it: it is a recovery-data source, not an activity source. It makes the analysis product better and the map product no better at all.
 
 **Strava is not on this list.** We are competing with them, their post-2024 terms restrict apps that replicate Strava features, and building on the API of the incumbent you are trying to displace is a poor structural bet. Strava users reach us through Path 3.
 
@@ -104,14 +102,14 @@ Native apps reading the platform health store. Target set: **Apple Watch (Health
 These are not equivalent, and the difference is verified rather than assumed:
 
 * **Apple Watch → HealthKit** exposes `HKWorkoutRoute`. Full GPS geometry is available on-device to a native iOS app.
-* **Samsung Galaxy Watch → Health Connect** does **not** expose route geometry. Samsung's own developer documentation states that `EXERCISE_ROUTE` data cannot be accessed from Samsung Health via Health Connect. Samsung sync therefore yields summary metrics — distance, duration, heart rate — and **no map**.
+* **Samsung Galaxy Watch → Health Connect** does **not** expose route geometry. Samsung's own developer documentation states that `EXERCISE_ROUTE` data cannot be accessed from Samsung Health via Health Connect. FitMap only ingests activities that have a route, so Samsung sync cannot deliver activities into FitMap today — every Samsung-sourced session arrives with no geometry and is rejected at sync time, not silently dropped or shown as a metrics-only entry.
 
 Two further Android platform constraints apply to any Health Connect route read:
 
 * `READ_EXERCISE_ROUTES` **cannot be requested programmatically**; the user must grant it manually in Health Connect settings or via the route request activity.
 * **Routes written by other apps cannot be read in the background** — Health Connect returns `ExerciseRouteResult.ConsentRequired` even with "Always allow" granted.
 
-So Android on-device sync is foreground-only, and for Samsung specifically it is summary-only. Product copy must not promise otherwise. This is a platform constraint, not an implementation shortcut.
+So Android on-device sync is foreground-only, and Samsung Galaxy Watch is unsupported — it never provides the route geometry FitMap requires. Product copy must not promise otherwise. This is a platform constraint, not an implementation shortcut.
 
 #### Path 3 — Direct manual file upload
 
@@ -136,14 +134,15 @@ Before engineering begins:
 | :--- | :--- | :--- |
 | **Multi-source ingest** | The structural differentiator | Cloud connectors, on-device sync, file upload; cross-source deduplication |
 | **Visual Map Engine** | Interactive renderer with custom styles | Fog of War, heatmap and track/normal modes (`IMPLEMENTATION.md` §4.2, §4.2.2); curated themes; smooth (non-hexagonal) fog edges |
-| **Performance analysis** | The second pillar of the product | Pace/power/HR curves, training load, personal bests, per-sport splits, trends over time |
+| **Per-activity detail** | Pace and heart rate as route context, not a coaching product | Per-vertex pace/HR/elevation profile on a single activity (`IMPLEMENTATION.md` §4.5) |
 | **Exploration Game** | Coverage scoring | Explorer-tile counts (z14 / z17), max cluster, coverage % by region |
 | **Activity graph** | Private, single-player motivation | A GitHub-style daily contribution grid, year by year, shadeable by count or distance (`IMPLEMENTATION.md` §4.8) |
+| **Distance & coverage trends** | See how much ground you've covered this period vs last | Weekly/monthly distance, moving-time and elevation trends |
 | **Filtering** | Slice the history | Activity type, date range, geographic bounding box, source |
 | **Export** | Free, unrestricted | Print-grade raster/vector export, story cards, animated reveals — no watermark, no tier |
 | **Privacy Controls** | Table stakes, see §7 | Privacy zones, automatic start/end trimming, per-map share scoping |
 
-**Performance analysis is a genuine second pillar now**, not a stats sidebar. It is also the feature most dependent on ingest quality: heart rate, cadence and power arrive from Path 1 and Path 3 in full, and from Path 2 only partially. The schema already carries per-point streams (`IMPLEMENTATION.md` §3.3) — this is where they finally get used.
+**Pace and heart rate are shown per activity, not analysed as a training product.** They're a supporting detail on the route, not a pillar — the pillars are the map and the exploration stats. The schema carries per-point streams (`IMPLEMENTATION.md` §3.3) for exactly this, and no more.
 
 **The activity graph is deliberately private, not a profile page.** It's the same genre of thing as Fog of War and the explorer-tile game above — motivation through your own history, no comparison required — not a step toward the social features §1.1 and §5.5 explicitly hold off on. It has no follows, no feed, and nothing another user can view; it's a personal dashboard, available once accounts exist (§5.2), not a public artifact. If a shareable version is ever worth building, that's a §5.5 social-phase decision to make deliberately, not a side effect of how this one ships.
 
@@ -201,14 +200,13 @@ Sequenced so the unconditional ingest path ships first and the ones that depend 
 * Accounts and persistence for anyone who wants to keep it.
 * A private activity graph once an account exists — a GitHub-style daily contribution grid shadeable by count or distance, plus active-days and longest-streak stat cards (`IMPLEMENTATION.md` §4.8). The grid itself reuses §4.7's histogram query; the streak and active-day stats are small new aggregate queries of their own.
 
-### 5.3 Phase 2: Analysis + Cloud sources (Months 4–6)
-* Performance analysis: pace/power/HR curves, personal bests, training load, trends.
+### 5.3 Phase 2: Cloud Sources (Months 4–6)
 * Path 1 connectors, in whatever order §4.1's approvals actually land.
 * Cross-source deduplication — unavoidable the moment a second source exists.
 * Free high-resolution export.
 
 ### 5.4 Phase 3: Mobile (Months 7–9)
-* Android app — Health Connect, with the Samsung route limitation surfaced honestly in the UI. Built first of the pair, so the Path 2 sync contract is designed against the more constrained platform.
+* Android app — Health Connect. Samsung Galaxy Watch sync is unsupported (Samsung never exposes route geometry, and FitMap only ingests activities that have one). Built first of the pair regardless, so the Path 2 sync contract is designed against the more constrained platform.
 * iOS app — HealthKit and Apple Watch, the stronger of the two on-device paths.
 * Explorer-tile gamification and coverage stats.
 

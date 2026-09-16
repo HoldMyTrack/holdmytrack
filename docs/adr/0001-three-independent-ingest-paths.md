@@ -16,7 +16,7 @@ Cloud-provider APIs generally carry the same risk in miniature: Garmin's Connect
 
 Build three structurally independent ingest paths, so no single company's decision can take the product down:
 
-1. **Path 1 — cloud-to-cloud** (Garmin, Wahoo, COROS, Oura): server-side OAuth pulls, each gated on that provider's own approval, built in whatever order approvals actually land.
+1. **Path 1 — cloud-to-cloud** (Garmin, Wahoo, COROS): server-side OAuth pulls, each gated on that provider's own approval, built in whatever order approvals actually land.
 2. **Path 2 — on-device sync** (Apple HealthKit, Android Health Connect): native mobile apps reading the platform's own health store, subject to real platform constraints (Health Connect route reads are foreground-only; Samsung specifically exposes no route geometry at all — verified against platform documentation, not assumed).
 3. **Path 3 — direct file upload** (`.gpx`/`.fit`/`.tcx`, plus bulk-export archives including Strava's own export): no API terms, no licence, no permission model, no vendor who can revoke it — works for every service that offers an export, which is all of them, because GDPR requires it.
 
@@ -34,6 +34,6 @@ All three paths converge on one ingest pipeline from parse onward (`IMPLEMENTATI
 ## Consequences
 
 - The product's very first usable version depends on no external approval at all, which is what let it actually ship (Phase 1, `VISION.md` §5.2) instead of waiting on Garmin/Wahoo/ COROS paperwork.
-- Real functionality — automatic sync, power/cadence from cloud sources — is gated on approvals FitMap doesn't control and may never receive on the terms hoped for (`VISION.md` §4.1's own "validation gate"; tracked as open in `docs/ROADMAP.md`'s Phase 0).
+- Real functionality — automatic sync from cloud sources — is gated on approvals FitMap doesn't control and may never receive on the terms hoped for (`VISION.md` §4.1's own "validation gate"; tracked as open in `docs/ROADMAP.md`'s Phase 0).
 - Three paths is three times the parsing/normalization surface to maintain, even though they converge quickly — cross-source deduplication (a second, related cost) becomes unavoidable the moment a second path actually exists (`IMPLEMENTATION.md` §4.6).
 - Product copy has to stay honest about Path 2's real limits (Android is foreground-only, Samsung has no map at all) rather than implying parity across every source.

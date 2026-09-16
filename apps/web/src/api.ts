@@ -506,7 +506,7 @@ export async function updateActivity(
 
 /**
  * §4.7.5's `DELETE /v1/activities/{id}` — a full purge (track, fog/heatmap coverage,
- * best-efforts/splits, the raw upload), not a soft delete. `204 No Content` on success, same
+ * the raw upload), not a soft delete. `204 No Content` on success, same
  * convention `logout` already uses for "succeeded, nothing to say back" — nothing to parse or
  * return here either.
  */
@@ -781,92 +781,6 @@ export async function getActivityTrends(bucket: TrendBucket, signal?: AbortSigna
       elevationGainM: p.elevation_gain_m,
     })),
   };
-}
-
-export type BestEffortMetric = 'pace' | 'heartrate';
-
-export interface BestEffortPoint {
-  windowS: number;
-  /** m/s for `pace`, average bpm for `heartrate` — see formatPace (format.ts) for the pace
-   *  conversion back to a runner's usual min/km. */
-  value: number;
-}
-
-export interface ActivityBestEfforts {
-  metric: BestEffortMetric;
-  points: BestEffortPoint[];
-}
-
-interface BestEffortPointBody {
-  window_s: number;
-  value: number;
-}
-
-interface ActivityBestEffortsBody {
-  metric: BestEffortMetric;
-  points: BestEffortPointBody[];
-}
-
-/**
- * `GET /v1/activities/best-efforts?metric=pace|heartrate` — VISION.md §5.3's
- * best-effort curve, all-time: the best value any activity ever achieved, per standard
- * duration (5 s to 1 h). Windows with nothing long/complete enough are simply absent.
- */
-export async function getBestEfforts(metric: BestEffortMetric, signal?: AbortSignal): Promise<ActivityBestEfforts> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/activities/best-efforts?metric=${metric}`, {
-    ...(signal ? { signal } : {}),
-    credentials: 'include',
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `best efforts failed (${res.status})`);
-  }
-  const body = (await res.json()) as ActivityBestEffortsBody;
-  return {
-    metric: body.metric,
-    points: body.points.map((p) => ({ windowS: p.window_s, value: p.value })),
-  };
-}
-
-export interface PersonalBest {
-  distanceM: number;
-  seconds: number;
-  activityId: string;
-  startedAt: string;
-}
-
-interface PersonalBestBody {
-  distance_m: number;
-  seconds: number;
-  activity_id: string;
-  started_at: string;
-}
-
-interface PersonalBestsBody {
-  personal_bests: PersonalBestBody[];
-}
-
-/**
- * `GET /v1/activities/personal-bests` — VISION.md §5.3's personal bests: the fastest
- * time this account has ever covered each of the five standard distances, all-time, and
- * which activity/date set it. Distances with no qualifying activity are simply absent.
- */
-export async function getPersonalBests(signal?: AbortSignal): Promise<PersonalBest[]> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/activities/personal-bests`, {
-    ...(signal ? { signal } : {}),
-    credentials: 'include',
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `personal bests failed (${res.status})`);
-  }
-  const body = (await res.json()) as PersonalBestsBody;
-  return body.personal_bests.map((b) => ({
-    distanceM: b.distance_m,
-    seconds: b.seconds,
-    activityId: b.activity_id,
-    startedAt: b.started_at,
-  }));
 }
 
 export interface TrackMetricPoint {

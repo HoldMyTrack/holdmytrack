@@ -15,9 +15,9 @@ This document specifies FitMap's functional behavior as currently implemented: w
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and privacy trim, FR-1.7), the no-signup demo, activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, the date-range picker, the per-account activity graph, password recovery, and performance analysis's first three slices — trends, best-effort pace/heart-rate curves, and personal bests (FR-9 below).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and privacy trim, FR-1.7), the no-signup demo, activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, the date-range picker, the per-account activity graph, password recovery, and distance/time trends (FR-9 below).
 
-**Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — the rest of performance analysis (power curves and training load — trends, pace/HR curves, and personal bests are built, FR-9.1/FR-9.2/FR-9.3 below), Path 1 cloud-provider connectors (Garmin/Wahoo/COROS/Oura), Path 2 on-device sync (HealthKit/Health Connect), cross-source deduplication, explorer-tile gamification, the rest of "Export" (story cards, animated reveals — high-resolution map export itself is built, FR-4.10 below), and user-defined privacy zones (a `privacy_zones` table exists in the schema — `IMPLEMENTATION.md` §3.7 — but no endpoint or UI creates or applies one today; only the endpoint-trim privacy control in FR-8.1 below, user-adjustable via FR-1.7's Settings page, is functional). This document will be extended with new FR sections as that functionality ships, not rewritten in place of them.
+**Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync (HealthKit/Health Connect), cross-source deduplication, explorer-tile gamification, the rest of "Export" (story cards, animated reveals — high-resolution map export itself is built, FR-4.10 below), and user-defined privacy zones (a `privacy_zones` table exists in the schema — `IMPLEMENTATION.md` §3.7 — but no endpoint or UI creates or applies one today; only the endpoint-trim privacy control in FR-8.1 below, user-adjustable via FR-1.7's Settings page, is functional). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against FitMap being a health or fitness advisor, and pace/heart-rate stay as per-activity route context (FR-4.9) rather than an analysed, all-time performance record. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
 ### 1.3 Intended audience
 
@@ -27,7 +27,7 @@ Engineers implementing against or modifying this system, QA deriving test cases,
 
 | Term | Meaning |
 | :-- | :-- |
-| **Activity** | One recorded exercise session (a run, ride, hike, swim, etc.) with a start time, and usually a GPS trajectory and sensor data (heart rate, cadence, power). |
+| **Activity** | One recorded exercise session (a run, ride, hike, swim, etc.) with a start time, and usually a GPS trajectory and heart-rate data. |
 | **Track** | An activity's GPS trajectory, as rendered on the map. |
 | **Session** | A signed-in browser's authentication state, held as an opaque cookie. |
 | **Registered user** | An account with a real email and password, created via sign-up or by upgrading a demo account. |
@@ -164,8 +164,7 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 **Behavior**:
 1. Avatar uploads and removals take effect immediately (`POST`/`DELETE /v1/account/avatar`) — each is its own action, not gated behind a separate save step. The account menu's own avatar button reflects whichever image is current everywhere in the app the moment it changes, with no reload.
 2. Name, Country, and Privacy Trim save together as one action (`PATCH /v1/account/settings`) — editing one and leaving without saving discards all three, not just the one touched.
-3. **Country decides which unit system the entire app displays distance, pace, and elevation in** — metric (km, min/km, meters) for every country except the United States, Liberia, and Myanmar, which see imperial (mi, min/mi, feet). Leaving Country unset defaults to metric. This takes effect the moment it's saved, across every screen that shows one of these values (the Activities panel, the date-range picker, the activity graph, Trends, Best Efforts, the per-activity pace/elevation profile, and the map's own distance scale) — none of it requires a reload.
-4. Personal Bests (FR-9.3)'s 5K/10K/Half Marathon/Marathon distance labels do not change with Country — those are fixed, internationally recognized race-distance names, not a display unit.
+3. **Country decides which unit system the entire app displays distance, pace, and elevation in** — metric (km, min/km, meters) for every country except the United States, Liberia, and Myanmar, which see imperial (mi, min/mi, feet). Leaving Country unset defaults to metric. This takes effect the moment it's saved, across every screen that shows one of these values (the Activities panel, the date-range picker, the activity graph, Trends, the per-activity pace/elevation profile, and the map's own distance scale) — none of it requires a reload.
 
 **Outputs**: The account's current Avatar, Name, Country, and Privacy Trim value, always reflecting the last successful save (or the account's defaults, if never changed) — reloading the app never reverts to something stale.
 
@@ -236,7 +235,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 4. The upload panel shows each file's live status (uploading, with a progress percentage; then "Processing…") until the background job finishes.
 5. Once ingestion completes, the activity appears automatically in the Activities panel, the map, and every summary that reflects the current date range — no page reload is required.
 
-**Outputs**: One new `Activity` per successfully ingested file, each with a parsed trajectory, distance, duration, and (where the source file provides it) heart rate/cadence/ power/elevation data.
+**Outputs**: One new `Activity` per successfully ingested file, each with a parsed trajectory, distance, duration, and (where the source file provides it) heart rate/elevation data.
 
 **Error cases**:
 - Unsupported file extension → `415 Unsupported Media Type`.
@@ -462,7 +461,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 ### FR-5.11 Delete an activity
 
-**Description**: A signed-in user permanently deletes one of their own activities — a full purge, not a soft delete or an archive: the activity itself, its track, its contribution to Fog-of-War/Heatmap coverage, and any performance-analysis record it held are all removed. There is no undo.
+**Description**: A signed-in user permanently deletes one of their own activities — a full purge, not a soft delete or an archive: the activity itself, its track, and its contribution to Fog-of-War/Heatmap coverage are all removed. There is no undo.
 
 **Preconditions**: Active session; the caller owns the activity.
 
@@ -470,10 +469,9 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Behavior**:
 1. Clicking the delete icon opens a confirmation dialog naming the activity and stating plainly that this can't be undone; nothing is deleted until the user confirms.
-2. Confirming removes the activity and everything derived from it: its recorded stream data, its rendered coverage masks, and any best-effort or personal-best record it held.
+2. Confirming removes the activity and everything derived from it: its recorded stream data and its rendered coverage masks.
 3. The Fog-of-War/Heatmap view updates to reflect the deletion — coverage the deleted activity was the only source for reverts to unrevealed, not left showing stale coverage for data that no longer exists.
-4. If the deleted activity was FR-9.2/FR-9.3's current best-effort or personal-best holder for any duration/distance, that record is recomputed from the account's remaining activities (moving to the next-best one, or clearing entirely if none remain).
-5. Canceling the confirmation, or dismissing it, leaves the activity untouched.
+4. Canceling the confirmation, or dismissing it, leaves the activity untouched.
 
 **Outputs**: The activity and everything derived from it no longer exist; every list, filter, total, and aggregate that previously included it reflects its removal.
 
@@ -559,11 +557,11 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Description**: An account can only ever see its own activities, uploads, and profile data. Every data-returning endpoint derives the account from the caller's session; no endpoint accepts a user or account identifier as a request parameter that could be substituted for another account's.
 
-## 11. FR-9 — Performance Analysis
+## 11. FR-9 — Trends
 
 ### FR-9.1 Trends
 
-**Description**: A signed-in account's own activity history, aggregated into weekly or monthly totals, viewable on the Profile page below the activity grid.
+**Description**: A signed-in account's own activity history, aggregated into weekly or monthly totals, viewable on the Profile page below the activity grid — how much ground was covered over recent weeks or months.
 
 **Preconditions**: The caller has a valid session (real or demo user).
 
@@ -576,43 +574,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Outputs**: `{bucket, from, to, periods: [{period_start, count, distance_meters, moving_seconds, elevation_gain_m}, ...]}`.
 
-**Notes**: "Moving time" falls back to elapsed time for any activity ingested before moving- time detection existed — those activities have no moving-time figure of their own, so this bucket-level total uses whichever one each activity actually has, rather than a bucket going silently short. Power curves and training load are still out of scope (§1.2) pending further work.
-
-### FR-9.2 Best Efforts
-
-**Description**: The best average pace or heart rate any activity has ever sustained, per standard duration, viewable on the Profile page below Trends.
-
-**Preconditions**: The caller has a valid session (real or demo user).
-
-**Inputs**: `metric` — `pace` or `heartrate`.
-
-**Behavior**:
-1. At ingest time, each activity's best average value over every duration in a fixed set (5 s, 10 s, 30 s, 1, 2, 5, 10, 20, 30, and 60 minutes) is computed and stored — pace as speed, heart rate as an average over the window. A duration longer than the activity's own length is simply not recorded for it. Heart-rate curves are computed only for an activity with heart-rate data for every point; an activity with any gap in heart-rate coverage contributes no heart-rate curve at all, never a partial one.
-2. Querying a metric returns, for each duration, the single best value any activity has ever recorded for it — an all-time maximum, not per-activity detail (there is no per-activity detail view in this application yet).
-3. The UI (`BestEfforts`, on the Profile page) plots this as a curve — one point per duration with data, log-scaled by duration — with a Pace/Heart rate toggle. Hovering a point shows its duration and the exact value, pace formatted as `min:sec/km`.
-
-**Outputs**: `{metric, points: [{window_s, value}, ...]}` — durations with no qualifying activity are simply absent, the same convention FR-9.1's trends and FR-6's histogram both use for missing data.
-
-**Error cases**: `metric` outside `pace`/`heartrate` — `400`.
-
-**Notes**: This is an all-time, aggregate view only — there is no per-activity breakdown of which specific activity set which best. Power curves and training load remain out of scope (§1.2).
-
-### FR-9.3 Personal Bests
-
-**Description**: The fastest time this account has ever recorded over each of five standard distances, viewable on the Profile page below Best Efforts.
-
-**Preconditions**: The caller has a valid session (real or demo user).
-
-**Inputs**: None.
-
-**Behavior**:
-1. At ingest time, each activity's fastest time to cover at least each of five standard distances (1K, 5K, 10K, half marathon, marathon) is computed and stored, spanning every activity type together — a personal best is not split by activity type (`VISION.md` places no controlled vocabulary on it, and neither does this feature). An activity shorter than a given distance contributes no record for it.
-2. Querying returns, for each distance, the single fastest time any activity has ever recorded, along with which activity and when.
-3. The UI (`PersonalBests`, on the Profile page) shows one card per standard distance, always all five — a distance with no record yet shows an em dash rather than being omitted. Each card shows the time (`h:mm:ss` or `m:ss`) and the date it was set.
-
-**Outputs**: `{personal_bests: [{distance_m, seconds, activity_id, started_at}, ...]}` — distances with no qualifying activity are simply absent from the array (the UI still shows all five cards; see Behavior above).
-
-**Notes**: A faster activity at the same distance replaces the previous record independently per distance — a shorter but faster activity can set a new 5K record while leaving an older, longer activity's 10K record untouched. There is no per-activity detail view to link to from a record's activity yet (same limitation FR-9.2 already has).
+**Notes**: "Moving time" falls back to elapsed time for any activity ingested before moving- time detection existed — those activities have no moving-time figure of their own, so this bucket-level total uses whichever one each activity actually has, rather than a bucket going silently short. Best-effort curves and personal bests (formerly FR-9.2/FR-9.3) were built and then cut — deliberately out of scope, see §1.2 and §14.
 
 ## 12. Non-Functional Requirements (summary)
 
@@ -636,20 +598,21 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 **Behavior**:
 1. Below approximately 768px viewport width, the Activities panel (FR-5.1) is a collapsible bottom sheet instead of a permanent sidebar — collapsed by default to a slim strip showing the range total and the Filter toggle, with the map fully interactive around and under it; tapping the strip expands it over the map to show the full list, filters, and footer actions (FR-5.2–FR-5.7), exactly as they behave at desktop width. Expanding or collapsing the sheet never changes the checked group (FR-5.6) or the row-click focus (FR-5.5).
 2. The date-range picker's (FR-6) drag handles present a larger touch target than their visual width, so resizing the selected range is comfortable with a finger, not just a mouse cursor.
-3. Trends (FR-9.1) and Best Efforts (FR-9.2) — both hover-tooltip charts at desktop width — also respond to a tap: tapping a bar or point shows the same tooltip a hover would, tapping it again (or tapping empty chart space) hides it. A tap and a mouse hover never conflict with each other on the same chart.
-4. Every other behavior in this document (upload, all three map modes, filtering, the date-range picker's paging/selection, Personal Bests, account settings) works the same way at mobile widths as at desktop widths.
+3. Trends (FR-9.1) — a hover-tooltip chart at desktop width — also responds to a tap: tapping a bar shows the same tooltip a hover would, tapping it again (or tapping empty chart space) hides it. A tap and a mouse hover never conflict with each other on the same chart.
+4. Every other behavior in this document (upload, all three map modes, filtering, the date-range picker's paging/selection, account settings) works the same way at mobile widths as at desktop widths.
 
-**Explicitly not built** (hover-only, no touch equivalent, unlike Trends/Best Efforts above — both are a continuous position read with no discrete point to tap, not a per-bar/per-point value): the colored zone segments' and pace/heart-rate + elevation profile's exact hover values (FR-4.8, FR-4.9), and the two-way map-track-hover ↔ Activities-row-underline highlight (FR-4.1, FR-5.4). Both remain mouse-only; a touchscreen user can still see the colored bands and elevation curve themselves, and can still focus/select a track by tapping it, just not read an exact value by touch alone the way a mouse hover shows one.
+**Explicitly not built** (hover-only, no touch equivalent, unlike Trends above — a continuous position read with no discrete point to tap, not a per-bar value): the colored zone segments' and pace/heart-rate + elevation profile's exact hover values (FR-4.8, FR-4.9), and the two-way map-track-hover ↔ Activities-row-underline highlight (FR-4.1, FR-5.4). Both remain mouse-only; a touchscreen user can still see the colored bands and elevation curve themselves, and can still focus/select a track by tapping it, just not read an exact value by touch alone the way a mouse hover shows one.
 
 ## 14. Out-of-scope items, tracked for future revisions of this document
 
 The following are named in `VISION.md`'s roadmap but have no functional requirements in this document because they are not yet built:
 
-- The rest of performance analysis (power curves, training load) — trends (FR-9.1), pace/heart-rate best-effort curves (FR-9.2), and personal bests (FR-9.3) are built so far
-- Path 1 cloud-provider connectors (Garmin, Wahoo, COROS, Oura)
+- Path 1 cloud-provider connectors (Garmin, Wahoo, COROS)
 - Path 2 on-device sync (Apple HealthKit, Android Health Connect)
 - Cross-source deduplication
 - Explorer-tile gamification
 - The rest of "Export" — story cards, animated reveals (high-resolution map export itself is built, FR-4.10)
 - User-defined privacy zones (beyond the fixed endpoint trim in FR-8.1)
 - Dark-theme variant of the Fog of War veil (the theme parameter is accepted but currently has no visual effect on the veil itself)
+
+Deliberately out of scope, not a "not yet" — built and then cut, not planned to return: Oura and other recovery-data sources (sleep, HRV, readiness), best-effort curves, personal bests, power curves, and training load. `VISION.md` §1.1 draws a hard line against FitMap being a health or fitness advisor; pace and heart rate stay as per-activity route context (FR-4.9), not an analysed, all-time performance record.
