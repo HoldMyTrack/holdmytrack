@@ -1,0 +1,17 @@
+[versions]
+agp = "9.4.0"
+# 1.1.0 is the current stable; 1.2.0 is alpha only. A PoC whose whole job is to report what
+# the platform really does should sit on the API surface the real app would ship against.
+healthConnect = "1.1.0"
+coreKtx = "1.17.0"
+appcompat = "1.7.1"
+lifecycle = "2.9.4"
+
+[libraries]
+health-connect = { module = "androidx.health.connect:connect-client", version.ref = "healthConnect" }
+core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
+appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
+lifecycle-runtime = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }

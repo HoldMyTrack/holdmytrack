@@ -28,6 +28,7 @@ Before implementing any UI or sync routines, we must design around two hard plat
 2. **Samsung Health Route-Geometry Limitation**
    - **Constraint**: Samsung Health writes summary data but does not expose GPS route geometry (`EXERCISE_ROUTE`) to other apps via Health Connect, so Galaxy Watch sync yields summary metrics and no map (`docs/VISION.md` §4.1, `docs/IMPLEMENTATION.md` §4.0).
    - **Decision**: Degrade honestly (`docs/IMPLEMENTATION.md` §5.1). A session with no route must be visibly marked "no route" rather than silently contributing nothing to the map; the failure mode to avoid is a user syncing 400 activities and seeing an empty map with no explanation.
+   - **Route-less activities are ordinary, and indoor exercise is why.** A gym session, a swim or a rowing machine has no trajectory by its nature, so an activity with no route is a permanent category rather than a symptom of a limited integration — `docs/IMPLEMENTATION.md` §4.0.2 already meets the same case from the Takeout side. Measured on a real store (Phase 1 below), half the sessions had no geometry on exactly these grounds. Samsung is a separate problem that happens to produce the same empty result: there the activity *did* have a route and the platform will not hand it over. Both land on the same requirement — ingest and the UI must represent a trajectory-less activity — which puts that work on the main path rather than in an edge-case bucket.
 
 ---
 
@@ -52,9 +53,11 @@ These are **not Android work**, but no Android phase can complete without them. 
 
 One throwaway app, one physical device, both platform questions answered together. Framed as due diligence rather than an open blocker: root `ROADMAP.md` notes that Samsung's own developer docs already state `EXERCISE_ROUTE` is unreachable, and this is "double-checking in case reality is better than documented". Both checks need the same device and the same permission plumbing, and the Samsung answer changes what Phase 3 has to build, so neither can wait until after the app exists.
 
-- [ ] **Health Connect route-access proof of concept**
-  - Test permission requests, verify the foreground route-reading requirement, and confirm that background reads return `ConsentRequired` (`docs/IMPLEMENTATION.md` §4.0).
-- [ ] **Empirical Samsung Health check**
+- [x] **Health Connect route-access proof of concept** — `apps/android/poc-healthconnect`, measured on a Pixel 10a running Android 17 (API 37) against a Health Connect store fed by Fitbit.
+  - **`READ_EXERCISE_ROUTES` is not programmatically requestable.** Requesting it alongside `READ_EXERCISE` and `READ_HEALTH_DATA_IN_BACKGROUND` grants the other two and silently omits it — it never even acquires a `USER_SET` flag. The user grants it at **Health Connect → the app → Additional access → Access exercise routes → Always allow**, a screen two levels below the app's main permission page and not linked from it. Phase 3's onboarding has to walk the user there explicitly; "grant permissions" is not a single flow.
+  - **Foreground-only is real, and "Always allow" does not lift it.** With all three permissions granted, the same query over the same 46 sessions returned `23 route / 23 no-route / 0 consent-required` in the foreground and `0 / 23 / 23` in the background. Background access being granted changes nothing for routes.
+  - **`NoData` and `ConsentRequired` are distinguishable, and both are stable.** 23 of the 46 sessions read as `NoData` in both runs — indoor workouts, which have no route to begin with — while the outdoor half flipped between geometry and `ConsentRequired` depending only on foreground state. So the two conditions never have to be conflated: the UI can say "recorded indoors, no route" and "route not readable right now" as the different things they are, which is what makes honest degradation statable rather than guesswork.
+- [ ] **Empirical Samsung Health check** — not doable on the Pixel used above; needs a Galaxy Watch paired to Samsung Health.
   - On a real Galaxy Watch paired to Samsung Health, confirm whether route geometry is genuinely unreachable via Health Connect, or whether there is any supported route we have missed (`docs/VISION.md` §4.1's validation gate). If routes turn out to be readable, Android's product improves materially and Phase 3's honest-degrade work shrinks to an edge case.
 
 ---
