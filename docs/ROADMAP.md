@@ -17,7 +17,7 @@ Checkboxes are the source of truth for progress; re-check them against the three
 
 ## Phase 1 — MVP
 
-**Shipped and deployable.** Every feature in `SPEC.md`'s FR-1 through FR-9 — auth and account management, the no-signup demo, activity upload/ingestion (file, `.zip`, Google Takeout), Normal/Fog of War/Heatmap map modes with colored zone segments and high-res export, the Activities panel and its filters, the date-range picker, the per-account activity graph, and performance analysis's first three slices (trends, best-effort curves, personal bests) — is built and documented there; not re-enumerated here.
+**Shipped and deployable.** Every feature in `SPEC.md`'s FR-1 through FR-9 — auth and account management, the no-signup demo, activity upload/ingestion (file, `.zip`, Google Takeout), Normal/Fog of War/Heatmap map modes with colored zone segments and high-res export, the Activities panel and its filters, the date-range picker, the per-account activity graph, per-activity pace/heart-rate, and distance trends — is built and documented there; not re-enumerated here.
 
 ### Production deployment — repo scaffolding built (`docs/DEPLOY.md`, §5.8), not yet actually deployed anywhere
 
@@ -41,7 +41,7 @@ Native apps whose core job is exporting device-recorded health data to FitMap (P
 
 - [ ] Confirm the Samsung Health Connect route-geometry limitation empirically, not just from documentation (`VISION.md` §4.1) — Samsung's own developer docs already state `EXERCISE_ROUTE` cannot be read via Health Connect; this is double-checking in case reality is better than documented, not an open question blocking the build.
 - [ ] Confirm `HKWorkoutRoute` access with a throwaway iOS app (`VISION.md` §4.1) — due diligence before committing engineering effort to the full iOS build, not resolving a real unknown: Apple's docs already say this works.
-- [ ] Android app: Health Connect sync, foreground-only (`READ_EXERCISE_ROUTES` can't be requested programmatically, and background route reads return `ConsentRequired` even with "Always allow" granted — a platform constraint, not an implementation shortcut), with the Samsung no-route-geometry limitation surfaced honestly in the UI rather than silently producing a map-less activity. **Build this one first**, so the Path 2 sync contract is designed against the harder platform's constraints. `apps/android/docs/ROADMAP.md` carries this app's own phases and its server-side prerequisites.
+- [ ] Android app: Health Connect sync, foreground-only (`READ_EXERCISE_ROUTES` can't be requested programmatically, and background route reads return `ConsentRequired` even with "Always allow" granted — a platform constraint, not an implementation shortcut). Samsung Galaxy Watch is unsupported — it never exposes route geometry, and FitMap only ingests activities that have one. **Build this one first**, so the Path 2 sync contract is designed against the harder platform's constraints. `apps/android/docs/ROADMAP.md` carries this app's own phases and its server-side prerequisites.
 - [ ] iOS app: HealthKit sync, `HKWorkoutRoute` for full GPS geometry — the stronger of the two on-device paths, and the one that inherits the payload and sync-cursor design Android settles.
 
 ### Cross-source deduplication (`IMPLEMENTATION.md` §4.6) — unavoidable once a second ingest source exists, which mobile sync is, ahead of Phase 4's cloud connectors under this order
@@ -65,9 +65,9 @@ The shipped UI so far is functional scaffolding, not a finished product — conf
 
 ---
 
-## Phase 4 — Analysis + Cloud sources
+## Phase 4 — Cloud sources + Exploration scoring
 
-Connecting the app to third-party services, and the scoring/analysis work that benefits from the broader activity history that unlocks.
+Connecting the app to third-party services, and the explorer-tile scoring work that benefits from the broader activity history that unlocks.
 
 ### Prerequisites — gate the specific connectors below, not this phase's other work
 
@@ -81,7 +81,6 @@ Connecting the app to third-party services, and the scoring/analysis work that b
 - [ ] Garmin connector (after the licence prerequisite is settled).
 - [ ] Wahoo connector (after partner approval).
 - [ ] COROS connector (after partner approval).
-- [ ] Oura connector — recovery data only (sleep/HRV/readiness), feeds performance analysis, contributes nothing to the map (`VISION.md` §4.1 — don't blur this distinction in UI copy).
 - [ ] Deauthorization deletion for each connector as it ships, not after — Garmin/Wahoo/COROS contractually require it (§7).
 
 ### Explorer-tile gamification

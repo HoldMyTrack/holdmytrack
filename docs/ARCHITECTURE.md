@@ -31,7 +31,7 @@ A second constraint now shapes every decision: **the service is free and communi
 ```mermaid
 graph TD
     Files["Path 3: File upload (.GPX/.FIT/.TCX)"]
-    Cloud["Path 1: Garmin / Wahoo / COROS / Oura"]
+    Cloud["Path 1: Garmin / Wahoo / COROS"]
     Device["Path 2: Apple Watch, Galaxy Watch"]
 
     Web["Web App (upload + view)"]
