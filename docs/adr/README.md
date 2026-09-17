@@ -15,6 +15,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0004](0004-demo-account-reuses-real-pipeline.md) | The no-signup demo reuses the real account pipeline, bounded by a TTL |
 | [0005](0005-client-side-export-rendering.md) | High-resolution export renders client-side, not in a headless worker pool |
 | [0006](0006-minimal-deployment-same-origin-caddy.md) | Minimal deployment serves frontend and API from one origin via Caddy |
+| [0007](0007-in-app-gps-recording-submits-directly.md) | In-app GPS recording submits directly to the sync endpoint, not via a Health Connect/HealthKit round-trip |
 
 ## Writing a new one
 

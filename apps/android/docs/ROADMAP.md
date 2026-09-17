@@ -1,6 +1,6 @@
 # FitMap for Android — Roadmap
 
-This document outlines the engineering and product roadmap for the native Android application. The Android app's primary responsibility is to serve as an on-device ingest path (Path 2, `docs/adr/0001-three-independent-ingest-paths.md`), reading platform health data via **Health Connect** and displaying the shared map interface using **MapLibre Native**.
+This document outlines the engineering and product roadmap for the native Android application. The Android app's primary responsibility is to serve as an on-device ingest path (Path 2, `docs/adr/0001-three-independent-ingest-paths.md`), reading platform health data via **Health Connect** and displaying the shared map interface using **MapLibre Native**. Phase 7 adds a second, unrelated way an activity can originate on this app: casual, GPS-only recording done directly in FitMap, submitted straight to the server rather than through Health Connect ([ADR-0007](../../../docs/adr/0007-in-app-gps-recording-submits-directly.md), `docs/VISION.md` §4.1).
 
 As stated in `apps/android/README.md`, the Android development environment is not containerized and runs directly on the host machine.
 
@@ -183,3 +183,34 @@ Prepare the app for testing and store publication.
   - The list is settled and is as short as it can be: **one data type, Exercise** (`READ_EXERCISE`), plus `READ_EXERCISE_ROUTES` and `READ_HEALTH_DATA_HISTORY`, neither of which is an additional type — routes are part of an exercise session, and history is a time window over it. Confirmed on the device: Health Connect's own permission dialog for FitMap offers exactly one toggle. No heart rate, distance, calories, sleep or weight; the product draws outdoor GPS routes, so anything else would be requesting more than it demonstrably uses, which is a known rejection cause (`docs/VISION.md` §7; root `ROADMAP.md` Phase 6). What remains is filling in the Play Console declaration itself.
 - [ ] **Confirm the wider launch gates are met**
   - A Play Store release is a public launch and is gated by the same items as any other: the DPIA, EU-region hosting for EU users, and working data export and deletion endpoints (root `ROADMAP.md` Phase 6), plus the funding page and concept-render validation in its Phase 1. These are not Android work, but shipping the app without them is not an option.
+
+---
+
+## Phase 7: In-App GPS Recording
+
+A new capability, not an extension of Path 2: the app becomes able to originate an activity itself — a plain start/pause/stop GPS recording for a casual walk, hike, or drive someone would not otherwise bother tracking — rather than only reading history that already exists somewhere else. `docs/VISION.md` §1.1 and §4.1 state the product boundary this has to respect: GPS only, no heart rate/cadence/power, no training metrics, explicitly not a fitness-tracker replacement. [ADR-0007](../../../docs/adr/0007-in-app-gps-recording-submits-directly.md) settles the one architectural fork this phase would otherwise have to litigate on its own: a finished recording is submitted directly to `POST /v1/sync/activities` under its own `source` value, with no Health Connect round-trip — so this phase does not re-fight Phase 3's foreground-only battle, because there is no other app's data being asked for here.
+
+This phase is independent of Phases 5/6 above and can proceed in parallel with either — it touches new screens and a new permission set that the design freeze (Phase 5) and the Play Store compliance pass (Phase 6) will each eventually need to account for, but neither blocks starting this one.
+
+### Platform questions to settle before building
+
+- [ ] **Foreground service or plain background location?** Continuous GPS while the screen is off is exactly the kind of work Android expects a declared foreground service (`FOREGROUND_SERVICE_LOCATION`, Android 14+) for, with a persistent notification — the OS is free to kill an ordinary background process, and a killed recording with no recovery is a materially worse outcome than the app just not offering this feature. Needs verifying on-device, the same way Phase 1 verified Health Connect's real behavior rather than assuming it from documentation.
+- [ ] **Permission scope: foreground-only location, or background location too?** `ACCESS_FINE_LOCATION` covers recording while the app is visible; `ACCESS_BACKGROUND_LOCATION` is a separately-reviewed, separately-declared permission with its own Play Store justification burden (a "prominent disclosure" screen, a stricter review) — needed only if recording must survive the screen turning off, which the foreground-service question above decides. Requesting it unconditionally, before confirming it's actually needed, repeats the mistake §7's Health Connect declarations item explicitly avoided (declaring more than the product demonstrably uses).
+- [ ] **Local buffering strategy while a recording is in progress.** Points need to survive a process death mid-recording (a phone call, a low-memory kill) without being lost — an in-memory list alone is not enough, but the exact mechanism (a small local database, a flat file, `SharedPreferences`-style incremental writes) is an implementation choice this phase makes, not one `apps/android/docs/ARCHITECTURE.md` should predict before it's built.
+- [ ] **What "pause" actually means for a GPS-only recording.** Not automatic (§1.1 explicitly disclaims "auto-pause" as fitness-tracker sophistication this feature doesn't attempt) — a plain, user-initiated pause/resume is the more likely shape, but this needs a product decision, not just an implementation default.
+
+### Client work
+
+- [ ] **Recording screen**: start, pause/resume, stop, with a live elapsed-time/distance readout and a persistent notification while a recording is in progress (tied to whichever answer the foreground-service question above lands on).
+- [ ] **`RecordingRunner`-equivalent** (naming TBD, mirroring `sync/SyncRunner.kt`'s role for Path 2): accumulates location updates into the buffering mechanism above, and on stop, builds the same wire shape `docs/IMPLEMENTATION.md` §4.0.3 already defines for a sync batch — `{external_id, activity_type, points}` — with a client-generated `external_id` (there is no platform record id to reuse, unlike Health Connect) and a new `source` value distinct from `"healthconnect"`/`"healthkit"`.
+- [ ] **Activity type**: the user picks one (or a small default set — walk/hike/run/ride/drive) at start or stop, since there is no platform exercise-type field to read the way Path 2 has one; reuse `health/ExerciseTypes.kt`'s existing vocabulary rather than inventing a second one.
+- [ ] **Discard/save-on-stop confirmation**, mirroring the deliberate-confirmation pattern `docs/SPEC.md` FR-5.11 already uses for deleting an activity — stopping a recording is a one-way action once submitted, and an accidental stop should be recoverable up to that point.
+- [ ] **Crash/kill recovery**: if the app or OS ends the process mid-recording, the next launch should offer to resume or discard whatever was buffered, rather than silently losing it or silently resubmitting a stale, incomplete track.
+
+### Server-side prerequisite
+
+- [ ] **Allowlist the new `source` value** in `POST /v1/sync/activities` (`docs/IMPLEMENTATION.md` §4.0.3 currently accepts exactly `"healthconnect"`/`"healthkit"`) — the only server-side change this phase needs, per ADR-0007. No new endpoint, no schema migration: `activities.source` (`docs/IMPLEMENTATION.md` §3.3) already accepts an arbitrary `VARCHAR(32)`.
+
+### Play Store / compliance implications (feeds Phase 6, not resolved here)
+
+- [ ] A live-location feature is a distinct Play Console review surface from Health Connect's data-type declarations (Phase 6) — location permissions have their own policy requirements (a prominent in-app disclosure before the first request, a stated retention/use case) that Phase 6's existing Health Connect-focused checklist does not cover and will need extending for.

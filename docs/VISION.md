@@ -16,7 +16,7 @@ FitMap's wedge is:
 
 Worth stating early, because the shorthand for this product is "a free Strava" and that overstates it in three specific ways:
 
-* **FitMap does not record workouts.** There is no start button, no live GPS, no auto-pause. Your watch already does that well. FitMap begins where the recording ends.
+* **FitMap is not a fitness tracker.** The mobile app can record a plain GPS track as a convenience — a road trip, a dog walk, a forest walk, anything you'd otherwise need a separate tool running for (§4.1) — but it captures GPS only: no heart rate, cadence, power or other sensor data, no training metrics, no ambition to match a dedicated watch's battery life or accuracy. If you already track workouts on a watch, that stays the better tool for the job; FitMap keeps ingesting its output exactly as it always has.
 * **FitMap has no social network yet.** No feed, no follows, no kudos, no segments, no leaderboards. Athlete social networking is a stated direction (§5.5) and is deliberately out of scope until the core works — see §5.6 for why that ordering is not just caution.
 * **FitMap is not a health or fitness advisor.** No HR zones, no training load, no recovery or readiness scores, no sleep tracking. Pace and heart rate are shown per activity as context for the route, not analysed as a coaching product — an outdoor GPS tracker is what this is, not a health platform wearing a map as a skin.
 
@@ -128,11 +128,18 @@ Before engineering begins:
 
 **Path 3 is unconditional.** If every item above fails, file upload still delivers the entire product to every user willing to export once. That is what source independence buys, and it is why Phase 1 builds Path 3 first (§5).
 
+#### Casual in-app GPS recording — mobile-only, and not a fourth path
+
+Distinct from the three paths above, which each bring in a user's *existing* history from somewhere else: the mobile app can also originate an activity itself, for someone who has no watch running and does not want to install a separate tracker for a one-off walk or drive. Start, optionally pause, and stop a GPS-only recording directly in FitMap; on stop, the recorded track submits through the same ingest pipeline every other source already uses (`ARCHITECTURE.md` §1.1, `IMPLEMENTATION.md` §4.1) — no new server-side path, no separate privacy story, no dedupe case beyond what already exists for two overlapping recordings of the same activity.
+
+This isn't a resilience decision the way Paths 1–3 are — §4.1's provider-independence argument doesn't apply, since it depends on no external provider at all. It's a convenience feature: one fewer tool to install for someone who just wants a casual walk or drive on the map, with no export and no import in the way. **Scope stays deliberately narrow — GPS only.** No heart rate, cadence, power, or any other sensor; no training-load or coaching output; not a replacement for a dedicated fitness tracker (§1.1). Phased in on Android first, then iOS (§5.4); see `apps/android/docs/ROADMAP.md` for the plan.
+
 ### 4.2 Core Features
 
 | Category | Description | Key functionality |
 | :--- | :--- | :--- |
 | **Multi-source ingest** | The structural differentiator | Cloud connectors, on-device sync, file upload; cross-source deduplication |
+| **In-app GPS recording** (mobile) | Convenience capture, not a fitness-tracker replacement | Start/pause/stop a GPS-only track directly in the app; feeds the same ingest pipeline as any other source |
 | **Visual Map Engine** | Interactive renderer with custom styles | Fog of War, heatmap and track/normal modes (`IMPLEMENTATION.md` §4.2, §4.2.2); curated themes; smooth (non-hexagonal) fog edges |
 | **Per-activity detail** | Pace and heart rate as route context, not a coaching product | Per-vertex pace/HR/elevation profile on a single activity (`IMPLEMENTATION.md` §4.5) |
 | **Exploration Game** | Coverage scoring | Explorer-tile counts (z14 / z17), max cluster, coverage % by region |
@@ -208,6 +215,7 @@ Sequenced so the unconditional ingest path ships first and the ones that depend 
 ### 5.4 Phase 3: Mobile (Months 7–9)
 * Android app — Health Connect. Samsung Galaxy Watch sync is unsupported (Samsung never exposes route geometry, and FitMap only ingests activities that have one). Built first of the pair regardless, so the Path 2 sync contract is designed against the more constrained platform.
 * iOS app — HealthKit and Apple Watch, the stronger of the two on-device paths.
+* In-app GPS recording (Android, then iOS) — a plain start/pause/stop track capture for casual, watch-free activities, submitted through the existing ingest pipeline; no new server-side work beyond the mobile clients themselves (§4.1).
 * Explorer-tile gamification and coverage stats.
 
 ### 5.5 Phase 4: Social (not committed)

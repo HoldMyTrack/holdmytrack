@@ -2,7 +2,7 @@
 
 The canonical reference for *how the system is put together* — the top-level shape, the key decisions behind it, the stack, and what's deliberately not built yet. `docs/ IMPLEMENTATION.md` picks up from here with the schema and the feature-by- feature "how it's built" detail (ingest, fog, tiles, accounts, deployment); this document does not duplicate that, and that document no longer duplicates this.
 
-> **Scope note.** FitMap ingests activities; it never records them. There is no in-app GPS capture, and no social graph — see `VISION.md` §1.1 and §5.6 for why both are out of scope.
+> **Scope note.** FitMap mainly ingests activities it didn't record. The one planned exception is casual, GPS-only recording in the mobile app itself (`VISION.md` §1.1, §4.1) — everything about how an activity reaches and moves through the system beyond that capture step is unchanged: a stopped recording submits through the same ingest pipeline every other source already uses (§1.1 below). There is still no social graph — see `VISION.md` §5.6 for why that stays out of scope.
 
 ---
 
@@ -75,7 +75,7 @@ Everything server-side runs as one binary in two modes (`serve` and `work`) agai
 | Separate render service | Export rendering starves the API of CPU |
 | Read replicas | Read load, not write load, saturates the primary |
 | Social graph, feed, segments | Never, until `VISION.md` §5.6's condition is met |
-| In-app activity recording | Out of scope by product decision, not by sequencing |
+| In-app GPS recording | Now planned, mobile-only (`VISION.md` §4.1) — tracked in `apps/android/docs/ROADMAP.md`, not scheduled here since it adds no new server-side path (see [ADR-0007](adr/0007-in-app-gps-recording-submits-directly.md)) |
 
 ---
 
