@@ -834,7 +834,7 @@ The Protomaps basemap is an ODbL "Produced Work" and OSM attribution is mandator
 <a href="https://protomaps.com">Protomaps</a> © <a href="https://openstreetmap.org">OpenStreetMap</a>
 ```
 
-MapLibre Native does not render an attribution control by default in every configuration, so this must be explicitly verified on mobile rather than assumed.
+MapLibre Native does not render an attribution control by default in every configuration, so this is verified on each mobile client rather than assumed. On Android it is: `MapView` shows the attribution control on its own, and it picks up the credit the style document's `protomaps` source already carries — confirmed on a physical device against the served style (`apps/android/docs/ROADMAP.md`, Phase 2), so the Android app adds no attribution code of its own and must not disable the control.
 
 ### 5.7 Cost control — an engineering requirement, not an ops concern
 

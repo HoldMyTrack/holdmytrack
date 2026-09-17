@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/map_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -21,4 +22,72 @@
         android:textColor="#FFFFFF"
         android:textSize="13sp"
         android:visibility="gone" />
+
+    <!-- Session state and the map-mode toggle. Plain on purpose: the design freeze is Phase 3
+         of the root roadmap, after Mobile, so there is no token system or type scale to build
+         against and inventing one here would only have to be undone. -->
+    <LinearLayout
+        android:id="@+id/bottom_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="#CC000000"
+        android:orientation="vertical"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/account_label"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/account_action"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/sign_in" />
+        </LinearLayout>
+
+        <!-- Only shown to a signed-in account: all three layers the toggle switches between
+             are behind requireAuth, so there is nothing for it to do without a session. -->
+        <LinearLayout
+            android:id="@+id/mode_bar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <Button
+                android:id="@+id/mode_normal"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/mode_normal" />
+
+            <Button
+                android:id="@+id/mode_fog"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/mode_fog" />
+
+            <Button
+                android:id="@+id/mode_heatmap"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/mode_heatmap" />
+        </LinearLayout>
+    </LinearLayout>
 </FrameLayout>

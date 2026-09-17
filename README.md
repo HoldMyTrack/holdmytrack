@@ -23,7 +23,7 @@ fitmap/
 │   └── DEPLOY.md                     # the production deployment runbook
 ├── AGENTS.md                    # orientation for coding agents
 ├── apps/
-│   ├── android/                 # Kotlin — Phase 2, Health Connect ingest. Placeholder
+│   ├── android/                 # Kotlin — Phase 2. Map + session built; Health Connect next
 │   ├── ios/                     # Swift — Phase 2, HealthKit ingest. Placeholder
 │   └── web/                     # the Phase 1 product
 │       ├── Dockerfile  .dockerignore  docker/entrypoint.sh
