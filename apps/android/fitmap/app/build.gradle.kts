@@ -51,4 +51,5 @@ android {
 dependencies {
     implementation(libs.maplibre)
     implementation(libs.appcompat)
+    implementation(libs.okhttp)
 }

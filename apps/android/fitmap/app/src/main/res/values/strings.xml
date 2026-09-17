@@ -2,4 +2,24 @@
 <resources>
     <string name="app_name">FitMap</string>
     <string name="map_load_failed">Map failed to load from %1$s\n%2$s</string>
+
+    <string name="sign_in">Sign in</string>
+    <string name="sign_out">Sign out</string>
+    <string name="create_account">Create account</string>
+    <string name="try_demo">Try the demo</string>
+    <string name="sign_in_title">Sign in to FitMap</string>
+    <string name="sign_in_intro">Sign in to see your tracks, fog of war and heatmap on the map. The demo account needs no signup and is deleted after a day.</string>
+    <string name="email_hint">Email</string>
+    <string name="password_hint">Password</string>
+    <string name="credentials_required">Enter an email and a password.</string>
+    <string name="sign_in_failed">Could not sign in.</string>
+
+    <string name="signed_out">Not signed in — basemap only</string>
+    <string name="signed_in_as">Signed in as %1$s</string>
+    <string name="signed_in_demo">Signed in to the demo account</string>
+    <string name="checking_session">Checking your session…</string>
+
+    <string name="mode_normal">Normal</string>
+    <string name="mode_fog">Fog</string>
+    <string name="mode_heatmap">Heatmap</string>
 </resources>

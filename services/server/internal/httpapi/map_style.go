@@ -18,10 +18,11 @@ import (
 // and one that reads it from a CDN — the same split apps/web's VITE_BASEMAP_ORIGIN already
 // handles on its side.
 //
-// Note for a native client: the basemap source URL uses the `pmtiles://` scheme, which is a
-// protocol MapLibre GL JS registers via the pmtiles package and MapLibre Native does not
-// have. Deciding how Native reads the archive is its own open item on the Android roadmap;
-// this endpoint serves the style as the web client defines it and does not pre-empt that.
+// The basemap source URL uses the `pmtiles://` scheme, which MapLibre GL JS answers with the
+// pmtiles package's registered protocol and MapLibre Native answers natively (built in since
+// Android 11.8.0 / iOS 6.10.0). So one document serves both: no native client needs the
+// archive re-exposed as `{z}/{x}/{y}`, confirmed on a physical Android device reading this
+// endpoint's own output (apps/android/docs/ROADMAP.md, Phase 2).
 func (s *Server) handleMapStyle(w http.ResponseWriter, r *http.Request) {
 	flavor := strings.TrimSuffix(r.PathValue("flavor"), ".json")
 

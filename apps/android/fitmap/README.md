@@ -1,6 +1,8 @@
 # fitmap-android
 
-The FitMap Android app (`apps/android/docs/ROADMAP.md`). Today it is the client shell: a full-screen MapLibre Native map rendering the style document the API serves at `GET /v1/map/style/{flavor}`, with no account, no user layers and no Health Connect yet — those are the roadmap items that follow.
+The FitMap Android app (`apps/android/docs/ROADMAP.md`). Today it is the client shell, a session and the map: a full-screen MapLibre Native map rendering the style document the API serves at `GET /v1/map/style/{flavor}`, sign-in against the same accounts the web client uses, and the Normal / Fog of War / Heatmap toggle over the user's own layers. Health Connect ingestion is the roadmap phase that follows, and none of it is here yet.
+
+The basemap draws whether or not anyone is signed in — the style endpoint is unauthenticated and the archive it points at is a plain `pmtiles://` URL that MapLibre Native reads natively — so a signed-out FitMap is a working map rather than a login wall. Signing in is what adds the three user layers, every one of which is behind `requireAuth` server-side.
 
 ## Build requirements
 
@@ -35,6 +37,20 @@ Cleartext `http://` is permitted in debug builds only (`app/src/debug/AndroidMan
 
 ## Layout
 
-- `app/src/main/kotlin/dev/fitmap/android/MainActivity.kt` — the map, its style URL, and MapLibre's lifecycle forwarding.
+Everything is under `app/src/main/kotlin/dev/fitmap/android/`:
+
+- `FitMapApplication.kt` — process-level setup. The load-bearing line is `HttpRequestUtil.setOkHttpClient`, which replaces MapLibre Native's own HTTP client with the app's. The map SDK fetches the style, the archive and every tile through a stack the app's API client never sees, so without this the session would reach none of the user layers.
+- `MainActivity.kt` — the map, the session state it reflects, the mode toggle, and MapLibre's lifecycle forwarding.
+- `SignInActivity.kt` — sign in, create an account, or start a demo account.
+- `net/Session.kt` — the session token, held process-wide and mirrored to private `SharedPreferences`.
+- `net/FitMapApi.kt` — the whole HTTP surface: the shared `OkHttpClient`, the interceptor that attaches the token to FitMap's own origin and nowhere else, and the five calls the app makes.
+- `map/MapOverlays.kt` — the tracks, fog and heatmap layers, their ordering beneath the basemap's labels, and the three-way mode toggle.
+
+Alongside:
+
 - `gradle/libs.versions.toml` — every dependency version, including MapLibre Native.
 - `../poc-healthconnect/` — a separate, throwaway build answering the roadmap's Phase 1 questions. Not a module of this project, and deleted once its findings are recorded.
+
+## Signing in against a dev stack
+
+There is no seeded Android account. Create one from the app itself (**Create account**), or tap **Try the demo** for an ephemeral account that needs no signup and is purged after a day. A session survives restarts, and is checked against `GET /v1/auth/me` at startup before any user layer is attached — a token revoked or expired while the app was closed would otherwise show up only as 401s in logcat, behind a map that looks merely empty.
