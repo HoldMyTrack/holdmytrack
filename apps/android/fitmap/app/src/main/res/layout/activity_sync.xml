@@ -8,63 +8,60 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
         android:orientation="vertical"
         android:padding="24dp">
 
+        <!-- Health Connect opens this screen as the app's permission rationale, so this has to
+             stand on its own as an answer to "why does this app want my exercise data". -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingBottom="16dp"
-            android:text="@string/sign_in_intro"
+            android:text="@string/sync_rationale"
             android:textSize="14sp" />
 
-        <EditText
-            android:id="@+id/email"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:autofillHints="emailAddress"
-            android:hint="@string/email_hint"
-            android:importantForAutofill="yes"
-            android:inputType="textEmailAddress" />
-
-        <EditText
-            android:id="@+id/password"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:autofillHints="password"
-            android:hint="@string/password_hint"
-            android:importantForAutofill="yes"
-            android:inputType="textPassword" />
-
-        <!-- The server's own wording, verbatim — see SignInActivity for why it isn't reworded
-             on the way through. -->
         <TextView
-            android:id="@+id/error"
+            android:id="@+id/sync_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/sync_instructions"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingTop="12dp"
-            android:textColor="#C62828"
-            android:textSize="13sp"
+            android:textSize="14sp"
             android:visibility="gone" />
 
         <Button
-            android:id="@+id/sign_in"
+            android:id="@+id/sync_primary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="@string/sign_in" />
+            android:layout_marginTop="16dp" />
+
+        <!-- A state-specific alternative to the primary action; only the 30-day-history state
+             uses one so far ("sync what's reachable anyway"). -->
+        <Button
+            android:id="@+id/sync_secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
 
         <Button
-            android:id="@+id/sign_up"
+            android:id="@+id/sync_open_health_connect"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/create_account" />
+            android:text="@string/sync_open_health_connect" />
 
-        <Button
-            android:id="@+id/demo"
+        <TextView
+            android:id="@+id/sync_results"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/try_demo" />
+            android:paddingTop="16dp"
+            android:textIsSelectable="true"
+            android:textSize="13sp"
+            android:visibility="gone" />
     </LinearLayout>
 </ScrollView>

@@ -2,9 +2,36 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- The map is served, not bundled: both the style document and every basemap tile come
-         from the API. Health Connect permissions belong to Phase 3 and are not declared yet;
-         asking for more than the app demonstrably uses is a known Play rejection cause. -->
+         from the API. -->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+      Exactly two Health Connect permissions, and no more. Declaring types the product does
+      not demonstrably use is a known Play rejection cause (docs/VISION.md §7), so heart rate,
+      distance, calories and the rest stay out: FitMap ingests outdoor GPS routes, and a route
+      needs the session and its geometry, nothing else.
+
+      READ_HEALTH_DATA_IN_BACKGROUND is deliberately absent. Phase 1 measured that it buys
+      nothing for routes — the same 46 sessions returned 23 routes in the foreground and 0 in
+      the background with it granted — so requesting it would be asking the user for an
+      alarming permission that cannot change what the app can do.
+
+      READ_EXERCISE_ROUTES cannot be requested programmatically at all: the platform only
+      grants it from Health Connect's own settings, two screens below the app's permission
+      page. It is declared here because it still has to be, and SyncActivity walks the user
+      there by hand.
+
+      READ_HEALTH_DATA_HISTORY is not a fourth data type — it is a time window over the ones
+      already declared. Without it Health Connect hands back only the last 30 days, which was
+      not a guess: the first sync on a real device read exactly 30 days and Health Connect's
+      own screen said "FitMap can read data added after August 17, 2026". A 30-day map is not
+      what this product is; FitMap exists to show the accumulated shape of where someone has
+      been, from history they already have. So this is asked for, and it is still the whole
+      list — three permissions, one data type.
+    -->
+    <uses-permission android:name="android.permission.health.READ_EXERCISE" />
+    <uses-permission android:name="android.permission.health.READ_EXERCISE_ROUTES" />
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" />
 
     <application
         android:name=".FitMapApplication"
@@ -30,5 +57,32 @@
             android:exported="false"
             android:label="@string/sign_in_title"
             android:theme="@style/Theme.AppCompat.DayNight" />
+
+        <!-- Exported, unlike SignInActivity, because Health Connect itself launches it: the
+             rationale intent below is how the platform shows the user why this app wants
+             their exercise data, and without that filter the permission dialog can refuse to
+             appear at all (found in the Phase 1 PoC). This screen is the rationale — it says
+             what is read and what it is used for before asking for anything. -->
+        <activity
+            android:name=".SyncActivity"
+            android:exported="true"
+            android:label="@string/sync_title"
+            android:theme="@style/Theme.AppCompat.DayNight">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
+
+        <!-- Where Health Connect's "see how this app used your data" link lands. -->
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE"
+            android:targetActivity=".SyncActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
     </application>
 </manifest>

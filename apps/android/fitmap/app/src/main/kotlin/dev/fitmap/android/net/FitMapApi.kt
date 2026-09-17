@@ -14,10 +14,21 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 
 /** An account with a live session — what a successful sign-in, sign-up or demo start yields. */
 data class Account(val token: String, val email: String)
+
+/**
+ * What the server did with one activity in a sync batch. [status] is `"enqueued"`,
+ * `"already_processed"` or `"rejected"`, and [error] carries the reason for the last of those —
+ * an activity with no usable geometry, most often, which is a permanent verdict about that
+ * record rather than a transient failure worth retrying.
+ */
+data class SyncResult(val externalId: String, val status: String, val error: String)
 
 /**
  * A request the server answered with a non-2xx status. The API writes its errors as plain
@@ -41,6 +52,10 @@ class ApiException(val code: Int, message: String) :
 object FitMapApi {
 
     private const val API_V1 = "/v1"
+
+    /** The `source` value the endpoint's allowlist accepts for Android — the other is iOS's
+     *  `"healthkit"`, and Paths 1 and 3 have their own endpoints and their own values. */
+    private const val HEALTH_CONNECT_SOURCE = "healthconnect"
     private val JSON = "application/json; charset=utf-8".toMediaType()
     private val main = Handler(Looper.getMainLooper())
 
@@ -81,6 +96,43 @@ object FitMapApi {
             return chain.proceed(request.newBuilder().header("Authorization", "Bearer $token").build())
         }
     }
+
+    /**
+     * `POST /v1/sync/activities` — Path 2's batched sync (`docs/IMPLEMENTATION.md` §4.0.3).
+     *
+     * Suspending rather than callback-based like everything above it, because its only caller
+     * is the sync run, which is a coroutine from end to end (Health Connect's read API leaves
+     * no choice). The blocking `execute()` is confined to `Dispatchers.IO` here rather than
+     * wrapped in `enqueue`, since the caller genuinely wants to wait: the next batch must not
+     * be sent, and the watermark must not move, until this one is answered.
+     *
+     * Returns the server's per-activity verdicts rather than a single pass/fail — a batch is
+     * not all-or-nothing there, and the caller needs to know which ones landed before it can
+     * decide how far the watermark may move. A non-2xx status is the whole request failing and
+     * throws instead; nothing in the batch was decided.
+     */
+    suspend fun syncActivities(activities: List<JSONObject>): List<SyncResult> =
+        withContext(Dispatchers.IO) {
+            val body = JSONObject()
+                .put("source", HEALTH_CONNECT_SOURCE)
+                .put("activities", JSONArray(activities))
+            val request = Request.Builder()
+                .url(BuildConfig.API_BASE_URL + API_V1 + "/sync/activities")
+                .post(body.toString().toRequestBody(JSON))
+                .build()
+            val response = client.newCall(request).execute()
+            val text = response.use { it.body?.string().orEmpty() }
+            if (!response.isSuccessful) throw ApiException(response.code, text.trim())
+            val results = JSONObject(text).getJSONArray("results")
+            List(results.length()) { i ->
+                val result = results.getJSONObject(i)
+                SyncResult(
+                    externalId = result.optString("external_id"),
+                    status = result.optString("status"),
+                    error = result.optString("error"),
+                )
+            }
+        }
 
     fun signIn(email: String, password: String, onResult: (Result<Account>) -> Unit) {
         authenticate("/auth/login", credentials(email, password), onResult)

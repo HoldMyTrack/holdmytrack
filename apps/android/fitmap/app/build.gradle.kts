@@ -52,4 +52,10 @@ dependencies {
     implementation(libs.maplibre)
     implementation(libs.appcompat)
     implementation(libs.okhttp)
+    implementation(libs.health.connect)
+    // Coroutines are not a style preference here: every HealthConnectClient read is a suspend
+    // function, so there is no callback API to use instead. lifecycle-runtime brings the
+    // lifecycleScope the sync run is tied to, which is what keeps it foreground-only.
+    implementation(libs.lifecycle.runtime)
+    implementation(libs.coroutines.android)
 }
