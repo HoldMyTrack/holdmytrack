@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-09-14.
+Last updated: 2026-09-17.
 
 ## How to read this document
 
@@ -18,6 +18,15 @@ Checkboxes are the source of truth for progress; re-check them against the three
 ## Phase 1 — MVP
 
 **Shipped and deployable.** Every feature in `SPEC.md`'s FR-1 through FR-9 — auth and account management, the no-signup demo, activity upload/ingestion (file, `.zip`, Google Takeout), Normal/Fog of War/Heatmap map modes with colored zone segments and high-res export, the Activities panel and its filters, the date-range picker, the per-account activity graph, per-activity pace/heart-rate, and distance trends — is built and documented there; not re-enumerated here.
+
+### Email verification + demo without real ingest — reverses the "no email verification" simplicity call `IMPLEMENTATION.md`:741 documents, now that real sync's cost makes that trade-off worth revisiting
+
+Sync (Health Connect ingest today, cloud connectors in Phase 4) does real, non-trivial work per activity — classification, batching, server-side parsing, distance/duration calc, fog/heatmap tile mask rendering. An account whose email was mistyped at signup can never complete a password reset, so any of that work is permanently stranded on an account nobody can ever get back into. The demo account (`POST /v1/auth/demo`, `IMPLEMENTATION.md` §4.10) has the same problem in a sharper form: it requires no signup at all, is rate-limited but not identity-checked, and today is verified to allow a real authenticated upload before being purged a day later — compute anyone can trigger repeatedly for data guaranteed to be thrown away.
+
+- [ ] Real account creation gates the map (and every authenticated route) behind email verification — hold on a "verify your email" screen until `email_verified = true`. Unaffected: the existing signed-out, unauthenticated basemap stays public exactly as today (`docs/ARCHITECTURE.md`'s "a signed-out FitMap is a working map rather than a login wall" still holds — this only gates a freshly created, unverified account, not anonymous browsing).
+- [ ] The verify-email screen offers both resend and change-email — resend alone doesn't help someone who typed the address wrong in the first place, which is the actual case this change exists to catch.
+- [ ] Demo accounts drop upload/sync entirely — no Health Connect permission flow, no `POST /v1/activities/upload`/`sync/activities` access — and are seeded instead from a small, curated, one-time-built library of preset activities (GPX/FIT-shaped, stored like any other activity) so Normal/Fog of War/Heatmap/Trends all have something to show immediately.
+- [ ] Preset library selection is a one-time lookup, not per-request generation: build roughly 15-30 realistic routes once (a city park loop, a coastal run, a river path, etc.) spread across major regions, then pick the nearest to the demo account's coarse IP-based country/region at start time — reusing the remote-address extraction the demo rate limiter already does (`IMPLEMENTATION.md` §4.10's 429 on the 6th demo start/hour from one address) — falling back to one default global set when nothing nearby exists. No live route-generation engine: synthesizing plausible roads/pace/elevation per request would cost more than the sync work this change removes, undoing the point of it.
 
 ### Production deployment — repo scaffolding built (`docs/DEPLOY.md`, §5.8), not yet actually deployed anywhere
 
