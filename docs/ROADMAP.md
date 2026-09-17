@@ -112,6 +112,7 @@ Non-negotiable, GDPR Art. 9 special-category data (`VISION.md` §7).
 - [ ] EU-region hosting for EU users.
 - [ ] Working data export and deletion endpoints (account deletion doesn't exist yet — confirm and build if missing).
 - [ ] Health Connect data-type declarations in the Play Console, scoped to only what's actually used (Phase 2 builds the app; the declaration work belongs here).
+- [ ] Confirm we don't need a cookie consent banner — as of this writing the web client sets exactly one cookie (`fitmap_session`: `HttpOnly`, `SameSite=Lax`, `Secure` under HTTPS, no `localStorage`/analytics/tracking anywhere in `apps/web`), which should fall under the ePrivacy Directive Art. 5(3) "strictly necessary" exemption — no consent required, only a plain-language disclosure in the privacy policy. Re-check this conclusion at launch time (cookie/analytics usage can drift) and again the day anything non-essential (analytics, an ad pixel, marketing tracking) is added, since that would flip the answer.
 
 ### Privacy zones (schema exists, nothing else does — `privacy_zones` table, §3.7)
 
