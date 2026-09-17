@@ -38,6 +38,15 @@ FR-5.10 already lets a person retype a single activity's Type (free text, with a
 - [ ] Each per-id call must resend that activity's own existing `name`/`description` alongside the new shared `activityType` — `updateActivity` is full-replace, not partial (`api.ts`), so naively sending only the new Type to every id would blank out every checked activity's name and description. The panel already holds full `Activity` objects for the checked group (the same data `checkedActivities` already provides Delete group's confirm message), so this is just building the right per-row payload, not a new data dependency.
 - [ ] Once it lands: FR-5.2's TYPE filter chips, each row's TYPE label, and FR-5.10's own `<datalist>` all recompute for free from the refreshed data (`activityFacets.ts` is already purely derived from loaded activities) — no changes needed there, same as FR-5.10 required none.
 
+### Export attribution + FitMap logo — closes a compliance gap in FR-4.10, and adds a small brand mark
+
+`style.ts:28` already documents that OSM/Protomaps attribution is mandatory, not decorative — the basemap is an ODbL "Produced Work," and the comment states credit "has to be visible on the map and on any export." But `exportMap.ts:68` sets `attributionControl: false` on the offscreen export map instance, and nothing else draws attribution onto the canvas before `toBlob()` — so FR-4.10's exported PNGs carry no attribution at all today, contradicting the code's own stated requirement. This is a real compliance bug in already-shipped functionality, not a cosmetic gap.
+
+- [ ] Draw `style.ts`'s own `ATTRIBUTION` text onto the export canvas before `toBlob()` in `exportMap.ts` — the fix for the gap above. Not optional or togglable: it's a license requirement, not a preference.
+- [ ] Add a small FitMap logo/wordmark in a non-competing corner of the export (sharing the same lower-corner strip as the attribution text, small and low-contrast, never covering map content) — free brand exposure on exports that get shared, which fits `VISION.md` §6's free-forever, donation-funded, no-ad-budget model. Several free, sharing-driven apps (Strava, Peloton, Duolingo) put the same kind of subtle mark on their own shareable images for the same reason.
+- [ ] The logo is on by default, with a simple toggle to turn it off per export (or a persisted preference) — a courtesy, not a paywall gate, since there is no paid tier here to protect. Unlike the attribution text, this one is genuinely optional.
+- [ ] Both are drawn in `exportMap.ts` right before the canvas's `toBlob()` call, in the same pass — the natural point, since both need to be baked into the raster itself, not just shown via the live map's DOM-based `AttributionControl`, which the export path bypasses entirely.
+
 ### Production deployment — repo scaffolding built (`docs/DEPLOY.md`, §5.8), not yet actually deployed anywhere
 
 - [x] `compose.prod.yml` + `apps/web/Dockerfile`'s `build`/`serve` stages + `apps/web/docker/Caddyfile` — a minimal single-VPS topology (Postgres+PostGIS, `api`, `worker`, Caddy), verified to build and validate but never run against a real VPS/domain/R2 bucket.
