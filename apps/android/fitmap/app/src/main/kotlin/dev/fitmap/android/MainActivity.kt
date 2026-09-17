@@ -38,6 +38,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var status: TextView
     private lateinit var accountLabel: TextView
     private lateinit var accountAction: Button
+    private lateinit var syncAction: Button
     private lateinit var modeBar: View
     private lateinit var modeButtons: Map<MapMode, Button>
 
@@ -63,6 +64,7 @@ class MainActivity : AppCompatActivity() {
         status = findViewById(R.id.status)
         accountLabel = findViewById(R.id.account_label)
         accountAction = findViewById(R.id.account_action)
+        syncAction = findViewById(R.id.sync_action)
         modeBar = findViewById(R.id.mode_bar)
         modeButtons = mapOf(
             MapMode.NORMAL to findViewById(R.id.mode_normal),
@@ -71,6 +73,7 @@ class MainActivity : AppCompatActivity() {
         )
         modeButtons.forEach { (value, button) -> button.setOnClickListener { setMode(value) } }
         accountAction.setOnClickListener { onAccountAction() }
+        syncAction.setOnClickListener { startActivity(Intent(this, SyncActivity::class.java)) }
         setMode(mode)
 
         insetSystemBars()
@@ -157,6 +160,9 @@ class MainActivity : AppCompatActivity() {
             else -> getString(R.string.signed_in_as, Session.email)
         }
         modeBar.visibility = if (signedIn) View.VISIBLE else View.GONE
+        // Health Connect sync needs somewhere to sync to, so it appears with the session
+        // rather than sitting there inert for a signed-out visitor.
+        syncAction.visibility = if (signedIn) View.VISIBLE else View.GONE
 
         val loaded = style ?: return
         if (signedIn && !overlaysAttached) {

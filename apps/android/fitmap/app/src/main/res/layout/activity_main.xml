@@ -52,6 +52,14 @@
                 android:textColor="#FFFFFF"
                 android:textSize="13sp" />
 
+            <!-- Only meaningful with a session, so it hides with the mode bar. -->
+            <Button
+                android:id="@+id/sync_action"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/sync_action"
+                android:visibility="gone" />
+
             <Button
                 android:id="@+id/account_action"
                 android:layout_width="wrap_content"
