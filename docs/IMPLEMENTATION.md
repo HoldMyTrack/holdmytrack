@@ -68,7 +68,10 @@ CREATE TABLE activities (
                                                -- | 'coros' | 'healthkit' | 'healthconnect'
     source_detail     VARCHAR(255),
     external_id       VARCHAR(255),            -- provider activity ID, or HK/HC record UID
-    dedupe_key        TEXT,                    -- see §4.6; cross-source identity
+    -- The copy that displaced this one, or NULL when this row is live (§4.6). ON DELETE SET
+    -- NULL, so deleting the winner puts the copy it displaced back on the map rather than
+    -- orphaning it into permanent invisibility.
+    superseded_by     UUID REFERENCES activities(id) ON DELETE SET NULL,
 
     activity_type     VARCHAR(50)  NOT NULL,   -- whatever the source reports, verbatim —
                                                -- not a controlled vocabulary; see §4.7
@@ -92,7 +95,11 @@ CREATE TABLE activities (
 
 CREATE UNIQUE INDEX idx_activities_dedupe
     ON activities (user_id, source, external_id) WHERE external_id IS NOT NULL;
-CREATE INDEX idx_activities_crosssource ON activities (user_id, dedupe_key);
+-- Every user-facing read is "this user's live activities", so that is the index they get.
+CREATE INDEX idx_activities_live ON activities (user_id, started_at DESC)
+    WHERE superseded_by IS NULL;
+-- §4.6's collision lookup: same user, same type, a range around a start time.
+CREATE INDEX idx_activities_dedupe_window ON activities (user_id, activity_type, started_at);
 CREATE INDEX idx_activities_user_time   ON activities (user_id, started_at DESC);
 CREATE INDEX idx_activities_spatial     ON activities USING GIST (trajectory);
 CREATE INDEX idx_activities_type        ON activities (user_id, activity_type);
@@ -513,9 +520,17 @@ Not a performance-analysis pillar — `VISION.md` §1.1 draws a hard line agains
 
 Unavoidable the moment a second path exists, and every multi-device athlete hits it immediately: a ride recorded on a Garmin syncs via Path 1, gets written to HealthKit and syncs via Path 2, and appears again in a Strava bulk export via Path 3. Three copies, three different `external_id`s, one real ride. The unique index in §3.3 does not catch this — the identities are genuinely different.
 
-`dedupe_key` is a fuzzy identity: **user, activity type, start time rounded to the nearest minute, and distance bucketed to ~1%.** Collisions are handled by preferring the richest record — the one with geometry over one without, and more stream channels over fewer — and marking the others as superseded rather than deleting them, so a user can see why something disappeared.
+**Built**, in `internal/ingest/dedupe.go`, run from `ingest.Process` once the new activity's streams and masks exist — richness is read off those rows, so ranking a record ahead of its own streams would judge it the poorest copy every time.
 
-Start times differ by a few seconds between sources, which is why rounding is needed, and why this is a heuristic rather than a key. Get it wrong in the permissive direction and two real activities merge; wrong in the strict direction and the fog is drawn twice. Prefer the strict direction: a duplicate is visible and fixable, a silently merged activity is not.
+Identity is fuzzy: **same user, same activity type, start within half a minute either way, distance within ~1%.** It is applied as a window around the incoming activity rather than as equality on a pre-rounded bucket. Rounding first is cheaper to index but turns matching into a lottery at the bucket edges — two copies three seconds apart match or don't depending purely on whether they straddle a boundary, which was measured happening on a real pair. A window applies the same tolerance to every pair the same way. `idx_activities_dedupe_window` (§3.3) is what keeps the range scan cheap. Tolerance is relative rather than absolute because 1% of a 5 km run and 1% of a 200 km ride are very different numbers of metres.
+
+Collisions prefer the **richest** record — geometry over none, then more stream channels over fewer — and the rest are marked `superseded_by` rather than deleted, so a user can see why something disappeared (`GET /v1/activities/duplicates`, §4.7). The remaining comparisons are a tie-break rather than a richness judgement, and they have to be total and stable: two identical-looking copies must resolve the same way whichever was examined first, or a re-run flips which one is live and churns every fog tile underneath it.
+
+Start times differ by a few seconds between sources, which is why the tolerance exists at all, and why this is a heuristic rather than a key. Get it wrong in the permissive direction and two real activities merge; wrong in the strict direction and the fog is drawn twice. Prefer the strict direction: a duplicate is visible and fixable, a silently merged activity is not — so an activity with **no distance is never deduplicated**, since type and start time alone are too weak to merge on.
+
+**Every user-facing read excludes superseded rows** — the activity list, the summary, the histogram and its day pages, trends, the graph stats, the tracks tiles, and both fog/heatmap composites. The two reads that deliberately do not are the receive-time idempotency checks on `(user_id, source, external_id)`, where an already-superseded row is still "already processed", and the per-id lookups behind editing and deleting, which have to keep working for a duplicate the user can see.
+
+**Deleting the winner re-ranks what it releases.** `superseded_by` is `ON DELETE SET NULL`, so every copy the deleted row displaced becomes live at once — without re-resolving, the same ride would be counted two or three times in the totals and drawn that many times into the additive heatmap, which is precisely what this section exists to prevent.
 
 ### 4.7 Activity listing and filtering
 
@@ -531,6 +546,12 @@ GET /v1/activities?from=2026-06-01&to=2026-09-18&types=ride,run
 - **Response**: `{"activities": [...]}`, where each row carries `id`, `started_at`, `activity_type`, `distance_meters`, `duration_seconds` and `bbox` — what the panel renders, plus the one thing it needs to point the map at a row. `bbox` is `[minLon, minLat, maxLon, maxLat]` (GeoJSON's ordering), computed per row with `ST_XMin(trajectory)` and friends, and `null` when the row has no trajectory. It is not a stored column: PostGIS caches a geometry's bounding box in its header, so reading it costs nothing like a scan, and §3.3's note on why the `BOX2D` column was removed applies equally to adding a new one. Full geometry still never travels this way — that is §4.3's tiles. **`duration_seconds`, not `moving_seconds`**: the ingest pipeline populates `moving_seconds` now (§4.5's ingest-gap fixes), but only for activities ingested since — anything older still has it `null`, and this list serves every activity through the same row shape, so it stays on `duration_seconds`, which has no such gap. `moving_seconds` is for callers that can accept that split, like §4.5's own trends. The metric fields stay nullable rather than defaulting to `0` — a file that carried no distance is not a zero-distance activity, and the UI shows an em dash for the difference.
 
 **Built**, in `internal/httpapi/activities.go`. The `from`/`to`/`types` parsing is shared code with §4.3's tracks query (`parseActivityFilter`), so the "absent means no restriction" convention cannot drift between the map and the list.
+
+```http
+GET /v1/activities/duplicates
+```
+
+**Also built**, and it is the counterpart the list needs once a second ingest path exists: the list only ever shows live activities (§4.6), so something a user synced can be absent for two quite different reasons — it failed, or it was already here from somewhere else — and only the second is not a fault. Each row names both sources, since that is the actual answer to "why is this not on my map". No filter and no pagination: duplicates are a small set beside the history they came from, and the question is asked about all of them at once.
 
 **Pagination was considered and dropped.** A row-wise keyset cursor, `(started_at, id) < ($cursor_ts, $cursor_id)` — chosen over `started_at < $cursor_ts` alone because duplicate start times are real here (the same ride ingested from two files lands as two rows sharing a `started_at`), and a timestamp-only cursor either drops or repeats one at a page boundary — isn't worth it: the Activities panel's TYPE and DISTANCE filters, computed client-side over the panel's own rows, need the *whole* current range at once (their checkbox counts and slider bounds), and the map already draws every matching track regardless of what the list had paged in, so a cursor was never actually letting anyone skip work. Phase 1 has one seeded user with activity counts in the hundreds to low thousands at most; a real multi-user phase is what's likely to make this worth revisiting.
 

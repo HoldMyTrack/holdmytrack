@@ -31,6 +31,39 @@ data class Account(val token: String, val email: String)
 data class SyncResult(val externalId: String, val status: String, val error: String)
 
 /**
+ * One row of the sync history — an `ingest` job and, once it has produced one, the activity it
+ * became. [startedAt] and [distanceMeters] are null while the job is still processing, or
+ * forever if it failed: there is no activity behind it to describe.
+ */
+data class SyncHistoryEntry(
+    val label: String,
+    val status: String,
+    val error: String,
+    val submittedAt: String,
+    val startedAt: String?,
+    val distanceMeters: Double?,
+)
+
+/** A page of the sync history, plus the counts that describe the whole of it. */
+data class SyncHistory(
+    val total: Long,
+    val processing: Long,
+    val entries: List<SyncHistoryEntry>,
+)
+
+/**
+ * One activity cross-source deduplication took out of circulation, and the copy that displaced
+ * it (`docs/IMPLEMENTATION.md` §4.6). Carries both sources, because that is the actual answer
+ * to "why is this not on my map": the same ride, already in from somewhere else.
+ */
+data class Duplicate(
+    val startedAt: String,
+    val activityType: String,
+    val source: String,
+    val supersededBySource: String,
+)
+
+/**
  * A request the server answered with a non-2xx status. The API writes its errors as plain
  * text (`http.Error`), so `message` is the server's own wording, shown to the user as-is
  * rather than replaced with something vaguer — "invalid email or password" and "an account
@@ -133,6 +166,55 @@ object FitMapApi {
                 )
             }
         }
+
+    /**
+     * `GET /v1/uploads` — every ingest job this account has, newest first, whatever path it
+     * arrived by. The sync screen and an uploaded file share one history because they are the
+     * same jobs table; there is no separate notion of "a sync" to list.
+     */
+    fun syncHistory(limit: Int, onResult: (Result<SyncHistory>) -> Unit) {
+        val request = Request.Builder()
+            .url(BuildConfig.API_BASE_URL + API_V1 + "/uploads?limit=" + limit)
+            .build()
+        call(request, { body ->
+            val json = JSONObject(body)
+            val rows = json.getJSONArray("uploads")
+            SyncHistory(
+                total = json.optLong("total"),
+                processing = json.optLong("processing"),
+                entries = List(rows.length()) { i ->
+                    val row = rows.getJSONObject(i)
+                    SyncHistoryEntry(
+                        label = row.optString("filename").ifBlank { row.optString("external_id") },
+                        status = row.optString("status"),
+                        error = row.optString("error"),
+                        submittedAt = row.optString("submitted_at"),
+                        startedAt = row.optString("started_at").ifBlank { null },
+                        distanceMeters = if (row.isNull("distance_meters")) null else row.optDouble("distance_meters"),
+                    )
+                },
+            )
+        }, onResult)
+    }
+
+    /** `GET /v1/activities/duplicates` — see [Duplicate]. */
+    fun duplicates(onResult: (Result<List<Duplicate>>) -> Unit) {
+        val request = Request.Builder()
+            .url(BuildConfig.API_BASE_URL + API_V1 + "/activities/duplicates")
+            .build()
+        call(request, { body ->
+            val rows = JSONObject(body).getJSONArray("duplicates")
+            List(rows.length()) { i ->
+                val row = rows.getJSONObject(i)
+                Duplicate(
+                    startedAt = row.optString("started_at"),
+                    activityType = row.optString("activity_type"),
+                    source = row.optString("source"),
+                    supersededBySource = row.getJSONObject("superseded_by").optString("source"),
+                )
+            }
+        }, onResult)
+    }
 
     fun signIn(email: String, password: String, onResult: (Result<Account>) -> Unit) {
         authenticate("/auth/login", credentials(email, password), onResult)

@@ -179,7 +179,22 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	if err := fog.RenderActivityMasks(ctx, pool, store, activityID, points, tiles); err != nil {
 		return Result{}, fmt.Errorf("ingest: render activity masks: %w", err)
 	}
-	if err := MarkFogTilesDirty(ctx, pool, job.UserID, tiles); err != nil {
+
+	// §4.6's cross-source deduplication, after the streams and masks above and not before:
+	// richness is ranked off those rows, so a record judged ahead of its own streams would
+	// lose every collision it entered. Masks are rendered for the loser too — they cost
+	// nothing to keep, every read already excludes a superseded activity, and if the winner
+	// is ever deleted the loser becomes live again with its coverage already on file.
+	//
+	// The tiles it reports back are added to the dirty set rather than replacing it: a
+	// collision can change which activities a tile the *new* one never touched is composited
+	// from, and rebuilding only the new one's tiles would leave the rest showing coverage
+	// from a copy that no longer counts.
+	dedupeTiles, err := ResolveDuplicates(ctx, pool, job.UserID, act.ActivityType, points[0].Time, m.distanceM)
+	if err != nil {
+		return Result{}, err
+	}
+	if err := MarkFogTilesDirty(ctx, pool, job.UserID, mergeTiles(tiles, dedupeTiles)); err != nil {
 		return Result{}, fmt.Errorf("ingest: mark fog tiles dirty: %w", err)
 	}
 	if err := EnqueueRenderFog(ctx, pool, job.UserID); err != nil {
@@ -187,6 +202,26 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	}
 
 	return Result{ActivityID: activityID, Persisted: true}, nil
+}
+
+// mergeTiles unions two tile lists, dropping duplicates — MarkFogTilesDirty is an upsert, so
+// a repeat is harmless, but the dirty set is also what bounds the rebuild's cost.
+func mergeTiles(a, b [][2]int) [][2]int {
+	if len(b) == 0 {
+		return a
+	}
+	seen := make(map[[2]int]struct{}, len(a)+len(b))
+	out := make([][2]int, 0, len(a)+len(b))
+	for _, list := range [][][2]int{a, b} {
+		for _, t := range list {
+			if _, ok := seen[t]; ok {
+				continue
+			}
+			seen[t] = struct{}{}
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 // FogZoom is exported alongside MarkFogTilesDirty/EnqueueRenderFog — a caller re-triggering a

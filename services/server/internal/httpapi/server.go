@@ -113,6 +113,7 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(route("GET", "/activities"), s.requireAuth(s.handleListActivities))
 	s.mux.HandleFunc(route("PATCH", "/activities/{id}"), s.requireAuth(s.handleUpdateActivity))
 	s.mux.HandleFunc(route("DELETE", "/activities/{id}"), s.requireAuth(s.handleDeleteActivity))
+	s.mux.HandleFunc(route("GET", "/activities/duplicates"), s.requireAuth(s.handleListDuplicates))
 	s.mux.HandleFunc(route("GET", "/activities/summary"), s.requireAuth(s.handleActivitySummary))
 	s.mux.HandleFunc(route("GET", "/activities/histogram"), s.requireAuth(s.handleActivityHistogram))
 	s.mux.HandleFunc(route("GET", "/activities/graph-stats"), s.requireAuth(s.handleActivityGraphStats))

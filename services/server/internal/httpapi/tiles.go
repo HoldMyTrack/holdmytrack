@@ -22,6 +22,7 @@ FROM (
            ) AS geom
     FROM activities
     WHERE user_id = $4
+      AND superseded_by IS NULL
       AND trajectory && ST_Transform(ST_TileEnvelope($1, $2, $3), 4326)
       AND ($5::timestamptz IS NULL OR started_at >= $5)
       AND ($6::timestamptz IS NULL OR started_at <= $6)

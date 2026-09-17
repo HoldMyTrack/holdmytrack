@@ -46,8 +46,8 @@ Native apps whose core job is exporting device-recorded health data to FitMap (P
 
 ### Cross-source deduplication (`IMPLEMENTATION.md` §4.6) — unavoidable once a second ingest source exists, which mobile sync is, ahead of Phase 4's cloud connectors under this order
 
-- [ ] `dedupe_key` computation at ingest: user, activity type, start time rounded to the nearest minute, distance bucketed to ~1%.
-- [ ] Superseded-record handling: prefer the richest record (geometry over none, more stream channels over fewer); mark others `superseded`, don't delete, so a user can see why an activity disappeared.
+- [x] Fuzzy identity at ingest: same user, same activity type, start within half a minute either way, distance within ~1% — applied as a window around the incoming activity rather than equality on a pre-rounded bucket, so a pair a few seconds apart matches every time instead of only when it happens not to straddle a boundary (`IMPLEMENTATION.md` §4.6).
+- [x] Superseded-record handling: prefer the richest record (geometry over none, more stream channels over fewer); mark others `superseded_by`, don't delete, so a user can see why an activity disappeared (`GET /v1/activities/duplicates`). Deleting the winner re-ranks the copies it releases rather than making them all live at once.
 - [ ] Surface superseded activities somewhere in the Activities panel or Profile, so "disappeared" activities are discoverable, not silently gone.
 
 ---

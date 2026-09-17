@@ -50,6 +50,7 @@ Everything is under `app/src/main/kotlin/dev/fitmap/android/`:
 - `health/ExerciseTypes.kt` — Health Connect's exercise type to FitMap's `activity_type`, normalised onto the vocabulary the other ingest paths already produce.
 - `sync/SyncCursor.kt` — the watermark. Read its comment before changing anything about it.
 - `sync/SyncRunner.kt` — one foreground sync run: read, classify, batch, post, advance.
+- `SyncStatusActivity.kt` — sync history, pending work, failure detail, and the activities cross-source deduplication took out of circulation because they were already here from another source.
 
 Alongside:
 
