@@ -96,7 +96,8 @@ func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.
 		SELECT m.mask_object_key
 		FROM activity_tile_masks m
 		JOIN activities a ON a.id = m.activity_id
-		WHERE a.user_id = $1 AND m.zoom = $2 AND m.tile_x = $3 AND m.tile_y = $4
+		WHERE a.user_id = $1 AND a.superseded_by IS NULL
+		  AND m.zoom = $2 AND m.tile_x = $3 AND m.tile_y = $4
 	`, userID, zoom, x, y)
 	if err != nil {
 		return fmt.Errorf("query activity masks: %w", err)

@@ -75,6 +75,7 @@ SELECT id, started_at, activity_type, distance_meters, duration_seconds, descrip
        ST_XMin(trajectory), ST_YMin(trajectory), ST_XMax(trajectory), ST_YMax(trajectory)
 FROM activities
 WHERE user_id = $1
+  AND superseded_by IS NULL
   AND ($2::timestamptz IS NULL OR started_at >= $2)
   AND ($3::timestamptz IS NULL OR started_at <= $3)
   AND ($4::text[] IS NULL OR activity_type = ANY($4))
@@ -334,6 +335,20 @@ func (s *Server) handleDeleteActivity(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// A representative of the copies this delete is about to release (§4.6). They all share
+	// one dedupe window by construction, so re-ranking from any one of them re-ranks the lot —
+	// and without that they would every one become live at once, leaving the same ride counted
+	// two or three times in the totals and the fog.
+	var releasedType *string
+	var releasedStart *time.Time
+	var releasedDistance *float64
+	if err := s.pool.QueryRow(ctx,
+		`SELECT activity_type, started_at, distance_meters FROM activities
+		 WHERE superseded_by = $1 ORDER BY created_at LIMIT 1`, activityID,
+	).Scan(&releasedType, &releasedStart, &releasedDistance); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		s.log.Error("activity delete: superseded lookup failed", "activity_id", activityID, "err", err)
+	}
+
 	tag, err := s.pool.Exec(ctx, `DELETE FROM activities WHERE id = $1 AND user_id = $2`, activityID, userID)
 	if err != nil {
 		s.log.Error("activity delete failed", "err", err)
@@ -351,6 +366,16 @@ func (s *Server) handleDeleteActivity(w http.ResponseWriter, r *http.Request) {
 	// whatever activity_tile_masks rows currently exist, so simply re-triggering it against
 	// the now-smaller set (this activity's rows already gone via the cascade above) produces a
 	// correct result with no new compositing logic needed.
+	// Re-rank before re-rendering, so the render below composites the set that actually wins.
+	if releasedType != nil && releasedStart != nil && releasedDistance != nil {
+		extra, err := ingest.ResolveDuplicates(ctx, s.pool, userID, *releasedType, *releasedStart, *releasedDistance)
+		if err != nil {
+			s.log.Error("activity delete: re-resolving duplicates failed", "activity_id", activityID, "err", err)
+		} else {
+			tiles = append(tiles, extra...)
+		}
+	}
+
 	if len(tiles) > 0 {
 		if err := ingest.MarkFogTilesDirty(ctx, s.pool, userID, tiles); err != nil {
 			s.log.Error("activity delete: mark fog tiles dirty failed", "activity_id", activityID, "err", err)
@@ -366,9 +391,20 @@ func (s *Server) handleDeleteActivity(w http.ResponseWriter, r *http.Request) {
 // cover — activity_tile_masks' primary key leads with activity_id, so this is an index-only
 // lookup, not a scan. Has to run before the cascade removes these rows: there is no other way
 // to recover which tiles need re-rendering once they're gone.
+// Includes the tiles of any activity this one supersedes (§4.6), because deleting the copy
+// that won a deduplication collision is exactly when those come back: `superseded_by` is
+// `ON DELETE SET NULL`, so the displaced copy becomes live again the moment this row goes, and
+// its own coverage has to be composited back in. Its tiles are not necessarily a subset of
+// this row's — a privacy trim or a shorter recording can leave each copy touching tiles the
+// other never did — so they are collected rather than assumed.
 func (s *Server) activityFogTiles(ctx context.Context, activityID string) ([][2]int, error) {
 	rows, err := s.pool.Query(ctx,
-		`SELECT tile_x, tile_y FROM activity_tile_masks WHERE activity_id = $1 AND zoom = $2`, activityID, ingest.FogZoom,
+		`SELECT DISTINCT m.tile_x, m.tile_y
+		 FROM activity_tile_masks m
+		 WHERE m.zoom = $2
+		   AND (m.activity_id = $1
+		        OR m.activity_id IN (SELECT id FROM activities WHERE superseded_by = $1))`,
+		activityID, ingest.FogZoom,
 	)
 	if err != nil {
 		return nil, err
@@ -402,6 +438,7 @@ SELECT COUNT(*),
        COALESCE(SUM(elevation_gain_m), 0)
 FROM activities
 WHERE user_id = $1
+  AND superseded_by IS NULL
   AND ($2::timestamptz IS NULL OR started_at >= $2)
   AND ($3::timestamptz IS NULL OR started_at <= $3)
   AND ($4::text[] IS NULL OR activity_type = ANY($4))`
@@ -467,6 +504,7 @@ SELECT date_trunc('day', started_at AT TIME ZONE 'UTC')::date AS day,
        COALESCE(SUM(distance_meters), 0)
 FROM activities
 WHERE user_id = $1
+  AND superseded_by IS NULL
   AND started_at >= $2
   AND started_at < $3
 GROUP BY day
@@ -492,6 +530,7 @@ SELECT date_trunc('day', started_at AT TIME ZONE 'UTC')::date AS day,
        COALESCE(SUM(distance_meters), 0)
 FROM activities
 WHERE user_id = $1
+  AND superseded_by IS NULL
   AND ($2::timestamptz IS NULL OR started_at < $2)
 GROUP BY day
 ORDER BY day DESC
@@ -560,7 +599,7 @@ func (s *Server) handleActivityHistogram(w http.ResponseWriter, r *http.Request)
 
 	var earliest *time.Time
 	if err := s.pool.QueryRow(r.Context(),
-		`SELECT MIN(started_at) FROM activities WHERE user_id = $1`, userIDFromContext(r.Context()),
+		`SELECT MIN(started_at) FROM activities WHERE user_id = $1 AND superseded_by IS NULL`, userIDFromContext(r.Context()),
 	).Scan(&earliest); err != nil {
 		s.log.Error("activity earliest-date query failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -694,6 +733,7 @@ SELECT COUNT(*),
        COUNT(DISTINCT date_trunc('day', started_at AT TIME ZONE 'UTC')::date)
 FROM activities
 WHERE user_id = $1
+  AND superseded_by IS NULL
   AND ($2::timestamptz IS NULL OR started_at >= $2)
   AND ($3::timestamptz IS NULL OR started_at < $3)`
 
@@ -707,6 +747,7 @@ WITH days AS (
   SELECT DISTINCT date_trunc('day', started_at AT TIME ZONE 'UTC')::date AS day
   FROM activities
   WHERE user_id = $1
+    AND superseded_by IS NULL
     AND ($2::timestamptz IS NULL OR started_at >= $2)
     AND ($3::timestamptz IS NULL OR started_at < $3)
 ),
@@ -814,6 +855,7 @@ SELECT date_trunc($1, started_at AT TIME ZONE 'UTC')::date AS period,
        COALESCE(SUM(elevation_gain_m), 0)
 FROM activities
 WHERE user_id = $2
+  AND superseded_by IS NULL
   AND started_at >= $3
   AND started_at < $4
 GROUP BY period
@@ -1065,4 +1107,78 @@ func nearestElapsedIndex(elapsedSRaw []int32, target int64) int {
 		return i - 1
 	}
 	return i
+}
+
+// duplicatesQuery lists the activities cross-source deduplication took out of circulation
+// (§4.6), each alongside the copy that displaced it.
+//
+// This endpoint is the reason §4.6 marks duplicates rather than deleting them. Three ingest
+// paths mean the same ride can genuinely arrive three times, and an activity that silently
+// stopped existing is indistinguishable from one that failed to import — the user has to be
+// able to see which happened. Both sides carry `source`, because that is the actual answer to
+// "why is this gone": the same ride, already in from somewhere else.
+//
+// Not filtered by date or type, and not paginated: duplicates are by nature a small set
+// beside the history they came from, and the question this answers ("what went missing, and
+// why") is asked about all of them at once.
+const duplicatesQuery = `
+SELECT a.id, a.started_at, a.activity_type, a.distance_meters, a.source,
+       w.id, w.source, w.started_at
+FROM activities a
+JOIN activities w ON w.id = a.superseded_by
+WHERE a.user_id = $1
+ORDER BY a.started_at DESC, a.id DESC`
+
+// supersedingActivity is the copy that won, named well enough for a client to say which one
+// it is without a second request.
+type supersedingActivity struct {
+	ID        string    `json:"id"`
+	Source    string    `json:"source"`
+	StartedAt time.Time `json:"started_at"`
+}
+
+type duplicateRow struct {
+	ID           string    `json:"id"`
+	StartedAt    time.Time `json:"started_at"`
+	ActivityType string    `json:"activity_type"`
+	// Nullable for the same reason every other per-row metric here is: a source that reported
+	// no distance is not a zero-distance activity.
+	DistanceMeters *float64            `json:"distance_meters"`
+	Source         string              `json:"source"`
+	SupersededBy   supersedingActivity `json:"superseded_by"`
+}
+
+type duplicatesResponse struct {
+	Duplicates []duplicateRow `json:"duplicates"`
+}
+
+// handleListDuplicates serves `GET /v1/activities/duplicates`.
+func (s *Server) handleListDuplicates(w http.ResponseWriter, r *http.Request) {
+	rows, err := s.pool.Query(r.Context(), duplicatesQuery, userIDFromContext(r.Context()))
+	if err != nil {
+		s.log.Error("duplicates query failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	list := make([]duplicateRow, 0)
+	for rows.Next() {
+		var d duplicateRow
+		if err := rows.Scan(&d.ID, &d.StartedAt, &d.ActivityType, &d.DistanceMeters, &d.Source,
+			&d.SupersededBy.ID, &d.SupersededBy.Source, &d.SupersededBy.StartedAt); err != nil {
+			s.log.Error("duplicates scan failed", "err", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		list = append(list, d)
+	}
+	if err := rows.Err(); err != nil {
+		s.log.Error("duplicates read failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, duplicatesResponse{Duplicates: list})
 }

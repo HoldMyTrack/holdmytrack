@@ -73,6 +73,12 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".SyncStatusActivity"
+            android:exported="false"
+            android:label="@string/status_title"
+            android:theme="@style/Theme.AppCompat.DayNight" />
+
         <!-- Where Health Connect's "see how this app used your data" link lands. -->
         <activity-alias
             android:name="ViewPermissionUsageActivity"

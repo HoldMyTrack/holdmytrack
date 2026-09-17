@@ -55,6 +55,14 @@
             android:layout_height="wrap_content"
             android:text="@string/sync_open_health_connect" />
 
+        <!-- Always available to a signed-in account, whatever the permission state: the
+             history is worth reading precisely when a sync has not worked. -->
+        <Button
+            android:id="@+id/sync_history"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/status_history" />
+
         <TextView
             android:id="@+id/sync_results"
             android:layout_width="match_parent"

@@ -1,5 +1,6 @@
 package dev.fitmap.android
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -49,6 +50,7 @@ class SyncActivity : AppCompatActivity() {
     private lateinit var primary: Button
     private lateinit var secondary: Button
     private lateinit var openHealthConnect: Button
+    private lateinit var history: Button
 
     private var syncJob: Job? = null
 
@@ -68,8 +70,10 @@ class SyncActivity : AppCompatActivity() {
         primary = findViewById(R.id.sync_primary)
         secondary = findViewById(R.id.sync_secondary)
         openHealthConnect = findViewById(R.id.sync_open_health_connect)
+        history = findViewById(R.id.sync_history)
 
         openHealthConnect.setOnClickListener { openSettings() }
+        history.setOnClickListener { startActivity(Intent(this, SyncStatusActivity::class.java)) }
     }
 
     override fun onResume() {
@@ -110,11 +114,13 @@ class SyncActivity : AppCompatActivity() {
             instructions.visibility = View.GONE
             primary.visibility = View.GONE
             secondary.visibility = View.GONE
+            history.visibility = View.GONE
             return
         }
 
         primary.visibility = View.VISIBLE
         primary.isEnabled = true
+        history.visibility = View.VISIBLE
         secondary.visibility = View.GONE
         instructions.visibility = View.GONE
 

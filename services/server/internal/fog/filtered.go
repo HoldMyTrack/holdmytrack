@@ -133,7 +133,7 @@ func RenderFilteredTile(ctx context.Context, pool *pgxpool.Pool, store *storage.
 		SELECT m.tile_x, m.tile_y, m.mask_object_key
 		FROM activity_tile_masks m
 		JOIN activities a ON a.id = m.activity_id
-		WHERE a.user_id = $1 AND m.zoom = $2
+		WHERE a.user_id = $1 AND a.superseded_by IS NULL AND m.zoom = $2
 		  AND m.tile_x BETWEEN $3 AND $4 AND m.tile_y BETWEEN $5 AND $6
 		  AND ($7::timestamptz IS NULL OR a.started_at >= $7)
 		  AND ($8::timestamptz IS NULL OR a.started_at <= $8)
