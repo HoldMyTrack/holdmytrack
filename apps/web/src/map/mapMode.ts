@@ -1,6 +1,7 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { FOG_LAYER_ID } from './fog';
 import { HEATMAP_LAYER_ID } from './heatmap';
+import { BAND_LAYER_ID } from './trackBands';
 import { TRACKS_LAYER_ID } from './tracks';
 
 /**
@@ -24,6 +25,10 @@ export function setMapMode(map: MapLibreMap, mode: MapMode): void {
   setVisible(map, HEATMAP_LAYER_ID, mode === 'heatmap');
   // Tracks stay visible only in Normal — both Fog and Heatmap hide them (§4.2.2).
   setVisible(map, TRACKS_LAYER_ID, mode === 'normal');
+  // FR-4.8: a focused activity's colored zone segments are a second layer over the shared
+  // tracks layer (trackBands.ts) — not covered by the tracks toggle above — so switching to
+  // Fog/Heatmap has to hide it too, or it keeps rendering over the raster.
+  setVisible(map, BAND_LAYER_ID, mode === 'normal');
 }
 
 function setVisible(map: MapLibreMap, layerId: string, visible: boolean): void {
