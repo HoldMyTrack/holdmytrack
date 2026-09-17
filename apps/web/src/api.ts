@@ -391,19 +391,21 @@ export async function getUploadHistory(query: UploadHistoryQuery = {}, signal?: 
 }
 
 /**
- * One row of IMPLEMENTATION.md §4.7's activity list. No name field:
- * `activities` has no name column and deliberately isn't getting one (§4.7, "Resolved: no
- * name column"), so `startedAt` is what a row leads with. `distanceMeters` and
- * `durationSeconds` are nullable because the schema is — a file that carried no distance
- * is not a zero-distance activity, and the UI says "—" rather than "0.0 km".
+ * One row of IMPLEMENTATION.md §4.7's activity list. `distanceMeters` and `durationSeconds`
+ * are nullable because the schema is — a file that carried no distance is not a
+ * zero-distance activity, and the UI says "—" rather than "0.0 km".
  *
- * `description` (§4.7.4) is a later, separate addition — free text, not a name, edited via
- * `updateActivity` below. `null` means never set, not "set to empty."
+ * `name` (§4.7's revised "no name column" decision — a user-entered title only, never
+ * parsed from a source file) is what a row leads with when set; `startedAt` is the fallback
+ * for a row that has none. `description` (§4.7.4) stays a separate, later addition — longer
+ * free text, shown only as a hover tooltip, not the row's visible title. Both are edited via
+ * `updateActivity` below, and `null` means never set for either, not "set to empty."
  */
 export interface Activity {
   id: string;
   startedAt: string;
   activityType: string;
+  name: string | null;
   distanceMeters: number | null;
   durationSeconds: number | null;
   description: string | null;
@@ -425,6 +427,7 @@ interface ActivityRowBody {
   id: string;
   started_at: string;
   activity_type: string;
+  name: string | null;
   distance_meters: number | null;
   duration_seconds: number | null;
   description: string | null;
@@ -451,6 +454,7 @@ function toActivity(a: ActivityRowBody): Activity {
     id: a.id,
     startedAt: a.started_at,
     activityType: a.activity_type,
+    name: a.name,
     distanceMeters: a.distance_meters,
     durationSeconds: a.duration_seconds,
     description: a.description,
@@ -479,8 +483,9 @@ export async function listActivities(query: ActivityQuery = {}, signal?: AbortSi
 }
 
 /**
- * §4.7.4's `PATCH /v1/activities/{id}` — the edit-type-and-description dialog's Save button.
- * Full-replace-on-save like `updateSettings`, not per-field: both fields commit together.
+ * §4.7.4's `PATCH /v1/activities/{id}` — the edit-type-name-and-description dialog's Save
+ * button. Full-replace-on-save like `updateSettings`, not per-field: all three fields commit
+ * together.
  * Returns the updated row so the caller can `reload()` the list (EditActivityDialog.tsx does,
  * matching the "just refetch" convention an upload completion already uses) rather than
  * needing this return value directly — returned anyway for the same reason `updateSettings`
@@ -488,13 +493,13 @@ export async function listActivities(query: ActivityQuery = {}, signal?: AbortSi
  */
 export async function updateActivity(
   id: string,
-  patch: { activityType: string; description: string },
+  patch: { activityType: string; name: string; description: string },
 ): Promise<Activity> {
   const res = await fetch(`${API_BASE_URL}${API_V1}/activities/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ activity_type: patch.activityType, description: patch.description }),
+    body: JSON.stringify({ activity_type: patch.activityType, name: patch.name, description: patch.description }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');

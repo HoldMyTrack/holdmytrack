@@ -27,8 +27,9 @@ export function unitLabel(system: UnitSystem): 'km' | 'mi' {
 }
 
 /**
- * A row's primary line. §4.7 resolved that rows show `started_at` rather than a name — so
- * this is the full local datetime, not a bare date.
+ * A row's fallback primary line, for an activity with no name set (ActivitiesPanel.tsx
+ * prefers `activity.name` when present — §4.7's revised decision). The full local datetime,
+ * not a bare date, since it's carrying the whole "when" on its own in that case.
  */
 export function formatStartedAt(iso: string): string {
   const d = new Date(iso);

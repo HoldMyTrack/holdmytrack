@@ -2,24 +2,30 @@ import { useEffect, useRef, useState } from 'react';
 import { updateActivity, type Activity } from '../api';
 import { formatStartedAt } from './format';
 
-/** Mirrors the backend's own bounds (activities.go's maxActivityTypeLen/
+/** Mirrors the backend's own bounds (activities.go's maxActivityTypeLen/maxActivityNameLen/
  *  maxActivityDescriptionLen) — enforced here too so a caller sees the limit before
  *  submitting, not only after a 400 comes back. */
 const MAX_ACTIVITY_TYPE_LEN = 50;
+const MAX_NAME_LEN = 200;
 const MAX_DESCRIPTION_LEN = 2000;
 
 /**
- * The "rename an activity, add a note" form (§4.7.4) — reached from a row's pencil icon
- * (ActivitiesPanel.tsx). A real `<dialog>`/`showModal()`, the same choice PlaceholderNotice.tsx
- * already made for "a small focused piece of UI over the map": free Escape/backdrop/focus-trap
- * behavior, and exactly one path out (the dialog's own `close()`) regardless of whether that
- * came from Save, Cancel, Escape, or a backdrop click.
+ * The "rename an activity, name it, add a note" form (§4.7.4) — reached from a row's pencil
+ * icon (ActivitiesPanel.tsx). A real `<dialog>`/`showModal()`, the same choice
+ * PlaceholderNotice.tsx already made for "a small focused piece of UI over the map": free
+ * Escape/backdrop/focus-trap behavior, and exactly one path out (the dialog's own `close()`)
+ * regardless of whether that came from Save, Cancel, Escape, or a backdrop click.
  *
  * Type is a plain text field, not a select — §4.7.2 already resolved activity_type as
  * free-form, not a controlled vocabulary, and this is not the place to reintroduce one. The
  * `<datalist>` of `knownTypes` is a convenience (retyping "Ride" is a pick, not a retype),
  * never a constraint: anything typed here, including something nobody has used before
  * ("Solowheel", "Roadtrip"), saves exactly as typed.
+ *
+ * Name is optional, unlike Type — an activity with none simply falls back to its start
+ * datetime as the row's primary line (ActivitiesPanel.tsx). It's never parsed from a source
+ * file (§4.7's revised decision is deliberately narrower than that); the only way one exists
+ * is a person typing it in here.
  */
 export interface EditActivityDialogProps {
   activity: Activity;
@@ -36,6 +42,7 @@ export interface EditActivityDialogProps {
 export function EditActivityDialog({ activity, knownTypes, onClose, onSaved }: EditActivityDialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const [activityType, setActivityType] = useState(activity.activityType);
+  const [name, setName] = useState(activity.name ?? '');
   const [description, setDescription] = useState(activity.description ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +62,11 @@ export function EditActivityDialog({ activity, knownTypes, onClose, onSaved }: E
       setError(`Type must be ${MAX_ACTIVITY_TYPE_LEN} characters or fewer.`);
       return;
     }
+    const trimmedName = name.trim();
+    if (trimmedName.length > MAX_NAME_LEN) {
+      setError(`Name must be ${MAX_NAME_LEN} characters or fewer.`);
+      return;
+    }
     if (description.length > MAX_DESCRIPTION_LEN) {
       setError(`Description must be ${MAX_DESCRIPTION_LEN} characters or fewer.`);
       return;
@@ -62,7 +74,7 @@ export function EditActivityDialog({ activity, knownTypes, onClose, onSaved }: E
     setSaving(true);
     setError(null);
     try {
-      await updateActivity(activity.id, { activityType: trimmedType, description });
+      await updateActivity(activity.id, { activityType: trimmedType, name: trimmedName, description });
       onSaved();
       ref.current?.close();
     } catch (err) {
@@ -102,6 +114,18 @@ export function EditActivityDialog({ activity, knownTypes, onClose, onSaved }: E
             <option key={t} value={t} />
           ))}
         </datalist>
+      </label>
+
+      <label className="settings-page__section">
+        <span className="settings-page__label">Name</span>
+        <input
+          className="settings-page__input"
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={MAX_NAME_LEN}
+          placeholder="Optional — shown instead of the date in the Activities list"
+        />
       </label>
 
       <label className="settings-page__section">

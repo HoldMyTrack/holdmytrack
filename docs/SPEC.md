@@ -395,7 +395,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Description**: A permanent sidebar lists every activity within the currently selected date range (FR-6), narrowed by the TYPE and DISTANCE filters below.
 
-**Behavior**: Each row shows the activity's date/time, distance, duration, and type. The list is not paginated — every matching activity is shown at once. The panel also shows a running count of matching activities and total distance for the range (independent of the TYPE/DISTANCE filters, which narrow the visible rows without changing this total).
+**Behavior**: Each row's primary line is the activity's own name if one has been set (FR-5.10), or its start date/time otherwise — an activity has a name only once a person has typed one in via FR-5.10's edit dialog, never from parsing a source file. A row whose primary line is a name still shows its date/time as part of the row's secondary line, alongside distance and duration; a row with no name shows distance and duration alone, since its date/time is already the primary line. Type is also shown per row. Regardless of what a row displays, **the list itself is always ordered by start date/time, newest first** — a name never affects sort order. The list is not paginated — every matching activity is shown at once. The panel also shows a running count of matching activities and total distance for the range (independent of the TYPE/DISTANCE filters, which narrow the visible rows without changing this total).
 
 ### FR-5.2 TYPE filter
 
@@ -439,24 +439,24 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Description**: The Activities panel can be resized by dragging its right edge, between 260 and 560 pixels wide (default 380). Not persisted across reloads.
 
-### FR-5.10 Edit activity type and description
+### FR-5.10 Edit activity type, name, and description
 
-**Description**: A signed-in user renames an activity's type and/or attaches a free-text description to it — for example, re-labeling an activity a fitness tracker logged under the wrong category, or uploading and describing a non-sport GPS trace (a road trip) so it's identifiable later.
+**Description**: A signed-in user renames an activity's type, gives it a name, and/or attaches a free-text description to it — for example, re-labeling an activity a fitness tracker logged under the wrong category, naming a road trip so it's identifiable in the Activities panel at a glance, or describing a non-sport GPS trace in more detail than a name allows.
 
 **Preconditions**: Active session; the caller owns the activity.
 
-**Inputs**: A new type (required, 1–50 characters) and a description (optional, up to 2000 characters) for one activity, entered via a small edit dialog reached from that activity's row.
+**Inputs**: A new type (required, 1–50 characters), a name (optional, up to 200 characters), and a description (optional, up to 2000 characters) for one activity, entered via a small edit dialog reached from that activity's row.
 
 **Behavior**:
-1. Clicking a row's edit (pencil) icon opens a dialog pre-filled with that activity's current type and description.
-2. The type field is plain free text — the same "whatever the source reports, not a controlled vocabulary" rule FR-5.2's TYPE filter already follows (`IMPLEMENTATION.md` §4.7.2) applies equally to a manual rename. A list of this account's other existing types is offered as suggestions, purely as a convenience; nothing is enforced against it, and a value nobody has used before saves exactly as typed.
-3. Saving both fields commits together in one request; canceling discards any unsaved edits.
-4. Once saved, the row's TYPE label updates immediately, the new/renamed type becomes (or remains) a real entry in FR-5.2's TYPE filter with a live count, and the description becomes visible as a hover tooltip on the row — not a second visible line.
+1. Clicking a row's edit (pencil) icon opens a dialog pre-filled with that activity's current type, name, and description.
+2. The type field is plain free text — the same "whatever the source reports, not a controlled vocabulary" rule FR-5.2's TYPE filter already follows (`IMPLEMENTATION.md` §4.7.2) applies equally to a manual rename. A list of this account's other existing types is offered as suggestions, purely as a convenience; nothing is enforced against it, and a value nobody has used before saves exactly as typed. The name field is always plain free text, with no source to ever populate it automatically — an activity has a name only once a person types one in here (`IMPLEMENTATION.md` §4.7).
+3. Saving all three fields commits together in one request; canceling discards any unsaved edits.
+4. Once saved: the row's TYPE label updates immediately; the new/renamed type becomes (or remains) a real entry in FR-5.2's TYPE filter with a live count; the row's primary line shows the name in place of its start date/time if one is set, or the start date/time as before if the name is cleared (FR-5.1); and the description becomes visible as a hover tooltip on the row — not a second visible line. **The Activities panel's sort order never changes**: rows stay ordered by start date/time (FR-5.1) regardless of what a row displays or whether it has a name at all.
 
-**Outputs**: The activity's `activity_type` and `description` are updated; every other computed value for that activity (distance, duration, its Fog-of-War/Heatmap coverage, its inclusion in FR-9's performance-analysis aggregates) is unaffected, since none of those are keyed on type or description.
+**Outputs**: The activity's `activity_type`, `name`, and `description` are updated; every other computed value for that activity (distance, duration, its Fog-of-War/Heatmap coverage, its inclusion in FR-9's performance-analysis aggregates) is unaffected, since none of those are keyed on type, name, or description.
 
 **Error cases**:
-- Empty or over-length type, or an over-length description → `400 Bad Request`, no change applied.
+- Empty or over-length type, an over-length name, or an over-length description → `400 Bad Request`, no change applied.
 - The activity does not exist or belongs to another account → `404 Not Found`, the two cases indistinguishable from each other.
 
 ### FR-5.11 Delete an activity

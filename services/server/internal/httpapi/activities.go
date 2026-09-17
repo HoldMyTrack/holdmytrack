@@ -71,7 +71,7 @@ func parseActivityFilter(q url.Values) (activityFilter, error) {
 // Column order here has to match scanActivityRow's Scan call exactly — activityByIDQuery
 // below shares that same order for the same reason.
 const listActivitiesQuery = `
-SELECT id, started_at, activity_type, distance_meters, duration_seconds, description,
+SELECT id, started_at, activity_type, name, distance_meters, duration_seconds, description,
        ST_XMin(trajectory), ST_YMin(trajectory), ST_XMax(trajectory), ST_YMax(trajectory)
 FROM activities
 WHERE user_id = $1
@@ -82,17 +82,19 @@ WHERE user_id = $1
 ORDER BY started_at DESC, id DESC`
 
 // activityRow is one row of the list. The field set is exactly what the Activities panel
-// renders, no more: there is no *name* column (§4.7 resolved that deliberately —
-// started_at is the row's primary line), and duration is `duration_seconds`, not
-// `moving_seconds`. ingest.Process populates moving_seconds now (VISION.md §5.3's
-// ingest-gap fixes), but only for activities ingested since — anything older still has it
-// NULL, and serving a field that's populated for some rows and not others in the one list
-// every activity shares would read as broken data rather than as what it is.
-// duration_seconds has no such gap.
+// renders, no more. Duration is `duration_seconds`, not `moving_seconds`. ingest.Process
+// populates moving_seconds now (VISION.md §5.3's ingest-gap fixes), but only for activities
+// ingested since — anything older still has it NULL, and serving a field that's populated
+// for some rows and not others in the one list every activity shares would read as broken
+// data rather than as what it is. duration_seconds has no such gap.
 //
-// Description (§4.7.4, migrations/0001_init.sql's activities.description) is free-text,
-// not a name/title, and nullable the same way: a row with nothing written there has never
-// been edited, not "an empty description."
+// Name (migrations/0015_activity_name.sql) is a user-entered title, nullable — a row with
+// none has never had one set, and the client falls back to started_at for its primary line
+// (§4.7 revised its earlier "no name column" decision to add exactly this, and nothing
+// more: still no parser reads a name out of a source file). Description (§4.7.4,
+// migrations/0001_init.sql's activities.description) stays separate free-text, shown only
+// as a hover tooltip — a row with nothing written there has never been edited, not "an
+// empty description."
 //
 // The three metric fields are nullable in §3.3 and stay nullable here rather than being
 // coerced to 0: a file that carried no distance is not a zero-distance activity.
@@ -100,6 +102,7 @@ type activityRow struct {
 	ID              string    `json:"id"`
 	StartedAt       time.Time `json:"started_at"`
 	ActivityType    string    `json:"activity_type"`
+	Name            *string   `json:"name"`
 	DistanceMeters  *float64  `json:"distance_meters"`
 	DurationSeconds *int32    `json:"duration_seconds"`
 	Description     *string   `json:"description"`
@@ -121,7 +124,7 @@ func scanActivityRow(row rowScanner) (activityRow, error) {
 	// Four nullable floats rather than one bbox type: they are null together, since a row
 	// either has a trajectory or doesn't, but pgx has no reason to know that.
 	var minLon, minLat, maxLon, maxLat *float64
-	if err := row.Scan(&a.ID, &a.StartedAt, &a.ActivityType, &a.DistanceMeters, &a.DurationSeconds, &a.Description,
+	if err := row.Scan(&a.ID, &a.StartedAt, &a.ActivityType, &a.Name, &a.DistanceMeters, &a.DurationSeconds, &a.Description,
 		&minLon, &minLat, &maxLon, &maxLat); err != nil {
 		return activityRow{}, err
 	}
@@ -185,17 +188,23 @@ const maxActivityTypeLen = 50
 // not opine on reasonable length" reasoning maxPrivacyTrimM already uses in account.go.
 const maxActivityDescriptionLen = 2000
 
+// maxActivityNameLen matches migrations/0015_activity_name.sql's VARCHAR(200) — a single-line
+// title bound, deliberately shorter than maxActivityDescriptionLen: anything longer belongs
+// in the description field, not the row's primary line.
+const maxActivityNameLen = 200
+
 // activityByIDQuery is the single-row counterpart to listActivitiesQuery, same column order
 // (scanActivityRow's Scan call is shared between both), scoped by id and owner exactly like
 // trackMetricsQuery — a non-owned or nonexistent id is indistinguishable from "not found."
 const activityByIDQuery = `
-SELECT id, started_at, activity_type, distance_meters, duration_seconds, description,
+SELECT id, started_at, activity_type, name, distance_meters, duration_seconds, description,
        ST_XMin(trajectory), ST_YMin(trajectory), ST_XMax(trajectory), ST_YMax(trajectory)
 FROM activities
 WHERE id = $1 AND user_id = $2`
 
 type updateActivityRequest struct {
 	ActivityType string `json:"activity_type"`
+	Name         string `json:"name"`
 	Description  string `json:"description"`
 }
 
@@ -206,10 +215,11 @@ type updateActivityRequest struct {
 // against an allow-list, just a length bound matching the column.
 //
 // Full-replace-on-save, not per-field PATCH semantics, matching account.go's
-// handleUpdateSettings: one Save button in the edit dialog commits both fields at once.
-// Empty description means "clear it," written as NULLIF the same way every other optional
-// text column here already is; activity_type has no such escape hatch since the column is
-// NOT NULL — an empty value is rejected outright rather than silently kept unchanged.
+// handleUpdateSettings: one Save button in the edit dialog commits all three fields at once.
+// Empty name/description means "clear it," written as NULLIF the same way every other
+// optional text column here already is; activity_type has no such escape hatch since the
+// column is NOT NULL — an empty value is rejected outright rather than silently kept
+// unchanged.
 func (s *Server) handleUpdateActivity(w http.ResponseWriter, r *http.Request) {
 	activityID := r.PathValue("id")
 	if activityID == "" {
@@ -224,6 +234,7 @@ func (s *Server) handleUpdateActivity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.ActivityType = strings.TrimSpace(req.ActivityType)
+	req.Name = strings.TrimSpace(req.Name)
 	req.Description = strings.TrimSpace(req.Description)
 	if req.ActivityType == "" {
 		http.Error(w, "activity_type is required", http.StatusBadRequest)
@@ -233,6 +244,10 @@ func (s *Server) handleUpdateActivity(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("activity_type must be %d characters or fewer", maxActivityTypeLen), http.StatusBadRequest)
 		return
 	}
+	if len(req.Name) > maxActivityNameLen {
+		http.Error(w, fmt.Sprintf("name must be %d characters or fewer", maxActivityNameLen), http.StatusBadRequest)
+		return
+	}
 	if len(req.Description) > maxActivityDescriptionLen {
 		http.Error(w, fmt.Sprintf("description must be %d characters or fewer", maxActivityDescriptionLen), http.StatusBadRequest)
 		return
@@ -240,9 +255,9 @@ func (s *Server) handleUpdateActivity(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	tag, err := s.pool.Exec(ctx, `
-		UPDATE activities SET activity_type = $3, description = NULLIF($4, '')
+		UPDATE activities SET activity_type = $3, name = NULLIF($4, ''), description = NULLIF($5, '')
 		WHERE id = $1 AND user_id = $2
-	`, activityID, userID, req.ActivityType, req.Description)
+	`, activityID, userID, req.ActivityType, req.Name, req.Description)
 	if err != nil {
 		s.log.Error("activity update failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)

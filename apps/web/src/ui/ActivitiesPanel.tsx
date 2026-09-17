@@ -364,7 +364,13 @@ export function ActivitiesPanel({
           const isFocused = focusedId === activity.id;
           const isHovered = hoveredId === activity.id;
           const isHidden = hiddenIds.has(activity.id);
-          const label = formatStartedAt(activity.startedAt);
+          // A user-entered name (§4.7's revised decision) leads; started_at is the fallback
+          // for a row that has none — never the reverse, so an activity's date doesn't
+          // disappear from the list just because it also has a name (shown in the meta line
+          // below instead). Sorting itself is untouched either way: the list's order comes
+          // entirely from the server's own `ORDER BY started_at DESC`, never from this label.
+          const displayName = activity.name?.trim() || null;
+          const label = displayName ?? formatStartedAt(activity.startedAt);
           const classes = ['activities-panel__row'];
           // Bold on the map is the union of checked and focused — the row highlight matches.
           if (isChecked || isFocused) classes.push('activities-panel__row--selected');
@@ -401,6 +407,10 @@ export function ActivitiesPanel({
               >
                 <span className={`activities-panel__title${isHovered ? ' activities-panel__title--hovered' : ''}`}>{label}</span>
                 <span className="activities-panel__meta">
+                  {/* The date moves down here, ahead of distance/duration, once a name has
+                      taken its place as the title above — otherwise it's already the title
+                      and repeating it here would be redundant. */}
+                  {displayName && `${formatStartedAt(activity.startedAt)} · `}
                   {formatDistance(activity.distanceMeters, system)} · {formatDuration(activity.durationSeconds)}
                 </span>
               </button>
@@ -420,8 +430,8 @@ export function ActivitiesPanel({
               <button
                 type="button"
                 className="activities-panel__edit"
-                aria-label={`Edit type and description for ${label}`}
-                title="Edit type and description"
+                aria-label={`Edit type, name, and description for ${label}`}
+                title="Edit type, name, and description"
                 onClick={() => setEditingActivity(activity)}
               >
                 <PencilIcon />
