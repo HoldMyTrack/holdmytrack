@@ -672,7 +672,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
   return (
     <div className="app-shell">
       <Header
-        uploadControl={isDemo ? undefined : <UploadPanel onUploaded={handleUploaded} />}
+        uploadControl={<UploadPanel readOnly={isDemo} onUploaded={handleUploaded} />}
         exportControl={
           <ExportButton
             map={map}

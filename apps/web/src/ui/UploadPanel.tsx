@@ -67,9 +67,16 @@ export interface UploadPanelProps {
    *  Activities list, totals and the histogram from this. See useUploadHistory's own doc
    *  comment for why it needs both calls, not just the first one. */
   onUploaded?: () => void;
+  /** A demo account (docs/ROADMAP.md's "Email verification + demo without real ingest") —
+   *  the backend already rejects a demo upload regardless (requireNotDemo), so this only
+   *  disables the trigger (with an explaining title) rather than opening a dropdown that
+   *  would just fail. Deliberately not hidden: showing the control, disabled, demonstrates
+   *  the feature exists rather than leaving a demo visitor to wonder — MapView.tsx's own
+   *  comment on ActivitiesPanel's matching `readOnly` prop has the fuller reasoning. */
+  readOnly?: boolean;
 }
 
-export function UploadPanel({ onUploaded }: UploadPanelProps) {
+export function UploadPanel({ onUploaded, readOnly = false }: UploadPanelProps) {
   const [open, setOpen] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [inFlight, setInFlight] = useState<InFlightFile[]>([]);
@@ -190,6 +197,8 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
         data-testid="upload-panel-trigger"
         aria-haspopup="dialog"
         aria-expanded={open}
+        disabled={readOnly}
+        title={readOnly ? 'Not available for demo accounts — create an account to upload your own data' : undefined}
         onClick={() => setOpen((was) => !was)}
       >
         Upload activity
@@ -199,7 +208,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
         </span>
       </button>
 
-      {open && (
+      {open && !readOnly && (
         <div className="upload-panel__dropdown" role="dialog" aria-label="Upload activity" data-testid="upload-panel-dropdown">
           <h3 className="upload-panel__title">Upload activity</h3>
           <p className="upload-panel__hint">.gpx, .fit, .tcx, or a .zip archive containing them</p>
