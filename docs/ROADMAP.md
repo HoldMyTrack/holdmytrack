@@ -61,6 +61,15 @@ FR-5.10 already lets a person retype a single activity's Type (free text, with a
 - [ ] Backups (Postgres, object storage) and a restore drill — **the most urgent of these gaps now that real personal data (synced Health Connect history) is starting to land on this box**, not just disposable dev fixtures.
 - [ ] Basic monitoring/alerting (error rate, queue depth, cost-per-user from Phase 5's measurement item).
 
+### CI on push/PR — closes the gap where `tsc`/Go tests/`make test` already exist but nothing runs them automatically
+
+Now that `main` feeds a real, if small, live deployment (`freefitmap.com`), a broken build or a regression slipping past manual local verification is a materially bigger risk than it was pre-deployment. `tsc --noEmit`, `make test` (the web's `verify:map`/`verify:build`), and four Go unit test files (`dedupe_test.go`, `parse_test.go`, `fit_test.go`, `mapstyle_test.go`) already exist, but nothing runs them except whoever remembers to type the command locally — there is no `.github/workflows` at all today, despite the repo already living on GitHub and already using PRs.
+
+- [ ] A GitHub Actions workflow running on every push/PR: `tsc --noEmit`, `go test ./...`, and `make test` — all three already exist and already pass locally; this is wiring, not new test-writing.
+- [ ] Fold `go test ./...` into `make test` itself (or a sibling target) while at it — right now the Go tests aren't part of any single command, automated or not, so even a careful local run before pushing can miss them.
+- [ ] Deliberately not a large new unit-test-writing effort — this project's stated quality approach favors manual, live verification over unit tests (`AGENTS.md`/`IMPLEMENTATION.md`'s repeated "confirmed live, not just a unit test"); this item wires up checks that already exist, it doesn't change that philosophy.
+- [ ] **CD (auto-deploy on merge) is explicitly out of scope here, and gated behind the Production deployment section's backups item above.** Auto-deploying every merge onto the one uncopied copy of real synced health data, with no restore path if a bad deploy corrupts something, is a bigger risk than the manual deploy step it would replace. Revisit once backups and a restore drill exist.
+
 ### Pre-launch validation — gates any public launch, regardless of which paths are live
 
 - [ ] Stand up the funding page (Open Collective, public ledger — `VISION.md` §6.1) before any public launch, not retrofitted after.
