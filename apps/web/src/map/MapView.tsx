@@ -21,6 +21,7 @@ import {
 import { useMapInstance } from './useMapInstance';
 import { DEFAULT_FLAVOR, parseHash, replaceHash, type ViewState } from './viewState';
 import { getActivityTrackMetrics, type Activity, type ActivityTrackMetrics } from '../api';
+import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
 import { ActivitiesPanel } from '../ui/ActivitiesPanel';
 import { ActivityHistogram } from '../ui/ActivityHistogram';
@@ -59,6 +60,13 @@ export interface MapViewProps {
 }
 
 export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
+  // docs/ROADMAP.md's "Email verification + demo without real ingest": a demo account is
+  // read-only (no upload/sync, no edit/delete) — see ActivitiesPanel's own readOnly prop and
+  // the uploadControl below. `'email' in user` is the same narrowing api.ts's SessionUser
+  // already establishes as the way to tell a DemoUser from an AuthUser.
+  const { user } = useAuth();
+  const isDemo = !('email' in user);
+
   const container = useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = useState<CoverageBounds | null>(null);
   const [outside, setOutside] = useState(false);
@@ -664,7 +672,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
   return (
     <div className="app-shell">
       <Header
-        uploadControl={<UploadPanel onUploaded={handleUploaded} />}
+        uploadControl={isDemo ? undefined : <UploadPanel onUploaded={handleUploaded} />}
         exportControl={
           <ExportButton
             map={map}
@@ -683,6 +691,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
 
       <div className="app-body">
         <ActivitiesPanel
+          readOnly={isDemo}
           activities={filteredActivities}
           loading={activitiesLoading}
           error={activitiesError}

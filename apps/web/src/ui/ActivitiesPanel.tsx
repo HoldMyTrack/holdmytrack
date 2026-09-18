@@ -42,6 +42,13 @@ import { useUnitSystem } from './units';
  *    of all three of the above.
  */
 export interface ActivitiesPanelProps {
+  /** A demo account (docs/ROADMAP.md's "Email verification + demo without real ingest") — the
+   *  backend already rejects every mutation a demo session attempts (requireNotDemo), this
+   *  just hides the controls that would otherwise error rather than presenting them and
+   *  failing. Group visible and the per-row eye icon stay enabled either way — purely local
+   *  UI state, never sent to the backend, so there's nothing for a demo account to be blocked
+   *  from there. */
+  readOnly?: boolean;
   /** Rows already narrowed by TYPE/DISTANCE — what actually renders. */
   activities: Activity[];
   loading: boolean;
@@ -99,6 +106,7 @@ export interface ActivitiesPanelProps {
 }
 
 export function ActivitiesPanel({
+  readOnly = false,
   activities,
   loading,
   error,
@@ -346,16 +354,18 @@ export function ActivitiesPanel({
           <EyeIcon open={!groupHasHidden} />
         </button>
         <span className="activities-panel__toolbar-spacer activities-panel__toolbar-spacer--edit" aria-hidden="true" />
-        <button
-          type="button"
-          className="activities-panel__delete"
-          disabled={checked.size === 0}
-          onClick={() => setDeletingGroup(true)}
-          aria-label="Delete every checked activity"
-          title="Delete checked group"
-        >
-          <TrashIcon />
-        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            className="activities-panel__delete"
+            disabled={checked.size === 0}
+            onClick={() => setDeletingGroup(true)}
+            aria-label="Delete every checked activity"
+            title="Delete checked group"
+          >
+            <TrashIcon />
+          </button>
+        )}
       </div>
 
       <ul className="activities-panel__list" data-testid="activities-list">
@@ -427,24 +437,28 @@ export function ActivitiesPanel({
               >
                 <EyeIcon open={!isHidden} />
               </button>
-              <button
-                type="button"
-                className="activities-panel__edit"
-                aria-label={`Edit type, name, and description for ${label}`}
-                title="Edit type, name, and description"
-                onClick={() => setEditingActivity(activity)}
-              >
-                <PencilIcon />
-              </button>
-              <button
-                type="button"
-                className="activities-panel__delete"
-                aria-label={`Delete ${label}`}
-                title="Delete this activity"
-                onClick={() => setDeletingActivity(activity)}
-              >
-                <TrashIcon />
-              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  className="activities-panel__edit"
+                  aria-label={`Edit type, name, and description for ${label}`}
+                  title="Edit type, name, and description"
+                  onClick={() => setEditingActivity(activity)}
+                >
+                  <PencilIcon />
+                </button>
+              )}
+              {!readOnly && (
+                <button
+                  type="button"
+                  className="activities-panel__delete"
+                  aria-label={`Delete ${label}`}
+                  title="Delete this activity"
+                  onClick={() => setDeletingActivity(activity)}
+                >
+                  <TrashIcon />
+                </button>
+              )}
             </li>
           );
         })}

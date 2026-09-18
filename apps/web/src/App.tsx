@@ -55,6 +55,20 @@ export function App() {
     return token;
   });
 
+  // Same read-once-and-strip pattern as resetToken above, for docs/ROADMAP.md's email
+  // verification link (`?verify_token=...`).
+  const [verifyToken, setVerifyToken] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('verify_token');
+    if (token) {
+      params.delete('verify_token');
+      const rest = params.toString();
+      const path = window.location.pathname + (rest ? `?${rest}` : '') + window.location.hash;
+      window.history.replaceState(null, '', path);
+    }
+    return token;
+  });
+
   useEffect(() => {
     getCurrentUser()
       .then((user) => setAuth(user ?? 'signed-out'))
@@ -76,12 +90,46 @@ export function App() {
     );
   }
 
+  if (verifyToken) {
+    return (
+      <>
+        <VersionBanner />
+        <AuthGate
+          verifyToken={verifyToken}
+          onAuthenticated={(user) => {
+            setAuth(user);
+            setVerifyToken(null);
+          }}
+        />
+      </>
+    );
+  }
+
   if (auth === 'checking') return <VersionBanner />;
   if (auth === 'signed-out') {
     return (
       <>
         <VersionBanner />
         <AuthGate onAuthenticated={setAuth} />
+      </>
+    );
+  }
+
+  // A real (non-demo) account whose email isn't confirmed yet — docs/ROADMAP.md's "Email
+  // verification + demo without real ingest" gate. Checked ahead of `upgrading` and the real
+  // app below: an unverified account has nothing to show yet regardless of anything else.
+  if ('email' in auth && !auth.emailVerified) {
+    return (
+      <>
+        <VersionBanner />
+        <AuthGate
+          unverifiedUser={auth}
+          onAuthenticated={setAuth}
+          onSignOut={() => {
+            void logout();
+            setAuth('signed-out');
+          }}
+        />
       </>
     );
   }

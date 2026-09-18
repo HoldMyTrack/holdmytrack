@@ -37,6 +37,13 @@ type Config struct {
 	// serves it from there. Set it only for a deployment reading the archive from object
 	// storage or a CDN. Only read by `serve`.
 	BasemapOrigin string
+	// SkipEmailVerification bypasses docs/ROADMAP.md's email-verification gate entirely —
+	// every new signup is created already verified, and no verification email is sent. Off
+	// by default; compose.yaml's `test` profile is the one place this is turned on, since
+	// apps/web/tests/smoke.mjs and build.mjs sign up a fixture account and expect the map to
+	// mount immediately with no token to fetch out of a mailbox that doesn't exist in CI.
+	// Never set this in a real deployment. Only read by `serve`.
+	SkipEmailVerification bool
 }
 
 func Load() (Config, error) {
@@ -54,6 +61,7 @@ func Load() (Config, error) {
 		SMTPFrom:     env("SMTP_FROM", ""),
 		AppBaseURL:   env("APP_BASE_URL", "http://localhost:5173"),
 	}
+	c.SkipEmailVerification = env("SKIP_EMAIL_VERIFICATION", "") == "true"
 	if c.BasemapOrigin = env("BASEMAP_ORIGIN", ""); c.BasemapOrigin == "" {
 		// Deliberately derived from AppBaseURL rather than given its own default, for the
 		// same reason auth.go derives the session cookie's Secure flag from it: two env

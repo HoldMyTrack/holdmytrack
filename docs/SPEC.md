@@ -15,7 +15,7 @@ This document specifies FitMap's functional behavior as currently implemented: w
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and privacy trim, FR-1.7), the no-signup demo, activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, the date-range picker, the per-account activity graph, password recovery, and distance/time trends (FR-9 below).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and privacy trim, FR-1.7; email verification, FR-1.8), the no-signup demo (now read-only, seeded with fixed preset activities — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, the date-range picker, the per-account activity graph, password recovery, and distance/time trends (FR-9 below).
 
 **Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync (HealthKit/Health Connect), cross-source deduplication, explorer-tile gamification, the rest of "Export" (story cards, animated reveals — high-resolution map export itself is built, FR-4.10 below), and user-defined privacy zones (a `privacy_zones` table exists in the schema — `IMPLEMENTATION.md` §3.7 — but no endpoint or UI creates or applies one today; only the endpoint-trim privacy control in FR-8.1 below, user-adjustable via FR-1.7's Settings page, is functional). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against FitMap being a health or fitness advisor, and pace/heart-rate stay as per-activity route context (FR-4.9) rather than an analysed, all-time performance record. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
@@ -59,13 +59,11 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 **Behavior**:
 1. Client submits email + password to `POST /v1/auth/signup`.
 2. Server validates the email is a syntactically valid address and the password meets the minimum length.
-3. Server hashes the password (bcrypt) and creates or claims a `users` row (see note).
-4. Server creates a session (30-day expiry) and sets it as an `HttpOnly` cookie.
-5. Client is signed in and shown the map.
+3. Server hashes the password (bcrypt) and creates a new `users` row — always a fresh row, whether or not the caller's browser holds a live demo session (see FR-2.3, revised).
+4. Server creates a session (30-day expiry) and sets it as an `HttpOnly` cookie, and sends a verification email (FR-1.8).
+5. Client is signed in, but held on FR-1.8's "verify your email" screen rather than shown the map, until the account is verified.
 
-**Note — "claim" semantics**: if the caller's browser holds a live demo session, that same account is converted in place (its uploaded activities are preserved) rather than a new one being created (FR-2.3). Otherwise, if no account anywhere has ever set a password, the system's original seeded account is claimed in place instead of inserting a new row (a one-time migration convenience, not something a normal user observes differently). In every other case, a new account row is created.
-
-**Outputs**: A valid session cookie; the account's email is returned to the client.
+**Outputs**: A valid session cookie; the account's email and its (unverified) status are returned to the client.
 
 **Error cases**:
 - Invalid email format → `400 Bad Request`.
@@ -111,7 +109,7 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 2. If the cookie names a live, unexpired session, the server returns the account's identity (`200 OK`).
 3. Otherwise the server returns `401 Unauthorized`, and the client shows the sign-in screen.
 
-**Notes**: A session's validity is checked in the database on every request (not trusted from the cookie's own stated expiry), so a session ended server-side (FR-1.3, or invalidated by a password reset, FR-1.6) stops working immediately even if the browser still holds the cookie. Sessions last 30 days from creation.
+**Notes**: A session's validity is checked in the database on every request (not trusted from the cookie's own stated expiry), so a session ended server-side (FR-1.3, or invalidated by a password reset, FR-1.6) stops working immediately even if the browser still holds the cookie. Sessions last 30 days from creation. The response also reports whether the account's email is verified (always `true` for a demo account) — the client uses this to decide whether to show the map or FR-1.8's verify screen.
 
 ### FR-1.5 Forgot password
 
@@ -172,6 +170,28 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 - An unsupported image type or a file over 5 MB → `415`/`413`, and the image is not saved.
 - Country outside the supported list, or Privacy Trim outside 0–5000 → `400 Bad Request`, and none of the three fields in that save are applied (a full-replace save either succeeds as a whole or not at all).
 
+### FR-1.8 Email verification
+
+**Description**: A real (non-demo) account created by FR-1.1 must confirm its email address before it can use anything beyond this screen — the map and every other authenticated route are gated on it. A demo account (FR-2) is never subject to this gate.
+
+**Preconditions**: An active session for a real account whose email is not yet verified.
+
+**Behavior**:
+1. On signup (FR-1.1) and whenever the email address changes (step 4 below), the server emails a link containing a verification token (valid 24 hours, single-use) to the address on file.
+2. Clicking the link submits the token to `POST /v1/auth/verify-email`. On success, the server marks the account verified, invalidates every other outstanding verification token for it, and creates a fresh session for whichever browser opened the link — regardless of whether that browser already held a session of its own, so the link works from any device.
+3. While waiting, the account holder can request another copy of the link (`POST /v1/auth/resend-verification`, rate-limited to 5 per hour per account) without needing to already know it was lost or expired.
+4. The account holder can also change the address on file (`PATCH /v1/auth/email`) before ever verifying — correcting a typo the original signup made, since a resend alone cannot fix a wrong address. Any change resets the account back to unverified and sends a new link to the new address, whether or not the account was already verified.
+5. Until verified, every route other than `GET /v1/auth/me`, `POST /v1/auth/logout`, and the three endpoints above returns `403 Forbidden` with a distinguishable error rather than the normal response.
+
+**Outputs**: `verify-email` and `reset-password` both return a valid session cookie for the account on success. `resend-verification` and `change-email` return a confirmation; `change-email` also returns the account's current (now-unverified) profile.
+
+**Error cases**:
+- Verification token missing, already used, or expired → `400 Bad Request` with a generic message, same non-distinguishing reasoning as FR-1.6's reset token.
+- `change-email`/`resend-verification` attempted by a demo account → `400 Bad Request` (neither concept applies to one).
+- More than 5 resend requests for the same account within an hour → `429 Too Many Requests`.
+
+**Notes**: This reverses an earlier, deliberately simpler version of FR-1 that had no email verification at all — added once real Health Connect/cloud sync made an unrecoverable, mistyped-email account a real cost (server-side ingest work stranded on an account nobody can get back into), not because the original simplicity was a mistake.
+
 ## 4. FR-2 — No-Signup Demo
 
 ### FR-2.1 Start a demo
@@ -182,11 +202,11 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 
 **Behavior**:
 1. Client calls `POST /v1/auth/demo`.
-2. Server creates a new account with no email or password a person could use to sign in with directly, marked as ephemeral with a 24-hour expiry.
+2. Server creates a new account with no email or password a person could use to sign in with directly, marked as ephemeral with a 24-hour expiry, and seeds it with a small fixed set of preset activities (currently two: a walk and a run, at different fixed locations).
 3. Server creates a session for it (also 24-hour expiry) and sets it as a cookie.
-4. Client is signed in and shown the map, with full functional access to every other feature in this document (upload, map modes, filtering, the activity graph) exactly as a registered user has it.
+4. Client is signed in and shown the map, with the two preset activities already visible in every mode (Normal, Fog of War, Heatmap) and every read-only feature (filtering, the activity graph, export) exactly as a registered user has it. **A demo account cannot upload, sync, edit, or delete an activity, or change its avatar/settings** — every such request is rejected regardless of what a client attempts, whether or not its own UI still offers the control. Creating a real account (FR-1.1) is the only way to save one's own data.
 
-**Outputs**: A valid session cookie for the new ephemeral account.
+**Outputs**: A valid session cookie for the new ephemeral account, already showing its two preset activities.
 
 **Rate limiting**: Limited to 5 demo accounts per hour per client IP address; further requests receive `429 Too Many Requests`.
 
@@ -198,9 +218,9 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 
 **Notes**: There is no warning before expiry and no way to recover a demo account's data after it expires. A user who wants to keep their data must upgrade it (FR-2.3) before the 24-hour window elapses.
 
-### FR-2.3 Upgrade a demo account to a registered account
+### FR-2.3 Create a registered account from a demo session
 
-**Description**: A demo user converts their ephemeral account into a permanent one without losing anything uploaded during the demo.
+**Description**: A demo user creates a real, permanent account of their own to start saving data. Since a demo account only ever holds FR-2.1's fixed preset activities — never anything the person actually uploaded — this is an ordinary new signup, not a conversion: nothing from the demo carries over.
 
 **Preconditions**: An active demo session.
 
@@ -209,10 +229,10 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 **Behavior**:
 1. From the account menu, the user selects "Demo session — save this," which presents the same sign-up screen a new visitor sees (FR-1.1), with a "← Back" option instead of the "try demo" option (starting a second demo while already in one would abandon the first).
 2. The user submits an email and password.
-3. Because the request carries a live demo session, the server updates that same account's row in place (setting its email and password, and clearing its ephemeral-expiry marker) rather than creating a new one — every activity uploaded during the demo remains attached under the same account.
-4. The user is returned to the map, now signed in as a registered user.
+3. The server creates a plain new account (FR-1.1's normal behavior) — the demo session's own row is untouched and remains subject to FR-2.2's expiry.
+4. The user is signed in to the new account, held on FR-1.8's verify-email screen exactly like any other fresh signup.
 
-**Outputs**: The demo account is now a permanent, registered account; all previously uploaded data is preserved and immediately visible.
+**Outputs**: A new, unverified registered account — not the demo account, and not carrying any of its preset activities.
 
 **Note — cancellation**: selecting "← Back" (or navigating away without submitting) returns to the map with the demo session untouched — nothing is lost, and the account remains subject to FR-2.2's 24-hour expiry.
 

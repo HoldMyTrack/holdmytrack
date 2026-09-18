@@ -18,13 +18,12 @@ import (
 )
 
 // Simple email+password auth, server-side sessions (migrations/0006_sessions.sql) — resolved
-// toward the smallest thing that removes PlaceholderUserID, not a third-party identity
-// provider: no vendor to depend on, the same bias Path 3 uploads already made. No email
-// verification — a real gap for a multi-user deployment, not built here because this is
-// explicitly the *simple* version. Password reset (IMPLEMENTATION.md §4.11) is
-// built, once internal/mail existed to build it on. Rate limiting is partially built: see
-// demoLimiter/forgotPasswordLimiter below, added specifically because their endpoints are
-// reachable with no credentials at all.
+// toward the smallest thing that removes the old placeholder-user stand-in, not a
+// third-party identity provider: no vendor to depend on, the same bias Path 3 uploads already
+// made. Password reset (IMPLEMENTATION.md §4.11) and email verification
+// (docs/ROADMAP.md's "Email verification + demo without real ingest") share the same
+// token-table shape. Rate limiting is partially built: see demoLimiter/forgotPasswordLimiter
+// below, added specifically because their endpoints are reachable with no credentials at all.
 
 const sessionCookieName = "fitmap_session"
 
@@ -43,6 +42,11 @@ const demoSessionTTL = 24 * time.Hour
 // somewhere less secure than the session cookie it's standing in for.
 const passwordResetTTL = time.Hour
 
+// emailVerificationTTL is longer than passwordResetTTL — confirming a new signup is less
+// time-sensitive than a credential reset, and someone might reasonably not check their inbox
+// for a day.
+const emailVerificationTTL = 24 * time.Hour
+
 const minPasswordLength = 8
 
 type authRequest struct {
@@ -58,6 +62,11 @@ type authResponse struct {
 	// handleDemoStart), not something to leak into a response the frontend might display.
 	Email  string `json:"email"`
 	IsDemo bool   `json:"isDemo"`
+	// Always true for a demo account (the gate never applies to one — see requireVerified);
+	// for a real account, whatever users.email_verified actually holds. The frontend's own
+	// gate logic still checks IsDemo itself rather than trusting this alone, so a demo session
+	// is never accidentally read as "needs to verify."
+	EmailVerified bool `json:"email_verified"`
 	// The Settings page's own fields (services/server/internal/httpapi/account.go).
 	// DisplayName/Country/AvatarURL are "" when unset — not omitted — so the frontend never
 	// has to distinguish "absent" from "empty," and PrivacyTrimM is never omitted either,
@@ -93,17 +102,19 @@ func (s *Server) loadAuthResponse(ctx context.Context, userID string) (authRespo
 	var avatarUpdatedAt *time.Time
 	var demoExpiresAt *time.Time
 	var privacyTrimM int
+	var emailVerified bool
 	err := s.pool.QueryRow(ctx, `
 		SELECT email, demo_expires_at, COALESCE(display_name, ''), COALESCE(country, ''),
-		       COALESCE(avatar_key, ''), avatar_updated_at, privacy_trim_m
+		       COALESCE(avatar_key, ''), avatar_updated_at, privacy_trim_m, email_verified
 		FROM users WHERE id = $1
-	`, userID).Scan(&email, &demoExpiresAt, &displayName, &country, &avatarKey, &avatarUpdatedAt, &privacyTrimM)
+	`, userID).Scan(&email, &demoExpiresAt, &displayName, &country, &avatarKey, &avatarUpdatedAt, &privacyTrimM, &emailVerified)
 	if err != nil {
 		return authResponse{}, err
 	}
 	isDemo := demoExpiresAt != nil
 	if isDemo {
-		email = "" // never leak the internal, synthetic demo email — see handleDemoStart
+		email = ""           // never leak the internal, synthetic demo email — see handleDemoStart
+		emailVerified = true // the gate never applies to a demo account — see requireVerified
 	}
 	var avatarURL string
 	if avatarKey != "" && avatarUpdatedAt != nil {
@@ -113,12 +124,13 @@ func (s *Server) loadAuthResponse(ctx context.Context, userID string) (authRespo
 		avatarURL = fmt.Sprintf("/v1/account/avatar?v=%d", avatarUpdatedAt.Unix())
 	}
 	return authResponse{
-		Email:        email,
-		IsDemo:       isDemo,
-		DisplayName:  displayName,
-		Country:      country,
-		AvatarURL:    avatarURL,
-		PrivacyTrimM: privacyTrimM,
+		Email:         email,
+		IsDemo:        isDemo,
+		EmailVerified: emailVerified,
+		DisplayName:   displayName,
+		Country:       country,
+		AvatarURL:     avatarURL,
+		PrivacyTrimM:  privacyTrimM,
 	}, nil
 }
 
@@ -151,14 +163,13 @@ func normalizeEmail(raw string) (string, error) {
 
 var errEmailTaken = errors.New("email already registered")
 
-// handleSignup serves `POST /v1/auth/signup`. Three cases, in priority order:
-//  1. The caller already holds a live demo session (VISION.md §8.2) — claim that
-//     account in place (claimDemoUser) so whatever they uploaded during the demo survives
-//     becoming a real account, rather than starting a second, empty one.
-//  2. Otherwise, the very first signup ever claims the seeded placeholder user
-//     (migrations/0003_seed_demo_user.sql) — see claimOrCreateUser — so activity history
-//     uploaded before accounts existed stays attached to the same account.
-//  3. Otherwise, a plain new account.
+// handleSignup serves `POST /v1/auth/signup`. Always a plain new account, whether or not the
+// caller currently holds a demo session — docs/ROADMAP.md's "Email verification + demo
+// without real ingest" retired the old claim-the-demo-account-in-place path along with demo's
+// real upload/sync access: a demo account only ever holds the fixed preset activities
+// seedDemoPresets seeded it with (never anything real), so there is nothing worth preserving
+// by reusing its row. The new account starts unverified (email_verified defaults false) and
+// gets a verification email; requireVerified is what actually gates on that.
 func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 	req, err := decodeAuthRequest(r)
 	if err != nil {
@@ -175,19 +186,26 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	var userID string
-	if demoUserID, ok := s.currentDemoUserID(r); ok {
-		userID, err = s.claimDemoUser(ctx, demoUserID, req.Email, hash)
-	} else {
-		userID, err = s.claimOrCreateUser(ctx, req.Email, hash)
-	}
+	err = s.pool.QueryRow(ctx,
+		`INSERT INTO users (email, password_hash, email_verified) VALUES ($1, $2, $3) RETURNING id`,
+		req.Email, hash, s.skipEmailVerification,
+	).Scan(&userID)
 	if err != nil {
-		if errors.Is(err, errEmailTaken) {
+		if isUniqueViolation(err) {
 			http.Error(w, "an account with this email already exists", http.StatusConflict)
 			return
 		}
 		s.log.Error("signup failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
+	}
+
+	if !s.skipEmailVerification {
+		if err := s.sendVerificationEmail(ctx, userID, req.Email); err != nil {
+			// Not fatal to the signup itself — the account exists and can request a resend
+			// (handleResendVerification) — but worth knowing about if Mailgun/SMTP is down.
+			s.log.Error("verification email failed", "err", err)
+		}
 	}
 
 	sessionID, err := s.startSession(w, ctx, userID, sessionTTL)
@@ -205,83 +223,27 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, authResponseWithSession{authResponse: resp, SessionToken: sessionID})
 }
 
-// claimOrCreateUser: if no account anywhere has ever set a password, this signup claims the
-// seeded placeholder row (updating its email/password_hash in place, keeping its id and
-// therefore every activity already attributed to it) instead of inserting a new one.
-// Otherwise it's a plain new-account insert. "Has anyone ever set a password" rather than
-// "does the placeholder row still have email = the seed's own value" so this keeps working
-// correctly even if the seed migration's placeholder email was already changed by hand.
-func (s *Server) claimOrCreateUser(ctx context.Context, email string, hash []byte) (string, error) {
-	var anyClaimed bool
-	if err := s.pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM users WHERE password_hash IS NOT NULL)`).Scan(&anyClaimed); err != nil {
-		return "", err
+// sendVerificationEmail creates a fresh token and emails the verification link — called from
+// handleSignup, handleChangeEmail, and handleResendVerification, the three places a real
+// account needs one (re)sent.
+func (s *Server) sendVerificationEmail(ctx context.Context, userID, email string) error {
+	expiresAt := time.Now().Add(emailVerificationTTL)
+	var tokenID string
+	if err := s.pool.QueryRow(ctx,
+		`INSERT INTO email_verifications (user_id, expires_at) VALUES ($1, $2) RETURNING id`,
+		userID, expiresAt,
+	).Scan(&tokenID); err != nil {
+		return err
 	}
 
-	if !anyClaimed {
-		var userID string
-		err := s.pool.QueryRow(ctx, `
-			UPDATE users SET email = $2, password_hash = $3
-			WHERE id = $1 AND password_hash IS NULL
-			RETURNING id
-		`, PlaceholderUserID, email, hash).Scan(&userID)
-		if err == nil {
-			return userID, nil
-		}
-		if !errors.Is(err, pgx.ErrNoRows) {
-			if isUniqueViolation(err) {
-				return "", errEmailTaken
-			}
-			return "", err
-		}
-		// No placeholder row to claim (e.g. a fresh DB without 0003's seed applied) —
-		// fall through to a plain create below.
-	}
-
-	var userID string
-	err := s.pool.QueryRow(ctx, `INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id`, email, hash).Scan(&userID)
-	if err != nil {
-		if isUniqueViolation(err) {
-			return "", errEmailTaken
-		}
-		return "", err
-	}
-	return userID, nil
-}
-
-// currentDemoUserID resolves the caller's session the same way currentUserID does, but only
-// returns it when that account is still an active demo (demo_expires_at IS NOT NULL) — a
-// real account's own session must never be mistaken for one here.
-func (s *Server) currentDemoUserID(r *http.Request) (string, bool) {
-	sessionID, ok := sessionIDFromRequest(r)
-	if !ok {
-		return "", false
-	}
-	var userID string
-	err := s.pool.QueryRow(r.Context(), `
-		SELECT u.id FROM sessions se
-		JOIN users u ON u.id = se.user_id
-		WHERE se.id = $1 AND se.expires_at > NOW() AND u.demo_expires_at IS NOT NULL
-	`, sessionID).Scan(&userID)
-	if err != nil {
-		return "", false
-	}
-	return userID, true
-}
-
-// claimDemoUser turns an active demo account into a real one in place — same id, so every
-// activity uploaded during the demo (VISION.md §8.2) stays attached — by setting its
-// email/password_hash and clearing demo_expires_at so internal/worker's purge sweep stops
-// treating it as ephemeral.
-func (s *Server) claimDemoUser(ctx context.Context, userID, email string, hash []byte) (string, error) {
-	if _, err := s.pool.Exec(ctx, `
-		UPDATE users SET email = $2, password_hash = $3, demo_expires_at = NULL WHERE id = $1
-	`, userID, email, hash); err != nil {
-		if isUniqueViolation(err) {
-			return "", errEmailTaken
-		}
-		return "", err
-	}
-	return userID, nil
+	link := fmt.Sprintf("%s/?verify_token=%s", s.appBaseURL, tokenID)
+	body := fmt.Sprintf(
+		"Welcome to FitMap! Confirm this email address to unlock your account:\n\n%s\n\n"+
+			"This link works once and expires in 24 hours. If you didn't create a FitMap "+
+			"account, you can safely ignore this email.",
+		link,
+	)
+	return s.mailer.Send(ctx, email, "Verify your FitMap email", body)
 }
 
 // handleLogin serves `POST /v1/auth/login`.
@@ -364,15 +326,17 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleDemoStart serves `POST /v1/auth/demo` — VISION.md §8.2's "no-signup,
-// drag-a-file-in, see-your-fog-map page." Creates a real user row, marked ephemeral via
-// demo_expires_at, and a real session for it exactly like login/signup — the entire existing
-// upload/ingest/fog/tile pipeline then runs completely unchanged for a demo visitor. The
-// email is a synthetic, never-shown placeholder (a real one isn't needed until — and unless —
-// claimDemoUser turns this into a real account); ".invalid" is the RFC 2606 TLD reserved for
-// addresses guaranteed never to be real. Rate-limited per IP: this is the one auth endpoint
-// reachable with no session or credentials at all, so it's the one auth.go's own "no rate
-// limiting" gap couldn't be left alone — an anonymous endpoint that creates real rows and
-// accepts uploads is a cheaper target than any of the already-authenticated ones.
+// drag-a-file-in, see-your-fog-map page," revised per docs/ROADMAP.md's "Email verification +
+// demo without real ingest": a demo account no longer gets real upload/sync access at all
+// (requireNotDemo rejects those regardless of what a client attempts), so it's seeded here
+// with a small fixed set of preset activities (seedDemoPresets) instead, through the same
+// ingest pipeline a real upload uses. The email is a synthetic, never-shown placeholder — a
+// real one is never needed, since a demo account can no longer become a real one in place (see
+// handleSignup); ".invalid" is the RFC 2606 TLD reserved for addresses guaranteed never to be
+// real. Rate-limited per IP: this is the one auth endpoint reachable with no session or
+// credentials at all, so it's the one auth.go's own "no rate limiting" gap couldn't be left
+// alone — an anonymous endpoint that creates real rows is a cheaper target than any of the
+// already-authenticated ones.
 func (s *Server) handleDemoStart(w http.ResponseWriter, r *http.Request) {
 	if !demoLimiter.allow(clientIP(r)) {
 		http.Error(w, "too many demo sessions from this address; try again later", http.StatusTooManyRequests)
@@ -391,6 +355,7 @@ func (s *Server) handleDemoStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	s.seedDemoPresets(ctx, userID)
 
 	sessionID, err := s.startSession(w, ctx, userID, demoSessionTTL)
 	if err != nil {
@@ -560,6 +525,164 @@ func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 // arbitrary address through this endpoint.
 var forgotPasswordLimiter = newFixedWindowLimiter(5, time.Hour)
 
+type verifyEmailRequest struct {
+	Token string `json:"token"`
+}
+
+// handleVerifyEmail serves `POST /v1/auth/verify-email` — the link handleSignup/
+// handleChangeEmail/handleResendVerification email out. Token-based like
+// handleResetPassword, not session-based: the link has to work whether or not the browser
+// opening it already holds a session (a different device, a different browser profile), so it
+// mints a fresh session on success exactly as reset-password does, rather than requiring one
+// to already exist. A generic error for a missing or expired token, same "don't tell a caller
+// more than it needs to know" reasoning as reset-password.
+func (s *Server) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
+	var req verifyEmailRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	var userID string
+	err := s.pool.QueryRow(ctx,
+		`SELECT user_id FROM email_verifications WHERE id = $1 AND expires_at > NOW()`, req.Token,
+	).Scan(&userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		http.Error(w, "this verification link is invalid or has expired", http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		s.log.Error("verify-email lookup failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	if _, err := s.pool.Exec(ctx, `UPDATE users SET email_verified = true WHERE id = $1`, userID); err != nil {
+		s.log.Error("email verify update failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	// Every outstanding token for this account, not just the one used — mirrors
+	// handleResetPassword's own "close every other still-live link too" reasoning, applied to
+	// a resend that arrived after this one was already clicked.
+	if _, err := s.pool.Exec(ctx, `DELETE FROM email_verifications WHERE user_id = $1`, userID); err != nil {
+		s.log.Error("verification token cleanup failed", "err", err)
+	}
+
+	sessionID, err := s.startSession(w, ctx, userID, sessionTTL)
+	if err != nil {
+		s.log.Error("session start failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	resp, err := s.loadAuthResponse(ctx, userID)
+	if err != nil {
+		s.log.Error("verify-email response lookup failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, authResponseWithSession{authResponse: resp, SessionToken: sessionID})
+}
+
+// handleResendVerification serves `POST /v1/auth/resend-verification` — plain requireAuth,
+// deliberately not requireVerified, since the whole point is helping an account that hasn't
+// verified yet. Rate-limited per account rather than per IP (resendVerificationLimiter): the
+// caller is already an authenticated user at this point, not an anonymous one, so the abuse
+// case this guards is one signed-in account spamming its own inbox, not a script targeting
+// arbitrary addresses.
+func (s *Server) handleResendVerification(w http.ResponseWriter, r *http.Request) {
+	info := authInfoFromContext(r.Context())
+	if info.isDemo {
+		http.Error(w, "demo accounts have no email to verify", http.StatusBadRequest)
+		return
+	}
+	if info.emailVerified {
+		writeJSON(w, http.StatusOK, map[string]string{"message": "This account is already verified."})
+		return
+	}
+	if !resendVerificationLimiter.allow(info.userID) {
+		http.Error(w, "too many requests; try again later", http.StatusTooManyRequests)
+		return
+	}
+
+	ctx := r.Context()
+	var email string
+	if err := s.pool.QueryRow(ctx, `SELECT email FROM users WHERE id = $1`, info.userID).Scan(&email); err != nil {
+		s.log.Error("resend-verification lookup failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if err := s.sendVerificationEmail(ctx, info.userID, email); err != nil {
+		s.log.Error("resend verification email failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Verification email sent."})
+}
+
+// resendVerificationLimiter mirrors forgotPasswordLimiter's shape but keys on the account's
+// own id rather than an IP — see handleResendVerification's own doc comment for why.
+var resendVerificationLimiter = newFixedWindowLimiter(5, time.Hour)
+
+type changeEmailRequest struct {
+	Email string `json:"email"`
+}
+
+// handleChangeEmail serves `PATCH /v1/auth/email` — plain requireAuth like
+// handleResendVerification, reachable before verification specifically so a mistyped signup
+// email can be corrected (docs/ROADMAP.md: "resend alone doesn't help someone who typed the
+// address wrong in the first place"). Any change resets email_verified to false and sends a
+// fresh verification email to the new address, whether or not the account was already
+// verified — an unconfirmed address is unconfirmed regardless of how it got there.
+func (s *Server) handleChangeEmail(w http.ResponseWriter, r *http.Request) {
+	info := authInfoFromContext(r.Context())
+	if info.isDemo {
+		http.Error(w, "demo accounts have no email to change", http.StatusBadRequest)
+		return
+	}
+
+	var req changeEmailRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	email, err := normalizeEmail(req.Email)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	if _, err := s.pool.Exec(ctx,
+		`UPDATE users SET email = $2, email_verified = false WHERE id = $1`, info.userID, email,
+	); err != nil {
+		if isUniqueViolation(err) {
+			http.Error(w, "an account with this email already exists", http.StatusConflict)
+			return
+		}
+		s.log.Error("change-email update failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	// Old tokens pointed at a verification link that would still verify an address this
+	// account no longer holds, if the new address ever unluckily collided with a stale one.
+	if _, err := s.pool.Exec(ctx, `DELETE FROM email_verifications WHERE user_id = $1`, info.userID); err != nil {
+		s.log.Error("verification token cleanup failed", "err", err)
+	}
+	if err := s.sendVerificationEmail(ctx, info.userID, email); err != nil {
+		s.log.Error("change-email verification send failed", "err", err)
+	}
+
+	resp, err := s.loadAuthResponse(ctx, info.userID)
+	if err != nil {
+		s.log.Error("change-email response lookup failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
 type fixedWindowLimiter struct {
 	mu     sync.Mutex
 	limit  int
@@ -690,30 +813,93 @@ func (s *Server) currentUserID(r *http.Request) (string, bool) {
 
 type contextKey string
 
-const userIDContextKey contextKey = "userID"
+const authContextKey contextKey = "authInfo"
+
+// authInfo is what requireAuth resolves a session down to, in one query, and attaches to the
+// request context — userID for every handler that used to read the old PlaceholderUserID
+// constant, plus isDemo/emailVerified for the two gates layered on top (requireVerified,
+// requireNotDemo) that need them without a second round trip each.
+type authInfo struct {
+	userID        string
+	isDemo        bool
+	emailVerified bool
+}
+
+func authInfoFromContext(ctx context.Context) authInfo {
+	info, _ := ctx.Value(authContextKey).(authInfo)
+	return info
+}
 
 // userIDFromContext reads the user id requireAuth already resolved and attached to the
 // request context — every handler that used to read the PlaceholderUserID constant reads
 // this instead now.
 func userIDFromContext(ctx context.Context) string {
-	id, _ := ctx.Value(userIDContextKey).(string)
-	return id
+	return authInfoFromContext(ctx).userID
 }
 
-// requireAuth wraps a handler that needs an authenticated user, threading the resolved id
-// through the request context rather than changing every wrapped handler's own signature —
-// the mechanical diff (replacing PlaceholderUserID with userIDFromContext(r.Context()) at
-// each call site) is far smaller than re-plumbing a new parameter through every handler and
-// every server.go registration.
+// requireAuth wraps a handler that needs an authenticated user, threading the resolved
+// authInfo through the request context rather than changing every wrapped handler's own
+// signature — the mechanical diff (replacing PlaceholderUserID with
+// userIDFromContext(r.Context()) at each call site) is far smaller than re-plumbing a new
+// parameter through every handler and every server.go registration. Deliberately the only one
+// of the three auth middlewares that never rejects on isDemo/emailVerified — used directly by
+// handleResendVerification and handleChangeEmail, which exist specifically to help an account
+// that hasn't verified yet.
 func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := s.currentUserID(r)
+		sessionID, ok := sessionIDFromRequest(r)
 		if !ok {
 			http.Error(w, "authentication required", http.StatusUnauthorized)
 			return
 		}
-		next(w, r.WithContext(context.WithValue(r.Context(), userIDContextKey, userID)))
+		var info authInfo
+		err := s.pool.QueryRow(r.Context(), `
+			SELECT u.id, u.demo_expires_at IS NOT NULL, u.email_verified
+			FROM sessions se JOIN users u ON u.id = se.user_id
+			WHERE se.id = $1 AND se.expires_at > NOW()
+		`, sessionID).Scan(&info.userID, &info.isDemo, &info.emailVerified)
+		if err != nil {
+			http.Error(w, "authentication required", http.StatusUnauthorized)
+			return
+		}
+		next(w, r.WithContext(context.WithValue(r.Context(), authContextKey, info)))
 	}
+}
+
+// requireVerified wraps requireAuth with docs/ROADMAP.md's email-verification gate: a real
+// (non-demo) account whose email isn't yet confirmed gets a distinguishable 403 instead of
+// reaching the handler, so the frontend can render the "verify your email" screen rather than
+// a generic error. Demo accounts always pass — the gate never applied to them; see
+// handleDemoStart's own doc comment for why a demo account has no email worth verifying at
+// all. This is the middleware every previously-plain-requireAuth route below gets, except the
+// handful (resend-verification, change-email) that exist to help an unverified account.
+func (s *Server) requireVerified(next http.HandlerFunc) http.HandlerFunc {
+	return s.requireAuth(func(w http.ResponseWriter, r *http.Request) {
+		info := authInfoFromContext(r.Context())
+		if !info.isDemo && !info.emailVerified {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "email_not_verified"})
+			return
+		}
+		next(w, r)
+	})
+}
+
+// requireNotDemo layers on top of requireVerified for the write endpoints a demo account must
+// never reach — upload, sync, edit, delete, avatar, settings — docs/ROADMAP.md: "Demo Users
+// can only view preset activities and can't do any modifications." A real, verified account
+// passes through unchanged; a demo account gets a distinguishable 403 a frontend can turn into
+// "create an account to save your own data" rather than a generic error.
+func (s *Server) requireNotDemo(next http.HandlerFunc) http.HandlerFunc {
+	return s.requireVerified(func(w http.ResponseWriter, r *http.Request) {
+		if authInfoFromContext(r.Context()).isDemo {
+			writeJSON(w, http.StatusForbidden, map[string]string{
+				"error":   "demo_read_only",
+				"message": "Demo accounts can't add, edit, or delete activities — create an account to save your own data.",
+			})
+			return
+		}
+		next(w, r)
+	})
 }
 
 func isUniqueViolation(err error) bool {

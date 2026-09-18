@@ -84,7 +84,7 @@ func main() {
 			smtpFrom = cfg.SMTPUsername
 		}
 		mailer := mail.New(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUsername, cfg.SMTPPassword, smtpFrom, log)
-		srv := httpapi.New(pool, store, log, mailer, cfg.AppBaseURL, cfg.BasemapOrigin, gitSHA)
+		srv := httpapi.New(pool, store, log, mailer, cfg.AppBaseURL, cfg.BasemapOrigin, gitSHA, cfg.SkipEmailVerification)
 		httpSrv := &http.Server{Addr: cfg.ListenAddr, Handler: srv}
 		log.Info("serve: listening", "addr", cfg.ListenAddr)
 		go func() {
