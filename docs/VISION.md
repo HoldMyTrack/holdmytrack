@@ -29,6 +29,8 @@ What is left is an aggregator and a map for exploring where you've been — not 
 ### 2.1 Mission Statement
 To let athletes, runners, cyclists and explorers see and keep the shape of where they have been — without a subscription, and without surrendering their data.
 
+**Tagline**: "FitMap — Keep the shape of your outdoor journeys." Not a fitness-tracker claim (§1.1 is explicit that FitMap isn't one) — FitMap still motivates and supports people doing fitness activities and syncing them in to see the result, it just isn't the tool doing the tracking itself.
+
 ### 2.2 Value Proposition
 * **No tracking friction** — fits existing workflows; FitMap never asks to record a workout.
 * **Bring everything** — one place for data scattered across a watch, a cloud service and a folder of old exports.
