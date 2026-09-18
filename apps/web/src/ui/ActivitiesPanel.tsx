@@ -42,6 +42,15 @@ import { useUnitSystem } from './units';
  *    of all three of the above.
  */
 export interface ActivitiesPanelProps {
+  /** A demo account (docs/ROADMAP.md's "Email verification + demo without real ingest") — the
+   *  backend already rejects every mutation a demo session attempts (requireNotDemo), so this
+   *  disables the controls that would otherwise error, with a `title` explaining why, rather
+   *  than either hiding them (which would hide the feature existing at all, undercutting the
+   *  demo's whole point of letting someone feel the app) or leaving them enabled to fail.
+   *  Group visible and the per-row eye icon stay enabled either way — purely local UI state,
+   *  never sent to the backend, so there's nothing for a demo account to be blocked from
+   *  there. */
+  readOnly?: boolean;
   /** Rows already narrowed by TYPE/DISTANCE — what actually renders. */
   activities: Activity[];
   loading: boolean;
@@ -99,6 +108,7 @@ export interface ActivitiesPanelProps {
 }
 
 export function ActivitiesPanel({
+  readOnly = false,
   activities,
   loading,
   error,
@@ -349,10 +359,10 @@ export function ActivitiesPanel({
         <button
           type="button"
           className="activities-panel__delete"
-          disabled={checked.size === 0}
+          disabled={readOnly || checked.size === 0}
           onClick={() => setDeletingGroup(true)}
           aria-label="Delete every checked activity"
-          title="Delete checked group"
+          title={readOnly ? 'Not available for demo accounts — create an account to delete activities' : 'Delete checked group'}
         >
           <TrashIcon />
         </button>
@@ -430,8 +440,9 @@ export function ActivitiesPanel({
               <button
                 type="button"
                 className="activities-panel__edit"
+                disabled={readOnly}
                 aria-label={`Edit type, name, and description for ${label}`}
-                title="Edit type, name, and description"
+                title={readOnly ? 'Not available for demo accounts — create an account to edit activities' : 'Edit type, name, and description'}
                 onClick={() => setEditingActivity(activity)}
               >
                 <PencilIcon />
@@ -439,8 +450,9 @@ export function ActivitiesPanel({
               <button
                 type="button"
                 className="activities-panel__delete"
+                disabled={readOnly}
                 aria-label={`Delete ${label}`}
-                title="Delete this activity"
+                title={readOnly ? 'Not available for demo accounts — create an account to delete activities' : 'Delete this activity'}
                 onClick={() => setDeletingActivity(activity)}
               >
                 <TrashIcon />

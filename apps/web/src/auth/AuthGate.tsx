@@ -1,5 +1,16 @@
-import { useState } from 'react';
-import { forgotPassword, login, resetPassword, signup, startDemo, type SessionUser } from '../api';
+import { useEffect, useState } from 'react';
+import {
+  changeEmail,
+  forgotPassword,
+  login,
+  resendVerification,
+  resetPassword,
+  signup,
+  startDemo,
+  verifyEmail,
+  type AuthUser,
+  type SessionUser,
+} from '../api';
 
 export interface AuthGateProps {
   /** Called once a session actually exists — App.tsx swaps this screen out for the real app. */
@@ -16,13 +27,24 @@ export interface AuthGateProps {
    *  arriving via a clicked email link is unambiguous intent, regardless of whatever `mode`
    *  or session state would otherwise apply. */
   resetToken?: string;
+  /** Present only when the URL carried an email-verification token (App.tsx reads a
+   *  `verify_token` query param the same way it reads `reset_token`, docs/ROADMAP.md's "Email
+   *  verification + demo without real ingest"). Verifies immediately on mount — there's
+   *  nothing for a person to type, unlike resetToken's form, just a link that was clicked. */
+  verifyToken?: string;
+  /** Present when there's already a live but unverified real session — App.tsx's own check of
+   *  `emailVerified` on the signed-in user, not a URL token at all. Distinct from resetToken/
+   *  verifyToken (which both mean "no session exists yet, or ignore the one that does"): this
+   *  one has a real session to sign out of, hence onSignOut alongside it. */
+  unverifiedUser?: AuthUser;
+  onSignOut?: () => void;
 }
 
 /** The four screens this component can show — one at a time, never combined. `'form'` is the
  *  original signin/signup toggle; `'forgot'`/`'forgot-sent'` are password-recovery's own
- *  request step and its confirmation; a `resetToken` prop bypasses this union entirely (see
- *  AuthGateProps' own doc comment) since it isn't reached by clicking anything in this
- *  component at all. */
+ *  request step and its confirmation; a `resetToken`/`verifyToken`/`unverifiedUser` prop
+ *  bypasses this union entirely (see AuthGateProps' own doc comments) since none of them are
+ *  reached by clicking anything in this component at all. */
 type Screen = 'form' | 'forgot' | 'forgot-sent';
 
 /** The brand mark repeated at the top of every screen this component can show — pulled out
@@ -60,13 +82,59 @@ function Brand() {
  * endpoint above — a real session behind the scenes, so `onAuthenticated` treats it exactly
  * like a real login.
  */
-export function AuthGate({ onAuthenticated, onCancel, resetToken }: AuthGateProps) {
+export function AuthGate({ onAuthenticated, onCancel, resetToken, verifyToken, unverifiedUser, onSignOut }: AuthGateProps) {
   const [mode, setMode] = useState<'signin' | 'signup'>(onCancel ? 'signup' : 'signin');
   const [screen, setScreen] = useState<Screen>('form');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // verifyToken auto-submits on mount — there's nothing for a person to type here, unlike
+  // resetToken's form, just a link that was clicked. 'verifying' is the only state a person
+  // ever sees unless it fails (an expired or already-used link).
+  const [verifyStatus, setVerifyStatus] = useState<'verifying' | 'error'>('verifying');
+  useEffect(() => {
+    if (!verifyToken) return;
+    verifyEmail(verifyToken)
+      .then(onAuthenticated)
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : String(err));
+        setVerifyStatus('error');
+      });
+    // Deliberately run once per mount, not once per verifyToken change — App.tsx only ever
+    // mounts this component with a given token once (it strips the query param immediately).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // unverifiedUser's own two actions (below) — kept separate from the main form's email/
+  // password state above since this screen shares none of it.
+  const [newEmail, setNewEmail] = useState(unverifiedUser?.email ?? '');
+  const [verifyNotice, setVerifyNotice] = useState<string | null>(null);
+
+  const handleResend = () => {
+    setError(null);
+    setVerifyNotice(null);
+    setSubmitting(true);
+    resendVerification()
+      .then(() => setVerifyNotice('Verification email sent.'))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setSubmitting(false));
+  };
+
+  const handleChangeEmailSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    setVerifyNotice(null);
+    setSubmitting(true);
+    changeEmail(newEmail)
+      .then((user) => {
+        setVerifyNotice('Verification email sent to the new address.');
+        onAuthenticated(user); // still unverified — App.tsx keeps showing this screen, updated.
+      })
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setSubmitting(false));
+  };
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -108,6 +176,68 @@ export function AuthGate({ onAuthenticated, onCancel, resetToken }: AuthGateProp
       .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setSubmitting(false));
   };
+
+  if (verifyToken) {
+    return (
+      <div className="auth-gate">
+        <div className="auth-gate__card">
+          <Brand />
+          <h1 className="auth-gate__title">Verifying your email…</h1>
+          {verifyStatus === 'error' && error && (
+            <p className="auth-gate__error" role="alert">
+              {error}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (unverifiedUser) {
+    return (
+      <div className="auth-gate">
+        <div className="auth-gate__card">
+          <Brand />
+          <h1 className="auth-gate__title">Verify your email</h1>
+          <p className="auth-gate__hint">
+            We sent a confirmation link to <strong>{unverifiedUser.email}</strong>. Click it to unlock your account.
+          </p>
+
+          {verifyNotice && <p className="auth-gate__hint">{verifyNotice}</p>}
+          {error && (
+            <p className="auth-gate__error" role="alert">
+              {error}
+            </p>
+          )}
+
+          <button type="button" className="auth-gate__submit" onClick={handleResend} disabled={submitting}>
+            {submitting ? 'Please wait…' : 'Resend verification email'}
+          </button>
+
+          <form className="auth-gate__field" onSubmit={handleChangeEmailSubmit}>
+            <span>Typed the wrong address? Change it:</span>
+            <input
+              type="email"
+              required
+              autoComplete="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              disabled={submitting}
+            />
+            <button type="submit" className="auth-gate__toggle" disabled={submitting}>
+              Save new email
+            </button>
+          </form>
+
+          {onSignOut && (
+            <button type="button" className="auth-gate__toggle" onClick={onSignOut} disabled={submitting}>
+              ← Sign out
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (resetToken) {
     return (

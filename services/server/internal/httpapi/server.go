@@ -54,14 +54,6 @@ const maxZipEntryBytes = maxUploadBytes
 
 var allowedExt = map[string]bool{".gpx": true, ".fit": true, ".tcx": true}
 
-// PlaceholderUserID is the seeded demo user (migrations/0003_seed_demo_user.sql) real
-// accounts now grow out of rather than replace — see auth.go's claimOrCreateUser: the first
-// ever signup claims this row in place (setting its email/password_hash), so activity
-// history uploaded before accounts existed stays attached to the same id instead of being
-// orphaned. Only auth.go itself still references this constant directly; every other
-// handler reads the authenticated user from userIDFromContext instead (see requireAuth).
-const PlaceholderUserID = "00000000-0000-0000-0000-000000000001"
-
 // corsAllowedOrigins lists the origins a credentialed cross-origin request may come from —
 // needed now that sessions are cookies (see ServeHTTP's own doc comment for why "*" no
 // longer works once a request carries credentials). apps/web's dev server (5173), plus the
@@ -86,18 +78,23 @@ func route(method, path string) string     { return method + " " + apiPrefix + p
 func tileRoute(method, path string) string { return method + " " + tilesPrefix + path }
 
 type Server struct {
-	pool          *pgxpool.Pool
-	store         *storage.Store
-	log           *slog.Logger
-	mux           *http.ServeMux
-	mailer        mail.Sender
-	appBaseURL    string
-	basemapOrigin string
-	version       string
+	pool                  *pgxpool.Pool
+	store                 *storage.Store
+	log                   *slog.Logger
+	mux                   *http.ServeMux
+	mailer                mail.Sender
+	appBaseURL            string
+	basemapOrigin         string
+	version               string
+	skipEmailVerification bool
 }
 
-func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail.Sender, appBaseURL, basemapOrigin, version string) *Server {
-	s := &Server{pool: pool, store: store, log: log, mux: http.NewServeMux(), mailer: mailer, appBaseURL: appBaseURL, basemapOrigin: basemapOrigin, version: version}
+func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail.Sender, appBaseURL, basemapOrigin, version string, skipEmailVerification bool) *Server {
+	s := &Server{
+		pool: pool, store: store, log: log, mux: http.NewServeMux(), mailer: mailer,
+		appBaseURL: appBaseURL, basemapOrigin: basemapOrigin, version: version,
+		skipEmailVerification: skipEmailVerification,
+	}
 	s.mux.HandleFunc(route("POST", "/auth/signup"), s.handleSignup)
 	s.mux.HandleFunc(route("POST", "/auth/login"), s.handleLogin)
 	s.mux.HandleFunc(route("POST", "/auth/logout"), s.handleLogout)
@@ -105,26 +102,34 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(route("POST", "/auth/demo"), s.handleDemoStart)
 	s.mux.HandleFunc(route("POST", "/auth/forgot-password"), s.handleForgotPassword)
 	s.mux.HandleFunc(route("POST", "/auth/reset-password"), s.handleResetPassword)
-	s.mux.HandleFunc(route("PATCH", "/account/settings"), s.requireAuth(s.handleUpdateSettings))
-	s.mux.HandleFunc(route("POST", "/account/avatar"), s.requireAuth(s.handleUploadAvatar))
-	s.mux.HandleFunc(route("GET", "/account/avatar"), s.requireAuth(s.handleGetAvatar))
-	s.mux.HandleFunc(route("DELETE", "/account/avatar"), s.requireAuth(s.handleDeleteAvatar))
-	s.mux.HandleFunc(route("POST", "/activities/upload"), s.requireAuth(s.handleUpload))
-	s.mux.HandleFunc(route("GET", "/activities"), s.requireAuth(s.handleListActivities))
-	s.mux.HandleFunc(route("PATCH", "/activities/{id}"), s.requireAuth(s.handleUpdateActivity))
-	s.mux.HandleFunc(route("DELETE", "/activities/{id}"), s.requireAuth(s.handleDeleteActivity))
-	s.mux.HandleFunc(route("GET", "/activities/duplicates"), s.requireAuth(s.handleListDuplicates))
-	s.mux.HandleFunc(route("GET", "/activities/summary"), s.requireAuth(s.handleActivitySummary))
-	s.mux.HandleFunc(route("GET", "/activities/histogram"), s.requireAuth(s.handleActivityHistogram))
-	s.mux.HandleFunc(route("GET", "/activities/graph-stats"), s.requireAuth(s.handleActivityGraphStats))
-	s.mux.HandleFunc(route("GET", "/activities/trends"), s.requireAuth(s.handleActivityTrends))
-	s.mux.HandleFunc(route("GET", "/activities/status/{external_id}"), s.requireAuth(s.handleActivityStatus))
-	s.mux.HandleFunc(route("GET", "/activities/track-metrics/{id}"), s.requireAuth(s.handleActivityTrackMetrics))
-	s.mux.HandleFunc(route("GET", "/uploads"), s.requireAuth(s.handleListUploads))
-	s.mux.HandleFunc(route("POST", "/sync/activities"), s.requireAuth(s.handleSyncActivities))
-	s.mux.HandleFunc(tileRoute("GET", "/tracks/{z}/{x}/{y}"), s.requireAuth(s.handleTracksTile))
-	s.mux.HandleFunc(tileRoute("GET", "/fog/{z}/{x}/{y}"), s.requireAuth(s.handleFogTile))
-	s.mux.HandleFunc(tileRoute("GET", "/heatmap/{z}/{x}/{y}"), s.requireAuth(s.handleHeatmapTile))
+	s.mux.HandleFunc(route("POST", "/auth/verify-email"), s.handleVerifyEmail)
+	// Plain requireAuth, not requireVerified — these two exist specifically to help an
+	// account that hasn't verified yet (auth.go's own doc comments on each).
+	s.mux.HandleFunc(route("POST", "/auth/resend-verification"), s.requireAuth(s.handleResendVerification))
+	s.mux.HandleFunc(route("PATCH", "/auth/email"), s.requireAuth(s.handleChangeEmail))
+	// requireNotDemo below: account/activity mutations docs/ROADMAP.md's "Email verification
+	// + demo without real ingest" says a demo account must never reach. requireVerified alone
+	// covers everything else a signed-in-but-unverified real account must also not reach yet.
+	s.mux.HandleFunc(route("PATCH", "/account/settings"), s.requireNotDemo(s.handleUpdateSettings))
+	s.mux.HandleFunc(route("POST", "/account/avatar"), s.requireNotDemo(s.handleUploadAvatar))
+	s.mux.HandleFunc(route("GET", "/account/avatar"), s.requireVerified(s.handleGetAvatar))
+	s.mux.HandleFunc(route("DELETE", "/account/avatar"), s.requireNotDemo(s.handleDeleteAvatar))
+	s.mux.HandleFunc(route("POST", "/activities/upload"), s.requireNotDemo(s.handleUpload))
+	s.mux.HandleFunc(route("GET", "/activities"), s.requireVerified(s.handleListActivities))
+	s.mux.HandleFunc(route("PATCH", "/activities/{id}"), s.requireNotDemo(s.handleUpdateActivity))
+	s.mux.HandleFunc(route("DELETE", "/activities/{id}"), s.requireNotDemo(s.handleDeleteActivity))
+	s.mux.HandleFunc(route("GET", "/activities/duplicates"), s.requireVerified(s.handleListDuplicates))
+	s.mux.HandleFunc(route("GET", "/activities/summary"), s.requireVerified(s.handleActivitySummary))
+	s.mux.HandleFunc(route("GET", "/activities/histogram"), s.requireVerified(s.handleActivityHistogram))
+	s.mux.HandleFunc(route("GET", "/activities/graph-stats"), s.requireVerified(s.handleActivityGraphStats))
+	s.mux.HandleFunc(route("GET", "/activities/trends"), s.requireVerified(s.handleActivityTrends))
+	s.mux.HandleFunc(route("GET", "/activities/status/{external_id}"), s.requireVerified(s.handleActivityStatus))
+	s.mux.HandleFunc(route("GET", "/activities/track-metrics/{id}"), s.requireVerified(s.handleActivityTrackMetrics))
+	s.mux.HandleFunc(route("GET", "/uploads"), s.requireVerified(s.handleListUploads))
+	s.mux.HandleFunc(route("POST", "/sync/activities"), s.requireNotDemo(s.handleSyncActivities))
+	s.mux.HandleFunc(tileRoute("GET", "/tracks/{z}/{x}/{y}"), s.requireVerified(s.handleTracksTile))
+	s.mux.HandleFunc(tileRoute("GET", "/fog/{z}/{x}/{y}"), s.requireVerified(s.handleFogTile))
+	s.mux.HandleFunc(tileRoute("GET", "/heatmap/{z}/{x}/{y}"), s.requireVerified(s.handleHeatmapTile))
 	// Deliberately not behind requireAuth, unlike every /v1 route above it. The style
 	// document is derived entirely from the public Protomaps basemap and contains no
 	// per-user data — only layer definitions and the asset URLs a client would need
@@ -278,7 +283,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 // args easy to transpose silently at a call site).
 type uploadFileParams struct {
 	// The authenticated caller (userIDFromContext) — every call site reads this from the
-	// request it's already handling rather than PlaceholderUserID now.
+	// request it's already handling.
 	UserID string
 	// "upload" (a plain or zip-contained file) or "takeout" (handleTakeoutUpload) — the
 	// `activities.source` column's own provenance value, not just a label.

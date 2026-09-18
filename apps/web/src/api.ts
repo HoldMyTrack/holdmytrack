@@ -39,6 +39,11 @@ export interface UserProfile {
 
 export interface AuthUser extends UserProfile {
   email: string;
+  /** docs/ROADMAP.md's "Email verification + demo without real ingest" — always `true` for a
+   *  `DemoUser` (the gate never applies to one, so that type doesn't carry this field at all),
+   *  reflects the account's real `users.email_verified` column for a real one. App.tsx checks
+   *  this to decide whether to render the map or AuthGate's verify-email screen. */
+  emailVerified: boolean;
 }
 
 /** VISION.md §8.2's ephemeral demo account. Its real email is an internal,
@@ -58,6 +63,7 @@ export type SessionUser = AuthUser | DemoUser;
 interface AuthResponseBody {
   email: string;
   isDemo: boolean;
+  email_verified: boolean;
   display_name: string;
   country: string;
   avatar_url: string;
@@ -68,8 +74,12 @@ function toProfile(body: AuthResponseBody): UserProfile {
   return { displayName: body.display_name, country: body.country, avatarUrl: body.avatar_url, privacyTrimM: body.privacy_trim_m };
 }
 
+function toAuthUser(body: AuthResponseBody): AuthUser {
+  return { email: body.email, emailVerified: body.email_verified, ...toProfile(body) };
+}
+
 function toSessionUser(body: AuthResponseBody): SessionUser {
-  return body.isDemo ? toProfile(body) : { email: body.email, ...toProfile(body) };
+  return body.isDemo ? toProfile(body) : toAuthUser(body);
 }
 
 async function postAuth(path: string, email: string, password: string): Promise<AuthUser> {
@@ -84,7 +94,7 @@ async function postAuth(path: string, email: string, password: string): Promise<
     throw new Error(text || `request failed (${res.status})`);
   }
   const body = (await res.json()) as AuthResponseBody;
-  return { email: body.email, ...toProfile(body) };
+  return toAuthUser(body);
 }
 
 export function signup(email: string, password: string): Promise<AuthUser> {
@@ -138,7 +148,59 @@ export async function resetPassword(token: string, password: string): Promise<Au
     throw new Error(text || `request failed (${res.status})`);
   }
   const body = (await res.json()) as AuthResponseBody;
-  return { email: body.email, ...toProfile(body) };
+  return toAuthUser(body);
+}
+
+/** docs/ROADMAP.md's verification link (`?verify_token=...`) — App.tsx reads it the same way
+ *  it already reads `reset_token`. Never a `DemoUser`, same reasoning as `resetPassword`: the
+ *  backend only ever mints one of these tokens for a real account. */
+export async function verifyEmail(token: string): Promise<AuthUser> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/auth/verify-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ token }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(text || `request failed (${res.status})`);
+  }
+  const body = (await res.json()) as AuthResponseBody;
+  return toAuthUser(body);
+}
+
+/** The verify-email screen's "resend" action (AuthGate.tsx) — the caller is already signed in
+ *  but unverified, so this needs no email/token of its own, just the session cookie already
+ *  attached. */
+export async function resendVerification(): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/auth/resend-verification`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(text || `request failed (${res.status})`);
+  }
+}
+
+/** The verify-email screen's "change email" action — corrects a mistyped signup address
+ *  before it's ever been confirmed (docs/ROADMAP.md: "resend alone doesn't help someone who
+ *  typed the address wrong in the first place"). Resets emailVerified to false on the caller's
+ *  side too, matching what the backend just did, so AuthGate keeps showing the verify screen
+ *  for the new address rather than briefly reading as verified. */
+export async function changeEmail(email: string): Promise<AuthUser> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/auth/email`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(text || `request failed (${res.status})`);
+  }
+  const body = (await res.json()) as AuthResponseBody;
+  return toAuthUser(body);
 }
 
 export async function logout(): Promise<void> {

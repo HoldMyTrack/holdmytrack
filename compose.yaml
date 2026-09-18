@@ -111,6 +111,13 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5173}
+      # Email verification (docs/ROADMAP.md) defaults to skipped in local dev, same
+      # dev-convenience reasoning as SMTP_HOST's empty default above — apps/web/tests/
+      # smoke.mjs and build.mjs sign up a fixture account and expect the map to mount
+      # immediately, with no mailbox to fetch a token out of. compose.prod.yml has its own,
+      # separate env anchor and does not inherit this — a real deployment always enforces the
+      # gate. Set SKIP_EMAIL_VERIFICATION=false locally to exercise the real gate by hand.
+      SKIP_EMAIL_VERIFICATION: ${SKIP_EMAIL_VERIFICATION:-true}
     depends_on:
       db: { condition: service_healthy }
 
