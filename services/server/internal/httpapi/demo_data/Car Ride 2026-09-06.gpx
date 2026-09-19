@@ -1,0 +1,44 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1" creator="https://gpx.studio" version="1.1">
+  <metadata>
+    <name>Car Ride - 2026-09-06</name>
+  </metadata>
+  <trk>
+    <name>Car Ride - 2026-09-06</name>
+    <type>driving</type>
+    <trkseg>
+      <trkpt lat="41.40133961324268" lon="-81.74020554668216">
+        <ele>265.8845513176</ele>
+        <time>2026-09-06T13:33:47Z</time>
+      </trkpt>
+      <trkpt lat="41.40133330809159" lon="-81.73817806755957">
+        <ele>267.5655107041</ele>
+        <time>2026-09-06T13:33:58Z</time>
+      </trkpt>
+      <trkpt lat="41.40132239323278" lon="-81.73459812430868">
+        <ele>266.8574943874</ele>
+        <time>2026-09-06T13:34:41Z</time>
+      </trkpt>
+      <trkpt lat="41.39892108823815" lon="-81.73457945516371">
+        <ele>267.0470711160</ele>
+        <time>2026-09-06T13:35:09Z</time>
+      </trkpt>
+      <trkpt lat="41.39891538213769" lon="-81.73371240908574">
+        <ele>267.3503186859</ele>
+        <time>2026-09-06T13:35:44Z</time>
+      </trkpt>
+      <trkpt lat="41.39890130119822" lon="-81.73354142868259">
+        <ele>266.9709691036</ele>
+        <time>2026-09-06T13:35:46Z</time>
+      </trkpt>
+      <trkpt lat="41.39840561031552" lon="-81.73359509457724">
+        <ele>268.0365062072</ele>
+        <time>2026-09-06T13:35:51Z</time>
+      </trkpt>
+      <trkpt lat="41.39834190173386" lon="-81.73375353728213">
+        <ele>268.0374706430</ele>
+        <time>2026-09-06T13:36:21Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>

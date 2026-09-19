@@ -31,10 +31,10 @@ const sessionCookieName = "fitmap_session"
 // checkbox should just stay signed in, not force a re-login every few hours.
 const sessionTTL = 30 * 24 * time.Hour
 
-// demoSessionTTL bounds how long a no-signup demo account (VISION.md §8.2) and its
-// uploaded data live before internal/worker's purge sweep removes them — long enough to try
-// the app and share a link same day, short enough to bound storage from anonymous traffic
-// that never converts to a real account.
+// demoSessionTTL bounds how long a no-signup demo session (VISION.md §8.2) stays signed in
+// before needing a fresh `POST /v1/auth/demo` call — the persistent DemoCustomerUserID
+// (demo_presets.go) it points at never itself expires or gets purged, only this session
+// cookie does. Long enough to try the app and share a link same day.
 const demoSessionTTL = 24 * time.Hour
 
 // passwordResetTTL is deliberately much shorter than sessionTTL/demoSessionTTL — the
@@ -166,9 +166,9 @@ var errEmailTaken = errors.New("email already registered")
 // handleSignup serves `POST /v1/auth/signup`. Always a plain new account, whether or not the
 // caller currently holds a demo session — docs/ROADMAP.md's "Email verification + demo
 // without real ingest" retired the old claim-the-demo-account-in-place path along with demo's
-// real upload/sync access: a demo account only ever holds the fixed preset activities
-// seedDemoPresets seeded it with (never anything real), so there is nothing worth preserving
-// by reusing its row. The new account starts unverified (email_verified defaults false) and
+// real upload/sync access: every demo session shares the one persistent DemoCustomerUserID
+// (demo_presets.go) rather than holding a row of its own, so there is nothing per-session to
+// preserve by reusing it. The new account starts unverified (email_verified defaults false) and
 // gets a verification email; requireVerified is what actually gates on that.
 func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 	req, err := decodeAuthRequest(r)
@@ -328,15 +328,15 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 // handleDemoStart serves `POST /v1/auth/demo` — VISION.md §8.2's "no-signup,
 // drag-a-file-in, see-your-fog-map page," revised per docs/ROADMAP.md's "Email verification +
 // demo without real ingest": a demo account no longer gets real upload/sync access at all
-// (requireNotDemo rejects those regardless of what a client attempts), so it's seeded here
-// with a small fixed set of preset activities (seedDemoPresets) instead, through the same
-// ingest pipeline a real upload uses. The email is a synthetic, never-shown placeholder — a
-// real one is never needed, since a demo account can no longer become a real one in place (see
-// handleSignup); ".invalid" is the RFC 2606 TLD reserved for addresses guaranteed never to be
-// real. Rate-limited per IP: this is the one auth endpoint reachable with no session or
-// credentials at all, so it's the one auth.go's own "no rate limiting" gap couldn't be left
-// alone — an anonymous endpoint that creates real rows is a cheaper target than any of the
-// already-authenticated ones.
+// (requireNotDemo rejects those regardless of what a client attempts). Every visitor's session
+// here is pointed at the same persistent, pre-seeded DemoCustomerUserID (demo_presets.go) —
+// not a fresh row created and re-ingested per visitor, which would be far too slow at that
+// account's real activity-history size. handleSignup never reuses this row (a demo account
+// can't become a real one in place), so many concurrent demo sessions safely sharing one
+// read-only user id is the whole point. Rate-limited per IP: this is the one auth endpoint
+// reachable with no session or credentials at all, so it's the one auth.go's own "no rate
+// limiting" gap couldn't be left alone — cheap now that it only creates a session row, but
+// still worth capping.
 func (s *Server) handleDemoStart(w http.ResponseWriter, r *http.Request) {
 	if !demoLimiter.allow(clientIP(r)) {
 		http.Error(w, "too many demo sessions from this address; try again later", http.StatusTooManyRequests)
@@ -344,18 +344,7 @@ func (s *Server) handleDemoStart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	var userID string
-	err := s.pool.QueryRow(ctx, `
-		INSERT INTO users (email, demo_expires_at)
-		VALUES ('demo-' || gen_random_uuid() || '@fitmap.invalid', NOW() + $1)
-		RETURNING id
-	`, demoSessionTTL).Scan(&userID)
-	if err != nil {
-		s.log.Error("demo start failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	s.seedDemoPresets(ctx, userID)
+	userID := DemoCustomerUserID
 
 	sessionID, err := s.startSession(w, ctx, userID, demoSessionTTL)
 	if err != nil {

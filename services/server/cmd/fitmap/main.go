@@ -31,7 +31,7 @@ func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: fitmap <serve|work|migrate>")
+		fmt.Fprintln(os.Stderr, "usage: fitmap <serve|work|migrate|seed-demo-customer>")
 		os.Exit(2)
 	}
 
@@ -110,8 +110,28 @@ func main() {
 			os.Exit(1)
 		}
 
+	case "seed-demo-customer":
+		// One-time (idempotent — safe to re-run on redeploy) seed of the persistent demo
+		// account's activity history — httpapi.SeedDemoCustomer's own doc comment explains
+		// why this runs here, out of band, rather than per "Try Demo" request.
+		store, err := storage.New(cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3Bucket)
+		if err != nil {
+			log.Error("storage", "err", err)
+			os.Exit(1)
+		}
+		if err := retry(ctx, log, "minio ensure bucket", func() error { return store.EnsureBucket(ctx) }); err != nil {
+			log.Error("storage bucket", "err", err)
+			os.Exit(1)
+		}
+		log.Info("seed-demo-customer: starting")
+		if err := httpapi.SeedDemoCustomer(ctx, pool, store, log); err != nil {
+			log.Error("seed-demo-customer", "err", err)
+			os.Exit(1)
+		}
+		log.Info("seed-demo-customer: done")
+
 	default:
-		fmt.Fprintf(os.Stderr, "unknown subcommand %q; want serve, work, or migrate\n", os.Args[1])
+		fmt.Fprintf(os.Stderr, "unknown subcommand %q; want serve, work, migrate, or seed-demo-customer\n", os.Args[1])
 		os.Exit(2)
 	}
 }
