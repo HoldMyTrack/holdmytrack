@@ -138,24 +138,16 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
   // focusActivity itself (the row-click handler) is defined further down, alongside
   // clearSelection — both need fitToSelection/activities/mapHiddenIds, which aren't in scope
   // yet at this point in the component.
-  const toggleActivityVisibility = useCallback((id: string) => {
-    setHiddenActivityIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }, []);
-  // The header toolbar's "Group visible" — a bulk version of the row-level eye icon above,
-  // applied to the whole checked group at once. The rule: if any checked activity is
-  // currently hidden, show the whole group (removes every checked id from hiddenActivityIds);
-  // otherwise hide the whole group (adds every checked id). Mirrors a typical bulk-checkbox
-  // toggle — one click reveals everything in the group, click again to hide it — rather than
-  // per-row toggling each one individually, which would leave the group in a mixed state no
-  // single click could cleanly undo.
+  //
+  // The header toolbar's "Group visible" — there's no per-row eye icon any more (hiding a
+  // single activity now goes through check-then-toolbar, the same as every other single-item
+  // action), so this is the only visibility toggle left, always applied to the whole checked
+  // group. The rule: if any checked activity is currently hidden, show the whole group
+  // (removes every checked id from hiddenActivityIds); otherwise hide the whole group (adds
+  // every checked id). Mirrors a typical bulk-checkbox toggle — one click reveals everything
+  // in the group, click again to hide it — rather than per-row toggling each one
+  // individually, which would leave the group in a mixed state no single click could
+  // cleanly undo.
   const toggleGroupVisibility = useCallback(() => {
     setHiddenActivityIds((prev) => {
       const anyHidden = [...checkedActivityIds].some((id) => prev.has(id));
@@ -576,7 +568,6 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
     },
     [handleUploaded],
   );
-  const handleActivityDeleted = useCallback((id: string) => handleActivitiesDeleted([id]), [handleActivitiesDeleted]);
 
   /**
    * Re-attach anything that is not part of the basemap style.
@@ -729,10 +720,8 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
           onSelectAll={selectAll}
           onShowSelected={showSelected}
           hiddenIds={hiddenActivityIds}
-          onToggleVisibility={toggleActivityVisibility}
           onToggleGroupVisibility={toggleGroupVisibility}
           onActivityUpdated={reloadActivities}
-          onActivityDeleted={handleActivityDeleted}
           onActivitiesDeleted={handleActivitiesDeleted}
         />
 

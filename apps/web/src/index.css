@@ -1,6 +1,45 @@
+/* Design tokens — the app has no dark theme, so these are the only palette in play
+   (color-scheme: light reflects that; native controls no longer get a browser-guessed dark
+   tint with no matching CSS to back it up). --fm-ink-rgb/--fm-accent-rgb exist so the many
+   opacity-tinted borders/text/hovers throughout this file can keep their existing alpha
+   values while shifting hue from black/blue to this palette's ink/gold, via
+   rgb(var(--fm-ink-rgb) / N%) instead of a hand-picked hex per element. */
 :root {
-  color-scheme: light dark;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: light;
+  --fm-font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --fm-font-serif: 'Fraunces', serif;
+
+  --fm-bg: #f7f4ec;
+  --fm-surface: #fff;
+  --fm-surface-tint: #f6f3e9;
+  --fm-surface-tint-strong: #f1eee3;
+  --fm-divider-tint: #efead9;
+
+  --fm-ink: #202b25;
+  --fm-ink-rgb: 32 43 37;
+  --fm-ink-secondary: #6c7a70;
+  --fm-ink-muted: #8b9186;
+  --fm-ink-faint: #b7af9a;
+
+  --fm-border: #e6e1d2;
+  --fm-border-strong: #dcd6c4;
+  --fm-border-panel: #e2dcc8;
+
+  --fm-accent: #b07e2e;
+  --fm-accent-rgb: 176 126 46;
+  --fm-accent-strong: #93691f;
+  --fm-accent-hover: #8a611f;
+
+  --fm-donate: #b0532f;
+  --fm-donate-hover: #96431f;
+  --fm-donate-text: #fff7ee;
+
+  --fm-danger: #a33;
+  --fm-danger-rgb: 170 51 51;
+  --fm-danger-hover: #8a2a2a;
+
+  --fm-success: #2f8a4e;
+  --fm-success-strong: #2e7d32;
 }
 
 html,
@@ -8,6 +47,12 @@ body,
 #root {
   margin: 0;
   height: 100%;
+}
+
+body {
+  background: var(--fm-bg);
+  color: var(--fm-ink);
+  font-family: var(--fm-font-sans);
 }
 
 .app-shell {
@@ -30,8 +75,8 @@ body,
   gap: 16px;
   height: 56px;
   padding: 0 20px;
-  background: #fff;
-  border-bottom: 1px solid rgb(0 0 0 / 10%);
+  background: var(--fm-surface);
+  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 10%);
   /* Its own stacking context, above the map. Both things that hang out of this bar — the
      account dropdown and the upload widget's status popover — overlap the map canvas, and
      MapLibre's own controls sit at a z-index of their own that would otherwise win. */
@@ -43,10 +88,11 @@ body,
   display: flex;
   align-items: center;
   gap: 10px;
-  font-weight: 800;
-  font-size: 16px;
-  letter-spacing: 0.06em;
-  color: #1a1a1a;
+  font-family: var(--fm-font-serif);
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: 0;
+  color: var(--fm-ink);
 }
 
 /* Only ProfilePage renders the brand as a button (Header's onBrandClick) — reset every
@@ -66,7 +112,7 @@ body,
   justify-content: center;
   width: 22px;
   height: 22px;
-  border: 2px solid #3a6ea5;
+  border: 2px solid var(--fm-accent);
   border-radius: 5px;
 }
 
@@ -74,7 +120,7 @@ body,
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  border: 2px solid #3a6ea5;
+  border: 2px solid var(--fm-accent);
 }
 
 /* Donate, the upload control and the account menu, pushed to the trailing end together. */
@@ -90,20 +136,20 @@ body,
    specifically so Donate doesn't read as just another neutral nav action; it's how FitMap
    is funded (business_plan.md §6), not a footnote. */
 .donate-button {
-  border: 1px solid #a85412;
+  border: 1px solid var(--fm-donate);
   border-radius: 8px;
   padding: 6px 12px;
-  background: #a85412;
+  background: var(--fm-donate);
   font: inherit;
   font-weight: 600;
   font-size: 13px;
-  color: #f2f2f3;
+  color: var(--fm-donate-text);
   cursor: pointer;
 }
 
 .donate-button:hover {
-  background: #8f470f;
-  border-color: #8f470f;
+  background: var(--fm-donate-hover);
+  border-color: var(--fm-donate-hover);
 }
 
 /* `position: relative` is what the dropdown anchors to, so it hangs under the avatar rather
@@ -120,15 +166,15 @@ body,
   width: 32px;
   height: 32px;
   padding: 0;
-  border: 1px solid rgb(0 0 0 / 15%);
+  border: 1px solid rgb(var(--fm-ink-rgb) / 15%);
   border-radius: 50%;
-  background: #fff;
-  color: #1a1a1a;
+  background: var(--fm-surface);
+  color: var(--fm-ink);
   cursor: pointer;
 }
 
 .user-menu__avatar:hover {
-  background: rgb(0 0 0 / 4%);
+  background: rgb(var(--fm-ink-rgb) / 4%);
 }
 
 /* Stroked, not filled: the glyph is two shapes (head and shoulders) that only read as a
@@ -160,18 +206,18 @@ body,
   flex-direction: column;
   min-width: 12rem;
   padding: 4px;
-  background: #fff;
-  border: 1px solid rgb(0 0 0 / 10%);
+  background: var(--fm-surface);
+  border: 1px solid rgb(var(--fm-ink-rgb) / 10%);
   border-radius: 8px;
-  box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
+  box-shadow: 0 12px 32px rgb(var(--fm-ink-rgb) / 18%);
 }
 
 .user-menu__email {
   padding: 7px 10px 8px;
   margin-bottom: 4px;
-  border-bottom: 1px solid rgb(0 0 0 / 8%);
+  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 8%);
   font-size: 12px;
-  color: rgb(0 0 0 / 55%);
+  color: rgb(var(--fm-ink-rgb) / 55%);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -184,17 +230,17 @@ body,
   background: transparent;
   font: inherit;
   font-size: 13px;
-  color: #1a1a1a;
+  color: var(--fm-ink);
   text-align: left;
   cursor: pointer;
 }
 
 .user-menu__item:hover {
-  background: rgb(0 0 0 / 6%);
+  background: rgb(var(--fm-ink-rgb) / 6%);
 }
 
 .user-menu__item:disabled {
-  color: rgb(0 0 0 / 45%);
+  color: rgb(var(--fm-ink-rgb) / 45%);
   cursor: default;
 }
 
@@ -202,7 +248,7 @@ body,
    shape as any other item, just tinted so it reads as the one worth noticing over
    Profile/Sign out. */
 .user-menu__item--accent {
-  color: #2f6fb0;
+  color: var(--fm-accent-strong);
   font-weight: 600;
 }
 
@@ -213,15 +259,15 @@ body,
   width: min(26rem, calc(100vw - 40px));
   margin: auto;
   padding: 20px;
-  border: 1px solid rgb(0 0 0 / 10%);
+  border: 1px solid rgb(var(--fm-ink-rgb) / 10%);
   border-radius: 12px;
-  background: #fff;
-  color: #1a1a1a;
-  box-shadow: 0 24px 60px rgb(0 0 0 / 25%);
+  background: var(--fm-surface);
+  color: var(--fm-ink);
+  box-shadow: 0 24px 60px rgb(var(--fm-ink-rgb) / 25%);
 }
 
 .placeholder-notice::backdrop {
-  background: rgb(0 0 0 / 35%);
+  background: rgb(var(--fm-ink-rgb) / 35%);
 }
 
 .placeholder-notice__title {
@@ -235,23 +281,23 @@ body,
   margin: 0 0 18px;
   font-size: 13px;
   line-height: 1.5;
-  color: rgb(0 0 0 / 70%);
+  color: rgb(var(--fm-ink-rgb) / 70%);
 }
 
 .placeholder-notice__dismiss {
-  border: 1px solid rgb(0 0 0 / 15%);
+  border: 1px solid rgb(var(--fm-ink-rgb) / 15%);
   border-radius: 8px;
   padding: 6px 14px;
-  background: #fff;
+  background: var(--fm-surface);
   font: inherit;
   font-weight: 600;
   font-size: 13px;
-  color: #1a1a1a;
+  color: var(--fm-ink);
   cursor: pointer;
 }
 
 .placeholder-notice__dismiss:hover {
-  background: rgb(0 0 0 / 4%);
+  background: rgb(var(--fm-ink-rgb) / 4%);
 }
 
 /* EditActivityDialog.tsx (§4.7.4) — same real-<dialog>/showModal() shape as
@@ -261,18 +307,18 @@ body,
   width: min(28rem, calc(100vw - 40px));
   margin: auto;
   padding: 20px;
-  border: 1px solid rgb(0 0 0 / 10%);
+  border: 1px solid rgb(var(--fm-ink-rgb) / 10%);
   border-radius: 12px;
-  background: #fff;
-  color: #1a1a1a;
-  box-shadow: 0 24px 60px rgb(0 0 0 / 25%);
+  background: var(--fm-surface);
+  color: var(--fm-ink);
+  box-shadow: 0 24px 60px rgb(var(--fm-ink-rgb) / 25%);
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
 .edit-activity-dialog::backdrop {
-  background: rgb(0 0 0 / 35%);
+  background: rgb(var(--fm-ink-rgb) / 35%);
 }
 
 .edit-activity-dialog__title {
@@ -285,7 +331,7 @@ body,
 .edit-activity-dialog__subtitle {
   margin: -10px 0 0;
   font-size: 12.5px;
-  color: rgb(0 0 0 / 55%);
+  color: rgb(var(--fm-ink-rgb) / 55%);
 }
 
 .edit-activity-dialog__description {
@@ -302,15 +348,15 @@ body,
   width: min(24rem, calc(100vw - 40px));
   margin: auto;
   padding: 20px;
-  border: 1px solid rgb(0 0 0 / 10%);
+  border: 1px solid rgb(var(--fm-ink-rgb) / 10%);
   border-radius: 12px;
-  background: #fff;
-  color: #1a1a1a;
-  box-shadow: 0 24px 60px rgb(0 0 0 / 25%);
+  background: var(--fm-surface);
+  color: var(--fm-ink);
+  box-shadow: 0 24px 60px rgb(var(--fm-ink-rgb) / 25%);
 }
 
 .confirm-dialog::backdrop {
-  background: rgb(0 0 0 / 35%);
+  background: rgb(var(--fm-ink-rgb) / 35%);
 }
 
 .confirm-dialog__title {
@@ -324,16 +370,16 @@ body,
   margin: 0 0 18px;
   font-size: 13px;
   line-height: 1.5;
-  color: rgb(0 0 0 / 70%);
+  color: rgb(var(--fm-ink-rgb) / 70%);
 }
 
-/* Reuses .settings-page__error's #a33 red — the same tone this app already uses for
+/* Reuses .settings-page__error's var(--fm-danger) red — the same tone this app already uses for
    destructive/error states, not a new color introduced just for this button. */
 .confirm-dialog__confirm {
   border: 0;
   border-radius: 8px;
   padding: 10px 18px;
-  background: #a33;
+  background: var(--fm-danger);
   color: #fff;
   font: inherit;
   font-weight: 600;
@@ -342,7 +388,7 @@ body,
 }
 
 .confirm-dialog__confirm:hover {
-  background: #8a2a2a;
+  background: var(--fm-danger-hover);
 }
 
 .confirm-dialog__confirm:disabled {
@@ -363,8 +409,8 @@ body,
   width: var(--panel-width);
   display: flex;
   flex-direction: column;
-  background: #fff;
-  border-right: 1px solid rgb(0 0 0 / 10%);
+  background: var(--fm-surface);
+  border-right: 1px solid rgb(var(--fm-ink-rgb) / 10%);
   overflow: hidden;
 }
 
@@ -388,7 +434,7 @@ body,
 
 .activities-panel__resize-handle:hover,
 .activities-panel__resize-handle:active {
-  background: rgb(58 110 165 / 35%);
+  background: rgb(var(--fm-accent-rgb) / 35%);
 }
 
 .activities-panel__head {
@@ -405,16 +451,17 @@ body,
 }
 
 .activities-panel__heading-text {
-  font-weight: 800;
-  font-size: 15px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #1a1a1a;
+  font-family: var(--fm-font-serif);
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--fm-ink);
 }
 
 .activities-panel__badge {
-  background: #e7effa;
-  color: #2f6fb0;
+  background: rgb(var(--fm-accent-rgb) / 14%);
+  color: var(--fm-accent-strong);
   border-radius: 5px;
   padding: 1px 7px;
   font-size: 12px;
@@ -433,7 +480,7 @@ body,
   padding: 0 16px;
   border: 0;
   background: none;
-  color: rgb(0 0 0 / 55%);
+  color: rgb(var(--fm-ink-rgb) / 55%);
   font: inherit;
   font-size: 12px;
   text-align: left;
@@ -455,7 +502,7 @@ body,
   flex-direction: column;
   gap: 12px;
   padding: 4px 16px 14px;
-  border-bottom: 1px solid rgb(0 0 0 / 8%);
+  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 8%);
 }
 
 .activity-filters__section {
@@ -475,12 +522,12 @@ body,
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgb(0 0 0 / 50%);
+  color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
 .activity-filters__readout {
   font-size: 11.5px;
-  color: rgb(0 0 0 / 55%);
+  color: rgb(var(--fm-ink-rgb) / 55%);
 }
 
 /* A real checkbox list, scrollable rather than collapsing behind "Show all (N)" — the Type
@@ -502,7 +549,7 @@ body,
   min-width: 0;
   padding: 4px 2px;
   font-size: 13px;
-  color: #1a1a1a;
+  color: var(--fm-ink);
   cursor: pointer;
 }
 
@@ -510,7 +557,7 @@ body,
   flex: none;
   width: 14px;
   height: 14px;
-  accent-color: #3a6ea5;
+  accent-color: var(--fm-accent);
   cursor: pointer;
 }
 
@@ -525,7 +572,7 @@ body,
 .activity-filters__type-count {
   flex: none;
   font: 400 11px ui-monospace, Menlo, monospace;
-  color: rgb(0 0 0 / 50%);
+  color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
 /* Two overlapping native range inputs sharing one track — a well-known dual-thumb-slider
@@ -544,7 +591,7 @@ body,
   left: 0;
   right: 0;
   height: 2px;
-  background: rgb(0 0 0 / 12%);
+  background: rgb(var(--fm-ink-rgb) / 12%);
   border-radius: 1px;
 }
 
@@ -552,7 +599,7 @@ body,
   position: absolute;
   top: 9px;
   height: 2px;
-  background: #3a6ea5;
+  background: var(--fm-accent);
   border-radius: 1px;
 }
 
@@ -583,8 +630,8 @@ body,
   height: 16px;
   margin-top: -7px;
   border-radius: 50%;
-  border: 2px solid #3a6ea5;
-  background: #fff;
+  border: 2px solid var(--fm-accent);
+  background: var(--fm-surface);
   cursor: pointer;
 }
 
@@ -593,8 +640,8 @@ body,
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  border: 2px solid #3a6ea5;
-  background: #fff;
+  border: 2px solid var(--fm-accent);
+  background: var(--fm-surface);
   cursor: pointer;
 }
 
@@ -602,7 +649,7 @@ body,
   display: flex;
   justify-content: space-between;
   font-size: 10.5px;
-  color: rgb(0 0 0 / 40%);
+  color: rgb(var(--fm-ink-rgb) / 40%);
 }
 
 .activity-filters__reset {
@@ -610,7 +657,7 @@ body,
   border: 0;
   background: none;
   padding: 0;
-  color: #2f6fb0;
+  color: var(--fm-accent-strong);
   font: inherit;
   font-size: 12px;
   font-weight: 600;
@@ -624,23 +671,23 @@ body,
   margin: 0;
   padding: 0;
   overflow-y: auto;
-  border-top: 1px solid rgb(0 0 0 / 8%);
+  border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
 }
 
 .activities-panel__row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  border-bottom: 1px solid rgb(0 0 0 / 6%);
+  gap: 11px;
+  padding: 9px 16px;
+  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 6%);
 }
 
 /* Reached via the checkbox (adds/removes just this row) or the row's own text (replaces the
    whole selection with just this row) — both land in the same selected set, so one treatment
    covers whichever put a row in it. */
 .activities-panel__row--selected {
-  background: #eaf1fb;
-  box-shadow: inset 3px 0 0 #2f6fb0;
+  background: rgb(var(--fm-accent-rgb) / 8%);
+  box-shadow: inset 3px 0 0 var(--fm-accent-strong);
 }
 
 .activities-panel__checkbox {
@@ -648,20 +695,8 @@ body,
   width: 15px;
   height: 15px;
   margin: 0;
-  accent-color: #2f6fb0;
+  accent-color: var(--fm-accent-strong);
   cursor: pointer;
-}
-
-.activities-panel__icon {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 24px;
-  border: 1px solid rgb(0 0 0 / 12%);
-  border-radius: 5px;
-  color: rgb(0 0 0 / 55%);
 }
 
 /* A button, because clicking it flies the map — but it has to keep looking like the row
@@ -689,6 +724,15 @@ body,
   text-decoration: underline;
 }
 
+/* Hidden from the map, not from the list — the row stays in place and fully readable, just
+   dimmed, since there's no per-row eye icon any more to show open/closed at a glance (hiding
+   a single activity now goes through check-then-toolbar like every other single-item action;
+   see the toolbar's Show/Hide checked-group button above). */
+.activities-panel__row--hidden .activities-panel__title,
+.activities-panel__row--hidden .activities-panel__meta {
+  opacity: 0.55;
+}
+
 /* The reverse direction of the hover above: hovering this activity's *track on the map*
    (not the row itself) also underlines the title, via MapView's shared hoveredActivityId
    state rather than a real `:hover` here — the pointer isn't over this row at all. */
@@ -706,7 +750,7 @@ body,
   min-width: 0;
   font-size: 13.5px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--fm-ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -717,178 +761,128 @@ body,
   min-width: 0;
   max-width: 100%;
   font-size: 11.5px;
-  color: rgb(0 0 0 / 55%);
+  color: rgb(var(--fm-ink-rgb) / 55%);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.activities-panel__type {
-  flex: none;
-  max-width: 5.5rem;
-  font-size: 12px;
-  color: rgb(0 0 0 / 50%);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* §4.7.4's edit affordance and §4.7.5's delete affordance — same box/hover treatment as
-   .activities-panel__visibility right next to them, so all three read as one family of
-   row-action icon buttons. Delete gets its own muted-red resting color (not just on hover)
-   since a full purge with no undo is worth reading as "different" from Edit/Visible at a
-   glance, not only once the pointer's already over it. */
-.activities-panel__edit {
+/* §4.7.6's toolbar icon buttons — Show/Edit/Delete/Focus all operate on the checked group,
+   never a single row (there are no more per-row action icons; a single-item edit/delete/hide
+   goes through check-then-toolbar like everything else). One shared chip look, matching the
+   mockup: a soft tinted square rather than a bare icon, so the group actions read as one
+   family regardless of which one is destructive. */
+.activities-panel__edit,
+.activities-panel__delete,
+.activities-panel__visibility,
+.activities-panel__focus {
   flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 7px;
   padding: 0;
-  background: none;
-  color: rgb(0 0 0 / 40%);
+  background: var(--fm-surface-tint);
+  color: var(--fm-ink-secondary);
   cursor: pointer;
 }
 
-.activities-panel__edit:hover:not(:disabled) {
-  background: rgb(0 0 0 / 6%);
-  color: #1a1a1a;
+.activities-panel__edit:hover:not(:disabled),
+.activities-panel__delete:hover:not(:disabled),
+.activities-panel__visibility:hover:not(:disabled) {
+  background: var(--fm-surface-tint-strong);
+  color: var(--fm-ink);
 }
 
-.activities-panel__delete {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: 0;
-  border-radius: 5px;
-  padding: 0;
-  background: none;
-  color: rgb(170 51 51 / 55%);
-  cursor: pointer;
-}
-
-.activities-panel__delete:hover:not(:disabled) {
-  background: rgb(170 51 51 / 10%);
-  color: #a33;
-}
-
-/* A demo account's disabled Edit/Delete (ActivitiesPanel's readOnly prop) — visibly inert,
-   not just a hover/click no-op, so "not available for demo" reads before anyone hovers for
-   the title tooltip. Shared by both: .activities-panel__delete's own red tint would otherwise
-   survive opacity dimming and still read as "active-but-dangerous." */
+/* A demo account's disabled Edit/Delete (ActivitiesPanel's readOnly prop), or simply nothing
+   checked yet — visibly inert, not just a hover/click no-op, so "there's nothing to act on"
+   reads before anyone hovers for the title tooltip. */
 .activities-panel__edit:disabled,
-.activities-panel__delete:disabled {
-  color: rgb(0 0 0 / 20%);
+.activities-panel__delete:disabled,
+.activities-panel__visibility:disabled,
+.activities-panel__focus:disabled {
+  color: var(--fm-ink-faint);
   cursor: not-allowed;
 }
 
-.activities-panel__visibility {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: 0;
-  border-radius: 5px;
-  padding: 0;
-  background: none;
-  color: rgb(0 0 0 / 55%);
-  cursor: pointer;
+/* The one primary action in the group — tinted with the accent rather than the neutral chip
+   the others share, so "focus the map on this" reads as the toolbar's main affordance. */
+.activities-panel__focus {
+  background: rgb(var(--fm-accent-rgb) / 12%);
+  color: var(--fm-accent-strong);
 }
 
-.activities-panel__visibility:hover {
-  background: rgb(0 0 0 / 6%);
-  color: #1a1a1a;
+.activities-panel__focus:hover:not(:disabled) {
+  background: rgb(var(--fm-accent-rgb) / 20%);
 }
 
-/* Hidden from the map, not from the list — the row itself stays fully legible, only the
-   eye glyph and (via tracks.ts's layer filter) the track on the map change. */
-.activities-panel__row--hidden .activities-panel__visibility {
-  color: rgb(0 0 0 / 30%);
+.activities-panel__focus:disabled {
+  background: var(--fm-surface-tint);
 }
 
 .activities-panel__note {
   padding: 14px 16px;
   font-size: 12.5px;
-  color: rgb(0 0 0 / 50%);
+  color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
 .activities-panel__note--error {
-  color: #a33;
+  color: var(--fm-danger);
 }
 
-/* §4.7.6's header toolbar — right above the row list, deliberately mirroring
-   .activities-panel__row's own flex layout (same gap/padding) column for column, so it reads
-   as that list's header rather than a floating control strip: the select-all checkbox sits
-   above the row checkboxes, the Type trigger above the TYPE column, Group visible above the
-   row's own Visible icon, and Delete group above Delete. No flex-wrap here on purpose — the
-   whole point is staying column-aligned with the list beneath it, and the text-spacer's own
-   flex:1/min-width:0 (same as .activities-panel__text) absorbs narrowness at the panel's
-   260px minimum the same way a row's own title text does. */
+/* §4.7.6's header toolbar — right above the row list. There are no more per-row action
+   columns to stay aligned with (Visible/Edit/Delete moved here entirely), so this is now a
+   plain compact strip rather than a column-aligned header: the select-all checkbox, the Type
+   dropdown, a flex spacer pushing the rest right, the group action chips, a divider, then the
+   one accent-tinted "focus on map" action. */
 .activities-panel__toolbar {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
-  border-bottom: 1px solid rgb(0 0 0 / 8%);
+  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 8%);
 }
 
-/* Matches .activities-panel__icon/.activities-panel__edit's own widths (28px/24px) exactly —
-   there is no bulk equivalent for the row icon or the per-row Edit button, so these columns
-   stay empty rather than collapsing, which is what keeps Delete group aligned under Delete. */
 .activities-panel__toolbar-spacer {
-  flex: none;
-}
-
-.activities-panel__toolbar-spacer--icon {
-  width: 28px;
-}
-
-.activities-panel__toolbar-spacer--text {
   flex: 1;
   min-width: 0;
 }
 
-.activities-panel__toolbar-spacer--edit {
-  width: 24px;
+.activities-panel__toolbar-divider {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  background: var(--fm-border);
 }
 
 /* Anchors the dropdown panel under its trigger — same arrangement .upload-panel/.user-menu
-   already use for their own dropdowns. Fixed width matching .activities-panel__type's own
-   max-width exactly, so the trigger sits directly above where TYPE labels render in the rows
-   below rather than floating at whatever width its own label happens to need. */
+   already use for their own dropdowns. No fixed width any more (nothing below it to stay
+   column-aligned with) — sized to its own label/caret like the mockup's chip. */
 .activities-panel__type-dropdown {
   position: relative;
   flex: none;
-  width: 5.5rem;
 }
 
 .activities-panel__type-trigger {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
-  width: 100%;
-  border: 1px solid rgb(0 0 0 / 18%);
+  gap: 7px;
+  border: 1px solid var(--fm-border-panel);
   border-radius: 7px;
-  padding: 5px 6px;
-  background: #fff;
-  color: #1a1a1a;
+  padding: 7px 11px;
+  background: var(--fm-surface-tint);
+  color: var(--fm-ink);
   font: inherit;
   font-size: 12.5px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
 }
 
 .activities-panel__type-trigger:hover {
-  background: rgb(0 0 0 / 4%);
+  background: var(--fm-surface-tint-strong);
 }
 
 /* A plain dot, not a count — the trigger's own label already says "Type"; a badge repeating
@@ -898,13 +892,13 @@ body,
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #3a6ea5;
+  background: var(--fm-accent);
 }
 
 .activities-panel__type-trigger-caret {
   flex: none;
   font-size: 10px;
-  color: rgb(0 0 0 / 45%);
+  color: rgb(var(--fm-ink-rgb) / 45%);
 }
 
 /* Right-aligned to the trigger, not left — the trigger sits mid-row now (above the TYPE
@@ -913,22 +907,40 @@ body,
 .activities-panel__type-panel {
   position: absolute;
   top: calc(100% + 8px);
-  right: 0;
+  /* left, not right: the trigger sits near the toolbar's left edge now (checkbox, then Type),
+     not mid-row above a TYPE column any more — anchoring the panel's right edge to that
+     narrow, left-positioned trigger pushed a 13rem-wide panel leftward past x: 0, clipped
+     out of view entirely by .activities-panel's own overflow: hidden. */
+  left: 0;
   z-index: 3;
-  width: 15rem;
+  width: 13rem;
   max-width: calc(100vw - 32px);
-  border: 1px solid rgb(0 0 0 / 12%);
+  border: 1px solid var(--fm-border-panel);
   border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
-  padding: 10px 12px;
+  background: var(--fm-surface);
+  box-shadow: 0 14px 30px rgb(var(--fm-ink-rgb) / 16%);
+  padding: 8px;
 }
 
 .activities-panel__type-panel-empty {
   margin: 0;
   padding: 4px 2px;
   font-size: 12.5px;
-  color: rgb(0 0 0 / 55%);
+  color: rgb(var(--fm-ink-rgb) / 55%);
+}
+
+/* The "All types" convenience row above the divider — a select-all, not a real toggle: it
+   only ever clears every exclusion (there is no "hide every type" action here), matching
+   "Reset filters"'s own always-clears-forward behavior elsewhere in this panel. */
+.activity-filters__type-item--all {
+  font-weight: 600;
+  color: var(--fm-ink);
+}
+
+.activities-panel__type-panel-divider {
+  height: 1px;
+  background: var(--fm-divider-tint);
+  margin: 5px 0;
 }
 
 .activities-panel__footer {
@@ -937,139 +949,134 @@ body,
   justify-content: space-between;
   gap: 12px;
   padding: 12px 16px;
-  border-top: 1px solid rgb(0 0 0 / 8%);
+  border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
 }
 
 .activities-panel__footer-summary {
   font-size: 12.5px;
-  color: rgb(0 0 0 / 65%);
+  color: rgb(var(--fm-ink-rgb) / 65%);
 }
 
-.activities-panel__footer-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* The footer's own action button — "Fit map" is automatic (see MapView's checked-group
-   auto-fly effect), so this is what's left: a manual re-trigger of that same fly, for after
-   panning away from the group. Select all/Clear moved to the header toolbar's master
-   checkbox (§4.7.6) and no longer lives here. */
-.activities-panel__show-selected {
-  border: 1px solid rgb(0 0 0 / 18%);
-  border-radius: 7px;
-  padding: 6px 12px;
-  background: #fff;
-  color: #1a1a1a;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.activities-panel__show-selected:disabled {
-  color: rgb(0 0 0 / 30%);
-  border-color: rgb(0 0 0 / 10%);
-  cursor: not-allowed;
-}
-
-/* A column now, not a row: the header (selection info + pan window + Earlier/Later) sits
-   above the chart rather than beside it, so RangePicker.tsx's chart can span the footer's
-   full width instead of sharing it with a fixed-width sidebar and two button columns. */
+/* Two regions side by side, not a header row above a full-width chart: a legend column sized
+   to match the Activities panel's own current width (`var(--panel-width)`, the same custom
+   property that panel already sets on itself — reusing it is what keeps this row visually
+   aligned with the sidebar above it even as that panel is resized, with no JS of its own
+   needed for that), and a chart area filling the rest, flanked directly by the Earlier/Later
+   buttons instead of sharing a header row with them. */
 .activity-histogram {
-  /* There's no global box-sizing: border-box reset in this app, so a bare `height` here would
-     be the content box alone and the padding below would add 28px on top of it — border-box
-     locally is what makes `height` mean what it looks like it means. */
   box-sizing: border-box;
   flex: none;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  /* Taller than the flanking-buttons layout this replaced (124px): the header used to sit
-     beside the chart, costing it no vertical space; stacked above it now, it needs some
-     back or the bars themselves would be squeezed down to a sliver. */
-  height: 142px;
-  padding: 14px 20px;
-  background: #fff;
-  border-top: 1px solid rgb(0 0 0 / 10%);
+  height: 104px;
+  background: var(--fm-surface);
+  border-top: 1px solid var(--fm-border);
 }
 
-.activity-histogram__header {
+/* One stacked block, not two side-by-side halves — found live: splitting the column's width
+   in two left each date range (e.g. "14 SEP 2026 – 19 SEP 2026") only about half the column's
+   own width to render in, which truncated mid-number well before the text actually ran out of
+   room to matter. Stacked, each block gets the legend's full width instead. */
+/* Sized to its own content now, not to the Activities panel's width — the sidebar can be
+   dragged from 260px to 560px (ActivitiesPanel.tsx's own panelWidth state), and there's no
+   reason the date picker beside it should shrink or grow along with that drag. Shrink-wrapped
+   to whichever line of text is actually widest, so the chart area (`flex: 1` below) gets
+   whatever's left over — as much room as the strip can have. */
+.activity-histogram__legend {
   flex: none;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 20px;
-}
-
-.activity-histogram__summary {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-right: 1px solid var(--fm-border);
+}
+
+.activity-histogram__legend-block {
+  flex: none;
+  min-width: 0;
+  text-align: right;
+}
+
+.activity-histogram__legend-label {
+  margin-bottom: 2px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--fm-ink-muted);
 }
 
 .activity-histogram__range-label {
-  font-weight: 800;
-  font-size: 13px;
-  letter-spacing: 0.02em;
-  color: #1a1a1a;
+  font-weight: 600;
+  font-size: 10.5px;
+  color: var(--fm-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .activity-histogram__stats {
-  font-size: 12px;
-  color: rgb(0 0 0 / 55%);
+  margin-top: 1px;
+  font-size: 9px;
+  color: var(--fm-ink-muted);
 }
 
-/* The pan window and the Earlier/Later buttons that page it, grouped together on the
-   header's right — see ActivityHistogram.tsx's doc comment for why the pan window and the
-   selection are laid out as two independent corners instead of one column, and why the
-   buttons live up here rather than flanking the chart below. */
-.activity-histogram__window {
+.activity-histogram__chart-area {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  display: flex;
+  /* stretch, not center: the chart and the Earlier/Later buttons fill this box's height (only
+     the small vertical padding below is left as a gap), rather than sitting at a fixed height
+     centered inside a much taller box. */
+  align-items: stretch;
+  gap: 10px;
+  padding: 6px 24px;
+}
+
+/* Earlier/Later — icon-only now, flanking the chart directly. Active/inactive is a real
+   visual distinction, not just :disabled's default dimming: enabled reads as a tinted,
+   clickable chip; disabled drops back to a plain, faint outline so "nothing further that
+   way" is obvious before a click fails. canPanEarlier/canPanLater (useActivityDays.ts)
+   already gate `disabled` correctly — this only restyles the two states. */
+.range-picker__page {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 10px;
-}
-
-.activity-histogram__window-label {
-  font-size: 10.5px;
-  color: rgb(0 0 0 / 40%);
-  white-space: nowrap;
-}
-
-.range-picker__page {
-  flex: none;
-  align-self: center;
-  border: 1px solid rgb(0 0 0 / 15%);
-  border-radius: 7px;
-  padding: 6px 10px;
-  background: #fff;
-  color: #1a1a1a;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
+  justify-content: center;
+  /* Taller and thinner than a typical button — it flanks the full-height chart beside it now,
+     not a fixed 56px strip, so width shrank to match rather than looking squat next to it. */
+  width: 19px;
+  border: 1px solid var(--fm-border-panel);
+  border-radius: 8px;
+  padding: 0;
+  background: var(--fm-surface-tint);
+  color: var(--fm-ink);
   cursor: pointer;
 }
 
 .range-picker__page:hover:not(:disabled) {
-  border-color: #3a6ea5;
-  color: #2f6fb0;
+  background: var(--fm-surface-tint-strong);
 }
 
 .range-picker__page:disabled {
-  color: rgb(0 0 0 / 30%);
-  border-color: rgb(0 0 0 / 8%);
+  background: var(--fm-surface);
+  border-color: var(--fm-divider-tint);
+  color: var(--fm-ink-faint);
   cursor: not-allowed;
 }
 
 /* The chart itself: bars, the draggable selection band and its handles, and the month
    labels, all absolutely positioned within this one relative box. touch-action: none keeps
-   a touchscreen drag from also trying to scroll the page while dragging a handle. */
+   a touchscreen drag from also trying to scroll the page while dragging a handle. No explicit
+   height — `align-items: stretch` on its parent (.activity-histogram__chart-area) is what
+   fills it to the same full height the Earlier/Later buttons beside it stretch to, both
+   bounded only by that container's own small vertical padding. flex: 1 still controls its
+   *width*, unaffected by the cross-axis sizing. */
 .range-picker__chart {
   position: relative;
   flex: 1;
-  min-height: 0;
   touch-action: none;
   /* Belt-and-braces alongside RangePicker.tsx's beginDrag preventDefault(): stops a drag that
      wanders near the month labels' text from starting a browser text selection at all, which
@@ -1095,9 +1102,9 @@ body,
   top: 0;
   bottom: 20px;
   z-index: 2;
-  background: rgb(58 110 165 / 14%);
-  border-left: 2px solid #3a6ea5;
-  border-right: 2px solid #3a6ea5;
+  background: rgb(var(--fm-accent-rgb) / 14%);
+  border-left: 2px solid var(--fm-accent);
+  border-right: 2px solid var(--fm-accent);
   pointer-events: none;
 }
 
@@ -1160,7 +1167,7 @@ body,
 .range-picker__bar {
   width: 100%;
   max-width: 10px;
-  background: rgb(0 0 0 / 18%);
+  background: rgb(var(--fm-ink-rgb) / 18%);
   border-radius: 1px 1px 0 0;
   pointer-events: auto;
 }
@@ -1168,15 +1175,15 @@ body,
 /* No transition on either rule — the response has to be instant, not eased in, since this is
    the only feedback a hover gets before the native title tooltip's own delay catches up. */
 .range-picker__bar:hover {
-  background: rgb(58 110 165 / 55%);
+  background: rgb(var(--fm-accent-rgb) / 55%);
 }
 
 .range-picker__bar--selected {
-  background: rgb(58 110 165 / 75%);
+  background: rgb(var(--fm-accent-rgb) / 75%);
 }
 
 .range-picker__bar--selected:hover {
-  background: #3a6ea5;
+  background: var(--fm-accent);
 }
 
 /* Month labels sit under the first bar of their month, at that bar's real slot position —
@@ -1188,7 +1195,7 @@ body,
   right: 0;
   bottom: 0;
   height: 20px;
-  border-top: 1px solid rgb(0 0 0 / 10%);
+  border-top: 1px solid rgb(var(--fm-ink-rgb) / 10%);
   /* Takes pointer events so it can be grabbed to pan — see RangePicker's note on why the
      chart needs one surface a selection band can never cover. The labels on it stay inert
      so a drag that starts on a label still reaches this rail. */
@@ -1200,9 +1207,25 @@ body,
   top: 4px;
   pointer-events: none;
   font-size: 10px;
-  color: rgb(0 0 0 / 45%);
+  color: rgb(var(--fm-ink-rgb) / 45%);
   transform: translateX(-50%);
   white-space: nowrap;
+}
+
+/* A label centered on a bar that's genuinely at (or past) the chart's own left/right edge —
+   found live logged in as the demo account, which seeds enough packed history for the very
+   first bar to land at left: 0% — would have roughly half its own text width extending past
+   that edge, previously overlapping the Earlier/Later button beside the chart entirely.
+   RangePicker.tsx applies these only when the tick's own position is actually that close to
+   an edge (most ticks, including a short history's own first one sitting well inside blank
+   space, still center normally) — anchoring the label's edge to the tick instead of its
+   center keeps the full label on screen rather than clipping or overlapping it. */
+.range-picker__month--start {
+  transform: translateX(0);
+}
+
+.range-picker__month--end {
+  transform: translateX(-100%);
 }
 
 .map-root {
@@ -1227,7 +1250,7 @@ body,
   padding: 3px;
   border-radius: 8px;
   background: rgb(255 255 255 / 92%);
-  box-shadow: 0 1px 4px rgb(0 0 0 / 25%);
+  box-shadow: 0 1px 4px rgb(var(--fm-ink-rgb) / 25%);
 }
 
 .map-mode-toggle__btn {
@@ -1236,17 +1259,17 @@ body,
   padding: 5px 10px;
   font: inherit;
   font-size: 12px;
-  color: #1a1a1a;
+  color: var(--fm-ink);
   background: transparent;
   cursor: pointer;
 }
 
 .map-mode-toggle__btn:hover {
-  background: rgb(0 0 0 / 7%);
+  background: rgb(var(--fm-ink-rgb) / 7%);
 }
 
 .map-mode-toggle__btn--active {
-  background: #1a1a1a;
+  background: var(--fm-ink);
   color: #fff;
 }
 
@@ -1267,7 +1290,7 @@ body,
   padding: 8px;
   border-radius: 8px;
   background: rgb(255 255 255 / 92%);
-  box-shadow: 0 1px 4px rgb(0 0 0 / 25%);
+  box-shadow: 0 1px 4px rgb(var(--fm-ink-rgb) / 25%);
 }
 
 /* The straight-line pace/HR + elevation profile (TrackProfile.tsx) — deliberately small and
@@ -1300,13 +1323,13 @@ body,
 }
 
 .track-profile__elevation-fill {
-  fill: rgb(58 110 165 / 15%);
+  fill: rgb(var(--fm-accent-rgb) / 15%);
   stroke: none;
 }
 
 .track-profile__elevation-line {
   fill: none;
-  stroke: rgb(0 0 0 / 45%);
+  stroke: rgb(var(--fm-ink-rgb) / 45%);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
@@ -1320,7 +1343,7 @@ body,
   margin-top: 4px;
   min-height: 14px;
   font-size: 11px;
-  color: rgb(0 0 0 / 70%);
+  color: rgb(var(--fm-ink-rgb) / 70%);
   white-space: nowrap;
 }
 
@@ -1335,26 +1358,26 @@ body,
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid rgb(0 0 0 / 15%);
+  border: 1px solid var(--fm-border-strong);
   border-radius: 8px;
   padding: 6px 12px;
-  background: #fff;
+  background: var(--fm-surface);
   font: inherit;
   font-weight: 600;
   font-size: 13px;
-  color: #1a1a1a;
+  color: var(--fm-ink);
   cursor: pointer;
 }
 
 .upload-panel__trigger:hover:not(:disabled) {
-  background: rgb(0 0 0 / 4%);
+  background: rgb(var(--fm-ink-rgb) / 4%);
 }
 
 /* A demo account (UploadPanel's own readOnly prop) — visibly inert, not just a click no-op
    that silently never opens the dropdown. */
 .upload-panel__trigger:disabled {
-  color: rgb(0 0 0 / 35%);
-  border-color: rgb(0 0 0 / 8%);
+  color: rgb(var(--fm-ink-rgb) / 35%);
+  border-color: rgb(var(--fm-ink-rgb) / 8%);
   cursor: not-allowed;
 }
 
@@ -1365,23 +1388,23 @@ body,
 }
 
 .export-button {
-  border: 1px solid rgb(0 0 0 / 15%);
+  border: 1px solid var(--fm-border-strong);
   border-radius: 8px;
   padding: 6px 12px;
-  background: #fff;
+  background: var(--fm-surface);
   font: inherit;
   font-weight: 600;
   font-size: 13px;
-  color: #1a1a1a;
+  color: var(--fm-ink);
   cursor: pointer;
 }
 
 .export-button:hover:not(:disabled) {
-  background: rgb(0 0 0 / 4%);
+  background: rgb(var(--fm-ink-rgb) / 4%);
 }
 
 .export-button:disabled {
-  color: rgb(0 0 0 / 40%);
+  color: rgb(var(--fm-ink-rgb) / 40%);
   cursor: default;
 }
 
@@ -1395,10 +1418,10 @@ body,
   padding: 8px 12px;
   max-width: 20rem;
   border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 2px 10px rgb(0 0 0 / 20%);
+  background: var(--fm-surface);
+  box-shadow: 0 2px 10px rgb(var(--fm-ink-rgb) / 20%);
   font-size: 12.5px;
-  color: #a33;
+  color: var(--fm-danger);
   z-index: 5;
 }
 
@@ -1414,7 +1437,7 @@ body,
   height: 16px;
   padding: 0 4px;
   border-radius: 999px;
-  background: #3a6ea5;
+  background: var(--fm-accent);
   color: #fff;
   font-size: 10.5px;
   font-weight: 700;
@@ -1422,7 +1445,7 @@ body,
 
 .upload-panel__caret {
   font-size: 10px;
-  color: rgb(0 0 0 / 45%);
+  color: rgb(var(--fm-ink-rgb) / 45%);
 }
 
 .upload-panel__dropdown {
@@ -1435,10 +1458,10 @@ body,
   width: min(24rem, calc(100vw - 40px));
   max-height: min(32rem, calc(100vh - 100px));
   padding: 14px;
-  background: #fff;
-  border: 1px solid rgb(0 0 0 / 10%);
+  background: var(--fm-surface);
+  border: 1px solid rgb(var(--fm-ink-rgb) / 10%);
   border-radius: 10px;
-  box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
+  box-shadow: 0 12px 32px rgb(var(--fm-ink-rgb) / 18%);
   overflow-y: auto;
 }
 
@@ -1446,13 +1469,13 @@ body,
   margin: 0 0 2px;
   font-size: 14px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--fm-ink);
 }
 
 .upload-panel__hint {
   margin: 0 0 10px;
   font-size: 12px;
-  color: rgb(0 0 0 / 55%);
+  color: rgb(var(--fm-ink-rgb) / 55%);
 }
 
 .upload-panel__dropzone {
@@ -1460,18 +1483,18 @@ body,
   align-items: center;
   justify-content: center;
   height: 64px;
-  border: 1px dashed rgb(0 0 0 / 25%);
+  border: 1px dashed rgb(var(--fm-ink-rgb) / 25%);
   border-radius: 8px;
   font-size: 12.5px;
-  color: rgb(0 0 0 / 55%);
+  color: rgb(var(--fm-ink-rgb) / 55%);
   cursor: pointer;
   text-align: center;
 }
 
 .upload-panel__dropzone--drag {
-  border-color: #3a6ea5;
-  background: rgb(58 110 165 / 6%);
-  color: #3a6ea5;
+  border-color: var(--fm-accent);
+  background: rgb(var(--fm-accent-rgb) / 6%);
+  color: var(--fm-accent);
 }
 
 .upload-panel__input {
@@ -1494,15 +1517,15 @@ body,
   gap: 8px;
   padding: 7px 9px;
   border-radius: 6px;
-  background: rgb(58 110 165 / 8%);
+  background: rgb(var(--fm-accent-rgb) / 8%);
   font-size: 12px;
   line-height: 1.4;
-  color: #1a1a1a;
+  color: var(--fm-ink);
 }
 
 .upload-panel__notice--error {
-  background: rgb(170 51 51 / 8%);
-  color: #a33;
+  background: rgb(var(--fm-danger-rgb) / 8%);
+  color: var(--fm-danger);
 }
 
 .upload-panel__notice-dismiss {
@@ -1530,19 +1553,19 @@ body,
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgb(0 0 0 / 50%);
+  color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
 .upload-panel__list-summary {
   font-size: 11.5px;
-  color: rgb(0 0 0 / 50%);
+  color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
 .upload-panel__rows {
   list-style: none;
   margin: 0;
   padding: 0;
-  border-top: 1px solid rgb(0 0 0 / 8%);
+  border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
 }
 
 .upload-panel__row {
@@ -1550,7 +1573,7 @@ body,
   align-items: center;
   gap: 8px;
   padding: 8px 0;
-  border-bottom: 1px solid rgb(0 0 0 / 6%);
+  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 6%);
 }
 
 .upload-panel__row-name {
@@ -1558,7 +1581,7 @@ body,
   min-width: 0;
   font-size: 12.5px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--fm-ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1567,7 +1590,7 @@ body,
 .upload-panel__row-size {
   flex: none;
   font-size: 11px;
-  color: rgb(0 0 0 / 45%);
+  color: rgb(var(--fm-ink-rgb) / 45%);
   min-width: 3.2rem;
   text-align: right;
 }
@@ -1583,20 +1606,20 @@ body,
 
 .upload-panel__row-status {
   font-size: 11px;
-  color: rgb(0 0 0 / 55%);
+  color: rgb(var(--fm-ink-rgb) / 55%);
 }
 
 .upload-panel__row-status--error {
-  color: #a33;
+  color: var(--fm-danger);
 }
 
 .upload-panel__row-status--ready {
-  color: #2f8a4e;
+  color: var(--fm-success);
 }
 
 .upload-panel__row-meta {
   font-size: 10.5px;
-  color: rgb(0 0 0 / 45%);
+  color: rgb(var(--fm-ink-rgb) / 45%);
 }
 
 .upload-panel__progress {
@@ -1604,25 +1627,25 @@ body,
   width: 6.5rem;
   height: 4px;
   border-radius: 2px;
-  background: rgb(0 0 0 / 8%);
+  background: rgb(var(--fm-ink-rgb) / 8%);
   overflow: hidden;
 }
 
 .upload-panel__progress-fill {
   display: block;
   height: 100%;
-  background: #3a6ea5;
+  background: var(--fm-accent);
   transition: width 120ms linear;
 }
 
 .upload-panel__note {
   padding: 10px 0;
   font-size: 12px;
-  color: rgb(0 0 0 / 50%);
+  color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
 .upload-panel__note--error {
-  color: #a33;
+  color: var(--fm-danger);
 }
 
 .upload-panel__pager {
@@ -1632,7 +1655,7 @@ body,
   margin-top: 8px;
   padding-top: 8px;
   font-size: 11.5px;
-  color: rgb(0 0 0 / 50%);
+  color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
 .upload-panel__pager-buttons {
@@ -1641,11 +1664,11 @@ body,
 }
 
 .upload-panel__pager-buttons button {
-  border: 1px solid rgb(0 0 0 / 15%);
+  border: 1px solid rgb(var(--fm-ink-rgb) / 15%);
   border-radius: 5px;
   width: 24px;
   height: 24px;
-  background: #fff;
+  background: var(--fm-surface);
   cursor: pointer;
 }
 
@@ -1667,16 +1690,16 @@ body,
   padding: 8px 16px;
   font-size: 13px;
   line-height: 1.4;
-  color: #1a1a1a;
+  color: var(--fm-ink);
   background: rgb(255 244 214 / 96%);
-  box-shadow: 0 1px 6px rgb(0 0 0 / 28%);
+  box-shadow: 0 1px 6px rgb(var(--fm-ink-rgb) / 28%);
 }
 
 .version-banner__refresh {
   padding: 4px 10px;
-  border: 1px solid rgb(0 0 0 / 20%);
+  border: 1px solid rgb(var(--fm-ink-rgb) / 20%);
   border-radius: 6px;
-  background: #fff;
+  background: var(--fm-surface);
   cursor: pointer;
   font-size: 13px;
 }
@@ -1692,9 +1715,9 @@ body,
   border-radius: 8px;
   font-size: 13px;
   line-height: 1.45;
-  color: #1a1a1a;
+  color: var(--fm-ink);
   background: rgb(255 244 214 / 96%);
-  box-shadow: 0 1px 6px rgb(0 0 0 / 28%);
+  box-shadow: 0 1px 6px rgb(var(--fm-ink-rgb) / 28%);
 }
 
 /* §4.8's Profile screen — a normal scrolling page, unlike the map screen's fixed-height
@@ -1714,7 +1737,7 @@ body,
   padding: 0;
   font: inherit;
   font-size: 13px;
-  color: #2f6fb0;
+  color: var(--fm-accent-strong);
   cursor: pointer;
 }
 
@@ -1731,9 +1754,10 @@ body,
 
 .settings-page__title {
   margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-  color: #1a1a1a;
+  font-family: var(--fm-font-serif);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--fm-ink);
 }
 
 .settings-page__section {
@@ -1745,22 +1769,31 @@ body,
 .settings-page__label {
   font-size: 12.5px;
   font-weight: 600;
-  color: rgb(0 0 0 / 60%);
+  color: rgb(var(--fm-ink-rgb) / 60%);
 }
 
 .settings-page__input {
   padding: 9px 10px;
-  border: 1px solid rgb(0 0 0 / 18%);
+  border: 1px solid rgb(var(--fm-ink-rgb) / 18%);
   border-radius: 6px;
   font: inherit;
   font-size: 14px;
-  color: #1a1a1a;
-  background: #fff;
+  color: var(--fm-ink);
+  background: var(--fm-surface);
 }
 
 .settings-page__input:focus {
-  outline: 2px solid #3a6ea5;
+  outline: 2px solid var(--fm-accent);
   outline-offset: 1px;
+}
+
+/* EditActivityDialog.tsx's Name/Description fields when editing more than one checked
+   activity at once — visibly inert, not just inert on click, so "why can't I type here"
+   reads before anyone hovers long enough for the field's own title tooltip. */
+.settings-page__input:disabled {
+  background: var(--fm-surface-tint);
+  color: var(--fm-ink-faint);
+  cursor: not-allowed;
 }
 
 .settings-page__input--narrow {
@@ -1770,7 +1803,7 @@ body,
 .settings-page__hint {
   margin: 2px 0 0;
   font-size: 12px;
-  color: rgb(0 0 0 / 55%);
+  color: rgb(var(--fm-ink-rgb) / 55%);
   line-height: 1.5;
 }
 
@@ -1787,15 +1820,15 @@ body,
   width: 72px;
   height: 72px;
   flex-shrink: 0;
-  border: 1px dashed rgb(0 0 0 / 25%);
+  border: 1px dashed rgb(var(--fm-ink-rgb) / 25%);
   border-radius: 10px;
   overflow: hidden;
-  background: rgb(0 0 0 / 3%);
+  background: rgb(var(--fm-ink-rgb) / 3%);
 }
 
 .settings-page__avatar-drop--over {
-  border-color: #3a6ea5;
-  background: rgb(58 110 165 / 8%);
+  border-color: var(--fm-accent);
+  background: rgb(var(--fm-accent-rgb) / 8%);
 }
 
 .settings-page__avatar-preview {
@@ -1806,7 +1839,7 @@ body,
 
 .settings-page__avatar-placeholder {
   font-size: 28px;
-  color: rgb(0 0 0 / 25%);
+  color: rgb(var(--fm-ink-rgb) / 25%);
 }
 
 .settings-page__avatar-actions {
@@ -1817,11 +1850,11 @@ body,
 }
 
 .settings-page__button {
-  border: 1px solid rgb(0 0 0 / 18%);
+  border: 1px solid rgb(var(--fm-ink-rgb) / 18%);
   border-radius: 7px;
   padding: 6px 12px;
-  background: #fff;
-  color: #1a1a1a;
+  background: var(--fm-surface);
+  color: var(--fm-ink);
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
@@ -1829,8 +1862,8 @@ body,
 }
 
 .settings-page__button:disabled {
-  color: rgb(0 0 0 / 30%);
-  border-color: rgb(0 0 0 / 10%);
+  color: rgb(var(--fm-ink-rgb) / 30%);
+  border-color: rgb(var(--fm-ink-rgb) / 10%);
   cursor: not-allowed;
 }
 
@@ -1838,8 +1871,8 @@ body,
   margin: 4px 0 0;
   padding: 8px 10px;
   border-radius: 6px;
-  background: rgb(170 51 51 / 8%);
-  color: #a33;
+  background: rgb(var(--fm-danger-rgb) / 8%);
+  color: var(--fm-danger);
   font-size: 12.5px;
 }
 
@@ -1853,7 +1886,7 @@ body,
   border: 0;
   border-radius: 8px;
   padding: 10px 18px;
-  background: #3a6ea5;
+  background: var(--fm-accent);
   color: #fff;
   font: inherit;
   font-weight: 600;
@@ -1862,7 +1895,7 @@ body,
 }
 
 .settings-page__submit:hover {
-  background: #2f5c8a;
+  background: var(--fm-accent-hover);
 }
 
 .settings-page__submit:disabled {
@@ -1873,7 +1906,7 @@ body,
 .settings-page__saved {
   font-size: 12.5px;
   font-weight: 600;
-  color: #2e7d32;
+  color: var(--fm-success-strong);
 }
 
 .activity-graph {
@@ -1886,8 +1919,8 @@ body,
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 1px;
   margin-bottom: 28px;
-  background: rgb(0 0 0 / 8%);
-  border: 1px solid rgb(0 0 0 / 8%);
+  background: rgb(var(--fm-ink-rgb) / 8%);
+  border: 1px solid rgb(var(--fm-ink-rgb) / 8%);
 }
 
 .activity-graph__card {
@@ -1895,7 +1928,7 @@ body,
   flex-direction: column;
   gap: 6px;
   padding: 14px 16px;
-  background: #fff;
+  background: var(--fm-surface);
 }
 
 .activity-graph__card-label {
@@ -1903,13 +1936,13 @@ body,
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgb(0 0 0 / 50%);
+  color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
 .activity-graph__card-value {
   font-size: 22px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--fm-ink);
 }
 
 .activity-graph__head {
@@ -1927,13 +1960,13 @@ body,
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgb(0 0 0 / 60%);
+  color: rgb(var(--fm-ink-rgb) / 60%);
 }
 
 .activity-graph__subtext {
   margin: 0;
   font-size: 13px;
-  color: rgb(0 0 0 / 55%);
+  color: rgb(var(--fm-ink-rgb) / 55%);
 }
 
 .activity-graph__shade {
@@ -1947,16 +1980,16 @@ body,
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgb(0 0 0 / 50%);
+  color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
 .activity-graph__shade-btn {
-  border: 1px solid rgb(0 0 0 / 20%);
-  background: #fff;
+  border: 1px solid rgb(var(--fm-ink-rgb) / 20%);
+  background: var(--fm-surface);
   padding: 5px 12px;
   font: inherit;
   font-size: 12.5px;
-  color: #1a1a1a;
+  color: var(--fm-ink);
   cursor: pointer;
 }
 
@@ -1970,13 +2003,13 @@ body,
 }
 
 .activity-graph__shade-btn[aria-pressed='true'] {
-  background: #3a6ea5;
-  border-color: #3a6ea5;
+  background: var(--fm-accent);
+  border-color: var(--fm-accent);
   color: #fff;
 }
 
 .activity-graph__error {
-  color: #a33;
+  color: var(--fm-danger);
   font-size: 13px;
 }
 
@@ -1986,14 +2019,14 @@ body,
   gap: 5px;
   margin: 18px 0 0;
   font-size: 11.5px;
-  color: rgb(0 0 0 / 50%);
+  color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
 .trends {
   max-width: 960px;
   margin: 36px auto 0;
   padding-top: 24px;
-  border-top: 1px solid rgb(0 0 0 / 8%);
+  border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
 }
 
 .trends__head {
@@ -2011,13 +2044,13 @@ body,
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgb(0 0 0 / 60%);
+  color: rgb(var(--fm-ink-rgb) / 60%);
 }
 
 .trends__subtext {
   margin: 0;
   font-size: 13px;
-  color: rgb(0 0 0 / 55%);
+  color: rgb(var(--fm-ink-rgb) / 55%);
 }
 
 .trends__bucket {
@@ -2027,12 +2060,12 @@ body,
 }
 
 .trends__bucket-btn {
-  border: 1px solid rgb(0 0 0 / 20%);
-  background: #fff;
+  border: 1px solid rgb(var(--fm-ink-rgb) / 20%);
+  background: var(--fm-surface);
   padding: 5px 12px;
   font: inherit;
   font-size: 12.5px;
-  color: #1a1a1a;
+  color: var(--fm-ink);
   cursor: pointer;
 }
 
@@ -2046,18 +2079,18 @@ body,
 }
 
 .trends__bucket-btn[aria-pressed='true'] {
-  background: #3a6ea5;
-  border-color: #3a6ea5;
+  background: var(--fm-accent);
+  border-color: var(--fm-accent);
   color: #fff;
 }
 
 .trends__error {
-  color: #a33;
+  color: var(--fm-danger);
   font-size: 13px;
 }
 
 .trends__empty {
-  color: rgb(0 0 0 / 50%);
+  color: rgb(var(--fm-ink-rgb) / 50%);
   font-size: 13px;
 }
 
@@ -2072,25 +2105,25 @@ body,
   align-items: flex-end;
   gap: 2px;
   height: 140px;
-  border-bottom: 1px solid rgb(0 0 0 / 12%);
+  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 12%);
 }
 
 .trends__bar {
   flex: 1 1 0;
   min-height: 2px;
-  background: #3a6ea5;
+  background: var(--fm-accent);
   border-radius: 2px 2px 0 0;
 }
 
 .trends__bar:hover {
-  background: #274d78;
+  background: var(--fm-accent-hover);
 }
 
 .trends__axis {
   display: flex;
   justify-content: space-between;
   font-size: 11px;
-  color: rgb(0 0 0 / 50%);
+  color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
 .trends__tooltip {
@@ -2099,10 +2132,10 @@ body,
   gap: 4px 14px;
   margin-top: 12px;
   padding: 8px 12px;
-  background: rgb(0 0 0 / 4%);
+  background: rgb(var(--fm-ink-rgb) / 4%);
   border-radius: 5px;
   font-size: 12.5px;
-  color: #1a1a1a;
+  color: var(--fm-ink);
 }
 
 .trends__tooltip-date {
@@ -2112,7 +2145,7 @@ body,
 .year-grid {
   margin-bottom: 30px;
   padding-top: 16px;
-  border-top: 1px solid rgb(0 0 0 / 8%);
+  border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
 }
 
 .year-grid__header {
@@ -2125,14 +2158,15 @@ body,
 
 .year-grid__year {
   margin: 0;
-  font-size: 18px;
-  font-weight: 800;
-  color: #1a1a1a;
+  font-family: var(--fm-font-serif);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--fm-ink);
 }
 
 .year-grid__stats {
   font-size: 12.5px;
-  color: rgb(0 0 0 / 55%);
+  color: rgb(var(--fm-ink-rgb) / 55%);
 }
 
 .year-grid__body {
@@ -2153,7 +2187,7 @@ body,
   height: 12px;
   font-size: 9.5px;
   line-height: 12px;
-  color: rgb(0 0 0 / 45%);
+  color: rgb(var(--fm-ink-rgb) / 45%);
 }
 
 .year-grid__chart {
@@ -2169,7 +2203,7 @@ body,
 
 .year-grid__month {
   font-size: 9.5px;
-  color: rgb(0 0 0 / 45%);
+  color: rgb(var(--fm-ink-rgb) / 45%);
   white-space: nowrap;
 }
 
@@ -2184,7 +2218,7 @@ body,
   width: 12px;
   height: 12px;
   border-radius: 2px;
-  background: rgb(0 0 0 / 6%);
+  background: rgb(var(--fm-ink-rgb) / 6%);
 }
 
 .year-grid__cell--pad {
@@ -2192,19 +2226,19 @@ body,
 }
 
 .year-grid__cell--level-0 {
-  background: rgb(0 0 0 / 6%);
+  background: rgb(var(--fm-ink-rgb) / 6%);
 }
 
 .year-grid__cell--level-1 {
-  background: #bcdcf7;
+  background: rgb(var(--fm-accent-rgb) / 30%);
 }
 
 .year-grid__cell--level-2 {
-  background: #5a9bd4;
+  background: rgb(var(--fm-accent-rgb) / 60%);
 }
 
 .year-grid__cell--level-3 {
-  background: #1a4c78;
+  background: var(--fm-accent);
 }
 
 /* AuthGate.tsx — the whole screen App.tsx renders in place of the app until getCurrentUser()
@@ -2216,7 +2250,7 @@ body,
   justify-content: center;
   min-height: 100vh;
   padding: 24px;
-  background: #f2f3f5;
+  background: var(--fm-bg);
 }
 
 .auth-gate__card {
@@ -2226,27 +2260,29 @@ body,
   width: 100%;
   max-width: 22rem;
   padding: 28px;
-  background: #fff;
-  border: 1px solid rgb(0 0 0 / 10%);
+  background: var(--fm-surface);
+  border: 1px solid rgb(var(--fm-ink-rgb) / 10%);
   border-radius: 10px;
-  box-shadow: 0 12px 32px rgb(0 0 0 / 10%);
+  box-shadow: 0 12px 32px rgb(var(--fm-ink-rgb) / 10%);
 }
 
 .auth-gate__brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-weight: 800;
-  font-size: 15px;
-  letter-spacing: 0.06em;
-  color: #1a1a1a;
+  font-family: var(--fm-font-serif);
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0;
+  color: var(--fm-ink);
 }
 
 .auth-gate__title {
   margin: 4px 0 6px;
-  font-size: 19px;
-  font-weight: 700;
-  color: #1a1a1a;
+  font-family: var(--fm-font-serif);
+  font-size: 21px;
+  font-weight: 600;
+  color: var(--fm-ink);
 }
 
 .auth-gate__field {
@@ -2254,20 +2290,20 @@ body,
   flex-direction: column;
   gap: 5px;
   font-size: 12.5px;
-  color: rgb(0 0 0 / 60%);
+  color: rgb(var(--fm-ink-rgb) / 60%);
 }
 
 .auth-gate__field input {
   padding: 9px 10px;
-  border: 1px solid rgb(0 0 0 / 18%);
+  border: 1px solid rgb(var(--fm-ink-rgb) / 18%);
   border-radius: 6px;
   font: inherit;
   font-size: 14px;
-  color: #1a1a1a;
+  color: var(--fm-ink);
 }
 
 .auth-gate__field input:focus {
-  outline: 2px solid #3a6ea5;
+  outline: 2px solid var(--fm-accent);
   outline-offset: 1px;
 }
 
@@ -2275,8 +2311,8 @@ body,
   margin: 0;
   padding: 8px 10px;
   border-radius: 6px;
-  background: rgb(170 51 51 / 8%);
-  color: #a33;
+  background: rgb(var(--fm-danger-rgb) / 8%);
+  color: var(--fm-danger);
   font-size: 12.5px;
 }
 
@@ -2285,7 +2321,7 @@ body,
   border: 0;
   border-radius: 8px;
   padding: 10px;
-  background: #3a6ea5;
+  background: var(--fm-accent);
   color: #fff;
   font: inherit;
   font-weight: 600;
@@ -2294,7 +2330,7 @@ body,
 }
 
 .auth-gate__submit:hover {
-  background: #2f5c8a;
+  background: var(--fm-accent-hover);
 }
 
 .auth-gate__submit:disabled {
@@ -2309,12 +2345,12 @@ body,
   padding: 0;
   font: inherit;
   font-size: 12.5px;
-  color: #2f6fb0;
+  color: var(--fm-accent-strong);
   cursor: pointer;
 }
 
 .auth-gate__toggle:disabled {
-  color: rgb(0 0 0 / 40%);
+  color: rgb(var(--fm-ink-rgb) / 40%);
   cursor: default;
 }
 
@@ -2329,12 +2365,12 @@ body,
   padding: 0;
   font: inherit;
   font-size: 12px;
-  color: #2f6fb0;
+  color: var(--fm-accent-strong);
   cursor: pointer;
 }
 
 .auth-gate__forgot:disabled {
-  color: rgb(0 0 0 / 40%);
+  color: rgb(var(--fm-ink-rgb) / 40%);
   cursor: default;
 }
 
@@ -2344,7 +2380,7 @@ body,
   margin: 0;
   font-size: 13px;
   line-height: 1.5;
-  color: rgb(0 0 0 / 65%);
+  color: rgb(var(--fm-ink-rgb) / 65%);
 }
 
 .auth-gate__divider {
@@ -2353,7 +2389,7 @@ body,
   gap: 10px;
   margin: 2px 0;
   font-size: 11.5px;
-  color: rgb(0 0 0 / 40%);
+  color: rgb(var(--fm-ink-rgb) / 40%);
 }
 
 .auth-gate__divider::before,
@@ -2361,15 +2397,15 @@ body,
   content: '';
   flex: 1;
   height: 1px;
-  background: rgb(0 0 0 / 10%);
+  background: rgb(var(--fm-ink-rgb) / 10%);
 }
 
 .auth-gate__demo {
-  border: 1px solid rgb(0 0 0 / 15%);
+  border: 1px solid rgb(var(--fm-ink-rgb) / 15%);
   border-radius: 8px;
   padding: 10px;
-  background: #fff;
-  color: #1a1a1a;
+  background: var(--fm-surface);
+  color: var(--fm-ink);
   font: inherit;
   font-weight: 600;
   font-size: 14px;
@@ -2377,7 +2413,7 @@ body,
 }
 
 .auth-gate__demo:hover {
-  background: rgb(0 0 0 / 4%);
+  background: rgb(var(--fm-ink-rgb) / 4%);
 }
 
 .auth-gate__demo:disabled {
@@ -2425,8 +2461,8 @@ body,
     width: 100%;
     height: 68px;
     border-right: none;
-    border-top: 1px solid rgb(0 0 0 / 10%);
-    box-shadow: 0 -2px 10px rgb(0 0 0 / 18%);
+    border-top: 1px solid rgb(var(--fm-ink-rgb) / 10%);
+    box-shadow: 0 -2px 10px rgb(var(--fm-ink-rgb) / 18%);
     /* Above the map's own floating widgets (mode toggle/track-metric-toggle, z-index: 3)
        and MapLibre's own controls, below the app header (z-index: 5). */
     z-index: 4;
@@ -2457,7 +2493,7 @@ body,
   .activities-panel__sheet-chevron {
     display: inline;
     flex: none;
-    color: rgb(0 0 0 / 40%);
+    color: rgb(var(--fm-ink-rgb) / 40%);
   }
 
   /* Collapsed: the list/filters/footer need no rule of their own here at all — they're
@@ -2466,12 +2502,12 @@ body,
      desktop. Not unmounted, so a mid-scroll collapse doesn't lose the list's own scroll
      position, and expanding just gives that same flex child more height to actually use.
 
-     Bigger touch targets for the four per-row controls that stay at their desktop size
-     otherwise (15px/24px/24px/24px — comfortably clickable with a mouse, tight with a
-     finger). The header toolbar's select-all checkbox and its Group visible/Delete group
-     buttons reuse these exact same classes (.activities-panel__checkbox/__visibility/
-     __delete), so they already inherit the same larger touch targets with no rule of their
-     own needed here. */
+     Bigger touch targets for the row checkbox and the toolbar's four icon actions, which
+     stay at their desktop size otherwise (15px/30px/30px/30px/30px — comfortably clickable
+     with a mouse, tight with a finger). There are no per-row action icons any more (see the
+     toolbar's own doc comment in ActivitiesPanel.tsx), so this only needs to widen the
+     toolbar's own Show/Edit/Delete/Focus chips plus the checkbox shared by rows and the
+     master checkbox alike. */
   .activities-panel__checkbox {
     width: 20px;
     height: 20px;
@@ -2479,7 +2515,8 @@ body,
 
   .activities-panel__edit,
   .activities-panel__delete,
-  .activities-panel__visibility {
+  .activities-panel__visibility,
+  .activities-panel__focus {
     width: 34px;
     height: 34px;
   }
@@ -2550,36 +2587,49 @@ body,
     right: -15px;
   }
 
-  /* Found live, not anticipated in the initial pass: `.activity-histogram__header`'s two
-     sides (the range summary, and the pan window label + Earlier/Later buttons) are both
-     `white-space: nowrap`-ish content with no shrink/wrap behavior at all — at desktop
-     widths that's never been a problem, but on a ~390px phone the two together are wider
-     than the screen, which doesn't just clip locally: it forces the *whole page* wider than
-     the viewport (confirmed live — `document.documentElement.scrollWidth` exceeded
-     `clientWidth`), which in turn broke the Activities panel sheet's own `width: 100%`
-     above, since a `position: fixed` element's percentage width resolves against that same
-     widened layout viewport. Fixing the actual source (this) rather than symptom-patching
-     the sheet was the correct fix.
-     Letting the header wrap to two rows, and giving `.activity-histogram` itself a bit more
-     height to fit that second row without stealing space from `.range-picker__chart`
-     (`flex: 1` below it — reducing the histogram's own height instead would have shrunk the
-     chart, not just the header). */
+  /* The legend column's fixed `var(--panel-width)` and the chart area's flanking buttons
+     don't fit side by side on a ~390px phone — found live the same way the old header-row
+     overflow was (a fixed-width sidebar-aligned column plus a chart area is exactly the
+     "two wide things side by side" shape that already broke once here; see
+     .activities-panel__subtext's history and AGENTS.md for that earlier incident). Stacked
+     instead: legend on top at full width (matching .activities-panel's own mobile
+     `width: 100%` override — same reasoning, a fixed pixel width from panelWidth state makes
+     no sense once the sidebar itself becomes a full-width bottom sheet), chart area below.
+     Found live, a second time, stacking these two on top of each other: the taller stacked
+     footer's own chart area (Earlier/Later + the bars) now lands in the exact bottom 68px of
+     the viewport the collapsed Activities sheet (`position: fixed; bottom: 0`) always
+     occupies — a normal-flow element's position says nothing about what a fixed sibling
+     draws over it, so the sheet was hiding the Earlier/Later buttons entirely rather than
+     merely sitting beside them, the same "reserve real space for a fixed overlay" fix
+     `.maplibregl-ctrl-bottom-left/-right`'s own `bottom: 78px` already applies for controls
+     positioned *inside* the map — here it's the footer's own bottom padding doing the
+     reserving instead, since this element is normal flow, not absolutely positioned. */
   .activity-histogram {
-    height: 168px;
+    flex-direction: column;
+    height: auto;
+    padding-bottom: 68px;
+  }
+
+  .activity-histogram__legend {
+    width: 100%;
     padding: 10px 14px;
+    border-right: none;
+    border-bottom: 1px solid var(--fm-border);
   }
 
-  .activity-histogram__header {
-    flex-wrap: wrap;
-    row-gap: 4px;
+  .activity-histogram__chart-area {
+    padding: 6px 14px;
   }
 
-  .activity-histogram__summary {
-    min-width: 0;
-  }
-
-  .activity-histogram__window {
-    flex-wrap: wrap;
-    row-gap: 4px;
+  /* `.activity-histogram` is `height: auto` here (it stacks legend above chart-area instead
+     of the desktop row), so there's no definite height for `align-items: stretch` to resolve
+     against — without an explicit height, `.range-picker__chart` (whose own children are all
+     `position: absolute` and so contribute no intrinsic height of their own) would collapse
+     to 0px. Desktop doesn't need this: `.activity-histogram`'s own fixed 104px height is
+     definite, and stretch carries it down through `.activity-histogram__chart-area` to these
+     same two elements correctly. */
+  .range-picker__chart,
+  .range-picker__page {
+    height: 64px;
   }
 }

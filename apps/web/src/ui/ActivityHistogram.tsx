@@ -6,14 +6,20 @@ import { RangePicker, type DateRange } from './RangePicker';
  * RangePicker.tsx — one bar per day that has activity, drag to resize or slide the
  * selection, drag the strip to page through history.
  *
- * The header is two independent pieces of information side by side, not one stack: the left
- * side answers "what's selected" (the range and how much of it actually has activity —
- * km/activity-count totals live in ActivitiesPanel's own subtext already, so repeating them
- * here would just be the same numbers twice); the right side answers "what's currently on
- * screen", which is a different question the pan position owns and the selection doesn't.
- * The Earlier/Later buttons live in that same top row, next to the window they page — not
- * flanking the chart below, which is what let the chart itself stretch the full width of the
- * footer rather than sharing it with two button columns.
+ * Two regions side by side: a legend column, sized to its own content rather than to the
+ * Activities panel's width — the sidebar is independently resizable (260–560px), and there's
+ * no reason this footer should shrink or grow along with that drag — and a chart area filling
+ * whatever's left, `flex: 1`, so the date picker gets as much room as it can.
+ * The legend stacks two independent pieces of information as one column, not side by side
+ * (splitting the width in two left each date range only half the room to render in, which
+ * truncated mid-number well before the text ran out of space to matter): SHOWN DAYS answers
+ * "what's currently on screen" (a different question the pan position owns, not the
+ * selection); SELECTED RANGE answers "what's selected" below it (the range and how much of it
+ * actually has activity — km/activity-count totals live in ActivitiesPanel's own subtext
+ * already, so repeating them here would just be the same numbers twice). The Earlier/Later
+ * buttons flank the chart itself rather than sitting in the legend — icon-only, actively styled
+ * when there's somewhere
+ * further to page (canPanEarlier/canPanLater below) and flatly inert otherwise.
  */
 export interface ActivityHistogramProps {
   /** The days-with-activity currently on screen — see useActivityDays. */
@@ -65,8 +71,22 @@ export function ActivityHistogram({
 
   return (
     <footer className="activity-histogram" data-testid="activity-histogram">
-      <div className="activity-histogram__header">
-        <div className="activity-histogram__summary">
+      <div className="activity-histogram__legend">
+        {/* What's currently panned into view, independent of the selection below: this can
+            show a completely different stretch of history while a selection elsewhere stays
+            exactly where it was. */}
+        <div className="activity-histogram__legend-block">
+          <div className="activity-histogram__legend-label">Shown days</div>
+          <div className="activity-histogram__range-label" data-testid="visible-window-label">
+            {first && last ? `${formatRangeLabel(first.date)} – ${formatRangeLabel(last.date)}` : '—'}
+          </div>
+          <div className="activity-histogram__stats">
+            {first && last ? `${days.length} active ${days.length === 1 ? 'day' : 'days'}` : 'No activity days to show'}
+          </div>
+        </div>
+
+        <div className="activity-histogram__legend-block">
+          <div className="activity-histogram__legend-label">Selected range</div>
           <div className="activity-histogram__range-label" data-testid="selected-range-label">
             {formatRangeLabel(selectedRange.from)} – {formatRangeLabel(selectedRange.to)}
           </div>
@@ -74,45 +94,52 @@ export function ActivityHistogram({
             {selectedRangeDays}-day range · {selectedActiveDays} active {selectedActiveDays === 1 ? 'day' : 'days'}
           </div>
         </div>
-
-        <div className="activity-histogram__window">
-          {/* What's currently panned into view — a count of active days now rather than a
-              span of calendar time, since packed bars no longer imply one. Independent of
-              the selection to its left: this can show a completely different stretch of
-              history while a selection elsewhere stays exactly where it was. */}
-          <span className="activity-histogram__window-label" data-testid="visible-window-label" aria-hidden="true">
-            {first && last
-              ? `${days.length} active ${days.length === 1 ? 'day' : 'days'} · ${formatRangeLabel(first.date)} – ${formatRangeLabel(last.date)}`
-              : 'No activity days to show'}
-          </span>
-          <button
-            type="button"
-            className="range-picker__page"
-            data-testid="range-picker-earlier"
-            disabled={!canPanEarlier}
-            onClick={() => onPan(-pageStep)}
-          >
-            ‹ Earlier
-          </button>
-          <button
-            type="button"
-            className="range-picker__page"
-            data-testid="range-picker-later"
-            disabled={!canPanLater}
-            onClick={() => onPan(pageStep)}
-          >
-            Later ›
-          </button>
-        </div>
       </div>
 
-      <RangePicker
-        days={days}
-        onPan={onPan}
-        selectedRange={selectedRange}
-        onChangeSelection={onChangeSelection}
-        onCapacityChange={onCapacityChange}
-      />
+      <div className="activity-histogram__chart-area">
+        <button
+          type="button"
+          className="range-picker__page"
+          data-testid="range-picker-earlier"
+          disabled={!canPanEarlier}
+          aria-label="Earlier"
+          title="Earlier"
+          onClick={() => onPan(-pageStep)}
+        >
+          <ChevronIcon direction="left" />
+        </button>
+
+        <RangePicker
+          days={days}
+          onPan={onPan}
+          selectedRange={selectedRange}
+          onChangeSelection={onChangeSelection}
+          onCapacityChange={onCapacityChange}
+        />
+
+        <button
+          type="button"
+          className="range-picker__page"
+          data-testid="range-picker-later"
+          disabled={!canPanLater}
+          aria-label="Later"
+          title="Later"
+          onClick={() => onPan(pageStep)}
+        >
+          <ChevronIcon direction="right" />
+        </button>
+      </div>
     </footer>
+  );
+}
+
+/** A plain chevron for the icon-only Earlier/Later buttons — text labels moved to
+ *  `aria-label`/`title` since the buttons now flank the chart at a fixed 34px width. */
+function ChevronIcon({ direction }: { direction: 'left' | 'right' }) {
+  const d = direction === 'left' ? 'M9 4l-6 6 6 6' : 'M7 4l6 6-6 6';
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14">
+      <path d={d} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }

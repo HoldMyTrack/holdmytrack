@@ -73,6 +73,15 @@ const MIN_REPORTED_CAPACITY = 5;
  *  slots; without this they would overprint each other into a smear. */
 const MIN_TICK_GAP_PERCENT = 9;
 
+/** How close a tick's own position has to be to the chart's left/right edge, as a percent of
+ *  its width, before that label stops centering on its bar and instead anchors inward — found
+ *  live with a long enough packed history that the very first bar lands at left: 0%, where a
+ *  centered label has roughly half its own text width extending straight past the chart's
+ *  edge and overlapping the Earlier/Later button beside it. Most ticks, including a short
+ *  history's own first one sitting well inside blank space (a nonzero `blankFraction`), are
+ *  nowhere near this close and keep centering normally. */
+const EDGE_ALIGN_THRESHOLD_PERCENT = 4;
+
 /** Shortest bar drawn for a day that has activity, as a percent of the chart height — a day
  *  with a 300 m walk on it still has to be visible and clickable. */
 const MIN_BAR_PERCENT = 4;
@@ -138,8 +147,8 @@ function monthTicks(
   days: HistogramBucket[],
   blankFraction: number,
   packedFraction: number,
-): { key: string; label: string; left: number }[] {
-  const ticks: { key: string; label: string; left: number }[] = [];
+): { key: string; label: string; left: number; align: 'start' | 'center' | 'end' }[] {
+  const ticks: { key: string; label: string; left: number; align: 'start' | 'center' | 'end' }[] = [];
   let lastLeft = -Infinity;
   let lastYear = '';
   days.forEach((day, index) => {
@@ -150,7 +159,8 @@ function monthTicks(
     const month = new Date(`${day.date}T00:00:00Z`)
       .toLocaleDateString(undefined, { month: 'short', timeZone: 'UTC' })
       .toUpperCase();
-    ticks.push({ key: day.date, label: year === lastYear ? month : `${month} ${year}`, left });
+    const align = left <= EDGE_ALIGN_THRESHOLD_PERCENT ? 'start' : left >= 100 - EDGE_ALIGN_THRESHOLD_PERCENT ? 'end' : 'center';
+    ticks.push({ key: day.date, label: year === lastYear ? month : `${month} ${year}`, left, align });
     lastLeft = left;
     lastYear = year;
   });
@@ -454,7 +464,13 @@ export function RangePicker({ days, onPan, selectedRange, onChangeSelection, onC
           selection band never covers, so there is always somewhere to grab. */}
       <div className="range-picker__months" data-testid="range-picker-rail">
         {ticks.map((tick) => (
-          <span key={tick.key} className="range-picker__month" style={{ left: `${tick.left}%` }}>
+          <span
+            key={tick.key}
+            className={
+              tick.align === 'center' ? 'range-picker__month' : `range-picker__month range-picker__month--${tick.align}`
+            }
+            style={{ left: `${tick.left}%` }}
+          >
             {tick.label}
           </span>
         ))}

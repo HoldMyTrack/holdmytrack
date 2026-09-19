@@ -452,7 +452,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Description**: A permanent sidebar lists every activity within the currently selected date range (FR-6), narrowed by the TYPE and DISTANCE filters below.
 
-**Behavior**: Each row's primary line is the activity's own name if one has been set (FR-5.10), or its start date/time otherwise — an activity has a name only once a person has typed one in via FR-5.10's edit dialog, never from parsing a source file. A row whose primary line is a name still shows its date/time as part of the row's secondary line, alongside distance and duration; a row with no name shows distance and duration alone, since its date/time is already the primary line. Type is also shown per row. Regardless of what a row displays, **the list itself is always ordered by start date/time, newest first** — a name never affects sort order. The list is not paginated — every matching activity is shown at once. The panel also shows a running count of matching activities and total distance for the range (independent of the TYPE/DISTANCE filters, which narrow the visible rows without changing this total).
+**Behavior**: Each row's primary line is the activity's own name if one has been set (FR-5.10), or its start date/time otherwise — an activity has a name only once a person has typed one in via FR-5.10's edit dialog, never from parsing a source file. A row whose primary line is a name still shows its date/time as part of the row's secondary line, alongside distance, duration, and type — a row's only other elements are its checkbox and this text; there is no separate per-row column or icon of any kind, and no per-row action controls (edit/delete/hide are reached via FR-5.6's checkbox plus the header toolbar, not from the row itself). Regardless of what a row displays, **the list itself is always ordered by start date/time, newest first** — a name never affects sort order. The list is not paginated — every matching activity is shown at once. The panel also shows a running count of matching activities and total distance for the range (independent of the TYPE/DISTANCE filters, which narrow the visible rows without changing this total).
 
 ### FR-5.2 TYPE filter
 
@@ -480,17 +480,17 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Notes**: A hidden activity (FR-5.8) can still be focused (FR-5.5) or checked; the system excludes hidden activities from the fly-to bounds specifically so the camera never flies to an area with nothing drawn on it. A row that is both focused and checked renders with the same single highlight treatment as either alone — there is no visually distinct "both" state.
 
-### FR-5.7 Select all / Clear / Show selected
+### FR-5.7 Select all / Clear / Focus on map
 
-**Description**: A master checkbox in the header toolbar selects or clears every currently listed activity at once; a separate footer control re-flies to fit the current checked group on demand.
+**Description**: A master checkbox in the header toolbar selects or clears every currently listed activity at once; a separate toolbar icon re-flies to fit the current checked group on demand.
 
-**Behavior**: The header checkbox reflects the checked group's state against the currently listed (TYPE/DISTANCE-filtered) rows — checked once every listed row is checked, unchecked once none are, and indeterminate for a partial selection. Clicking it when unchecked or indeterminate checks every listed row and flies to fit them all; clicking it when fully checked empties the checked group and flies the camera to fit every currently visible activity in the date range (respecting the hidden-activity set). The footer's **"Show selected"** button, disabled when nothing is checked, re-flies to fit the current checked group without changing it — for recovering the view after panning away from it.
+**Behavior**: The header checkbox reflects the checked group's state against the currently listed (TYPE/DISTANCE-filtered) rows — checked once every listed row is checked, unchecked once none are, and indeterminate for a partial selection. Clicking it when unchecked or indeterminate checks every listed row and flies to fit them all; clicking it when fully checked empties the checked group and flies the camera to fit every currently visible activity in the date range (respecting the hidden-activity set). The toolbar's accent-tinted **Focus on map** icon, disabled when nothing is checked, re-flies to fit the current checked group without changing it — for recovering the view after panning away from it. This is also the only way to fly to a single checked activity's own bounds by group rather than by row-click (FR-5.5).
 
-**Notes**: Neither control affects the row-click focus (FR-5.5) — a focused row keeps its own highlight regardless of the header checkbox or "Show selected."
+**Notes**: Neither control affects the row-click focus (FR-5.5) — a focused row keeps its own highlight regardless of the header checkbox or Focus on map.
 
-### FR-5.8 Hide/show a track (eye icon)
+### FR-5.8 Hide/show a track
 
-**Description**: Each row has an eye-icon control that hides or shows that activity's track on the map, independent of whether it is selected. A hidden activity's track is not drawn in any map mode (Normal, Fog, or Heatmap) until shown again. Hiding/showing is purely client-side and does not refetch data.
+**Description**: The header toolbar's Show/hide icon (FR-5.12) hides or shows every currently checked activity's track on the map, independent of the row-click focus (FR-5.5). There is no per-row hide/show control — hiding or showing a single activity means checking just its own box first, the same as any other single-item action. A hidden activity's track is not drawn in any map mode (Normal, Fog, or Heatmap) until shown again; its row dims in place so its hidden state is still visible at a glance. Hiding/showing is purely client-side and does not refetch data. See FR-5.12 for the exact toggle rule.
 
 ### FR-5.9 Resizable panel
 
@@ -502,63 +502,52 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Preconditions**: Active session; the caller owns the activity.
 
-**Inputs**: A new type (required, 1–50 characters), a name (optional, up to 200 characters), and a description (optional, up to 2000 characters) for one activity, entered via a small edit dialog reached from that activity's row.
+**Inputs**: Reached via the header toolbar's Edit icon (FR-5.6's checkbox group must be non-empty) or a single row's checkbox followed by that same icon — there is no per-row edit control. Editing exactly one checked activity accepts a new type (required, 1–50 characters), a name (optional, up to 200 characters), and a description (optional, up to 2000 characters). Editing more than one checked activity at once accepts only a new type — the Name and Description fields are disabled, since there is nothing consistent to set across several different activities' names/descriptions in one request.
 
 **Behavior**:
-1. Clicking a row's edit (pencil) icon opens a dialog pre-filled with that activity's current type, name, and description.
+1. Checking one or more rows and clicking the toolbar's Edit icon opens a dialog. With exactly one activity checked, it is pre-filled with that activity's current type, name, and description, all three editable. With more than one checked, only the type field is editable, seeded from the first checked activity; the Name and Description fields render disabled with an explanation of why.
 2. The type field is plain free text — the same "whatever the source reports, not a controlled vocabulary" rule FR-5.2's TYPE filter already follows (`IMPLEMENTATION.md` §4.7.2) applies equally to a manual rename. A list of this account's other existing types is offered as suggestions, purely as a convenience; nothing is enforced against it, and a value nobody has used before saves exactly as typed. The name field is always plain free text, with no source to ever populate it automatically — an activity has a name only once a person types one in here (`IMPLEMENTATION.md` §4.7).
-3. Saving all three fields commits together in one request; canceling discards any unsaved edits.
-4. Once saved: the row's TYPE label updates immediately; the new/renamed type becomes (or remains) a real entry in FR-5.2's TYPE filter with a live count; the row's primary line shows the name in place of its start date/time if one is set, or the start date/time as before if the name is cleared (FR-5.1); and the description becomes visible as a hover tooltip on the row — not a second visible line. **The Activities panel's sort order never changes**: rows stay ordered by start date/time (FR-5.1) regardless of what a row displays or whether it has a name at all.
+3. Saving commits in one request per checked activity. For a single checked activity, all three fields commit together. For a group, each activity's own request carries the new shared type alongside that activity's own existing name and description unchanged — a group edit never touches Name or Description, even though the underlying request is a full replace. Canceling discards any unsaved edits.
+4. Once saved: each affected row's displayed type updates immediately; the new/renamed type becomes (or remains) a real entry in FR-5.2's TYPE filter with a live count; a single-activity edit's row shows the name in place of its start date/time if one is set, or the start date/time as before if the name is cleared (FR-5.1); and its description becomes visible as a hover tooltip on the row — not a second visible line. **The Activities panel's sort order never changes**: rows stay ordered by start date/time (FR-5.1) regardless of what a row displays or whether it has a name at all.
 
-**Outputs**: The activity's `activity_type`, `name`, and `description` are updated; every other computed value for that activity (distance, duration, its Fog-of-War/Heatmap coverage, its inclusion in FR-9's performance-analysis aggregates) is unaffected, since none of those are keyed on type, name, or description.
+**Outputs**: Each edited activity's `activity_type` is updated (plus `name`/`description` for a single-activity edit); every other computed value for that activity (distance, duration, its Fog-of-War/Heatmap coverage, its inclusion in FR-9's performance-analysis aggregates) is unaffected, since none of those are keyed on type, name, or description.
 
 **Error cases**:
-- Empty or over-length type, an over-length name, or an over-length description → `400 Bad Request`, no change applied.
-- The activity does not exist or belongs to another account → `404 Not Found`, the two cases indistinguishable from each other.
+- Empty or over-length type, an over-length name, or an over-length description → `400 Bad Request`, no change applied for that activity.
+- An activity does not exist or belongs to another account → `404 Not Found`, indistinguishable from each other.
 
 ### FR-5.11 Delete an activity
 
-**Description**: A signed-in user permanently deletes one of their own activities — a full purge, not a soft delete or an archive: the activity itself, its track, and its contribution to Fog-of-War/Heatmap coverage are all removed. There is no undo.
+**Description**: A signed-in user permanently deletes one or more of their own activities — a full purge, not a soft delete or an archive: each activity itself, its track, and its contribution to Fog-of-War/Heatmap coverage are all removed. There is no undo. Deleting a single activity and deleting a group are the same mechanism (FR-5.13) — there is no separate per-row delete control; deleting one activity means checking just its own box first.
 
-**Preconditions**: Active session; the caller owns the activity.
+**Preconditions**: Active session; the caller owns every checked activity.
 
-**Inputs**: The activity to delete, reached via that row's delete (trash) icon.
+**Inputs**: The checked group (FR-5.6), reached via the header toolbar's Delete icon.
 
 **Behavior**:
-1. Clicking the delete icon opens a confirmation dialog naming the activity and stating plainly that this can't be undone; nothing is deleted until the user confirms.
-2. Confirming removes the activity and everything derived from it: its recorded stream data and its rendered coverage masks.
-3. The Fog-of-War/Heatmap view updates to reflect the deletion — coverage the deleted activity was the only source for reverts to unrevealed, not left showing stale coverage for data that no longer exists.
-4. Canceling the confirmation, or dismissing it, leaves the activity untouched.
+1. Clicking the toolbar's Delete icon opens a confirmation dialog naming how many activities are checked and their combined distance, stating plainly that this can't be undone; nothing is deleted until the user confirms.
+2. Confirming removes every checked activity and everything derived from each one: its recorded stream data and its rendered coverage masks.
+3. The Fog-of-War/Heatmap view updates to reflect the deletion — coverage a deleted activity was the only source for reverts to unrevealed, not left showing stale coverage for data that no longer exists.
+4. Canceling the confirmation, or dismissing it, leaves every checked activity untouched.
 
-**Outputs**: The activity and everything derived from it no longer exist; every list, filter, total, and aggregate that previously included it reflects its removal.
+**Outputs**: Every deleted activity, and everything derived from it, no longer exists; every list, filter, total, and aggregate that previously included it reflects the removal, in one combined refresh rather than once per deleted activity.
 
 **Error cases**:
-- The activity does not exist or belongs to another account → `404 Not Found`, indistinguishable from each other, same as FR-5.10.
+- A checked activity does not exist or belongs to another account → `404 Not Found`, indistinguishable from each other.
 
 ### FR-5.12 Group visible
 
-**Description**: An icon-only header toolbar button (the same eye icon FR-5.8's per-row control uses, positioned directly above it) toggles whether every currently checked (FR-5.6) activity is drawn on the map, in bulk — the same on/off idea applied to the whole checked group at once.
+**Description**: An icon-only header toolbar button toggles whether every currently checked (FR-5.6) activity is drawn on the map, in bulk — this is FR-5.8's entire hide/show mechanism, applied to whatever is checked, one activity or many.
 
 **Preconditions**: At least one activity is checked; the button is disabled otherwise.
 
-**Behavior**: If any checked activity is currently hidden, clicking shows the entire checked group (removes all of them from the hidden set). If every checked activity is already visible, clicking hides the entire group instead. Each activity's individual FR-5.8 state is otherwise unaffected — hiding or showing the group is equivalent to toggling every checked row's own eye icon to the same state, not a separate mechanism.
+**Behavior**: If any checked activity is currently hidden, clicking shows the entire checked group (removes all of them from the hidden set). If every checked activity is already visible, clicking hides the entire group instead.
 
-**Outputs**: The hidden-activity set updates; the map's drawn tracks and Fog-of-War/Heatmap coverage reflect it immediately, the same as an individual eye-icon toggle does.
+**Outputs**: The hidden-activity set updates; the map's drawn tracks and Fog-of-War/Heatmap coverage reflect it immediately.
 
 ### FR-5.13 Delete group
 
-**Description**: An icon-only header toolbar button (the same trash icon FR-5.11's per-row control uses, positioned directly above it) permanently deletes every currently checked (FR-5.6) activity at once — the same full purge FR-5.11 performs per activity, batched.
-
-**Preconditions**: At least one activity is checked; the button is disabled otherwise.
-
-**Inputs**: The checked group, reached via the header toolbar's delete icon.
-
-**Behavior**:
-1. Clicking the button opens a confirmation dialog naming how many activities are in the group and their combined distance, stating plainly that this can't be undone; nothing is deleted until the user confirms.
-2. Confirming deletes every checked activity and everything derived from each one, the same as FR-5.11 performs for a single activity.
-3. Canceling, or dismissing the confirmation, leaves every activity in the group untouched.
-
-**Outputs**: Every activity in the group, and everything derived from each one, no longer exists; every list, filter, total, and aggregate reflects the removal in one combined refresh rather than once per deleted activity.
+**Description**: The header toolbar's Delete icon — see FR-5.11, which this number and FR-5.11 both describe: deleting one activity and deleting several are the same mechanism, not two.
 
 ## 8. FR-6 — Date Range Picker
 

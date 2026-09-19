@@ -55,7 +55,7 @@ function Brand() {
       <span className="app-header__mark" aria-hidden="true">
         <span className="app-header__mark-dot" />
       </span>
-      FITMAP
+      FitMap
     </div>
   );
 }

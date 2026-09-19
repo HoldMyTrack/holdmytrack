@@ -46,7 +46,7 @@ export function Header({ uploadControl, exportControl, onBrandClick, onOpenProfi
       <span className="app-header__mark" aria-hidden="true">
         <span className="app-header__mark-dot" />
       </span>
-      FITMAP
+      FitMap
     </>
   );
   return (

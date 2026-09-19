@@ -17,17 +17,20 @@ import { useUnitSystem } from './units';
  * DistanceFilter.tsx renders standalone and always visible now, between the subtext line and
  * the toolbar below — no longer hidden behind the old "Filter" toggle button, which is gone.
  *
- * A header toolbar (§4.7.6) sits directly above the row list, its columns aligned with each
- * row's own layout so it reads as that list's header: a master checkbox (above the row
- * checkbox column) mirroring the checked group's state, a Type dropdown (above the TYPE
- * column — TYPE checkboxes only now; Distance moved out, see above) and two icon-only bulk
- * actions, Group visible and Delete group (above the row's own Visible/Delete icon columns),
- * that operate on the whole checked group at once rather than one row at a time. The footer's
- * old Select all/Clear text button is gone, retired in the header checkbox's favor.
+ * A header toolbar sits directly above the row list. Every single-item action (edit, delete,
+ * hide) lives here now, not on the row — a row has only its checkbox and its text; there are
+ * no more per-row icon buttons at all. Acting on one activity means checking just its own box
+ * first, the same as acting on many: a master checkbox mirrors the checked group's state, a
+ * Type dropdown (TYPE checkboxes plus an "All types" convenience row that clears every
+ * exclusion; Distance is its own standalone control above, see above), then four icon actions
+ * over the checked group — Show/hide, Edit (Type/Name/Description for exactly one checked
+ * activity, Type only for more than one — see EditActivityDialog.tsx), Delete, and, set off by
+ * a divider, Focus on map (fly-to-fit, moved here from the footer's old text button). The
+ * footer keeps only the "N selected · X km" summary.
  *
  * Four interactions per row, all living in MapView (which holds the map instance they need;
  * this component owns only rendering and its own local UI state). Row-click focus and the
- * checkbox group are two fully independent mechanisms now — reported live as wrongly coupled
+ * checkbox group are two fully independent mechanisms — reported live as wrongly coupled once,
  * when a row click also silently checked/unchecked boxes:
  *  - Hovering the row (anywhere on it) previews that activity's track — bold on the map,
  *    nothing else — for as long as the pointer stays there. Purely a preview: the camera
@@ -38,8 +41,9 @@ import { useUnitSystem } from './units';
  *  - The checkbox instead *adds or removes* this one row from the checked group, for building
  *    up a multi-row selection — every checked row bolds, and MapView's debounced auto-fly
  *    moves to fit the whole group. Never touches the row-click focus, in either direction.
- *  - The eye icon toggles whether that activity's track paints on the map at all, independent
- *    of all three of the above.
+ *  - The toolbar's Show/hide button toggles whether the checked group's tracks paint on the
+ *    map at all, independent of all three of the above — there is no longer a per-row eye icon
+ *    to toggle just one activity directly; a hidden activity's row dims in place instead.
  */
 export interface ActivitiesPanelProps {
   /** A demo account (docs/ROADMAP.md's "Email verification + demo without real ingest") — the
@@ -47,9 +51,8 @@ export interface ActivitiesPanelProps {
    *  disables the controls that would otherwise error, with a `title` explaining why, rather
    *  than either hiding them (which would hide the feature existing at all, undercutting the
    *  demo's whole point of letting someone feel the app) or leaving them enabled to fail.
-   *  Group visible and the per-row eye icon stay enabled either way — purely local UI state,
-   *  never sent to the backend, so there's nothing for a demo account to be blocked from
-   *  there. */
+   *  Group visible stays enabled either way — purely local UI state, never sent to the
+   *  backend, so there's nothing for a demo account to be blocked from there. */
   readOnly?: boolean;
   /** Rows already narrowed by TYPE/DISTANCE — what actually renders. */
   activities: Activity[];
@@ -86,10 +89,10 @@ export interface ActivitiesPanelProps {
   onSelectAll: () => void;
   /** Flies to fit the current checked group without changing it. */
   onShowSelected: () => void;
-  /** Activities currently hidden from the map — the eye icon's own state, and what the
-   *  header toolbar's "Group visible" button toggles in bulk over `checked`. */
+  /** Activities currently hidden from the map — dims the row (there's no per-row eye icon any
+   *  more), and what the header toolbar's "Group visible" button toggles in bulk over
+   *  `checked`. */
   hiddenIds: Set<string>;
-  onToggleVisibility: (id: string) => void;
   /** The header toolbar's "Group visible": if any checked activity is currently hidden, show
    *  the whole checked group; otherwise hide the whole group. See MapView's
    *  toggleGroupVisibility for the exact rule. */
@@ -97,13 +100,12 @@ export interface ActivitiesPanelProps {
   /** §4.7.4: a row's edit dialog saved successfully — reload the list so the renamed type/
    *  description (and the TYPE filter chip it may now belong to) reflect it immediately. */
   onActivityUpdated: () => void;
-  /** §4.7.5: a row was deleted and purged — unlike onActivityUpdated, this also has to drop
-   *  the id from `checked`/`hiddenIds`/`focusedId` if it was in any of them, and refresh the
-   *  map's track layer and totals/histogram (deleting changes distance/duration, editing
-   *  never does), so MapView's own onActivityDeleted does more than a plain reload. */
-  onActivityDeleted: (id: string) => void;
-  /** The header toolbar's "Delete group" — same full-purge semantics as onActivityDeleted,
-   *  batched: one combined refresh instead of one per deleted activity. */
+  /** §4.7.5's "Delete group" — the only delete entry point now (a single activity is deleted
+   *  by checking just its own box first, then this same button), so always an array even for
+   *  one id. Unlike onActivityUpdated, this also has to drop every deleted id from
+   *  `checked`/`hiddenIds`/`focusedId` and refresh the map's track layer and totals/histogram
+   *  (deleting changes distance/duration, editing never does) — MapView's own
+   *  handleActivitiesDeleted does more than a plain reload. */
   onActivitiesDeleted: (ids: string[]) => void;
 }
 
@@ -130,10 +132,8 @@ export function ActivitiesPanel({
   onSelectAll,
   onShowSelected,
   hiddenIds,
-  onToggleVisibility,
   onToggleGroupVisibility,
   onActivityUpdated,
-  onActivityDeleted,
   onActivitiesDeleted,
 }: ActivitiesPanelProps) {
   const hasActiveFilters = excludedTypes.size > 0 || distanceFilter !== null;
@@ -174,16 +174,18 @@ export function ActivitiesPanel({
     };
   }, [typeFilterOpen]);
 
-  // §4.7.4's edit-type-and-description dialog — at most one row's, since only one dialog is
-  // ever open at a time. `facets` (already computed for the TYPE filter chips) doubles as the
-  // dialog's <datalist> suggestions, so opening it needs no fetch of its own.
-  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  // §4.7.4's edit dialog — at most one open at a time, but now over either one row (a row's
+  // own text no longer has a pencil icon; there isn't one any more) or the whole checked
+  // group (the toolbar's Edit-selected button), so this holds an array rather than a single
+  // Activity. EditActivityDialog itself branches on its length: exactly one edits Type, Name,
+  // and Description as before; more than one edits Type only. `facets` (already computed for
+  // the TYPE filter chips) doubles as the dialog's <datalist> suggestions either way.
+  const [editingActivities, setEditingActivities] = useState<Activity[] | null>(null);
 
-  // §4.7.5's delete confirm dialog — same "at most one row's" shape as editingActivity above.
-  const [deletingActivity, setDeletingActivity] = useState<Activity | null>(null);
-
-  // The header toolbar's "Delete group" confirm — a separate boolean rather than reusing
-  // deletingActivity above, since a bulk delete has no single Activity to point at.
+  // §4.7.5's delete confirm dialog — the toolbar's "Delete group" is now the only delete
+  // entry point (there's no per-row delete button any more; a single activity is deleted by
+  // checking just its own box first), so this covers both the one-activity and many-activity
+  // case uniformly. The confirm message below already branches on checkedActivities.length.
   const [deletingGroup, setDeletingGroup] = useState(false);
 
   // Mobile-only bottom sheet (index.css's `@media (max-width: 768px)` layer) — collapsed by
@@ -301,12 +303,11 @@ export function ActivitiesPanel({
         hasActiveFilters={hasActiveFilters}
       />
 
-      {/* The header toolbar — right above the row list, its columns aligned with each row's
-          own layout (checkbox / icon / text / TYPE / Visible / Edit / Delete) so it reads as
-          that list's own header rather than a floating control strip. Group visible and
-          Delete group are icon-only, reusing the exact per-row Visible/Delete button classes
-          for a pixel-identical look — Edit has no bulk equivalent, so that column is a bare
-          spacer, matching its row counterpart's width so Delete still lines up under Delete. */}
+      {/* The header toolbar — right above the row list. There are no more per-row action
+          icons to stay column-aligned with (Visible/Edit/Delete all moved here, operating on
+          the checked group), so this is a plain compact strip: select-all checkbox, the Type
+          dropdown, a spacer, the three group-action chips, a divider, then the one
+          accent-tinted "focus the map on this group" action. */}
       <div className="activities-panel__toolbar">
         <input
           ref={selectAllRef}
@@ -318,8 +319,6 @@ export function ActivitiesPanel({
           title={allChecked ? 'Uncheck all' : 'Check all'}
           onChange={() => (allChecked || someChecked ? onClear() : onSelectAll())}
         />
-        <span className="activities-panel__toolbar-spacer activities-panel__toolbar-spacer--icon" aria-hidden="true" />
-        <span className="activities-panel__toolbar-spacer activities-panel__toolbar-spacer--text" aria-hidden="true" />
 
         <div className="activities-panel__type-dropdown" ref={typeFilterRef}>
           <button
@@ -340,23 +339,44 @@ export function ActivitiesPanel({
               {facets.length === 0 ? (
                 <p className="activities-panel__type-panel-empty">No activities to filter yet.</p>
               ) : (
-                <div className="activity-filters__type-list">
-                  {facets.map((facet) => {
-                    const included = !excludedTypes.has(facet.type);
-                    const inputId = `activities-toolbar-type-${facet.type}`;
-                    return (
-                      <label key={facet.type} htmlFor={inputId} className="activity-filters__type-item">
-                        <input id={inputId} type="checkbox" checked={included} onChange={() => onToggleType(facet.type)} />
-                        <span className="activity-filters__type-label">{formatActivityType(facet.type)}</span>
-                        <span className="activity-filters__type-count">{facet.count}</span>
-                      </label>
-                    );
-                  })}
-                </div>
+                <>
+                  {/* A select-all convenience, not a real toggle — it only ever clears every
+                      exclusion (looping onToggleType over the current excluded set re-includes
+                      each one; there's no separate prop for "clear all"), matching how "Reset
+                      filters" elsewhere in this panel also only ever clears forward. Clicking
+                      it while every type is already shown is a no-op. */}
+                  <label htmlFor="activities-toolbar-type-all" className="activity-filters__type-item activity-filters__type-item--all">
+                    <input
+                      id="activities-toolbar-type-all"
+                      type="checkbox"
+                      checked={excludedTypes.size === 0}
+                      onChange={() => {
+                        for (const type of excludedTypes) onToggleType(type);
+                      }}
+                    />
+                    <span className="activity-filters__type-label">All types</span>
+                  </label>
+                  <div className="activities-panel__type-panel-divider" aria-hidden="true" />
+                  <div className="activity-filters__type-list">
+                    {facets.map((facet) => {
+                      const included = !excludedTypes.has(facet.type);
+                      const inputId = `activities-toolbar-type-${facet.type}`;
+                      return (
+                        <label key={facet.type} htmlFor={inputId} className="activity-filters__type-item">
+                          <input id={inputId} type="checkbox" checked={included} onChange={() => onToggleType(facet.type)} />
+                          <span className="activity-filters__type-label">{formatActivityType(facet.type)}</span>
+                          <span className="activity-filters__type-count">{facet.count}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </div>
           )}
         </div>
+
+        <span className="activities-panel__toolbar-spacer" aria-hidden="true" />
 
         <button
           type="button"
@@ -368,7 +388,22 @@ export function ActivitiesPanel({
         >
           <EyeIcon open={!groupHasHidden} />
         </button>
-        <span className="activities-panel__toolbar-spacer activities-panel__toolbar-spacer--edit" aria-hidden="true" />
+        <button
+          type="button"
+          className="activities-panel__edit"
+          disabled={readOnly || checked.size === 0}
+          onClick={() => setEditingActivities(checkedActivities)}
+          aria-label="Edit the checked group"
+          title={
+            readOnly
+              ? 'Not available for demo accounts — create an account to edit activities'
+              : checkedActivities.length === 1
+                ? 'Edit type, name, and description'
+                : 'Edit type for every checked activity'
+          }
+        >
+          <PencilIcon />
+        </button>
         <button
           type="button"
           className="activities-panel__delete"
@@ -378,6 +413,17 @@ export function ActivitiesPanel({
           title={readOnly ? 'Not available for demo accounts — create an account to delete activities' : 'Delete checked group'}
         >
           <TrashIcon />
+        </button>
+        <span className="activities-panel__toolbar-divider" aria-hidden="true" />
+        <button
+          type="button"
+          className="activities-panel__focus"
+          disabled={checked.size === 0}
+          onClick={onShowSelected}
+          aria-label="Focus the map on the checked group"
+          title="Focus checked group on the map"
+        >
+          <FocusIcon />
         </button>
       </div>
 
@@ -418,9 +464,6 @@ export function ActivitiesPanel({
                 aria-label={isChecked ? `Remove ${label} from selection` : `Add ${label} to selection`}
                 onChange={() => onToggle(activity.id)}
               />
-              <span className="activities-panel__icon" aria-hidden="true">
-                <RowIcon />
-              </span>
               <button
                 type="button"
                 className="activities-panel__text"
@@ -433,43 +476,14 @@ export function ActivitiesPanel({
                 <span className="activities-panel__meta">
                   {/* The date moves down here, ahead of distance/duration, once a name has
                       taken its place as the title above — otherwise it's already the title
-                      and repeating it here would be redundant. */}
+                      and repeating it here would be redundant. Type trails the line now
+                      (there's no separate trailing column any more — single-item actions,
+                      including visibility, all moved to the toolbar via check-then-toolbar,
+                      so a bare row has nothing left to show but this text). */}
                   {displayName && `${formatStartedAt(activity.startedAt)} · `}
-                  {formatDistance(activity.distanceMeters, system)} · {formatDuration(activity.durationSeconds)}
+                  {formatDistance(activity.distanceMeters, system)} · {formatDuration(activity.durationSeconds)} ·{' '}
+                  {formatActivityType(activity.activityType)}
                 </span>
-              </button>
-              <span className="activities-panel__type">{formatActivityType(activity.activityType)}</span>
-              {/* Order is Visible, Edit, Delete — a direct product choice, not alphabetical
-                  or age-of-feature order. */}
-              <button
-                type="button"
-                className="activities-panel__visibility"
-                aria-pressed={!isHidden}
-                aria-label={isHidden ? `Show ${label} on the map` : `Hide ${label} on the map`}
-                title={isHidden ? 'Hidden — click to show on the map' : 'Visible — click to hide from the map'}
-                onClick={() => onToggleVisibility(activity.id)}
-              >
-                <EyeIcon open={!isHidden} />
-              </button>
-              <button
-                type="button"
-                className="activities-panel__edit"
-                disabled={readOnly}
-                aria-label={`Edit type, name, and description for ${label}`}
-                title={readOnly ? 'Not available for demo accounts — create an account to edit activities' : 'Edit type, name, and description'}
-                onClick={() => setEditingActivity(activity)}
-              >
-                <PencilIcon />
-              </button>
-              <button
-                type="button"
-                className="activities-panel__delete"
-                disabled={readOnly}
-                aria-label={`Delete ${label}`}
-                title={readOnly ? 'Not available for demo accounts — create an account to delete activities' : 'Delete this activity'}
-                onClick={() => setDeletingActivity(activity)}
-              >
-                <TrashIcon />
               </button>
             </li>
           );
@@ -483,43 +497,20 @@ export function ActivitiesPanel({
         )}
       </ul>
 
+      {/* Just the summary now — the fly-to-fit action it used to hold moved to the toolbar's
+          own accent-tinted "Focus checked group on the map" icon above. */}
       <div className="activities-panel__footer">
         <span className="activities-panel__footer-summary">
           {checkedActivities.length} selected · {formatTotalDistance(checkedMeters, system)}
         </span>
-        <div className="activities-panel__footer-actions">
-          <button
-            type="button"
-            className="activities-panel__show-selected"
-            onClick={onShowSelected}
-            disabled={checked.size === 0}
-          >
-            Show selected
-          </button>
-        </div>
       </div>
 
-      {editingActivity && (
+      {editingActivities && (
         <EditActivityDialog
-          activity={editingActivity}
+          activities={editingActivities}
           knownTypes={facets.map((f) => f.type)}
-          onClose={() => setEditingActivity(null)}
+          onClose={() => setEditingActivities(null)}
           onSaved={onActivityUpdated}
-        />
-      )}
-
-      {deletingActivity && (
-        <ConfirmDialog
-          title="Delete this activity?"
-          message={`${formatStartedAt(deletingActivity.startedAt)} will be permanently deleted — its track, fog/heatmap coverage, and any performance records it contributed to. This can't be undone.`}
-          confirmLabel="Delete"
-          busyLabel="Deleting…"
-          onConfirm={async () => {
-            const id = deletingActivity.id;
-            await deleteActivity(id);
-            onActivityDeleted(id);
-          }}
-          onClose={() => setDeletingActivity(null)}
         />
       )}
 
@@ -551,27 +542,8 @@ export function ActivitiesPanel({
   );
 }
 
-/**
- * A generic per-row glyph. Deliberately one fixed shape: the elevation profile it evokes
- * would have to come from activity_streams (§3.4), which the list endpoint does not serve
- * and should not — drawing a *varying* fake profile per row would imply data that isn't there.
- */
-function RowIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="16" height="16">
-      <polyline
-        points="1,13 5,9 9,10 12,4 15,6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 /** A simple pencil glyph for the §4.7.4 edit affordance — same viewBox/stroke weight as
- *  RowIcon/EyeIcon so all three read as one family of row-action icons. */
+ *  EyeIcon/TrashIcon/FocusIcon so all four read as one family of toolbar icons. */
 function PencilIcon() {
   return (
     <svg viewBox="0 0 16 16" width="14" height="14">
@@ -606,7 +578,7 @@ function EyeIcon({ open }: { open: boolean }) {
 }
 
 /** A simple trash-can glyph for the §4.7.5 delete affordance — same viewBox/stroke weight as
- *  RowIcon/PencilIcon/EyeIcon so all four read as one family of row-action icons. */
+ *  PencilIcon/EyeIcon/FocusIcon so all four read as one family of toolbar icons. */
 function TrashIcon() {
   return (
     <svg viewBox="0 0 16 16" width="14" height="14">
@@ -620,6 +592,21 @@ function TrashIcon() {
       />
       <line x1="6.5" y1="7" x2="6.5" y2="11.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
       <line x1="9.5" y1="7" x2="9.5" y2="11.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** A crosshair glyph for the toolbar's "Focus checked group on the map" action — the one
+ *  fly-to-fit affordance for the checked group, moved here from the footer's old text button. */
+function FocusIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15">
+      <circle cx="8" cy="8" r="5" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="8" cy="8" r="1.4" fill="currentColor" />
+      <line x1="8" y1="0.5" x2="8" y2="2.6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <line x1="8" y1="13.4" x2="8" y2="15.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <line x1="0.5" y1="8" x2="2.6" y2="8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <line x1="13.4" y1="8" x2="15.5" y2="8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
     </svg>
   );
 }
