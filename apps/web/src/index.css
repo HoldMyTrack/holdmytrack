@@ -1726,6 +1726,13 @@ body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* Without this, a scrollbar toggling on/off shrinks this element's own content width by
+     the scrollbar's own width — found live on the Trends chart specifically: hovering a bar
+     renders `.trends__tooltip` below it, adding just enough height to cross the threshold
+     where this container needs to scroll, which visibly shifted the whole page left by a few
+     pixels for as long as the tooltip was showing. Reserving the gutter unconditionally means
+     the content width never changes whether or not a scrollbar is actually needed right now. */
+  scrollbar-gutter: stable;
   padding: 24px clamp(16px, 4vw, 48px) 60px;
 }
 
