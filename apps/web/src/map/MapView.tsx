@@ -497,15 +497,20 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
 
   // Draws (or clears) the colored zone segments themselves — separate from the fetch effect
   // above so switching the Pace/Heart rate toggle re-renders instantly from data already in
-  // hand, no refetch.
+  // hand, no refetch. Also cleared when the focused activity itself is hidden (its eye icon,
+  // or a TYPE/DISTANCE filter narrowing it out) — reported live as hiding a focused activity's
+  // plain track (setHiddenTracks, below) while this layer, deliberately drawn *on top* of that
+  // same track (trackBands.ts's own doc comment), kept painting it regardless, since this
+  // effect never checked mapHiddenIds. Re-showing it draws the band again from data already in
+  // hand, no refetch, same as the Pace/Heart rate toggle above.
   useEffect(() => {
     if (!map) return;
-    if (trackMetrics) {
+    if (trackMetrics && focusedActivityId !== null && !mapHiddenIds.has(focusedActivityId)) {
       setTrackBands(map, trackMetrics.points, bandMetric);
     } else {
       clearTrackBands(map);
     }
-  }, [map, trackMetrics, bandMetric]);
+  }, [map, trackMetrics, bandMetric, focusedActivityId, mapHiddenIds]);
 
   // The blue band's effect on the map: when the selected date range changes, the tracks
   // layer's own tile query has to change with it, or the map keeps showing activities
@@ -606,12 +611,13 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
       setHiddenTracks(instance, [...mapHiddenIds]);
       // Same reasoning again: ensureBandLayer above always (re)creates an empty source, so a
       // styledata mid-focus would otherwise silently wipe whatever bands were showing until
-      // the selection happened to change again.
-      if (trackMetrics) {
+      // the selection happened to change again. Same mapHiddenIds check as the live effect
+      // above: a styledata while the focused activity is hidden must not repaint its band.
+      if (trackMetrics && focusedActivityId !== null && !mapHiddenIds.has(focusedActivityId)) {
         setTrackBands(instance, trackMetrics.points, bandMetric);
       }
     },
-    [mapMode, mapHiddenIds, activityQuery, maskQuery, trackMetrics, bandMetric],
+    [mapMode, mapHiddenIds, activityQuery, maskQuery, trackMetrics, bandMetric, focusedActivityId],
   );
 
   useEffect(() => {
