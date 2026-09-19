@@ -50,7 +50,23 @@ export interface RangePickerProps {
   onPan: (deltaBars: number) => void;
   selectedRange: DateRange;
   onChangeSelection: (next: DateRange) => void;
+  /** How many bars the chart's current rendered width actually fits — reported on every
+   *  measurement (mount, and every resize), so useActivityDays.ts can show that many instead
+   *  of a fixed count. Reported live as a fixed count leaving the strip visibly short of a
+   *  wide monitor's full width, packed against the right edge with empty space on the left. */
+  onCapacityChange: (barsPerView: number) => void;
 }
+
+/** Must match `.range-picker__slot`'s flex-basis and `.range-picker__bars`' `gap` in
+ *  index.css — used only to turn a measured pixel width into a bar count for
+ *  `onCapacityChange`, never for layout itself (the CSS is what actually draws it). */
+const SLOT_WIDTH_PX = 10;
+const SLOT_GAP_PX = 1;
+
+/** Never reports a capacity below this, however narrow (or momentarily zero, e.g. mid-layout)
+ *  the measurement — a real but tiny number would still work, this just avoids a jarring
+ *  flash down to one or two bars between measurements. */
+const MIN_REPORTED_CAPACITY = 5;
 
 /** Percent of the chart's width two month labels must be apart to both be drawn. Bars are
  *  packed by activity-day, so a sparse stretch can put twelve months into twelve adjacent
@@ -161,7 +177,7 @@ interface DragState {
   panned: number;
 }
 
-export function RangePicker({ days, onPan, selectedRange, onChangeSelection }: RangePickerProps) {
+export function RangePicker({ days, onPan, selectedRange, onChangeSelection, onCapacityChange }: RangePickerProps) {
   const chartRef = useRef<HTMLDivElement>(null);
   const barsRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -183,6 +199,12 @@ export function RangePicker({ days, onPan, selectedRange, onChangeSelection }: R
     const chartEl = chartRef.current;
     const barsEl = barsRef.current;
     if (!chartEl || !barsEl) return;
+    const chartWidth = chartEl.getBoundingClientRect().width;
+    // Capacity comes from the chart's own full width divided by one slot's fixed footprint —
+    // deliberately not from how many bars are actually rendered right now (below), since the
+    // whole point is answering "how many *could* fit" even when fewer than that are loaded or
+    // on screen.
+    onCapacityChange(Math.max(MIN_REPORTED_CAPACITY, Math.floor((chartWidth + SLOT_GAP_PX) / (SLOT_WIDTH_PX + SLOT_GAP_PX))));
     // .range-picker__bars' own box still spans the chart's full width (it's `inset: 4px 0
     // 20px`, i.e. left:0/right:0) — only its flex *content* packs to the right now, so its
     // own scrollWidth/getBoundingClientRect can't tell "few days" from "enough to fill."
@@ -190,14 +212,13 @@ export function RangePicker({ days, onPan, selectedRange, onChangeSelection }: R
     // packed span directly, independent of the (still full-width) box around them.
     const firstSlot = barsEl.firstElementChild as HTMLElement | null;
     const lastSlot = barsEl.lastElementChild as HTMLElement | null;
-    const chartWidth = chartEl.getBoundingClientRect().width;
     if (!firstSlot || !lastSlot || chartWidth <= 0) {
       setPackedFraction(1);
       return;
     }
     const packedWidth = lastSlot.getBoundingClientRect().right - firstSlot.getBoundingClientRect().left;
     setPackedFraction(Math.min(1, Math.max(0, packedWidth / chartWidth)));
-  }, []);
+  }, [onCapacityChange]);
 
   // Re-measure whenever the bars themselves could have changed width: a new `days` window
   // (a different count, e.g. paging to the edge of a short history) via this layout effect,

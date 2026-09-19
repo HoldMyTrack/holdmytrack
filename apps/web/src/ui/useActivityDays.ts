@@ -28,21 +28,23 @@ import { getActivityDayPage, type HistogramBucket } from '../api';
  * leaves it exactly as it was.
  */
 
-/** How many bars the strip shows at once — one "page", and one Earlier/Later click's step.
- *  A tightly-packed strip needs far more days in the same footer width than 45 ever
+/** How many bars the strip shows at once, before RangePicker.tsx's own width measurement
+ *  reports the real number that fits — used for the one frame before that first measurement
+ *  lands (nothing to flicker) and as the floor a fetch always covers regardless of screen
+ *  width. A tightly-packed strip needs far more days in the same footer width than 45 ever
  *  could without each bar floating in a slot much wider than itself (confirmed live: at 45,
- *  a full screen's 22px-capped bars sat in ~35px slots, a ~13px gap around each one). Raised
- *  so the on-screen density is actually tight; see `.range-picker__bar`'s own `max-width` for
- *  the other half of this. */
-const BARS_PER_VIEW = 120;
+ *  a full screen's 22px-capped bars sat in ~35px slots, a ~13px gap around each one); see
+ *  `.range-picker__bar`'s own `max-width` for the other half of this. Reported live again on
+ *  a wide monitor: a fixed count left the strip visibly short of the container's actual
+ *  width, packed against the right edge with empty space on the left — `barsPerView` below is
+ *  what replaces the fixed count with the strip's own measured capacity. */
+const DEFAULT_BARS_PER_VIEW = 120;
 
-/** How many days-with-activity one request asks for. Two screens' worth, so the slack kept
- *  by PREFETCH_MARGIN below survives a click without a round trip of its own. */
-const PAGE_SIZE = BARS_PER_VIEW * 2;
-
-/** Start loading more history once the view is within this many bars of the loaded edge —
- *  one full click's worth, so Earlier normally lands on bars that are already here. */
-const PREFETCH_MARGIN = BARS_PER_VIEW;
+/** The floor on how many days-with-activity one request asks for, however few bars actually
+ *  fit on screen — plenty of slack so a narrow window's prefetch margin still survives a
+ *  click without a round trip of its own. Grows past this floor to stay roughly two screens'
+ *  worth on a wide monitor — see `pageSize` below. */
+const MIN_PAGE_SIZE = 240;
 
 export interface ActivityDaysState {
   /** The bars currently on screen: a packed slice of consecutive days-with-activity. */
@@ -62,6 +64,11 @@ export interface ActivityDaysState {
   canPanLater: boolean;
   /** Moves the view by whole bars — negative is toward the past. */
   panBy: (deltaBars: number) => void;
+  /** RangePicker.tsx's own measured capacity report — how many bars its current rendered
+   *  width actually fits, recomputed on every resize (window, or the Activities panel's own
+   *  drag handle). Safe to call with an unchanged value on every measurement tick; state only
+   *  actually updates (and `visibleDays` only re-slices) when the number changes. */
+  setBarsPerView: (n: number) => void;
   /** Re-reads from the newest end; the upload widget calls this once a job finishes. */
   reload: () => void;
   /** Bumps by exactly one on every `reload()` (not on `panBy`, which never refetches — see
@@ -82,16 +89,23 @@ export function useActivityDays(): ActivityDaysState {
   // after an upload shows up rather than sitting just off the right edge.
   const [anchor, setAnchor] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
+  const [barsPerView, setBarsPerViewState] = useState(DEFAULT_BARS_PER_VIEW);
+  // Read inside a callback without being a reactive dependency — a resize mid-fetch must not
+  // restart the in-flight request, only change what the *next* one asks for.
+  const barsPerViewRef = useRef(barsPerView);
+  barsPerViewRef.current = barsPerView;
+  const pageSize = () => Math.max(MIN_PAGE_SIZE, barsPerViewRef.current * 2);
   // One extend request at a time. A second would be anchored at the same day as the first
   // and prepend the same page twice.
   const extending = useRef(false);
   // Bars a pan asked for that weren't loaded yet, carried until they are. Only reachable by
-  // clicking Earlier faster than the network answers — PREFETCH_MARGIN covers the rest.
+  // clicking Earlier faster than the network answers — the prefetch effect below covers the
+  // rest.
   const carry = useRef(0);
 
   useEffect(() => {
     const controller = new AbortController();
-    getActivityDayPage({ limit: PAGE_SIZE }, controller.signal)
+    getActivityDayPage({ limit: pageSize() }, controller.signal)
       .then((page) => {
         setDays(page.days);
         setEarliest(page.earliest);
@@ -106,7 +120,7 @@ export function useActivityDays(): ActivityDaysState {
     return () => controller.abort();
   }, [nonce]);
 
-  const maxStart = Math.max(0, days.length - BARS_PER_VIEW);
+  const maxStart = Math.max(0, days.length - barsPerView);
   // The anchor resolved against the current array. `>=` rather than an exact match so an
   // anchor day that somehow isn't in `days` still lands next to where it belongs.
   const start = useMemo(() => {
@@ -115,7 +129,7 @@ export function useActivityDays(): ActivityDaysState {
     return Math.min(index === -1 ? maxStart : index, maxStart);
   }, [days, anchor, maxStart]);
 
-  const visibleDays = useMemo(() => days.slice(start, start + BARS_PER_VIEW), [days, start]);
+  const visibleDays = useMemo(() => days.slice(start, start + barsPerView), [days, start, barsPerView]);
 
   // Whether there is any history at all behind what's loaded. Derived rather than tracked as
   // a flag: a short page is what running out looks like, and then days[0] *is* `earliest`.
@@ -125,7 +139,7 @@ export function useActivityDays(): ActivityDaysState {
     const oldest = days[0]?.date;
     if (!oldest || extending.current) return;
     extending.current = true;
-    getActivityDayPage({ limit: PAGE_SIZE, before: oldest })
+    getActivityDayPage({ limit: pageSize(), before: oldest })
       .then((page) => {
         setDays((prev) => (prev[0]?.date === oldest ? [...page.days, ...prev] : prev));
         setEarliest(page.earliest);
@@ -137,9 +151,14 @@ export function useActivityDays(): ActivityDaysState {
       });
   }, [days]);
 
+  // Start loading more history once the view is within one bar-per-view's width of the
+  // loaded edge — one full click's worth, so Earlier normally lands on bars that are already
+  // here. Also what settles a capacity increase (a resize to a wider window): `start` can
+  // drop to (or below) the new, larger `barsPerView` the instant it changes, firing this the
+  // same way a real pan would.
   useEffect(() => {
-    if (hasEarlier && start <= PREFETCH_MARGIN) extendEarlier();
-  }, [hasEarlier, start, extendEarlier]);
+    if (hasEarlier && start <= barsPerView) extendEarlier();
+  }, [hasEarlier, start, barsPerView, extendEarlier]);
 
   const panBy = useCallback(
     (deltaBars: number) => {
@@ -164,16 +183,21 @@ export function useActivityDays(): ActivityDaysState {
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
+  const setBarsPerView = useCallback((n: number) => {
+    setBarsPerViewState((prev) => (prev === n ? prev : n));
+  }, []);
+
   return {
     visibleDays,
     earliest,
     ready,
     error,
-    pageStep: BARS_PER_VIEW,
+    pageStep: barsPerView,
     canPanEarlier: start > 0 || hasEarlier,
     canPanLater: start < maxStart,
     panBy,
     reload,
     generation: nonce,
+    setBarsPerView,
   };
 }

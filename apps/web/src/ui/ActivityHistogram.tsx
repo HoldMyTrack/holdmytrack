@@ -36,6 +36,8 @@ export interface ActivityHistogramProps {
    *  both numbers collapse to 1. Not a computation bug; the rendered label just didn't say
    *  "day" a second time, so keep that word in whatever phrasing uses this number. */
   selectedActiveDays: number;
+  /** Forwarded straight to RangePicker.tsx — see its own doc comment. */
+  onCapacityChange: (barsPerView: number) => void;
 }
 
 /** "9 MAR 2026", matching main-screen-v6.png's date labels. */
@@ -56,6 +58,7 @@ export function ActivityHistogram({
   onChangeSelection,
   selectedRangeDays,
   selectedActiveDays,
+  onCapacityChange,
 }: ActivityHistogramProps) {
   const first = days[0];
   const last = days[days.length - 1];
@@ -108,6 +111,7 @@ export function ActivityHistogram({
         onPan={onPan}
         selectedRange={selectedRange}
         onChangeSelection={onChangeSelection}
+        onCapacityChange={onCapacityChange}
       />
     </footer>
   );

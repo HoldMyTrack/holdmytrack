@@ -233,6 +233,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
     panBy,
     reload: reloadHistogram,
     generation: historyGeneration,
+    setBarsPerView,
   } = useActivityDays();
 
   // Defaults to the 5 most recent activity-days, not all-time: an all-time default spans
@@ -809,6 +810,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
         onChangeSelection={changeSelectedRange}
         selectedRangeDays={selectedRangeDays}
         selectedActiveDays={selectedActiveDays}
+        onCapacityChange={setBarsPerView}
       />
     </div>
   );
