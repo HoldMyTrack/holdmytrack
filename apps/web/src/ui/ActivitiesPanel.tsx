@@ -145,6 +145,19 @@ export function ActivitiesPanel({
   const [typeFilterOpen, setTypeFilterOpen] = useState(false);
   const typeFilterRef = useRef<HTMLDivElement>(null);
 
+  // Scrolls the newly row-click-focused activity into view, centered — reported live as
+  // having to hunt for the now-bolded row by eye after clicking a track on the map, since a
+  // long list scrolled it out of view as often as not. Keyed on focusedId alone (not
+  // `checked`): a row click always has exactly one target to center on, while a checkbox spree
+  // building up a multi-row group has no single row to scroll to, and would otherwise jerk the
+  // list around after every click. `data-activity-id` on the row below is what this looks up.
+  const listRef = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    if (focusedId === null) return;
+    const row = listRef.current?.querySelector(`[data-activity-id="${CSS.escape(focusedId)}"]`);
+    row?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [focusedId]);
+
   useEffect(() => {
     if (!typeFilterOpen) return;
     const onPointerDown = (event: PointerEvent) => {
@@ -368,7 +381,7 @@ export function ActivitiesPanel({
         </button>
       </div>
 
-      <ul className="activities-panel__list" data-testid="activities-list">
+      <ul className="activities-panel__list" data-testid="activities-list" ref={listRef}>
         {activities.map((activity) => {
           const isChecked = checked.has(activity.id);
           const isFocused = focusedId === activity.id;
@@ -388,6 +401,7 @@ export function ActivitiesPanel({
           return (
             <li
               key={activity.id}
+              data-activity-id={activity.id}
               className={classes.join(' ')}
               // The description (§4.7.4) shows as a hover tooltip only — no second visible
               // line, and undefined (not an empty string) when there is none, so a row with
