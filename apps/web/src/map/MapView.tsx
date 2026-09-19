@@ -399,20 +399,29 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
   // Auto-fly when the blue band changes the *set* of activities, not just which rows the
   // panel lists — without this, narrowing the tracks layer to the new range (the effect
   // above) could leave the camera pointed at empty water if the previous view doesn't
-  // overlap the new one at all. Skips the very first time activities has anything in it, so
-  // it doesn't override an initial or shared URL view on first load — every change after
-  // that flies to fit whatever's now actually visible.
+  // overlap the new one at all. The very first time activities has anything in it is a
+  // special case (docs/ROADMAP.md's "Fly to the most recent activity on first load"): a
+  // saved/shared URL position (initialHash.view) still wins, per FR-4.5, but otherwise this
+  // flies to just the single most recent activity rather than the whole default selection —
+  // an account with scattered recent history (e.g. one activity in another country yesterday,
+  // one locally today) would otherwise fitBounds to a near-world view, which reads as broken
+  // rather than just generic. Every change after the first flies to fit whatever's now
+  // actually visible, as before.
   const hasFlownToActivitiesRef = useRef(false);
   useEffect(() => {
     if (!map || activities.length === 0) return;
     if (!hasFlownToActivitiesRef.current) {
       hasFlownToActivitiesRef.current = true;
+      if (initialHash.view == null) {
+        const mostRecent = activities.reduce((latest, a) => (a.startedAt > latest.startedAt ? a : latest));
+        fitToSelection([mostRecent]);
+      }
       return;
     }
     const visible = activities.filter((a) => !mapHiddenIdsRef.current.has(a.id));
     const flyBounds = unionBBox(visible.flatMap((a) => (a.bbox ? [a.bbox] : [])));
     if (flyBounds) flyToBBox(map, flyBounds);
-  }, [map, activities]);
+  }, [map, activities, fitToSelection]);
 
   // Clicking a track directly on the map is the row-text "focus" behavior, not the checkbox's
   // — it bolds just that one track, replacing whichever was focused before, and flies to it,
