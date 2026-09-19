@@ -169,6 +169,13 @@ const (
 	// the same way §4.2.1 adopted fog's reveal radius, explicitly open to retuning once
 	// there's real usage data rather than a single synthetic guess.
 	heatmapCap = 8.0
+
+	// HeatmapWindowDays bounds Heatmap to a rolling window ending now — unlike Fog of War,
+	// which shows true all-time coverage, Heatmap answers "where do I go *now*," so a route
+	// no longer visited should be able to cool off instead of staying maximally hot forever.
+	// Not user-configurable (there is no control for it); a fixed product decision, adopted
+	// and recorded here the same way heatmapCap above is, equally open to retuning.
+	HeatmapWindowDays = 365
 )
 
 // compositeHeatmapMask builds §4.2.2's additive intensity mask from several activities' crisp

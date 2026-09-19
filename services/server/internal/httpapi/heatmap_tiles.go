@@ -1,22 +1,30 @@
 package httpapi
 
 import (
-	"errors"
-	"image"
 	"image/png"
 	"net/http"
 	"strconv"
 	"strings"
-
-	"github.com/jackc/pgx/v5"
+	"time"
 
 	"github.com/fitmap/fitmap/services/server/internal/fog"
 )
 
 // handleHeatmapTile serves §4.2.2's additive-intensity mask as a ready-to-draw RGBA PNG via
-// heatmapRamp — the same shape as handleFogTile (see its own doc comment for the unfiltered/
-// filtered split), reading heatmap_object_key instead of object_key from the unfiltered
-// fog_tiles row, and fog.HeatmapKind instead of fog.FogKind for a filtered composite.
+// heatmapRamp — reading heatmap_object_key instead of object_key from the unfiltered fog_tiles
+// row that Fog uses (handleFogTile), and fog.HeatmapKind instead of fog.FogKind for the
+// composite.
+//
+// Unlike Fog of War, which shows true all-time coverage (a place once cleared stays cleared),
+// Heatmap answers "where do I go *now*" — an old, no-longer-visited route should be able to
+// cool off rather than stay maximally hot forever. So this always takes the on-the-fly
+// filtered path (fog.RenderFilteredTile), with a fixed rolling window (fog.HeatmapWindowDays,
+// computed here, not from the request) as the only filter — never a client-supplied date range
+// or exclude list; a query string carrying either is ignored entirely. Unlike an arbitrary
+// user-chosen range, a relative rolling window is inherently self-bounding — "activities in
+// the last N days" costs roughly the same whether the account is one year old or ten — which
+// is what makes the filtered path affordable to always take here, unlike the arbitrary ranges
+// this same endpoint used to accept.
 //
 // Unlike fog's blank tile (fully opaque white veil — "no coverage" must still read as
 // fogged), a blank heatmap tile renders fully transparent: "no heat here" is genuinely
@@ -29,39 +37,17 @@ func (s *Server) handleHeatmapTile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid tile coordinates", http.StatusBadRequest)
 		return
 	}
-	filter, err := parseMaskFilter(r.URL.Query())
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 	ctx := r.Context()
 	userID := userIDFromContext(ctx)
 
-	var mask *image.Gray
-	if filter.IsUnfiltered() {
-		var objectKey *string
-		err := s.pool.QueryRow(ctx,
-			`SELECT heatmap_object_key FROM fog_tiles WHERE user_id = $1 AND zoom = $2 AND tile_x = $3 AND tile_y = $4`,
-			userID, z, x, y,
-		).Scan(&objectKey)
-		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			s.log.Error("heatmap tile query failed", "err", err, "z", z, "x", x, "y", y)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-		mask, err = loadMaskOrBlank(ctx, s.store, objectKey)
-		if err != nil {
-			s.log.Error("heatmap tile fetch failed", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-	} else {
-		mask, err = fog.RenderFilteredTile(ctx, s.pool, s.store, userID, fog.HeatmapKind, z, x, y, filter)
-		if err != nil {
-			s.log.Error("heatmap tile filtered render failed", "err", err, "z", z, "x", x, "y", y)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
+	windowStart := time.Now().AddDate(0, 0, -fog.HeatmapWindowDays)
+	filter := fog.Filter{From: &windowStart}
+
+	mask, err := fog.RenderFilteredTile(ctx, s.pool, s.store, userID, fog.HeatmapKind, z, x, y, filter)
+	if err != nil {
+		s.log.Error("heatmap tile filtered render failed", "err", err, "z", z, "x", x, "y", y)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
 	}
 
 	rgba := fog.RenderHeatmapPNG(mask)
