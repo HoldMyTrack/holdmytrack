@@ -130,6 +130,15 @@ Native apps whose core job is exporting device-recorded health data to FitMap (P
 - [x] Superseded-record handling: prefer the richest record (geometry over none, more stream channels over fewer); mark others `superseded_by`, don't delete, so a user can see why an activity disappeared (`GET /v1/activities/duplicates`). Deleting the winner re-ranks the copies it releases rather than making them all live at once.
 - [ ] Surface superseded activities somewhere in the Activities panel or Profile, so "disappeared" activities are discoverable, not silently gone.
 
+### Rename "Upload" to "Import", split into Files/Sync tabs — the current single-purpose upload UI stops being an accurate label the moment a second ingest source exists
+
+`UploadPanel.tsx`'s "Upload activity" button/panel is the only ingest surface in the web app today, since manual file/`.zip`/Google Takeout upload is the only source shipped (`SPEC.md` FR-1 through FR-9). This phase's mobile sync and Phase 4's cloud connectors both add ingest sources that aren't "a file the user picked," so "Upload" stops describing what's actually happening the moment either lands.
+
+- [ ] Rename the entry point from "Upload activity" to "Import", with two tabs: **Files** (today's drag/drop + `.zip`/Takeout flow, unchanged) and **Sync** (status for whichever automatic sources are connected).
+- [ ] The Sync tab is a status/connected-accounts view, not a "sync now" button, for Health Connect/HealthKit specifically — sync there is phone-triggered (`READ_EXERCISE_ROUTES` can't be requested programmatically off-app, this phase's own item above), so the web app can only ever report something like "last synced via Android app: 2h ago, 3 new activities," reusing the same per-item status list `useUploadHistory`/`GET /v1/uploads` already renders for file uploads (processing/done/failed) rather than inventing a second status UI.
+- [ ] Phase 4's cloud connectors (Garmin/Wahoo/COROS) are the one part of "Sync" that *is* triggerable from this tab directly — connect/disconnect, and (once that phase's OAuth token-refresh runs on a schedule) the same last-synced/status summary as the on-device sources above.
+- [ ] Not worth building ahead of either dependency landing — registered here so the IA decision (naming, the tab split, and which half of Sync is a button vs. a status display) gets made once, deliberately, instead of retrofitted under time pressure once this phase or Phase 4 actually ships.
+
 ---
 
 ## Phase 3 — Finalized design + mobile browser support
