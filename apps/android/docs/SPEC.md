@@ -94,7 +94,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 **Behavior**:
 1. **Normal** draws the account's tracks as a single-color vector line layer (`GET /tiles/v1/tracks/{z}/{x}/{y}.mvt`).
-2. **Fog** replaces the tracks with the server-rendered white-veil raster (`GET /tiles/v1/fog/{z}/{x}/{y}.png`); tracks are hidden.
+2. **Fog** replaces the tracks with the server-rendered dark-veil raster (`GET /tiles/v1/fog/{z}/{x}/{y}.png`); tracks are hidden.
 3. **Heatmap** replaces the tracks with the server-rendered intensity raster (`GET /tiles/v1/heatmap/{z}/{x}/{y}.png`); tracks are hidden.
 4. All three layers sit beneath the basemap's first label layer, so place names stay legible; within that, the active raster (fog or heatmap) is drawn beneath the tracks layer so a cleared route reads as visible through the fog rather than obscured by it — the same ordering the web client uses.
 5. The active mode's button is shown bold and at full opacity; the other two are dimmed.

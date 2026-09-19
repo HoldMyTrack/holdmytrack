@@ -363,7 +363,7 @@ The radius was reduced from 40–60 m after measuring references (§4.2.1): a ti
 
 **Serving.** The stored mask is a coverage alpha channel, but MapLibre cannot invert or colourise it at render time, so the tile route emits a **ready-to-draw RGBA PNG**: fog colour in RGB, `alpha = fog_opacity × (255 - coverage)`. Theme is part of the URL so the CDN caches one variant per theme, and storage holds only the single-channel master.
 
-**The fog is a white veil, not a dark one.** Unexplored ground is washed out and hazy; explored ground looks normal. Default `fog_colour = #FFFFFF`, `fog_opacity ≈ 0.66` (§4.2.1). White also prints far better than dark fog.
+**The fog is a dark veil now, not a white one.** §4.2.1's reference measurements originally settled on white (`fog_colour = #FFFFFF`, `fog_opacity ≈ 0.66`), and that shipped first — but found live against this app's own light cream basemap, white-on-cream is two similarly light colours, so unexplored ground barely read as covered at all ("hardly distinguishable," reported directly). `fog_colour` is now the app's own dark ink token (`--fm-ink` in index.css, `#202B25`) at `fog_opacity = 0.82`: a dark veil reads as real, unambiguous contrast against a light basemap regardless of the basemap's own exact shade, which white never guaranteed. Unexplored ground now reads as dark and hazy; explored ground looks normal — the same "washed vs. normal" contrast §4.2.1 always wanted, just inverted in lightness to actually deliver it against this basemap.
 
 ```http
 GET /tiles/v1/fog/{z}/{x}/{y}.png?theme=dark
@@ -372,8 +372,8 @@ GET /tiles/v1/fog/{z}/{x}/{y}.png?theme=dark
 Authorization follows §7 — the user is derived from the session, never from a parameter.
 
 **Client compositing**, identical on MapLibre GL JS and MapLibre Native — this is Fog mode specifically; §4.2.2 covers how Heatmap mode composites differently:
-1. Base layer — self-hosted Protomaps basemap. Choose a **rich, saturated flavor**: with a white veil the only thing distinguishing explored from unexplored is how much basemap colour survives, so a washed-out base leaves nothing to reveal.
-2. Fog layer — the white RGBA tiles as a plain `raster` source, inserted **beneath the basemap's first symbol layer** so place labels stay legible on top of the fog.
+1. Base layer — self-hosted Protomaps basemap. Choose a **rich, saturated flavor**: a washed-out base leaves the least to reveal once fog covers the rest — this reasoning predates the fog-colour change above and holds regardless of which colour the veil itself is.
+2. Fog layer — the fog RGBA tiles as a plain `raster` source, inserted **beneath the basemap's first symbol layer** so place labels stay legible on top of the fog.
 3. Track layer — vector tracks from `/tiles/v1/tracks/{z}/{x}/{y}.mvt`, over cleared regions.
 
 > **Why the inversion is server-side.** The original spec said "a full-viewport dark rectangle whose alpha is driven by the *inverse* of the coverage raster". MapLibre cannot express that. Verified against `@maplibre/maplibre-gl-style-spec` 26.4.2 (2026-09-08): `paint_raster` offers only `raster-opacity`, `raster-hue-rotate`, `raster-brightness-min`/`-max`, `raster-saturation`, `raster-contrast`, `raster-resampling` and `raster-fade-duration`. There is no `raster-color` / `raster-color-mix` — Mapbox GL has it, MapLibre issue #4479 is open. Baking the inversion server-side keeps every client on a stock `raster` layer, and avoids writing the shader twice against two bindings.
@@ -384,8 +384,8 @@ Three Fog of World screenshots (`reference/fog-of-war-example*.{webp,jpg}`) were
 
 | Property | Measured | Decision |
 | :--- | :--- | :--- |
-| Fog colour | White. Fogged ≈ RGB (193, 192, 188); revealed ≈ (63, 66, 58) | Adopt — white veil |
-| Fog opacity | ~0.66, consistent to ±0.02 across all three | Adopt — `0.66` default |
+| Fog colour | White. Fogged ≈ RGB (193, 192, 188); revealed ≈ (63, 66, 58) | Adopted white first, then reverted to a dark veil (`#202B25`) once shipped against this app's own light basemap made a white veil hardly distinguishable — see the current value above, not this table |
+| Fog opacity | ~0.66, consistent to ±0.02 across all three | Adopted `0.66` first; now `0.82` alongside the colour change above |
 | Desaturation | Saturation falls 0.15 → 0.03 under fog | **Not a separate effect.** A 66% white blend produces exactly this arithmetically |
 | Edge softness | 1–4 px transition at display resolution | Adopt — a hairline feather |
 | Reveal radius | Hugs the road centreline, ~2–3 lane widths | Adopt — ~20–40 m |
@@ -405,7 +405,7 @@ The third of the three modes `VISION.md` §4.2's Core Features table names (Fog 
 
 `fog_tiles` (§3.6) gains a second object key for this — `heatmap_object_key` alongside the existing one, sharing the same `(user_id, zoom, tile_x, tile_y)` row, the same `dirty` flag, and the same re-render job, since one ingest event dirties both rasters for the same tile at the same time. Not a separate `heatmap_tiles` table: that would duplicate the entire dirty-tracking scheme for data invalidated by exactly the same events.
 
-**Serving: a baked colour ramp, for the same reason fog's inversion is baked server-side.** MapLibre still has no `raster-color`/`raster-color-mix` (§4.2's own verified note against `@maplibre/maplibre-gl-style-spec` 26.4.2 — MapLibre issue #4479 is still open), so a client-side gradient from a single grayscale channel isn't an option here either. The heat ramp — transparent at zero, through a couple of hue stops, to a saturated hot colour at the high end — is baked into the served RGBA PNG server-side, exactly like fog bakes its white-veil inversion:
+**Serving: a baked colour ramp, for the same reason fog's inversion is baked server-side.** MapLibre still has no `raster-color`/`raster-color-mix` (§4.2's own verified note against `@maplibre/maplibre-gl-style-spec` 26.4.2 — MapLibre issue #4479 is still open), so a client-side gradient from a single grayscale channel isn't an option here either. The heat ramp — transparent at zero, through a couple of hue stops, to a saturated hot colour at the high end — is baked into the served RGBA PNG server-side, exactly like fog bakes its own dark-veil inversion:
 
 ```http
 GET /tiles/v1/heatmap/{z}/{x}/{y}.png
@@ -416,7 +416,7 @@ Same authorization rule as fog and tracks: the user comes from the session, neve
 **Client compositing — one more mode, not a fourth layer stacked on the other two.** The three modes are mutually exclusive views of the same underlying history, switched by a single on-map toggle, not independent checkboxes:
 
 - **Normal** — base layer + track vector layer only. This is what already ships today; it needed no new work to exist as a "mode."
-- **Fog** — base layer + fog raster (§4.2's white veil), track layer hidden.
+- **Fog** — base layer + fog raster (§4.2's dark veil), track layer hidden.
 - **Heatmap** — base layer + heatmap raster in place of the fog layer, track layer hidden.
 
 Track lines are redundant over either raster — the raster already encodes where (and, for heatmap, how much) — and drawing both reads as visually noisy rather than additive, undercutting the fog/heatmap effect rather than complementing it. Both modes hide the track layer.

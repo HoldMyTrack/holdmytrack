@@ -88,7 +88,7 @@ export function ensureTrackLayer(map: MapLibreMap, beforeId: string | undefined,
         'source-layer': TRACKS_SOURCE_LAYER,
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
-          'line-color': '#e0562f',
+          'line-color': '#b07e2e',
           // Hover and selected get the same treatment on purpose — hovering previews
           // exactly the emphasis a click would commit to, not a different one.
           'line-width': [

@@ -59,7 +59,7 @@ object MapOverlays {
     /** Matches `internal/fog.TileSize` — the server renders 512px masks, not 256px ones. */
     private const val RASTER_TILE_SIZE = 512
 
-    private const val TRACK_COLOR = "#e0562f"
+    private const val TRACK_COLOR = "#b07e2e"
     private const val TRACK_WIDTH = 2.5f
     private const val TRACK_OPACITY = 0.9f
 

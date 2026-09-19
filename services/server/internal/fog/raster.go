@@ -203,22 +203,24 @@ func compositeHeatmapMask(masks []*image.Gray) *image.Gray {
 }
 
 // heatmapRamp is a small set of (position, colour, alpha) control points, linearly
-// interpolated between neighbours — "roughly Strava's own visual language"
-// (VISION.md's competitive analysis references it): transparent at zero, a fast
-// ramp into a deep red-orange even at low intensity (a heatmap should read as "something
-// happened here" well before the cap), through orange, to a saturated hot yellow at the
-// cap. Adopted and recorded here, same status as fog's colour/opacity constants: a
-// considered first choice, not derived from a reference the way §4.2.1's fog measurements
-// were (there is no equivalent reference screenshot for heatmap).
+// interpolated between neighbours: transparent at zero, a fast ramp into the app's own rust
+// accent (#b07e2e, `apps/web/src/map/tracks.ts`'s TRACK_COLOR — a single activity's track and
+// a low-intensity heatmap cell are meant to read as the same colour) even at low intensity (a
+// heatmap should read as "something happened here" well before the cap), through toward a
+// saturated hot yellow at the cap. Every stop's colour is a straight lerp from rust to yellow
+// at that stop's own `t`, so the hue shifts smoothly across the whole ramp rather than passing
+// through an unrelated third colour (an earlier version's independent red-orange-yellow scheme
+// didn't share a colour with anything else in the app). The alpha shape (fast ramp to
+// near-opaque, fully opaque well before the cap) is unchanged from that version.
 type rampStop struct {
 	t          float64
 	r, g, b, a uint8
 }
 
 var heatmapRamp = []rampStop{
-	{t: 0.00, r: 178, g: 24, b: 24, a: 0},
-	{t: 0.15, r: 178, g: 24, b: 24, a: 130},
-	{t: 0.55, r: 255, g: 140, b: 0, a: 210},
+	{t: 0.00, r: 176, g: 126, b: 46, a: 0},
+	{t: 0.15, r: 188, g: 142, b: 48, a: 130},
+	{t: 0.55, r: 219, g: 186, b: 54, a: 210},
 	{t: 1.00, r: 255, g: 235, b: 60, a: 255},
 }
 
@@ -258,24 +260,31 @@ func RenderHeatmapPNG(mask *image.Gray) *image.RGBA {
 	return out
 }
 
-// RenderFogPNG converts a stored single-channel coverage mask into the ready-to-draw white-
-// veil RGBA PNG §4.2 specifies: fog_colour in RGB, alpha = fog_opacity × (255 - coverage).
-// theme is accepted by the serving handler (§4.2: "part of the URL so the CDN caches one
-// variant per theme") but not yet applied to anything — there is only the one documented
-// white-veil treatment (§4.2.1); a dark-theme variant is a real gap, not silently invented
-// here.
+// RenderFogPNG converts a stored single-channel coverage mask into the ready-to-draw fog-veil
+// RGBA PNG: fog_colour in RGB, alpha = fog_opacity × (255 - coverage). theme is accepted by the
+// serving handler (§4.2: "part of the URL so the CDN caches one variant per theme") but not yet
+// applied to anything — there is only the one veil treatment below; a dark-theme variant is a
+// real gap, not silently invented here.
 func RenderFogPNG(mask *image.Gray) *image.RGBA {
-	const fogOpacity = 0.66 // §4.2.1: measured ~0.66, consistent to ±0.02 across all three references
+	// §4.2.1 originally measured a white veil at ~0.66 opacity from reference screenshots, but
+	// found live against this app's own light cream basemap (#F7F4EC-ish): white-on-cream is
+	// two similarly light colours, so unexplored territory barely read as covered at all —
+	// reported directly as "hardly distinguishable." Switched to the app's own dark ink token
+	// (`--fm-ink` in index.css, #202b25) at a higher opacity instead: a dark veil against a
+	// light basemap is real, unambiguous contrast regardless of what shade the basemap itself
+	// happens to be, which the white treatment never guaranteed.
+	const fogOpacity = 0.82
+	const fogR, fogG, fogB = 32, 43, 37
 	out := image.NewRGBA(mask.Bounds())
 	for y := mask.Bounds().Min.Y; y < mask.Bounds().Max.Y; y++ {
 		for x := mask.Bounds().Min.X; x < mask.Bounds().Max.X; x++ {
 			coverage := mask.GrayAt(x, y).Y
 			alpha := uint8(fogOpacity * float64(255-coverage))
-			// Straight (non-premultiplied) white at this alpha is simply (255,255,255,a) —
-			// premultiplying would require scaling RGB by alpha, which image.RGBA expects.
+			// Premultiplied, matching image.RGBA's convention (see RenderHeatmapPNG's own
+			// comment on the same point): scale each channel by the same alpha fraction.
 			a := float64(alpha) / 255
 			out.SetRGBA(x, y, color.RGBA{
-				R: uint8(255 * a), G: uint8(255 * a), B: uint8(255 * a), A: alpha,
+				R: uint8(fogR * a), G: uint8(fogG * a), B: uint8(fogB * a), A: alpha,
 			})
 		}
 	}

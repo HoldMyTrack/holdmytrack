@@ -32,7 +32,7 @@ Engineers implementing against or modifying this system, QA deriving test cases,
 | **Session** | A signed-in browser's authentication state, held as an opaque cookie. |
 | **Registered user** | An account with a real email and password, created via sign-up or by upgrading a demo account. |
 | **Demo user** | An ephemeral account created via "Try it now — no signup," functionally identical to a registered user except for its lifetime (FR-2.2 below). |
-| **Fog of War** | A map mode that shows a white veil over everywhere the signed-in user has *not* recorded an activity, so recorded routes appear as "cleared" ground. |
+| **Fog of War** | A map mode that shows a dark veil over everywhere the signed-in user has *not* recorded an activity, so recorded routes appear as "cleared" ground. |
 | **Heatmap** | A map mode that shades every recorded location by how many times it's been crossed, brightest where crossed most. |
 | **Ingest** | The server-side process of turning an uploaded file into a persisted `Activity` — parsing, privacy trimming, simplification, and storage. |
 
@@ -372,7 +372,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 ### FR-4.2 Fog of War mode
 
-**Description**: An alternate map mode showing a white veil over everywhere the user has not recorded an activity.
+**Description**: An alternate map mode showing a dark veil over everywhere the user has not recorded an activity.
 
 **Behavior**:
 1. Selecting "Fog" from the map-mode toggle replaces the track lines with a raster veil: any area a recorded route has passed through is rendered clear; everywhere else stays fogged.
