@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted. Supersedes an earlier design recorded in the same section of `IMPLEMENTATION.md` §7.
+Partially superseded. The real-pipeline decision below (reuse the exact same upload/ingest/privacy/fog code a real account uses, rather than a parallel client-side-only path) still holds. The specific mechanism described in "Decision" and "Consequences" below — a fresh, ephemeral `users` row per demo visitor, a 24-hour TTL, a background purge, and converting to a real account by updating that row in place — does not: `docs/ROADMAP.md`'s "Email verification + demo without real ingest" item retired the convert-in-place path (a demo account can no longer become a real one; FR-2.3 is an ordinary new signup instead), and root `docs/ROADMAP.md`'s "Add a persistent Demo Customer account" item replaced the per-visitor ephemeral row with one shared, non-expiring account every demo session opens against — see `docs/SPEC.md` FR-2.1–FR-2.3 for the current behavior. The purge sweep (`internal/worker/demo_purge.go`) described below still exists and still runs, but has nothing left to act on under the current design.
+
+Originally: Accepted. Supersedes an earlier design recorded in the same section of `IMPLEMENTATION.md` §7.
 
 ## Context
 

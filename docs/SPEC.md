@@ -4,7 +4,7 @@
 | :-- | :-- |
 | **Version** | 1.0 |
 | **Status** | Current — describes Phase 0/1 functionality as built |
-| **Last updated** | 2026-09-14 |
+| **Last updated** | 2026-09-19 |
 | **Related documents** | `VISION.md` (product scope, market rationale, phase roadmap — the authority on *what ships and why*); `ARCHITECTURE.md` (system-level shape, key decisions, the stack); `IMPLEMENTATION.md` (schema, each feature's own implementation — the authority on *how it's built*); `AGENTS.md` (repository orientation) |
 
 ## 1. Introduction
@@ -15,9 +15,9 @@ This document specifies FitMap's functional behavior as currently implemented: w
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and privacy trim, FR-1.7; email verification, FR-1.8), the no-signup demo (now read-only, seeded with fixed preset activities — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, the date-range picker, the per-account activity graph, password recovery, and distance/time trends (FR-9 below).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and privacy trim, FR-1.7; email verification, FR-1.8), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, and Android's Health Connect mobile sync — FR-3.6), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, the date-range picker, the per-account activity graph, password recovery, and distance/time trends (FR-9 below).
 
-**Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync (HealthKit/Health Connect), cross-source deduplication, explorer-tile gamification, the rest of "Export" (story cards, animated reveals — high-resolution map export itself is built, FR-4.10 below), and user-defined privacy zones (a `privacy_zones` table exists in the schema — `IMPLEMENTATION.md` §3.7 — but no endpoint or UI creates or applies one today; only the endpoint-trim privacy control in FR-8.1 below, user-adjustable via FR-1.7's Settings page, is functional). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against FitMap being a health or fitness advisor, and pace/heart-rate stay as per-activity route context (FR-4.9) rather than an analysed, all-time performance record. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
+**Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), explorer-tile gamification, the rest of "Export" (story cards, animated reveals — high-resolution map export itself is built, FR-4.10 below), and user-defined privacy zones (a `privacy_zones` table exists in the schema — `IMPLEMENTATION.md` §3.7 — but no endpoint or UI creates or applies one today; only the endpoint-trim privacy control in FR-8.1 below, user-adjustable via FR-1.7's Settings page, is functional). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against FitMap being a health or fitness advisor, and pace/heart-rate stay as per-activity route context (FR-4.9) rather than an analysed, all-time performance record. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
 ### 1.3 Intended audience
 
@@ -202,25 +202,25 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 
 **Behavior**:
 1. Client calls `POST /v1/auth/demo`.
-2. Server creates a new account with no email or password a person could use to sign in with directly, marked as ephemeral with a 24-hour expiry, and seeds it with a small fixed set of preset activities (currently two: a walk and a run, at different fixed locations).
-3. Server creates a session for it (also 24-hour expiry) and sets it as a cookie.
-4. Client is signed in and shown the map, with the two preset activities already visible in every mode (Normal, Fog of War, Heatmap) and every read-only feature (filtering, the activity graph, export) exactly as a registered user has it. **A demo account cannot upload, sync, edit, or delete an activity, or change its avatar/settings** — every such request is rejected regardless of what a client attempts, whether or not its own UI still offers the control. Creating a real account (FR-1.1) is the only way to save one's own data.
+2. Server opens a session against one persistent, shared **Demo Customer** account — not a fresh account created per visitor. That account is pre-seeded, once, out of band (not per request — see FR-2.2), with a real, richly-populated history: roughly 611 activities spanning about 7 months, a mix of walks, dog walks, bike rides, local errands, and a few multi-day road trips.
+3. Server creates a session for this visitor (24-hour expiry) and sets it as a cookie. Any number of visitors can hold their own session against the same shared account at once — they all see identical data.
+4. Client is signed in and shown the map, with the account's full history already visible in every mode (Normal, Fog of War, Heatmap) and every read-only feature (filtering, the activity graph, export) exactly as a registered user has it. **A demo account cannot upload, sync, edit, or delete an activity, or change its avatar/settings** — every such request is rejected regardless of what a client attempts, whether or not its own UI still offers the control. Creating a real account (FR-1.1) is the only way to save one's own data.
 
-**Outputs**: A valid session cookie for the new ephemeral account, already showing its two preset activities.
+**Outputs**: A valid session cookie for the shared Demo Customer account, already showing its full activity history.
 
-**Rate limiting**: Limited to 5 demo accounts per hour per client IP address; further requests receive `429 Too Many Requests`.
+**Rate limiting**: Limited to 5 demo session starts per hour per client IP address; further requests receive `429 Too Many Requests`.
 
-### FR-2.2 Demo expiry
+### FR-2.2 Demo account seeding and lifetime
 
-**Description**: An ephemeral demo account and everything associated with it (uploaded activities, rendered map tiles) are automatically and permanently deleted 24 hours after creation, unless upgraded first (FR-2.3).
+**Description**: Unlike a demo account under the earlier per-visitor design, the shared Demo Customer account (FR-2.1) and its activity history are not created or deleted per visit — only each visitor's own *session* is temporary.
 
-**Behavior**: A background sweep runs every 5 minutes, deletes every database row for each expired demo account (cascading to its activities and sessions), and deletes its uploaded files and rendered map tiles from object storage.
+**Behavior**: The Demo Customer account is seeded once, out of band, via a `seed-demo-customer` CLI subcommand run at deploy time (not from any HTTP request) — re-running it is safe and only fills in anything missing. Its `demo_expires_at` is set to a fixed far-future timestamp rather than left null, which is what keeps it read-only (FR-2.1) without ever matching the background purge sweep's `< NOW()` condition, so the account and its data are never deleted. Each visitor's own *session* still expires 24 hours after `POST /v1/auth/demo` was called, same as any other session — a visitor who stays past that just calls it again for a fresh session against the same account.
 
-**Notes**: There is no warning before expiry and no way to recover a demo account's data after it expires. A user who wants to keep their data must upgrade it (FR-2.3) before the 24-hour window elapses.
+**Notes**: This replaces an earlier design where each demo visitor got their own new, ephemeral account seeded with two small fixed presets, deleted 24 hours later by the same background sweep. That per-visitor purge sweep still exists (`internal/worker/demo_purge.go`) and still runs, but has nothing left to act on under the current design — it would only matter again if a future change reintroduced per-visitor demo accounts.
 
 ### FR-2.3 Create a registered account from a demo session
 
-**Description**: A demo user creates a real, permanent account of their own to start saving data. Since a demo account only ever holds FR-2.1's fixed preset activities — never anything the person actually uploaded — this is an ordinary new signup, not a conversion: nothing from the demo carries over.
+**Description**: A demo user creates a real, permanent account of their own to start saving data. The shared Demo Customer account (FR-2.1) belongs to no one visitor in particular and is never modified by one, so this is an ordinary new signup, not a conversion: nothing from the demo carries over, and nothing the person does in a demo session is "theirs" to keep in the first place.
 
 **Preconditions**: An active demo session.
 
@@ -229,12 +229,12 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 **Behavior**:
 1. From the account menu, the user selects "Demo session — save this," which presents the same sign-up screen a new visitor sees (FR-1.1), with a "← Back" option instead of the "try demo" option (starting a second demo while already in one would abandon the first).
 2. The user submits an email and password.
-3. The server creates a plain new account (FR-1.1's normal behavior) — the demo session's own row is untouched and remains subject to FR-2.2's expiry.
+3. The server creates a plain new account (FR-1.1's normal behavior) — the shared Demo Customer account itself is untouched, exactly as every other concurrent demo visitor's session leaves it.
 4. The user is signed in to the new account, held on FR-1.8's verify-email screen exactly like any other fresh signup.
 
-**Outputs**: A new, unverified registered account — not the demo account, and not carrying any of its preset activities.
+**Outputs**: A new, unverified registered account — not the demo account, and not carrying any of its activity history.
 
-**Note — cancellation**: selecting "← Back" (or navigating away without submitting) returns to the map with the demo session untouched — nothing is lost, and the account remains subject to FR-2.2's 24-hour expiry.
+**Note — cancellation**: selecting "← Back" (or navigating away without submitting) returns to the map with the demo session untouched — nothing is lost, and it remains subject to FR-2.1's 24-hour session expiry (the underlying account itself is unaffected either way, per FR-2.2).
 
 ## 5. FR-3 — Activity Upload & Ingestion
 
@@ -318,6 +318,43 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Behavior**: The server checks a content-derived identifier before enqueuing a new job. If that exact content was already ingested for this account, the upload responds immediately with an "already processed" status (`200 OK`) and no new job is created; the client shows a notice that the file was already uploaded rather than silently doing nothing.
 
 **Notes**: This guarantee holds even under concurrent duplicate uploads (e.g., two tabs uploading the same file at once) — at most one `Activity` is ever created for the same content.
+
+### FR-3.6 Mobile sync (Android / Health Connect)
+
+**Description**: The Android app reads a signed-in account's exercise history from Health Connect and syncs it to FitMap — a second ingest path (Path 2) alongside file upload above, distinct from a file the user explicitly picked.
+
+**Preconditions**: Signed in on the Android app (`apps/android/fitmap`); Health Connect installed, with the Exercise permission granted plus the separately-granted "Access exercise routes" permission — a session with no route geometry can't be placed on the map, so it's rejected at sync time rather than persisted without one (see step 3).
+
+**Inputs**: Health Connect exercise sessions with route geometry, read **foreground-only** — `READ_EXERCISE_ROUTES` returns `ConsentRequired` in the background regardless of what's granted, a platform constraint rather than a client choice. `READ_HEALTH_DATA_HISTORY`, requested separately, extends the otherwise 30-day-only read window.
+
+**Behavior**:
+1. User opens the sync screen; the app walks through granting whichever Health Connect permissions are still missing.
+2. A foreground sync run reads sessions ascending from the account's own last confirmed position (a cursor keyed on both an instant and the record ids already handled at it, not a bare timestamp — two sessions can share a start instant), classifies each one, and posts batches to `POST /v1/sync/activities`.
+3. A session with no route (an indoor workout, or any Samsung Galaxy Watch session — Samsung doesn't expose route geometry via Health Connect at all) is skipped and reported as such, not treated as a failure; the cursor still advances past it.
+4. A route that exists but can't be read this run (`ConsentRequired`, e.g. the app was backgrounded mid-run) is reported distinctly from "no route" and blocks the cursor from advancing past it, so a resumed run retries it rather than skipping it permanently.
+5. Each synced activity is idempotent on the Health Connect record's own id and flows through the exact same ingest pipeline FR-3.1's file upload uses. Activity type is normalized onto FitMap's existing vocabulary (Health Connect's `biking` becomes `cycling`, etc.), so it doesn't fragment the TYPE filter or defeat FR-3.7's cross-source matching.
+
+**Outputs**: One new `Activity` per synced session with a route; a per-run summary (synced / skipped-no-route / rejected, each with its own reason) on the sync screen; and a persistent history via the same `GET /v1/uploads` FR-3.4 already describes — a Health Connect sync and a file upload are the same kind of ingest job, not two separate histories.
+
+**Error cases**: Server unreachable mid-run — the run stops, reports the failure, and the cursor does not advance past anything the server never confirmed, so a retried run resumes rather than re-sending everything already accepted.
+
+**Not yet built**: the iOS/HealthKit half of Path 2 — no iOS app exists yet (`apps/ios` is a placeholder). `apps/android/docs/ROADMAP.md` is the authority on Android's own remaining work (UI design, Play Store compliance, in-app GPS recording).
+
+### FR-3.7 Cross-source duplicate detection
+
+**Description**: The same real-world activity arriving from two different sources (e.g. synced from a watch via Health Connect, then later also uploaded as an exported `.fit` file) is recognized as one activity, not two — distinct from FR-3.5, which only catches identical re-uploaded file content from the same source.
+
+**Preconditions**: At least two ingest sources have produced activities for the account close enough in time to compare (FR-3.6's mobile sync is what makes this reachable at all today; Path 1 cloud connectors will be a third source once built).
+
+**Behavior**:
+1. On ingest, a new activity is compared against the account's existing ones within a fuzzy window — same activity type, start time within thirty seconds either way, distance within about 1% — rather than exact equality on a pre-rounded bucket, which would miss a pair that happens to straddle a rounding boundary.
+2. A match is resolved by keeping the richer record (route geometry over none; more data channels, e.g. heart rate, over fewer) and marking the other `superseded_by` the winner, rather than deleting it.
+3. Every user-facing read — the Activities list, totals, histogram, day pages, trends, graph stats, map tiles, and both Fog of War and Heatmap composites — excludes superseded activities automatically.
+4. Deleting the kept copy of a matched pair promotes the next-richest superseded copy back to live, rather than leaving both gone.
+
+**Outputs**: At most one live `Activity` per real-world activity, regardless of how many sources reported it.
+
+**Not yet built**: nothing in the web app currently surfaces *that* a duplicate was caught or lets someone review what got superseded (`docs/ROADMAP.md`'s "Surface superseded activities" item). The Android app's own sync screen does show this today, listing duplicates by both source names.
 
 ## 6. FR-4 — Map Visualization
 
