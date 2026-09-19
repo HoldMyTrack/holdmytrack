@@ -32,6 +32,23 @@ const demoActivityPrivacyTrimM = 200
 //go:embed demo_data/*.gpx
 var demoData embed.FS
 
+// demoActivityNames overrides the display name for a handful of seeded files that read
+// better with a real destination/errand name than the generic "Car Ride - <date>" every
+// other file gets — the four out-of-town trips (each originally its own subfolder before
+// being flattened into demo_data/) and two identifiable local errands. Applied after every
+// ingest.Process call, keyed by embedded filename, regardless of whether that call actually
+// persisted a new row or found one already there (ON CONFLICT DO NOTHING still returns the
+// existing row's id) — so re-running the seed always leaves these names correct rather than
+// only setting them the one time a row is first inserted.
+var demoActivityNames = map[string]string{
+	"Car Ride 2026-03-14.gpx": "Niagara Waterfall",
+	"Car Ride 2026-05-22.gpx": "Chicago",
+	"Car Ride 2026-06-05.gpx": "Cider Point",
+	"Car Ride 2026-07-13.gpx": "Ocean City",
+	"Car Ride 2026-06-04.gpx": "Walmart",
+	"Car Ride 2026-08-17.gpx": "The Home Depot",
+}
+
 // SeedDemoCustomer ingests every embedded GPX file in demo_data/ into DemoCustomerUserID,
 // through the same real pipeline (internal/ingest.Process — parse, persist, fog/heatmap mask
 // render) a real upload uses. Meant to run once, out of band (the `seed-demo-customer` CLI
@@ -87,6 +104,13 @@ func SeedDemoCustomer(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 			ingested++
 		} else {
 			skipped++
+		}
+
+		if name, ok := demoActivityNames[filename]; ok {
+			if _, err := pool.Exec(ctx, `UPDATE activities SET name = $1 WHERE id = $2`, name, result.ActivityID); err != nil {
+				log.Error("demo customer seed: name override failed", "err", err, "file", filename)
+				failed++
+			}
 		}
 	}
 
