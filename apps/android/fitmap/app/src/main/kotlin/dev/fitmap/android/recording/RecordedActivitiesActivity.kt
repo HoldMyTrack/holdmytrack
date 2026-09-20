@@ -1,5 +1,6 @@
 package dev.fitmap.android.recording
 
+import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
 import android.view.Gravity
@@ -14,6 +15,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import dev.fitmap.android.R
+import dev.fitmap.android.net.Session
 import dev.fitmap.android.recording.db.RecordedActivityRecord
 import dev.fitmap.android.recording.db.RecordedActivityStore
 import dev.fitmap.android.recording.db.SyncStatus
@@ -41,6 +43,7 @@ class RecordedActivitiesActivity : AppCompatActivity() {
     private lateinit var typeFilter: Spinner
     private lateinit var rowsContainer: LinearLayout
     private lateinit var emptyView: TextView
+    private lateinit var demoNotice: TextView
 
     private var all: List<RecordedActivityRecord> = emptyList()
 
@@ -61,6 +64,7 @@ class RecordedActivitiesActivity : AppCompatActivity() {
         typeFilter = findViewById(R.id.recorded_filter_type)
         rowsContainer = findViewById(R.id.recorded_rows)
         emptyView = findViewById(R.id.recorded_empty)
+        demoNotice = findViewById(R.id.recorded_demo_notice)
 
         statusFilter.adapter = dropdownAdapter(
             listOf(
@@ -83,6 +87,9 @@ class RecordedActivitiesActivity : AppCompatActivity() {
      *  table changed. */
     override fun onResume() {
         super.onResume()
+        // Re-checked every resume, not cached: returning from Profile after signing in or out
+        // is a resume, and demo status can only really change that way.
+        demoNotice.visibility = if (Session.isDemo) View.VISIBLE else View.GONE
         lifecycleScope.launch {
             all = store.all()
             rebuildTypeFilterOptions()
@@ -126,7 +133,12 @@ class RecordedActivitiesActivity : AppCompatActivity() {
         row.addView(
             CheckBox(this).apply {
                 isChecked = record.syncStatus != SyncStatus.NOT_SYNCED
-                isEnabled = record.syncStatus != SyncStatus.SYNCED
+                // A demo account can record and manage rows locally — only sync itself is a
+                // mutation the server rejects (requireNotDemo, services/server/internal/
+                // httpapi/auth.go) — so queuing is blocked here too, matching the Sync
+                // screen's own demo gate: no point letting a demo account queue something
+                // "Sync Now" can never actually take.
+                isEnabled = record.syncStatus != SyncStatus.SYNCED && !Session.isDemo
                 setOnCheckedChangeListener { _, checked ->
                     val newStatus = if (checked) SyncStatus.QUEUED else SyncStatus.NOT_SYNCED
                     lifecycleScope.launch {
@@ -173,7 +185,40 @@ class RecordedActivitiesActivity : AppCompatActivity() {
             },
         )
 
+        // Always enabled, regardless of sync status — unlike Edit, which locks once synced,
+        // there's nothing left for a synced row's own fields to protect against, and removing
+        // a row from this device's list is a decision the user can always make. Local-only:
+        // see RecordedActivityStore.delete's own doc comment for why a synced row's real
+        // server-side activity isn't touched, and the confirmation dialog below says so too.
+        row.addView(
+            Button(this).apply {
+                text = getString(R.string.recording_delete)
+                setOnClickListener { confirmDelete(record) }
+            },
+        )
+
         return row
+    }
+
+    private fun confirmDelete(record: RecordedActivityRecord) {
+        val message = if (record.syncStatus == SyncStatus.SYNCED) {
+            R.string.recorded_delete_confirm_message_synced
+        } else {
+            R.string.recorded_delete_confirm_message_unsynced
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.recorded_delete_confirm_title)
+            .setMessage(message)
+            .setPositiveButton(R.string.recording_delete) { _, _ ->
+                lifecycleScope.launch {
+                    store.delete(record.id)
+                    all = all.filterNot { it.id == record.id }
+                    rebuildTypeFilterOptions()
+                    render()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun statusLabel(status: String) = when (status) {

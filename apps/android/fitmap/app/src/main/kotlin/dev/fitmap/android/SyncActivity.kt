@@ -122,6 +122,25 @@ class SyncActivity : AppCompatActivity() {
             return
         }
 
+        // The server's requireNotDemo (services/server/internal/httpapi/auth.go) rejects
+        // POST /sync/activities for a demo account regardless of what this screen offers, the
+        // same way it rejects upload/edit/delete for every other client — but the web app
+        // doesn't rely on that alone: it disables the Upload control up front, with an
+        // explanation, rather than letting the user discover the block from a server error
+        // (UploadPanel.tsx's readOnly prop). This is that same treatment on Android: Sync Now
+        // and the Health Connect permission flow are hidden rather than left to fail, since a
+        // demo account can never actually sync no matter what it grants. History stays
+        // visible — reading the demo account's own (shared, seeded) history is not a mutation.
+        if (Session.isDemo) {
+            status.setText(R.string.sync_demo_read_only)
+            instructions.visibility = View.GONE
+            primary.visibility = View.GONE
+            secondary.visibility = View.GONE
+            openHealthConnect.visibility = View.GONE
+            history.visibility = View.VISIBLE
+            return
+        }
+
         primary.visibility = View.VISIBLE
         primary.isEnabled = true
         history.visibility = View.VISIBLE

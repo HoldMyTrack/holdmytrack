@@ -59,6 +59,12 @@ object Session {
     /** Empty for a demo account, whose real email the server deliberately never returns. */
     val email: String get() = prefs.getString(KEY_EMAIL, "").orEmpty()
 
+    /** The one client-side signal for "this is the read-only demo account" — the same
+     *  emptiness [email] already carries, named so every caller that needs to gate a mutating
+     *  action (sync, in particular — `requireNotDemo`, `services/server/internal/httpapi/
+     *  auth.go`, rejects it server-side regardless) doesn't re-derive the check its own way. */
+    val isDemo: Boolean get() = isSignedIn && email.isEmpty()
+
     fun start(token: String, email: String) {
         cachedToken = token
         verified = true
