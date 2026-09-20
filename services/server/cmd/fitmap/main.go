@@ -16,6 +16,7 @@ import (
 
 	"github.com/fitmap/fitmap/services/server/internal/config"
 	"github.com/fitmap/fitmap/services/server/internal/db"
+	"github.com/fitmap/fitmap/services/server/internal/geo"
 	"github.com/fitmap/fitmap/services/server/internal/httpapi"
 	"github.com/fitmap/fitmap/services/server/internal/mail"
 	"github.com/fitmap/fitmap/services/server/internal/storage"
@@ -31,7 +32,7 @@ func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: fitmap <serve|work|migrate|seed-demo-customer>")
+		fmt.Fprintln(os.Stderr, "usage: fitmap <serve|work|migrate|seed-demo-customer|seed-admin-boundaries>")
 		os.Exit(2)
 	}
 
@@ -130,8 +131,20 @@ func main() {
 		}
 		log.Info("seed-demo-customer: done")
 
+	case "seed-admin-boundaries":
+		// One-time (idempotent — safe to re-run on redeploy) load of the Natural Earth
+		// country/region polygons backing Fog/Heatmap's Country/Region zoom tiers, plus a
+		// backfill of activity_country/activity_region for every activity ingested before
+		// this feature existed. See internal/geo.SeedAdminBoundaries's own doc comment.
+		log.Info("seed-admin-boundaries: starting")
+		if err := geo.SeedAdminBoundaries(ctx, pool, log); err != nil {
+			log.Error("seed-admin-boundaries", "err", err)
+			os.Exit(1)
+		}
+		log.Info("seed-admin-boundaries: done")
+
 	default:
-		fmt.Fprintf(os.Stderr, "unknown subcommand %q; want serve, work, migrate, or seed-demo-customer\n", os.Args[1])
+		fmt.Fprintf(os.Stderr, "unknown subcommand %q; want serve, work, migrate, seed-demo-customer, or seed-admin-boundaries\n", os.Args[1])
 		os.Exit(2)
 	}
 }

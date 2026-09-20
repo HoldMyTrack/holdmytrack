@@ -19,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/fitmap/fitmap/services/server/internal/fog"
+	"github.com/fitmap/fitmap/services/server/internal/geo"
 	"github.com/fitmap/fitmap/services/server/internal/parse"
 	"github.com/fitmap/fitmap/services/server/internal/storage"
 	"github.com/fitmap/fitmap/services/server/internal/tilemath"
@@ -197,6 +198,14 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	if err := MarkFogTilesDirty(ctx, pool, job.UserID, mergeTiles(tiles, dedupeTiles)); err != nil {
 		return Result{}, fmt.Errorf("ingest: mark fog tiles dirty: %w", err)
 	}
+
+	// Country/Region-tier unlocking (§4.2.4) — independent of the fog/heatmap raster pyramid
+	// above, so it runs alongside it rather than inside fog's own dirty/render pipeline: there
+	// is nothing here to mark dirty or recomposite, matching against activity_id is enough.
+	if err := geo.MatchActivity(ctx, pool, activityID); err != nil {
+		return Result{}, fmt.Errorf("ingest: match admin boundaries: %w", err)
+	}
+
 	if err := EnqueueRenderFog(ctx, pool, job.UserID); err != nil {
 		return Result{}, fmt.Errorf("ingest: enqueue render_fog: %w", err)
 	}

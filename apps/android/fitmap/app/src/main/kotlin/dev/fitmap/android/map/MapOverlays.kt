@@ -2,6 +2,7 @@ package dev.fitmap.android.map
 
 import dev.fitmap.android.BuildConfig
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
@@ -49,6 +50,30 @@ object MapOverlays {
     private const val HEATMAP_SOURCE_ID = "heatmap"
     private const val HEATMAP_LAYER_ID = "heatmap-raster"
 
+    private const val COUNTRY_FOG_SOURCE_ID = "country-fog"
+    private const val COUNTRY_FOG_LAYER_ID = "country-fog-fill"
+    private const val COUNTRY_HEATMAP_SOURCE_ID = "country-heatmap"
+    private const val COUNTRY_HEATMAP_LAYER_ID = "country-heatmap-fill"
+    private const val REGION_FOG_SOURCE_ID = "region-fog"
+    private const val REGION_FOG_LAYER_ID = "region-fog-fill"
+    private const val REGION_HEATMAP_SOURCE_ID = "region-heatmap"
+    private const val REGION_HEATMAP_LAYER_ID = "region-heatmap-fill"
+
+    /** Must match `ST_AsMVT(t, 'countries'/'regions', ...)` in the backend's own tile queries. */
+    private const val COUNTRIES_SOURCE_LAYER = "countries"
+    private const val REGIONS_SOURCE_LAYER = "regions"
+
+    /**
+     * The three zoom-dependent tiers Fog and Heatmap fall back to below city zoom
+     * (`docs/IMPLEMENTATION.md` §4.2.4), mirroring `apps/web/src/map/zoomTiers.ts` exactly so
+     * the boundary can't drift between the two clients. Adopted starting bands, tunable
+     * visually, not scientifically derived.
+     */
+    private const val COUNTRY_MAX_ZOOM = 5f
+    private const val REGION_MIN_ZOOM = 5f
+    private const val REGION_MAX_ZOOM = 8f
+    private const val CITY_MIN_ZOOM = 8f
+
     /**
      * The basemap archive's own maximum zoom (`docs/IMPLEMENTATION.md` §5.4), and the same
      * ceiling the server renders fog and heatmap tiles to. MapLibre overzooms past a declared
@@ -62,6 +87,16 @@ object MapOverlays {
     private const val TRACK_COLOR = "#b07e2e"
     private const val TRACK_WIDTH = 2.5f
     private const val TRACK_OPACITY = 0.9f
+
+    /** Same dark veil colour/opacity as the raster tier's own fog_colour/fog_opacity
+     *  (`internal/fog/raster.go`'s RenderFogPNG: #202b25 @ 0.82). */
+    private const val FOG_FILL_COLOR = "#202b25"
+    private const val FOG_FILL_OPACITY = 0.82f
+
+    /** The heatmap ramp's own base hue (also `TRACK_COLOR` above) at a fixed moderate
+     *  opacity — "you've been somewhere in this country," not graded by how much. */
+    private const val HEATMAP_FILL_COLOR = "#b07e2e"
+    private const val HEATMAP_FILL_OPACITY = 0.45f
 
     /**
      * Adds all three layers, hidden or visible per [mode]. Safe to call against a style that
@@ -77,25 +112,51 @@ object MapOverlays {
      */
     fun attach(style: Style, mode: MapMode) {
         val beforeId = labelInsertionPoint(style)
-        addRaster(style, FOG_SOURCE_ID, FOG_LAYER_ID, tileUrl("fog", "png"), beforeId)
-        addRaster(style, HEATMAP_SOURCE_ID, HEATMAP_LAYER_ID, tileUrl("heatmap", "png"), beforeId)
+        addRaster(style, FOG_SOURCE_ID, FOG_LAYER_ID, tileUrl("fog", "png"), beforeId, minZoom = CITY_MIN_ZOOM)
+        addRaster(style, HEATMAP_SOURCE_ID, HEATMAP_LAYER_ID, tileUrl("heatmap", "png"), beforeId, minZoom = CITY_MIN_ZOOM)
+        addFill(
+            style, COUNTRY_FOG_SOURCE_ID, COUNTRY_FOG_LAYER_ID, COUNTRIES_SOURCE_LAYER,
+            tileUrl("country-fog", "mvt"), beforeId, 0f, COUNTRY_MAX_ZOOM, FOG_FILL_COLOR, FOG_FILL_OPACITY,
+        )
+        addFill(
+            style, COUNTRY_HEATMAP_SOURCE_ID, COUNTRY_HEATMAP_LAYER_ID, COUNTRIES_SOURCE_LAYER,
+            tileUrl("country-heatmap", "mvt"), beforeId, 0f, COUNTRY_MAX_ZOOM, HEATMAP_FILL_COLOR, HEATMAP_FILL_OPACITY,
+        )
+        addFill(
+            style, REGION_FOG_SOURCE_ID, REGION_FOG_LAYER_ID, REGIONS_SOURCE_LAYER,
+            tileUrl("region-fog", "mvt"), beforeId, REGION_MIN_ZOOM, REGION_MAX_ZOOM, FOG_FILL_COLOR, FOG_FILL_OPACITY,
+        )
+        addFill(
+            style, REGION_HEATMAP_SOURCE_ID, REGION_HEATMAP_LAYER_ID, REGIONS_SOURCE_LAYER,
+            tileUrl("region-heatmap", "mvt"), beforeId, REGION_MIN_ZOOM, REGION_MAX_ZOOM, HEATMAP_FILL_COLOR, HEATMAP_FILL_OPACITY,
+        )
         addTracks(style, beforeId)
         setMode(style, mode)
     }
 
-    /** Removes all three, layers before sources — a source still in use cannot be removed. */
+    /** Removes every layer before its source — a source still in use cannot be removed. */
     fun detach(style: Style) {
-        for (layerId in listOf(TRACKS_LAYER_ID, HEATMAP_LAYER_ID, FOG_LAYER_ID)) {
+        for (layerId in listOf(
+            TRACKS_LAYER_ID, HEATMAP_LAYER_ID, FOG_LAYER_ID,
+            COUNTRY_FOG_LAYER_ID, COUNTRY_HEATMAP_LAYER_ID, REGION_FOG_LAYER_ID, REGION_HEATMAP_LAYER_ID,
+        )) {
             style.removeLayer(layerId)
         }
-        for (sourceId in listOf(TRACKS_SOURCE_ID, HEATMAP_SOURCE_ID, FOG_SOURCE_ID)) {
+        for (sourceId in listOf(
+            TRACKS_SOURCE_ID, HEATMAP_SOURCE_ID, FOG_SOURCE_ID,
+            COUNTRY_FOG_SOURCE_ID, COUNTRY_HEATMAP_SOURCE_ID, REGION_FOG_SOURCE_ID, REGION_HEATMAP_SOURCE_ID,
+        )) {
             style.removeSource(sourceId)
         }
     }
 
     fun setMode(style: Style, mode: MapMode) {
         setVisible(style, FOG_LAYER_ID, mode == MapMode.FOG)
+        setVisible(style, COUNTRY_FOG_LAYER_ID, mode == MapMode.FOG)
+        setVisible(style, REGION_FOG_LAYER_ID, mode == MapMode.FOG)
         setVisible(style, HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
+        setVisible(style, COUNTRY_HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
+        setVisible(style, REGION_HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
         setVisible(style, TRACKS_LAYER_ID, mode == MapMode.NORMAL)
     }
 
@@ -107,12 +168,49 @@ object MapOverlays {
     private fun labelInsertionPoint(style: Style): String? =
         style.layers.firstOrNull { it is SymbolLayer }?.id
 
-    private fun addRaster(style: Style, sourceId: String, layerId: String, url: String, beforeId: String?) {
+    private fun addRaster(
+        style: Style, sourceId: String, layerId: String, url: String, beforeId: String?, minZoom: Float,
+    ) {
         if (style.getSource(sourceId) == null) {
             style.addSource(RasterSource(sourceId, tileSet(url), RASTER_TILE_SIZE))
         }
         if (style.getLayer(layerId) == null) {
-            insert(style, RasterLayer(layerId, sourceId), beforeId)
+            val layer = RasterLayer(layerId, sourceId).apply { setMinZoom(minZoom) }
+            insert(style, layer, beforeId)
+        }
+    }
+
+    /**
+     * Adds one Country/Region tier fill layer — a flat colour fill over whichever polygons the
+     * given endpoint returns (locked countries/regions for Fog, unlocked ones for Heatmap; see
+     * `services/server/internal/httpapi/admin_country_tiles.go`/`admin_region_tiles.go`), gated
+     * to [minZoom]/[maxZoom] so it and the raster/vector tiers it hands off to never both paint
+     * at the same zoom.
+     */
+    private fun addFill(
+        style: Style,
+        sourceId: String,
+        layerId: String,
+        sourceLayer: String,
+        url: String,
+        beforeId: String?,
+        minZoom: Float,
+        maxZoom: Float,
+        color: String,
+        opacity: Float,
+    ) {
+        if (style.getSource(sourceId) == null) {
+            style.addSource(VectorSource(sourceId, tileSet(url).apply { this.minZoom = minZoom; this.maxZoom = maxZoom }))
+        }
+        if (style.getLayer(layerId) == null) {
+            val layer = FillLayer(layerId, sourceId)
+                .withSourceLayer(sourceLayer)
+                .withProperties(
+                    PropertyFactory.fillColor(color),
+                    PropertyFactory.fillOpacity(opacity),
+                )
+                .apply { setMinZoom(minZoom); setMaxZoom(maxZoom) }
+            insert(style, layer, beforeId)
         }
     }
 
@@ -121,6 +219,10 @@ object MapOverlays {
             style.addSource(VectorSource(TRACKS_SOURCE_ID, tileSet(tileUrl("tracks", "mvt"))))
         }
         if (style.getLayer(TRACKS_LAYER_ID) == null) {
+            // Finally implements `docs/IMPLEMENTATION.md` §5.3's previously
+            // undocumented-as-built claim ("below roughly z8 tracks are hidden entirely — at
+            // that scale the fog mask *is* the picture"), at the same threshold introduced
+            // above rather than a second, disconnected one.
             val layer = LineLayer(TRACKS_LAYER_ID, TRACKS_SOURCE_ID)
                 .withSourceLayer(TRACKS_SOURCE_LAYER)
                 .withProperties(
@@ -130,6 +232,7 @@ object MapOverlays {
                     PropertyFactory.lineWidth(TRACK_WIDTH),
                     PropertyFactory.lineOpacity(TRACK_OPACITY),
                 )
+                .apply { setMinZoom(CITY_MIN_ZOOM) }
             insert(style, layer, beforeId)
         }
     }

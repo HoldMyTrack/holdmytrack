@@ -1,6 +1,6 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { FOG_LAYER_ID } from './fog';
-import { HEATMAP_LAYER_ID } from './heatmap';
+import { COUNTRY_FOG_LAYER_ID, FOG_LAYER_ID, REGION_FOG_LAYER_ID } from './fog';
+import { COUNTRY_HEATMAP_LAYER_ID, HEATMAP_LAYER_ID, REGION_HEATMAP_LAYER_ID } from './heatmap';
 import { BAND_LAYER_ID } from './trackBands';
 import { TRACKS_LAYER_ID } from './tracks';
 
@@ -22,7 +22,11 @@ export type MapMode = 'normal' | 'fog' | 'heatmap';
  */
 export function setMapMode(map: MapLibreMap, mode: MapMode): void {
   setVisible(map, FOG_LAYER_ID, mode === 'fog');
+  setVisible(map, COUNTRY_FOG_LAYER_ID, mode === 'fog');
+  setVisible(map, REGION_FOG_LAYER_ID, mode === 'fog');
   setVisible(map, HEATMAP_LAYER_ID, mode === 'heatmap');
+  setVisible(map, COUNTRY_HEATMAP_LAYER_ID, mode === 'heatmap');
+  setVisible(map, REGION_HEATMAP_LAYER_ID, mode === 'heatmap');
   // Tracks stay visible only in Normal — both Fog and Heatmap hide them (§4.2.2).
   setVisible(map, TRACKS_LAYER_ID, mode === 'normal');
   // FR-4.8: a focused activity's colored zone segments are a second layer over the shared

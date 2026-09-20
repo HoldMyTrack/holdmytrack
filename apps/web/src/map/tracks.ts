@@ -1,5 +1,6 @@
 import type { FilterSpecification, Map as MapLibreMap, VectorTileSource } from 'maplibre-gl';
 import { API_BASE_URL, TILES_V1, type ActivityQuery } from '../api';
+import { CITY_MIN_ZOOM } from './zoomTiers';
 
 /**
  * The live tracks MVT layer (IMPLEMENTATION.md §4.3). Unlike the basemap —
@@ -86,6 +87,11 @@ export function ensureTrackLayer(map: MapLibreMap, beforeId: string | undefined,
         type: 'line',
         source: TRACKS_SOURCE_ID,
         'source-layer': TRACKS_SOURCE_LAYER,
+        // Finally implements IMPLEMENTATION.md §5.3's previously undocumented-as-built
+        // claim ("below roughly z8 tracks are hidden entirely — at that scale the fog mask
+        // *is* the picture"), at the same threshold zoomTiers.ts introduces for Fog/Heatmap's
+        // own Region/City boundary rather than a second, disconnected one.
+        minzoom: CITY_MIN_ZOOM,
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': '#b07e2e',

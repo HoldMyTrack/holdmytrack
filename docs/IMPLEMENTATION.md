@@ -265,6 +265,68 @@ CREATE INDEX idx_activity_tile_masks_tile ON activity_tile_masks (zoom, tile_x, 
 
 `fog_tiles` (§3.6) is unchanged in shape and meaning — it stays the cached "everyone, whole history, nothing hidden" composite. What changed is only how that composite (and a filtered one) gets computed: by compositing these per-activity masks, not by re-parsing raw payloads.
 
+### 3.12 `admin_countries`
+
+Natural Earth's 1:50m Admin-0 country polygons, loaded once by the `seed-admin-boundaries` subcommand (§4.2.4) and never derived from user data. `adm0_a3` — Natural Earth's own stable per-country code — is the seed's idempotency key, not `iso_a2`: a few small dependencies share their parent country's ISO code (Australia's Indian Ocean Territory and Ashmore & Cartier Islands both carry `AU`), so `iso_a2` is nullable and intentionally not unique, informational only, never joined on.
+
+```sql
+CREATE TABLE admin_countries (
+    id       SERIAL PRIMARY KEY,
+    adm0_a3  TEXT NOT NULL UNIQUE,
+    iso_a2   CHAR(2),
+    name     TEXT NOT NULL,
+    geom     GEOMETRY(MultiPolygon, 4326) NOT NULL
+);
+
+CREATE INDEX idx_admin_countries_geom ON admin_countries USING GIST (geom);
+```
+
+### 3.13 `admin_regions`
+
+Natural Earth's 1:10m Admin-1 (state/province) polygons — 1:10m, not 1:50m, because Natural Earth's own 1:50m Admin-1 export only covers 9 of 242 countries (Russia, the US, India, Indonesia, China, Brazil, Canada, Australia, South Africa); the 1:10m export covers every one. Confirmed directly against the vendored data: every `admin_countries` row has at least one `admin_regions` row, even single-region sovereign states like Monaco or Vatican City, so no synthetic "whole country as one region" row is ever needed. `adm1_code` — again Natural Earth's own stable code, globally unique and already prefixed with its country's `adm0_a3` — is the seed's idempotency key; `code` holds ISO 3166-2 where Natural Earth has one and is NULL otherwise.
+
+```sql
+CREATE TABLE admin_regions (
+    id         SERIAL PRIMARY KEY,
+    country_id INT NOT NULL REFERENCES admin_countries(id),
+    adm1_code  TEXT NOT NULL UNIQUE,
+    code       TEXT,
+    name       TEXT NOT NULL,
+    geom       GEOMETRY(MultiPolygon, 4326) NOT NULL
+);
+
+CREATE INDEX idx_admin_regions_geom ON admin_regions USING GIST (geom);
+CREATE INDEX idx_admin_regions_country ON admin_regions (country_id);
+```
+
+A handful of the 1:10m export's rows (16 of 4,596, confirmed live) carry an `adm0_a3` with no matching `admin_countries` row at all — disputed micro-territories the coarser 1:50m country layer drops (Gibraltar, Bir Tawil, and similarly small cases). The seed step skips these and logs a count rather than failing the whole load; there is no `country_id` to attach them to.
+
+### 3.14 `activity_country` / 3.15 `activity_region`
+
+One row per (activity, country/region) its trajectory touches — computed once by `internal/geo.MatchActivity`, called from `ingest.Process` right after the activity is persisted (§4.2.4), and backfilled once for pre-existing activities by `seed-admin-boundaries`. This is what lets the Country/Region tile queries do a cheap indexed lookup instead of the geometry test itself at request time (ADR-0008).
+
+```sql
+CREATE TABLE activity_country (
+    activity_id UUID NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+    country_id  INT NOT NULL REFERENCES admin_countries(id),
+    PRIMARY KEY (activity_id, country_id)
+);
+
+CREATE INDEX idx_activity_country_country ON activity_country (country_id);
+
+CREATE TABLE activity_region (
+    activity_id UUID NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+    region_id   INT NOT NULL REFERENCES admin_regions(id),
+    PRIMARY KEY (activity_id, region_id)
+);
+
+CREATE INDEX idx_activity_region_region ON activity_region (region_id);
+```
+
+`ON DELETE CASCADE` on `activity_id` means deleting an activity needs no matching cleanup code elsewhere: its membership rows disappear with it, and since the tile queries read this table live rather than a cached aggregate, the country/region re-locks on the very next request with nothing to invalidate.
+
+Matching runs against `activities.trajectory` — the already-persisted, simplified display geometry — not the raw pre-simplification points `activity_tile_masks` uses. Country/region polygons are kilometers across, so `simplifyToleranceDeg`'s ~3 m tolerance cannot plausibly change which one a segment intersects, and reading the already-persisted column avoids a second geometry pass in Go. Every polygon touched gets a row however briefly the trajectory crossed it, matching that a visit's size or duration doesn't matter, only whether it happened; rows are not filtered by `superseded_by`, mirroring `activity_tile_masks`'s own reasoning — a deleted winner makes a superseded duplicate's coverage live again for free — with the filtering done instead at read time by the tile queries themselves.
+
 ---
 
 ## 4. Core Technical Workflows
@@ -464,6 +526,29 @@ Both still rely on the same **crisp (unblurred) mask per activity, per z14 tile 
 **Keeping the window current without a live per-request check**: an activity entering the window (a fresh upload) is handled by the exact same ingest-time dirty-marking Fog already has — nothing new there. An activity *leaving* the window is a pure function of time passing, which ingest/delete events have no reason to ever notice, so window membership is a stored fact rather than something recomputed against "now" at render time: `activities.in_heatmap_window` (`migrations/0018_activity_in_heatmap_window.sql`, default `true` — a fresh activity is by definition within the window), read directly by the query above. `internal/worker`'s `ageOutHeatmapWindow` runs daily (`heatmapAgingInterval`), finds whichever activities have just crossed the boundary (`in_heatmap_window AND started_at < now - 365d`), flips each one's flag, and re-renders only *that activity's own* touched tiles (`ingest.ActivityTiles`, the same per-activity lookup `handleDeleteActivity` uses) — never a whole-account sweep. This is deliberately per-activity and daily rather than per-account and weekly: activities age out on whatever calendar day happens to be 365 days after they were originally created, which are already scattered across the year, so the daily sweep's workload is naturally small and spread out on its own, with no artificial staggering needed. The trade-off is explicit: an aged-out activity takes up to a day to cool off, not exactly 365 days to the hour — accepted, since nothing about this feature is watched closely enough in real time for the difference to matter.
 
 **A known gap, worth naming for whenever it's built**: there is no reprivacy job yet (§7's own retroactive-reprivacy re-render has no implementation, and there's no way to change `users.privacy_trim_m` today either). When one is built, it needs to re-call `RenderActivityMasks` with freshly re-trimmed points per affected activity — masks are composited from what's already rendered, not re-derived from raw points on each read, so nothing notices a trim setting changed underneath them on its own.
+
+#### 4.2.4 Country/Region zoom tiers
+
+Below a threshold zoom, Fog and Heatmap's per-pixel raster (§4.2, §4.2.2) is replaced entirely by a coarser whole-polygon reveal: a country or state/region renders as fully "unlocked" the moment the account has a single activity anywhere inside it, however small or brief. The two tiers are switched purely by MapLibre `minzoom`/`maxzoom` on the layers themselves (`apps/web/src/map/zoomTiers.ts`; `apps/android/...MapOverlays.kt` mirrors the same four constants) — Country at z0–z4, Region at z5–z7, City (the untouched raster pyramid) at z8 and above — never layered together and never reconciled against each other: at country/region zoom there's no fine-grained detail visible to contradict, so the coarse reveal already is the whole truth at that scale.
+
+**Boundary data**: `admin_countries`/`admin_regions` (§3.12–§3.13) hold Natural Earth's country and state/province polygons, loaded once by the `seed-admin-boundaries` subcommand (`cmd/fitmap`) — an idempotent, re-runnable load mirroring `seed-demo-customer`'s own shape, embedded via `go:embed` from `internal/geo/seed-data/*.geojson` rather than fetched over the network at deploy time. The vendored files are pre-simplified (Douglas-Peucker, ~800m tolerance) and coordinate-rounded from Natural Earth's raw shapefiles, since the raw 1:10m region export is ~52 MB of full-precision vertices for a layer that only ever renders below z8 — simplified, it's ~9 MB.
+
+**Matching**: `internal/geo.MatchActivity` runs once per activity, called from `ingest.Process` right after the row is persisted, and inserts into `activity_country`/`activity_region` (§3.14–§3.15) for every polygon the activity's trajectory intersects. `seed-admin-boundaries` also backfills this for every activity that predates the feature — not optional: without it, every existing account (including the Demo Customer) would show every country locked until its next upload.
+
+**Serving**: live vector tiles (MVT), not a precomputed raster — see ADR-0008 for the reasoning. Four endpoints, mirroring `handleTracksTile`'s live-query shape:
+
+```http
+GET /tiles/v1/country-fog/{z}/{x}/{y}.mvt
+GET /tiles/v1/country-heatmap/{z}/{x}/{y}.mvt
+GET /tiles/v1/region-fog/{z}/{x}/{y}.mvt
+GET /tiles/v1/region-heatmap/{z}/{x}/{y}.mvt
+```
+
+Fog's query returns the **locked** set — countries/regions with no matching `activity_country`/`activity_region` row for the current user (`superseded_by IS NULL`) — rendered as a flat fill in fog's own veil colour (`#202b25` @ 0.82, identical to `RenderFogPNG`'s `fogColour`/`fogOpacity`, so nothing shifts hue crossing the zoom boundary); unlocked polygons are simply absent from the tile, same "no veil = revealed" semantic as the raster tier. Heatmap's query returns the **unlocked** set — with a matching row *and* `in_heatmap_window` true, so a country visited only long ago cools off at this tier exactly as it already does at city zoom — rendered as a flat fill in the heatmap ramp's own base hue (`#b07e2e`, also `tracks.ts`'s `TRACK_COLOR`) at a fixed moderate opacity (0.45): "you've been here," not graded by how much — a whole-country intensity gradient would be a second scoring dimension nobody asked for.
+
+**Why a live query is safe here despite the cost that ruled it out for Heatmap's own raster tier (§4.2.3)**: `admin_countries`/`admin_regions` have a small, fixed row count (~250 / ~4,600) that never grows with a user's activity history; each query is one indexed `EXISTS`/`NOT EXISTS` join against `activity_country`/`activity_region`, never the `ST_Intersects` geometry test itself, which only ever runs once, at ingest.
+
+**Deletion**: `ON DELETE CASCADE` on `activity_country`/`activity_region` means `handleDeleteActivity` needs no new code — a deleted activity's membership rows disappear with it, and the next tile request simply sees a different join result. There is no dirty flag, cache, or rebuild step for this tier to invalidate.
 
 ### 4.3 Track vector tiles
 
@@ -843,7 +928,7 @@ Three paths means three different failure modes, and the mitigation is that they
 
 ### 5.3 Tile payload at low zoom
 
-Solved by construction rather than by rollup jobs. Fog uses a downsampled raster pyramid, so a z3 fog tile is the same handful of KB as a z14 one. Track MVTs stay bounded through zoom-dependent simplification, and below roughly z8 tracks are hidden entirely — at that scale the fog mask *is* the picture.
+Solved by construction rather than by rollup jobs. Fog uses a downsampled raster pyramid, so a z3 fog tile is the same handful of KB as a z14 one. Track MVTs stay bounded through zoom-dependent simplification, and below z8 tracks are hidden entirely (`CITY_MIN_ZOOM`, `zoomTiers.ts`) — at that scale the fog mask *is* the picture, and below z8 the fog/heatmap raster itself gives way to the Country/Region tiers (§4.2.4), which need no per-tile payload concern at all: each tile is a handful of whole-polygon fills from a fixed ~250/~4,600-row dataset, not simplified per-user geometry.
 
 ### 5.4 Basemap cost and build
 

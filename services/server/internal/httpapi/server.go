@@ -130,6 +130,13 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(tileRoute("GET", "/tracks/{z}/{x}/{y}"), s.requireVerified(s.handleTracksTile))
 	s.mux.HandleFunc(tileRoute("GET", "/fog/{z}/{x}/{y}"), s.requireVerified(s.handleFogTile))
 	s.mux.HandleFunc(tileRoute("GET", "/heatmap/{z}/{x}/{y}"), s.requireVerified(s.handleHeatmapTile))
+	// §4.2.4's Country/Region zoom tiers — live MVT, not precomputed, see
+	// admin_country_tiles.go's own doc comment for why that's safe here despite the
+	// live-heatmap-compositing cost fog/heatmap's own tiles were moved away from.
+	s.mux.HandleFunc(tileRoute("GET", "/country-fog/{z}/{x}/{y}"), s.requireVerified(s.handleCountryFogTile))
+	s.mux.HandleFunc(tileRoute("GET", "/country-heatmap/{z}/{x}/{y}"), s.requireVerified(s.handleCountryHeatmapTile))
+	s.mux.HandleFunc(tileRoute("GET", "/region-fog/{z}/{x}/{y}"), s.requireVerified(s.handleRegionFogTile))
+	s.mux.HandleFunc(tileRoute("GET", "/region-heatmap/{z}/{x}/{y}"), s.requireVerified(s.handleRegionHeatmapTile))
 	// Deliberately not behind requireAuth, unlike every /v1 route above it. The style
 	// document is derived entirely from the public Protomaps basemap and contains no
 	// per-user data — only layer definitions and the asset URLs a client would need

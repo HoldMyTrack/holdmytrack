@@ -25,6 +25,7 @@ A second constraint now shapes every decision: **the service is free and communi
 | Privacy applied **at ingest** | Fog maps point at people's homes; render-time filtering leaks through any downstream bug — [ADR-0002](adr/0002-privacy-applied-at-ingest.md) |
 | **Three independent ingest paths** | No single provider can revoke the product (`VISION.md` §4.1) — [ADR-0001](adr/0001-three-independent-ingest-paths.md) |
 | **Planet-wide basemap**, not a regional extract | Users are everywhere; a regional extract makes "blank map" the default outside one metro |
+| **Country/Region zoom tiers are live vector tiles**, not a second precomputed raster pyramid | Their cost scales with a fixed ~250-country/~4,600-region boundary dataset, not with a user's own activity history — the scaling problem the fog raster pyramid exists to avoid never applies here — [ADR-0008](adr/0008-vector-tiles-for-country-region-boundary-tiers.md) |
 
 ### 1.2 Target architecture
 
