@@ -20,9 +20,8 @@ import (
 // Simple email+password auth, server-side sessions (migrations/0006_sessions.sql) — resolved
 // toward the smallest thing that removes the old placeholder-user stand-in, not a
 // third-party identity provider: no vendor to depend on, the same bias Path 3 uploads already
-// made. Password reset (IMPLEMENTATION.md §4.11) and email verification
-// (docs/ROADMAP.md's "Email verification + demo without real ingest") share the same
-// token-table shape. Rate limiting is partially built: see demoLimiter/forgotPasswordLimiter
+// made. Password reset (IMPLEMENTATION.md §4.11) and email verification (docs/SPEC.md FR-1.8)
+// share the same token-table shape. Rate limiting is partially built: see demoLimiter/forgotPasswordLimiter
 // below, added specifically because their endpoints are reachable with no credentials at all.
 
 const sessionCookieName = "fitmap_session"

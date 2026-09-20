@@ -39,7 +39,7 @@ export interface UserProfile {
 
 export interface AuthUser extends UserProfile {
   email: string;
-  /** docs/ROADMAP.md's "Email verification + demo without real ingest" — always `true` for a
+  /** docs/SPEC.md FR-1.8 — always `true` for a
    *  `DemoUser` (the gate never applies to one, so that type doesn't carry this field at all),
    *  reflects the account's real `users.email_verified` column for a real one. App.tsx checks
    *  this to decide whether to render the map or AuthGate's verify-email screen. */

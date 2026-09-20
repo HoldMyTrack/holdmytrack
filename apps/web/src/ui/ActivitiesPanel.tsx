@@ -46,7 +46,7 @@ import { useUnitSystem } from './units';
  *    to toggle just one activity directly; a hidden activity's row dims in place instead.
  */
 export interface ActivitiesPanelProps {
-  /** A demo account (docs/ROADMAP.md's "Email verification + demo without real ingest") — the
+  /** A demo account (`docs/SPEC.md` FR-2.1–FR-2.3) — the
    *  backend already rejects every mutation a demo session attempts (requireNotDemo), so this
    *  disables the controls that would otherwise error, with a `title` explaining why, rather
    *  than either hiding them (which would hide the feature existing at all, undercutting the

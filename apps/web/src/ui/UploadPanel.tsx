@@ -67,7 +67,7 @@ export interface UploadPanelProps {
    *  Activities list, totals and the histogram from this. See useUploadHistory's own doc
    *  comment for why it needs both calls, not just the first one. */
   onUploaded?: () => void;
-  /** A demo account (docs/ROADMAP.md's "Email verification + demo without real ingest") —
+  /** A demo account (`docs/SPEC.md` FR-2.1–FR-2.3) —
    *  the backend already rejects a demo upload regardless (requireNotDemo), so this only
    *  disables the trigger (with an explaining title) rather than opening a dropdown that
    *  would just fail. Deliberately not hidden: showing the control, disabled, demonstrates

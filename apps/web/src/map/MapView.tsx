@@ -67,7 +67,7 @@ export interface MapViewProps {
 }
 
 export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
-  // docs/ROADMAP.md's "Email verification + demo without real ingest": a demo account is
+  // docs/SPEC.md FR-2.1–FR-2.3: a demo account is
   // read-only (no upload/sync, no edit/delete) — see ActivitiesPanel's own readOnly prop and
   // the uploadControl below. `'email' in user` is the same narrowing api.ts's SessionUser
   // already establishes as the way to tell a DemoUser from an AuthUser.
