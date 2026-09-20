@@ -388,7 +388,8 @@ All upload functionality requires an active session (demo or registered — FR-1
 1. Selecting "Heatmap" replaces the track lines with a raster overlay, brighter wherever more recorded activity has crossed the same location (a daily commute reads brighter than a once-ridden road).
 2. Like Fog of War, Heatmap ignores the date range and the Type/Distance/hidden-track filters, hides the Activities panel and date-range picker, and clears any checked or focused activity. Unlike Fog, it only considers activities within a fixed rolling window (the last 365 days, not user-configurable) — the camera flies to fit that window's coverage, not the account's full history.
 3. Individual track lines are not drawn in this mode.
-4. Returning to Normal mode restores the previously checked/focused activities, the date range, and the panel/picker exactly as they were before switching to Heatmap.
+4. How much crossing traffic it takes to reach full brightness adapts to the account's own history, recomputed daily — a new account and a long-running one don't saturate at the same point, so each account's own most-used spot is what reads as hottest, not a fixed number of visits everyone shares.
+5. Returning to Normal mode restores the previously checked/focused activities, the date range, and the panel/picker exactly as they were before switching to Heatmap.
 
 ### FR-4.4 Mode is mutually exclusive
 
