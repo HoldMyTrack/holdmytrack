@@ -26,11 +26,11 @@ const pollInterval = 500 * time.Millisecond
 // needs sub-second responsiveness the way the job queue does.
 const demoPurgeInterval = 5 * time.Minute
 
-// heatmapRefreshInterval matches fog.HeatmapWindowDays' own granularity, not the job queue's
-// — an activity aging out of the rolling window is a once-a-week-at-most event for any given
-// tile, so there is nothing to gain from checking more often (heatmap_refresh.go's own
-// comment explains why weekly, not live, is the right cadence for this at all).
-const heatmapRefreshInterval = 7 * 24 * time.Hour
+// heatmapAgingInterval is daily, not weekly — heatmap_aging.go's sweep is cheap (one indexed
+// query plus whatever small number of activities actually crossed the window boundary since
+// the last run), so there's no reason to let staleness accumulate to a week when a day is just
+// as easy to check.
+const heatmapAgingInterval = 24 * time.Hour
 
 type job struct {
 	id      int64
@@ -47,7 +47,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 	defer ticker.Stop()
 	demoTicker := time.NewTicker(demoPurgeInterval)
 	defer demoTicker.Stop()
-	heatmapTicker := time.NewTicker(heatmapRefreshInterval)
+	heatmapTicker := time.NewTicker(heatmapAgingInterval)
 	defer heatmapTicker.Stop()
 
 	for {
@@ -70,8 +70,8 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 				log.Error("demo purge error", "err", err)
 			}
 		case <-heatmapTicker.C:
-			if err := refreshHeatmapWindows(ctx, pool, log); err != nil {
-				log.Error("heatmap refresh error", "err", err)
+			if err := ageOutHeatmapWindow(ctx, pool, log); err != nil {
+				log.Error("heatmap aging error", "err", err)
 			}
 		}
 	}

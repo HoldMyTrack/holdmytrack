@@ -8,7 +8,6 @@ import (
 	"image"
 	"image/draw"
 	"image/png"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -95,17 +94,14 @@ func dirtyTiles(ctx context.Context, pool *pgxpool.Pool, userID string, zoom int
 //
 // Fog and Heatmap draw from the same query but not the same *rows*: Fog is a true all-time
 // aggregate (every non-superseded activity's mask), while Heatmap only composites masks whose
-// activity falls inside the rolling window (HeatmapWindowDays) as of this render — an activity
-// that ages past it stops contributing the next time this tile is re-rendered. That "next
-// time" is driven by two triggers: the normal ingest/delete dirty-marking (immediate, for
-// anything that actually changed), and a weekly sweep (internal/worker's heatmapRefresh) that
-// marks every tile dirty purely so the window's trailing edge keeps moving even when nothing
-// new is uploaded — see that file's own comment for why weekly, not live-per-request, is the
-// right granularity for an aging effect nobody is watching in real time.
+// activity is currently flagged `in_heatmap_window` — a plain column read, not a comparison
+// against "now" here. Keeping that flag current as activities age past HeatmapWindowDays is
+// internal/worker's job (heatmap_aging.go's daily sweep), not this function's — by the time an
+// activity's flag actually flips, that sweep has already marked its tiles dirty too, so this
+// render is always just reflecting whatever the flag already says, never deciding it itself.
 func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID string, zoom, x, y int) error {
-	windowStart := time.Now().AddDate(0, 0, -HeatmapWindowDays)
 	rows, err := pool.Query(ctx, `
-		SELECT m.mask_object_key, a.started_at
+		SELECT m.mask_object_key, a.in_heatmap_window
 		FROM activity_tile_masks m
 		JOIN activities a ON a.id = m.activity_id
 		WHERE a.user_id = $1 AND a.superseded_by IS NULL
@@ -115,13 +111,13 @@ func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.
 		return fmt.Errorf("query activity masks: %w", err)
 	}
 	type keyedMask struct {
-		key       string
-		startedAt time.Time
+		key      string
+		inWindow bool
 	}
 	var rowsOut []keyedMask
 	for rows.Next() {
 		var row keyedMask
-		if err := rows.Scan(&row.key, &row.startedAt); err != nil {
+		if err := rows.Scan(&row.key, &row.inWindow); err != nil {
 			rows.Close()
 			return fmt.Errorf("scan activity mask key: %w", err)
 		}
@@ -144,7 +140,7 @@ func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.
 			continue
 		}
 		fogMasks = append(fogMasks, mask)
-		if row.startedAt.After(windowStart) {
+		if row.inWindow {
 			heatmapMasks = append(heatmapMasks, mask)
 		}
 	}

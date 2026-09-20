@@ -27,9 +27,11 @@ import (
 // instant, which a fresh `time.Now().AddDate(0, 0, -N)` call almost never reproduces between
 // two real requests, so every single tile request paid full compositing cost. Heatmap now
 // reads a precomputed aggregate instead, exactly like Fog — internal/fog.renderAndStoreTile
-// builds heatmap_object_key from only the window's masks, kept current the same way Fog's own
-// aggregate is (ingest/delete dirty-marking) plus a weekly sweep (internal/worker's
-// refreshHeatmapWindows) so the window's trailing edge keeps moving even without new uploads.
+// builds heatmap_object_key from only the masks whose activity is currently flagged
+// `in_heatmap_window`, kept current by ingest/delete dirty-marking plus a daily sweep
+// (internal/worker's heatmap_aging.go) that flips the flag and re-renders as each activity
+// individually ages out — see that file's own comment for why per-activity and daily, rather
+// than a weekly whole-account sweep.
 func (s *Server) handleHeatmapTile(w http.ResponseWriter, r *http.Request) {
 	z, errZ := strconv.Atoi(r.PathValue("z"))
 	x, errX := strconv.Atoi(r.PathValue("x"))
