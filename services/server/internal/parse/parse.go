@@ -25,6 +25,13 @@ type Point struct {
 type Activity struct {
 	ActivityType string // 'run' | 'ride' | 'hike' | ... — best-effort from the source file
 	Points       []Point
+	// Name and Description are empty for every file-format parser (GPX/TCX/FIT never carry a
+	// title FitMap trusts here) and for Health Connect/HealthKit sync. Path 2's JSON wire
+	// format is the one source that can set them directly (`docs/IMPLEMENTATION.md` §4.0.4,
+	// in-app GPS recording) — ingest.Process persists them at creation when non-empty, the
+	// same NULLIF-on-empty convention `handleUpdateActivity` uses for an edit after the fact.
+	Name        string
+	Description string
 }
 
 // ByExtension dispatches on the uploaded filename's extension and streams from r — callers
@@ -58,9 +65,17 @@ type JSONPoint struct {
 
 // JSONActivity is one activity's worth of JSONPoint, the unit both the sync request body and
 // the stored raw payload carry (`internal/httpapi.syncActivityRequest` embeds this).
+//
+// Name and Description are optional and empty for Health Connect/HealthKit sync, which never
+// sends them. In-app GPS recording (`source = "recorded"`, `docs/IMPLEMENTATION.md` §4.0.4)
+// sets them from its own Name/Description fields, captured before or during a recording, so
+// the resulting activity carries them from the moment it's created rather than needing a
+// separate edit afterward.
 type JSONActivity struct {
 	ActivityType string      `json:"activity_type"`
 	Points       []JSONPoint `json:"points"`
+	Name         string      `json:"name,omitempty"`
+	Description  string      `json:"description,omitempty"`
 }
 
 // ParseJSON decodes Path 2's normalized-point wire format into the same Activity shape
@@ -83,5 +98,5 @@ func ParseJSON(r io.Reader) (Activity, error) {
 	if activityType == "" {
 		activityType = "unknown"
 	}
-	return Activity{ActivityType: activityType, Points: points}, nil
+	return Activity{ActivityType: activityType, Points: points, Name: a.Name, Description: a.Description}, nil
 }

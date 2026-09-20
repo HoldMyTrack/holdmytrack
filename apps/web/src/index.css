@@ -2598,8 +2598,8 @@ body {
      don't fit side by side on a ~390px phone — found live the same way the old header-row
      overflow was (a fixed-width sidebar-aligned column plus a chart area is exactly the
      "two wide things side by side" shape that already broke once here; see
-     .activities-panel__subtext's history and AGENTS.md for that earlier incident). Stacked
-     instead: legend on top at full width (matching .activities-panel's own mobile
+     docs/IMPLEMENTATION.md's mobile browser support section for that earlier incident).
+     Stacked instead: legend on top at full width (matching .activities-panel's own mobile
      `width: 100%` override — same reasoning, a fixed pixel width from panelWidth state makes
      no sense once the sidebar itself becomes a full-width bottom sheet), chart area below.
      Found live, a second time, stacking these two on top of each other: the taller stacked

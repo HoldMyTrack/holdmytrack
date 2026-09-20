@@ -33,6 +33,22 @@
     <uses-permission android:name="android.permission.health.READ_EXERCISE_ROUTES" />
     <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" />
 
+    <!--
+      In-app GPS recording (docs/adr/0007-in-app-gps-recording-submits-directly.md,
+      apps/android/docs/ROADMAP.md Phase 7) — foreground-only, deliberately. Not
+      ACCESS_BACKGROUND_LOCATION: that's a separately-reviewed permission with its own Play
+      Store "prominent disclosure" burden, needed only if recording had to survive the app
+      having no foreground presence at all. A declared foreground service with location type
+      already keeps GPS running while the screen is off without it — background location is
+      for access with *no* running foreground component, which this never is while recording.
+      FOREGROUND_SERVICE_LOCATION (Android 14+) and POST_NOTIFICATIONS (Android 13+) are both
+      required unconditionally at this app's minSdk 34, not optionally.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:name=".FitMapApplication"
         android:allowBackup="false"
@@ -48,6 +64,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Not exported: reached only from MainActivity's burger menu, never by another app. -->
+        <activity
+            android:name=".ProfileActivity"
+            android:exported="false"
+            android:label="@string/menu_profile"
+            android:theme="@style/Theme.AppCompat.DayNight" />
 
         <!-- Not exported: reached only from MainActivity, never by another app. It keeps an
              action bar (the DayNight theme, not the NoActionBar one the map uses) purely so
@@ -78,6 +101,21 @@
             android:exported="false"
             android:label="@string/status_title"
             android:theme="@style/Theme.AppCompat.DayNight" />
+
+        <!-- Not exported: reached only from MainActivity's burger menu, never by another app. -->
+        <activity
+            android:name=".recording.RecordingActivity"
+            android:exported="false"
+            android:label="@string/menu_gps_logger"
+            android:theme="@style/Theme.AppCompat.DayNight" />
+
+        <!-- A foreground service so GPS keeps running while the screen is off — an ordinary
+             background process is free game for the OS to kill, and a killed recording with
+             no recovery is worse than the app not offering this at all. -->
+        <service
+            android:name=".recording.RecordingService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
 
         <!-- Where Health Connect's "see how this app used your data" link lands. -->
         <activity-alias

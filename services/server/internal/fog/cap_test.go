@@ -5,7 +5,7 @@ import "testing"
 // maxCount is the one pure, independently-testable piece of the adaptive cap — the SQL query
 // and the change-threshold/minimum-data gating around it (RecomputeHeatmapCap) are exercised
 // live against a real account instead, per this project's own stated preference for
-// integration-shaped behavior (IMPLEMENTATION.md/AGENTS.md). That live run against the Demo
+// integration-shaped behavior (IMPLEMENTATION.md). That live run against the Demo
 // Customer account is also what ruled out a percentile statistic in the first place: see
 // RecomputeHeatmapCap's own doc comment.
 

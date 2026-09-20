@@ -175,7 +175,7 @@ class SyncRunner(
             return null
         }
         val results = try {
-            FitMapApi.syncActivities(batch)
+            FitMapApi.syncActivities(batch, FitMapApi.SOURCE_HEALTH_CONNECT)
         } catch (e: IOException) {
             Log.w(TAG, "sync batch failed", e)
             batch.clear()

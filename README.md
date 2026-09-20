@@ -13,15 +13,15 @@ fitmap/
 ├── .env.prod.example            # compose.prod.yml's own env template
 ├── .editorconfig
 ├── docs/
-│   ├── VISION.md              # product, market, funding, roadmap
-│   ├── ARCHITECTURE.md               # system architecture, key decisions, stack
-│   ├── IMPLEMENTATION.md   # schema, workflows, each feature's own detail
-│   ├── SPEC.md   # observable behavior, FR-N.M, independent of the above
-│   ├── ROADMAP.md                    # the remaining-work checklist
-│   ├── KNOWN_ISSUES.md               # currently-open defects in shipped functionality
-│   ├── adr/                          # Architecture Decision Records — why, not just what
-│   ├── DEVELOPMENT.md                # running it locally, verification, gotchas, commands
-│   └── DEPLOY.md                     # the production deployment runbook
+│   ├── VISION.md                # product, market, funding, roadmap
+│   ├── ARCHITECTURE.md          # system architecture, key decisions, stack
+│   ├── IMPLEMENTATION.md        # schema, workflows, each feature's own detail
+│   ├── SPEC.md                  # observable behavior, FR-N.M, independent of the above
+│   ├── ROADMAP.md               # the remaining-work checklist
+│   ├── KNOWN_ISSUES.md          # currently-open defects in shipped functionality
+│   ├── adr/                     # Architecture Decision Records — why, not just what
+│   ├── DEVELOPMENT.md           # running it locally, verification, gotchas, commands
+│   └── DEPLOY.md                # the production deployment runbook
 ├── AGENTS.md                    # orientation for coding agents
 ├── apps/
 │   ├── android/                 # Kotlin — Phase 2. Map + session built; Health Connect next
@@ -58,7 +58,7 @@ This tree is the canonical one; do not let a second tree exist anywhere else to 
 | [`docs/adr/`](docs/adr/) | Architecture Decision Records — why each consequential, hard-to-reverse decision was made, and what was rejected. |
 | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Running it locally, the verification checklist, gotchas worth not rediscovering, and the command reference. |
 | [`docs/DEPLOY.md`](docs/DEPLOY.md) | You're standing up an actual deployment. |
-| [`AGENTS.md`](AGENTS.md) | You are a coding agent, or you want the short version of all of the above. |
+| [`AGENTS.md`](AGENTS.md) | You are a coding agent opening the repo cold — this same routing table, self-contained, plus the Markdown formatting convention these docs follow. |
 
 ## License
 

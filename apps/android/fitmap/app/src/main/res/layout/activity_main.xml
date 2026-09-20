@@ -23,78 +23,67 @@
         android:textSize="13sp"
         android:visibility="gone" />
 
-    <!-- Session state and the map-mode toggle. Plain on purpose: the design freeze is Phase 3
-         of the root roadmap, after Mobile, so there is no token system or type scale to build
-         against and inventing one here would only have to be undone. -->
+    <!-- Floating chrome over the map, top-start: the burger menu above the map-mode toggle,
+         mirroring the web client's own top-left mode control (apps/web/src/index.css's
+         .map-mode-toggle) rather than a bar pinned along the bottom. Kept clear of MapLibre's
+         own compass, which sits top-end. Plain on purpose: the design freeze is Phase 3 of the
+         root roadmap, after Mobile, so there is no token system or type scale to build against
+         and inventing one here would only have to be undone. -->
     <LinearLayout
-        android:id="@+id/bottom_bar"
-        android:layout_width="match_parent"
+        android:id="@+id/top_start_bar"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:background="#CC000000"
-        android:orientation="vertical"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
-        android:paddingTop="4dp"
-        android:paddingBottom="4dp">
+        android:layout_gravity="top|start"
+        android:layout_margin="12dp"
+        android:orientation="vertical">
 
-        <LinearLayout
-            android:layout_width="match_parent"
+        <Button
+            android:id="@+id/menu_button"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/account_label"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:textColor="#FFFFFF"
-                android:textSize="13sp" />
-
-            <!-- Only meaningful with a session, so it hides with the mode bar. -->
-            <Button
-                android:id="@+id/sync_action"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/sync_action"
-                android:visibility="gone" />
-
-            <Button
-                android:id="@+id/account_action"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/sign_in" />
-        </LinearLayout>
+            android:layout_gravity="start"
+            android:background="#CC000000"
+            android:contentDescription="@string/menu_button"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingStart="16dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="8dp"
+            android:text="@string/menu_button"
+            android:textColor="#FFFFFF" />
 
         <!-- Only shown to a signed-in account: all three layers the toggle switches between
              are behind requireAuth, so there is nothing for it to do without a session. -->
         <LinearLayout
             android:id="@+id/mode_bar"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="start"
+            android:layout_marginTop="6dp"
+            android:background="#CC000000"
             android:orientation="horizontal"
             android:visibility="gone">
 
             <Button
                 android:id="@+id/mode_normal"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:minWidth="0dp"
                 android:text="@string/mode_normal" />
 
             <Button
                 android:id="@+id/mode_fog"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:minWidth="0dp"
                 android:text="@string/mode_fog" />
 
             <Button
                 android:id="@+id/mode_heatmap"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:minWidth="0dp"
                 android:text="@string/mode_heatmap" />
         </LinearLayout>
     </LinearLayout>

@@ -89,11 +89,15 @@ CREATE TABLE activities (
                                                -- uploaded file (Path 3), provider push (Path 1),
                                                -- or synced point batch (Path 2). See §4.1 step 6.
     description       TEXT,                    -- §4.7.4; user-editable free text, NULL means
-                                               -- never set
+                                               -- never set. Never parsed from a GPX/TCX/FIT
+                                               -- file or from Health Connect/HealthKit sync;
+                                               -- Path 2's JSON wire format is the one ingest
+                                               -- path that can set it at creation (§4.0.4,
+                                               -- in-app GPS recording).
     name              VARCHAR(200),            -- §4.7.4/migrations/0015; user-editable title,
-                                               -- shown in place of started_at when set. Never
-                                               -- parsed from a source file -- NULL means never
-                                               -- set, same convention as description.
+                                               -- shown in place of started_at when set. Same
+                                               -- "never at ingest except §4.0.4" rule as
+                                               -- description above. NULL means never set.
     created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
@@ -323,7 +327,7 @@ All three are idempotent on `(user_id, source, external_id)`, and this is a hard
 
 #### 4.0.3 `POST /v1/sync/activities` — Path 2's batched sync endpoint
 
-**Built.** `internal/httpapi/sync_activities.go`. Takes a JSON body `{source, activities: [{external_id, activity_type, points: [{lat, lon, elevation_m, time, heart_rate}]}]}` and returns one result per activity (`"enqueued"` / `"already_processed"` / `"rejected"`, with an error string on rejection) rather than a single pass/fail for the whole request — a batch is not all-or-nothing, the same "one bad entry doesn't abort the rest" treatment §4.0.1's zip upload already gives a mixed-quality archive. `source` is checked against an allowlist of exactly the two on-device platforms §4.0 names for Path 2 (`"healthconnect"`, `"healthkit"`) — Path 1 and Path 3 have their own endpoints and their own `source` values, so this list doesn't need to anticipate those.
+**Built.** `internal/httpapi/sync_activities.go`. Takes a JSON body `{source, activities: [{external_id, activity_type, points: [{lat, lon, elevation_m, time, heart_rate}], name, description}]}` and returns one result per activity (`"enqueued"` / `"already_processed"` / `"rejected"`, with an error string on rejection) rather than a single pass/fail for the whole request — a batch is not all-or-nothing, the same "one bad entry doesn't abort the rest" treatment §4.0.1's zip upload already gives a mixed-quality archive. `source` is checked against an allowlist (`"healthconnect"`, `"healthkit"`, and `"recorded"` for §4.0.4's in-app GPS recording) — Path 1 and Path 3 have their own endpoints and their own `source` values, so this list doesn't need to anticipate those. `name`/`description` are optional and empty for Health Connect/HealthKit sync, which never sends them; validated against the same `maxActivityNameLen`/`maxActivityDescriptionLen` bounds `handleUpdateActivity` (§4.7.4) enforces for an edit after the fact.
 
 **No Path-2-specific branch in `ingest.Process`.** `internal/parse` gained a `.json` case (`ParseJSON`, dispatched by `ByExtension` the same way `.gpx`/`.tcx`/`.fit` already are) that decodes the wire shape above straight into the same `Activity`/`Point` structs the file parsers produce — there is no format-specific parsing left to do for Path 2 since the on-device app already read raw samples out of the platform health store itself, only a field-for-field reshape. Each activity's `{activity_type, points}` is re-marshaled and persisted to object storage exactly like a Path 3 raw file, then read back through the same `parseByExtensionReader` call `ingest.Process` already made — §4.0's "differ only in how bytes arrive, converge on §4.1 step 2" holds literally, not just in spirit.
 
@@ -332,6 +336,16 @@ All three are idempotent on `(user_id, source, external_id)`, and this is a hard
 **Bounds**, the same "cap before reading the body fully" posture §5.1 states for Path 3: `maxSyncBatchActivities` (100 activities per request — a page of a foreground sync run, not a claim a real history is smaller), `maxSyncPointsPerActivity` (50,000, matching §5.2's own "100-mile ride at 1 Hz is 36,000+ points" ceiling for file formats), `maxSyncBodyBytes` (64 MiB). An activity needs at least 2 points to be accepted here — the same floor `ingest.Process` itself enforces post-privacy-trim — but this is a coarse pre-check, not a guarantee: an activity that clears it can still fail the deeper trim-based check asynchronously in the worker, exactly as already happens for Path 3.
 
 **Verified against a live `db`/`minio`/`api`/`worker` stack**, not just unit tests: signed up a test user, posted a 3-point batch and confirmed `{"status":"enqueued"}`; confirmed the activity reached `state = 'done'` and appeared correctly in both `GET /v1/activities` and `GET /v1/uploads` (source-joined filename `hc-run-001.json`); read the row back from Postgres directly and confirmed `source = 'healthconnect'`, `external_id = 'hc-run-001'` (not a hash), and `raw_payload_key = 'raw/{userID}/healthconnect/hc-run-001.json'`; re-posted the identical batch entry and confirmed it returned `"already_processed"` rather than a second row; confirmed a batch of 101 activities is rejected in full with a 400, and confirmed the route requires an authenticated session.
+
+#### 4.0.4 In-app GPS recording (Android)
+
+**Built.** No new endpoint and no schema migration, per [ADR-0007](adr/0007-in-app-gps-recording-submits-directly.md): a finished recording is normalized to the exact same wire shape §4.0.3 already accepts and posted to the same `POST /v1/sync/activities`, under `source = "recorded"` — the one server-side change was adding that value to `syncSources` (`internal/httpapi/sync_activities.go`). `apps/android/fitmap`'s `RecordingActivity`/`RecordingService` own the client half; `apps/android/docs/ROADMAP.md` Phase 7 is the authority on that.
+
+`external_id` is a UUID the app mints at recording start (`java.util.UUID.randomUUID()`), not a platform record id — unlike Health Connect/HealthKit, there is no platform health store handing this activity an identity, so the client has to originate one itself. Idempotency (`(user_id, source, external_id)`) works exactly the same either way; a retried submit of the same recording is recognized rather than duplicated.
+
+**This is the one ingest path that sets `name`/`description` at creation, not just through a later edit.** The recording screen's Name/Description fields ride along in the same batch entry `parse.JSONActivity` already carries (§3.3's `activities.name`/`description` columns), so the activity is titled from the moment `ingest.Process` first inserts it rather than needing a follow-up `PATCH /v1/activities/{id}` (§4.7.4) the way every other ingest path does. Health Connect/HealthKit sync leaves both fields empty, exactly as before — nothing about their payload changed.
+
+**Verified against a live `db`/`api`/`worker` stack**: posted a 3-point batch with `source: "recorded"`, a `name` and a `description`, confirmed `{"status":"enqueued"}`; read the row back from Postgres and confirmed `source = 'recorded'` and both `name`/`description` persisted exactly as sent, alongside the usual computed `distance_meters`; re-posted the identical entry and confirmed `"already_processed"`; confirmed an unrecognized `source` value still `400`s with the (now three-way) allowlist message.
 
 ### 4.1 Ingestion pipeline
 

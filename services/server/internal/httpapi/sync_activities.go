@@ -10,10 +10,12 @@ import (
 )
 
 // syncSources is the `source` allowlist this endpoint accepts — IMPLEMENTATION.md §4.0 names
-// exactly these two on-device platforms for Path 2 (iOS/HealthKit, Android/Health Connect).
-// Path 1 (webhooks) and Path 3 (upload) have their own endpoints and their own `source`
-// values, so this list doesn't need to anticipate those.
-var syncSources = map[string]bool{"healthconnect": true, "healthkit": true}
+// the two on-device platforms for Path 2 (iOS/HealthKit, Android/Health Connect), and §4.0.4
+// adds "recorded" for in-app GPS recording (ADR-0007) — authored by FitMap itself rather than
+// read from a platform health store, but the same batched wire shape either way. Path 1
+// (webhooks) and Path 3 (upload) have their own endpoints and their own `source` values, so
+// this list doesn't need to anticipate those.
+var syncSources = map[string]bool{"healthconnect": true, "healthkit": true, "recorded": true}
 
 // maxSyncBatchActivities bounds one request to a reasonable page of a foreground sync run, not
 // a claim that a real sync history can't be larger — ROADMAP.md's own "resumable retry"
@@ -85,7 +87,7 @@ func (s *Server) handleSyncActivities(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !syncSources[req.Source] {
-		http.Error(w, `invalid "source", want "healthconnect" or "healthkit"`, http.StatusBadRequest)
+		http.Error(w, `invalid "source", want "healthconnect", "healthkit" or "recorded"`, http.StatusBadRequest)
 		return
 	}
 	if len(req.Activities) == 0 {
@@ -128,6 +130,16 @@ func (s *Server) syncOneActivity(ctx context.Context, userID, source string, act
 	}
 	if len(act.Points) > maxSyncPointsPerActivity {
 		result.Status, result.Error = "rejected", fmt.Sprintf("too many points (%d), want %d or fewer", len(act.Points), maxSyncPointsPerActivity)
+		return result
+	}
+	// Same bounds handleUpdateActivity enforces for an edit after the fact — these columns
+	// are VARCHAR(200)/TEXT-but-bounded regardless of which path sets them first.
+	if len(act.Name) > maxActivityNameLen {
+		result.Status, result.Error = "rejected", fmt.Sprintf("name must be %d characters or fewer", maxActivityNameLen)
+		return result
+	}
+	if len(act.Description) > maxActivityDescriptionLen {
+		result.Status, result.Error = "rejected", fmt.Sprintf("description must be %d characters or fewer", maxActivityDescriptionLen)
 		return result
 	}
 
