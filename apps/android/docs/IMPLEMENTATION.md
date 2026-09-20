@@ -1,6 +1,6 @@
 # FitMap for Android: Implementation
 
-> **Scope note.** This document covers each file's own implementation detail for the Android app — the app shell, auth, map overlays, Health Connect sync, and the sync status screen. See `apps/android/docs/ARCHITECTURE.md` first for the app's shape and the stack this runs on, and `docs/IMPLEMENTATION.md` for the server-side schema and pipeline every call here eventually reaches. There is no database schema section in this document — the app persists nothing beyond two `SharedPreferences` files, both covered in place below.
+> **Scope note.** This document covers each file's own implementation detail for the Android app — the app shell, auth, map overlays, Health Connect sync, in-app GPS recording, and the sync status screen. See `apps/android/docs/ARCHITECTURE.md` first for the app's shape and the stack this runs on, and `docs/IMPLEMENTATION.md` for the server-side schema and pipeline every call here eventually reaches. The app's local persistence is two `SharedPreferences` files, covered in place below, plus one SQLite database (§7) for recordings pending sync.
 
 ---
 
@@ -130,7 +130,35 @@ Reads two independent endpoints and renders them as two independent sections —
 - **Row labels prefer what the activity actually became over its raw identifier.** `describe()` shows the activity's own date and distance once a job reaches `"done"`; a synced Health Connect job's `source_detail` is the platform's own record UUID, which is meaningless to a person and is never surfaced directly.
 - **`sourceName()` is a small closed mapping from the schema's `source` values** (`docs/IMPLEMENTATION.md` §3.3) to human-readable labels, used identically for both the sync-history rows and the duplicate rows, so "Health Connect" and "HealthKit" read the same way in both sections.
 
-## 7. Build Configuration
+## 7. In-App GPS Recording
+
+`recording/` (`RecordingActivity`, `RecordingService`, `RecordedActivitiesActivity`, `recording/db`) owns this feature end to end. The wire contract it submits to — `POST /v1/sync/activities` under `source = "recorded"` — is specified server-side in `docs/IMPLEMENTATION.md` §4.0.4, along with [ADR-0007](../../../docs/adr/0007-in-app-gps-recording-submits-directly.md)'s decision not to add a new endpoint for it. What follows is the client half that decision left to this app to design.
+
+### 7.1 Recording and submitting are two separate steps, not one
+
+Stopping a recording only persists it to `recording/db/RecordedActivityStore.kt`, tagged not-synced; nothing reaches the network until the user marks it to sync from `RecordedActivitiesActivity` (a list filterable by sync status × activity type) and taps the Sync screen's existing "Sync Now." That screen's `flushRecordedQueue` (`SyncActivity.kt`) walks every locally queued row in the same run as Health Connect sync (§5), submitting each as its own call to `POST /v1/sync/activities` and marking it synced on `"enqueued"`/`"already_processed"`. A rejected or failed row is left queued rather than reverted, so the next "Sync Now" retries it with no action needed from the user — the same resumable-retry posture `SyncCursor` (§5.3) already has for Health Connect sync, applied to a per-row local status instead of a single cursor position.
+
+`activity_type` is free text here, not the fixed vocabulary `health/ExerciseTypes.kt` (§4.2) normalizes Health Connect sessions onto — there's no platform exercise-type field to normalize from on this path. `external_id` is a UUID the app mints at recording start (`java.util.UUID.randomUUID()`), not a platform record id — unlike Health Connect/HealthKit, there is no platform health store handing this activity an identity, so the client originates one itself.
+
+### 7.2 `recording/db/RecordedActivityStore`
+
+Plain `SQLiteOpenHelper`, not Room: this project's Kotlin toolchain — AGP's built-in Kotlin at the time this was built — was newer than any published KSP release, confirmed by trying it (a `com.google.devtools.ksp` version matching Kotlin 2.4.0 does not exist on Maven Central) rather than assumed from documentation.
+
+**The table is scoped per account, and wasn't at first — a real bug, found by testing a demo-then-real-account switch on one device, not by inspection.** The first version carried no account column at all: every row was visible regardless of which account was currently signed in, so a recording made under one account (or the shared demo session) would show up in another's Recorded Activities list on the same device. Fixed by adding an `account` column and scoping every query (`all`, `get`, `queued`, `update`, `setSyncStatus`, `delete`) to `Session.email` — the same per-account key `sync/SyncCursor.kt` (§5.3) already established for exactly this reason, including that class's own precedent for a demo account sharing one empty-string key across every demo session. That sharing is harmless here for the same reason it's harmless there: a demo account can never sync regardless (§7.4), so nothing recorded under it ever reaches the server no matter which demo session later sees it locally. `RecordingDbHelper` bumped to schema version 2; `onUpgrade` drops and recreates rather than a hand-written `ALTER TABLE`, the same "no migration tooling needed pre-launch" call the server side already makes.
+
+### 7.3 Delete is local-only
+
+Available on every row regardless of sync status, unlike Edit — there's nothing left to protect once a row can only ever be deleted, not corrupted. For an already-synced row this only removes Recorded Activities' own bookkeeping; the real `Activity` it produced is untouched, because nothing captured here links back to that row's server-assigned id — only the client-generated `external_id` it was submitted under. This is a deliberate scope decision, not an oversight: doing the full purge too (mirroring `handleDeleteActivity`, `docs/IMPLEMENTATION.md` §4.7.4) would mean threading the server's assigned activity id back through the sync response, which nothing today captures. The confirmation dialog says this explicitly for a synced row.
+
+### 7.4 Demo accounts are blocked from sync client-side too
+
+Matching the web's own pattern (`UploadPanel.tsx`'s `readOnly`-plus-tooltip treatment), not just the server's `requireNotDemo`. Found missing, not assumed present: neither `SyncActivity` nor `RecordedActivitiesActivity` checked demo status before this pass, so a demo session could open Sync, tap "Sync Now," or queue a recording, and would only discover the block from the server's raw `demo_read_only` JSON surfacing through a generic failure path — confirmed live, by accident, before the fix. `Session.isDemo` (§2.1, `isSignedIn && email.isEmpty()` — the same emptiness the class already used to mean "demo") is now checked in both places: the Sync screen hides Sync Now, the secondary button, and the Health Connect permission flow behind an explanatory message (sync history stays visible — reading is not a mutation), and Recorded Activities disables every sync checkbox with a banner.
+
+### 7.5 Verified on device
+
+On a Pixel 10a: recorded a short walk with a custom, free-text activity type; confirmed the row landed in Recorded Activities as not-synced with no network request having been made; edited its name/description/type pre-sync and confirmed the edit persisted; checked its sync box (queued); tapped "Sync Now" and confirmed the row synced alongside a Health Connect run in the same combined summary text; confirmed the row's checkbox became checked-and-disabled and its Edit screen became read-only with "Already synced — no longer editable." A real failure case surfaced by accident (the session had signed into the demo account, whose writes the server correctly refuses) confirmed the failed-row behavior live: the row stayed queued and the combined summary reported "N synced, 1 failed — will retry next time" rather than silently dropping it. A second pass verified Delete (removed a synced row locally, confirmed the underlying `activities` row was untouched server-side) and the demo-gating and account-scoping fixes together: signed into the demo account, confirmed Sync Now/Open Health Connect were both hidden with the read-only explanation and Recorded Activities' checkbox rendered `enabled="false"`; recorded under the demo session, confirmed the row appeared locally; signed out and into a real account and confirmed that demo-authored row did **not** appear in the real account's Recorded Activities list.
+
+## 8. Build Configuration
 
 `BuildConfig.API_BASE_URL` is the one build-time-injected value in the app, sourced from the `fitmap.apiBaseUrl` Gradle property (`gradle.properties` defaults it to `http://10.0.2.2:8080`, the emulator's alias for the host loopback). Pointing a physical device at a host dev stack over USB requires `adb reverse` for both the API port and the web dev server port the style document's asset URLs resolve against (`BASEMAP_ORIGIN`, `docs/ARCHITECTURE.md` §2.1) — documented with exact commands in `apps/android/fitmap/README.md`.
 
@@ -138,7 +166,7 @@ Reads two independent endpoints and renders them as two independent sections —
 
 `libs.versions.toml` pins every dependency version with an inline rationale for why that version specifically (MapLibre's pmtiles-support floor, the Health Connect version the Phase 1 findings were measured against, OkHttp pinned to what MapLibre's own POM resolves to rather than left implicit) — the versions themselves are covered in `apps/android/docs/ARCHITECTURE.md` §2; this file is where the *reasoning* for each pin lives, so an upgrade is a decision made against that reasoning rather than a blind bump.
 
-## 8. Verification Methodology & Known Gaps
+## 9. Verification Methodology & Known Gaps
 
 **There are no automated tests anywhere in this app** — no unit tests, no instrumentation tests, no CI. Every behavior described in `apps/android/docs/SPEC.md` has instead been verified manually, on a physical device (a Pixel 10a running Android 17/API 37 throughout), against a live `db`/`minio`/`api`/`worker` stack, with the specific steps and observed results recorded narratively in `apps/android/docs/ROADMAP.md` under each phase — for example, the sync engine's watermark correctness was verified by forcing a mid-run API outage and confirming a subsequent run recovered every record with zero duplicates, and the layer-ordering/visibility logic in `map/MapOverlays` was verified by screenshotting all three map modes against a real account.
 
