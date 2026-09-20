@@ -32,6 +32,12 @@ const demoPurgeInterval = 5 * time.Minute
 // as easy to check.
 const heatmapAgingInterval = 24 * time.Hour
 
+// heatmapCapInterval matches heatmapAgingInterval's own reasoning — recomputeHeatmapCaps
+// (heatmap_cap.go) is one cheap indexed query per user with any in-window activity, so daily
+// is easy to afford and keeps users.heatmap_cap from drifting far from an account's actual
+// coverage between sweeps.
+const heatmapCapInterval = 24 * time.Hour
+
 type job struct {
 	id      int64
 	kind    string
@@ -49,6 +55,8 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 	defer demoTicker.Stop()
 	heatmapTicker := time.NewTicker(heatmapAgingInterval)
 	defer heatmapTicker.Stop()
+	heatmapCapTicker := time.NewTicker(heatmapCapInterval)
+	defer heatmapCapTicker.Stop()
 
 	for {
 		select {
@@ -72,6 +80,10 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 		case <-heatmapTicker.C:
 			if err := ageOutHeatmapWindow(ctx, pool, log); err != nil {
 				log.Error("heatmap aging error", "err", err)
+			}
+		case <-heatmapCapTicker.C:
+			if err := recomputeHeatmapCaps(ctx, pool, log); err != nil {
+				log.Error("heatmap cap error", "err", err)
 			}
 		}
 	}

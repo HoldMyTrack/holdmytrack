@@ -23,6 +23,11 @@ import (
 // tile, not just whichever one triggered the dirty flag, because a tile's mask has to
 // represent the user's entire history through it every time, not just the newest activity.
 func RenderUser(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID string) error {
+	heatmapCap, err := userHeatmapCap(ctx, pool, userID)
+	if err != nil {
+		return fmt.Errorf("fog: load heatmap cap: %w", err)
+	}
+
 	dirty, err := dirtyTiles(ctx, pool, userID, Zoom)
 	if err != nil {
 		return fmt.Errorf("fog: list dirty tiles: %w", err)
@@ -30,7 +35,7 @@ func RenderUser(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, u
 
 	changed := make(map[[2]int]struct{}, len(dirty))
 	for _, t := range dirty {
-		if err := renderAndStoreTile(ctx, pool, store, userID, Zoom, t[0], t[1]); err != nil {
+		if err := renderAndStoreTile(ctx, pool, store, userID, Zoom, t[0], t[1], heatmapCap); err != nil {
 			return fmt.Errorf("fog: render z%d/%d/%d: %w", Zoom, t[0], t[1], err)
 		}
 		changed[t] = struct{}{}
@@ -63,6 +68,18 @@ func RenderUser(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, u
 // `users.privacy_trim_m` today, and no reprivacy job — §7 — reads it back): when one is
 // built, it needs to re-call RenderActivityMasks with freshly re-trimmed points per affected
 // activity, not just re-render a tile from its existing masks.
+
+// userHeatmapCap reads the account's own users.heatmap_cap (migrations/0019_heatmap_cap.sql)
+// — kept current by internal/worker/heatmap_cap.go's daily sweep (cap.go's
+// RecomputeHeatmapCap), never derived here. A render pass always uses whatever value is
+// currently stored, even if a recompute is mid-flight elsewhere; the next render after that
+// sweep's own dirty-marking picks up the new value, the same eventual-consistency the rest of
+// this package's dirty-tile model already relies on.
+func userHeatmapCap(ctx context.Context, pool *pgxpool.Pool, userID string) (float64, error) {
+	var cap float64
+	err := pool.QueryRow(ctx, `SELECT heatmap_cap FROM users WHERE id = $1`, userID).Scan(&cap)
+	return cap, err
+}
 
 func dirtyTiles(ctx context.Context, pool *pgxpool.Pool, userID string, zoom int) ([][2]int, error) {
 	rows, err := pool.Query(ctx,
@@ -99,7 +116,7 @@ func dirtyTiles(ctx context.Context, pool *pgxpool.Pool, userID string, zoom int
 // internal/worker's job (heatmap_aging.go's daily sweep), not this function's — by the time an
 // activity's flag actually flips, that sweep has already marked its tiles dirty too, so this
 // render is always just reflecting whatever the flag already says, never deciding it itself.
-func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID string, zoom, x, y int) error {
+func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID string, zoom, x, y int, heatmapCap float64) error {
 	rows, err := pool.Query(ctx, `
 		SELECT m.mask_object_key, a.in_heatmap_window
 		FROM activity_tile_masks m
@@ -149,7 +166,7 @@ func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.
 	// compositeFogMask/compositeHeatmapMask in raster.go — but, per the window above, not
 	// necessarily the same *set* of masks.
 	fogMask := compositeFogMask(fogMasks)
-	heatmapMask := compositeHeatmapMask(heatmapMasks)
+	heatmapMask := compositeHeatmapMask(heatmapMasks, heatmapCap)
 	if err := storeTilePNG(ctx, store, fogObjectKey(userID, zoom, x, y), fogMask); err != nil {
 		return err
 	}

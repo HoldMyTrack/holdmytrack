@@ -162,19 +162,26 @@ func blankTile() *image.Gray {
 }
 
 const (
-	// heatmapCap: the accumulated-intensity value that maps to fully saturated in the
-	// stored 8-bit channel. One "unit" of accumulation is roughly one full-strength stroke
-	// pass through a pixel (see accumulateTrack) — 8 is a first guess ("about 8 separate
-	// activities through the same spot reads as maximally hot"), adopted and recorded here
-	// the same way §4.2.1 adopted fog's reveal radius, explicitly open to retuning once
-	// there's real usage data rather than a single synthetic guess.
-	heatmapCap = 8.0
+	// defaultHeatmapCap seeds every account's users.heatmap_cap (migrations/
+	// 0019_heatmap_cap.sql) and is also the floor RecomputeHeatmapCap falls back to before an
+	// account has enough coverage to derive its own value (see minTouchedTilesForAdaptiveCap
+	// in cap.go) — "about 8 separate activities through the same spot reads as maximally hot,"
+	// the same adopted-not-derived reasoning §4.2.1 recorded fog's reveal radius with, kept as
+	// the starting point a sparse account's cap actually is before real usage data exists for
+	// it specifically.
+	defaultHeatmapCap = 8.0
+
+	// minHeatmapCap floors RecomputeHeatmapCap's output — a sparse or unusually uniform
+	// account's 95th-percentile touch count could otherwise land low enough that a single
+	// activity's pass through a pixel reads as maximally hot, the exact fast-saturation
+	// failure this whole adaptive-cap change exists to fix, just at a smaller number.
+	minHeatmapCap = 2.0
 
 	// HeatmapWindowDays bounds Heatmap to a rolling window ending now — unlike Fog of War,
 	// which shows true all-time coverage, Heatmap answers "where do I go *now*," so a route
 	// no longer visited should be able to cool off instead of staying maximally hot forever.
 	// Not user-configurable (there is no control for it); a fixed product decision, adopted
-	// and recorded here the same way heatmapCap above is, equally open to retuning.
+	// and recorded here the same way defaultHeatmapCap above is, equally open to retuning.
 	HeatmapWindowDays = 365
 )
 
@@ -186,7 +193,7 @@ const (
 // self-intersection (a loop ridden past twice) adds too, which is correct: it really was
 // visited twice. Feathering per-mask before summing (not once after, the way fog does it)
 // matches this package's original rasterizeHeatmapTile/strokeMask behavior exactly.
-func compositeHeatmapMask(masks []*image.Gray) *image.Gray {
+func compositeHeatmapMask(masks []*image.Gray, cap float64) *image.Gray {
 	accum := make([]float64, TileSize*TileSize)
 	for _, m := range masks {
 		blurred := boxBlur(m, featherPx)
@@ -197,7 +204,7 @@ func compositeHeatmapMask(masks []*image.Gray) *image.Gray {
 
 	out := image.NewGray(image.Rect(0, 0, TileSize, TileSize))
 	for i, v := range accum {
-		normalized := v / heatmapCap
+		normalized := v / cap
 		if normalized > 1 {
 			normalized = 1
 		}
