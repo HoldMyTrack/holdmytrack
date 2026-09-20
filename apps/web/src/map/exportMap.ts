@@ -1,7 +1,7 @@
 import { Map as MapLibreMap } from 'maplibre-gl';
 import { API_BASE_URL, type ActivityQuery } from '../api';
 import { basemapOrigin } from './config';
-import { ensureFogLayer, type MaskQuery } from './fog';
+import { ensureFogLayer } from './fog';
 import { ensureHeatmapLayer } from './heatmap';
 import { labelInsertionPoint } from './layers';
 import { setMapMode, type MapMode } from './mapMode';
@@ -33,7 +33,6 @@ export interface ExportViewState {
   flavor: Flavor;
   mode: MapMode;
   activityQuery: ActivityQuery;
-  maskQuery: MaskQuery;
   hiddenIds: string[];
 }
 
@@ -85,8 +84,8 @@ export async function exportMapImage(liveMap: MapLibreMap, state: ExportViewStat
     });
 
     const beforeId = labelInsertionPoint(instance);
-    ensureFogLayer(instance, beforeId, state.maskQuery);
-    ensureHeatmapLayer(instance, beforeId, state.maskQuery);
+    ensureFogLayer(instance, beforeId);
+    ensureHeatmapLayer(instance, beforeId);
     ensureTrackLayer(instance, beforeId, state.activityQuery);
     setMapMode(instance, state.mode);
     setHiddenTracks(instance, state.hiddenIds);

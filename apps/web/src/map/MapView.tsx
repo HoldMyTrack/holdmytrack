@@ -4,8 +4,8 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { flyToBBox, unionBBox } from './bbox';
 import { browserOrigin, DEFAULT_VIEW } from './config';
 import { centreIsOutside, readCoverageBounds, type CoverageBounds } from './coverage';
-import { ensureFogLayer, refreshFogLayer } from './fog';
-import { ensureHeatmapLayer, refreshHeatmapLayer } from './heatmap';
+import { ensureFogLayer } from './fog';
+import { ensureHeatmapLayer } from './heatmap';
 import { setMapMode, type MapMode } from './mapMode';
 import { labelInsertionPoint } from './layers';
 import { archiveUrl, type Flavor } from './style';
@@ -20,7 +20,7 @@ import {
 } from './tracks';
 import { useMapInstance } from './useMapInstance';
 import { DEFAULT_FLAVOR, parseHash, replaceHash, type ViewState } from './viewState';
-import { getActivityTrackMetrics, type Activity, type ActivityTrackMetrics } from '../api';
+import { getActivityTrackMetrics, listActivities, type Activity, type ActivityTrackMetrics } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
 import { ActivitiesPanel } from '../ui/ActivitiesPanel';
@@ -45,6 +45,21 @@ const initialView: ViewState = initialHash.view ?? {
   zoom: DEFAULT_VIEW.zoom,
 };
 const initialFlavor: Flavor = initialHash.flavor ?? DEFAULT_FLAVOR;
+
+/** How many calendar days back Heatmap's rolling window reaches — must match
+ *  services/server/internal/fog's HeatmapWindowDays exactly, since this is only used to fetch
+ *  the same set of activities server-side already renders, for the "fly to fit Heatmap's
+ *  current coverage" camera target below. */
+const HEATMAP_WINDOW_DAYS = 365;
+
+/** `from` boundary for the Heatmap fly-to-coverage fetch below — a plain function, not a
+ *  memoized value, since "365 days before right now" has to be read fresh at the moment of
+ *  each transition into Heatmap, not fixed once at module load. */
+function heatmapWindowStart(): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - HEATMAP_WINDOW_DAYS);
+  return d.toISOString().slice(0, 10);
+}
 
 /** How long a checkbox-selection spree pauses before the map auto-flies to fit it (replacing
  *  the old explicit "Fit map" button — see AGENTS.md) — long enough that ticking three boxes
@@ -284,16 +299,6 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
     return new Set([...filteredOut, ...hiddenActivityIds]);
   }, [activities, excludedTypes, distanceFilter, hiddenActivityIds]);
 
-  // Fog/Heatmap's own filter — the same range as activityQuery, plus mapHiddenIds (the full
-  // eye-icon/TYPE/DISTANCE union, not just hiddenActivityIds alone) as an explicit exclude
-  // list. Unlike tracks, a raster tile has no per-feature identity for setHiddenTracks-style
-  // client-side hiding to act on, so the hidden set has to reach the server instead — see
-  // fog.ts's MaskQuery.
-  const maskQuery = useMemo(
-    () => ({ ...activityQuery, exclude: [...mapHiddenIds] }),
-    [activityQuery, mapHiddenIds],
-  );
-
   const unitSystem = useUnitSystem();
   const map = useMapInstance({ container, initialView, initialFlavor, scaleUnit: unitSystem });
 
@@ -307,6 +312,49 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
       if (flyBounds) flyToBBox(map, flyBounds);
     },
     [map],
+  );
+
+  // Fog/Heatmap show coverage no filter narrows any more (all-time for Fog, the rolling
+  // window above for Heatmap) — entering either from Normal has to clear the checked/focused
+  // selection (neither mode can select or focus a single activity) and fly to fit whatever
+  // that mode actually renders, then restore the selection exactly on the way back to Normal.
+  // Only that one transition does either: toggling directly between Fog and Heatmap touches
+  // neither, since Normal's selection state was never disturbed to begin with.
+  const modeSnapshotRef = useRef<{ checked: Set<string>; focused: string | null } | null>(null);
+  const flyToModeCoverage = useCallback(
+    (mode: 'fog' | 'heatmap') => {
+      if (!map) return;
+      const query = mode === 'heatmap' ? { from: heatmapWindowStart() } : {};
+      listActivities(query)
+        .then((all) => {
+          const flyBounds = unionBBox(all.flatMap((a) => (a.bbox ? [a.bbox] : [])));
+          if (flyBounds) flyToBBox(map, flyBounds);
+        })
+        .catch((error: unknown) => {
+          console.error('Could not fetch activities to fly to mode coverage', error);
+        });
+    },
+    [map],
+  );
+  const changeMapMode = useCallback(
+    (next: MapMode) => {
+      if (next === mapMode) return;
+      if (mapMode === 'normal') {
+        modeSnapshotRef.current = { checked: checkedActivityIds, focused: focusedActivityId };
+        setCheckedActivityIds(new Set());
+        setFocusedActivityId(null);
+        flyToModeCoverage(next as 'fog' | 'heatmap');
+      } else if (next === 'normal') {
+        const snapshot = modeSnapshotRef.current;
+        modeSnapshotRef.current = null;
+        if (snapshot) {
+          setCheckedActivityIds(snapshot.checked);
+          setFocusedActivityId(snapshot.focused);
+        }
+      }
+      setMapModeState(next);
+    },
+    [mapMode, checkedActivityIds, focusedActivityId, flyToModeCoverage],
   );
 
   // Auto-fly on checked-group change ("FLYING TO 3 SELECTED"),
@@ -515,19 +563,10 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
     if (map) refreshTrackLayer(map, activityQuery);
   }, [map, activityQuery]);
 
-  // Fog/Heatmap's own version of the effect just above — same reasoning, `maskQuery` instead
-  // of `activityQuery` alone, since fog/heatmap also need the hidden-activity exclude list
-  // tracks answers client-side (setHiddenTracks) and these can't. No `mapMode` gating: like
-  // the tracks effect, this refreshes the source regardless of which mode is currently
-  // visible, and setMapMode independently controls which layer actually shows — refreshing
-  // an invisible layer's source is cheap and keeps it correct the moment the user switches
-  // into Fog/Heatmap mode rather than only after they do.
-  useEffect(() => {
-    if (map) refreshFogLayer(map, maskQuery);
-  }, [map, maskQuery]);
-  useEffect(() => {
-    if (map) refreshHeatmapLayer(map, maskQuery);
-  }, [map, maskQuery]);
+  // Unlike tracks, Fog/Heatmap have no refresh-on-change effect here: neither mode is scoped
+  // by date/TYPE/DISTANCE/hidden-track state any more, so `ensureFogLayer`/`ensureHeatmapLayer`
+  // (both called once in `reattachOverlays` below, with no query) never have anything to
+  // refresh against.
 
   // A finished upload is a new track on the map and a new row in every §4.7 response, so
   // refresh all four together rather than let the header badge fall behind the geometry.
@@ -587,8 +626,8 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
       // it. setMapMode has to run again after this: addLayer always starts a fresh layer
       // hidden (fog.ts/heatmap.ts), so a styledata mid-non-Normal-mode would otherwise
       // silently drop back to Normal.
-      ensureFogLayer(instance, beforeId, maskQuery);
-      ensureHeatmapLayer(instance, beforeId, maskQuery);
+      ensureFogLayer(instance, beforeId);
+      ensureHeatmapLayer(instance, beforeId);
       ensureTrackLayer(instance, beforeId, activityQuery);
       // After tracks, so it paints on top and fully overlays the one track it applies to —
       // see trackBands.ts's own doc comment for why this is a second layer rather than a
@@ -609,7 +648,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
         setTrackBands(instance, trackMetrics.points, bandMetric);
       }
     },
-    [mapMode, mapHiddenIds, activityQuery, maskQuery, trackMetrics, bandMetric, focusedActivityId],
+    [mapMode, mapHiddenIds, activityQuery, trackMetrics, bandMetric, focusedActivityId],
   );
 
   useEffect(() => {
@@ -687,7 +726,6 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
               flavor: initialFlavor,
               mode: mapMode,
               activityQuery,
-              maskQuery,
               hiddenIds: [...mapHiddenIds],
             }}
           />
@@ -697,33 +735,35 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
       />
 
       <div className="app-body">
-        <ActivitiesPanel
-          readOnly={isDemo}
-          activities={filteredActivities}
-          loading={activitiesLoading}
-          error={activitiesError}
-          totals={totals}
-          facets={facets}
-          excludedTypes={excludedTypes}
-          onToggleType={toggleType}
-          distanceBounds={activityDistanceBounds}
-          distanceFilter={distanceFilter}
-          onChangeDistance={setDistanceFilter}
-          onResetFilters={resetActivityFilters}
-          checked={checkedActivityIds}
-          focusedId={focusedActivityId}
-          hoveredId={hoveredActivityId}
-          onToggle={toggleActivityChecked}
-          onFocus={focusActivity}
-          onHoverActivity={setHoveredActivityId}
-          onClear={clearSelection}
-          onSelectAll={selectAll}
-          onShowSelected={showSelected}
-          hiddenIds={hiddenActivityIds}
-          onToggleGroupVisibility={toggleGroupVisibility}
-          onActivityUpdated={reloadActivities}
-          onActivitiesDeleted={handleActivitiesDeleted}
-        />
+        {mapMode === 'normal' && (
+          <ActivitiesPanel
+            readOnly={isDemo}
+            activities={filteredActivities}
+            loading={activitiesLoading}
+            error={activitiesError}
+            totals={totals}
+            facets={facets}
+            excludedTypes={excludedTypes}
+            onToggleType={toggleType}
+            distanceBounds={activityDistanceBounds}
+            distanceFilter={distanceFilter}
+            onChangeDistance={setDistanceFilter}
+            onResetFilters={resetActivityFilters}
+            checked={checkedActivityIds}
+            focusedId={focusedActivityId}
+            hoveredId={hoveredActivityId}
+            onToggle={toggleActivityChecked}
+            onFocus={focusActivity}
+            onHoverActivity={setHoveredActivityId}
+            onClear={clearSelection}
+            onSelectAll={selectAll}
+            onShowSelected={showSelected}
+            hiddenIds={hiddenActivityIds}
+            onToggleGroupVisibility={toggleGroupVisibility}
+            onActivityUpdated={reloadActivities}
+            onActivitiesDeleted={handleActivitiesDeleted}
+          />
+        )}
 
         <div className="map-root">
           <div ref={container} className="map-canvas" data-testid="map-canvas" />
@@ -732,7 +772,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
               type="button"
               className={mapMode === 'normal' ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
               aria-pressed={mapMode === 'normal'}
-              onClick={() => setMapModeState('normal')}
+              onClick={() => changeMapMode('normal')}
             >
               Normal
             </button>
@@ -740,7 +780,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
               type="button"
               className={mapMode === 'fog' ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
               aria-pressed={mapMode === 'fog'}
-              onClick={() => setMapModeState('fog')}
+              onClick={() => changeMapMode('fog')}
             >
               Fog
             </button>
@@ -748,7 +788,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
               type="button"
               className={mapMode === 'heatmap' ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
               aria-pressed={mapMode === 'heatmap'}
-              onClick={() => setMapModeState('heatmap')}
+              onClick={() => changeMapMode('heatmap')}
             >
               Heatmap
             </button>
@@ -789,18 +829,20 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
         </div>
       </div>
 
-      <ActivityHistogram
-        days={visibleDays}
-        onPan={panBy}
-        pageStep={pageStep}
-        canPanEarlier={canPanEarlier}
-        canPanLater={canPanLater}
-        selectedRange={selectedRange ?? { from: today, to: today }}
-        onChangeSelection={changeSelectedRange}
-        selectedRangeDays={selectedRangeDays}
-        selectedActiveDays={selectedActiveDays}
-        onCapacityChange={setBarsPerView}
-      />
+      {mapMode === 'normal' && (
+        <ActivityHistogram
+          days={visibleDays}
+          onPan={panBy}
+          pageStep={pageStep}
+          canPanEarlier={canPanEarlier}
+          canPanLater={canPanLater}
+          selectedRange={selectedRange ?? { from: today, to: today }}
+          onChangeSelection={changeSelectedRange}
+          selectedRangeDays={selectedRangeDays}
+          selectedActiveDays={selectedActiveDays}
+          onCapacityChange={setBarsPerView}
+        />
+      )}
     </div>
   );
 }
