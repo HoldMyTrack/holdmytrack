@@ -13,15 +13,15 @@ fitmap/
 ├── .env.prod.example            # compose.prod.yml's own env template
 ├── .editorconfig
 ├── docs/
-│   ├── VISION.md              # product, market, funding, roadmap
-│   ├── ARCHITECTURE.md               # system architecture, key decisions, stack
-│   ├── IMPLEMENTATION.md   # schema, workflows, each feature's own detail
-│   ├── SPEC.md   # observable behavior, FR-N.M, independent of the above
-│   ├── ROADMAP.md                    # the remaining-work checklist
-│   ├── KNOWN_ISSUES.md               # currently-open defects in shipped functionality
-│   ├── adr/                          # Architecture Decision Records — why, not just what
-│   ├── DEVELOPMENT.md                # running it locally, verification, gotchas, commands
-│   └── DEPLOY.md                     # the production deployment runbook
+│   ├── VISION.md                # product, market, funding, roadmap
+│   ├── ARCHITECTURE.md          # system architecture, key decisions, stack
+│   ├── IMPLEMENTATION.md        # schema, workflows, each feature's own detail
+│   ├── SPEC.md                  # observable behavior, FR-N.M, independent of the above
+│   ├── ROADMAP.md               # the remaining-work checklist
+│   ├── KNOWN_ISSUES.md          # currently-open defects in shipped functionality
+│   ├── adr/                     # Architecture Decision Records — why, not just what
+│   ├── DEVELOPMENT.md           # running it locally, verification, gotchas, commands
+│   └── DEPLOY.md                # the production deployment runbook
 ├── AGENTS.md                    # orientation for coding agents
 ├── apps/
 │   ├── android/                 # Kotlin — Phase 2. Map + session built; Health Connect next
