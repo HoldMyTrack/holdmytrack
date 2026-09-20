@@ -118,7 +118,7 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 				user_id, source, source_detail, external_id,
 				activity_type, distance_meters, duration_seconds, moving_seconds,
 				elevation_gain_m, avg_speed_mps, started_at,
-				trajectory, raw_payload_key
+				trajectory, raw_payload_key, name, description
 			) VALUES (
 				$1, $2, $3, $4,
 				$5, $6, $7, $8,
@@ -130,7 +130,7 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 					)),
 					4326
 				),
-				$15
+				$15, NULLIF($16, ''), NULLIF($17, '')
 			)
 			ON CONFLICT (user_id, source, external_id) WHERE external_id IS NOT NULL DO NOTHING -- $15 = raw_payload_key
 			RETURNING id
@@ -146,7 +146,7 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 		act.ActivityType, m.distanceM, m.durationS, m.movingS,
 		m.elevationGainM, m.avgSpeedMps, points[0].Time,
 		simpLons, simpLats, simpTs,
-		job.RawPayloadKey,
+		job.RawPayloadKey, act.Name, act.Description,
 	).Scan(&activityID, &inserted)
 	if err != nil {
 		return Result{}, fmt.Errorf("ingest: persist activity: %w", err)
