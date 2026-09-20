@@ -24,6 +24,8 @@ For repository layout, the root `README.md` is now the authority — it absorbed
 
 `VISION.md`, `ARCHITECTURE.md` and `IMPLEMENTATION.md` cite each other by section number (`§5.2`, `§1.2`) rather than by page or quotation; `SPEC.md` cites all three the same way, but internally cites its own requirements as `FR-N.M`, not `§N.M` — its own top-level section numbers don't align with the FR groups (Introduction and Actors sit ahead of FR-1), so `§8` inside that document does not mean "FR-8." `ARCHITECTURE.md` and `IMPLEMENTATION.md` were one document until this content was split out — existing citations to what's now `ARCHITECTURE.md` §1/§2 keep the exact section numbers they already had, just pointing at a different file now; `IMPLEMENTATION.md` itself starts at §3 for the same reason. When you change something any of these documents specifies, update the document in the same change — a citation that no longer matches the code (or another document) is worse than no citation.
 
+This file stays limited to orientation — the table above, `What FitMap is`, and the Markdown convention below. If you're about to write what a feature does, how it works, or why it was built a particular way, that belongs in `SPEC.md` (what) or `IMPLEMENTATION.md` (how/why), not here.
+
 ## Markdown Formatting Style
 
 - **No hard-wrapping:** Markdown files are not hard-wrapped at a fixed column (~90-100 chars) the way a plain-text file would be.
