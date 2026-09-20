@@ -372,21 +372,23 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 ### FR-4.2 Fog of War mode
 
-**Description**: An alternate map mode showing a dark veil over everywhere the user has not recorded an activity.
+**Description**: An alternate map mode showing a dark veil over everywhere the user has not recorded an activity — true all-time coverage, ignoring every other filter.
 
 **Behavior**:
-1. Selecting "Fog" from the map-mode toggle replaces the track lines with a raster veil: any area a recorded route has passed through is rendered clear; everywhere else stays fogged.
-2. The veil respects the current date range and hidden-activity set exactly as Normal mode's tracks do (FR-4.1) — narrowing the range or hiding an activity re-fogs the area it covered.
+1. Selecting "Fog" from the map-mode toggle replaces the track lines with a raster veil: any area a recorded route has ever passed through is rendered clear; everywhere else stays fogged.
+2. Fog ignores the date range and the Type/Distance/hidden-track filters entirely — it always shows every activity the account has ever recorded, not just what Normal mode currently has selected. Entering Fog hides the Activities panel and the date-range picker (there is nothing for either to filter), clears any checked or focused activity, and flies the camera to fit the account's full all-time extent.
 3. Individual track lines are not drawn in this mode (the veil itself is the information).
+4. Returning to Normal mode restores the previously checked/focused activities, the date range, and the panel/picker exactly as they were before switching to Fog.
 
 ### FR-4.3 Heatmap mode
 
-**Description**: An alternate map mode shading locations by how often they've been visited.
+**Description**: An alternate map mode shading locations by how often they've been visited recently — a rolling window, not an all-time record, so a route no longer visited can cool off.
 
 **Behavior**:
 1. Selecting "Heatmap" replaces the track lines with a raster overlay, brighter wherever more recorded activity has crossed the same location (a daily commute reads brighter than a once-ridden road).
-2. Like Fog of War, the heatmap respects the current date range and hidden-activity set.
+2. Like Fog of War, Heatmap ignores the date range and the Type/Distance/hidden-track filters, hides the Activities panel and date-range picker, and clears any checked or focused activity. Unlike Fog, it only considers activities within a fixed rolling window (the last 365 days, not user-configurable) — the camera flies to fit that window's coverage, not the account's full history.
 3. Individual track lines are not drawn in this mode.
+4. Returning to Normal mode restores the previously checked/focused activities, the date range, and the panel/picker exactly as they were before switching to Heatmap.
 
 ### FR-4.4 Mode is mutually exclusive
 
@@ -438,7 +440,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Preconditions**: Active session; the map has finished its initial load.
 
 **Behavior**:
-1. The exported image reflects the current camera position, theme, map mode (Normal, Fog, or Heatmap), and the current date-range/hidden-track filters — everything the live map is currently showing, at a resolution well above the on-screen canvas.
+1. The exported image reflects the current camera position, theme, and map mode — everything the live map is currently showing, at a resolution well above the on-screen canvas. In Normal mode that includes the current date-range/hidden-track filters; Fog exports its all-time coverage and Heatmap its current rolling window (FR-4.2/FR-4.3), regardless of what Normal mode's filters were set to before switching.
 2. The live map is not disturbed by an export — camera, zoom, and mode remain exactly as they were before the export was triggered.
 3. While an export is generating, the control shows a busy state; a failure (e.g. a timeout waiting for tiles to load at export resolution) is reported inline rather than silently producing nothing.
 

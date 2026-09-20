@@ -284,11 +284,11 @@ func (s *Server) handleUpdateActivity(w http.ResponseWriter, r *http.Request) {
 //
 //   - Object storage has no foreign keys (demo_purge.go's own reasoning), so the raw upload
 //     and this activity's rendered fog/heatmap masks have to be removed explicitly.
-//   - The *unfiltered* Fog/Heatmap view reads a precomputed per-user, per-tile cache that
-//     ingest builds by compositing activity_tile_masks rows together, but only ingest ever
-//     marks a tile dirty or enqueues its re-render — deleting an activity would otherwise
-//     cascade its masks away while leaving that cache's already-rendered PNGs stale
-//     indefinitely, still showing coverage for an activity that no longer exists.
+//   - Fog and Heatmap both read a precomputed per-user, per-tile cache that ingest builds by
+//     compositing activity_tile_masks rows together, but only ingest ever marks a tile dirty
+//     or enqueues its re-render — deleting an activity would otherwise cascade its masks away
+//     while leaving that cache's already-rendered PNGs stale indefinitely, still showing
+//     coverage for an activity that no longer exists.
 //
 // Runs synchronously in the handler, like handleUpdateActivity/handleDeleteAvatar: unlike
 // ingest's parsing, everything here (a row delete, a couple of small queries, an

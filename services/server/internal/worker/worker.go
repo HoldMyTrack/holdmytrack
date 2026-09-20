@@ -26,6 +26,12 @@ const pollInterval = 500 * time.Millisecond
 // needs sub-second responsiveness the way the job queue does.
 const demoPurgeInterval = 5 * time.Minute
 
+// heatmapAgingInterval is daily, not weekly — heatmap_aging.go's sweep is cheap (one indexed
+// query plus whatever small number of activities actually crossed the window boundary since
+// the last run), so there's no reason to let staleness accumulate to a week when a day is just
+// as easy to check.
+const heatmapAgingInterval = 24 * time.Hour
+
 type job struct {
 	id      int64
 	kind    string
@@ -41,6 +47,8 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 	defer ticker.Stop()
 	demoTicker := time.NewTicker(demoPurgeInterval)
 	defer demoTicker.Stop()
+	heatmapTicker := time.NewTicker(heatmapAgingInterval)
+	defer heatmapTicker.Stop()
 
 	for {
 		select {
@@ -60,6 +68,10 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 		case <-demoTicker.C:
 			if err := purgeExpiredDemoUsers(ctx, pool, store, log); err != nil {
 				log.Error("demo purge error", "err", err)
+			}
+		case <-heatmapTicker.C:
+			if err := ageOutHeatmapWindow(ctx, pool, log); err != nil {
+				log.Error("heatmap aging error", "err", err)
 			}
 		}
 	}

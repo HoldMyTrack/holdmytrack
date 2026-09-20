@@ -257,10 +257,12 @@ func computeTouchedTiles(points []parse.Point, zoom int) [][2]int {
 }
 
 // MarkFogTilesDirty upserts a fog_tiles row (dirty = true) for every given z14 tile —
-// computeTouchedTiles' result for a fresh ingest, or a deleted activity's own already-rendered
+// computeTouchedTiles' result for a fresh ingest, a deleted activity's own already-rendered
 // tiles (`internal/httpapi`'s handleDeleteActivity, which has no raw points to recompute
 // touched tiles from — it reads them back out of activity_tile_masks before the cascade
-// removes that row). Exported for that second caller; the upsert itself doesn't care which.
+// removes that row), or an activity that just aged out of Heatmap's rolling window
+// (`internal/worker`'s heatmap_aging.go, via ActivityTiles below). Exported for those callers;
+// the upsert itself doesn't care which triggered it.
 func MarkFogTilesDirty(ctx context.Context, pool *pgxpool.Pool, userID string, tiles [][2]int) error {
 	if len(tiles) == 0 {
 		return nil
@@ -280,6 +282,33 @@ func MarkFogTilesDirty(ctx context.Context, pool *pgxpool.Pool, userID string, t
 		ON CONFLICT (user_id, zoom, tile_x, tile_y) DO UPDATE SET dirty = true
 	`, userID, FogZoom, xs, ys)
 	return err
+}
+
+// ActivityTiles reads back the z14 tiles one activity's own crisp masks cover —
+// activity_tile_masks' primary key leads with activity_id, so this is an index-only lookup.
+// Shared by handleDeleteActivity's own tile lookup (which additionally merges in any
+// activity this one supersedes — see its own activityFogTiles) and heatmap_aging.go's daily
+// sweep, which has no supersede case to worry about: an activity aging out of the window is
+// still live, just no longer eligible, so only its own tiles ever need re-rendering.
+func ActivityTiles(ctx context.Context, pool *pgxpool.Pool, activityID string) ([][2]int, error) {
+	rows, err := pool.Query(ctx,
+		`SELECT DISTINCT tile_x, tile_y FROM activity_tile_masks WHERE activity_id = $1 AND zoom = $2`,
+		activityID, FogZoom,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tiles [][2]int
+	for rows.Next() {
+		var x, y int
+		if err := rows.Scan(&x, &y); err != nil {
+			return nil, err
+		}
+		tiles = append(tiles, [2]int{x, y})
+	}
+	return tiles, rows.Err()
 }
 
 // RenderFogJob is `render_fog`'s payload — just enough to say whose tiles to render, since
