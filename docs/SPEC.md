@@ -4,7 +4,7 @@
 | :-- | :-- |
 | **Version** | 1.0 |
 | **Status** | Current — describes Phase 0/1 functionality as built |
-| **Last updated** | 2026-09-19 |
+| **Last updated** | 2026-09-20 |
 | **Related documents** | `VISION.md` (product scope, market rationale, phase roadmap — the authority on *what ships and why*); `ARCHITECTURE.md` (system-level shape, key decisions, the stack); `IMPLEMENTATION.md` (schema, each feature's own implementation — the authority on *how it's built*); `AGENTS.md` (repository orientation) |
 
 ## 1. Introduction
@@ -15,7 +15,7 @@ This document specifies FitMap's functional behavior as currently implemented: w
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and privacy trim, FR-1.7; email verification, FR-1.8), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, and Android's Health Connect mobile sync — FR-3.6), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, the date-range picker, the per-account activity graph, password recovery, and distance/time trends (FR-9 below).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and privacy trim, FR-1.7; email verification, FR-1.8), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, the date-range picker, the per-account activity graph, password recovery, and distance/time trends (FR-9 below).
 
 **Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), explorer-tile gamification, the rest of "Export" (story cards, animated reveals — high-resolution map export itself is built, FR-4.10 below), and user-defined privacy zones (a `privacy_zones` table exists in the schema — `IMPLEMENTATION.md` §3.7 — but no endpoint or UI creates or applies one today; only the endpoint-trim privacy control in FR-8.1 below, user-adjustable via FR-1.7's Settings page, is functional). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against FitMap being a health or fitness advisor, and pace/heart-rate stay as per-activity route context (FR-4.9) rather than an analysed, all-time performance record. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
@@ -338,7 +338,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Error cases**: Server unreachable mid-run — the run stops, reports the failure, and the cursor does not advance past anything the server never confirmed, so a retried run resumes rather than re-sending everything already accepted.
 
-**Not yet built**: the iOS/HealthKit half of Path 2 — no iOS app exists yet (`apps/ios` is a placeholder). `apps/android/docs/ROADMAP.md` is the authority on Android's own remaining work (UI design, Play Store compliance, in-app GPS recording).
+**Not yet built**: the iOS/HealthKit half of Path 2 — no iOS app exists yet (`apps/ios` is a placeholder). `apps/android/docs/ROADMAP.md` is the authority on Android's own remaining work (UI design, Play Store compliance).
 
 ### FR-3.7 Cross-source duplicate detection
 
@@ -355,6 +355,26 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Outputs**: At most one live `Activity` per real-world activity, regardless of how many sources reported it.
 
 **Not yet built**: nothing in the web app currently surfaces *that* a duplicate was caught or lets someone review what got superseded (`docs/ROADMAP.md`'s "Surface superseded activities" item). The Android app's own sync screen does show this today, listing duplicates by both source names.
+
+### FR-3.8 In-app GPS recording (Android)
+
+**Description**: The Android app records a casual, GPS-only activity itself — a walk, hike, or drive someone would not otherwise bother tracking — and submits it directly to FitMap on stop, with no Health Connect round-trip. A third way an activity can originate on the Android app, alongside FR-3.6's Health Connect sync and a manual file upload (FR-3.1) done from the phone's browser.
+
+**Preconditions**: Signed in on the Android app; location permission granted.
+
+**Inputs**: The device's own GPS, read while a recording is in progress; a name, an activity type, and a description, all entered on the recording screen.
+
+**Behavior**:
+1. User opens **GPS Logger** from the app's menu, enters a name, picks an activity type (walk / hike / run / ride / drive), and optionally a description — all editable at any point before Stop, not just up front.
+2. **Record** starts a foreground-service-backed location recording, so it survives the screen turning off; **Pause**/**Resume** are user-initiated only — there is no automatic pause. A live readout shows elapsed time, distance, current altitude, and current speed while recording.
+3. **Stop** ends the recording and immediately submits it to `POST /v1/sync/activities` under `source = "recorded"`, with a client-generated `external_id` (a UUID minted at Record) and the name/type/description entered in step 1 — the same batched wire shape FR-3.6 uses, reusing its ingest pipeline unchanged (`docs/IMPLEMENTATION.md` §4.0.4, [ADR-0007](adr/0007-in-app-gps-recording-submits-directly.md)).
+4. A recording with fewer than 2 points (Stop pressed immediately after Record, before any location fix arrived) is rejected client-side rather than submitted, matching the endpoint's own floor.
+
+**Outputs**: One new `Activity`, titled and described from the moment it's created rather than needing an edit afterward — the one ingest path where that's true (every other path leaves both fields unset at ingest). Reported through the same `GET /v1/uploads` history FR-3.4 already describes.
+
+**Error cases**: Server unreachable at Stop — the submission fails and is reported on screen; the recorded points are not discarded by a failed submit, so retrying is possible (naming TBD; still recovering from Stop failing is client-side, not a server behavior).
+
+**Not yet built**: recovery from an app/process kill mid-recording (the next launch does not yet offer to resume or discard a buffered-but-unsubmitted recording); a discard confirmation before Stop finalizes; the iOS half (`docs/ROADMAP.md` Phase 2 tracks it as a combined Android/iOS item; Android's half is what this FR describes).
 
 ## 6. FR-4 — Map Visualization
 
