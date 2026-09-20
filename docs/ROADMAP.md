@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-09-19.
+Last updated: 2026-09-20.
 
 ## How to read this document
 
@@ -12,7 +12,7 @@ This is the master checklist from "what exists today" to "the full product `VISI
 - **`AGENTS.md`** is repository orientation — which document to read for what, not a status narrative of its own; `SPEC.md`/`IMPLEMENTATION.md` are where "what's built, mapped to actual files" actually lives.
 - **`KNOWN_ISSUES.md`** is the opposite direction from this file: currently-open defects in already-shipped functionality, not planned work. A bug found while building something on this list belongs there, not here.
 
-Checkboxes are the source of truth for progress; re-check them against the three docs above rather than trusting this file's memory of itself if it's been a while. A step that names a file or table already assumes the reader will open the referenced §/FR for the real detail.
+Checkboxes are the source of truth for progress; re-check them against the three docs above rather than trusting this file's memory of itself if it's been a while. A step that names a file or table already assumes the reader will open the referenced §/FR for the real detail. Once every checkbox in a subsection is checked, delete the subsection rather than leave it as a completed record — its design and rationale belong in `SPEC.md`/`IMPLEMENTATION.md` by the time it ships, not here. A partially-done section stays as-is until its own last checkbox is checked.
 
 ---
 
@@ -38,13 +38,6 @@ Today `users.country` (FR-1.7) is set only if a person visits Settings and picks
 - [ ] Stays a normal, editable Settings field afterward — never locked. Country-level accuracy from a database like GeoLite2 is good but not perfect (VPNs, corporate networks, travel), so this is a sensible default, not an authoritative fact about the account.
 - [ ] Browser locale (`Accept-Language`) and the browser Geolocation API were both considered and rejected as the signal here: locale reflects a language/OS preference, not physical location (someone with `en-GB` set while living elsewhere gets the wrong answer), and the Geolocation API needs an explicit permission prompt — exactly the kind of signup friction the email-verification item above is trying to avoid elsewhere. IP geolocation needs neither.
 - [ ] If a CDN ever fronts the app (`Production deployment`'s open CDN item), and if that CDN happens to be one that injects a country header on every request (e.g. Cloudflare's `CF-IPCountry`), that becomes a free replacement for the self-hosted lookup — worth revisiting then, not a blocker now.
-
-### Group edit type — extends FR-5.12/FR-5.13's header-toolbar bulk actions to Type, alongside Group visible/Delete group
-
-The header toolbar's third icon-only bulk action (pencil, `ActivitiesPanel.tsx`, next to Group visible/Delete group, enabled by the same non-empty-checked-group rule) opens `EditActivityDialog.tsx` over the checked group. With more than one activity checked, the dialog disables Name/Description (inherently per-activity) and leaves only the Type input/datalist active — the same one FR-5.10's single-row edit uses — with a subtitle stating the count of activities it will affect.
-
-- [x] **No backend change.** `PATCH /v1/activities/{id}` stays single-item; the dialog's `handleSave` loops over the checked activities, calling it once per id sequentially (matching Delete group's own pattern), each call resending that activity's own existing `name`/`description` alongside the new shared `activityType` — `updateActivity` is full-replace, not partial, so the dialog already held full `Activity` objects for the checked group to build the right per-row payload from.
-- [x] FR-5.2's TYPE filter chips, each row's TYPE label, and FR-5.10's own `<datalist>` all recompute for free from the refreshed data (`activityFacets.ts` is purely derived from loaded activities) — no changes were needed there.
 
 ### Fly to the most recent activity on first load — the map opens on an arbitrary fixed point today, not the signed-in account's own activities
 
@@ -79,32 +72,6 @@ Today's export (`exportMap.ts`) fixes width at 2400px and derives height from th
 - [ ] **A small set of fixed-shape presets** (square, portrait, landscape, shown as icons rather than raw dimensions), each of which fits the *selection's own bounding box* — never the viewport's — fully inside the chosen shape, reusing the same `fitBounds`-style computation `flyToBBox` already provides elsewhere. Fitting the content's own tight bounds, rather than whatever happened to be on screen, is what actually guarantees every selected activity is fully visible, with no cropping and no needlessly tiny result.
 - [ ] Everything else about FR-4.10 (theme, mode, date-range/hidden-track filters reflected, the busy state, the `fitmap-{date}.png` naming, the attribution/logo baked in per `docs/KNOWN_ISSUES.md`'s attribution fix and the logo item above) is unchanged and shared across every option — this only changes what bounding box and shape each option targets.
 - [ ] **Open question: rename the control itself.** "Export" no longer fits well once it's selection-based and framed around producing a shareable image — and Phase 6's planned GDPR data-export feature will also want the word "Export" for something completely different (downloading your raw account data), which would collide with this if both keep the same name. Candidates raised: "Share," "Save," or something else — not decided; whoever builds this should pick a name and rename the FR-4.10 header control and the `fitmap-{date}.png` download accordingly.
-
-### Fog of War/Heatmap probably shouldn't be scoped to the date range at all — the date picker driving them may be answering a question nobody actually asks
-
-Fog of War's whole premise is cumulative — "everywhere I've ever been" — so narrowing it to "everywhere I've been in the selected date range" doesn't obviously correspond to a real question a user has; checking a handful of activities and asking "what does their combined fog trace look like" isn't a thing people do, the way checking them and asking "where are these on the map" (Normal mode) clearly is. Heatmap has a slightly better case for date-scoping (comparing hot spots month over month is at least plausible), but it's a much rarer use than Normal mode's date range, which is core to the product. DISTANCE/TYPE filters and the per-row eye icon are a different matter — "show me only my runs" or "hide that one mislabeled activity" are real questions either mode can meaningfully answer, and would stay wired up either way.
-
-- [x] **Decided, and gone further than this item's own framing**: Fog and Heatmap now ignore Date Range *and* the DISTANCE/TYPE/hidden-track filters — not just the date range — since neither mode can select or focus a single activity anyway, there's nothing left for those filters to scope. Fog shows true all-time coverage; Heatmap shows a fixed rolling 365-day window instead (`fog.HeatmapWindowDays`) so a route no longer visited can cool off — see `docs/SPEC.md` FR-4.2/FR-4.3.
-- [x] Resolved by removing the controls entirely rather than greying them out: the Activities panel and date-range picker disappear while in Fog/Heatmap mode (`MapView.tsx`'s `changeMapMode`), and reappear with the previous selection/date range restored exactly on returning to Normal.
-- [x] Confirmed — see the performance item directly below, now resolved the same way.
-
-### Fog of War/Heatmap performance — resolved twice: first the date range, then the live-compositing path itself
-
-Fog and Heatmap no longer take a date range or any other Activities-panel filter at all (see the design-decision item above) — both serve a plain precomputed lookup off `fog_tiles`, with no per-request compositing of any kind. Fog's own aggregate always covers every non-superseded activity; Heatmap's is rebuilt from only the activities currently flagged `in_heatmap_window` (`migrations/0018_activity_in_heatmap_window.sql`), kept current by the same ingest/delete dirty-marking Fog already had, plus a daily sweep (`internal/worker`'s `ageOutHeatmapWindow`) that flips the flag and re-renders just that activity's own tiles as each one individually ages past the rolling window (`fog.HeatmapWindowDays`, 365 days).
-
-- [x] **Stop scoping Fog/Heatmap to the date range at all** — done; an arbitrary, user-stretched range can no longer reach either mode.
-- [x] **Heatmap's fixed rolling window still turned out to be expensive, and got fixed too**: it originally kept the old live-compositing path (`internal/fog/filtered.go`), just with a server-computed window instead of a client-supplied one — reasoned at the time to be cheap since a relative window is self-bounding, but measured live against the Demo Customer account's home tile (591/611 activities) at ~12.6s per tile and ~56.5s at low zoom, with the 45s cache never actually hitting (its key embedded the filter's exact instant, which changes on every request). Fixed by moving Heatmap to the same precomputed-lookup shape Fog already had — `filtered.go` is deleted.
-- [x] **The first fix's own weekly, whole-account sweep was itself a thundering-herd risk** — regenerating every account's entire tile set on the same global tick, rather than the specific tiles that actually needed it. Replaced with the per-activity, per-day design described above: each activity ages out on whatever calendar day happens to be 365 days after it was created, already scattered across the year, so the daily sweep's workload is naturally small and spread out with no artificial staggering needed — and only that activity's own tiles are re-rendered, not the whole account's.
-
-### Heatmap's saturation point is now adaptive per account
-
-`internal/fog/raster.go`'s old `heatmapCap = 8.0` was a hardcoded constant — the number of accumulated activity-passes through a pixel that mapped to fully saturated (hottest yellow), the same for every account regardless of how much history it held. `users.heatmap_cap` (`migrations/0019_heatmap_cap.sql`) replaces it with a per-account value, recomputed daily.
-
-- [x] `internal/fog.RecomputeHeatmapCap` sets the cap to the account's own single most-touched z14 tile: `COUNT(DISTINCT activity_id)` per tile, grouped over `activity_tile_masks`, scoped to non-superseded, `in_heatmap_window` activities — the same population `compositeHeatmapMask` actually sums, so the cap stays calibrated to what's rendered as activities age out of the window over time.
-- [x] **A percentile statistic was tried first and rejected, live against the Demo Customer account**: of its 1,140 distinct touched z14 tiles, 1,100 are touched exactly once, and the two genuinely hot tiles (591 and 498 touches) are under 0.2% of that population — any percentile at or below the 99.7th still lands inside the once-touched mass. The max targets the stated problem directly instead: the account's single most-used spot reads as fully hot only at its true busiest, with everything else scaled relative to it. `COUNT(DISTINCT activity_id)` also makes it hard to spoof — one activity idling or jittering in place can't inflate a tile's count, only genuinely many separate activities crossing it can.
-- [x] **Not live/per-request** — `internal/worker`'s `recomputeHeatmapCaps` runs the recompute once daily for every user with any in-window activity (the same independent-ticker pattern as `ageOutHeatmapWindow`), not on every tile view.
-- [x] Two guards prevent misfires: `minTouchedTilesForAdaptiveCap` (20) holds off adapting at all until an account has enough touched tiles for its own max to mean anything, and `heatmapCapChangeThreshold` (15%) skips updating the stored value — and the full-account re-render that would follow — when the new cap wouldn't move the rendered picture enough to justify it.
-- [x] Computed over **tiles**, not pixels — a `GROUP BY` over `activity_tile_masks` per user is cheap; per-pixel intensity statistics across a whole account's coverage would cost far more for marginal extra accuracy.
 
 ### Production deployment — `freefitmap.com` is live as a sandbox, not yet Production
 
