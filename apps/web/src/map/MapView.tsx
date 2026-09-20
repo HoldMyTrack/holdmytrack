@@ -62,8 +62,8 @@ function heatmapWindowStart(): string {
 }
 
 /** How long a checkbox-selection spree pauses before the map auto-flies to fit it (replacing
- *  the old explicit "Fit map" button — see AGENTS.md) — long enough that ticking three boxes
- *  in a row flies once, at the end, not three times. */
+ *  the old explicit "Fit map" button — see IMPLEMENTATION.md §4.7) — long enough that ticking
+ *  three boxes in a row flies once, at the end, not three times. */
 const SELECTION_FLY_DEBOUNCE_MS = 300;
 
 export interface MapViewProps {
@@ -358,8 +358,9 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
   );
 
   // Auto-fly on checked-group change ("FLYING TO 3 SELECTED"),
-  // replacing the old explicit "Fit map to selection" button — see AGENTS.md. Debounced so a
-  // multi-checkbox spree flies once, after the user pauses, not once per checkbox. Guarded on
+  // replacing the old explicit "Fit map to selection" button — see IMPLEMENTATION.md §4.7.
+  // Debounced so a multi-checkbox spree flies once, after the user pauses, not once per
+  // checkbox. Guarded on
   // a non-empty group because *this* effect has nothing sensible to fly to once it's empty —
   // clearSelection below is the one place checkedActivityIds goes back to empty on purpose,
   // and it flies to every activity instead, explicitly, rather than relying on this effect to
@@ -638,7 +639,8 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
       // with no filter, so a styledata that recreates it would otherwise silently un-hide
       // everything the eye icon/TYPE/DISTANCE filters had hidden. Both setMapMode and
       // setHiddenTracks diff against the layer's current value before calling into
-      // MapLibre — see their own doc comments (AGENTS.md) for why that isn't optional here.
+      // MapLibre — see docs/DEVELOPMENT.md's setFilter/setLayoutProperty gotcha for why
+      // that isn't optional here.
       setHiddenTracks(instance, [...mapHiddenIds]);
       // Same reasoning again: ensureBandLayer above always (re)creates an empty source, so a
       // styledata mid-focus would otherwise silently wipe whatever bands were showing until

@@ -58,7 +58,7 @@ This tree is the canonical one; do not let a second tree exist anywhere else to 
 | [`docs/adr/`](docs/adr/) | Architecture Decision Records — why each consequential, hard-to-reverse decision was made, and what was rejected. |
 | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Running it locally, the verification checklist, gotchas worth not rediscovering, and the command reference. |
 | [`docs/DEPLOY.md`](docs/DEPLOY.md) | You're standing up an actual deployment. |
-| [`AGENTS.md`](AGENTS.md) | You are a coding agent, or you want the short version of all of the above. |
+| [`AGENTS.md`](AGENTS.md) | You are a coding agent opening the repo cold — this same routing table, self-contained, plus the Markdown formatting convention these docs follow. |
 
 ## License
 

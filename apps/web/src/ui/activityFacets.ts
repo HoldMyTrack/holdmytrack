@@ -4,8 +4,7 @@ import type { Activity } from '../api';
  * The TYPE and DISTANCE filters are pure client-side facets
  * over the activities already fetched for the current date range — no backend involvement,
  * since §4.7's list endpoint no longer paginates and the panel always holds the full range's
- * rows already (see AGENTS.md on why that made this possible). "Reset filters" is instant
- * for the same reason: there is nothing to refetch.
+ * rows already. "Reset filters" is instant for the same reason: there is nothing to refetch.
  */
 
 export interface DistanceRange {
