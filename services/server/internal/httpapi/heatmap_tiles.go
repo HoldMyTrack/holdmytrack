@@ -1,11 +1,13 @@
 package httpapi
 
 import (
+	"errors"
 	"image/png"
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/fitmap/fitmap/services/server/internal/fog"
 )
@@ -14,18 +16,20 @@ import (
 //
 // Unlike Fog of War, which shows true all-time coverage (a place once cleared stays cleared),
 // Heatmap answers "where do I go *now*" — an old, no-longer-visited route should be able to
-// cool off rather than stay maximally hot forever. So this always takes the on-the-fly
-// filtered path (fog.RenderFilteredTile), with a fixed rolling window (fog.HeatmapWindowDays,
-// computed here, not from the request) as the only filter — never a client-supplied date range
-// or exclude list; a query string carrying either is ignored entirely. Unlike an arbitrary
-// user-chosen range, a relative rolling window is inherently self-bounding — "activities in
-// the last N days" costs roughly the same whether the account is one year old or ten — which
-// is what makes the filtered path affordable to always take here, unlike the arbitrary ranges
-// this same endpoint used to accept.
+// cool off rather than stay maximally hot forever, so heatmap_object_key (fog_tiles) is built
+// from only the activities inside a rolling window (fog.HeatmapWindowDays), not the account's
+// whole history.
 //
-// Unlike fog's blank tile (fully opaque white veil — "no coverage" must still read as
-// fogged), a blank heatmap tile renders fully transparent: "no heat here" is genuinely
-// nothing to draw, not a state that needs representing on screen.
+// This used to mean composing that window live, on every request (fog.RenderFilteredTile) —
+// measured against the Demo Customer's home tile (591 of 611 activities), that took ~12.6s
+// per tile and ~56.5s at low zoom, and the 45-second cache meant to absorb repeat requests
+// within one pan/zoom gesture never actually hit: its key embedded the filter's exact `From`
+// instant, which a fresh `time.Now().AddDate(0, 0, -N)` call almost never reproduces between
+// two real requests, so every single tile request paid full compositing cost. Heatmap now
+// reads a precomputed aggregate instead, exactly like Fog — internal/fog.renderAndStoreTile
+// builds heatmap_object_key from only the window's masks, kept current the same way Fog's own
+// aggregate is (ingest/delete dirty-marking) plus a weekly sweep (internal/worker's
+// refreshHeatmapWindows) so the window's trailing edge keeps moving even without new uploads.
 func (s *Server) handleHeatmapTile(w http.ResponseWriter, r *http.Request) {
 	z, errZ := strconv.Atoi(r.PathValue("z"))
 	x, errX := strconv.Atoi(r.PathValue("x"))
@@ -37,12 +41,19 @@ func (s *Server) handleHeatmapTile(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	userID := userIDFromContext(ctx)
 
-	windowStart := time.Now().AddDate(0, 0, -fog.HeatmapWindowDays)
-	filter := fog.Filter{From: &windowStart}
-
-	mask, err := fog.RenderFilteredTile(ctx, s.pool, s.store, userID, fog.HeatmapKind, z, x, y, filter)
+	var objectKey *string
+	err := s.pool.QueryRow(ctx,
+		`SELECT heatmap_object_key FROM fog_tiles WHERE user_id = $1 AND zoom = $2 AND tile_x = $3 AND tile_y = $4`,
+		userID, z, x, y,
+	).Scan(&objectKey)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		s.log.Error("heatmap tile query failed", "err", err, "z", z, "x", x, "y", y)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	mask, err := loadMaskOrBlank(ctx, s.store, objectKey)
 	if err != nil {
-		s.log.Error("heatmap tile filtered render failed", "err", err, "z", z, "x", x, "y", y)
+		s.log.Error("heatmap tile fetch failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}

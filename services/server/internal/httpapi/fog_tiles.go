@@ -18,9 +18,9 @@ import (
 // Always reads the precomputed fog_tiles aggregate — Fog of War shows true all-time coverage,
 // unconditionally: it isn't scoped by date range, TYPE/DISTANCE, or hidden-track state (a
 // place once cleared stays cleared, which is the whole point of the mechanic), so there is no
-// per-request filter to honor and no on-the-fly compositing path here. Heatmap is the one mode
-// with a filtered path (handleHeatmapTile, a fixed rolling window) — see its own doc comment
-// for why that one still needs it.
+// per-request filter to honor and no on-the-fly compositing here. handleHeatmapTile is the
+// same shape now too — see its own doc comment for why it's a plain lookup as well, not a
+// live composite, despite Heatmap's rolling window.
 //
 // `theme` is accepted, per §4.2's own reasoning for putting it in the URL (so a CDN caches
 // one variant per theme) — but there is only one documented veil treatment (§4.2.1's white

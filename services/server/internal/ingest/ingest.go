@@ -282,6 +282,20 @@ func MarkFogTilesDirty(ctx context.Context, pool *pgxpool.Pool, userID string, t
 	return err
 }
 
+// MarkAllFogTilesDirty flags every z14 tile a user already has a fog_tiles row for, dirty —
+// unlike MarkFogTilesDirty, not in response to anything that changed, but so a scheduled
+// re-render (internal/worker's heatmapRefresh) picks every one of them up. Fog's own
+// aggregate is unaffected by this (it has no notion of "aging out"), so re-rendering it here
+// is pure, harmless recomputation of the same result — this exists to slide Heatmap's rolling
+// window's trailing edge on tiles nothing has touched recently enough to dirty on its own.
+func MarkAllFogTilesDirty(ctx context.Context, pool *pgxpool.Pool, userID string) error {
+	_, err := pool.Exec(ctx,
+		`UPDATE fog_tiles SET dirty = true WHERE user_id = $1 AND zoom = $2`,
+		userID, FogZoom,
+	)
+	return err
+}
+
 // RenderFogJob is `render_fog`'s payload — just enough to say whose tiles to render, since
 // which tiles is the dirty flag's job, not this payload's.
 type RenderFogJob struct {

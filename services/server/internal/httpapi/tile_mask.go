@@ -10,12 +10,12 @@ import (
 	"github.com/fitmap/fitmap/services/server/internal/storage"
 )
 
-// loadMaskOrBlank fetches and decodes a stored fog tile mask, or returns a blank (all-zero)
+// loadMaskOrBlank fetches and decodes a stored fog_tiles mask, or returns a blank (all-zero)
 // one when there is nothing stored yet — "no coverage rendered here" is a normal state (a
 // tile the user's history has never touched, or one still waiting on render_fog), not an
-// error condition. Used by handleFogTile's always-unfiltered path; Heatmap has no unfiltered
-// path at all (handleHeatmapTile always takes fog.RenderFilteredTile's rolling window
-// instead), which does its own equivalent internally.
+// error condition. Shared by handleFogTile (object_key) and handleHeatmapTile
+// (heatmap_object_key) — both are now plain precomputed-aggregate lookups, just against
+// different columns of the same row.
 func loadMaskOrBlank(ctx context.Context, store *storage.Store, objectKey *string) (*image.Gray, error) {
 	if objectKey == nil {
 		return image.NewGray(image.Rect(0, 0, fog.TileSize, fog.TileSize)), nil

@@ -26,6 +26,12 @@ const pollInterval = 500 * time.Millisecond
 // needs sub-second responsiveness the way the job queue does.
 const demoPurgeInterval = 5 * time.Minute
 
+// heatmapRefreshInterval matches fog.HeatmapWindowDays' own granularity, not the job queue's
+// — an activity aging out of the rolling window is a once-a-week-at-most event for any given
+// tile, so there is nothing to gain from checking more often (heatmap_refresh.go's own
+// comment explains why weekly, not live, is the right cadence for this at all).
+const heatmapRefreshInterval = 7 * 24 * time.Hour
+
 type job struct {
 	id      int64
 	kind    string
@@ -41,6 +47,8 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 	defer ticker.Stop()
 	demoTicker := time.NewTicker(demoPurgeInterval)
 	defer demoTicker.Stop()
+	heatmapTicker := time.NewTicker(heatmapRefreshInterval)
+	defer heatmapTicker.Stop()
 
 	for {
 		select {
@@ -60,6 +68,10 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 		case <-demoTicker.C:
 			if err := purgeExpiredDemoUsers(ctx, pool, store, log); err != nil {
 				log.Error("demo purge error", "err", err)
+			}
+		case <-heatmapTicker.C:
+			if err := refreshHeatmapWindows(ctx, pool, log); err != nil {
+				log.Error("heatmap refresh error", "err", err)
 			}
 		}
 	}

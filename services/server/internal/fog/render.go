@@ -8,6 +8,7 @@ import (
 	"image"
 	"image/draw"
 	"image/png"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -91,9 +92,20 @@ func dirtyTiles(ctx context.Context, pool *pgxpool.Pool, userID string, zoom int
 // precise than the old bbox-intersection query it replaces: activity_tile_masks only ever
 // contains tiles the *raw* trajectory actually passed through, not an approximation from the
 // simplified trajectory's bounding box.
+//
+// Fog and Heatmap draw from the same query but not the same *rows*: Fog is a true all-time
+// aggregate (every non-superseded activity's mask), while Heatmap only composites masks whose
+// activity falls inside the rolling window (HeatmapWindowDays) as of this render — an activity
+// that ages past it stops contributing the next time this tile is re-rendered. That "next
+// time" is driven by two triggers: the normal ingest/delete dirty-marking (immediate, for
+// anything that actually changed), and a weekly sweep (internal/worker's heatmapRefresh) that
+// marks every tile dirty purely so the window's trailing edge keeps moving even when nothing
+// new is uploaded — see that file's own comment for why weekly, not live-per-request, is the
+// right granularity for an aging effect nobody is watching in real time.
 func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID string, zoom, x, y int) error {
+	windowStart := time.Now().AddDate(0, 0, -HeatmapWindowDays)
 	rows, err := pool.Query(ctx, `
-		SELECT m.mask_object_key
+		SELECT m.mask_object_key, a.started_at
 		FROM activity_tile_masks m
 		JOIN activities a ON a.id = m.activity_id
 		WHERE a.user_id = $1 AND a.superseded_by IS NULL
@@ -102,23 +114,28 @@ func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.
 	if err != nil {
 		return fmt.Errorf("query activity masks: %w", err)
 	}
-	var keys []string
+	type keyedMask struct {
+		key       string
+		startedAt time.Time
+	}
+	var rowsOut []keyedMask
 	for rows.Next() {
-		var key string
-		if err := rows.Scan(&key); err != nil {
+		var row keyedMask
+		if err := rows.Scan(&row.key, &row.startedAt); err != nil {
 			rows.Close()
 			return fmt.Errorf("scan activity mask key: %w", err)
 		}
-		keys = append(keys, key)
+		rowsOut = append(rowsOut, row)
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		return err
 	}
 
-	masks := make([]*image.Gray, 0, len(keys))
-	for _, key := range keys {
-		mask, err := loadCrispMask(ctx, store, key)
+	fogMasks := make([]*image.Gray, 0, len(rowsOut))
+	heatmapMasks := make([]*image.Gray, 0, len(rowsOut))
+	for _, row := range rowsOut {
+		mask, err := loadCrispMask(ctx, store, row.key)
 		if err != nil {
 			// One missing/corrupt mask should not fail the whole tile — every other
 			// activity through it is still real coverage. Skip and continue, the same
@@ -126,13 +143,17 @@ func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.
 			// ingest.
 			continue
 		}
-		masks = append(masks, mask)
+		fogMasks = append(fogMasks, mask)
+		if row.startedAt.After(windowStart) {
+			heatmapMasks = append(heatmapMasks, mask)
+		}
 	}
 
-	// Both rasters come from the same set of per-activity masks, composited differently
-	// (§4.2.2: max vs sum) — see compositeFogMask/compositeHeatmapMask in raster.go.
-	fogMask := compositeFogMask(masks)
-	heatmapMask := compositeHeatmapMask(masks)
+	// Both rasters composite the same shape of input differently (§4.2.2: max vs sum) — see
+	// compositeFogMask/compositeHeatmapMask in raster.go — but, per the window above, not
+	// necessarily the same *set* of masks.
+	fogMask := compositeFogMask(fogMasks)
+	heatmapMask := compositeHeatmapMask(heatmapMasks)
 	if err := storeTilePNG(ctx, store, fogObjectKey(userID, zoom, x, y), fogMask); err != nil {
 		return err
 	}
@@ -144,8 +165,8 @@ func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.
 }
 
 // loadCrispMask fetches and decodes one activity's stored crisp (unblurred) mask —
-// activity_tile_masks' own object, shared by renderAndStoreTile (the unfiltered aggregate
-// path) and RenderFilteredTile (filtered.go, the on-the-fly path) alike.
+// activity_tile_masks' own object, read back here by renderAndStoreTile to build both the
+// Fog and Heatmap aggregates for one tile.
 func loadCrispMask(ctx context.Context, store *storage.Store, key string) (*image.Gray, error) {
 	obj, err := store.Get(ctx, key)
 	if err != nil {
