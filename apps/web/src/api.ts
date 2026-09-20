@@ -589,6 +589,69 @@ export async function deleteActivity(id: string): Promise<void> {
 }
 
 /**
+ * One row of FR-3.7's duplicate list (`GET /v1/activities/duplicates`, `IMPLEMENTATION.md`
+ * §4.6) — an activity cross-source dedup took out of circulation, alongside the richer copy
+ * that superseded it. Both sides carry `source`, since that's the actual answer to "why is
+ * this gone": the same activity, already in from somewhere else. Mirrors the Android app's own
+ * `SyncStatusActivity` duplicates section (`apps/android/docs/IMPLEMENTATION.md` §6).
+ */
+export interface DuplicateActivity {
+  id: string;
+  startedAt: string;
+  activityType: string;
+  distanceMeters: number | null;
+  source: string;
+  supersededBy: {
+    id: string;
+    source: string;
+    startedAt: string;
+  };
+}
+
+interface DuplicateActivityBody {
+  id: string;
+  started_at: string;
+  activity_type: string;
+  distance_meters: number | null;
+  source: string;
+  superseded_by: {
+    id: string;
+    source: string;
+    started_at: string;
+  };
+}
+
+interface DuplicatesBody {
+  duplicates: DuplicateActivityBody[];
+}
+
+/** No filter, no pagination — duplicates are a small set beside the history they came from,
+ *  the same reasoning `duplicatesQuery`'s own server-side comment gives. */
+export async function getDuplicates(signal?: AbortSignal): Promise<DuplicateActivity[]> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/activities/duplicates`, {
+    credentials: 'include',
+    ...(signal ? { signal } : {}),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(text || `duplicates fetch failed (${res.status})`);
+  }
+  const body = (await res.json()) as DuplicatesBody;
+  return body.duplicates.map((d) => ({
+    id: d.id,
+    startedAt: d.started_at,
+    activityType: d.activity_type,
+    distanceMeters: d.distance_meters,
+    source: d.source,
+    supersededBy: {
+      id: d.superseded_by.id,
+      source: d.superseded_by.source,
+      startedAt: d.superseded_by.started_at,
+    },
+  }));
+}
+
+/**
  * §4.7's range summary: the aggregate behind the header badge, the panel's subtext and the
  * histogram's stats line. Unlike the per-row metrics these are never null — a sum over zero
  * matching activities is legitimately 0, not unknown.

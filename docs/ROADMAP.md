@@ -102,12 +102,6 @@ Native apps whose core job is exporting device-recorded health data to FitMap (P
 - [x] In-app GPS recording, Android half — a convenience capture for casual, watch-free activities (a road trip, a dog walk), not a fitness-tracker replacement: GPS only, no sensor data, no training metrics (`VISION.md` §4.1, §1.1). Submits directly through the existing ingest pipeline once a recording stops, reusing the sync endpoint's payload shape rather than opening a new one ([ADR-0007](adr/0007-in-app-gps-recording-submits-directly.md)) — no new server-side path, just a new `source` value. `apps/android/docs/ROADMAP.md` Phase 7 carries the detail; `docs/SPEC.md` FR-3.8 is the behavior spec.
 - [ ] In-app GPS recording, iOS half — inherits the Android build's wire shape and `source` convention once the iOS app itself exists (see the iOS Path 2 item above, which this depends on).
 
-### Cross-source deduplication (`IMPLEMENTATION.md` §4.6, `docs/SPEC.md` FR-3.7) — unavoidable once a second ingest source exists, which mobile sync is, ahead of Phase 4's cloud connectors under this order
-
-- [x] Fuzzy identity at ingest: same user, same activity type, start within half a minute either way, distance within ~1% — applied as a window around the incoming activity rather than equality on a pre-rounded bucket, so a pair a few seconds apart matches every time instead of only when it happens not to straddle a boundary (`IMPLEMENTATION.md` §4.6).
-- [x] Superseded-record handling: prefer the richest record (geometry over none, more stream channels over fewer); mark others `superseded_by`, don't delete, so a user can see why an activity disappeared (`GET /v1/activities/duplicates`). Deleting the winner re-ranks the copies it releases rather than making them all live at once.
-- [ ] Surface superseded activities somewhere in the Activities panel or Profile, so "disappeared" activities are discoverable, not silently gone.
-
 ### Rename "Upload" to "Import", split into Files/Sync tabs — the current single-purpose upload UI stops being an accurate label the moment a second ingest source exists
 
 `UploadPanel.tsx`'s "Upload activity" button/panel is the only ingest surface in the web app today, since manual file/`.zip`/Google Takeout upload is the only source shipped (`SPEC.md` FR-1 through FR-9). This phase's mobile sync and Phase 4's cloud connectors both add ingest sources that aren't "a file the user picked," so "Upload" stops describing what's actually happening the moment either lands.

@@ -37,6 +37,7 @@ import { UploadPanel } from '../ui/UploadPanel';
 import { useActivityDays } from '../ui/useActivityDays';
 import { useActivityList } from '../ui/useActivityList';
 import { useActivityTotals } from '../ui/useActivityTotals';
+import { useDuplicates } from '../ui/useDuplicates';
 
 /** How many calendar days back Heatmap's rolling window reaches — must match
  *  services/server/internal/fog's HeatmapWindowDays exactly, since this is only used to fetch
@@ -237,6 +238,9 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
     reload: reloadActivities,
   } = useActivityList(activityQuery);
   const { totals, reload: reloadTotals } = useActivityTotals(activityQuery);
+  // Not scoped by activityQuery — FR-3.7's duplicate list, like the histogram, answers "what
+  // happened to my whole history", not "what's in the currently selected date range".
+  const duplicates = useDuplicates();
   // The range picker's own bars and pan position, independent of the selection above — it
   // pages by days-with-activity rather than by calendar window, see useActivityDays.
   const {
@@ -610,7 +614,9 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
     reloadActivities();
     reloadTotals();
     reloadHistogram();
-  }, [map, activityQuery, reloadActivities, reloadTotals, reloadHistogram]);
+    // A finished upload/sync is also the one thing that can produce a new duplicate.
+    duplicates.refresh();
+  }, [map, activityQuery, reloadActivities, reloadTotals, reloadHistogram, duplicates.refresh]);
 
   // §4.7.5/§4.7.6: one or more deleted activities need the exact same four-part refresh a
   // finished upload does (unlike editing type/description, deleting changes distance/duration
@@ -798,6 +804,8 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
             onToggleGroupVisibility={toggleGroupVisibility}
             onActivityUpdated={reloadActivities}
             onActivitiesDeleted={handleActivitiesDeleted}
+            duplicates={duplicates.duplicates}
+            duplicatesError={duplicates.error}
           />
         )}
 

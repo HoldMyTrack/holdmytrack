@@ -133,3 +133,25 @@ export function formatActivityType(activityType: string): string {
     .map((word) => word[0]!.toUpperCase() + word.slice(1))
     .join(' ');
 }
+
+/** The schema's `source` values (`IMPLEMENTATION.md` §3.3), said the way a person would say
+ *  them — same closed mapping and wording as the Android app's own `sourceName()`
+ *  (`SyncStatusActivity.kt`), so a duplicate's origin reads the same on both clients. Unlike
+ *  `formatActivityType`, this *is* a fixed vocabulary — `source` is a small enum the ingest
+ *  pipeline itself defines, not open text a source can invent. */
+export function formatIngestSource(source: string): string {
+  switch (source) {
+    case 'healthconnect':
+      return 'Health Connect';
+    case 'healthkit':
+      return 'HealthKit';
+    case 'upload':
+      return 'an uploaded file';
+    case 'takeout':
+      return 'a Google Takeout import';
+    case 'recorded':
+      return 'a GPS recording';
+    default:
+      return source;
+  }
+}

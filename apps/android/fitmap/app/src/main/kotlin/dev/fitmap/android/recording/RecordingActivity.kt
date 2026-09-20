@@ -167,11 +167,23 @@ class RecordingActivity : AppCompatActivity() {
         val id = editingId ?: return
         lifecycleScope.launch {
             val record = store.get(id) ?: return@launch
+            val newType = typeField.text.toString().trim().ifEmpty { RecordingTypes.DEFAULT }
+            // A queued row's type can be cleared back to "unknown" here (Edit stays open until
+            // sync, not just until Stop) — RecordedActivitiesActivity's checkbox gate only
+            // blocks queuing a row that's *already* unknown, so without this, clearing the type
+            // on an already-queued row would reopen the exact dedup gap that gate exists to
+            // close. Demoting back to not-synced forces the same re-check on the next visit.
+            val newStatus = if (newType == RecordingTypes.DEFAULT && record.syncStatus == SyncStatus.QUEUED) {
+                SyncStatus.NOT_SYNCED
+            } else {
+                record.syncStatus
+            }
             store.update(
                 record.copy(
                     name = nameField.text.toString().trim(),
-                    activityType = typeField.text.toString().trim().ifEmpty { RecordingTypes.DEFAULT },
+                    activityType = newType,
                     description = descriptionField.text.toString().trim(),
+                    syncStatus = newStatus,
                 ),
             )
             finish()

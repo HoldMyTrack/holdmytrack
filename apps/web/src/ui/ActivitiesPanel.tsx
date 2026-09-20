@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { deleteActivity, type Activity, type ActivityTotals } from '../api';
+import { deleteActivity, type Activity, type ActivityTotals, type DuplicateActivity } from '../api';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DistanceFilter } from './DistanceFilter';
 import { EditActivityDialog } from './EditActivityDialog';
 import type { DistanceRange, TypeFacet } from './activityFacets';
-import { formatActivityType, formatDistance, formatDuration, formatStartedAt, formatTotalDistance } from './format';
+import {
+  formatActivityType,
+  formatDistance,
+  formatDuration,
+  formatIngestSource,
+  formatStartedAt,
+  formatTotalDistance,
+} from './format';
 import { useUnitSystem } from './units';
 
 /**
@@ -107,6 +114,13 @@ export interface ActivitiesPanelProps {
    *  (deleting changes distance/duration, editing never does) — MapView's own
    *  handleActivitiesDeleted does more than a plain reload. */
   onActivitiesDeleted: (ids: string[]) => void;
+  /** FR-3.7's "Not yet built" gap, closed: activities cross-source dedup took out of
+   *  circulation, each alongside the richer copy that superseded it — mirrors the Android
+   *  app's own duplicates section (`SyncStatusActivity`). Never filtered by the date range or
+   *  TYPE/DISTANCE facets above; a duplicate answers "where did my activity go", which isn't
+   *  a question scoped to whatever's currently selected. */
+  duplicates: DuplicateActivity[];
+  duplicatesError: string | null;
 }
 
 export function ActivitiesPanel({
@@ -135,6 +149,8 @@ export function ActivitiesPanel({
   onToggleGroupVisibility,
   onActivityUpdated,
   onActivitiesDeleted,
+  duplicates,
+  duplicatesError,
 }: ActivitiesPanelProps) {
   const hasActiveFilters = excludedTypes.size > 0 || distanceFilter !== null;
 
@@ -144,6 +160,12 @@ export function ActivitiesPanel({
   // UploadPanel.tsx/UserMenu.tsx already use (not shared into a hook for a third call site).
   const [typeFilterOpen, setTypeFilterOpen] = useState(false);
   const typeFilterRef = useRef<HTMLDivElement>(null);
+
+  // The Duplicates disclosure, same closed-by-default/dismiss-on-outside-click pattern as the
+  // Type dropdown above — a small footer link, not part of the main row list, since a
+  // duplicate isn't one of "my activities" in the sense the rest of this panel means.
+  const [duplicatesOpen, setDuplicatesOpen] = useState(false);
+  const duplicatesRef = useRef<HTMLDivElement>(null);
 
   // Scrolls the newly row-click-focused activity into view, centered — reported live as
   // having to hunt for the now-bolded row by eye after clicking a track on the map, since a
@@ -173,6 +195,22 @@ export function ActivitiesPanel({
       document.removeEventListener('keydown', onKeyDown);
     };
   }, [typeFilterOpen]);
+
+  useEffect(() => {
+    if (!duplicatesOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!duplicatesRef.current?.contains(event.target as Node)) setDuplicatesOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setDuplicatesOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [duplicatesOpen]);
 
   // §4.7.4's edit dialog — at most one open at a time, but now over either one row (a row's
   // own text no longer has a pencil icon; there isn't one any more) or the whole checked
@@ -504,6 +542,40 @@ export function ActivitiesPanel({
           {checkedActivities.length} selected · {formatTotalDistance(checkedMeters, system)}
         </span>
       </div>
+
+      {/* FR-3.7's "not yet built" gap: something synced can be absent from the list above for
+          two different reasons — it failed, or cross-source dedup already had it from
+          somewhere else — and only the second is not a fault. Hidden entirely when there's
+          nothing to say, the same as Android's own duplicatesHeading. */}
+      {(duplicates.length > 0 || duplicatesError) && (
+        <div className="activities-panel__duplicates" ref={duplicatesRef}>
+          <button
+            type="button"
+            className="activities-panel__duplicates-toggle"
+            aria-expanded={duplicatesOpen}
+            onClick={() => setDuplicatesOpen((open) => !open)}
+          >
+            {duplicatesError
+              ? 'Duplicates — failed to load'
+              : `${duplicates.length} ${duplicates.length === 1 ? 'duplicate' : 'duplicates'} found`}
+            <span className="activities-panel__duplicates-chevron" aria-hidden="true">
+              {duplicatesOpen ? '▾' : '▴'}
+            </span>
+          </button>
+          {duplicatesOpen && !duplicatesError && (
+            <ul className="activities-panel__duplicates-list" data-testid="activities-duplicates-list">
+              {duplicates.map((d) => (
+                <li key={d.id} className="activities-panel__duplicates-row">
+                  {formatStartedAt(d.startedAt)} · {formatActivityType(d.activityType)}
+                  {d.distanceMeters !== null && ` · ${formatDistance(d.distanceMeters, system)}`}
+                  <br />
+                  From {formatIngestSource(d.source)} — replaced by the copy from {formatIngestSource(d.supersededBy.source)}.
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {editingActivities && (
         <EditActivityDialog

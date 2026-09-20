@@ -957,6 +957,56 @@ body {
   color: rgb(var(--fm-ink-rgb) / 65%);
 }
 
+/* FR-3.7's duplicates disclosure — a plain text toggle in the same subdued register as
+   .activities-panel__subtext above it, not a prominent action: most sessions have nothing
+   here at all (the whole block is unrendered when the list is empty), and the ones that do
+   are explaining an absence, not offering something to do. */
+.activities-panel__duplicates {
+  border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
+}
+
+.activities-panel__duplicates-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin: 0;
+  padding: 10px 16px;
+  border: 0;
+  background: none;
+  color: rgb(var(--fm-ink-rgb) / 55%);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.activities-panel__duplicates-toggle:hover {
+  color: var(--fm-ink);
+}
+
+.activities-panel__duplicates-chevron {
+  font-size: 10px;
+}
+
+.activities-panel__duplicates-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 16px 10px;
+}
+
+.activities-panel__duplicates-row {
+  padding: 6px 0;
+  border-top: 1px solid rgb(var(--fm-ink-rgb) / 6%);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: rgb(var(--fm-ink-rgb) / 65%);
+}
+
+.activities-panel__duplicates-row:first-child {
+  border-top: 0;
+}
+
 /* Two regions side by side, not a header row above a full-width chart: a legend column sized
    to match the Activities panel's own current width (`var(--panel-width)`, the same custom
    property that panel already sets on itself — reusing it is what keeps this row visually
