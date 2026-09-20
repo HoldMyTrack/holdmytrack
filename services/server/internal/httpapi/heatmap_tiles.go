@@ -10,10 +10,7 @@ import (
 	"github.com/fitmap/fitmap/services/server/internal/fog"
 )
 
-// handleHeatmapTile serves §4.2.2's additive-intensity mask as a ready-to-draw RGBA PNG via
-// heatmapRamp — reading heatmap_object_key instead of object_key from the unfiltered fog_tiles
-// row that Fog uses (handleFogTile), and fog.HeatmapKind instead of fog.FogKind for the
-// composite.
+// handleHeatmapTile serves §4.2.2's additive-intensity mask as a ready-to-draw RGBA PNG.
 //
 // Unlike Fog of War, which shows true all-time coverage (a place once cleared stays cleared),
 // Heatmap answers "where do I go *now*" — an old, no-longer-visited route should be able to
