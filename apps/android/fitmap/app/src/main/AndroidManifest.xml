@@ -117,6 +117,13 @@
             android:exported="false"
             android:foregroundServiceType="location" />
 
+        <!-- Not exported: reached only from MainActivity's burger menu, never by another app. -->
+        <activity
+            android:name=".recording.RecordedActivitiesActivity"
+            android:exported="false"
+            android:label="@string/menu_recorded_activities"
+            android:theme="@style/Theme.AppCompat.DayNight" />
+
         <!-- Where Health Connect's "see how this app used your data" link lands. -->
         <activity-alias
             android:name="ViewPermissionUsageActivity"

@@ -358,23 +358,26 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 ### FR-3.8 In-app GPS recording (Android)
 
-**Description**: The Android app records a casual, GPS-only activity itself — a walk, hike, or drive someone would not otherwise bother tracking — and submits it directly to FitMap on stop, with no Health Connect round-trip. A third way an activity can originate on the Android app, alongside FR-3.6's Health Connect sync and a manual file upload (FR-3.1) done from the phone's browser.
+**Description**: The Android app records a casual, GPS-only activity itself — a walk, hike, or drive someone would not otherwise bother tracking. Recording and syncing are two separate, explicit steps: Stop only saves a finished recording to the device; nothing reaches the server until the user marks it to sync and taps the Sync screen's "Sync Now" — a third way an activity can originate on the Android app, alongside FR-3.6's Health Connect sync and a manual file upload (FR-3.1) done from the phone's browser.
 
-**Preconditions**: Signed in on the Android app; location permission granted.
+**Preconditions**: Location permission granted to record. No account or sign-in is needed to record or manage recordings locally — only to actually sync one, the same precondition FR-3.6 has.
 
-**Inputs**: The device's own GPS, read while a recording is in progress; a name, an activity type, and a description, all entered on the recording screen.
+**Inputs**: The device's own GPS, read while a recording is in progress; a name, an activity type (free text, not a fixed list), and a description, editable on the recording screen and, after the fact, from **Recorded Activities**' Edit button.
 
 **Behavior**:
-1. User opens **GPS Logger** from the app's menu, enters a name, picks an activity type (walk / hike / run / ride / drive), and optionally a description — all editable at any point before Stop, not just up front.
+1. User opens **GPS Logger** from the app's menu. Name and Description start empty and Activity Type starts `"unknown"` — all three are plain text fields, editable at any point before Stop; the type field also offers walk/hike/run/ride/drive as tap-to-fill suggestions, but any text is accepted.
 2. **Record** starts a foreground-service-backed location recording, so it survives the screen turning off; **Pause**/**Resume** are user-initiated only — there is no automatic pause. A live readout shows elapsed time, distance, current altitude, and current speed while recording.
-3. **Stop** ends the recording and immediately submits it to `POST /v1/sync/activities` under `source = "recorded"`, with a client-generated `external_id` (a UUID minted at Record) and the name/type/description entered in step 1 — the same batched wire shape FR-3.6 uses, reusing its ingest pipeline unchanged (`docs/IMPLEMENTATION.md` §4.0.4, [ADR-0007](adr/0007-in-app-gps-recording-submits-directly.md)).
-4. A recording with fewer than 2 points (Stop pressed immediately after Record, before any location fix arrived) is rejected client-side rather than submitted, matching the endpoint's own floor.
+3. **Stop** ends the recording and saves it to an on-device store only, tagged not-synced — no network request happens. A recording with fewer than 2 points (Stop pressed before any location fix arrived) is not saved at all, matching the sync endpoint's own floor.
+4. **Recorded Activities** (a separate menu item) lists every locally saved recording, newest first, filterable by sync status (not synced / queued / synced) and by activity type. Each row has a sync checkbox and an Edit button.
+5. Checking a row's checkbox marks it queued; unchecking an unsynced row clears the queue mark. A synced row's checkbox is always checked and cannot be unchecked.
+6. **Edit** reopens the same recording screen against the saved row — the Record/Pause/Stop controls are replaced by a single Save button, and the Name/Type/Description fields (plus the recorded stats, read-only) are pre-filled. Editable at any point up until the row syncs; once synced, the fields and Save button are replaced with a notice that the row is locked.
+7. The Sync screen's existing "Sync Now" (FR-3.6) submits every queued row in the same run as the Health Connect sync, each as its own `POST /v1/sync/activities` call under `source = "recorded"` with a client-generated `external_id` (a UUID minted at Record) — the same batched wire shape FR-3.6 uses, reusing its ingest pipeline unchanged (`docs/IMPLEMENTATION.md` §4.0.4, [ADR-0007](adr/0007-in-app-gps-recording-submits-directly.md)). A row that syncs successfully is marked synced; a row the server rejects, or that fails outright, stays queued and is retried automatically on the next "Sync Now" — no action needed from the user.
 
-**Outputs**: One new `Activity`, titled and described from the moment it's created rather than needing an edit afterward — the one ingest path where that's true (every other path leaves both fields unset at ingest). Reported through the same `GET /v1/uploads` history FR-3.4 already describes.
+**Outputs**: One new `Activity` per successfully synced recording, titled and described from the moment it's created rather than needing an edit afterward — the one ingest path where that's true (every other path leaves both fields unset at ingest). Reported through the same `GET /v1/uploads` history FR-3.4 already describes, and reflected back on the recording's own row (queued → synced) in Recorded Activities.
 
-**Error cases**: Server unreachable at Stop — the submission fails and is reported on screen; the recorded points are not discarded by a failed submit, so retrying is possible (naming TBD; still recovering from Stop failing is client-side, not a server behavior).
+**Error cases**: A too-long custom activity type (over 50 characters, the column's own bound) is rejected by the sync endpoint with a clear reason rather than failing as a raw database error at insert time. A queued row that fails to sync (network error, server rejection) is left queued rather than reverted, so a retried "Sync Now" tries it again without the user re-checking anything.
 
-**Not yet built**: recovery from an app/process kill mid-recording (the next launch does not yet offer to resume or discard a buffered-but-unsubmitted recording); a discard confirmation before Stop finalizes; the iOS half (`docs/ROADMAP.md` Phase 2 tracks it as a combined Android/iOS item; Android's half is what this FR describes).
+**Not yet built**: recovery from an app/process kill mid-recording (the next launch does not offer to resume or discard a buffered-but-unsubmitted in-progress recording — this is distinct from the finished, saved-but-unsynced rows Recorded Activities already manages); a discard confirmation before Stop finalizes a save; the iOS half (`docs/ROADMAP.md` Phase 2 tracks it as a combined Android/iOS item; Android's half is what this FR describes).
 
 ## 6. FR-4 — Map Visualization
 

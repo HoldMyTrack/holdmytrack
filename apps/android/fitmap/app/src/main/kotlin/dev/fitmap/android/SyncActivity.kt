@@ -11,7 +11,11 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
 import dev.fitmap.android.health.HealthConnect
+import dev.fitmap.android.net.FitMapApi
 import dev.fitmap.android.net.Session
+import dev.fitmap.android.recording.db.RecordedActivityStore
+import dev.fitmap.android.recording.db.SyncStatus
+import dev.fitmap.android.recording.db.toSyncJson
 import dev.fitmap.android.sync.SyncCursor
 import dev.fitmap.android.sync.SyncProgress
 import dev.fitmap.android.sync.SyncReport
@@ -186,6 +190,15 @@ class SyncActivity : AppCompatActivity() {
     /** Keyed by account so two people on one device never inherit each other's position. */
     private fun cursor() = SyncCursor(this, Session.email)
 
+    /**
+     * Health Connect sync, then whatever GPS Logger recordings `RecordedActivitiesActivity`'s
+     * checkbox has queued — one button, both sources, since submitting a queued recording is
+     * exactly the same batched endpoint Health Connect sync already posts to
+     * (`docs/IMPLEMENTATION.md` §4.0.4). The recorded flush runs even when Health Connect
+     * itself throws (a dead network says nothing about whether the *local* recordings can
+     * still go out), just without a combined summary in that rarer case — the next resume's
+     * Recorded Activities list reflects whatever did or didn't land either way.
+     */
     private fun startSync() {
         val client = HealthConnect.clientOrNull(this) ?: return
         primary.isEnabled = false
@@ -197,9 +210,10 @@ class SyncActivity : AppCompatActivity() {
             val runner = SyncRunner(client, cursor())
             try {
                 val report = runner.run { progress -> showProgress(progress) }
-                show(report)
+                show(report, flushRecordedQueue())
             } catch (e: Exception) {
                 status.text = getString(R.string.sync_failed, e.message.orEmpty())
+                flushRecordedQueue()
             } finally {
                 syncJob = null
                 primary.isEnabled = true
@@ -208,6 +222,30 @@ class SyncActivity : AppCompatActivity() {
             }
         }
     }
+
+    /** Submits every locally queued GPS Logger recording (`RecordedActivityStore`,
+     *  `SyncStatus.QUEUED`) and marks each one [SyncStatus.SYNCED] on success. A rejected or
+     *  failed submit is left queued rather than reverted — the same resumable-retry posture
+     *  `SyncRunner`'s own watermark already uses, so the next "Sync Now" tries it again with
+     *  no action needed from the user. */
+    private suspend fun flushRecordedQueue(): RecordedSyncResult {
+        val store = RecordedActivityStore(this)
+        var synced = 0
+        var failed = 0
+        for (record in store.queued()) {
+            val status = runCatching { FitMapApi.syncActivities(listOf(record.toSyncJson()), FitMapApi.SOURCE_RECORDED) }
+                .getOrNull()?.firstOrNull()?.status
+            if (status == "enqueued" || status == "already_processed") {
+                store.setSyncStatus(record.id, SyncStatus.SYNCED)
+                synced++
+            } else {
+                failed++
+            }
+        }
+        return RecordedSyncResult(synced, failed)
+    }
+
+    private data class RecordedSyncResult(val synced: Int, val failed: Int)
 
     private fun showProgress(progress: SyncProgress) {
         status.text = getString(R.string.sync_progress, progress.scanned, progress.synced)
@@ -223,7 +261,7 @@ class SyncActivity : AppCompatActivity() {
      * The persistent, browsable version of this belongs to the sync status dashboard in the
      * next phase; this is the run you just watched, not a history.
      */
-    private fun show(report: SyncReport) {
+    private fun show(report: SyncReport, recordedResult: RecordedSyncResult) {
         val lines = mutableListOf<String>()
         lines += getString(R.string.sync_summary, report.synced, report.alreadyPresent, report.scanned)
         if (report.skippedNoRoute > 0) {
@@ -238,6 +276,13 @@ class SyncActivity : AppCompatActivity() {
             )
         }
         report.stoppedBecause?.let { lines += "\n" + getString(R.string.sync_stopped, it) }
+        if (recordedResult.synced > 0 || recordedResult.failed > 0) {
+            lines += if (recordedResult.failed > 0) {
+                getString(R.string.sync_recorded_summary_with_failed, recordedResult.synced, recordedResult.failed)
+            } else {
+                getString(R.string.sync_recorded_summary, recordedResult.synced)
+            }
+        }
 
         status.setText(R.string.sync_done)
         results.text = lines.joinToString("\n")

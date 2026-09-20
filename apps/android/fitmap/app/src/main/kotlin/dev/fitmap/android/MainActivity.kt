@@ -17,6 +17,7 @@ import dev.fitmap.android.map.MapOverlays
 import dev.fitmap.android.net.ApiException
 import dev.fitmap.android.net.FitMapApi
 import dev.fitmap.android.net.Session
+import dev.fitmap.android.recording.RecordedActivitiesActivity
 import dev.fitmap.android.recording.RecordingActivity
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -225,11 +226,13 @@ class MainActivity : AppCompatActivity() {
         menu.menu.add(0, MENU_PROFILE, 0, R.string.menu_profile)
         menu.menu.add(0, MENU_SYNC, 1, R.string.menu_sync)
         menu.menu.add(0, MENU_GPS_LOGGER, 2, R.string.menu_gps_logger)
+        menu.menu.add(0, MENU_RECORDED_ACTIVITIES, 3, R.string.menu_recorded_activities)
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 MENU_PROFILE -> startActivity(Intent(this, ProfileActivity::class.java))
                 MENU_SYNC -> startActivity(Intent(this, SyncActivity::class.java))
                 MENU_GPS_LOGGER -> startActivity(Intent(this, RecordingActivity::class.java))
+                MENU_RECORDED_ACTIVITIES -> startActivity(Intent(this, RecordedActivitiesActivity::class.java))
             }
             true
         }
@@ -336,5 +339,6 @@ class MainActivity : AppCompatActivity() {
         const val MENU_PROFILE = 1
         const val MENU_SYNC = 2
         const val MENU_GPS_LOGGER = 3
+        const val MENU_RECORDED_ACTIVITIES = 4
     }
 }

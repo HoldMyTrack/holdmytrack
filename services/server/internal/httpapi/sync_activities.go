@@ -133,7 +133,15 @@ func (s *Server) syncOneActivity(ctx context.Context, userID, source string, act
 		return result
 	}
 	// Same bounds handleUpdateActivity enforces for an edit after the fact — these columns
-	// are VARCHAR(200)/TEXT-but-bounded regardless of which path sets them first.
+	// are VARCHAR(50)/VARCHAR(200)/TEXT-but-bounded regardless of which path sets them first.
+	// activity_type specifically matters now that a client can send an arbitrary custom value
+	// (GPS Logger's free-text type field) rather than one of a fixed vocabulary — unchecked,
+	// an over-length value would fail as a raw, unhandled column-width error at insert time
+	// deep in the worker instead of a clean rejection here.
+	if len(act.ActivityType) > maxActivityTypeLen {
+		result.Status, result.Error = "rejected", fmt.Sprintf("activity_type must be %d characters or fewer", maxActivityTypeLen)
+		return result
+	}
 	if len(act.Name) > maxActivityNameLen {
 		result.Status, result.Error = "rejected", fmt.Sprintf("name must be %d characters or fewer", maxActivityNameLen)
 		return result
