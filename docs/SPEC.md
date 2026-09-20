@@ -422,9 +422,20 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Description**: Normal, Fog, and Heatmap are three views of the same underlying data, not independent toggles — exactly one is active at a time.
 
-### FR-4.5 Base map and theming
+### FR-4.5 Base map, theming, and the opening view
 
 **Description**: The map renders a self-hosted vector base map (streets, labels) in either a light or dark theme, selected via the page's URL (no in-app toggle). The current camera position (center, zoom) and theme are reflected in the URL and restored on reload, so a specific view is shareable via link.
+
+**Preconditions**: Active session.
+
+**Behavior**:
+1. If the URL carries a saved or shared position (`#map=...`), it wins outright — restored on load, ahead of every fallback below.
+2. Otherwise, the account's own most recent activity determines the opening view: the camera flies to fit that single activity, not the full default date-range selection (FR-6.1) — an account with scattered recent history (one activity in another country yesterday, one locally today) would otherwise fly to a near-world view that reads as broken rather than just generic.
+3. An account with no activity history at all falls back to its Country setting (FR-1.7), at that country's own view, if one is set.
+4. If none of the above applies — no saved position, no activity history, no Country set — the camera opens on a fixed, deliberately zoomed-out world view.
+5. Panning or zooming rewrites the URL's saved position continuously, so the current view is always what a copied link restores.
+
+**Notes**: A fresh session (signing out, then signing in or starting a demo session) never inherits a previous session's saved camera position — only an unmodified reload of the same session does. This resolution order never requests the browser's geolocation permission; FR-4.7's "Find my location" is a separate, always-available, user-clicked control, not part of it.
 
 ### FR-4.6 Coverage notice
 

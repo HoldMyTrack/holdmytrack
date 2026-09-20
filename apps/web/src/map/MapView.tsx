@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { flyToBBox, unionBBox } from './bbox';
-import { browserOrigin, DEFAULT_VIEW } from './config';
+import { flyToBBox, flyToView, unionBBox } from './bbox';
+import { browserOrigin, WORLD_VIEW } from './config';
+import { countryView } from './countryView';
 import { centreIsOutside, readCoverageBounds, type CoverageBounds } from './coverage';
 import { ensureFogLayer } from './fog';
 import { ensureHeatmapLayer } from './heatmap';
@@ -19,7 +20,7 @@ import {
   setTrackInteractivityHandlers,
 } from './tracks';
 import { useMapInstance } from './useMapInstance';
-import { DEFAULT_FLAVOR, parseHash, replaceHash, type ViewState } from './viewState';
+import { DEFAULT_FLAVOR, parseHash, replaceHash, type HashState, type ViewState } from './viewState';
 import { getActivityTrackMetrics, listActivities, type Activity, type ActivityTrackMetrics } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
@@ -36,15 +37,6 @@ import { UploadPanel } from '../ui/UploadPanel';
 import { useActivityDays } from '../ui/useActivityDays';
 import { useActivityList } from '../ui/useActivityList';
 import { useActivityTotals } from '../ui/useActivityTotals';
-
-/** Read once at module load: the hash is the source of truth for the opening view. */
-const initialHash = parseHash(window.location.hash);
-const initialView: ViewState = initialHash.view ?? {
-  longitude: DEFAULT_VIEW.longitude,
-  latitude: DEFAULT_VIEW.latitude,
-  zoom: DEFAULT_VIEW.zoom,
-};
-const initialFlavor: Flavor = initialHash.flavor ?? DEFAULT_FLAVOR;
 
 /** How many calendar days back Heatmap's rolling window reaches — must match
  *  services/server/internal/fog's HeatmapWindowDays exactly, since this is only used to fetch
@@ -81,6 +73,23 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
   // already establishes as the way to tell a DemoUser from an AuthUser.
   const { user } = useAuth();
   const isDemo = !('email' in user);
+
+  // Read once per mount, not once per page load: App.tsx clears window.location.hash on every
+  // app-initiated identity change (sign-out, demo start, sign-in — see clearSavedView in
+  // viewState.ts), but that only helps if MapView re-reads the hash when it remounts for the
+  // new session. A module-level constant here previously meant a stale hash from a *previous*
+  // session's last camera position silently won over the new session's own fly-to-most-recent
+  // (reported live: the Demo Customer account not flying to its own data after a same-tab
+  // sign-out/demo-start, fixed by a full reload — which is exactly what re-evaluated a
+  // module-level read, and exactly what a remount now does instead).
+  const [initial] = useState<{ hash: HashState; view: ViewState; flavor: Flavor }>(() => {
+    const hash = parseHash(window.location.hash);
+    return {
+      hash,
+      view: hash.view ?? { longitude: WORLD_VIEW.longitude, latitude: WORLD_VIEW.latitude, zoom: WORLD_VIEW.zoom },
+      flavor: hash.flavor ?? DEFAULT_FLAVOR,
+    };
+  });
 
   const container = useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = useState<CoverageBounds | null>(null);
@@ -300,7 +309,12 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
   }, [activities, excludedTypes, distanceFilter, hiddenActivityIds]);
 
   const unitSystem = useUnitSystem();
-  const map = useMapInstance({ container, initialView, initialFlavor, scaleUnit: unitSystem });
+  const map = useMapInstance({
+    container,
+    initialView: initial.view,
+    initialFlavor: initial.flavor,
+    scaleUnit: unitSystem,
+  });
 
   // The flight over the combined bounds of every selected row — a single selected row's
   // "combined bounds" is just its own bbox, so this covers both the one-row and multi-row case
@@ -443,7 +457,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
   // above) could leave the camera pointed at empty water if the previous view doesn't
   // overlap the new one at all. The very first time activities has anything in it is a
   // special case (docs/ROADMAP.md's "Fly to the most recent activity on first load"): a
-  // saved/shared URL position (initialHash.view) still wins, per FR-4.5, but otherwise this
+  // saved/shared URL position (initial.hash.view) still wins, per FR-4.5, but otherwise this
   // flies to just the single most recent activity rather than the whole default selection —
   // an account with scattered recent history (e.g. one activity in another country yesterday,
   // one locally today) would otherwise fitBounds to a near-world view, which reads as broken
@@ -454,7 +468,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
     if (!map || activities.length === 0) return;
     if (!hasFlownToActivitiesRef.current) {
       hasFlownToActivitiesRef.current = true;
-      if (initialHash.view == null) {
+      if (initial.hash.view == null) {
         const mostRecent = activities.reduce((latest, a) => (a.startedAt > latest.startedAt ? a : latest));
         fitToSelection([mostRecent]);
       }
@@ -464,6 +478,26 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
     const flyBounds = unionBBox(visible.flatMap((a) => (a.bbox ? [a.bbox] : [])));
     if (flyBounds) flyToBBox(map, flyBounds);
   }, [map, activities, fitToSelection]);
+
+  // The counterpart for an account with genuinely zero history (docs/ROADMAP.md's same "Fly
+  // to the most recent activity" item, its zero-history fallback): the effect above never
+  // fires at all once `activities` stays empty, so this is a separate one-shot guarded the
+  // same way. `earliest`/`daysReady` (useActivityDays), not `activities.length === 0`, is the
+  // right "genuinely zero" signal — activities is scoped to selectedRange, which degenerates
+  // to {today, today} for a brand-new account regardless of whether it truly has no history
+  // (see the comment on the default-range effect above for the exact same trap). Falls back
+  // to the account's Country setting, at that country's own view, if set; otherwise a fixed,
+  // deliberately zoomed-out world view (WORLD_VIEW) — never geolocation (ROADMAP.md's existing
+  // stance: no permission prompts here).
+  const hasFlownToFallbackRef = useRef(false);
+  useEffect(() => {
+    if (!map || hasFlownToFallbackRef.current) return;
+    if (initial.hash.view != null) return;
+    if (activities.length > 0) return;
+    if (!daysReady || earliest != null) return;
+    hasFlownToFallbackRef.current = true;
+    flyToView(map, countryView(user.country) ?? WORLD_VIEW);
+  }, [map, activities, daysReady, earliest, user.country]);
 
   // Clicking a track directly on the map is the row-text "focus" behavior, not the checkbox's
   // — it bolds just that one track, replacing whichever was focused before, and flies to it,
@@ -681,7 +715,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
     if (!map) return;
     const sync = () => {
       const centre = map.getCenter();
-      replaceHash({ longitude: centre.lng, latitude: centre.lat, zoom: map.getZoom() }, initialFlavor);
+      replaceHash({ longitude: centre.lng, latitude: centre.lat, zoom: map.getZoom() }, initial.flavor);
     };
     sync();
     map.on('moveend', sync);
@@ -725,7 +759,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
           <ExportButton
             map={map}
             viewState={{
-              flavor: initialFlavor,
+              flavor: initial.flavor,
               mode: mapMode,
               activityQuery,
               hiddenIds: [...mapHiddenIds],
