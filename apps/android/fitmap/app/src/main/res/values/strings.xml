@@ -26,6 +26,27 @@
     <string name="menu_button">☰</string>
     <string name="menu_profile">Profile</string>
     <string name="menu_sync">Sync</string>
+    <string name="menu_gps_logger">GPS Logger</string>
+
+    <string name="recording_needs_permission">FitMap needs location access to record a GPS track.</string>
+    <string name="recording_grant_permission">Grant location access</string>
+    <string name="recording_name_hint">Name</string>
+    <string name="recording_description_hint">Description (optional)</string>
+    <string name="recording_record">Record</string>
+    <string name="recording_pause">Pause</string>
+    <string name="recording_resume">Resume</string>
+    <string name="recording_stop">Stop</string>
+    <string name="recording_retry">Retry</string>
+    <string name="recording_stat_time">Time</string>
+    <string name="recording_stat_distance">Distance</string>
+    <string name="recording_stat_altitude">Altitude</string>
+    <string name="recording_stat_speed">Speed</string>
+    <string name="recording_stat_placeholder">—</string>
+    <string name="recording_not_enough_points">Not enough GPS data to save this recording — try recording for longer before stopping.</string>
+    <string name="recording_submitting">Saving…</string>
+    <string name="recording_submit_failed">Could not save this recording: %1$s. Your track is still here — tap Retry.</string>
+    <string name="recording_notification_channel">GPS recording</string>
+    <string name="recording_notification_title">Recording a GPS activity</string>
 
     <string name="sync_title">Sync from Health Connect</string>
     <string name="sync_rationale">FitMap reads your recorded exercise sessions and their GPS routes from Health Connect, and adds the outdoor ones to your map. It reads nothing else — no heart rate, no weight, no sleep — and it never writes anything back. Sessions recorded indoors have no route, so they are skipped.</string>
@@ -69,4 +90,5 @@
     <string name="source_health_kit">HealthKit</string>
     <string name="source_upload">an uploaded file</string>
     <string name="source_takeout">a Google Takeout import</string>
+    <string name="source_recorded">a GPS recording</string>
 </resources>

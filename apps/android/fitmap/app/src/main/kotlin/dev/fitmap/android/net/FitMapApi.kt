@@ -86,9 +86,12 @@ object FitMapApi {
 
     private const val API_V1 = "/v1"
 
-    /** The `source` value the endpoint's allowlist accepts for Android — the other is iOS's
-     *  `"healthkit"`, and Paths 1 and 3 have their own endpoints and their own values. */
-    private const val HEALTH_CONNECT_SOURCE = "healthconnect"
+    /** The two `source` values this app posts to `POST /v1/sync/activities` — Health Connect
+     *  sync (`sync/SyncRunner.kt`) and in-app GPS recording (`recording/RecordingActivity.kt`,
+     *  `docs/adr/0007-in-app-gps-recording-submits-directly.md`). iOS's own is `"healthkit"`;
+     *  Paths 1 and 3 have their own endpoints and their own values. */
+    const val SOURCE_HEALTH_CONNECT = "healthconnect"
+    const val SOURCE_RECORDED = "recorded"
     private val JSON = "application/json; charset=utf-8".toMediaType()
     private val main = Handler(Looper.getMainLooper())
 
@@ -144,10 +147,10 @@ object FitMapApi {
      * decide how far the watermark may move. A non-2xx status is the whole request failing and
      * throws instead; nothing in the batch was decided.
      */
-    suspend fun syncActivities(activities: List<JSONObject>): List<SyncResult> =
+    suspend fun syncActivities(activities: List<JSONObject>, source: String): List<SyncResult> =
         withContext(Dispatchers.IO) {
             val body = JSONObject()
-                .put("source", HEALTH_CONNECT_SOURCE)
+                .put("source", source)
                 .put("activities", JSONArray(activities))
             val request = Request.Builder()
                 .url(BuildConfig.API_BASE_URL + API_V1 + "/sync/activities")

@@ -157,6 +157,7 @@ class SyncStatusActivity : AppCompatActivity() {
         "healthkit" -> getString(R.string.source_health_kit)
         "upload" -> getString(R.string.source_upload)
         "takeout" -> getString(R.string.source_takeout)
+        "recorded" -> getString(R.string.source_recorded)
         else -> source
     }
 
