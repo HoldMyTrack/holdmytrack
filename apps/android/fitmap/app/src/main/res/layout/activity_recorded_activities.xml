@@ -26,6 +26,15 @@
     </LinearLayout>
 
     <TextView
+        android:id="@+id/recorded_demo_notice"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        android:text="@string/recorded_demo_notice"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <TextView
         android:id="@+id/recorded_empty"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

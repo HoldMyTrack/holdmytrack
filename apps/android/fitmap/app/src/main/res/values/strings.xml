@@ -57,10 +57,16 @@
     <string name="recorded_status_queued">Queued</string>
     <string name="recorded_status_synced">Synced</string>
     <string name="recorded_row_subtitle">%1$s · %2$.2f km · %3$s</string>
+    <string name="recorded_demo_notice">The demo account is read-only — recordings can be saved and edited here, but never synced. Create an account to sync your own data.</string>
+    <string name="recording_delete">Delete</string>
+    <string name="recorded_delete_confirm_title">Delete this recording?</string>
+    <string name="recorded_delete_confirm_message_unsynced">This only removes it from this device — it was never synced, so there\'s nothing to remove anywhere else. This can\'t be undone.</string>
+    <string name="recorded_delete_confirm_message_synced">This removes it from this device only — the activity it already synced stays on your map. This can\'t be undone.</string>
 
     <string name="sync_title">Sync from Health Connect</string>
     <string name="sync_rationale">FitMap reads your recorded exercise sessions and their GPS routes from Health Connect, and adds the outdoor ones to your map. It reads nothing else — no heart rate, no weight, no sleep — and it never writes anything back. Sessions recorded indoors have no route, so they are skipped.</string>
     <string name="sync_needs_account">Sign in to FitMap first — there is nowhere to sync to until then.</string>
+    <string name="sync_demo_read_only">The demo account is read-only — it can\'t add, edit, or delete activities. Create an account to sync your own data.</string>
     <string name="sync_unavailable">Health Connect isn\'t available on this device, so there is nothing to sync from.</string>
     <string name="sync_update_required">Health Connect needs updating before it can share anything.</string>
     <string name="sync_needs_exercise_permission">FitMap can\'t read your exercise sessions yet.</string>
