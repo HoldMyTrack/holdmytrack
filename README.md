@@ -18,6 +18,7 @@ fitmap/
 │   ├── IMPLEMENTATION.md   # schema, workflows, each feature's own detail
 │   ├── SPEC.md   # observable behavior, FR-N.M, independent of the above
 │   ├── ROADMAP.md                    # the remaining-work checklist
+│   ├── KNOWN_ISSUES.md               # currently-open defects in shipped functionality
 │   ├── adr/                          # Architecture Decision Records — why, not just what
 │   ├── DEVELOPMENT.md                # running it locally, verification, gotchas, commands
 │   └── DEPLOY.md                     # the production deployment runbook
@@ -53,6 +54,7 @@ This tree is the canonical one; do not let a second tree exist anywhere else to 
 | [`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md) | Database schema, and each feature's own implementation detail — ingest, tile/fog workflows, accounts, deployment, engineering risks. |
 | [`docs/SPEC.md`](docs/SPEC.md) | A precise, testable statement of what the system currently does, independent of both the business rationale and the implementation. |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | The remaining-work checklist — what's left to reach the product `VISION.md` describes. |
+| [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md) | Currently-open defects in already-shipped functionality — the opposite direction from `ROADMAP.md`'s planned work. |
 | [`docs/adr/`](docs/adr/) | Architecture Decision Records — why each consequential, hard-to-reverse decision was made, and what was rejected. |
 | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Running it locally, the verification checklist, gotchas worth not rediscovering, and the command reference. |
 | [`docs/DEPLOY.md`](docs/DEPLOY.md) | You're standing up an actual deployment. |

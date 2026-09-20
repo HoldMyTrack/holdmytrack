@@ -1,0 +1,24 @@
+# Known Issues
+
+Defects in already-shipped, currently-live functionality — not planned work. `docs/ROADMAP.md` is the forward-looking build plan ("what we're going to do"); this file is the opposite direction ("what's currently broken and needs fixing"), independent of any phase or priority ordering.
+
+This file stays lean and current-only. Once an entry is fixed, its root-cause/fix/verification write-up moves into `docs/IMPLEMENTATION.md` as a permanent implementation note next to the relevant pipeline step, and the entry is deleted from here — the same treatment the former root `BUGS.md` gave its one entry (the privacy-trim fallback that silently skipped short, sparse tracks; now documented in `IMPLEMENTATION.md` §4.1) before that file was retired. Nothing here is meant to accumulate as a permanent record — that record lives in `IMPLEMENTATION.md` once each issue is closed.
+
+---
+
+### Export attribution missing from PNG exports — an ODbL compliance gap in already-shipped functionality
+
+`style.ts:28` already documents that OSM/Protomaps attribution is mandatory, not decorative — the basemap is an ODbL "Produced Work," and the comment states credit "has to be visible on the map and on any export." But `exportMap.ts:68` sets `attributionControl: false` on the offscreen export map instance, and nothing else draws attribution onto the canvas before `toBlob()` — so FR-4.10's exported PNGs carry no attribution at all today, contradicting the code's own stated requirement.
+
+- [ ] Draw `style.ts`'s own `ATTRIBUTION` text onto the export canvas before `toBlob()` in `exportMap.ts`. Not optional or togglable: it's a license requirement, not a preference. `docs/ROADMAP.md`'s FitMap-logo item shares this same draw call site and pass — land them together if convenient, but that one is a courtesy and this one isn't optional.
+
+---
+
+### Fog of War/Heatmap tiles silently clip a route that runs close to a z14 tile boundary — `computeTouchedTiles` doesn't account for the stroke's own drawn width
+
+`internal/fog/raster.go`'s `renderActivityMask` draws each activity's route as a 12px-wide stroke (`strokeRadiusPx = 6.0`, each side), then blurs the composited result by another `featherPx = 3`. But `internal/ingest/ingest.go`'s `computeTouchedTiles` — which decides which z14 tiles get a mask rendered for an activity at all — only looks at exact point/segment *tile indices* (`tilemath.SegmentTiles`, floor-based), with no margin for that drawn width. A point or segment landing within roughly a stroke-width-plus-feather of a tile boundary (real-world, the last ~40-45m of a ~2446m-wide z14 tile) has part of its visual stroke geometrically belonging to the neighboring tile — but since that neighbor was never computed as "touched," no mask is ever rendered there for this activity, and `gg`'s rasterizer silently clips the overflow at the canvas edge instead of it appearing next door.
+
+- [ ] Found and confirmed live on the Demo Customer account's `Dog Walk 2026-09-17-1` (activity id `30c715b2-2091-4bc8-96b4-91c972adc1f7`): two consecutive trajectory points sit at tile-local pixel x ≈ 511.6 of 512 (i.e. right on the z14 4471/4472 boundary), and the segment between them runs the full length of that boundary — visibly cut off in Heatmap mode with other activities hidden, rather than just a barely-noticeable clipped stroke-end.
+- [ ] Not specific to that one activity or to Heatmap specifically — Fog of War renders from the same per-activity masks and would clip identically; any activity with a point or segment landing close enough to a z14 boundary can hit this, rare per-activity but not rare across a large history (611 activities was enough to surface it once).
+- [ ] Fix direction: buffer the tile-membership check in `computeTouchedTiles`/`tilemath.SegmentTiles` by `strokeRadiusPx + featherPx` (in tile-local pixels) — a point within that margin of a boundary should register as touching the neighboring tile(s) too, not just the one its bare coordinate floors into, so `RenderActivityMasks` renders (and the composite/blur/pyramid steps downstream pick up) the mask on both sides.
+- [ ] Re-render affected tiles once fixed — existing `activity_tile_masks`/`fog_tiles` rows for already-ingested activities won't self-correct; this needs either a full re-seed (cheap for the Demo Customer account — the same re-seed approach used to verify the privacy-trim fix, `IMPLEMENTATION.md` §4.1) or a proper backfill job for real accounts' existing history.
