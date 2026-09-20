@@ -35,11 +35,17 @@
             android:hint="@string/recording_name_hint"
             android:inputType="text" />
 
-        <Spinner
+        <!-- Free text, not a closed vocabulary — a custom type is the point. Still offers
+             RecordingTypes.PRESETS as tap-to-fill suggestions (see that class's doc comment)
+             so most recordings stay on the shared activity_type vocabulary. -->
+        <AutoCompleteTextView
             android:id="@+id/recording_type"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp" />
+            android:layout_marginTop="8dp"
+            android:completionThreshold="0"
+            android:hint="@string/recording_type_hint"
+            android:inputType="text" />
 
         <EditText
             android:id="@+id/recording_description"
@@ -160,6 +166,17 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="@string/recording_stop"
+                android:visibility="gone" />
+
+            <!-- Edit mode only (RecordingActivity launched with EXTRA_RECORDING_ID) — takes
+                 the same row the Record/Pause/Stop buttons use, since the two modes never
+                 show buttons at the same time. -->
+            <Button
+                android:id="@+id/recording_save"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/recording_save"
                 android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>

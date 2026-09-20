@@ -11,36 +11,50 @@ import android.os.IBinder
 import android.os.Looper
 import android.view.View
 import android.widget.ArrayAdapter
+import android.widget.AutoCompleteTextView
 import android.widget.Button
 import android.widget.EditText
-import android.widget.Spinner
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import dev.fitmap.android.R
-import dev.fitmap.android.net.FitMapApi
+import dev.fitmap.android.recording.db.RecordedActivityRecord
+import dev.fitmap.android.recording.db.RecordedActivityStore
+import dev.fitmap.android.recording.db.SyncStatus
 import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.launch
-import org.json.JSONArray
-import org.json.JSONObject
 
 /**
  * A plain start/pause/stop GPS recording for a casual, watch-free activity — `docs/VISION.md`
  * §1.1/§4.1's deliberately narrow scope: GPS only, no sensor data, no training metrics. The
  * actual recording lives in `RecordingService`, which outlives this screen going away (a
  * phone call, the user checking another app); this Activity is a view onto it plus the one
- * step the service can't do itself — building and submitting the finished wire payload
- * (`docs/adr/0007-in-app-gps-recording-submits-directly.md`).
+ * step the service can't do itself — saving the finished recording locally.
+ *
+ * **Two modes, one layout and one class**, per the deferred-sync design: a plain launch
+ * (no extra) is a fresh recording; a launch carrying [EXTRA_RECORDING_ID] is
+ * `RecordedActivitiesActivity`'s Edit button, reopening this same screen against an
+ * already-stopped, locally-saved row instead of starting a new one. The Record/Pause/Stop row
+ * and the Save button never show at once, since the two modes never overlap.
+ *
+ * **Stop no longer submits anything.** `docs/adr/0007-in-app-gps-recording-submits-directly.md`
+ * still holds — a finished recording still goes straight to `POST /v1/sync/activities` with
+ * no Health Connect round-trip — but *when* moved: Stop now only saves the recording locally
+ * (`RecordedActivityStore`, status [SyncStatus.NOT_SYNCED]); actually submitting it is
+ * `RecordedActivitiesActivity`'s sync checkbox plus the Sync screen's existing "Sync Now".
  */
 class RecordingActivity : AppCompatActivity() {
+
+    private lateinit var store: RecordedActivityStore
 
     private lateinit var permissionNotice: TextView
     private lateinit var grantPermission: Button
     private lateinit var nameField: EditText
-    private lateinit var typeSpinner: Spinner
+    private lateinit var typeField: AutoCompleteTextView
     private lateinit var descriptionField: EditText
     private lateinit var timeValue: TextView
     private lateinit var distanceValue: TextView
@@ -50,6 +64,13 @@ class RecordingActivity : AppCompatActivity() {
     private lateinit var recordButton: Button
     private lateinit var pauseResumeButton: Button
     private lateinit var stopButton: Button
+    private lateinit var saveButton: Button
+
+    /** Null for a fresh recording; the row being edited otherwise. */
+    private val editingId: String? get() = intent.getStringExtra(EXTRA_RECORDING_ID)
+    private val editMode: Boolean get() = editingId != null
+
+    // --- Record-mode-only state -------------------------------------------------------
 
     private var service: RecordingService? = null
     private var externalId: String? = null
@@ -65,11 +86,6 @@ class RecordingActivity : AppCompatActivity() {
             tickHandler.postDelayed(this, 1000)
         }
     }
-
-    /** Captured from `RecordingService.stop()` so a failed submit can be retried without
-     *  re-recording — the points already exist, only the network call failed. Non-null only
-     *  between a stop and a confirmed submit. */
-    private var pendingPoints: List<RecordedPoint>? = null
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -92,11 +108,12 @@ class RecordingActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_recording)
+        store = RecordedActivityStore(this)
 
         permissionNotice = findViewById(R.id.recording_permission_notice)
         grantPermission = findViewById(R.id.recording_grant_permission)
         nameField = findViewById(R.id.recording_name)
-        typeSpinner = findViewById(R.id.recording_type)
+        typeField = findViewById(R.id.recording_type)
         descriptionField = findViewById(R.id.recording_description)
         timeValue = findViewById(R.id.recording_stat_time_value)
         distanceValue = findViewById(R.id.recording_stat_distance_value)
@@ -106,8 +123,65 @@ class RecordingActivity : AppCompatActivity() {
         recordButton = findViewById(R.id.recording_record)
         pauseResumeButton = findViewById(R.id.recording_pause_resume)
         stopButton = findViewById(R.id.recording_stop)
+        saveButton = findViewById(R.id.recording_save)
 
-        typeSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, RecordingTypes.LABELS)
+        typeField.setAdapter(ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, RecordingTypes.PRESETS))
+        typeField.threshold = 0
+        typeField.setOnClickListener { typeField.showDropDown() }
+
+        if (editMode) setUpEditMode() else setUpRecordMode()
+    }
+
+    // --- Edit mode ----------------------------------------------------------------------
+
+    private fun setUpEditMode() {
+        recordButton.visibility = View.GONE
+        pauseResumeButton.visibility = View.GONE
+        stopButton.visibility = View.GONE
+        saveButton.visibility = View.VISIBLE
+        saveButton.setOnClickListener { onSaveEdit() }
+
+        lifecycleScope.launch {
+            val record = store.get(editingId!!) ?: run { finish(); return@launch }
+            nameField.setText(record.name)
+            typeField.setText(record.activityType, false)
+            descriptionField.setText(record.description)
+            renderStats(RecordingStats(
+                elapsedMs = record.durationSeconds * 1000,
+                distanceM = record.distanceMeters,
+                altitudeM = null,
+                speedMps = 0.0,
+            ))
+            if (!record.editable) {
+                nameField.isEnabled = false
+                typeField.isEnabled = false
+                descriptionField.isEnabled = false
+                saveButton.visibility = View.GONE
+                status.setText(R.string.recording_locked_synced)
+                status.visibility = View.VISIBLE
+            }
+        }
+    }
+
+    private fun onSaveEdit() {
+        val id = editingId ?: return
+        lifecycleScope.launch {
+            val record = store.get(id) ?: return@launch
+            store.update(
+                record.copy(
+                    name = nameField.text.toString().trim(),
+                    activityType = typeField.text.toString().trim().ifEmpty { RecordingTypes.DEFAULT },
+                    description = descriptionField.text.toString().trim(),
+                ),
+            )
+            finish()
+        }
+    }
+
+    // --- Record mode --------------------------------------------------------------------
+
+    private fun setUpRecordMode() {
+        typeField.setText(RecordingTypes.DEFAULT, false)
 
         grantPermission.setOnClickListener { requestPermissions() }
         recordButton.setOnClickListener { onRecord() }
@@ -117,14 +191,17 @@ class RecordingActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
+        if (editMode) return
         bindService(Intent(this, RecordingService::class.java), connection, BIND_AUTO_CREATE)
         renderPermissionState()
     }
 
     override fun onStop() {
-        tickHandler.removeCallbacks(ticker)
-        service?.onUpdate = null
-        unbindService(connection)
+        if (!editMode) {
+            tickHandler.removeCallbacks(ticker)
+            service?.onUpdate = null
+            unbindService(connection)
+        }
         super.onStop()
     }
 
@@ -158,8 +235,6 @@ class RecordingActivity : AppCompatActivity() {
         val bound = service ?: return
         if (!hasLocationPermission()) return
         externalId = UUID.randomUUID().toString()
-        pendingPoints = null
-        stopButton.setText(R.string.recording_stop)
         status.visibility = View.GONE
         ContextCompat.startForegroundService(this, Intent(this, RecordingService::class.java))
         bound.start()
@@ -176,21 +251,42 @@ class RecordingActivity : AppCompatActivity() {
         renderState(bound.state)
     }
 
-    /** Handles both "Stop" (the recording is still active) and, once `stopButton` has been
-     *  relabeled after a failed submit, "Retry" (the recording already stopped and its points
-     *  are sitting in [pendingPoints]) — the same button, because at that point there is
-     *  nothing left to record, only a submission to retry. */
     private fun onStopClicked() {
-        val alreadyStopped = pendingPoints != null
-        val points = if (alreadyStopped) pendingPoints!! else (service?.stop() ?: return)
-        if (!alreadyStopped) renderState(RecordingState.STOPPED)
-        submit(points)
+        val bound = service ?: return
+        val points = bound.stop()
+        val stats = bound.currentStats()
+        renderState(RecordingState.STOPPED)
+
+        if (points.size < 2) {
+            status.setText(R.string.recording_not_enough_points)
+            status.visibility = View.VISIBLE
+            return
+        }
+        val id = externalId ?: return
+        lifecycleScope.launch {
+            store.insert(
+                RecordedActivityRecord(
+                    id = id,
+                    name = nameField.text.toString().trim(),
+                    description = descriptionField.text.toString().trim(),
+                    activityType = typeField.text.toString().trim().ifEmpty { RecordingTypes.DEFAULT },
+                    startedAtMs = points.first().time.toEpochMilli(),
+                    distanceMeters = stats.distanceM,
+                    durationSeconds = stats.elapsedMs / 1000,
+                    points = points,
+                    syncStatus = SyncStatus.NOT_SYNCED,
+                    createdAtMs = System.currentTimeMillis(),
+                ),
+            )
+            Toast.makeText(this@RecordingActivity, R.string.recording_saved_locally, Toast.LENGTH_SHORT).show()
+            finish()
+        }
     }
 
     private fun renderState(state: RecordingState) {
         val fieldsEditable = state == RecordingState.IDLE
         nameField.isEnabled = fieldsEditable
-        typeSpinner.isEnabled = fieldsEditable
+        typeField.isEnabled = fieldsEditable
         descriptionField.isEnabled = fieldsEditable
 
         recordButton.visibility = if (state == RecordingState.IDLE) View.VISIBLE else View.GONE
@@ -210,52 +306,12 @@ class RecordingActivity : AppCompatActivity() {
             Locale.US, "%d:%02d:%02d", totalSeconds / 3600, (totalSeconds % 3600) / 60, totalSeconds % 60,
         )
         distanceValue.text = String.format(Locale.US, "%.2f km", stats.distanceM / 1000.0)
-        altitudeValue.text = stats.altitudeM?.let { String.format(Locale.US, "%.0f m", it) } ?: getString(R.string.recording_stat_placeholder)
+        altitudeValue.text = stats.altitudeM?.let { String.format(Locale.US, "%.0f m", it) }
+            ?: getString(R.string.recording_stat_placeholder)
         speedValue.text = String.format(Locale.US, "%.1f km/h", stats.speedMps * 3.6)
     }
 
-    private fun submit(points: List<RecordedPoint>) {
-        if (points.size < 2) {
-            pendingPoints = null
-            status.setText(R.string.recording_not_enough_points)
-            status.visibility = View.VISIBLE
-            return
-        }
-        val id = externalId ?: return
-        pendingPoints = points
-        status.setText(R.string.recording_submitting)
-        status.visibility = View.VISIBLE
-        stopButton.isEnabled = false
-
-        val pointsArray = JSONArray()
-        for (point in points) {
-            val json = JSONObject()
-                .put("lat", point.lat)
-                .put("lon", point.lon)
-                .put("time", point.time.toString())
-            point.elevationM?.let { json.put("elevation_m", it) }
-            pointsArray.put(json)
-        }
-        val activity = JSONObject()
-            .put("external_id", id)
-            .put("activity_type", RecordingTypes.wireValue(typeSpinner.selectedItemPosition))
-            .put("name", nameField.text.toString().trim())
-            .put("description", descriptionField.text.toString().trim())
-            .put("points", pointsArray)
-
-        lifecycleScope.launch {
-            val result = runCatching { FitMapApi.syncActivities(listOf(activity), FitMapApi.SOURCE_RECORDED) }
-            stopButton.isEnabled = true
-            result.onSuccess {
-                pendingPoints = null
-                finish()
-            }.onFailure { failure ->
-                status.text = getString(R.string.recording_submit_failed, failure.message.orEmpty())
-                // Stays visible (relabeled) so the already-recorded points can be resubmitted
-                // without recording the activity a second time.
-                stopButton.visibility = View.VISIBLE
-                stopButton.setText(R.string.recording_retry)
-            }
-        }
+    companion object {
+        const val EXTRA_RECORDING_ID = "recording_id"
     }
 }
