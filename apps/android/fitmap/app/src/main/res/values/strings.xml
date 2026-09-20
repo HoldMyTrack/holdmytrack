@@ -22,8 +22,12 @@
     <string name="mode_normal">Normal</string>
     <string name="mode_fog">Fog</string>
     <string name="mode_heatmap">Heatmap</string>
+
+    <string name="menu_button">☰</string>
+    <string name="menu_profile">Profile</string>
+    <string name="menu_sync">Sync</string>
+
     <string name="sync_title">Sync from Health Connect</string>
-    <string name="sync_action">Sync</string>
     <string name="sync_rationale">FitMap reads your recorded exercise sessions and their GPS routes from Health Connect, and adds the outdoor ones to your map. It reads nothing else — no heart rate, no weight, no sleep — and it never writes anything back. Sessions recorded indoors have no route, so they are skipped.</string>
     <string name="sync_needs_account">Sign in to FitMap first — there is nowhere to sync to until then.</string>
     <string name="sync_unavailable">Health Connect isn\'t available on this device, so there is nothing to sync from.</string>

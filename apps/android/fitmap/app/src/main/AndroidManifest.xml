@@ -49,6 +49,13 @@
             </intent-filter>
         </activity>
 
+        <!-- Not exported: reached only from MainActivity's burger menu, never by another app. -->
+        <activity
+            android:name=".ProfileActivity"
+            android:exported="false"
+            android:label="@string/menu_profile"
+            android:theme="@style/Theme.AppCompat.DayNight" />
+
         <!-- Not exported: reached only from MainActivity, never by another app. It keeps an
              action bar (the DayNight theme, not the NoActionBar one the map uses) purely so
              it reads as a screen with a title rather than a form floating on nothing. -->
