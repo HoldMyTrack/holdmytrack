@@ -523,6 +523,7 @@ export function ActivitiesPanel({
                   {formatActivityType(activity.activityType)}
                 </span>
               </button>
+              {isHidden && <span className="activities-panel__hidden-badge">Hidden</span>}
             </li>
           );
         })}

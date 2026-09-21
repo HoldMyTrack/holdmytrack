@@ -532,7 +532,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 ### FR-5.8 Hide/show a track
 
-**Description**: The header toolbar's Show/hide icon (FR-5.12) hides or shows every currently checked activity's track on the map, independent of the row-click focus (FR-5.5). There is no per-row hide/show control — hiding or showing a single activity means checking just its own box first, the same as any other single-item action. A hidden activity's track is not drawn in any map mode (Normal, Fog, or Heatmap) until shown again; its row dims in place so its hidden state is still visible at a glance. Hiding/showing is purely client-side and does not refetch data. See FR-5.12 for the exact toggle rule.
+**Description**: The header toolbar's Show/hide icon (FR-5.12) hides or shows every currently checked activity's track on the map, independent of the row-click focus (FR-5.5). There is no per-row hide/show control — hiding or showing a single activity means checking just its own box first, the same as any other single-item action. A hidden activity's track is not drawn in any map mode (Normal, Fog, or Heatmap) until shown again; its row dims in place and carries a "Hidden" badge so its hidden state is still visible at a glance. Hiding/showing is purely client-side and does not refetch data. See FR-5.12 for the exact toggle rule.
 
 ### FR-5.9 Resizable panel
 

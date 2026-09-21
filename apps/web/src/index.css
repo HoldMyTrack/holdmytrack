@@ -727,10 +727,27 @@ body {
 /* Hidden from the map, not from the list — the row stays in place and fully readable, just
    dimmed, since there's no per-row eye icon any more to show open/closed at a glance (hiding
    a single activity now goes through check-then-toolbar like every other single-item action;
-   see the toolbar's Show/Hide checked-group button above). */
+   see the toolbar's Show/Hide checked-group button above). The dim alone turned out too subtle
+   to notice at a glance (reported directly by a user who lost track of which rows they'd
+   hidden), so a standalone "Hidden" badge sits next to it as the actual scannable cue — the
+   badge is a sibling of .activities-panel__text, not nested under it, so it stays at full
+   opacity rather than dimming along with the title/meta text it's flagging. */
 .activities-panel__row--hidden .activities-panel__title,
 .activities-panel__row--hidden .activities-panel__meta {
   opacity: 0.55;
+}
+
+.activities-panel__hidden-badge {
+  flex: none;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: rgb(var(--fm-ink-rgb) / 55%);
+  background: rgb(var(--fm-ink-rgb) / 8%);
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
 }
 
 /* The reverse direction of the hover above: hovering this activity's *track on the map*
