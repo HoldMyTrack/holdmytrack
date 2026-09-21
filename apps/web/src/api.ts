@@ -379,6 +379,11 @@ export function uploadFile(
 export interface UploadHistoryRow {
   filename: string;
   externalId: string;
+  /** `"upload"` | `"takeout"` | `"healthconnect"` | `"healthkit"` | `"recorded"` — what
+   *  ImportPanel.tsx's Files/Sync tabs filter by, and (for a Files row) what makes `filename`
+   *  worth showing at all; a synced row's own filename is a raw external id, never meant to
+   *  be read directly (`formatSourceLabel` is what a Sync row's title actually shows). */
+  source: string;
   status: 'processing' | 'done' | 'failed';
   error?: string;
   submittedAt: string;
@@ -386,6 +391,9 @@ export interface UploadHistoryRow {
    *  row can read "9 Sep · 34.7 km" rather than just repeating its own filename. */
   startedAt?: string;
   distanceMeters?: number;
+  /** The resulting activity's own id, once one exists — ROADMAP.md's "View on map" item.
+   *  Same nullability as startedAt/distanceMeters: nothing to link to before ingest finishes. */
+  activityId?: string;
 }
 
 export interface UploadHistoryPage {
@@ -401,11 +409,13 @@ export interface UploadHistoryPage {
 interface UploadHistoryRowBody {
   filename: string;
   external_id: string;
+  source: string;
   status: string;
   error?: string;
   submitted_at: string;
   started_at?: string;
   distance_meters?: number;
+  activity_id?: string;
 }
 
 interface UploadHistoryBody {
@@ -419,12 +429,17 @@ interface UploadHistoryBody {
 export interface UploadHistoryQuery {
   limit?: number;
   offset?: number;
+  /** Comma-joined server-side, matching §4.3's own `types` filter convention — absent means
+   *  every source, which is what an unfiltered combined view (rather than ImportPanel.tsx's
+   *  own Files/Sync tabs) would ask for. */
+  sources?: readonly string[];
 }
 
 export async function getUploadHistory(query: UploadHistoryQuery = {}, signal?: AbortSignal): Promise<UploadHistoryPage> {
   const params = new URLSearchParams();
   if (query.limit !== undefined) params.set('limit', String(query.limit));
   if (query.offset !== undefined) params.set('offset', String(query.offset));
+  if (query.sources && query.sources.length > 0) params.set('source', query.sources.join(','));
   const qs = params.toString();
   const res = await fetch(`${API_BASE_URL}${API_V1}/uploads${qs ? `?${qs}` : ''}`, {
     credentials: 'include',
@@ -443,11 +458,13 @@ export async function getUploadHistory(query: UploadHistoryQuery = {}, signal?: 
     uploads: body.uploads.map((u) => ({
       filename: u.filename,
       externalId: u.external_id,
+      source: u.source,
       status: u.status as UploadHistoryRow['status'],
       submittedAt: u.submitted_at,
       ...(u.error ? { error: u.error } : {}),
       ...(u.started_at ? { startedAt: u.started_at } : {}),
       ...(u.distance_meters !== undefined ? { distanceMeters: u.distance_meters } : {}),
+      ...(u.activity_id ? { activityId: u.activity_id } : {}),
     })),
   };
 }

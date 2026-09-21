@@ -33,7 +33,7 @@ import { Header } from '../ui/Header';
 import type { DateRange } from '../ui/RangePicker';
 import { TrackProfile } from '../ui/TrackProfile';
 import { useUnitSystem } from '../ui/units';
-import { UploadPanel } from '../ui/UploadPanel';
+import { ImportPanel } from '../ui/ImportPanel';
 import { useActivityDays } from '../ui/useActivityDays';
 import { useActivityList } from '../ui/useActivityList';
 import { useActivityTotals } from '../ui/useActivityTotals';
@@ -70,7 +70,7 @@ export interface MapViewProps {
 export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
   // docs/SPEC.md FR-2.1–FR-2.3: a demo account is
   // read-only (no upload/sync, no edit/delete) — see ActivitiesPanel's own readOnly prop and
-  // the uploadControl below. `'email' in user` is the same narrowing api.ts's SessionUser
+  // the importControl below. `'email' in user` is the same narrowing api.ts's SessionUser
   // already establishes as the way to tell a DemoUser from an AuthUser.
   const { user } = useAuth();
   const isDemo = !('email' in user);
@@ -414,6 +414,40 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
     },
     [activities, mapHiddenIds, fitToSelection],
   );
+
+  // ROADMAP.md's "View on map" item — ImportPanel.tsx's per-row action, reusing focusActivity
+  // above rather than inventing a second fly-to mechanism. The one thing a row click doesn't
+  // already handle: the target activity may not be in the currently selected date range (an
+  // old Takeout import, a Health Connect backfill), in which case focusActivity would silently
+  // find nothing in `activities` and no-op. When that happens, this narrows the range to just
+  // that activity's own day (changeSelectedRange, the same mechanism a manual single-day pick
+  // already uses — FR-6.5) and defers the actual focus to the effect below, which fires once
+  // that range's own refetch has actually landed and the id is really there — a two-step async
+  // sequence, not a single call, since the range change and the fly both depend on a fetch
+  // landing first. Also restores Normal mode first: Fog/Heatmap have no per-track focus
+  // concept, and their own mode-switch effect already clears focus whenever entering either.
+  const pendingFocusIdRef = useRef<string | null>(null);
+  const viewActivityOnMap = useCallback(
+    (activityId: string, startedAtIso: string) => {
+      if (mapMode !== 'normal') changeMapMode('normal');
+      const day = startedAtIso.slice(0, 10); // YYYY-MM-DD (UTC) — same day-precision selectedRange itself uses
+      if (selectedRange !== null && day >= selectedRange.from && day <= selectedRange.to) {
+        focusActivity(activityId);
+        return;
+      }
+      pendingFocusIdRef.current = activityId;
+      changeSelectedRange({ from: day, to: day });
+    },
+    [mapMode, changeMapMode, selectedRange, changeSelectedRange, focusActivity],
+  );
+  useEffect(() => {
+    const pending = pendingFocusIdRef.current;
+    if (pending === null) return;
+    if (activities.some((a) => a.id === pending)) {
+      pendingFocusIdRef.current = null;
+      focusActivity(pending);
+    }
+  }, [activities, focusActivity]);
 
   // The footer's "Clear" button (shown once at least one row is checked): empties the checked
   // group (so every previously-bold-by-checkbox track drops that highlight — a focused row,
@@ -760,7 +794,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
   return (
     <div className="app-shell">
       <Header
-        uploadControl={<UploadPanel readOnly={isDemo} onUploaded={handleUploaded} />}
+        importControl={<ImportPanel readOnly={isDemo} onUploaded={handleUploaded} onViewOnMap={viewActivityOnMap} />}
         exportControl={
           <ExportButton
             map={map}

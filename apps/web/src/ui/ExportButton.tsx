@@ -15,7 +15,7 @@ export interface ExportButtonProps {
  * spoken for, and this is a deliberate one-shot action, not a live map mode/state toggle.
  * `map`/`viewState` are passed in rather than read here, the same "callback wiring belongs
  * where the map instance is" reasoning Header.tsx's own doc comment already gives for why
- * `uploadControl` is a prop.
+ * `importControl` is a prop.
  */
 export function ExportButton({ map, viewState }: ExportButtonProps) {
   const [busy, setBusy] = useState(false);

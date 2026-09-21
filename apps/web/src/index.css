@@ -123,7 +123,7 @@ body {
   border: 2px solid var(--fm-accent);
 }
 
-/* Donate, the upload control and the account menu, pushed to the trailing end together. */
+/* Donate, the import control and the account menu, pushed to the trailing end together. */
 .app-header__actions {
   margin-left: auto;
   display: flex;
@@ -858,7 +858,7 @@ body {
   background: var(--fm-border);
 }
 
-/* Anchors the dropdown panel under its trigger — same arrangement .upload-panel/.user-menu
+/* Anchors the dropdown panel under its trigger — same arrangement .import-panel/.user-menu
    already use for their own dropdowns. No fixed width any more (nothing below it to stay
    column-aligned with) — sized to its own label/caret like the mockup's chip. */
 .activities-panel__type-dropdown {
@@ -1397,14 +1397,15 @@ body {
   white-space: nowrap;
 }
 
-/* §4.0.1's upload control — a dropdown panel now, not a hover popover (docs/UI/exports/
-   fitmap-map-screen-standalone.html's live prototype). `position: relative` anchors the
-   dropdown under the trigger button, the same arrangement as .user-menu's own dropdown. */
-.upload-panel {
+/* §4.0.1's import control — a dropdown panel with Files/Sync tabs, not a hover popover
+   (docs/UI/exports/fitmap-map-screen-standalone.html's live prototype). `position: relative`
+   anchors the dropdown under the trigger button, the same arrangement as .user-menu's own
+   dropdown. */
+.import-panel {
   position: relative;
 }
 
-.upload-panel__trigger {
+.import-panel__trigger {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1419,13 +1420,13 @@ body {
   cursor: pointer;
 }
 
-.upload-panel__trigger:hover:not(:disabled) {
+.import-panel__trigger:hover:not(:disabled) {
   background: rgb(var(--fm-ink-rgb) / 4%);
 }
 
-/* A demo account (UploadPanel's own readOnly prop) — visibly inert, not just a click no-op
+/* A demo account (ImportPanel's own readOnly prop) — visibly inert, not just a click no-op
    that silently never opens the dropdown. */
-.upload-panel__trigger:disabled {
+.import-panel__trigger:disabled {
   color: rgb(var(--fm-ink-rgb) / 35%);
   border-color: rgb(var(--fm-ink-rgb) / 8%);
   cursor: not-allowed;
@@ -1459,7 +1460,7 @@ body {
 }
 
 /* A rare failure (network/timeout) — positioned so it doesn't push the rest of the header
-   down, the same floating-note treatment .upload-panel's own popovers already use. */
+   down, the same floating-note treatment .import-panel's own popovers already use. */
 .export-button__error {
   position: absolute;
   top: 100%;
@@ -1479,7 +1480,7 @@ body {
    useUploadHistory's own comment on why the latter isn't scoped to whichever page happens
    to be open) — visible even with the dropdown closed, so progress doesn't disappear the
    moment it's collapsed. */
-.upload-panel__badge {
+.import-panel__badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1493,12 +1494,12 @@ body {
   font-weight: 700;
 }
 
-.upload-panel__caret {
+.import-panel__caret {
   font-size: 10px;
   color: rgb(var(--fm-ink-rgb) / 45%);
 }
 
-.upload-panel__dropdown {
+.import-panel__dropdown {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
@@ -1515,20 +1516,44 @@ body {
   overflow-y: auto;
 }
 
-.upload-panel__title {
-  margin: 0 0 2px;
-  font-size: 14px;
-  font-weight: 700;
+/* The Files/Sync tab strip — ImportPanel.tsx's own doc comment has the reasoning for why
+   these are two tabs rather than one combined list. A plain underline-on-active treatment,
+   matching how little visual weight the rest of this dropdown spends on chrome. */
+.import-panel__tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 10px;
+  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 10%);
+}
+
+.import-panel__tab {
+  padding: 0 2px 8px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  color: rgb(var(--fm-ink-rgb) / 55%);
+  cursor: pointer;
+}
+
+.import-panel__tab:hover {
   color: var(--fm-ink);
 }
 
-.upload-panel__hint {
+.import-panel__tab--active {
+  border-bottom-color: var(--fm-accent);
+  color: var(--fm-ink);
+}
+
+.import-panel__hint {
   margin: 0 0 10px;
   font-size: 12px;
   color: rgb(var(--fm-ink-rgb) / 55%);
 }
 
-.upload-panel__dropzone {
+.import-panel__dropzone {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1541,17 +1566,17 @@ body {
   text-align: center;
 }
 
-.upload-panel__dropzone--drag {
+.import-panel__dropzone--drag {
   border-color: var(--fm-accent);
   background: rgb(var(--fm-accent-rgb) / 6%);
   color: var(--fm-accent);
 }
 
-.upload-panel__input {
+.import-panel__input {
   display: none;
 }
 
-.upload-panel__notices {
+.import-panel__notices {
   list-style: none;
   margin: 10px 0 0;
   padding: 0;
@@ -1560,7 +1585,7 @@ body {
   gap: 6px;
 }
 
-.upload-panel__notice {
+.import-panel__notice {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -1573,12 +1598,12 @@ body {
   color: var(--fm-ink);
 }
 
-.upload-panel__notice--error {
+.import-panel__notice--error {
   background: rgb(var(--fm-danger-rgb) / 8%);
   color: var(--fm-danger);
 }
 
-.upload-panel__notice-dismiss {
+.import-panel__notice-dismiss {
   flex: none;
   border: 0;
   background: none;
@@ -1590,7 +1615,7 @@ body {
   cursor: pointer;
 }
 
-.upload-panel__list-head {
+.import-panel__list-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -1598,7 +1623,7 @@ body {
   margin: 16px 0 6px;
 }
 
-.upload-panel__list-title {
+.import-panel__list-title {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -1606,19 +1631,19 @@ body {
   color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
-.upload-panel__list-summary {
+.import-panel__list-summary {
   font-size: 11.5px;
   color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
-.upload-panel__rows {
+.import-panel__rows {
   list-style: none;
   margin: 0;
   padding: 0;
   border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
 }
 
-.upload-panel__row {
+.import-panel__row {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1626,7 +1651,7 @@ body {
   border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 6%);
 }
 
-.upload-panel__row-name {
+.import-panel__row-name {
   flex: 1;
   min-width: 0;
   font-size: 12.5px;
@@ -1637,7 +1662,7 @@ body {
   white-space: nowrap;
 }
 
-.upload-panel__row-size {
+.import-panel__row-size {
   flex: none;
   font-size: 11px;
   color: rgb(var(--fm-ink-rgb) / 45%);
@@ -1645,7 +1670,7 @@ body {
   text-align: right;
 }
 
-.upload-panel__row-detail {
+.import-panel__row-detail {
   flex: none;
   display: flex;
   flex-direction: column;
@@ -1654,25 +1679,40 @@ body {
   min-width: 6.5rem;
 }
 
-.upload-panel__row-status {
+.import-panel__row-status {
   font-size: 11px;
   color: rgb(var(--fm-ink-rgb) / 55%);
 }
 
-.upload-panel__row-status--error {
+.import-panel__row-status--error {
   color: var(--fm-danger);
 }
 
-.upload-panel__row-status--ready {
+.import-panel__row-status--ready {
   color: var(--fm-success);
 }
 
-.upload-panel__row-meta {
+.import-panel__row-meta {
   font-size: 10.5px;
   color: rgb(var(--fm-ink-rgb) / 45%);
 }
 
-.upload-panel__progress {
+/* ROADMAP.md's "View on map" action — plain text, not a button-styled control, to stay
+   visually subordinate to the row's own status/date/distance rather than competing with them
+   for attention in an already-tight detail column. */
+.import-panel__row-view {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--fm-accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.import-panel__progress {
   display: block;
   width: 6.5rem;
   height: 4px;
@@ -1681,24 +1721,24 @@ body {
   overflow: hidden;
 }
 
-.upload-panel__progress-fill {
+.import-panel__progress-fill {
   display: block;
   height: 100%;
   background: var(--fm-accent);
   transition: width 120ms linear;
 }
 
-.upload-panel__note {
+.import-panel__note {
   padding: 10px 0;
   font-size: 12px;
   color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
-.upload-panel__note--error {
+.import-panel__note--error {
   color: var(--fm-danger);
 }
 
-.upload-panel__pager {
+.import-panel__pager {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1708,12 +1748,12 @@ body {
   color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
-.upload-panel__pager-buttons {
+.import-panel__pager-buttons {
   display: flex;
   gap: 4px;
 }
 
-.upload-panel__pager-buttons button {
+.import-panel__pager-buttons button {
   border: 1px solid rgb(var(--fm-ink-rgb) / 15%);
   border-radius: 5px;
   width: 24px;
@@ -1722,7 +1762,7 @@ body {
   cursor: pointer;
 }
 
-.upload-panel__pager-buttons button:disabled {
+.import-panel__pager-buttons button:disabled {
   opacity: 0.35;
   cursor: default;
 }

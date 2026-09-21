@@ -100,7 +100,7 @@ export function formatElevation(meters: number, system: UnitSystem): string {
   return `${Math.round(converted).toLocaleString()} ${system === 'imperial' ? 'ft' : 'm'}`;
 }
 
-/** "9 Sep" — the upload panel's finished rows (UploadPanel.tsx) need "which day did this
+/** "9 Sep" — the import panel's finished rows (ImportPanel.tsx) need "which day did this
  *  land on", not a full datetime; `formatStartedAt` above is a row's primary line, this
  *  is a compact subtitle next to a filename that's already the row's primary line. */
 export function formatShortDate(iso: string): string {
@@ -151,6 +151,28 @@ export function formatIngestSource(source: string): string {
       return 'a Google Takeout import';
     case 'recorded':
       return 'a GPS recording';
+    default:
+      return source;
+  }
+}
+
+/** The same `source` values as `formatIngestSource`, but as a short title rather than a
+ *  sentence fragment — ImportPanel.tsx's Sync-tab row names, where a synced row's own
+ *  `filename` is a raw external id never meant to be shown directly. Kept as its own switch
+ *  rather than stripping `formatIngestSource`'s leading article: the wording itself differs
+ *  too ("GPS Logger" vs. "a GPS recording"), not just the article. */
+export function formatSourceLabel(source: string): string {
+  switch (source) {
+    case 'healthconnect':
+      return 'Health Connect';
+    case 'healthkit':
+      return 'HealthKit';
+    case 'upload':
+      return 'Uploaded file';
+    case 'takeout':
+      return 'Google Takeout';
+    case 'recorded':
+      return 'GPS Logger';
     default:
       return source;
   }
