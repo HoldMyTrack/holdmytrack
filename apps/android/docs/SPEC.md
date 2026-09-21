@@ -3,8 +3,8 @@
 | | |
 | :-- | :-- |
 | **Version** | 1.0 |
-| **Status** | Current — describes the app as built through Phase 4 of `apps/android/docs/ROADMAP.md` |
-| **Last updated** | 2026-09-17 (scope note updated same day for the planned in-app GPS recording capability — see §1.2, §7) |
+| **Status** | Current — describes the app as built through Phase 4 of `apps/android/docs/ROADMAP.md`, plus Phase 7 (in-app GPS recording, built out of sequence — §1.2, §7 below) |
+| **Last updated** | 2026-09-20 (§1.2, §7 updated: in-app GPS recording is built, not just planned) |
 | **Related documents** | `apps/android/docs/ROADMAP.md` (the phase plan, platform-constraint findings, and the verification record this document's behavior claims are drawn from — the authority on *how each finding was reached*); `apps/android/docs/ARCHITECTURE.md` (this app's shape, stack, and key decisions); `apps/android/docs/IMPLEMENTATION.md` (file-by-file "how it's built" detail); `docs/SPEC.md`/`docs/IMPLEMENTATION.md` (the server behavior and schema this app is a client of); `docs/VISION.md` (why Path 2 exists at all, §4.1 and §5.4) |
 
 ## 1. Introduction
@@ -15,9 +15,9 @@ This document specifies the Android app's functional behavior as currently imple
 
 ### 1.2 Scope
 
-**In scope**: everything currently built and verified on a physical device — sign in, sign up, and starting a demo account (FR-1); session persistence and server-side re-verification on cold start (FR-1); a full-screen map with Normal, Fog of War, and Heatmap modes over the account's entire history (FR-2); Health Connect onboarding and permission acquisition (FR-3); a foreground sync run with resumable watermark tracking (FR-3); per-activity sync rejection feedback (FR-3); and a sync status/history screen that also surfaces cross-source duplicates (FR-4).
+**In scope**: everything currently built and verified on a physical device — sign in, sign up, and starting a demo account (FR-1); session persistence and server-side re-verification on cold start (FR-1); a full-screen map with Normal, Fog of War, and Heatmap modes over the account's entire history (FR-2); Health Connect onboarding and permission acquisition (FR-3); a foreground sync run with resumable watermark tracking (FR-3); per-activity sync rejection feedback (FR-3); and a sync status/history screen that also surfaces cross-source duplicates (FR-4). Also in scope, verified on an emulator rather than a physical device (noted where it matters — §7): casual in-app GPS recording, its Recorded Activities review/queue screen, and the activity-type gate that keeps a queued recording from silently defeating FR-4's cross-source dedup (FR-5).
 
-**Out of scope, not yet built**: everything root `docs/ROADMAP.md` Phase 3 (design finalization) and `apps/android/docs/ROADMAP.md` Phase 5 gate — a visual design system, an icon set, a launcher icon, and the date-range/type/hidden-track filter controls the web client already has (the map here always shows the account's unfiltered, entire history). Also not yet built: casual, GPS-only in-app recording (`docs/VISION.md` §1.1, §4.1) — a planned, deliberately separate capability from Health Connect sync, tracked as `apps/android/docs/ROADMAP.md` Phase 7 and not covered by any FR below yet. Out of scope as a platform limitation rather than a "not yet": background Health Connect sync (will not be built — see §3.3 note; this does not apply to the planned in-app recorder, which is not subject to the same platform constraint — [ADR-0007](../../../docs/adr/0007-in-app-gps-recording-submits-directly.md)), and Samsung Galaxy Watch sync (Samsung does not expose route geometry to Health Connect at all, so every Samsung-sourced session is rejected for having no route, same as any other route-less activity). iOS does not exist. Accessibility (content descriptions, touch-target sizing, large-font and TalkBack testing) has not been done and is scoped to Phase 5. See §7 for the complete list.
+**Out of scope, not yet built**: everything root `docs/ROADMAP.md` Phase 3 (design finalization) and `apps/android/docs/ROADMAP.md` Phase 5 gate — a visual design system, an icon set, a launcher icon, and the date-range/type/hidden-track filter controls the web client already has (the map here always shows the account's unfiltered, entire history). Out of scope as a platform limitation rather than a "not yet": background Health Connect sync (will not be built — see §3.3 note; this does not apply to in-app recording, which is not subject to the same platform constraint — [ADR-0007](../../../docs/adr/0007-in-app-gps-recording-submits-directly.md)), and Samsung Galaxy Watch sync (Samsung does not expose route geometry to Health Connect at all, so every Samsung-sourced session is rejected for having no route, same as any other route-less activity). iOS does not exist. Accessibility (content descriptions, touch-target sizing, large-font and TalkBack testing) has not been done and is scoped to Phase 5. See §9 for the complete list.
 
 ### 1.3 Intended audience
 
@@ -179,7 +179,44 @@ All of FR-3 requires an active session (demo or registered); Health Connect sync
 
 **Behavior**: Reads `GET /v1/activities/duplicates`. Each row names the activity's type and start time, the source it arrived from, and the source of the copy that superseded it (`docs/IMPLEMENTATION.md` §4.6) — phrased as, for example, "cycling from HealthKit — already here from Health Connect, so it is not drawn twice." The section is hidden entirely when there are no duplicates to show.
 
-## 7. Non-Functional Requirements (summary)
+## 7. FR-5 — In-App GPS Recording
+
+A third way an activity can originate on this app, alongside FR-3's Health Connect sync and a manual file upload done from the phone's browser (`docs/SPEC.md` FR-3.1). Architecturally distinct from FR-3: a finished recording submits directly to `POST /v1/sync/activities` under `source = "recorded"` rather than round-tripping through Health Connect ([ADR-0007](../../../docs/adr/0007-in-app-gps-recording-submits-directly.md)), so none of FR-3's foreground-only reasoning carries over — recording and syncing are two separate, explicit steps (below), not one continuous run. `docs/SPEC.md` FR-3.8 is the cross-platform behavior spec this restates at screen level; `docs/IMPLEMENTATION.md` §4.0.4 has the wire contract.
+
+### FR-5.1 GPS Logger — record
+
+**Description**: A menu item ("GPS Logger", `RecordingActivity`) that records a casual, GPS-only track — a walk, hike, or drive someone would not otherwise bother tracking.
+
+**Preconditions**: `ACCESS_FINE_LOCATION` granted to record. No account or sign-in needed — recording and locally managing rows works signed out; only syncing them does (FR-5.2 step 5).
+
+**Behavior**:
+1. The screen opens with Name and Description empty and Activity Type pre-filled `"unknown"` (`recording/RecordingTypes.DEFAULT`) — confirmed on an emulator (not a physical device): "GPS Logger" title, a "Name" field, an "unknown" Type field, a "Description (optional)" field, and a disabled Record button under a "FitMap needs location access to record a GPS track." notice with a "Grant location access" button until location is granted.
+2. Granting location triggers the ordinary system permission dialog (Precise/Approximate × While using the app/Only this time/Don't allow), immediately followed by a notification-permission dialog — both confirmed live; neither blocks Record once resolved either way.
+3. **Record** starts `RecordingService` (a declared foreground service, `FOREGROUND_SERVICE_TYPE_LOCATION`) and switches the screen to a live Time/Distance/Altitude/Speed readout with **Pause**/**Stop** — confirmed live: the readout advanced from a fresh `0:00:00`/`0.00 km` as simulated GPS fixes arrived, independent of the fix interval (the time readout ticks every second off a `Handler`, not off fix arrival).
+4. **Stop** ends the recording, saves it to `recording/db/RecordedActivityStore` (not Room — a plain `SQLiteOpenHelper`, `docs/IMPLEMENTATION.md` §7.2), tagged not-synced, and returns to the map with a "Saved. Find it under Recorded Activities to queue it for sync." toast — confirmed live; no network request happens at this step.
+
+### FR-5.2 Recorded Activities — review, edit, queue, sync
+
+**Description**: A menu item ("Recorded Activities", `RecordedActivitiesActivity`) listing every locally saved recording, where a row actually gets marked to go out.
+
+**Behavior**:
+1. Rows are newest first, filterable by two "All"-default dropdowns (sync status; activity type, rebuilt from whatever distinct types are on file) — confirmed live, including the empty state ("No recorded activities yet.") before any row exists.
+2. Each row reads `"{type} · {distance} km · {status}"` (e.g. "walking · 0.23 km · Queued"), with a checkbox and Edit/Delete buttons.
+3. **A row still on the unedited `"unknown"` default cannot be queued.** Its checkbox renders disabled, and the row grows a fourth clause explaining why — `"unknown · 0.23 km · Not synced · Set a type to sync"` — confirmed live by recording, stopping without touching Type, and confirming both the checkbox's disabled state and the row text. This exists because `docs/SPEC.md` FR-3.7's cross-source dedup match requires an *exact* `activity_type` match, and an untyped recording can never match a same-walk activity that arrived typed from another source — reproduced live against a local server as the root cause of a real production duplicate (two activities for one walk: one via this screen left on `"unknown"`, one via Health Connect sync reporting `"walking"`) before this gate existed.
+4. Editing the type to a real value — typed freely, or picked from the walk/hike/run/ride/drive suggestions (`recording/RecordingTypes.PRESETS`, an `AutoCompleteTextView`) — and saving re-enables the checkbox; checking it then flips the row to Queued. Confirmed live end to end.
+5. **Editing an already-queued row's type back to blank demotes it to not-synced** the moment Save is tapped, disabling the checkbox again — confirmed live. Edit stays unlocked until a row actually syncs (not just until Stop), so without this the gate in step 3 could be set once and then bypassed by clearing the type afterward; this closes that path.
+6. **Edit** (`RecordingActivity` reused, `EXTRA_RECORDING_ID`) reopens the same screen against the saved row — Record/Pause/Stop replaced by a single Save button, fields pre-filled, stats shown static. Locked (fields disabled, Save hidden, "Already synced — no longer editable.") once the row has synced.
+7. **Sync Now** (the existing Health Connect button, FR-3.2) also drains every queued row in the same tap — `flushRecordedQueue()`, run after the Health Connect pass or after it throws, submitting each as its own `POST /v1/sync/activities` call and marking it synced on success. Confirmed live through the readiness state machine (FR-3.1) up to triggering a sync run; not confirmed end-to-end to a synced row in this pass, since the row queued during verification had been recorded signed out and was therefore account-scoped away from the signed-in test account by the time Sync Now ran (FR-5.3 below) — a correct outcome of that scoping, not a gap in the gate this section documents.
+8. **Delete**, on every row regardless of sync status, asks for confirmation and removes the row from this device only — a synced row's real `Activity` is untouched server-side, which the confirmation dialog states.
+9. A demo session can record and manage rows here, but every sync checkbox is disabled with an explanatory notice — queuing something "Sync Now" can never actually take would be pointless (matches FR-3's own demo gate).
+
+### FR-5.3 Local storage is scoped per signed-in account
+
+**Description**: Recordings are keyed to whichever account is signed in when they're made (`Session.email`, empty string for signed-out/demo) — the same per-account key `SyncCursor` (FR-3.3) already established.
+
+**Behavior**: Switching accounts on one device never shows one account's recordings under another's. Confirmed live, incidentally: a recording made while signed out did not appear in Recorded Activities after signing into a real account, and so could not be queued or synced from that account either — consistent with `docs/IMPLEMENTATION.md` §7.2's own account-scoping note, not a defect.
+
+## 8. Non-Functional Requirements (summary)
 
 This section summarizes cross-cutting behavior specified elsewhere in this document.
 
@@ -192,7 +229,7 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 | **No reload required** | The sync history screen updates itself by polling while work is outstanding, and stops polling once settled (FR-4.1). |
 | **Idempotency** | Re-syncing the same Health Connect record never creates a duplicate activity — the server keys on the platform's own record id (FR-3.2, `docs/IMPLEMENTATION.md` §4.0.3). |
 
-## 8. Known Limitations & Out-of-Scope Items
+## 9. Known Limitations & Out-of-Scope Items
 
 Named here rather than left implicit, the way `docs/SPEC.md` §14 does for the wider system:
 
@@ -201,7 +238,7 @@ Named here rather than left implicit, the way `docs/SPEC.md` §14 does for the w
 - **No accessibility work done.** No content descriptions, no verified touch-target sizing, untested under a large system font or TalkBack.
 - **Samsung Galaxy Watch is unsupported**, not degraded — Samsung does not expose route geometry to Health Connect at all, so every Samsung-sourced session is rejected for having no route, indistinguishable at sync time from an ordinary indoor workout.
 - **Background sync will never be built for Health Connect routes** — a platform constraint (`ConsentRequired` regardless of grant state when backgrounded), not a sequencing gap.
-- **In-app GPS recording is planned, not built.** `docs/VISION.md` §1.1 and §4.1 now describe a casual, GPS-only recording capability for the mobile app — no heart rate/cadence/power, no training metrics, explicitly not a fitness-tracker replacement — tracked as `apps/android/docs/ROADMAP.md` Phase 7. It is architecturally distinct from Health Connect sync (FR-3 above): a finished recording submits directly to the server rather than round-tripping through Health Connect ([ADR-0007](../../../docs/adr/0007-in-app-gps-recording-submits-directly.md)), so none of FR-3's foreground-only reasoning necessarily carries over unchanged.
-- **No automated tests.** Every behavior in this document has been verified manually against a physical device and a live server stack; see `apps/android/docs/IMPLEMENTATION.md` §9 and `apps/android/docs/ROADMAP.md` for the verification record.
+- **In-app GPS recording's iOS half is unbuilt** — FR-5 above is Android-only; `docs/ROADMAP.md` Phase 2 tracks the iOS half as a combined item once an iOS app exists at all.
+- **No automated tests.** Every behavior in this document has been verified manually against a live server stack — a physical device for FR-1 through FR-4, an emulator for FR-5 (§7, noted inline where it matters); see `apps/android/docs/IMPLEMENTATION.md` §9 and `apps/android/docs/ROADMAP.md` for the verification record.
 - **iOS does not exist.** Path 2's HealthKit half is unbuilt; this app defines the sync contract iOS will inherit (`apps/android/docs/ROADMAP.md`).
 - **`poc-healthconnect/` is not part of the product** — a throwaway diagnostic app, retained only until Phase 1's findings are fully absorbed elsewhere.

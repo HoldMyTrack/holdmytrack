@@ -15,7 +15,7 @@ export interface UploadHistoryState {
 }
 
 /**
- * Backs the upload panel's "UPLOADS" list (§4.0.1) — a paginated read of `GET /v1/uploads`
+ * Backs ImportPanel.tsx's Files/Sync tabs (§4.0.1) — a paginated read of `GET /v1/uploads`
  * that also polls while anything is still processing, so a row visibly flips from
  * "Processing" to "Ready"/"Failed" without the panel needing to be closed and reopened.
  * Polling is keyed on the response's own `processing` count (every pending job for this
@@ -24,6 +24,14 @@ export interface UploadHistoryState {
  * does, but it also shouldn't stay silent while page 2 is mid-upload and page 1 is what's on
  * screen — polling this same page is the simplest thing that keeps both cases correct,
  * since whichever page is open is the one that needs to notice a change.
+ *
+ * One call per tab, both always mounted regardless of which tab is currently showing — a
+ * Files-tab job finishing while the Sync tab happens to be open still has to reach `onPoll`
+ * (which refreshes the map), so polling can't be conditional on tab visibility the way the
+ * *rendered* rows already are. `sources` (a stable array reference — pass a module-level
+ * constant, not an inline literal, or its identity changing every render would restart the
+ * poll loop) scopes which rows this instance's own page counts; omit it for the unfiltered
+ * combined view.
  *
  * `onPoll` fires after every *poll-driven* read (not the initial one, and not the one
  * `refresh()` triggers) — the one reliable signal that a job may have actually finished
@@ -35,7 +43,7 @@ export interface UploadHistoryState {
  * which time ingest had long since finished. This is what actually closes that gap: every
  * ~1.5s while something is still processing, the caller gets a chance to notice it's done.
  */
-export function useUploadHistory(onPoll?: () => void): UploadHistoryState {
+export function useUploadHistory(sources?: readonly string[], onPoll?: () => void): UploadHistoryState {
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState<UploadHistoryPage | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +60,7 @@ export function useUploadHistory(onPoll?: () => void): UploadHistoryState {
     let cancelled = false;
 
     const load = (polled: boolean) => {
-      getUploadHistory({ limit: PAGE_SIZE, offset }, controller.signal)
+      getUploadHistory({ limit: PAGE_SIZE, offset, ...(sources ? { sources } : {}) }, controller.signal)
         .then((result) => {
           if (cancelled) return;
           setPage(result);
@@ -76,7 +84,7 @@ export function useUploadHistory(onPoll?: () => void): UploadHistoryState {
       cancelled = true;
       controller.abort();
     };
-  }, [offset, nonce]);
+  }, [offset, nonce, sources]);
 
   const refresh = useCallback(() => setNonce((n) => n + 1), []);
   return { page, error, offset, setOffset, refresh };

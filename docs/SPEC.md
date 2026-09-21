@@ -204,7 +204,7 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 1. Client calls `POST /v1/auth/demo`.
 2. Server opens a session against one persistent, shared **Demo Customer** account — not a fresh account created per visitor. That account is pre-seeded, once, out of band (not per request — see FR-2.2), with a real, richly-populated history: roughly 611 activities spanning about 7 months, a mix of walks, dog walks, bike rides, local errands, and a few multi-day road trips.
 3. Server creates a session for this visitor (24-hour expiry) and sets it as a cookie. Any number of visitors can hold their own session against the same shared account at once — they all see identical data.
-4. Client is signed in and shown the map, with the account's full history already visible in every mode (Normal, Fog of War, Heatmap) and every read-only feature (filtering, the activity graph, export) exactly as a registered user has it. **A demo account cannot upload, sync, edit, or delete an activity, or change its avatar/settings** — every such request is rejected regardless of what a client attempts, whether or not its own UI still offers the control. Creating a real account (FR-1.1) is the only way to save one's own data. Both clients also gate this proactively rather than relying on the rejection alone: the web app disables the Upload control with an explanation (`UploadPanel.tsx`'s `readOnly` prop) and the Android app disables Sync Now and hides the Health Connect permission flow with the same explanation (FR-3.8) — a demo session can still record and manage GPS Logger recordings locally on Android, since nothing about that reaches the server until sync is attempted.
+4. Client is signed in and shown the map, with the account's full history already visible in every mode (Normal, Fog of War, Heatmap) and every read-only feature (filtering, the activity graph, export) exactly as a registered user has it. **A demo account cannot upload, sync, edit, or delete an activity, or change its avatar/settings** — every such request is rejected regardless of what a client attempts, whether or not its own UI still offers the control. Creating a real account (FR-1.1) is the only way to save one's own data. Both clients also gate this proactively rather than relying on the rejection alone: the web app disables the Import control with an explanation (`ImportPanel.tsx`'s `readOnly` prop) and the Android app disables Sync Now and hides the Health Connect permission flow with the same explanation (FR-3.8) — a demo session can still record and manage GPS Logger recordings locally on Android, since nothing about that reaches the server until sync is attempted.
 
 **Outputs**: A valid session cookie for the shared Demo Customer account, already showing its full activity history.
 
@@ -249,10 +249,10 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Inputs**: One or more files, each a `.gpx`, `.fit`, or `.tcx` file no larger than 64 MiB. Up to 20 individually-selected files per batch (a larger selection is rejected client-side in full, before any upload begins, with a message directing the user to a `.zip` archive instead — FR-3.2).
 
 **Behavior**:
-1. User drags files onto the upload panel, or selects them via a file picker.
+1. User drags files onto the Import panel's Files tab, or selects them via a file picker.
 2. Each file uploads independently, as its own `POST /v1/activities/upload` request (multipart), and is tracked independently — one file failing does not affect the others.
 3. For each file: server validates its extension and size, computes a content hash to check for a duplicate (FR-3.5), persists the raw file, and enqueues a background parsing job.
-4. The upload panel shows each file's live status (uploading, with a progress percentage; then "Processing…") until the background job finishes.
+4. The Files tab shows each file's live status (uploading, with a progress percentage; then "Processing…") until the background job finishes.
 5. Once ingestion completes, the activity appears automatically in the Activities panel, the map, and every summary that reflects the current date range — no page reload is required.
 
 **Outputs**: One new `Activity` per successfully ingested file, each with a parsed trajectory, distance, duration, and (where the source file provides it) heart rate/elevation data.
@@ -292,24 +292,25 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Inputs**: A Google Takeout export `.zip` archive (detected automatically by its internal folder structure — no separate upload flow to choose).
 
 **Behavior**:
-1. User uploads the Takeout export `.zip` through the same upload control as FR-3.1/FR-3.2.
+1. User uploads the Takeout export `.zip` through the same Files tab as FR-3.1/FR-3.2.
 2. Server recognizes the archive's shape as a Takeout export (rather than a plain `.zip`) and extracts one activity file per recorded activity that has GPS data (activity types with no GPS in the export — e.g. a logged swim with no route — are skipped, not treated as errors).
 3. Each extracted activity is ingested exactly as FR-3.1 describes, attributed to the Takeout source.
 
 **Outputs**: One new `Activity` per activity in the export that had GPS data.
 
-### FR-3.4 Upload status and history
+### FR-3.4 Import status and history
 
-**Description**: A user can see the status of in-progress and past uploads.
+**Description**: A user can see the status of in-progress and past uploads and syncs, and jump from a finished one straight to it on the map. The header's "Import" control (renamed from "Upload activity" once a second ingest source existed — FR-3.6) opens a dropdown with two tabs: **Files** (drag/drop, `.zip`, and Google Takeout — FR-3.1–FR-3.3, unchanged) and **Sync** (Health Connect and in-app GPS recording activity synced from the Android app — FR-3.6, FR-3.8). Sync is a read-only status view, not a "sync now" button: that sync is phone-triggered, and nothing in the web app can request it (`apps/android/docs/SPEC.md` §7.4's own "Ask every time"/"Always allow" split is the closest analogue, and it lives entirely on the phone).
 
 **Preconditions**: Active session.
 
 **Behavior**:
-1. The upload control's badge shows a live count of files still being processed.
-2. Opening the upload panel shows a paginated list (5 per page) of every file ever uploaded to this account, each showing: filename, status ("Processing" / "Ready" / "Failed"), and — once ready — the activity's date and distance.
-3. While anything is still processing, the list refreshes automatically (polled every 1.5 seconds) until every row settles to "Ready" or "Failed" — no manual refresh needed.
+1. The Import control's badge shows a live count of jobs still processing, combined across both tabs, regardless of which tab is currently open.
+2. Each tab shows its own paginated list (5 per page) of every matching job ever recorded for this account, each showing: a title (the filename, for a Files row; the source name — "Health Connect," "GPS Logger" — for a Sync row, since a synced job's own filename is a platform-assigned id with nothing human-readable in it), status ("Processing…" / "Ready" / "Failed"), and — once ready — the activity's date and distance.
+3. While anything in a tab is still processing, that tab's list refreshes automatically (polled every 1.5 seconds) until every row settles to "Ready" or "Failed" — no manual refresh needed. Both tabs poll independently and simultaneously, regardless of which one is currently showing, since a job finishing in the tab that isn't open still has to reach the map.
+4. A "View on map" action appears on every finished (`"Ready"`) row, on either tab. Clicking it closes the Import dropdown, focuses that activity exactly as clicking its row in the Activities panel would (FR-5.5) — track bolded, camera flown to fit it — and, if the activity's own date falls outside the currently selected date range (FR-6), first narrows the selected range to just that one day (the same mechanism a manual single-day pick already uses — FR-6.5) before focusing, rather than focusing something the Activities panel isn't currently showing at all.
 
-**Outputs**: `GET /v1/uploads?limit=&offset=` returns the current page, the total count, and how many are still processing.
+**Outputs**: `GET /v1/uploads?limit=&offset=&source=` returns the current page, the total count (scoped to `source` when given), and how many are still processing (always the global count, unscoped, for the badge). `source` is a comma-separated filter — `upload,takeout` for the Files tab, `healthconnect,healthkit,recorded` for Sync — omitted for the unfiltered combined view neither tab actually uses today. Each row also carries `source` and, once the job has produced one, the resulting activity's own `id` — what the "View on map" action targets.
 
 ### FR-3.5 Duplicate detection
 
@@ -347,14 +348,14 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Preconditions**: At least two ingest sources have produced activities for the account close enough in time to compare (FR-3.6's mobile sync is what makes this reachable at all today; Path 1 cloud connectors will be a third source once built).
 
 **Behavior**:
-1. On ingest, a new activity is compared against the account's existing ones within a fuzzy window — same activity type, start time within thirty seconds either way, distance within about 1% — rather than exact equality on a pre-rounded bucket, which would miss a pair that happens to straddle a rounding boundary.
+1. On ingest, a new activity is compared against the account's existing ones within a fuzzy window — same activity type, start time within thirty seconds either way, distance within about 1% — rather than exact equality on a pre-rounded bucket, which would miss a pair that happens to straddle a rounding boundary. The type comparison itself is exact, not fuzzy, so a source that cannot state a real type is guarded at that source instead — FR-3.8 step 5 blocks queuing an in-app recording still on its unedited `"unknown"` default for exactly this reason.
 2. A match is resolved by keeping the richer record (route geometry over none; more data channels, e.g. heart rate, over fewer) and marking the other `superseded_by` the winner, rather than deleting it.
 3. Every user-facing read — the Activities list, totals, histogram, day pages, trends, graph stats, map tiles, and both Fog of War and Heatmap composites — excludes superseded activities automatically.
 4. Deleting the kept copy of a matched pair promotes the next-richest superseded copy back to live, rather than leaving both gone.
 
 **Outputs**: At most one live `Activity` per real-world activity, regardless of how many sources reported it.
 
-**Not yet built**: nothing in the web app currently surfaces *that* a duplicate was caught or lets someone review what got superseded (`docs/ROADMAP.md`'s "Surface superseded activities" item). The Android app's own sync screen does show this today, listing duplicates by both source names.
+5. The web app's Activities panel surfaces a "N duplicates found" disclosure whenever `GET /v1/activities/duplicates` returns any rows, listing each superseded activity's start time, type, distance and source, and which source's copy superseded it — mirroring the Android app's own sync screen, which has shown this since FR-3.6 shipped. Hidden entirely when there are none.
 
 ### FR-3.8 In-app GPS recording (Android)
 
@@ -369,7 +370,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 2. **Record** starts a foreground-service-backed location recording, so it survives the screen turning off; **Pause**/**Resume** are user-initiated only — there is no automatic pause. A live readout shows elapsed time, distance, current altitude, and current speed while recording.
 3. **Stop** ends the recording and saves it to an on-device store only, tagged not-synced — no network request happens. A recording with fewer than 2 points (Stop pressed before any location fix arrived) is not saved at all, matching the sync endpoint's own floor.
 4. **Recorded Activities** (a separate menu item) lists every locally saved recording, newest first, filterable by sync status (not synced / queued / synced) and by activity type. Each row has a sync checkbox and an Edit button.
-5. Checking a row's checkbox marks it queued; unchecking an unsynced row clears the queue mark. A synced row's checkbox is always checked and cannot be unchecked.
+5. Checking a row's checkbox marks it queued; unchecking an unsynced row clears the queue mark. A synced row's checkbox is always checked and cannot be unchecked. A row whose Activity Type is still the unedited `"unknown"` default cannot be checked at all — the row explains why ("Set a type to sync") — since FR-3.7's cross-source match requires an exact activity-type match, and an untyped recording can never match a same-walk activity that arrived typed from another source (e.g. Health Connect). Editing an already-queued row's type back to blank (Edit stays unlocked until sync) reverts it to not-synced for the same reason.
 6. **Edit** reopens the same recording screen against the saved row — the Record/Pause/Stop controls are replaced by a single Save button, and the Name/Type/Description fields (plus the recorded stats, read-only) are pre-filled. Editable at any point up until the row syncs; once synced, the fields and Save button are replaced with a notice that the row is locked.
 7. The Sync screen's existing "Sync Now" (FR-3.6) submits every queued row in the same run as the Health Connect sync, each as its own `POST /v1/sync/activities` call under `source = "recorded"` with a client-generated `external_id` (a UUID minted at Record) — the same batched wire shape FR-3.6 uses, reusing its ingest pipeline unchanged (`docs/IMPLEMENTATION.md` §4.0.4, [ADR-0007](adr/0007-in-app-gps-recording-submits-directly.md)). A row that syncs successfully is marked synced; a row the server rejects, or that fails outright, stays queued and is retried automatically on the next "Sync Now" — no action needed from the user.
 8. **Delete**, on every row regardless of sync status (unlike Edit, which locks once synced), asks for confirmation and then removes the row from this device only. For an already-synced row this is deliberately not the same as FR-5.11's server-side delete: the real `Activity` it produced stays exactly where it is — on the map, in the web app, counted in every total — and the confirmation dialog says so before the user confirms, rather than implying a purge that doesn't happen.
@@ -422,9 +423,20 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Description**: Normal, Fog, and Heatmap are three views of the same underlying data, not independent toggles — exactly one is active at a time.
 
-### FR-4.5 Base map and theming
+### FR-4.5 Base map, theming, and the opening view
 
 **Description**: The map renders a self-hosted vector base map (streets, labels) in either a light or dark theme, selected via the page's URL (no in-app toggle). The current camera position (center, zoom) and theme are reflected in the URL and restored on reload, so a specific view is shareable via link.
+
+**Preconditions**: Active session.
+
+**Behavior**:
+1. If the URL carries a saved or shared position (`#map=...`), it wins outright — restored on load, ahead of every fallback below.
+2. Otherwise, the account's own most recent activity determines the opening view: the camera flies to fit that single activity, not the full default date-range selection (FR-6.1) — an account with scattered recent history (one activity in another country yesterday, one locally today) would otherwise fly to a near-world view that reads as broken rather than just generic.
+3. An account with no activity history at all falls back to its Country setting (FR-1.7), at that country's own view, if one is set.
+4. If none of the above applies — no saved position, no activity history, no Country set — the camera opens on a fixed, deliberately zoomed-out world view.
+5. Panning or zooming rewrites the URL's saved position continuously, so the current view is always what a copied link restores.
+
+**Notes**: A fresh session (signing out, then signing in or starting a demo session) never inherits a previous session's saved camera position — only an unmodified reload of the same session does. This resolution order never requests the browser's geolocation permission; FR-4.7's "Find my location" is a separate, always-available, user-clicked control, not part of it.
 
 ### FR-4.6 Coverage notice
 

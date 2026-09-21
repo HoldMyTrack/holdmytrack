@@ -3,6 +3,7 @@ import { getCurrentUser, logout, type SessionUser, type UserProfile } from './ap
 import { AuthGate } from './auth/AuthGate';
 import { AuthProvider } from './auth/AuthContext';
 import { MapView } from './map/MapView';
+import { clearSavedView } from './map/viewState';
 import { ProfilePage } from './ui/ProfilePage';
 import { SettingsPage } from './ui/SettingsPage';
 import { VersionBanner } from './ui/VersionBanner';
@@ -75,6 +76,23 @@ export function App() {
       .catch(() => setAuth('signed-out'));
   }, []);
 
+  // Every app-initiated identity change (a sign-in/sign-up/demo-start completing, or a
+  // sign-out) clears whatever camera position the URL hash carries before flipping `auth` —
+  // otherwise MapView's next mount can inherit a previous session's leftover position and skip
+  // its own fly-to-most-recent fallback entirely (see clearSavedView's own doc comment,
+  // viewState.ts). Deliberately *not* called on the mount-time getCurrentUser check above,
+  // where an existing hash is a legitimate same-session "return to where I was" on a plain
+  // page refresh, not a stale leftover.
+  const handleAuthenticated = (user: SessionUser) => {
+    clearSavedView();
+    setAuth(user);
+  };
+  const handleSignOut = async () => {
+    await logout();
+    clearSavedView();
+    setAuth('signed-out');
+  };
+
   if (resetToken) {
     return (
       <>
@@ -82,7 +100,7 @@ export function App() {
         <AuthGate
           resetToken={resetToken}
           onAuthenticated={(user) => {
-            setAuth(user);
+            handleAuthenticated(user);
             setResetToken(null);
           }}
         />
@@ -97,7 +115,7 @@ export function App() {
         <AuthGate
           verifyToken={verifyToken}
           onAuthenticated={(user) => {
-            setAuth(user);
+            handleAuthenticated(user);
             setVerifyToken(null);
           }}
         />
@@ -110,7 +128,7 @@ export function App() {
     return (
       <>
         <VersionBanner />
-        <AuthGate onAuthenticated={setAuth} />
+        <AuthGate onAuthenticated={handleAuthenticated} />
       </>
     );
   }
@@ -122,22 +140,10 @@ export function App() {
     return (
       <>
         <VersionBanner />
-        <AuthGate
-          unverifiedUser={auth}
-          onAuthenticated={setAuth}
-          onSignOut={() => {
-            void logout();
-            setAuth('signed-out');
-          }}
-        />
+        <AuthGate unverifiedUser={auth} onAuthenticated={handleAuthenticated} onSignOut={() => void handleSignOut()} />
       </>
     );
   }
-
-  const signOut = async () => {
-    await logout();
-    setAuth('signed-out');
-  };
 
   // AuthenticatedApp (and MapView with it) fully unmounts for this — a deliberate tradeoff,
   // not an oversight: the uploaded-during-the-demo data is server-side and untouched either
@@ -150,7 +156,7 @@ export function App() {
         <VersionBanner />
         <AuthGate
           onAuthenticated={(user) => {
-            setAuth(user);
+            handleAuthenticated(user);
             setUpgrading(false);
           }}
           onCancel={() => setUpgrading(false)}
@@ -166,7 +172,7 @@ export function App() {
   return (
     <>
       <VersionBanner />
-      <AuthProvider value={{ user: auth, signOut, requestUpgrade: () => setUpgrading(true), updateUser }}>
+      <AuthProvider value={{ user: auth, signOut: handleSignOut, requestUpgrade: () => setUpgrading(true), updateUser }}>
         <AuthenticatedApp />
       </AuthProvider>
     </>

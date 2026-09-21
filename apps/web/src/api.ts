@@ -39,7 +39,7 @@ export interface UserProfile {
 
 export interface AuthUser extends UserProfile {
   email: string;
-  /** docs/ROADMAP.md's "Email verification + demo without real ingest" — always `true` for a
+  /** docs/SPEC.md FR-1.8 — always `true` for a
    *  `DemoUser` (the gate never applies to one, so that type doesn't carry this field at all),
    *  reflects the account's real `users.email_verified` column for a real one. App.tsx checks
    *  this to decide whether to render the map or AuthGate's verify-email screen. */
@@ -379,6 +379,11 @@ export function uploadFile(
 export interface UploadHistoryRow {
   filename: string;
   externalId: string;
+  /** `"upload"` | `"takeout"` | `"healthconnect"` | `"healthkit"` | `"recorded"` — what
+   *  ImportPanel.tsx's Files/Sync tabs filter by, and (for a Files row) what makes `filename`
+   *  worth showing at all; a synced row's own filename is a raw external id, never meant to
+   *  be read directly (`formatSourceLabel` is what a Sync row's title actually shows). */
+  source: string;
   status: 'processing' | 'done' | 'failed';
   error?: string;
   submittedAt: string;
@@ -386,6 +391,9 @@ export interface UploadHistoryRow {
    *  row can read "9 Sep · 34.7 km" rather than just repeating its own filename. */
   startedAt?: string;
   distanceMeters?: number;
+  /** The resulting activity's own id, once one exists — ROADMAP.md's "View on map" item.
+   *  Same nullability as startedAt/distanceMeters: nothing to link to before ingest finishes. */
+  activityId?: string;
 }
 
 export interface UploadHistoryPage {
@@ -401,11 +409,13 @@ export interface UploadHistoryPage {
 interface UploadHistoryRowBody {
   filename: string;
   external_id: string;
+  source: string;
   status: string;
   error?: string;
   submitted_at: string;
   started_at?: string;
   distance_meters?: number;
+  activity_id?: string;
 }
 
 interface UploadHistoryBody {
@@ -419,12 +429,17 @@ interface UploadHistoryBody {
 export interface UploadHistoryQuery {
   limit?: number;
   offset?: number;
+  /** Comma-joined server-side, matching §4.3's own `types` filter convention — absent means
+   *  every source, which is what an unfiltered combined view (rather than ImportPanel.tsx's
+   *  own Files/Sync tabs) would ask for. */
+  sources?: readonly string[];
 }
 
 export async function getUploadHistory(query: UploadHistoryQuery = {}, signal?: AbortSignal): Promise<UploadHistoryPage> {
   const params = new URLSearchParams();
   if (query.limit !== undefined) params.set('limit', String(query.limit));
   if (query.offset !== undefined) params.set('offset', String(query.offset));
+  if (query.sources && query.sources.length > 0) params.set('source', query.sources.join(','));
   const qs = params.toString();
   const res = await fetch(`${API_BASE_URL}${API_V1}/uploads${qs ? `?${qs}` : ''}`, {
     credentials: 'include',
@@ -443,11 +458,13 @@ export async function getUploadHistory(query: UploadHistoryQuery = {}, signal?: 
     uploads: body.uploads.map((u) => ({
       filename: u.filename,
       externalId: u.external_id,
+      source: u.source,
       status: u.status as UploadHistoryRow['status'],
       submittedAt: u.submitted_at,
       ...(u.error ? { error: u.error } : {}),
       ...(u.started_at ? { startedAt: u.started_at } : {}),
       ...(u.distance_meters !== undefined ? { distanceMeters: u.distance_meters } : {}),
+      ...(u.activity_id ? { activityId: u.activity_id } : {}),
     })),
   };
 }
@@ -586,6 +603,69 @@ export async function deleteActivity(id: string): Promise<void> {
     const text = await res.text().catch(() => '');
     throw new Error(text || `activity delete failed (${res.status})`);
   }
+}
+
+/**
+ * One row of FR-3.7's duplicate list (`GET /v1/activities/duplicates`, `IMPLEMENTATION.md`
+ * §4.6) — an activity cross-source dedup took out of circulation, alongside the richer copy
+ * that superseded it. Both sides carry `source`, since that's the actual answer to "why is
+ * this gone": the same activity, already in from somewhere else. Mirrors the Android app's own
+ * `SyncStatusActivity` duplicates section (`apps/android/docs/IMPLEMENTATION.md` §6).
+ */
+export interface DuplicateActivity {
+  id: string;
+  startedAt: string;
+  activityType: string;
+  distanceMeters: number | null;
+  source: string;
+  supersededBy: {
+    id: string;
+    source: string;
+    startedAt: string;
+  };
+}
+
+interface DuplicateActivityBody {
+  id: string;
+  started_at: string;
+  activity_type: string;
+  distance_meters: number | null;
+  source: string;
+  superseded_by: {
+    id: string;
+    source: string;
+    started_at: string;
+  };
+}
+
+interface DuplicatesBody {
+  duplicates: DuplicateActivityBody[];
+}
+
+/** No filter, no pagination — duplicates are a small set beside the history they came from,
+ *  the same reasoning `duplicatesQuery`'s own server-side comment gives. */
+export async function getDuplicates(signal?: AbortSignal): Promise<DuplicateActivity[]> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/activities/duplicates`, {
+    credentials: 'include',
+    ...(signal ? { signal } : {}),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(text || `duplicates fetch failed (${res.status})`);
+  }
+  const body = (await res.json()) as DuplicatesBody;
+  return body.duplicates.map((d) => ({
+    id: d.id,
+    startedAt: d.started_at,
+    activityType: d.activity_type,
+    distanceMeters: d.distance_meters,
+    source: d.source,
+    supersededBy: {
+      id: d.superseded_by.id,
+      source: d.superseded_by.source,
+      startedAt: d.superseded_by.started_at,
+    },
+  }));
 }
 
 /**
