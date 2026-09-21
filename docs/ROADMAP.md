@@ -36,6 +36,15 @@ Discovered while building the signed-in zero-history fallback chain (now shipped
 - [ ] Decide whether web should offer real anonymous map browsing (a public basemap, no personal data, matching Android's own stated design) — and if so, build it: `MapView`/`AuthProvider` tolerating no session, a real render for `auth === 'signed-out'`, and an opening view for it (likely `WORLD_VIEW`, `config.ts` — the same constant the signed-in zero-history fallback already ends at).
 - [ ] If the answer is no — web stays login-gated by design, unlike Android — update `AGENTS.md`/`ARCHITECTURE.md`'s cross-references so nothing implies otherwise for web specifically.
 
+### SEO for `freefitmap.com` — nothing for a search engine to index yet, and nothing worth ranking until the item above lands
+
+`apps/web/index.html` has a bare `<title>FitMap</title>` and nothing else search-relevant — no meta description, no Open Graph/Twitter card tags, no `robots.txt`, no sitemap. `VISION.md` §5.1/§8.1's own pre-launch validation plan (the Pre-launch validation section above) is Reddit-post-driven, not search-driven, so this has never been worked. It's also low-value on its own right now: a signed-out visitor today gets only the login/signup form (the "Signed-out web map browsing" item directly above), so there is no real page content yet for a search engine to crawl or rank — optimizing metadata on an empty gate isn't worth much until that item gives signed-out visitors an actual page.
+
+- [ ] Sequence after "Signed-out web map browsing" above — real content to index is the prerequisite, not a nice-to-have.
+- [ ] Add meta description + Open Graph/Twitter card tags to `apps/web/index.html` (title already set).
+- [ ] Add `robots.txt` and a sitemap once there's real public content worth indexing.
+- [ ] Decide what search intent this targets before writing copy — candidates: "free Strava alternative," "fog of war app," "activity heatmap tracker" — not decided yet, and depends on how the signed-out landing ends up positioning the product.
+
 ### FitMap logo watermark on exports — free brand exposure, drawn in the same pass as a separately-tracked attribution fix
 
 `docs/KNOWN_ISSUES.md` tracks a compliance bug on this same code path (exported PNGs currently carry no OSM/Protomaps attribution at all, despite `style.ts:28`'s own comment stating it's required on every export). This item is the feature half of that `exportMap.ts` change, not the bug fix itself: a small FitMap logo/wordmark, worth landing in the same pass since both need to be baked into the raster itself before `toBlob()`, not just shown via the live map's DOM-based `AttributionControl`, which the export path bypasses entirely.
