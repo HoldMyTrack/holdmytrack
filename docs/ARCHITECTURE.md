@@ -76,7 +76,6 @@ Everything server-side runs as one binary in two modes (`serve` and `work`) agai
 | Separate render service | Export rendering starves the API of CPU |
 | Read replicas | Read load, not write load, saturates the primary |
 | Social graph, feed, segments | Never, until `VISION.md` §5.6's condition is met |
-| In-app GPS recording | Now planned, mobile-only (`VISION.md` §4.1) — tracked in `apps/android/docs/ROADMAP.md`, not scheduled here since it adds no new server-side path (see [ADR-0007](adr/0007-in-app-gps-recording-submits-directly.md)) |
 
 ---
 
