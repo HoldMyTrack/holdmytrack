@@ -172,5 +172,4 @@ Non-negotiable, GDPR Art. 9 special-category data (`VISION.md` §7).
 
 ## Ongoing, not phase-bound
 
-- [ ] Keep `SPEC.md`/`IMPLEMENTATION.md` in sync with each change, per the cross-reference discipline already established (a change to one almost always means a small edit to the other). `AGENTS.md` is orientation only, not a status narrative — it doesn't need a matching edit just because a feature changed.
 - [ ] Re-measure the funding-model assumptions (§4.3, §6.3) against real usage once any real users exist, rather than assuming the estimates hold.
