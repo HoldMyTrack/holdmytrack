@@ -19,8 +19,8 @@ export interface ExportPreset {
   heightPx: number;
 }
 
-export const EXPORT_PLATFORMS = ['Instagram', 'Facebook', 'X', 'Pinterest'] as const;
-export const EXPORT_PRESET_ROWS = ['Square', 'Portrait', 'Landscape', 'Story', 'Pin'] as const;
+export const EXPORT_PLATFORMS = ['Instagram', 'Facebook', 'X'] as const;
+export const EXPORT_PRESET_ROWS = ['Square', 'Portrait', 'Landscape', 'Story'] as const;
 
 export const EXPORT_PRESETS: ExportPreset[] = [
   { id: 'instagram-square', group: 'Instagram', row: 'Square', widthPx: 1080, heightPx: 1080 },
@@ -33,5 +33,4 @@ export const EXPORT_PRESETS: ExportPreset[] = [
   { id: 'facebook-story', group: 'Facebook', row: 'Story', widthPx: 1080, heightPx: 1920 },
   { id: 'x-square', group: 'X', row: 'Square', widthPx: 1080, heightPx: 1080 },
   { id: 'x-landscape', group: 'X', row: 'Landscape', widthPx: 1280, heightPx: 720 },
-  { id: 'pinterest-pin', group: 'Pinterest', row: 'Pin', widthPx: 1000, heightPx: 1500 },
 ];

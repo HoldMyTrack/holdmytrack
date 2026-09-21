@@ -24,9 +24,9 @@ Checkboxes are the source of truth for progress; re-check them against the three
 
 `apps/web/index.html` has a bare `<title>FitMap</title>` and nothing else search-relevant — no meta description, no Open Graph/Twitter card tags, no `robots.txt`, no sitemap. `VISION.md` §5.1/§8.1's own pre-launch validation plan (the Pre-launch validation section above) is Reddit-post-driven, not search-driven, so this has never been worked. It's also low-value on its own right now: anonymous browsing was considered and rejected for both clients (a bare basemap with no Fog of War, tracks or activities is a weak demo compared to the one-tap Demo account both clients already offer, `VISION.md` §8.2) — a signed-out visitor lands on the login/signup form by design, permanently, so there is no real map content for a search engine to crawl or rank.
 
-- [ ] Add meta description + Open Graph/Twitter card tags to `apps/web/index.html` (title already set) — the login/signup page itself is still worth describing correctly, even with no map content behind it.
+- [x] Add meta description + Open Graph/Twitter card tags to `apps/web/index.html` (title already set) — the login/signup page itself is still worth describing correctly, even with no map content behind it. No `og:image`/`twitter:image` yet — no brand artwork exists to point at until Phase 3's design-freeze pass.
 - [ ] Add `robots.txt` and a sitemap once there's a concrete public page worth indexing.
-- [ ] Decide what search intent this targets before writing copy — candidates: "free Strava alternative," "fog of war app," "activity heatmap tracker" — not decided yet, and constrained by there being no signed-out map to land search traffic on.
+- [x] Decide what search intent this targets before writing copy — decided: "free Strava alternative" and "fog of war app," both used in `apps/web/index.html`'s meta description/OG/Twitter tags alongside `VISION.md` §1's verbatim identity sentence. "Activity heatmap tracker" was considered and dropped — narrower than what FitMap actually is, and Heatmap is one of three map modes, not the product's identity.
 
 ### FitMap logo watermark on exports — free brand exposure, drawn in the same pass as a separately-tracked attribution fix
 

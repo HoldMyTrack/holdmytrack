@@ -16,8 +16,8 @@ export interface ExportPresetDialogProps {
  *
  * Platform columns × resolution rows (`exportPresets.ts`'s own grid coordinates), the same
  * comparison-table shape Hootsuite's own guide uses — not every cell is filled (X has no
- * Story, only Pinterest has Pin), which a sparse grid shows more directly than several
- * same-looking button lists would.
+ * Story), which a sparse grid shows more directly than several same-looking button lists
+ * would.
  */
 export function ExportPresetDialog({ onPick, onClose }: ExportPresetDialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
