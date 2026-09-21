@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-09-20.
+Last updated: 2026-09-21.
 
 ## How to read this document
 
@@ -20,30 +20,13 @@ Checkboxes are the source of truth for progress; re-check them against the three
 
 **Shipped and deployable.** Every feature in `SPEC.md`'s FR-1 through FR-9 — auth and account management, the no-signup demo, activity upload/ingestion (file, `.zip`, Google Takeout), Normal/Fog of War/Heatmap map modes with colored zone segments and high-res export, the Activities panel and its filters, the date-range picker, the per-account activity graph, per-activity pace/heart-rate, and distance trends — is built and documented there; not re-enumerated here.
 
-### Auto-set Country at signup from a coarse IP lookup — shared with the demo preset library above and the map's zero-history fallback (`SPEC.md` FR-4.5, `IMPLEMENTATION.md` §4.13)
+### SEO for `freefitmap.com` — nothing for a search engine to index yet, and nothing worth ranking behind a permanent login wall
 
-Today `users.country` (FR-1.7) is set only if a person visits Settings and picks one — leaving it unset silently defaults the whole app to metric (§FR-1.7.3), including for e.g. a US-based signup who never thinks to check Settings, and means the map's zero-history fallback has no Country to fall back to for most new accounts either (it still reaches its final `WORLD_VIEW` tier correctly, just one tier further out than it needs to for an account this would have covered).
+`apps/web/index.html` has a bare `<title>FitMap</title>` and nothing else search-relevant — no meta description, no Open Graph/Twitter card tags, no `robots.txt`, no sitemap. `VISION.md` §5.1/§8.1's own pre-launch validation plan (the Pre-launch validation section above) is Reddit-post-driven, not search-driven, so this has never been worked. It's also low-value on its own right now: anonymous browsing was considered and rejected for both clients (a bare basemap with no Fog of War, tracks or activities is a weak demo compared to the one-tap Demo account both clients already offer, `VISION.md` §8.2) — a signed-out visitor lands on the login/signup form by design, permanently, so there is no real map content for a search engine to crawl or rank.
 
-- [ ] Resolve country from the signup request's IP address (a self-hosted database like MaxMind's free GeoLite2 — no external API call needed, no extra request from the client) and set `users.country` at account-creation time, instead of leaving it null. Same remote-address extraction the demo rate limiter already does (`IMPLEMENTATION.md` §4.10) — build it once as shared server-side logic, used here and by the demo preset library above, rather than two separate lookups. The map's zero-history fallback needs no changes to benefit — it already reads whatever `users.country` holds, however it got set.
-- [ ] Stays a normal, editable Settings field afterward — never locked. Country-level accuracy from a database like GeoLite2 is good but not perfect (VPNs, corporate networks, travel), so this is a sensible default, not an authoritative fact about the account.
-- [ ] Browser locale (`Accept-Language`) and the browser Geolocation API were both considered and rejected as the signal here: locale reflects a language/OS preference, not physical location (someone with `en-GB` set while living elsewhere gets the wrong answer), and the Geolocation API needs an explicit permission prompt — exactly the kind of signup friction the email-verification item above is trying to avoid elsewhere. IP geolocation needs neither.
-- [ ] If a CDN ever fronts the app (`Production deployment`'s open CDN item), and if that CDN happens to be one that injects a country header on every request (e.g. Cloudflare's `CF-IPCountry`), that becomes a free replacement for the self-hosted lookup — worth revisiting then, not a blocker now.
-
-### Signed-out web map browsing — `apps/android/docs/SPEC.md`'s "no login wall" framing isn't actually true of the web client
-
-Discovered while building the signed-in zero-history fallback chain (now shipped, `SPEC.md` FR-4.5, `IMPLEMENTATION.md` §4.13): `App.tsx`'s signed-out branch renders only `AuthGate` (the login/signup form) — `MapView` never mounts without an active session (FR-4.1's own "Preconditions: Active session"). A signed-out visitor today has no map to see at all, not merely a generic one. This was previously assumed, incorrectly, to already work (an earlier version of this file's wording implied a signed-out fallback point already existed) — it doesn't, and `docs/ARCHITECTURE.md` itself makes no "signed-out FitMap is a working map" claim for web; that line exists only in the Android docs.
-
-- [ ] Decide whether web should offer real anonymous map browsing (a public basemap, no personal data, matching Android's own stated design) — and if so, build it: `MapView`/`AuthProvider` tolerating no session, a real render for `auth === 'signed-out'`, and an opening view for it (likely `WORLD_VIEW`, `config.ts` — the same constant the signed-in zero-history fallback already ends at).
-- [ ] If the answer is no — web stays login-gated by design, unlike Android — update `AGENTS.md`/`ARCHITECTURE.md`'s cross-references so nothing implies otherwise for web specifically.
-
-### SEO for `freefitmap.com` — nothing for a search engine to index yet, and nothing worth ranking until the item above lands
-
-`apps/web/index.html` has a bare `<title>FitMap</title>` and nothing else search-relevant — no meta description, no Open Graph/Twitter card tags, no `robots.txt`, no sitemap. `VISION.md` §5.1/§8.1's own pre-launch validation plan (the Pre-launch validation section above) is Reddit-post-driven, not search-driven, so this has never been worked. It's also low-value on its own right now: a signed-out visitor today gets only the login/signup form (the "Signed-out web map browsing" item directly above), so there is no real page content yet for a search engine to crawl or rank — optimizing metadata on an empty gate isn't worth much until that item gives signed-out visitors an actual page.
-
-- [ ] Sequence after "Signed-out web map browsing" above — real content to index is the prerequisite, not a nice-to-have.
-- [ ] Add meta description + Open Graph/Twitter card tags to `apps/web/index.html` (title already set).
-- [ ] Add `robots.txt` and a sitemap once there's real public content worth indexing.
-- [ ] Decide what search intent this targets before writing copy — candidates: "free Strava alternative," "fog of war app," "activity heatmap tracker" — not decided yet, and depends on how the signed-out landing ends up positioning the product.
+- [ ] Add meta description + Open Graph/Twitter card tags to `apps/web/index.html` (title already set) — the login/signup page itself is still worth describing correctly, even with no map content behind it.
+- [ ] Add `robots.txt` and a sitemap once there's a concrete public page worth indexing.
+- [ ] Decide what search intent this targets before writing copy — candidates: "free Strava alternative," "fog of war app," "activity heatmap tracker" — not decided yet, and constrained by there being no signed-out map to land search traffic on.
 
 ### FitMap logo watermark on exports — free brand exposure, drawn in the same pass as a separately-tracked attribution fix
 

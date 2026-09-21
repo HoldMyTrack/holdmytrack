@@ -93,6 +93,17 @@ Set up the application scaffolding and map rendering. Auth comes first within th
 
 ---
 
+## Gate the map behind login — supersedes Phase 2's original signed-out-basemap design
+
+Phase 2 above shipped the map rendering unconditionally, signed in or not: `MainActivity` draws the unauthenticated style document and clears the loading indicator regardless of session state, attaching the three user layers only once a session exists (`apps/android/docs/IMPLEMENTATION.md` §1.2). The reasoning recorded at the time — "a signed-out map is the basemap alone, which is a complete map rather than a broken one" — has been revisited and reversed: a bare basemap with no Fog of War, no tracks, no Activities panel is not actually a compelling demonstration of what FitMap does. The app already has a much stronger one — `SignInActivity` offers a no-signup Demo account one tap away (`docs/SPEC.md` FR-1.1, FR-2), which shows the real product `VISION.md` §8.2 calls "the ad." Web already works this way: `AuthGate` is the only thing a signed-out visitor sees, and `MapView` never mounts without a session (`docs/IMPLEMENTATION.md` §4.9, §4.13). This item brings Android in line with that, rather than the other direction (giving web Android's current anonymous-basemap behavior) — considered and rejected, since it would mean shipping a weaker first impression on both clients instead of a stronger one on neither.
+
+- [ ] `MainActivity` should not mount the map at all for a signed-out visitor — mirror web's `AuthGate` pattern rather than rendering the basemap and gating only the user layers.
+- [ ] Land on `SignInActivity` (sign in / sign up / start a demo) as the actual first screen when no verified session exists, instead of showing the bare map behind an account button.
+- [ ] Once built, update Phase 2's own record above — the "a signed-out map is the basemap alone, which is a complete map rather than a broken one" line will no longer describe the shipped app, and `docs/IMPLEMENTATION.md` §1.2's "the basemap renders unconditionally" note needs the same correction.
+- [ ] Closes the cross-client inconsistency `docs/IMPLEMENTATION.md` §4.13 and `docs/BRAINSTORM.md` used to track: both clients now land an anonymous visitor on the login/sign-up/demo screen, with no unauthenticated map on either.
+
+---
+
 ## Phase 3: Health Connect Ingestion (Path 2)
 
 Implement permissions, local tracking, and sync logic.
