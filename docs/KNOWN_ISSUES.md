@@ -8,9 +8,9 @@ This file stays lean and current-only. Once an entry is fixed, its root-cause/fi
 
 ### Export attribution missing from PNG exports — an ODbL compliance gap in already-shipped functionality
 
-`style.ts:28` already documents that OSM/Protomaps attribution is mandatory, not decorative — the basemap is an ODbL "Produced Work," and the comment states credit "has to be visible on the map and on any export." But `exportMap.ts:68` sets `attributionControl: false` on the offscreen export map instance, and nothing else draws attribution onto the canvas before `toBlob()` — so FR-4.10's exported PNGs carry no attribution at all today, contradicting the code's own stated requirement.
+`style.ts:28` already documents that OSM/Protomaps attribution is mandatory, not decorative — the basemap is an ODbL "Produced Work," and the comment states credit "has to be visible on the map and on any export." But `exportMap.ts:165` sets `attributionControl: false` on the offscreen export map instance, and nothing else draws attribution onto any of the export pipeline's canvases before `toBlob()` — so FR-4.10's exported PNGs carry no attribution at all today, contradicting the code's own stated requirement.
 
-- [ ] Draw `style.ts`'s own `ATTRIBUTION` text onto the export canvas before `toBlob()` in `exportMap.ts`. Not optional or togglable: it's a license requirement, not a preference. `docs/ROADMAP.md`'s FitMap-logo item shares this same draw call site and pass — land them together if convenient, but that one is a courtesy and this one isn't optional.
+- [ ] Draw `style.ts`'s own `ATTRIBUTION` text onto the *final* canvas — the one actually passed to `toBlob()` in `exportFramedImage` (`exportMap.ts:111`), after the crop-to-frame and scale-to-target steps, not the offscreen `renderOffscreen` canvas those steps read from — since frame position and preset scaling both happen after that point, and attribution needs to land correctly positioned/sized in the actual output regardless of either. Not optional or togglable: it's a license requirement, not a preference. `docs/ROADMAP.md`'s FitMap-logo item shares this same draw call site and pass — land them together if convenient, but that one is a courtesy and this one isn't optional.
 
 ---
 

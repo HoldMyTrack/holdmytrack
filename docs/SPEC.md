@@ -473,20 +473,24 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Notes**: Deliberately compact and unlabeled (no axis ticks or gridlines) — a general overlook alongside FR-4.8's toggle, not a separate detailed chart. See `IMPLEMENTATION.md` §4.3.2 for the full account.
 
-### FR-4.10 High-resolution map export
+### FR-4.10 Interactive frame-and-capture map export
 
-**Description**: A header control exports the current map view as a high-resolution PNG image, downloaded directly to the caller's device.
+**Description**: A header control opens a shape-picker, then a draggable/resizable frame over the live map, and captures exactly the region inside that frame as a high-resolution PNG image, downloaded directly to the caller's device.
 
-**Preconditions**: Active session; the map has finished its initial load.
+**Preconditions**: Active session; the map has finished its initial load. No activity selection is required — the user frames whatever region of the map they want manually, independent of any checked/focused activity.
 
 **Behavior**:
-1. The exported image reflects the current camera position, theme, and map mode — everything the live map is currently showing, at a resolution well above the on-screen canvas. In Normal mode that includes the current date-range/hidden-track filters; Fog exports its all-time coverage and Heatmap its current rolling window (FR-4.2/FR-4.3), regardless of what Normal mode's filters were set to before switching.
-2. The live map is not disturbed by an export — camera, zoom, and mode remain exactly as they were before the export was triggered.
-3. While an export is generating, the control shows a busy state; a failure (e.g. a timeout waiting for tiles to load at export resolution) is reported inline rather than silently producing nothing.
+1. Clicking Export opens a dialog showing platform image-size presets as a grid — one column per platform (Instagram, Facebook, X, Pinterest), one row per resolution/shape (Square, Portrait, Landscape, Story, Pin) — with a Custom option, no fixed dimensions, as a single button below the grid. Not every platform fills every row (e.g. X has no Story, only Pinterest has Pin); a cell with no matching preset is left empty.
+2. Picking a grid cell or Custom closes the dialog and shows a frame over the live map matching the chosen shape, centered and sized to fit comfortably within the map's own bounds, marked only by a dashed border — the map itself is not dimmed or obscured anywhere, including under the frame, and remains fully interactive (pan/zoom/click) everywhere outside the frame's own bounds.
+3. Dragging anywhere inside the frame repositions it anywhere over the map (aspect ratio unchanged); dragging the live map means grabbing anywhere outside the frame, same as normal map panning. If Custom was chosen, an additional corner handle resizes the frame freely, with no fixed aspect ratio; a preset's frame cannot be resized, only repositioned.
+4. Two buttons sit inside the frame's own top-right corner: Close, which cancels and returns to the normal map view with nothing captured, and Capture, which captures exactly the region inside the frame at that moment — the current camera position, theme, and map mode, at a resolution well above the on-screen canvas, scaled to the picked preset's exact declared pixel dimensions (or, for Custom, scaled proportionally so the frame's longer side hits a fixed ceiling). In Normal mode the captured region reflects the current date-range/hidden-track filters; Fog captures its all-time coverage and Heatmap its current rolling window (FR-4.2/FR-4.3), regardless of what Normal mode's filters were set to before switching.
+5. The live map is not disturbed by a capture — camera, zoom, and mode remain exactly as they were before it was triggered.
+6. While a capture is generating, the Capture button shows a busy state; a failure (e.g. a timeout waiting for tiles to load at export resolution) is reported inline, near the buttons, and the frame stays in place rather than being discarded — the user is not forced to reposition it and retry from scratch.
+7. Escape, or the frame's own Close button, cancels the current step (the picker dialog, or an open frame) and returns to the normal map view with nothing captured.
 
-**Outputs**: A PNG file download, named `fitmap-{date}.png`.
+**Outputs**: On a successful capture, a PNG file download, named `fitmap-{date}.png`.
 
-**Notes**: This is one of three things `VISION.md` §4.2 groups under "Export" — story cards and animated reveals are not built. Colored zone segments (FR-4.8) are not reflected in an export even when currently shown on screen — exporting a single focused activity's bands is a narrower case not covered by this first slice. Vector/SVG output is not offered; raster (PNG) only.
+**Notes**: This is one of three things `VISION.md` §4.2 groups under "Export" — story cards and animated reveals are not built. Colored zone segments (FR-4.8) are not reflected in a capture even when currently shown on screen — exporting a single focused activity's bands is a narrower case not covered by this slice. Vector/SVG output is not offered; raster (PNG) only. Platform preset dimensions are curated from Hootsuite's social-media-image-sizes guide; profile-picture/cover-photo sizes are excluded, since this feature frames map content, not an account avatar.
 
 ## 7. FR-5 — Activities Panel
 

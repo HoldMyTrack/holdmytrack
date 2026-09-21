@@ -396,6 +396,97 @@ body {
   cursor: default;
 }
 
+/* ExportPresetDialog.tsx — same real-<dialog>/showModal() shape as .confirm-dialog, sized for
+   a grouped list of preset buttons rather than a title+message. The first step of the
+   frame-and-capture export flow; ExportFrame.tsx (map/exportMap.ts's own section) is the
+   second. */
+.export-preset-dialog {
+  width: min(34rem, calc(100vw - 40px));
+  max-height: min(32rem, calc(100vh - 80px));
+  margin: auto;
+  padding: 20px;
+  border: 1px solid rgb(var(--fm-ink-rgb) / 10%);
+  border-radius: 12px;
+  background: var(--fm-surface);
+  color: var(--fm-ink);
+  box-shadow: 0 24px 60px rgb(var(--fm-ink-rgb) / 25%);
+  overflow-y: auto;
+}
+
+.export-preset-dialog::backdrop {
+  background: rgb(var(--fm-ink-rgb) / 35%);
+}
+
+.export-preset-dialog__title {
+  margin: 0 0 14px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+/* Horizontal scroll rather than wrapping/shrinking the grid — at 4 platform columns plus a
+   row-label column, a narrow viewport is better served by scrolling the table than by
+   squeezing every cell unreadably small. */
+.export-preset-dialog__grid-wrap {
+  overflow-x: auto;
+}
+
+.export-preset-dialog__grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.export-preset-dialog__grid th {
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgb(var(--fm-ink-rgb) / 55%);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.export-preset-dialog__grid td {
+  padding: 3px;
+  text-align: center;
+}
+
+.export-preset-dialog__cell {
+  width: 100%;
+  padding: 8px 6px;
+  border: 1px solid rgb(var(--fm-ink-rgb) / 10%);
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: var(--fm-ink);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.export-preset-dialog__cell:hover {
+  background: rgb(var(--fm-ink-rgb) / 4%);
+}
+
+.export-preset-dialog__custom {
+  width: 100%;
+  margin-top: 16px;
+  padding: 10px;
+  border: 1px solid var(--fm-border-strong);
+  border-radius: 8px;
+  background: var(--fm-surface);
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--fm-ink);
+  cursor: pointer;
+}
+
+.export-preset-dialog__custom:hover {
+  background: rgb(var(--fm-ink-rgb) / 4%);
+}
+
 /* A permanent left sidebar now (docs/UI/main-screen-v2.png), not a dropdown floating over
    the map — there is always at least one activity to show once anything's been uploaded, so
    there was nothing to gain by hiding the list behind an open/close toggle. Width is inline
@@ -1307,6 +1398,121 @@ body {
   inset: 0;
 }
 
+/* The frame-and-capture export overlay (ExportFrame.tsx) — a sibling of .map-canvas so it can
+   sit above the live map while the map itself stays interactive underneath. No darkening: the
+   live map is fully visible and usable everywhere except the frame box, its resize handle and
+   its two buttons, which are the only children that opt back into `pointer-events: auto` —
+   everything else here passes clicks/drags straight through to the map. */
+.export-frame {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* The frame itself — a dashed border, no fill, so the map underneath (and around) stays fully
+   visible. Its whole interior is the move-drag target (not just its edges): dragging anywhere
+   inside it repositions the frame, while dragging the live map means grabbing anywhere outside
+   the box, same as normal map panning. Reflows for free as --frame-x/y/w/h change during a
+   drag. */
+.export-frame__box {
+  position: absolute;
+  left: var(--frame-x);
+  top: var(--frame-y);
+  width: var(--frame-w);
+  height: var(--frame-h);
+  border: 2px dashed var(--fm-ink);
+  cursor: move;
+  touch-action: none;
+  pointer-events: auto;
+}
+
+/* Custom-only free-resize handle, bottom-right — top-right holds the Close/Capture buttons. */
+.export-frame__handle {
+  position: absolute;
+  left: calc(var(--frame-x) + var(--frame-w) - 7px);
+  top: calc(var(--frame-y) + var(--frame-h) - 7px);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--fm-ink);
+  cursor: nwse-resize;
+  touch-action: none;
+  pointer-events: auto;
+  z-index: 1;
+}
+
+.export-frame__close,
+.export-frame__capture {
+  position: absolute;
+  top: calc(var(--frame-y) + 8px);
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--fm-ink);
+  box-shadow: 0 1px 4px rgb(var(--fm-ink-rgb) / 25%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: auto;
+  z-index: 1;
+}
+
+/* Capture sits in the frame's own top-right corner; Close sits immediately to its left, same
+   row, so the two read as a pair rather than being scattered around the frame. */
+.export-frame__capture {
+  left: calc(var(--frame-x) + var(--frame-w) - 40px);
+}
+
+.export-frame__close {
+  left: calc(var(--frame-x) + var(--frame-w) - 78px);
+}
+
+.export-frame__close:hover,
+.export-frame__capture:hover:not(:disabled) {
+  background: rgb(255 255 255 / 85%);
+}
+
+.export-frame__capture:disabled {
+  cursor: default;
+}
+
+.export-frame__spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgb(var(--fm-ink-rgb) / 25%);
+  border-top-color: var(--fm-ink);
+  animation: export-frame-spin 0.7s linear infinite;
+}
+
+@keyframes export-frame-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Below the frame, wide enough to wrap a network/timeout message without overrunning a narrow
+   custom frame. */
+.export-frame__error {
+  position: absolute;
+  left: var(--frame-x);
+  top: calc(var(--frame-y) + var(--frame-h) + 8px);
+  max-width: min(20rem, calc(100% - 20px));
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--fm-surface);
+  box-shadow: 0 2px 10px rgb(var(--fm-ink-rgb) / 20%);
+  font-size: 12.5px;
+  color: var(--fm-danger);
+  pointer-events: none;
+}
+
 .map-mode-toggle {
   position: absolute;
   top: 10px;
@@ -1449,12 +1655,6 @@ body {
   cursor: not-allowed;
 }
 
-.export-button-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
 .export-button {
   border: 1px solid var(--fm-border-strong);
   border-radius: 8px;
@@ -1474,23 +1674,6 @@ body {
 .export-button:disabled {
   color: rgb(var(--fm-ink-rgb) / 40%);
   cursor: default;
-}
-
-/* A rare failure (network/timeout) — positioned so it doesn't push the rest of the header
-   down, the same floating-note treatment .import-panel's own popovers already use. */
-.export-button__error {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin: 6px 0 0;
-  padding: 8px 12px;
-  max-width: 20rem;
-  border-radius: 8px;
-  background: var(--fm-surface);
-  box-shadow: 0 2px 10px rgb(var(--fm-ink-rgb) / 20%);
-  font-size: 12.5px;
-  color: var(--fm-danger);
-  z-index: 5;
 }
 
 /* This session's in-flight count plus every pending job for this user globally (see

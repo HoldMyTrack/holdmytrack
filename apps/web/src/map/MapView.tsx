@@ -5,6 +5,8 @@ import { flyToBBox, flyToView, unionBBox } from './bbox';
 import { browserOrigin, WORLD_VIEW } from './config';
 import { countryView } from './countryView';
 import { centreIsOutside, readCoverageBounds, type CoverageBounds } from './coverage';
+import { exportFramedImage } from './exportMap';
+import type { ExportPreset } from './exportPresets';
 import { ensureFogLayer } from './fog';
 import { ensureHeatmapLayer } from './heatmap';
 import { setMapMode, type MapMode } from './mapMode';
@@ -28,6 +30,8 @@ import { ActivitiesPanel } from '../ui/ActivitiesPanel';
 import { ActivityHistogram } from '../ui/ActivityHistogram';
 import { CoverageNotice } from '../ui/CoverageNotice';
 import { ExportButton } from '../ui/ExportButton';
+import { ExportFrame, type FrameRect } from '../ui/ExportFrame';
+import { ExportPresetDialog } from '../ui/ExportPresetDialog';
 import { dayDiff, todayUTC } from '../ui/dateMath';
 import { Header } from '../ui/Header';
 import type { DateRange } from '../ui/RangePicker';
@@ -67,6 +71,42 @@ export interface MapViewProps {
   onOpenSettings: () => void;
 }
 
+/** The frame-and-capture export flow's own state machine — lives here, not inside
+ *  `ExportFrame.tsx`/`ExportPresetDialog.tsx` themselves, since it spans all three of those
+ *  components plus the live map instance this component already owns (`ExportButton.tsx` opens
+ *  it, `ExportPresetDialog` picks the shape, `ExportFrame` renders/drags it, and capture needs
+ *  `map` directly) — the same "callback wiring belongs where the map instance is" reasoning
+ *  `ExportButton.tsx`'s own doc comment already gives for why `map` is a prop there. */
+type ExportFlow =
+  | { stage: 'idle' }
+  | { stage: 'picking' }
+  | { stage: 'framing' | 'capturing'; preset: ExportPreset | 'custom'; rect: FrameRect };
+
+/** A centered starting rect for a freshly-picked shape. Custom gets a generously-sized default
+ *  (70% of the container) so it's immediately visible and easy to grab without the user first
+ *  hunting for it. A preset's rect is sized to its own declared aspect ratio — accounting for
+ *  the container's own aspect ratio, since `wFrac`/`hFrac` are fractions of two potentially
+ *  different container dimensions, not a shared unit — clamped so neither dimension exceeds
+ *  80% of the container. */
+function defaultFrameRect(preset: ExportPreset | 'custom', containerRect: DOMRect): FrameRect {
+  if (preset === 'custom') {
+    return { xFrac: 0.15, yFrac: 0.15, wFrac: 0.7, hFrac: 0.7 };
+  }
+  const MAX_FRACTION = 0.8;
+  const targetRatio = preset.widthPx / preset.heightPx;
+  const containerRatio = containerRect.width / containerRect.height || 1;
+  let wFrac: number;
+  let hFrac: number;
+  if (targetRatio / containerRatio >= 1) {
+    wFrac = MAX_FRACTION;
+    hFrac = wFrac * (containerRatio / targetRatio);
+  } else {
+    hFrac = MAX_FRACTION;
+    wFrac = hFrac * (targetRatio / containerRatio);
+  }
+  return { xFrac: (1 - wFrac) / 2, yFrac: (1 - hFrac) / 2, wFrac, hFrac };
+}
+
 export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
   // docs/SPEC.md FR-2.1–FR-2.3: a demo account is
   // read-only (no upload/sync, no edit/delete) — see ActivitiesPanel's own readOnly prop and
@@ -95,6 +135,8 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
   const container = useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = useState<CoverageBounds | null>(null);
   const [outside, setOutside] = useState(false);
+  const [exportFlow, setExportFlow] = useState<ExportFlow>({ stage: 'idle' });
+  const [exportError, setExportError] = useState<string | null>(null);
   // Normal is what already rendered before fog existed — it needed no new work to count
   // as a "mode" (IMPLEMENTATION.md §4.2.2).
   const [mapMode, setMapModeState] = useState<MapMode>('normal');
@@ -319,6 +361,57 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
     initialFlavor: initial.flavor,
     scaleUnit: unitSystem,
   });
+
+  const handlePickExportPreset = useCallback((preset: ExportPreset | 'custom') => {
+    const rect = container.current
+      ? defaultFrameRect(preset, container.current.getBoundingClientRect())
+      : { xFrac: 0.15, yFrac: 0.15, wFrac: 0.7, hFrac: 0.7 };
+    setExportFlow({ stage: 'framing', preset, rect });
+  }, []);
+
+  const handleExportCapture = useCallback(async () => {
+    if (exportFlow.stage !== 'framing' || !map || !container.current) return;
+    const { preset, rect } = exportFlow;
+    setExportFlow({ stage: 'capturing', preset, rect });
+    setExportError(null);
+    try {
+      const containerRect = container.current.getBoundingClientRect();
+      const frameRect = new DOMRect(
+        containerRect.left + rect.xFrac * containerRect.width,
+        containerRect.top + rect.yFrac * containerRect.height,
+        rect.wFrac * containerRect.width,
+        rect.hFrac * containerRect.height,
+      );
+      const blob = await exportFramedImage(
+        map,
+        { flavor: initial.flavor, mode: mapMode, activityQuery, hiddenIds: [...mapHiddenIds] },
+        {
+          containerRect,
+          frameRect,
+          ...(preset !== 'custom' && { target: { widthPx: preset.widthPx, heightPx: preset.heightPx } }),
+        },
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fitmap-${new Date().toISOString().slice(0, 10)}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setExportFlow({ stage: 'idle' });
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : String(err));
+      // Stays in 'framing', not 'idle' — a failed capture (e.g. a network timeout) shouldn't
+      // discard the frame the user just positioned, forcing them to redo it from scratch.
+      setExportFlow((flow) => (flow.stage === 'capturing' ? { stage: 'framing', preset: flow.preset, rect: flow.rect } : flow));
+    }
+  }, [exportFlow, map, initial.flavor, mapMode, activityQuery, mapHiddenIds]);
+
+  const handleExportCancel = useCallback(() => {
+    setExportFlow({ stage: 'idle' });
+    setExportError(null);
+  }, []);
 
   // The flight over the combined bounds of every selected row — a single selected row's
   // "combined bounds" is just its own bbox, so this covers both the one-row and multi-row case
@@ -795,20 +888,17 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
     <div className="app-shell">
       <Header
         importControl={<ImportPanel readOnly={isDemo} onUploaded={handleUploaded} onViewOnMap={viewActivityOnMap} />}
-        exportControl={
-          <ExportButton
-            map={map}
-            viewState={{
-              flavor: initial.flavor,
-              mode: mapMode,
-              activityQuery,
-              hiddenIds: [...mapHiddenIds],
-            }}
-          />
-        }
+        exportControl={<ExportButton map={map} onOpen={() => setExportFlow({ stage: 'picking' })} />}
         onOpenProfile={onOpenProfile}
         onOpenSettings={onOpenSettings}
       />
+
+      {exportFlow.stage === 'picking' && (
+        <ExportPresetDialog
+          onPick={handlePickExportPreset}
+          onClose={() => setExportFlow((flow) => (flow.stage === 'picking' ? { stage: 'idle' } : flow))}
+        />
+      )}
 
       <div className="app-body">
         {mapMode === 'normal' && (
@@ -845,6 +935,20 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
 
         <div className="map-root">
           <div ref={container} className="map-canvas" data-testid="map-canvas" />
+          {(exportFlow.stage === 'framing' || exportFlow.stage === 'capturing') && (
+            <ExportFrame
+              containerRef={container}
+              preset={exportFlow.preset}
+              rect={exportFlow.rect}
+              busy={exportFlow.stage === 'capturing'}
+              error={exportError}
+              onRectChange={(rect) =>
+                setExportFlow((flow) => (flow.stage === 'framing' ? { stage: 'framing', preset: flow.preset, rect } : flow))
+              }
+              onCapture={() => void handleExportCapture()}
+              onCancel={handleExportCancel}
+            />
+          )}
           <div className="map-mode-toggle" role="group" aria-label="Map mode" data-testid="map-mode-toggle">
             <button
               type="button"
