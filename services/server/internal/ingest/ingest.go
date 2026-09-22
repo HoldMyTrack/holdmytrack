@@ -240,20 +240,23 @@ const FogZoom = 14
 
 // computeTouchedTiles walks the raw, pre-simplification trajectory and returns every z14
 // tile it passes through — including tiles between consecutive points, not just the tiles
-// containing a point (see tilemath.SegmentTiles). Shared by RenderActivityMasks (which tiles
-// to render a mask for) and MarkFogTilesDirty (which tiles to flag for aggregate rebuild) —
-// the two need to agree exactly, or a rendered mask could sit in a tile never marked dirty
-// (never composited in) or vice versa.
+// containing a point (see tilemath.SegmentTilesBuffered), and including any tile a point or
+// segment never enters but sits close enough to (within fog.TileMarginPx) that the rendered
+// stroke's own drawn width still reaches into. Shared by RenderActivityMasks (which tiles to
+// render a mask for) and MarkFogTilesDirty (which tiles to flag for aggregate rebuild) — the
+// two need to agree exactly, or a rendered mask could sit in a tile never marked dirty (never
+// composited in) or vice versa.
 func computeTouchedTiles(points []parse.Point, zoom int) [][2]int {
 	seen := map[[2]int]struct{}{}
 	add := func(x, y int) { seen[[2]int{x, y}] = struct{}{} }
 
 	if len(points) == 1 {
-		x, y := tilemath.LonLatToTile(points[0].Lon, points[0].Lat, zoom)
-		add(x, y)
+		for _, t := range tilemath.SegmentTilesBuffered(points[0].Lon, points[0].Lat, points[0].Lon, points[0].Lat, zoom, fog.TileMarginPx, fog.TileSize) {
+			add(t[0], t[1])
+		}
 	}
 	for i := 1; i < len(points); i++ {
-		for _, t := range tilemath.SegmentTiles(points[i-1].Lon, points[i-1].Lat, points[i].Lon, points[i].Lat, zoom) {
+		for _, t := range tilemath.SegmentTilesBuffered(points[i-1].Lon, points[i-1].Lat, points[i].Lon, points[i].Lat, zoom, fog.TileMarginPx, fog.TileSize) {
 			add(t[0], t[1])
 		}
 	}

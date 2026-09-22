@@ -68,6 +68,53 @@ func SegmentTiles(lon1, lat1, lon2, lat2 float64, zoom int) [][2]int {
 	return bresenham(x1, y1, x2, y2)
 }
 
+// SegmentTilesBuffered is SegmentTiles plus every neighboring tile a marginPx-wide margin
+// around either endpoint spills into — the tile a bare coordinate floors into isn't the only
+// tile the *rendered* stroke can touch, since fog/heatmap draws each point as a
+// strokeRadiusPx-wide, then featherPx-blurred mark, not an infinitesimal dot. A point that
+// lands within marginPx (tile-local pixels, at tileSize) of a tile edge has part of that
+// drawn mark geometrically inside the neighboring tile even though the point's own bare tile
+// index never crosses over — without this, that neighbor is never rendered for the activity
+// and gg's rasterizer silently clips the overflow at the canvas edge instead.
+func SegmentTilesBuffered(lon1, lat1, lon2, lat2 float64, zoom int, marginPx, tileSize float64) [][2]int {
+	seen := map[[2]int]struct{}{}
+	for _, t := range SegmentTiles(lon1, lat1, lon2, lat2, zoom) {
+		seen[t] = struct{}{}
+	}
+
+	n := int(math.Pow(2, float64(zoom)))
+	addBufferedNeighbors := func(lon, lat float64) {
+		wx, wy := WorldPixel(lon, lat, zoom, tileSize)
+		tx, ty := int(math.Floor(wx/tileSize)), int(math.Floor(wy/tileSize))
+		localX, localY := wx-float64(tx)*tileSize, wy-float64(ty)*tileSize
+		for dx := -1; dx <= 1; dx++ {
+			for dy := -1; dy <= 1; dy++ {
+				if dx == 0 && dy == 0 {
+					continue
+				}
+				withinX := dx == 0 || (dx < 0 && localX < marginPx) || (dx > 0 && localX > tileSize-marginPx)
+				withinY := dy == 0 || (dy < 0 && localY < marginPx) || (dy > 0 && localY > tileSize-marginPx)
+				if !withinX || !withinY {
+					continue
+				}
+				nx, ny := tx+dx, ty+dy
+				if nx < 0 || ny < 0 || nx >= n || ny >= n {
+					continue
+				}
+				seen[[2]int{nx, ny}] = struct{}{}
+			}
+		}
+	}
+	addBufferedNeighbors(lon1, lat1)
+	addBufferedNeighbors(lon2, lat2)
+
+	out := make([][2]int, 0, len(seen))
+	for t := range seen {
+		out = append(out, t)
+	}
+	return out
+}
+
 // bresenham walks integer tile coordinates from (x0,y0) to (x1,y1) inclusive.
 func bresenham(x0, y0, x1, y1 int) [][2]int {
 	dx := abs(x1 - x0)

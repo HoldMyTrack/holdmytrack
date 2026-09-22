@@ -32,6 +32,14 @@ const (
 	// units that's ~10-20m, which at z14's ~4.8 m/px is roughly 2-4px of blur applied to
 	// the stored raster itself; adopted 3px.
 	featherPx = 3
+
+	// TileMarginPx is how far (in tile-local pixels, at TileSize) a point's own drawn mark
+	// reaches past its bare coordinate — half the stroke width plus the blur radius applied
+	// on top of it. internal/ingest's computeTouchedTiles buffers its tile-membership check
+	// by this margin so a point close enough to a tile boundary to actually paint into the
+	// neighboring tile gets that neighbor rendered too, not just the tile its coordinate
+	// floors into.
+	TileMarginPx = strokeRadiusPx + featherPx
 )
 
 // pixelPoint is a trajectory point already projected to tile-local pixel space (see
