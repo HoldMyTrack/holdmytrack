@@ -103,18 +103,25 @@ export function TrackProfile({ points, metric, elevationAvailable }: TrackProfil
           );
         })}
       </div>
-      {elevationAvailable && (
-        <svg
-          className="track-profile__elevation"
-          viewBox={`0 0 ${STRIP_WIDTH} ${CHART_HEIGHT}`}
-          preserveAspectRatio="none"
-          onMouseMove={onMove}
-          onMouseLeave={() => setHoverIndex(null)}
-        >
-          <path className="track-profile__elevation-fill" d={areaPath} />
-          <polyline className="track-profile__elevation-line" points={chartPoints} />
-        </svg>
-      )}
+      {/* Always rendered, reserving its ~30px regardless of elevationAvailable — mirrors the
+          tooltip row below: this card is bottom-anchored (position: absolute; bottom: ...),
+          so a height change under the cursor (mounting/unmounting this block) can push the
+          strip/chart out from under the pointer into a hide/show flicker loop. Only the
+          path/polyline content inside is conditional. */}
+      <svg
+        className="track-profile__elevation"
+        viewBox={`0 0 ${STRIP_WIDTH} ${CHART_HEIGHT}`}
+        preserveAspectRatio="none"
+        onMouseMove={onMove}
+        onMouseLeave={() => setHoverIndex(null)}
+      >
+        {elevationAvailable && (
+          <>
+            <path className="track-profile__elevation-fill" d={areaPath} />
+            <polyline className="track-profile__elevation-line" points={chartPoints} />
+          </>
+        )}
+      </svg>
       {/* Always rendered, hidden via visibility rather than mounted/unmounted — an
           appearing-and-disappearing row changes the card's own height, and since the card is
           bottom-anchored (position: absolute; bottom: ...), that shift moves the strip/chart
