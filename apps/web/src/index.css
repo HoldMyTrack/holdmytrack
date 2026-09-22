@@ -1559,6 +1559,16 @@ body {
   z-index: 3;
   display: flex;
   flex-direction: column;
+  /* Explicit, not auto — this card used to size itself off .track-profile__elevation's own
+     replaced-element width (an SVG with a fixed CSS height and no explicit width falls back
+     to its viewBox aspect ratio for the shrink-to-fit pass, which is what gave this column
+     its ~260px width with nothing else here setting one). That anchor vanishes the moment
+     the elevation row's height collapses to 0 for a pace-only activity
+     (`.track-profile__elevation--empty`), and with no other fixed-width child the whole card
+     fell back to whatever its narrowest live content happened to be — a ~5px sliver that
+     then resized itself on every hover as the tooltip text came and went. A real width fixes
+     the card's size independently of whichever rows happen to be empty. */
+  width: 240px;
   gap: 6px;
   padding: 8px;
   border-radius: 8px;
@@ -1593,6 +1603,16 @@ body {
   height: 28px;
   margin-top: 2px;
   cursor: crosshair;
+}
+
+/* No elevation stream on this activity — the strip above (pace/heart-rate bands) is the
+   whole card in that case, not this otherwise-blank 28px reserved for a curve that will
+   never draw. Safe to collapse for the card's whole lifetime, unlike the tooltip row below
+   (which reserves its own height across a live hover instead): elevationAvailable can't
+   change while this card is mounted, so there's no flicker risk from doing it. */
+.track-profile__elevation--empty {
+  height: 0;
+  margin-top: 0;
 }
 
 .track-profile__elevation-fill {
@@ -2790,6 +2810,11 @@ body {
   .activities-panel__sheet-chevron {
     display: inline;
     flex: none;
+    /* Inherits .activities-panel__subtext's 12px otherwise — a fine size for a text line, but
+       this glyph is the sheet's whole expand/collapse affordance on a touchscreen, not just a
+       decorative aside to that text, so it gets its own larger size rather than riding along. */
+    font-size: 20px;
+    line-height: 1;
     color: rgb(var(--fm-ink-rgb) / 40%);
   }
 
@@ -2822,25 +2847,6 @@ body {
     padding: 8px 6px;
   }
 
-  /* MapLibre's own control positioning (maplibre-gl.css, not this file) anchors the scale
-     control and attribution at the literal viewport edge via its own stylesheet — `bottom:
-     0`/`right: 0` on `.maplibregl-ctrl-bottom-left`/`-right`. That's a real cascade-order
-     risk (its CSS import and this file's aren't guaranteed to land in a specific order
-     relative to each other in the bundled output), so this is the one deliberate
-     `!important` in this file — overriding a third-party library's own stylesheet is
-     exactly the justified exception, not an internal specificity fight. Both need to clear
-     the collapsed peek strip's 68px height, or they'd render underneath/behind it. */
-  .maplibregl-ctrl-bottom-left,
-  .maplibregl-ctrl-bottom-right {
-    bottom: 78px !important;
-  }
-
-  /* Same reasoning, for this app's own floating card (not a MapLibre control, so no
-     !important needed — ordinary specificity/cascade already wins here). */
-  .track-metric-toggle {
-    bottom: 124px;
-  }
-
   /* The header: Donate/Upload/Export/the account menu at their desktop padding don't
      reliably fit a ~360px-wide phone alongside the brand mark. Tighter padding/gaps first;
      Donate (still a placeholder today — the least "core" of the four) is what's allowed to
@@ -2864,6 +2870,23 @@ body {
   .export-button {
     padding: 6px 9px;
     font-size: 12.5px;
+  }
+
+  /* Desktop anchors this dropdown to its own trigger's right edge (`right: 0` on the rule
+     above), which only stays on screen because Import happens to be the header's rightmost
+     action there. On a phone it sits between Export and the account menu (Header.tsx's fixed
+     order), so a dropdown nearly as wide as the viewport anchored to that trigger runs off the
+     left edge instead — reported live as the import window landing partly out of the
+     viewport. Fixed to the screen's own edges instead, the same "stop anchoring to a button
+     that isn't at either edge" fix the Activities panel's bottom sheet already needed; `top:
+     64px` clears the header's fixed 56px height plus the same 8px gap the desktop rule uses. */
+  .import-panel__dropdown {
+    position: fixed;
+    top: 64px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+    max-height: calc(100vh - 84px);
   }
 
   /* RangePicker.tsx's drag handles are 14px wide at rest — mechanically draggable via touch
@@ -2897,21 +2920,45 @@ body {
      the viewport the collapsed Activities sheet (`position: fixed; bottom: 0`) always
      occupies — a normal-flow element's position says nothing about what a fixed sibling
      draws over it, so the sheet was hiding the Earlier/Later buttons entirely rather than
-     merely sitting beside them, the same "reserve real space for a fixed overlay" fix
-     `.maplibregl-ctrl-bottom-left/-right`'s own `bottom: 78px` already applies for controls
-     positioned *inside* the map — here it's the footer's own bottom padding doing the
-     reserving instead, since this element is normal flow, not absolutely positioned. */
+     merely sitting beside them. This padding-bottom reserves that same 68px so the footer's
+     own real content clears it. The map's own bottom-anchored controls (the scale control,
+     attribution, `.track-metric-toggle`) need no matching offset of their own: the Activities
+     sheet only ever renders in `mapMode === 'normal'` (MapView.tsx), the one mode where this
+     very footer already exists too and already sits between the map's bottom edge and the
+     sheet — the map's real bottom edge never reaches down as far as the sheet in the first
+     place. A now-removed rule lifted those controls anyway, apparently on the assumption the
+     sheet sat flush against the map; with this footer already separating them, that lift just
+     pushed the scale control and attribution text needlessly high up the screen — reported
+     live as them landing "in the middle of the window." */
   .activity-histogram {
     flex-direction: column;
     height: auto;
     padding-bottom: 68px;
   }
 
+  /* Desktop stacks Shown days/Selected range as two full-width blocks in a column sized to
+     its own content (see the base rule's own comment on why side-by-side there truncated
+     dates). On a phone that column becomes this whole footer's full width instead, so the
+     truncation risk that ruled out side-by-side is gone — folded into one row of two columns
+     here so the legend doesn't cost the footer two whole stacked blocks' worth of height on
+     an already-short screen. */
   .activity-histogram__legend {
+    flex-direction: row;
     width: 100%;
-    padding: 10px 14px;
+    padding: 8px 14px;
+    gap: 12px;
     border-right: none;
     border-bottom: 1px solid var(--fm-border);
+  }
+
+  .activity-histogram__legend-block {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .activity-histogram__legend-block:last-child {
+    text-align: right;
   }
 
   .activity-histogram__chart-area {

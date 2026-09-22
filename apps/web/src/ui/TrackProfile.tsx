@@ -103,13 +103,17 @@ export function TrackProfile({ points, metric, elevationAvailable }: TrackProfil
           );
         })}
       </div>
-      {/* Always rendered, reserving its ~30px regardless of elevationAvailable — mirrors the
-          tooltip row below: this card is bottom-anchored (position: absolute; bottom: ...),
-          so a height change under the cursor (mounting/unmounting this block) can push the
-          strip/chart out from under the pointer into a hide/show flicker loop. Only the
-          path/polyline content inside is conditional. */}
+      {/* The flicker risk the tooltip row below guards against is a hover-state change
+          (mounting/unmounting under the cursor); elevationAvailable is fixed for the whole
+          card's lifetime, so collapsing this row's height for its whole life when there's no
+          elevation to draw never moves anything out from under a live hover — index.css's
+          `--empty` modifier zeroes it. Still rendered as an element (not omitted) purely to
+          keep this component's own conditional structure the same shape as the tooltip below
+          it. */}
       <svg
-        className="track-profile__elevation"
+        className={
+          elevationAvailable ? 'track-profile__elevation' : 'track-profile__elevation track-profile__elevation--empty'
+        }
         viewBox={`0 0 ${STRIP_WIDTH} ${CHART_HEIGHT}`}
         preserveAspectRatio="none"
         onMouseMove={onMove}
