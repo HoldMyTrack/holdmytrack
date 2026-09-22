@@ -31,6 +31,13 @@ export const BASEMAP_SOURCE = 'protomaps';
 export const ATTRIBUTION =
   '<a href="https://protomaps.com">Protomaps</a> © <a href="https://openstreetmap.org">OpenStreetMap</a>';
 
+/** Plain-text form of `ATTRIBUTION` — derived, not hand-duplicated, so the two can never say
+ *  different things. `AttributionControl` renders the HTML above as a DOM overlay, which is
+ *  fine for the live map but invisible to anything that reads pixels off a canvas instead
+ *  (`exportMap.ts`'s PNG export bakes this string into the raster itself for exactly that
+ *  reason — canvas `fillText` takes a plain string, not markup). */
+export const ATTRIBUTION_TEXT = ATTRIBUTION.replace(/<[^>]+>/g, '');
+
 export interface BuildStyleOptions {
   flavor: Flavor;
   /** Absolute origin, e.g. `https://cdn.example.com` — no trailing slash. */

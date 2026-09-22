@@ -490,7 +490,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 6. While a capture is generating, the Capture button shows a busy state; a failure (e.g. a timeout waiting for tiles to load at export resolution) is reported inline, near the buttons, and the frame stays in place rather than being discarded — the user is not forced to reposition it and retry from scratch.
 7. Escape, or the frame's own Close button, cancels the current step (the picker dialog, or an open frame) and returns to the normal map view with nothing captured.
 
-**Outputs**: On a successful capture, a PNG file download, named `fitmap-{date}.png`.
+**Outputs**: On a successful capture, a PNG file download, named `fitmap-{date}.png`. OSM/Protomaps attribution is baked into the image's own pixels, in the bottom-right corner over a translucent backing plate — not optional or user-removable, since the basemap is an ODbL "Produced Work" and credit is a license requirement on any distributed export, not a preference (`IMPLEMENTATION.md` §5.6).
 
 **Notes**: This is one of three things `VISION.md` §4.2 groups under "Export" — story cards and animated reveals are not built. Colored zone segments (FR-4.8) are not reflected in a capture even when currently shown on screen — exporting a single focused activity's bands is a narrower case not covered by this slice. Vector/SVG output is not offered; raster (PNG) only. Platform preset dimensions are curated from Hootsuite's social-media-image-sizes guide; profile-picture/cover-photo sizes are excluded, since this feature frames map content, not an account avatar.
 

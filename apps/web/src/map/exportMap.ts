@@ -5,7 +5,7 @@ import { ensureFogLayer } from './fog';
 import { ensureHeatmapLayer } from './heatmap';
 import { labelInsertionPoint } from './layers';
 import { setMapMode, type MapMode } from './mapMode';
-import { buildStyle, type Flavor } from './style';
+import { ATTRIBUTION_TEXT, buildStyle, type Flavor } from './style';
 import { ensureTrackLayer, setHiddenTracks } from './tracks';
 
 /**
@@ -39,6 +39,18 @@ const EXPORT_SUPERSAMPLE = 3;
  *  fresh Map instance has to fetch every tile at this new size/position from nothing, unlike
  *  the live map which usually has most of them cached already. */
 const EXPORT_IDLE_TIMEOUT_MS = 20_000;
+
+/** Attribution font size, as a fraction of the *final* canvas's shorter side — scales with
+ *  output resolution (a 566px-tall Instagram landscape crop and a 1920px Story shouldn't read
+ *  the credit line at the same absolute size) rather than a fixed px value tuned for one
+ *  preset and wrong for the rest. Clamped so it never disappears on a tiny custom crop or
+ *  overwhelms one on the largest preset. */
+const ATTRIBUTION_FONT_FRACTION = 0.016;
+const ATTRIBUTION_MIN_FONT_PX = 12;
+const ATTRIBUTION_MAX_FONT_PX = 28;
+/** Distance from the canvas's bottom-right corner to the credit line's own corner, same
+ *  fraction-of-shorter-side scaling as the font size above. */
+const ATTRIBUTION_MARGIN_FRACTION = 0.014;
 
 export interface ExportViewState {
   flavor: Flavor;
@@ -106,6 +118,11 @@ export async function exportFramedImage(
     const finalCanvas = target
       ? scaleCanvas(cropCanvas, target.widthPx, target.heightPx)
       : scaleCanvasToLongSide(cropCanvas, EXPORT_LONG_SIDE_PX);
+    // On the final canvas, not cropCanvas or the offscreen instance's own — this module's own
+    // doc comment on renderOffscreen explains why: frame position and preset scaling both
+    // happen after those, and attribution needs to land correctly positioned/sized in the
+    // actual output regardless of either.
+    drawAttribution(finalCanvas);
 
     const blob = await new Promise<Blob | null>((resolve) => {
       finalCanvas.toBlob(resolve, 'image/png');
@@ -133,11 +150,68 @@ function scaleCanvasToLongSide(source: HTMLCanvasElement, longSidePx: number): H
 }
 
 /**
+ * Bakes `style.ts`'s own `ATTRIBUTION_TEXT` into the bottom-right corner of `canvas` in place
+ * — not optional or togglable, since the basemap is an ODbL "Produced Work" and OSM/Protomaps
+ * credit is a license requirement, not a preference (`style.ts`'s own comment on
+ * `ATTRIBUTION`). The live map shows the same text via MapLibre's DOM-based
+ * `AttributionControl`, which an exported PNG's `canvas.toBlob()` never captures — this is
+ * what stands in for that control on the one output path that bypasses the DOM entirely.
+ *
+ * A translucent plate behind the text, not text alone, since the basemap flavor and whatever
+ * fog/heatmap/track content sits beneath this corner varies per export — plain white or black
+ * text can disappear against a same-toned background, the same "needs to read regardless of
+ * what's underneath" reasoning `IMPLEMENTATION.md` §4.2 already used for fog's own veil.
+ *
+ * `docs/ROADMAP.md`'s FitMap-logo item shares this same lower-right corner and this same draw
+ * call site by design — landing it later just means a second small draw call here, not a new
+ * pass over the canvas.
+ */
+function drawAttribution(canvas: HTMLCanvasElement): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('export: could not create attribution canvas context');
+
+  const shortSide = Math.min(canvas.width, canvas.height);
+  const fontPx = Math.min(
+    ATTRIBUTION_MAX_FONT_PX,
+    Math.max(ATTRIBUTION_MIN_FONT_PX, shortSide * ATTRIBUTION_FONT_FRACTION),
+  );
+  const margin = Math.max(fontPx * 0.5, shortSide * ATTRIBUTION_MARGIN_FRACTION);
+  const padX = fontPx * 0.5;
+  const padY = fontPx * 0.3;
+
+  ctx.font = `${fontPx}px sans-serif`;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'alphabetic';
+
+  const metrics = ctx.measureText(ATTRIBUTION_TEXT);
+  // Falls back to font-relative approximations of ascent/descent — actualBoundingBox* is
+  // widely supported (every browser this app otherwise targets), but degrading gracefully
+  // here costs nothing and keeps the plate from vanishing entirely if it's ever missing.
+  const ascent = metrics.actualBoundingBoxAscent || fontPx * 0.8;
+  const descent = metrics.actualBoundingBoxDescent || fontPx * 0.2;
+
+  const baselineX = canvas.width - margin;
+  const baselineY = canvas.height - margin;
+
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+  ctx.fillRect(
+    baselineX - metrics.width - padX * 2,
+    baselineY - ascent - padY,
+    metrics.width + padX * 2,
+    ascent + descent + padY * 2,
+  );
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(ATTRIBUTION_TEXT, baselineX - padX, baselineY);
+}
+
+/**
  * The offscreen-instance/overlay-replay machinery shared by every capture — factored out so
- * `exportFramedImage` above doesn't duplicate it. Attribution/logo bake-in (tracked separately,
- * `docs/KNOWN_ISSUES.md`/`docs/ROADMAP.md`) belongs on the *final* canvas in
- * `exportFramedImage` (post-crop, post-scale — the one actually encoded to PNG), not on the
- * canvas this returns, since frame position and preset scaling both happen after this step.
+ * `exportFramedImage` above doesn't duplicate it. Attribution bake-in (`drawAttribution`
+ * above; the still-unbuilt FitMap-logo item tracked in `docs/ROADMAP.md` will join it) belongs
+ * on the *final* canvas in `exportFramedImage` (post-crop, post-scale — the one actually
+ * encoded to PNG), not on the canvas this returns, since frame position and preset scaling
+ * both happen after this step.
  */
 async function renderOffscreen(
   liveMap: MapLibreMap,
