@@ -88,12 +88,12 @@ type authResponse struct {
 	EmailVerified bool `json:"email_verified"`
 	// The Settings page's own fields (services/server/internal/httpapi/account.go).
 	// DisplayName/Country/AvatarURL are "" when unset — not omitted — so the frontend never
-	// has to distinguish "absent" from "empty," and PrivacyTrimM is never omitted either,
+	// has to distinguish "absent" from "empty," and PrivacyTrimCm is never omitted either,
 	// since 0 (trimming turned off) is a real, meaningful value, not an absent one.
-	DisplayName  string `json:"display_name"`
-	Country      string `json:"country"`
-	AvatarURL    string `json:"avatar_url"`
-	PrivacyTrimM int    `json:"privacy_trim_m"`
+	DisplayName   string `json:"display_name"`
+	Country       string `json:"country"`
+	AvatarURL     string `json:"avatar_url"`
+	PrivacyTrimCm int    `json:"privacy_trim_cm"`
 	// IANA name (e.g. "America/New_York"), never empty — unlike DisplayName/Country there is
 	// no "unset" state: the column is NOT NULL DEFAULT 'UTC' (migrations/0021_user_timezone.sql).
 	Timezone string `json:"timezone"`
@@ -117,19 +117,19 @@ type authResponseWithSession struct {
 // loadAuthResponse reads userID's current row and builds the shared authResponse shape —
 // signup, login, demo-start and reset-password all call this instead of hand-building a
 // response from just the fields they happened to already have, so a freshly created account
-// reports its real column defaults (privacy_trim_m: 200, everything else unset) rather than
+// reports its real column defaults (privacy_trim_cm: 10000, everything else unset) rather than
 // a response that looks like every profile field was explicitly cleared.
 func (s *Server) loadAuthResponse(ctx context.Context, userID string) (authResponse, error) {
 	var email, displayName, country, avatarKey, timezone string
 	var avatarUpdatedAt *time.Time
 	var demoExpiresAt *time.Time
-	var privacyTrimM int
+	var privacyTrimCm int
 	var emailVerified bool
 	err := s.pool.QueryRow(ctx, `
 		SELECT email, demo_expires_at, COALESCE(display_name, ''), COALESCE(country, ''),
-		       COALESCE(avatar_key, ''), avatar_updated_at, privacy_trim_m, email_verified, timezone
+		       COALESCE(avatar_key, ''), avatar_updated_at, privacy_trim_cm, email_verified, timezone
 		FROM users WHERE id = $1
-	`, userID).Scan(&email, &demoExpiresAt, &displayName, &country, &avatarKey, &avatarUpdatedAt, &privacyTrimM, &emailVerified, &timezone)
+	`, userID).Scan(&email, &demoExpiresAt, &displayName, &country, &avatarKey, &avatarUpdatedAt, &privacyTrimCm, &emailVerified, &timezone)
 	if err != nil {
 		return authResponse{}, err
 	}
@@ -152,7 +152,7 @@ func (s *Server) loadAuthResponse(ctx context.Context, userID string) (authRespo
 		DisplayName:   displayName,
 		Country:       country,
 		AvatarURL:     avatarURL,
-		PrivacyTrimM:  privacyTrimM,
+		PrivacyTrimCm: privacyTrimCm,
 		Timezone:      timezone,
 	}, nil
 }
@@ -834,13 +834,15 @@ const authContextKey contextKey = "authInfo"
 
 // authInfo is what requireAuth resolves a session down to, in one query, and attaches to the
 // request context — userID for every handler that used to read the old PlaceholderUserID
-// constant, plus isDemo/emailVerified for the two gates layered on top (requireVerified,
-// requireNotDemo) that need them without a second round trip each.
+// constant, isDemo/emailVerified for the two gates layered on top (requireVerified,
+// requireNotDemo), and timezone/privacyTrimCm for handlers that need the account's own
+// settings (day-bucketing, ingest's endpoint trim) without a second round trip each.
 type authInfo struct {
 	userID        string
 	isDemo        bool
 	emailVerified bool
 	timezone      string
+	privacyTrimCm int
 }
 
 func authInfoFromContext(ctx context.Context) authInfo {
@@ -874,6 +876,13 @@ func locationFromContext(ctx context.Context) *time.Location {
 	return loc
 }
 
+// privacyTrimCmFromContext reads the authenticated user's stored endpoint-trim radius —
+// persistAndEnqueue's own source for ingest.Job.PrivacyTrimM (server.go), so a new upload is
+// trimmed by whatever the account's Settings page actually holds, not a hardcoded default.
+func privacyTrimCmFromContext(ctx context.Context) int {
+	return authInfoFromContext(ctx).privacyTrimCm
+}
+
 // requireAuth wraps a handler that needs an authenticated user, threading the resolved
 // authInfo through the request context rather than changing every wrapped handler's own
 // signature — the mechanical diff (replacing PlaceholderUserID with
@@ -891,10 +900,10 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 		}
 		var info authInfo
 		err := s.pool.QueryRow(r.Context(), `
-			SELECT u.id, u.demo_expires_at IS NOT NULL, u.email_verified, u.timezone
+			SELECT u.id, u.demo_expires_at IS NOT NULL, u.email_verified, u.timezone, u.privacy_trim_cm
 			FROM sessions se JOIN users u ON u.id = se.user_id
 			WHERE se.id = $1 AND se.expires_at > NOW()
-		`, sessionID).Scan(&info.userID, &info.isDemo, &info.emailVerified, &info.timezone)
+		`, sessionID).Scan(&info.userID, &info.isDemo, &info.emailVerified, &info.timezone, &info.privacyTrimCm)
 		if err != nil {
 			http.Error(w, "authentication required", http.StatusUnauthorized)
 			return

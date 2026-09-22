@@ -65,7 +65,7 @@ func RenderUser(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, u
 // trimmed once at ingest, and renderAndStoreTile now composites already-rendered masks
 // rather than re-parsing raw payloads with the user's *current* trim setting. This is a
 // latent gap for a feature that doesn't exist yet (there is no way to change
-// `users.privacy_trim_m` today, and no reprivacy job — §7 — reads it back): when one is
+// `users.privacy_trim_cm` today, and no reprivacy job — §7 — reads it back): when one is
 // built, it needs to re-call RenderActivityMasks with freshly re-trimmed points per affected
 // activity, not just re-render a tile from its existing masks.
 

@@ -360,8 +360,12 @@ func (s *Server) persistAndEnqueue(ctx context.Context, p uploadFileParams) (ext
 		SourceDetail:  p.Filename,
 		ExternalID:    externalID,
 		RawPayloadKey: rawKey,
-		PrivacyTrimM:  200, // IMPLEMENTATION.md §7 default; see users.privacy_trim_m
-		ActivityType:  p.ActivityType,
+		// The uploading account's own current setting (IMPLEMENTATION.md §4.12), not a
+		// hardcoded default — requireAuth already loaded it onto ctx as part of authInfo
+		// (auth.go), so every persistAndEnqueue caller gets it for free, including
+		// handleZipUpload's/handleTakeoutUpload's per-file loops within the same request.
+		PrivacyTrimM: float64(privacyTrimCmFromContext(ctx)) / 100,
+		ActivityType: p.ActivityType,
 	}
 	payload, err := json.Marshal(job)
 	if err != nil {

@@ -21,7 +21,7 @@ import (
 // Exported so internal/fog can apply the exact same trim when re-parsing an activity's raw
 // payload to render or re-render a tile (§4.2) — coverage must reflect the same privacy-
 // clipped points the activity itself was persisted from, not the untrimmed raw file.
-func TrimEndpoints(points []parse.Point, trimM int) []parse.Point {
+func TrimEndpoints(points []parse.Point, trimM float64) []parse.Point {
 	if trimM <= 0 || len(points) < 2 {
 		return points
 	}
@@ -30,7 +30,7 @@ func TrimEndpoints(points []parse.Point, trimM int) []parse.Point {
 	for i := 1; i < len(points); i++ {
 		total += HaversineM(points[i-1].Lat, points[i-1].Lon, points[i].Lat, points[i].Lon)
 	}
-	if total <= 2*float64(trimM) {
+	if total <= 2*trimM {
 		// The track's actual walked length, not just where the two cuts below happen to
 		// land — genuinely too short to trim both ends without them meeting or crossing.
 		// Keep the endpoints rather than emit an empty/degenerate activity: an
@@ -39,8 +39,8 @@ func TrimEndpoints(points []parse.Point, trimM int) []parse.Point {
 		return points
 	}
 
-	beforeIdx, startPt := cutFromStart(points, float64(trimM))
-	afterIdx, endPt := cutFromEnd(points, float64(trimM))
+	beforeIdx, startPt := cutFromStart(points, trimM)
+	afterIdx, endPt := cutFromEnd(points, trimM)
 
 	midStart, midEnd := beforeIdx+1, afterIdx
 	if midStart > midEnd {

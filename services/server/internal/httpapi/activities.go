@@ -189,7 +189,7 @@ const maxActivityTypeLen = 50
 
 // maxActivityDescriptionLen is a generous free-text bound (about the length of a couple of
 // paragraphs), not a claim that anyone needs that much — the same "reject an obvious mistake,
-// not opine on reasonable length" reasoning maxPrivacyTrimM already uses in account.go.
+// not opine on reasonable length" reasoning maxPrivacyTrimCm already uses in account.go.
 const maxActivityDescriptionLen = 2000
 
 // maxActivityNameLen matches migrations/0015_activity_name.sql's VARCHAR(200) — a single-line

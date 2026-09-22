@@ -7,15 +7,18 @@ import { Header } from './Header';
 import { TIMEZONES } from './timezones';
 import { unitSystemForCountry, type UnitSystem } from './units';
 
-const MAX_PRIVACY_TRIM_M = 5000;
+const MAX_PRIVACY_TRIM_CM = 20000;
 
-/** Converts a meters value (what the server always takes/returns) to whatever the input
- *  should display it as — rounded, since the field is a plain whole-number input, the same
- *  precision `formatElevation` (format.ts) already uses for a meters-or-feet value. Used to
- *  seed the field and, in `handleCountryChange` below, to re-express it the moment Country
- *  changes which unit is implied — the field's own state is *not* kept in meters in between,
- *  so free typing in either unit never gets silently reconverted underneath the user mid-edit. */
-function trimDisplay(meters: number, system: UnitSystem): string {
+/** Converts a centimeters value (what the server always takes/returns — cm precision, not
+ *  whole meters, is what lets a feet input round-trip back to the exact number typed; see
+ *  IMPLEMENTATION.md's Settings-page note) to whatever the input should display it as —
+ *  rounded, since the field is a plain whole-number input, the same precision
+ *  `formatElevation` (format.ts) already uses for a meters-or-feet value. Used to seed the
+ *  field and, in `handleCountryChange` below, to re-express it the moment Country changes
+ *  which unit is implied — the field's own state is *not* kept in centimeters in between, so
+ *  free typing in either unit never gets silently reconverted underneath the user mid-edit. */
+function trimDisplay(cm: number, system: UnitSystem): string {
+  const meters = cm / 100;
   return String(Math.round(system === 'imperial' ? metersToFeet(meters) : meters));
 }
 
@@ -53,7 +56,7 @@ export function SettingsPage({ onBack, onOpenProfile }: SettingsPageProps) {
   const [displayName, setDisplayName] = useState(user.displayName);
   const [country, setCountry] = useState(user.country);
   const [timezone, setTimezone] = useState(user.timezone);
-  const [privacyTrimM, setPrivacyTrimM] = useState(() => trimDisplay(user.privacyTrimM, unitSystemForCountry(user.country)));
+  const [privacyTrim, setPrivacyTrim] = useState(() => trimDisplay(user.privacyTrimCm, unitSystemForCountry(user.country)));
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -63,9 +66,9 @@ export function SettingsPage({ onBack, onOpenProfile }: SettingsPageProps) {
   // other field here is still just local state until then.
   const system = unitSystemForCountry(country);
 
-  // The input's own max, in whichever unit is currently shown — MAX_PRIVACY_TRIM_M's imperial
+  // The input's own max, in whichever unit is currently shown — MAX_PRIVACY_TRIM_CM's imperial
   // equivalent, not the same number relabeled.
-  const trimMax = system === 'imperial' ? Math.round(metersToFeet(MAX_PRIVACY_TRIM_M)) : MAX_PRIVACY_TRIM_M;
+  const trimMax = system === 'imperial' ? Math.round(metersToFeet(MAX_PRIVACY_TRIM_CM / 100)) : MAX_PRIVACY_TRIM_CM / 100;
 
   // Any further edit after a successful save invalidates the "Saved" confirmation — it
   // should read as "your last save succeeded," not linger once the form no longer matches
@@ -89,11 +92,11 @@ export function SettingsPage({ onBack, onOpenProfile }: SettingsPageProps) {
     const prevSystem = system;
     const nextSystem = unitSystemForCountry(nextCountry);
     if (nextSystem !== prevSystem) {
-      setPrivacyTrimM((current) => {
+      setPrivacyTrim((current) => {
         const typed = Number(current);
         if (!Number.isFinite(typed)) return current; // an empty/in-progress edit — leave it alone
         const meters = prevSystem === 'imperial' ? feetToMeters(typed) : typed;
-        return trimDisplay(meters, nextSystem);
+        return trimDisplay(meters * 100, nextSystem);
       });
     }
     editField(setCountry, nextCountry);
@@ -131,20 +134,21 @@ export function SettingsPage({ onBack, onOpenProfile }: SettingsPageProps) {
   }
 
   async function handleSave() {
-    const typedTrim = Number(privacyTrimM);
+    const typedTrim = Number(privacyTrim);
     if (!Number.isFinite(typedTrim) || typedTrim < 0 || typedTrim > trimMax) {
       setSaveError(`Privacy trim must be a number between 0 and ${trimMax} ${elevationUnitLabel(system)}.`);
       return;
     }
-    // The server only ever takes/stores meters (services/server/internal/httpapi/account.go) —
-    // rounded, since privacy_trim_m is a Go int and a fractional feet-to-meters conversion
-    // would fail to decode.
-    const trimMeters = Math.round(system === 'imperial' ? feetToMeters(typedTrim) : typedTrim);
+    // The server only ever takes/stores centimeters (services/server/internal/httpapi/
+    // account.go) — rounded to the nearest cm, not the nearest meter, since privacy_trim_cm
+    // is a Go int: cm precision is what lets a feet input round-trip back to the exact number
+    // typed (docs/IMPLEMENTATION.md's Settings-page note), unlike the old whole-meters column.
+    const trimCm = Math.round((system === 'imperial' ? feetToMeters(typedTrim) : typedTrim) * 100);
     setSaving(true);
     setSaveError(null);
     setSaved(false);
     try {
-      const profile = await updateSettings({ displayName, country, privacyTrimM: trimMeters, timezone });
+      const profile = await updateSettings({ displayName, country, privacyTrimCm: trimCm, timezone });
       updateUser(profile);
       setSaved(true);
     } catch (err) {
@@ -272,8 +276,8 @@ export function SettingsPage({ onBack, onOpenProfile }: SettingsPageProps) {
               type="number"
               min={0}
               max={trimMax}
-              value={privacyTrimM}
-              onChange={(e) => editField(setPrivacyTrimM, e.target.value)}
+              value={privacyTrim}
+              onChange={(e) => editField(setPrivacyTrim, e.target.value)}
             />
             <p className="settings-page__hint">
               Trims this distance from the start and end of every new track, so it doesn't reveal exactly where you started or

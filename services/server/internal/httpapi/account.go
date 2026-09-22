@@ -18,16 +18,16 @@ import (
 
 var countryCodePattern = regexp.MustCompile(`^[A-Z]{2}$`)
 
-// maxPrivacyTrimM is a sanity ceiling, not a claim that 5 km of trim is ever a good idea —
+// maxPrivacyTrimCm is a sanity ceiling, not a claim that 200 m of trim is ever a good idea —
 // it exists to reject an obviously-wrong value (a typo with an extra digit), not to opine on
 // what a reasonable trim looks like.
-const maxPrivacyTrimM = 5000
+const maxPrivacyTrimCm = 20000
 
 type updateSettingsRequest struct {
-	DisplayName  string `json:"display_name"`
-	Country      string `json:"country"`
-	PrivacyTrimM int    `json:"privacy_trim_m"`
-	Timezone     string `json:"timezone"`
+	DisplayName   string `json:"display_name"`
+	Country       string `json:"country"`
+	PrivacyTrimCm int    `json:"privacy_trim_cm"`
+	Timezone      string `json:"timezone"`
 }
 
 // handleUpdateSettings serves `PATCH /v1/account/settings` — a full replace of all three
@@ -48,8 +48,8 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "country must be a two-letter code, or empty to unset", http.StatusBadRequest)
 		return
 	}
-	if req.PrivacyTrimM < 0 || req.PrivacyTrimM > maxPrivacyTrimM {
-		http.Error(w, fmt.Sprintf("privacy_trim_m must be between 0 and %d", maxPrivacyTrimM), http.StatusBadRequest)
+	if req.PrivacyTrimCm < 0 || req.PrivacyTrimCm > maxPrivacyTrimCm {
+		http.Error(w, fmt.Sprintf("privacy_trim_cm must be between 0 and %d", maxPrivacyTrimCm), http.StatusBadRequest)
 		return
 	}
 	// Unlike Country, timezone has no "unset" state (the column is NOT NULL DEFAULT 'UTC' —
@@ -66,9 +66,9 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	// NULLIF, not a Go-side branch on "" — an empty display name or country means "unset",
 	// same as every other nullable text column this API already treats that way.
 	if _, err := s.pool.Exec(ctx, `
-		UPDATE users SET display_name = NULLIF($2, ''), country = NULLIF($3, ''), privacy_trim_m = $4, timezone = $5
+		UPDATE users SET display_name = NULLIF($2, ''), country = NULLIF($3, ''), privacy_trim_cm = $4, timezone = $5
 		WHERE id = $1
-	`, userID, req.DisplayName, req.Country, req.PrivacyTrimM, tz); err != nil {
+	`, userID, req.DisplayName, req.Country, req.PrivacyTrimCm, tz); err != nil {
 		s.log.Error("update settings failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

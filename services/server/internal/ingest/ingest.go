@@ -35,12 +35,12 @@ const simplifyToleranceDeg = 0.00003
 // Job is what the `ingest` job's payload carries — everything the worker needs that isn't
 // already in the raw payload itself.
 type Job struct {
-	UserID        string `json:"user_id"`
-	Source        string `json:"source"`
-	SourceDetail  string `json:"source_detail"`
-	ExternalID    string `json:"external_id"`
-	RawPayloadKey string `json:"raw_payload_key"`
-	PrivacyTrimM  int    `json:"privacy_trim_m"`
+	UserID        string  `json:"user_id"`
+	Source        string  `json:"source"`
+	SourceDetail  string  `json:"source_detail"`
+	ExternalID    string  `json:"external_id"`
+	RawPayloadKey string  `json:"raw_payload_key"`
+	PrivacyTrimM  float64 `json:"privacy_trim_m"`
 	// ActivityType overrides whatever the parser itself reports, when set. Empty means "use
 	// the parsed value" (the zero value already does the right thing for every existing
 	// caller). This exists for the Google Takeout import path

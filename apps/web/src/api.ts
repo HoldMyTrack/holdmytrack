@@ -66,7 +66,7 @@ export interface UserProfile {
   displayName: string;
   country: string;
   avatarUrl: string;
-  privacyTrimM: number;
+  privacyTrimCm: number;
   /** IANA zone name (e.g. "America/New_York"), never `''` — unlike displayName/country there
    *  is no "unset" state (services/server/migrations/0021_user_timezone.sql's column is
    *  `NOT NULL DEFAULT 'UTC'`). Drives every day-bucketing query server-side
@@ -105,7 +105,7 @@ interface AuthResponseBody {
   display_name: string;
   country: string;
   avatar_url: string;
-  privacy_trim_m: number;
+  privacy_trim_cm: number;
   timezone: string;
 }
 
@@ -114,7 +114,7 @@ function toProfile(body: AuthResponseBody): UserProfile {
     displayName: body.display_name,
     country: body.country,
     avatarUrl: body.avatar_url,
-    privacyTrimM: body.privacy_trim_m,
+    privacyTrimCm: body.privacy_trim_cm,
     timezone: body.timezone,
   };
 }
@@ -274,7 +274,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
 export async function updateSettings(patch: {
   displayName: string;
   country: string;
-  privacyTrimM: number;
+  privacyTrimCm: number;
   timezone: string;
 }): Promise<UserProfile> {
   const res = await fetch(`${API_BASE_URL}${API_V1}/account/settings`, {
@@ -284,7 +284,7 @@ export async function updateSettings(patch: {
     body: JSON.stringify({
       display_name: patch.displayName,
       country: patch.country,
-      privacy_trim_m: patch.privacyTrimM,
+      privacy_trim_cm: patch.privacyTrimCm,
       timezone: patch.timezone,
     }),
   });
