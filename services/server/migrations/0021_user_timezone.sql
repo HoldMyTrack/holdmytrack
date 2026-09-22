@@ -1,0 +1,14 @@
+-- Per-user IANA timezone (e.g. "America/New_York"), closing the UTC-day-bucketing bug
+-- documented in docs/KNOWN_ISSUES.md: every day-bucketing query in internal/httpapi/
+-- activities.go bucketed by UTC calendar day regardless of where the account actually is,
+-- so an evening activity in a negative-UTC-offset timezone could show a different date in
+-- different parts of the app. Auto-resolved client-side at signup (the browser's own
+-- Intl.DateTimeFormat().resolvedOptions().timeZone, sent with the signup request) and always
+-- freely editable afterward in Settings, alongside Country — never locked, treated as a
+-- sensible default rather than an authoritative fact about the account (the same treatment
+-- docs/BRAINSTORM.md's Country-at-signup idea proposes for that field).
+--
+-- Default 'UTC' reproduces every existing row's current bucketing behaviour exactly, so no
+-- backfill follows this ALTER TABLE — an existing account's stats don't change until it sets
+-- a real value.
+ALTER TABLE users ADD COLUMN timezone TEXT NOT NULL DEFAULT 'UTC';

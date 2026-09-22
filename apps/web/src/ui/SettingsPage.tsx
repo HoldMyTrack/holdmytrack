@@ -3,11 +3,12 @@ import { API_BASE_URL, removeAvatar, updateSettings, uploadAvatar } from '../api
 import { useAuth } from '../auth/AuthContext';
 import { COUNTRIES } from './countries';
 import { Header } from './Header';
+import { TIMEZONES } from './timezones';
 
 const MAX_PRIVACY_TRIM_M = 5000;
 
 /**
- * The Settings page (Avatar, Name, Country, Privacy Trim) — reached from the account menu's
+ * The Settings page (Avatar, Name, Country, Timezone, Privacy Trim) — reached from the account menu's
  * "Settings" item (UserMenu.tsx), a separate screen from ProfilePage.tsx rather than wired
  * into `profile-v1.png`'s own still-unbuilt "Edit profile" button (a direct user choice, not
  * a default). Same page shell as ProfilePage (`Header` + a back button), since both are
@@ -18,10 +19,11 @@ const MAX_PRIVACY_TRIM_M = 5000;
  * elevation display everywhere (not just this page) changes the moment it's saved — that's
  * why Save calls `updateUser()` on success rather than leaving the change to a future reload.
  *
- * Avatar and Name/Country/Privacy Trim are two independent save actions, not one combined
- * form submit: the avatar drop-zone commits on drop/pick (matching how a file picker already
- * reads as "done" the instant a file is chosen), while Name/Country/Privacy Trim share one
- * Save button since they're plain text/number fields with nothing to commit until asked to.
+ * Avatar and Name/Country/Timezone/Privacy Trim are two independent save actions, not one
+ * combined form submit: the avatar drop-zone commits on drop/pick (matching how a file picker
+ * already reads as "done" the instant a file is chosen), while Name/Country/Timezone/Privacy
+ * Trim share one Save button since they're plain text/number/select fields with nothing to
+ * commit until asked to.
  */
 export interface SettingsPageProps {
   onBack: () => void;
@@ -34,6 +36,7 @@ export function SettingsPage({ onBack, onOpenProfile }: SettingsPageProps) {
   const { user, updateUser } = useAuth();
   const [displayName, setDisplayName] = useState(user.displayName);
   const [country, setCountry] = useState(user.country);
+  const [timezone, setTimezone] = useState(user.timezone);
   const [privacyTrimM, setPrivacyTrimM] = useState(String(user.privacyTrimM));
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -88,7 +91,7 @@ export function SettingsPage({ onBack, onOpenProfile }: SettingsPageProps) {
     setSaveError(null);
     setSaved(false);
     try {
-      const profile = await updateSettings({ displayName, country, privacyTrimM: trimValue });
+      const profile = await updateSettings({ displayName, country, privacyTrimM: trimValue, timezone });
       updateUser(profile);
       setSaved(true);
     } catch (err) {
@@ -191,6 +194,22 @@ export function SettingsPage({ onBack, onOpenProfile }: SettingsPageProps) {
               ))}
             </select>
             <p className="settings-page__hint">Decides whether distance, pace and elevation show in km/m or mi/ft, everywhere in the app.</p>
+          </label>
+
+          <label className="settings-page__section">
+            <span className="settings-page__label">Timezone</span>
+            <select className="settings-page__input" value={timezone} onChange={(e) => editField(setTimezone, e.target.value)}>
+              {!TIMEZONES.includes(timezone) && <option value={timezone}>{timezone}</option>}
+              {TIMEZONES.map((tz) => (
+                <option key={tz} value={tz}>
+                  {tz}
+                </option>
+              ))}
+            </select>
+            <p className="settings-page__hint">
+              Decides which calendar day an activity falls on everywhere in the app (the histogram, the activity graph, date filtering).
+              Auto-detected from your browser when you signed up; change it here if you're somewhere else now.
+            </p>
           </label>
 
           <label className="settings-page__section">

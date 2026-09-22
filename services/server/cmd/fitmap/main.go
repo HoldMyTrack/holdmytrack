@@ -11,6 +11,11 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	// Embeds Go's own copy of the IANA timezone database into the binary — needed for
+	// time.LoadLocation(user's stored timezone) to work regardless of whether the deployed
+	// image (services/server/Dockerfile's distroless base) happens to carry
+	// /usr/share/zoneinfo, rather than depending on that being true.
+	_ "time/tzdata"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 

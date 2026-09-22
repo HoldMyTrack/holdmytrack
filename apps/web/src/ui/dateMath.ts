@@ -1,5 +1,5 @@
 /**
- * UTC-day arithmetic on plain YYYY-MM-DD strings.
+ * Day arithmetic on plain YYYY-MM-DD strings.
  *
  * This was a larger module — addDays/dayDiff/clampDate/clampWindow — back when the range
  * picker panned by calendar days and had to keep a `[earliest, today]` window's span intact
@@ -11,12 +11,20 @@
  * elapsed time, not about paging through bars.
  */
 
-export function todayUTC(): string {
+/** "What day is it" for the caller's own browser — the local calendar day, matching what a
+ *  person looking at the app understands "today" to mean, and the account's own local day the
+ *  server now buckets activities by (docs/KNOWN_ISSUES.md's fixed "UTC-day bucketing" entry).
+ *  Only ever the *fallback* `today` a zero-activity account's degenerate range collapses to
+ *  (MapView.tsx) — real activity data always takes precedence once there is any. */
+export function todayLocal(): string {
   const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString().slice(0, 10);
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
-/** Whole calendar days from `from` to `to`, inclusive of neither end — `dayDiff(a, a) === 0`. */
+/** Whole calendar days from `from` to `to`, inclusive of neither end — `dayDiff(a, a) === 0`.
+ *  UTC-parsed on purpose, unlike todayLocal above: this diffs two already-resolved date-only
+ *  strings, and parsing a date-only string as UTC (rather than the browser's own zone) is what
+ *  avoids an off-by-one from a DST transition landing inside the range. */
 export function dayDiff(from: string, to: string): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 }

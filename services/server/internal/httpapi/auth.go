@@ -51,6 +51,26 @@ const minPasswordLength = 8
 type authRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	// Optional — the browser's own Intl.DateTimeFormat().resolvedOptions().timeZone, sent
+	// only by handleSignup's caller (decodeAuthRequest itself is shared with login, which
+	// ignores this field). Invalid or absent falls back to "UTC" rather than rejecting the
+	// signup over it — auto-detection is a convenience default, not something worth blocking
+	// account creation over (see migrations/0021_user_timezone.sql's own doc comment).
+	Timezone string `json:"timezone"`
+}
+
+// normalizeTimezone validates raw against the IANA tz database via time.LoadLocation. Returns
+// ok=false for empty or unloadable input; the caller decides what that means for its own
+// endpoint (handleSignup falls back to "UTC", handleUpdateSettings rejects with a 400).
+func normalizeTimezone(raw string) (tz string, ok bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", false
+	}
+	if _, err := time.LoadLocation(raw); err != nil {
+		return "", false
+	}
+	return raw, true
 }
 
 // authResponse is the one shape every auth endpoint and handleMe returns — see
@@ -74,6 +94,9 @@ type authResponse struct {
 	Country      string `json:"country"`
 	AvatarURL    string `json:"avatar_url"`
 	PrivacyTrimM int    `json:"privacy_trim_m"`
+	// IANA name (e.g. "America/New_York"), never empty — unlike DisplayName/Country there is
+	// no "unset" state: the column is NOT NULL DEFAULT 'UTC' (migrations/0021_user_timezone.sql).
+	Timezone string `json:"timezone"`
 }
 
 // authResponseWithSession wraps authResponse with the freshly minted session id, for the
@@ -97,16 +120,16 @@ type authResponseWithSession struct {
 // reports its real column defaults (privacy_trim_m: 200, everything else unset) rather than
 // a response that looks like every profile field was explicitly cleared.
 func (s *Server) loadAuthResponse(ctx context.Context, userID string) (authResponse, error) {
-	var email, displayName, country, avatarKey string
+	var email, displayName, country, avatarKey, timezone string
 	var avatarUpdatedAt *time.Time
 	var demoExpiresAt *time.Time
 	var privacyTrimM int
 	var emailVerified bool
 	err := s.pool.QueryRow(ctx, `
 		SELECT email, demo_expires_at, COALESCE(display_name, ''), COALESCE(country, ''),
-		       COALESCE(avatar_key, ''), avatar_updated_at, privacy_trim_m, email_verified
+		       COALESCE(avatar_key, ''), avatar_updated_at, privacy_trim_m, email_verified, timezone
 		FROM users WHERE id = $1
-	`, userID).Scan(&email, &demoExpiresAt, &displayName, &country, &avatarKey, &avatarUpdatedAt, &privacyTrimM, &emailVerified)
+	`, userID).Scan(&email, &demoExpiresAt, &displayName, &country, &avatarKey, &avatarUpdatedAt, &privacyTrimM, &emailVerified, &timezone)
 	if err != nil {
 		return authResponse{}, err
 	}
@@ -130,6 +153,7 @@ func (s *Server) loadAuthResponse(ctx context.Context, userID string) (authRespo
 		Country:       country,
 		AvatarURL:     avatarURL,
 		PrivacyTrimM:  privacyTrimM,
+		Timezone:      timezone,
 	}, nil
 }
 
@@ -183,11 +207,16 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	tz, ok := normalizeTimezone(req.Timezone)
+	if !ok {
+		tz = "UTC"
+	}
+
 	ctx := r.Context()
 	var userID string
 	err = s.pool.QueryRow(ctx,
-		`INSERT INTO users (email, password_hash, email_verified) VALUES ($1, $2, $3) RETURNING id`,
-		req.Email, hash, s.skipEmailVerification,
+		`INSERT INTO users (email, password_hash, email_verified, timezone) VALUES ($1, $2, $3, $4) RETURNING id`,
+		req.Email, hash, s.skipEmailVerification, tz,
 	).Scan(&userID)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -811,6 +840,7 @@ type authInfo struct {
 	userID        string
 	isDemo        bool
 	emailVerified bool
+	timezone      string
 }
 
 func authInfoFromContext(ctx context.Context) authInfo {
@@ -823,6 +853,25 @@ func authInfoFromContext(ctx context.Context) authInfo {
 // this instead now.
 func userIDFromContext(ctx context.Context) string {
 	return authInfoFromContext(ctx).userID
+}
+
+// timezoneFromContext reads the authenticated user's stored IANA timezone name — the raw
+// string a day-bucketing query passes as its own `AT TIME ZONE $N` parameter.
+func timezoneFromContext(ctx context.Context) string {
+	return authInfoFromContext(ctx).timezone
+}
+
+// locationFromContext resolves timezoneFromContext to a *time.Location, for the Go-side date
+// math (time.ParseInLocation, time.Now().In(loc)) day-bucketing queries need alongside their
+// own SQL-side AT TIME ZONE parameter. Falls back to UTC on a load failure — defensive only,
+// since every stored value was already validated with time.LoadLocation before being written
+// (handleSignup, handleUpdateSettings), so this should never actually fail in practice.
+func locationFromContext(ctx context.Context) *time.Location {
+	loc, err := time.LoadLocation(timezoneFromContext(ctx))
+	if err != nil {
+		return time.UTC
+	}
+	return loc
 }
 
 // requireAuth wraps a handler that needs an authenticated user, threading the resolved
@@ -842,10 +891,10 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 		}
 		var info authInfo
 		err := s.pool.QueryRow(r.Context(), `
-			SELECT u.id, u.demo_expires_at IS NOT NULL, u.email_verified
+			SELECT u.id, u.demo_expires_at IS NOT NULL, u.email_verified, u.timezone
 			FROM sessions se JOIN users u ON u.id = se.user_id
 			WHERE se.id = $1 AND se.expires_at > NOW()
-		`, sessionID).Scan(&info.userID, &info.isDemo, &info.emailVerified)
+		`, sessionID).Scan(&info.userID, &info.isDemo, &info.emailVerified, &info.timezone)
 		if err != nil {
 			http.Error(w, "authentication required", http.StatusUnauthorized)
 			return

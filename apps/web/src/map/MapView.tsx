@@ -23,7 +23,7 @@ import {
 } from './tracks';
 import { useMapInstance } from './useMapInstance';
 import { DEFAULT_FLAVOR, parseHash, replaceHash, type HashState, type ViewState } from './viewState';
-import { getActivityTrackMetrics, listActivities, type Activity, type ActivityTrackMetrics } from '../api';
+import { getActivityTrackMetrics, type Activity, type ActivityTrackMetrics } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
 import { ActivitiesPanel } from '../ui/ActivitiesPanel';
@@ -32,7 +32,7 @@ import { CoverageNotice } from '../ui/CoverageNotice';
 import { ExportButton } from '../ui/ExportButton';
 import { ExportFrame, type FrameRect } from '../ui/ExportFrame';
 import { ExportPresetDialog } from '../ui/ExportPresetDialog';
-import { dayDiff, todayUTC } from '../ui/dateMath';
+import { dayDiff, todayLocal } from '../ui/dateMath';
 import { Header } from '../ui/Header';
 import type { DateRange } from '../ui/RangePicker';
 import { TrackProfile } from '../ui/TrackProfile';
@@ -42,21 +42,6 @@ import { useActivityDays } from '../ui/useActivityDays';
 import { useActivityList } from '../ui/useActivityList';
 import { useActivityTotals } from '../ui/useActivityTotals';
 import { useDuplicates } from '../ui/useDuplicates';
-
-/** How many calendar days back Heatmap's rolling window reaches — must match
- *  services/server/internal/fog's HeatmapWindowDays exactly, since this is only used to fetch
- *  the same set of activities server-side already renders, for the "fly to fit Heatmap's
- *  current coverage" camera target below. */
-const HEATMAP_WINDOW_DAYS = 365;
-
-/** `from` boundary for the Heatmap fly-to-coverage fetch below — a plain function, not a
- *  memoized value, since "365 days before right now" has to be read fresh at the moment of
- *  each transition into Heatmap, not fixed once at module load. */
-function heatmapWindowStart(): string {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() - HEATMAP_WINDOW_DAYS);
-  return d.toISOString().slice(0, 10);
-}
 
 /** How long a checkbox-selection spree pauses before the map auto-flies to fit it (replacing
  *  the old explicit "Fit map" button — see IMPLEMENTATION.md §4.7) — long enough that ticking
@@ -141,7 +126,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
   // as a "mode" (IMPLEMENTATION.md §4.2.2).
   const [mapMode, setMapModeState] = useState<MapMode>('normal');
 
-  const today = useMemo(() => todayUTC(), []);
+  const today = useMemo(() => todayLocal(), []);
 
   // Left-panel ActivitiesPanel/ActivityHistogram layout.
   // Selection lives here, not in ActivitiesPanel, since the map instance and the auto-fly
@@ -427,26 +412,14 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
 
   // Fog/Heatmap show coverage no filter narrows any more (all-time for Fog, the rolling
   // window above for Heatmap) — entering either from Normal has to clear the checked/focused
-  // selection (neither mode can select or focus a single activity) and fly to fit whatever
-  // that mode actually renders, then restore the selection exactly on the way back to Normal.
-  // Only that one transition does either: toggling directly between Fog and Heatmap touches
-  // neither, since Normal's selection state was never disturbed to begin with.
+  // selection (neither mode can select or focus a single activity), then restore it exactly on
+  // the way back to Normal. Only that one transition does either: toggling directly between Fog
+  // and Heatmap touches neither, since Normal's selection state was never disturbed to begin
+  // with. The camera is deliberately left alone on every mode change — an auto-fly here was
+  // reported live as disorienting (switching modes to glance at coverage shouldn't also yank
+  // the view to some computed bbox), so a mode switch now only ever changes what's drawn, never
+  // where the camera is pointed; the user's own pan/zoom controls stay the only way to move it.
   const modeSnapshotRef = useRef<{ checked: Set<string>; focused: string | null } | null>(null);
-  const flyToModeCoverage = useCallback(
-    (mode: 'fog' | 'heatmap') => {
-      if (!map) return;
-      const query = mode === 'heatmap' ? { from: heatmapWindowStart() } : {};
-      listActivities(query)
-        .then((all) => {
-          const flyBounds = unionBBox(all.flatMap((a) => (a.bbox ? [a.bbox] : [])));
-          if (flyBounds) flyToBBox(map, flyBounds);
-        })
-        .catch((error: unknown) => {
-          console.error('Could not fetch activities to fly to mode coverage', error);
-        });
-    },
-    [map],
-  );
   const changeMapMode = useCallback(
     (next: MapMode) => {
       if (next === mapMode) return;
@@ -454,7 +427,6 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
         modeSnapshotRef.current = { checked: checkedActivityIds, focused: focusedActivityId };
         setCheckedActivityIds(new Set());
         setFocusedActivityId(null);
-        flyToModeCoverage(next as 'fog' | 'heatmap');
       } else if (next === 'normal') {
         const snapshot = modeSnapshotRef.current;
         modeSnapshotRef.current = null;
@@ -465,7 +437,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
       }
       setMapModeState(next);
     },
-    [mapMode, checkedActivityIds, focusedActivityId, flyToModeCoverage],
+    [mapMode, checkedActivityIds, focusedActivityId],
   );
 
   // Auto-fly on checked-group change ("FLYING TO 3 SELECTED"),

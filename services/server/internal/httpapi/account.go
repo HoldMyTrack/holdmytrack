@@ -10,10 +10,11 @@ import (
 	"strings"
 )
 
-// The Settings page (Avatar, Name, Country, Privacy Trim) — see migrations/0001_init.sql's
-// users table (display_name/country/avatar_key/avatar_content_type/avatar_updated_at).
-// Country and Privacy Trim are covered by handleUpdateSettings; the avatar is a separate
-// content type entirely, so it gets its own three endpoints below.
+// The Settings page (Avatar, Name, Country, Timezone, Privacy Trim) — see
+// migrations/0001_init.sql's users table (display_name/country/avatar_key/
+// avatar_content_type/avatar_updated_at) and migrations/0021_user_timezone.sql (timezone).
+// Country, Timezone and Privacy Trim are covered by handleUpdateSettings; the avatar is a
+// separate content type entirely, so it gets its own three endpoints below.
 
 var countryCodePattern = regexp.MustCompile(`^[A-Z]{2}$`)
 
@@ -26,6 +27,7 @@ type updateSettingsRequest struct {
 	DisplayName  string `json:"display_name"`
 	Country      string `json:"country"`
 	PrivacyTrimM int    `json:"privacy_trim_m"`
+	Timezone     string `json:"timezone"`
 }
 
 // handleUpdateSettings serves `PATCH /v1/account/settings` — a full replace of all three
@@ -50,14 +52,23 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("privacy_trim_m must be between 0 and %d", maxPrivacyTrimM), http.StatusBadRequest)
 		return
 	}
+	// Unlike Country, timezone has no "unset" state (the column is NOT NULL DEFAULT 'UTC' —
+	// migrations/0021_user_timezone.sql) — Settings always sends the field's current
+	// selection, so an empty/unloadable value here means a malformed request, not a deliberate
+	// clear, and is rejected rather than silently defaulted.
+	tz, ok := normalizeTimezone(req.Timezone)
+	if !ok {
+		http.Error(w, "timezone must be a valid IANA zone name (e.g. America/New_York)", http.StatusBadRequest)
+		return
+	}
 
 	ctx := r.Context()
 	// NULLIF, not a Go-side branch on "" — an empty display name or country means "unset",
 	// same as every other nullable text column this API already treats that way.
 	if _, err := s.pool.Exec(ctx, `
-		UPDATE users SET display_name = NULLIF($2, ''), country = NULLIF($3, ''), privacy_trim_m = $4
+		UPDATE users SET display_name = NULLIF($2, ''), country = NULLIF($3, ''), privacy_trim_m = $4, timezone = $5
 		WHERE id = $1
-	`, userID, req.DisplayName, req.Country, req.PrivacyTrimM); err != nil {
+	`, userID, req.DisplayName, req.Country, req.PrivacyTrimM, tz); err != nil {
 		s.log.Error("update settings failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

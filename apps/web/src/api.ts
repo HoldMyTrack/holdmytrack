@@ -35,6 +35,12 @@ export interface UserProfile {
   country: string;
   avatarUrl: string;
   privacyTrimM: number;
+  /** IANA zone name (e.g. "America/New_York"), never `''` — unlike displayName/country there
+   *  is no "unset" state (services/server/migrations/0021_user_timezone.sql's column is
+   *  `NOT NULL DEFAULT 'UTC'`). Drives every day-bucketing query server-side
+   *  (docs/KNOWN_ISSUES.md's "UTC-day bucketing" entry) — the client never buckets by day
+   *  itself, it only offers this value for editing in Settings. */
+  timezone: string;
 }
 
 export interface AuthUser extends UserProfile {
@@ -68,10 +74,17 @@ interface AuthResponseBody {
   country: string;
   avatar_url: string;
   privacy_trim_m: number;
+  timezone: string;
 }
 
 function toProfile(body: AuthResponseBody): UserProfile {
-  return { displayName: body.display_name, country: body.country, avatarUrl: body.avatar_url, privacyTrimM: body.privacy_trim_m };
+  return {
+    displayName: body.display_name,
+    country: body.country,
+    avatarUrl: body.avatar_url,
+    privacyTrimM: body.privacy_trim_m,
+    timezone: body.timezone,
+  };
 }
 
 function toAuthUser(body: AuthResponseBody): AuthUser {
@@ -82,12 +95,12 @@ function toSessionUser(body: AuthResponseBody): SessionUser {
   return body.isDemo ? toProfile(body) : toAuthUser(body);
 }
 
-async function postAuth(path: string, email: string, password: string): Promise<AuthUser> {
+async function postAuth(path: string, email: string, password: string, extra?: Record<string, unknown>): Promise<AuthUser> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, ...extra }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -97,8 +110,14 @@ async function postAuth(path: string, email: string, password: string): Promise<
   return toAuthUser(body);
 }
 
+/** Sends the browser's own IANA zone (`Intl.DateTimeFormat().resolvedOptions().timeZone`) as
+ *  a one-time signup-only default — auth.go's `handleSignup` falls back to `'UTC'` if this is
+ *  missing or the server can't load it, so there's nothing to validate client-side here; the
+ *  account can always change it later in Settings (SettingsPage.tsx). `login` sends no such
+ *  field — the account's stored value, not the browser's, is authoritative from then on. */
 export function signup(email: string, password: string): Promise<AuthUser> {
-  return postAuth(`${API_V1}/auth/signup`, email, password);
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return postAuth(`${API_V1}/auth/signup`, email, password, { timezone });
 }
 
 export function login(email: string, password: string): Promise<AuthUser> {
@@ -225,16 +244,26 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   return toSessionUser(body);
 }
 
-/** SettingsPage.tsx's Save button — a full replace of all three fields at once (`PATCH
+/** SettingsPage.tsx's Save button — a full replace of all four fields at once (`PATCH
  *  /v1/account/settings`), not per-field auto-save. Returns the updated profile so the
  *  caller can merge it into AuthContext directly (`useAuth().updateUser`) with no extra
  *  round trip. */
-export async function updateSettings(patch: { displayName: string; country: string; privacyTrimM: number }): Promise<UserProfile> {
+export async function updateSettings(patch: {
+  displayName: string;
+  country: string;
+  privacyTrimM: number;
+  timezone: string;
+}): Promise<UserProfile> {
   const res = await fetch(`${API_BASE_URL}${API_V1}/account/settings`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ display_name: patch.displayName, country: patch.country, privacy_trim_m: patch.privacyTrimM }),
+    body: JSON.stringify({
+      display_name: patch.displayName,
+      country: patch.country,
+      privacy_trim_m: patch.privacyTrimM,
+      timezone: patch.timezone,
+    }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');

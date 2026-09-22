@@ -54,12 +54,12 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 
 **Preconditions**: No active session, or an active demo session (see note below).
 
-**Inputs**: Email address, password (minimum 8 characters).
+**Inputs**: Email address, password (minimum 8 characters); the browser's own IANA timezone, sent automatically (not user-entered) and optional — see step 3.
 
 **Behavior**:
-1. Client submits email + password to `POST /v1/auth/signup`.
+1. Client submits email + password + its own detected timezone to `POST /v1/auth/signup`.
 2. Server validates the email is a syntactically valid address and the password meets the minimum length.
-3. Server hashes the password (bcrypt) and creates a new `users` row — always a fresh row, whether or not the caller's browser holds a live demo session (see FR-2.3, revised).
+3. Server hashes the password (bcrypt) and creates a new `users` row — always a fresh row, whether or not the caller's browser holds a live demo session (see FR-2.3, revised). The submitted timezone is validated against the IANA tz database and stored if valid; missing or invalid falls back to UTC rather than rejecting the signup (FR-1.7 covers editing it afterward).
 4. Server creates a session (30-day expiry) and sets it as an `HttpOnly` cookie, and sends a verification email (FR-1.8).
 5. Client is signed in, but held on FR-1.8's "verify your email" screen rather than shown the map, until the account is verified.
 
@@ -153,22 +153,23 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 
 ### FR-1.7 Account settings
 
-**Description**: A signed-in user (real or demo — FR-2) edits their own profile: Avatar, Name, Country, and Privacy Trim (FR-8.1). Reached from the account menu's "Settings" item, a separate screen from the activity graph (FR-7).
+**Description**: A signed-in user (real or demo — FR-2) edits their own profile: Avatar, Name, Country, Timezone, and Privacy Trim (FR-8.1). Reached from the account menu's "Settings" item, a separate screen from the activity graph (FR-7).
 
 **Preconditions**: An active session.
 
-**Inputs**: An image file (PNG, JPEG, or WebP, up to 5 MB) for Avatar; free text for Name; a country selected from a standard list for Country; a whole number of meters (0–5000) for Privacy Trim.
+**Inputs**: An image file (PNG, JPEG, or WebP, up to 5 MB) for Avatar; free text for Name; a country selected from a standard list for Country; an IANA timezone name selected from the browser's own supported list for Timezone; a whole number of meters (0–5000) for Privacy Trim.
 
 **Behavior**:
 1. Avatar uploads and removals take effect immediately (`POST`/`DELETE /v1/account/avatar`) — each is its own action, not gated behind a separate save step. The account menu's own avatar button reflects whichever image is current everywhere in the app the moment it changes, with no reload.
-2. Name, Country, and Privacy Trim save together as one action (`PATCH /v1/account/settings`) — editing one and leaving without saving discards all three, not just the one touched.
+2. Name, Country, Timezone, and Privacy Trim save together as one action (`PATCH /v1/account/settings`) — editing one and leaving without saving discards all four, not just the one touched.
 3. **Country decides which unit system the entire app displays distance, pace, and elevation in** — metric (km, min/km, meters) for every country except the United States, Liberia, and Myanmar, which see imperial (mi, min/mi, feet). Leaving Country unset defaults to metric. This takes effect the moment it's saved, across every screen that shows one of these values (the Activities panel, the date-range picker, the activity graph, Trends, the per-activity pace/elevation profile, and the map's own distance scale) — none of it requires a reload.
+4. **Timezone decides which calendar day an activity is grouped under everywhere the app buckets by day** — the date-range picker's histogram, the activity graph's daily grid and stat cards, `GET /v1/activities/trends`, and date-range filtering. Auto-resolved from the browser at signup (FR-1.1) and editable here afterward; unlike Country, it has no "unset" state — every account always has one, defaulting to UTC until changed.
 
-**Outputs**: The account's current Avatar, Name, Country, and Privacy Trim value, always reflecting the last successful save (or the account's defaults, if never changed) — reloading the app never reverts to something stale.
+**Outputs**: The account's current Avatar, Name, Country, Timezone, and Privacy Trim value, always reflecting the last successful save (or the account's defaults, if never changed) — reloading the app never reverts to something stale.
 
 **Error cases**:
 - An unsupported image type or a file over 5 MB → `415`/`413`, and the image is not saved.
-- Country outside the supported list, or Privacy Trim outside 0–5000 → `400 Bad Request`, and none of the three fields in that save are applied (a full-replace save either succeeds as a whole or not at all).
+- Country outside the supported list, Timezone not a valid IANA zone name, or Privacy Trim outside 0–5000 → `400 Bad Request`, and none of the four fields in that save are applied (a full-replace save either succeeds as a whole or not at all).
 
 ### FR-1.8 Email verification
 
@@ -402,7 +403,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Behavior**:
 1. Selecting "Fog" from the map-mode toggle replaces the track lines with a raster veil: any area a recorded route has ever passed through is rendered clear; everywhere else stays fogged.
-2. Fog ignores the date range and the Type/Distance/hidden-track filters entirely — it always shows every activity the account has ever recorded, not just what Normal mode currently has selected. Entering Fog hides the Activities panel and the date-range picker (there is nothing for either to filter), clears any checked or focused activity, and flies the camera to fit the account's full all-time extent.
+2. Fog ignores the date range and the Type/Distance/hidden-track filters entirely — it always shows every activity the account has ever recorded, not just what Normal mode currently has selected. Entering Fog hides the Activities panel and the date-range picker (there is nothing for either to filter) and clears any checked or focused activity. The camera is left exactly where it was — switching modes never moves it; an earlier auto-fly-to-coverage on entry was removed after being reported as disorienting.
 3. Individual track lines are not drawn in this mode (the veil itself is the information).
 4. Below a threshold zoom, the veil switches from per-pixel coverage to a coarser reveal: a country renders fully clear the moment the account has at least one activity anywhere inside it, however small; one zoom step in, the same applies one administrative level down, at state/region granularity. Zooming back in past the threshold returns to exact per-pixel coverage — the two never blend or overlap, only one is ever shown at a given zoom.
 5. Returning to Normal mode restores the previously checked/focused activities, the date range, and the panel/picker exactly as they were before switching to Fog.
@@ -413,7 +414,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Behavior**:
 1. Selecting "Heatmap" replaces the track lines with a raster overlay, brighter wherever more recorded activity has crossed the same location (a daily commute reads brighter than a once-ridden road).
-2. Like Fog of War, Heatmap ignores the date range and the Type/Distance/hidden-track filters, hides the Activities panel and date-range picker, and clears any checked or focused activity. Unlike Fog, it only considers activities within a fixed rolling window (the last 365 days, not user-configurable) — the camera flies to fit that window's coverage, not the account's full history.
+2. Like Fog of War, Heatmap ignores the date range and the Type/Distance/hidden-track filters, hides the Activities panel and date-range picker, clears any checked or focused activity, and leaves the camera exactly where it was (see FR-4.2's note on why). Unlike Fog, it only considers activities within a fixed rolling window (the last 365 days, not user-configurable).
 3. Individual track lines are not drawn in this mode.
 4. How much crossing traffic it takes to reach full brightness adapts to the account's own history, recomputed daily — a new account and a long-running one don't saturate at the same point, so each account's own most-used spot is what reads as hottest, not a fixed number of visits everyone shares.
 5. Below the same threshold zoom Fog switches at, the graded overlay is replaced by a flat "visited" highlight at country granularity, and one step in at state/region granularity — not graded by how much, only whether the account has a currently-in-window activity there. A country/region whose only activity has aged out of the rolling window shows no highlight at this zoom either, matching what the per-pixel overlay already shows at city zoom.
@@ -660,7 +661,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Inputs**: `bucket` — `week` or `month`; `from`/`to` (`YYYY-MM-DD`, both optional, default to the trailing 12 months).
 
 **Behavior**:
-1. Every activity in the window is grouped into the requested bucket by its `started_at` date (UTC), one bucket per calendar week or month that has at least one activity — buckets with nothing recorded are omitted rather than returned as zeroes, the same convention FR-6's histogram uses.
+1. Every activity in the window is grouped into the requested bucket by its `started_at` date, in the account's own timezone (FR-1.7), one bucket per calendar week or month that has at least one activity — buckets with nothing recorded are omitted rather than returned as zeroes, the same convention FR-6's histogram uses.
 2. Each bucket reports: activity count, total distance, total moving time, and total elevation gain.
 3. The UI (`Trends`, on the Profile page) renders one bar per bucket, height scaled to the window's busiest bucket by distance, with a Week/Month toggle. Hovering a bar shows that bucket's full breakdown (distance, activity count, moving time, elevation gain).
 

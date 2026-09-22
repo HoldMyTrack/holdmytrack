@@ -50,7 +50,7 @@ func (s *Server) handleTracksTile(w http.ResponseWriter, r *http.Request) {
 
 	// The same from/to/types shape §4.7's listing endpoints parse — one parser, so the
 	// "absent means no restriction" convention can't drift between the map and the list.
-	filter, err := parseActivityFilter(r.URL.Query())
+	filter, err := parseActivityFilter(r.URL.Query(), locationFromContext(r.Context()))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

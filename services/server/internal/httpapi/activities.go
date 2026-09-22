@@ -27,19 +27,23 @@ type activityFilter struct {
 	Types []string
 }
 
-// parseActivityFilter reads that filter off a query string. The returned error is already
-// phrased for the client; callers pass it straight to http.Error with a 400.
-func parseActivityFilter(q url.Values) (activityFilter, error) {
+// parseActivityFilter reads that filter off a query string, interpreting a bare `from`/`to`
+// date as midnight *in loc* rather than UTC — loc is the caller's authenticated user's own
+// timezone (locationFromContext, auth.go), so `?from=2026-03-10` means "the 10th, as that
+// account experienced it," not always-UTC's 10th regardless of where the account actually is
+// (docs/KNOWN_ISSUES.md's "UTC-day bucketing" entry). The returned error is already phrased
+// for the client; callers pass it straight to http.Error with a 400.
+func parseActivityFilter(q url.Values, loc *time.Location) (activityFilter, error) {
 	var f activityFilter
 	if v := q.Get("from"); v != "" {
-		t, err := time.Parse(dateLayout, v)
+		t, err := time.ParseInLocation(dateLayout, v, loc)
 		if err != nil {
 			return activityFilter{}, errors.New(`invalid "from" date, want YYYY-MM-DD`)
 		}
 		f.From = &t
 	}
 	if v := q.Get("to"); v != "" {
-		t, err := time.Parse(dateLayout, v)
+		t, err := time.ParseInLocation(dateLayout, v, loc)
 		if err != nil {
 			return activityFilter{}, errors.New(`invalid "to" date, want YYYY-MM-DD`)
 		}
@@ -144,7 +148,7 @@ type activitiesResponse struct {
 // from userIDFromContext (requireAuth, server.go) rather than a query parameter, same as
 // every other data handler.
 func (s *Server) handleListActivities(w http.ResponseWriter, r *http.Request) {
-	filter, err := parseActivityFilter(r.URL.Query())
+	filter, err := parseActivityFilter(r.URL.Query(), locationFromContext(r.Context()))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -469,7 +473,7 @@ type activitySummaryResponse struct {
 // the whole point is that a client showing totals doesn't have to page through the history
 // to add them up itself.
 func (s *Server) handleActivitySummary(w http.ResponseWriter, r *http.Request) {
-	filter, err := parseActivityFilter(r.URL.Query())
+	filter, err := parseActivityFilter(r.URL.Query(), locationFromContext(r.Context()))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -509,12 +513,11 @@ const maxHistogramDays = 366
 // place what it did get. That keeps the response proportional to how much a user actually
 // recorded rather than to how long the window is.
 //
-// The bucket is a UTC day. There is no per-user timezone preference to bucket by instead —
-// `users` has no timezone column — and picking the server's local zone would make the same
-// data bucket differently depending on where the server runs, which is worse than being
-// explicit.
+// The bucket is the account's own local day ($4, its stored users.timezone — auth.go's
+// timezoneFromContext) — see docs/KNOWN_ISSUES.md's "UTC-day bucketing" entry for why this
+// used to be a hardcoded 'UTC' and what broke because of it.
 const activityHistogramQuery = `
-SELECT date_trunc('day', started_at AT TIME ZONE 'UTC')::date AS day,
+SELECT date_trunc('day', started_at AT TIME ZONE $4::text)::date AS day,
        COUNT(*),
        COALESCE(SUM(distance_meters), 0)
 FROM activities
@@ -540,7 +543,7 @@ ORDER BY day`
 // started_at < D 00:00:00 UTC when we want the days before D, which is the same predicate
 // the planner can use to seek rather than scan.
 const activityDayPageQuery = `
-SELECT date_trunc('day', started_at AT TIME ZONE 'UTC')::date AS day,
+SELECT date_trunc('day', started_at AT TIME ZONE $4::text)::date AS day,
        COUNT(*),
        COALESCE(SUM(distance_meters), 0)
 FROM activities
@@ -552,7 +555,7 @@ ORDER BY day DESC
 LIMIT $3`
 
 type histogramBucket struct {
-	Date           string  `json:"date"` // YYYY-MM-DD, the UTC day
+	Date           string  `json:"date"` // YYYY-MM-DD, the account's own local day
 	Count          int64   `json:"count"`
 	DistanceMeters float64 `json:"distance_meters"`
 }
@@ -567,7 +570,7 @@ type activityHistogramResponse struct {
 	From    string            `json:"from"`
 	To      string            `json:"to"`
 	Buckets []histogramBucket `json:"buckets"`
-	// The UTC day of this user's very first activity, omitted when they have none. Not
+	// The account's own local day of its very first activity, omitted when they have none. Not
 	// bounded by From/To — it answers a different question ("how far back is there
 	// anything at all") than the window does, so the client's range-picker strip knows
 	// when it has paged back as far as there is anything to page back to, however far
@@ -592,6 +595,8 @@ type activityHistogramResponse struct {
 // already in hand by construction.
 func (s *Server) handleActivityHistogram(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
+	loc := locationFromContext(r.Context())
+	tz := timezoneFromContext(r.Context())
 
 	var (
 		buckets []histogramBucket
@@ -600,9 +605,9 @@ func (s *Server) handleActivityHistogram(w http.ResponseWriter, r *http.Request)
 		err     error
 	)
 	if q.Get("days") != "" {
-		buckets, err = s.activityDayPage(r, q)
+		buckets, err = s.activityDayPage(r, q, loc, tz)
 	} else {
-		buckets, from, to, err = s.activityCalendarWindow(r, q)
+		buckets, from, to, err = s.activityCalendarWindow(r, q, loc, tz)
 	}
 	if err != nil {
 		s.writeHistogramError(w, err)
@@ -623,7 +628,7 @@ func (s *Server) handleActivityHistogram(w http.ResponseWriter, r *http.Request)
 
 	resp := activityHistogramResponse{Bucket: "day", From: from, To: to, Buckets: buckets}
 	if earliest != nil {
-		resp.Earliest = earliest.UTC().Format(dateLayout)
+		resp.Earliest = earliest.In(loc).Format(dateLayout)
 	}
 
 	w.Header().Set("Cache-Control", "no-store")
@@ -647,7 +652,7 @@ func (s *Server) writeHistogramError(w http.ResponseWriter, err error) {
 // activityDayPage is the `?days=N&before=` mode. Buckets come back newest-first from the
 // LIMIT and are reversed here, so every response this endpoint sends is in ascending date
 // order regardless of which mode produced it — a client should not have to check.
-func (s *Server) activityDayPage(r *http.Request, q url.Values) ([]histogramBucket, error) {
+func (s *Server) activityDayPage(r *http.Request, q url.Values, loc *time.Location, tz string) ([]histogramBucket, error) {
 	limit, err := strconv.Atoi(q.Get("days"))
 	if err != nil || limit < 1 {
 		return nil, badRequest{errors.New(`invalid "days", want a positive integer`)}
@@ -660,14 +665,14 @@ func (s *Server) activityDayPage(r *http.Request, q url.Values) ([]histogramBuck
 	// the anchor optional, and a zero time is a real (very old) timestamp, not a NULL.
 	var before *time.Time
 	if v := q.Get("before"); v != "" {
-		t, err := time.Parse(dateLayout, v)
+		t, err := time.ParseInLocation(dateLayout, v, loc)
 		if err != nil {
 			return nil, badRequest{errors.New(`invalid "before" date, want YYYY-MM-DD`)}
 		}
 		before = &t
 	}
 
-	buckets, err := s.scanHistogramBuckets(r, activityDayPageQuery, userIDFromContext(r.Context()), before, limit)
+	buckets, err := s.scanHistogramBuckets(r, activityDayPageQuery, userIDFromContext(r.Context()), before, limit, tz)
 	if err != nil {
 		return nil, err
 	}
@@ -680,13 +685,13 @@ func (s *Server) activityDayPage(r *http.Request, q url.Values) ([]histogramBuck
 // activityCalendarWindow is the original `?from=&to=` mode, unchanged in behaviour: one
 // bucket per day that has activity within the window, and the window itself echoed back so
 // the caller can lay out the days that have none.
-func (s *Server) activityCalendarWindow(r *http.Request, q url.Values) ([]histogramBucket, string, string, error) {
-	today := time.Now().UTC()
-	today = time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.UTC)
+func (s *Server) activityCalendarWindow(r *http.Request, q url.Values, loc *time.Location, tz string) ([]histogramBucket, string, string, error) {
+	today := time.Now().In(loc)
+	today = time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, loc)
 
 	last := today
 	if v := q.Get("to"); v != "" {
-		t, err := time.Parse(dateLayout, v)
+		t, err := time.ParseInLocation(dateLayout, v, loc)
 		if err != nil {
 			return nil, "", "", badRequest{errors.New(`invalid "to" date, want YYYY-MM-DD`)}
 		}
@@ -694,7 +699,7 @@ func (s *Server) activityCalendarWindow(r *http.Request, q url.Values) ([]histog
 	}
 	first := last.AddDate(0, -histogramWindowMonths, 0)
 	if v := q.Get("from"); v != "" {
-		t, err := time.Parse(dateLayout, v)
+		t, err := time.ParseInLocation(dateLayout, v, loc)
 		if err != nil {
 			return nil, "", "", badRequest{errors.New(`invalid "from" date, want YYYY-MM-DD`)}
 		}
@@ -705,7 +710,7 @@ func (s *Server) activityCalendarWindow(r *http.Request, q url.Values) ([]histog
 	}
 	end := last.AddDate(0, 0, 1) // exclusive upper bound for the query
 
-	buckets, err := s.scanHistogramBuckets(r, activityHistogramQuery, userIDFromContext(r.Context()), first, end)
+	buckets, err := s.scanHistogramBuckets(r, activityHistogramQuery, userIDFromContext(r.Context()), first, end, tz)
 	if err != nil {
 		return nil, "", "", err
 	}
@@ -745,7 +750,7 @@ func (s *Server) scanHistogramBuckets(r *http.Request, query string, args ...any
 const activityStatsAggregateQuery = `
 SELECT COUNT(*),
        COALESCE(SUM(distance_meters), 0),
-       COUNT(DISTINCT date_trunc('day', started_at AT TIME ZONE 'UTC')::date)
+       COUNT(DISTINCT date_trunc('day', started_at AT TIME ZONE $4::text)::date)
 FROM activities
 WHERE user_id = $1
   AND superseded_by IS NULL
@@ -759,7 +764,7 @@ WHERE user_id = $1
 // expression groups exactly the consecutive runs; the largest group is the longest streak.
 const activityLongestStreakQuery = `
 WITH days AS (
-  SELECT DISTINCT date_trunc('day', started_at AT TIME ZONE 'UTC')::date AS day
+  SELECT DISTINCT date_trunc('day', started_at AT TIME ZONE $4::text)::date AS day
   FROM activities
   WHERE user_id = $1
     AND superseded_by IS NULL
@@ -788,13 +793,13 @@ type activityStatsBlock struct {
 // needs its own CTE, and combining them into one query would mean computing the window twice
 // anyway (once per CTE) for no fewer round trips saved, since both still have to run to
 // completion before a single response can be built either way.
-func (s *Server) activityStats(ctx context.Context, userID string, from, to *time.Time) (activityStatsBlock, error) {
+func (s *Server) activityStats(ctx context.Context, userID string, from, to *time.Time, tz string) (activityStatsBlock, error) {
 	var b activityStatsBlock
-	if err := s.pool.QueryRow(ctx, activityStatsAggregateQuery, userID, from, to).
+	if err := s.pool.QueryRow(ctx, activityStatsAggregateQuery, userID, from, to, tz).
 		Scan(&b.Count, &b.DistanceMeters, &b.ActiveDays); err != nil {
 		return activityStatsBlock{}, err
 	}
-	if err := s.pool.QueryRow(ctx, activityLongestStreakQuery, userID, from, to).
+	if err := s.pool.QueryRow(ctx, activityLongestStreakQuery, userID, from, to, tz).
 		Scan(&b.LongestStreakDays); err != nil {
 		return activityStatsBlock{}, err
 	}
@@ -817,10 +822,13 @@ type activityGraphStatsResponse struct {
 // (`?from=YYYY-01-01&to=YYYY-12-31`), which already returns per-day count/distance buckets and
 // this user's earliest activity date for bounding the year switcher.
 //
-// `year` defaults to the current UTC year when omitted, so a bare request from the graph's
-// first paint (before it knows what to ask for) still gets something sensible back.
+// `year` defaults to the account's own current local year when omitted, so a bare request
+// from the graph's first paint (before it knows what to ask for) still gets something
+// sensible back.
 func (s *Server) handleActivityGraphStats(w http.ResponseWriter, r *http.Request) {
-	year := time.Now().UTC().Year()
+	loc := locationFromContext(r.Context())
+	tz := timezoneFromContext(r.Context())
+	year := time.Now().In(loc).Year()
 	if v := r.URL.Query().Get("year"); v != "" {
 		y, err := strconv.Atoi(v)
 		if err != nil || y < 1 {
@@ -830,17 +838,17 @@ func (s *Server) handleActivityGraphStats(w http.ResponseWriter, r *http.Request
 		year = y
 	}
 
-	yearStart := time.Date(year, time.January, 1, 0, 0, 0, 0, time.UTC)
+	yearStart := time.Date(year, time.January, 1, 0, 0, 0, 0, loc)
 	yearEnd := yearStart.AddDate(1, 0, 0)
 	userID := userIDFromContext(r.Context())
 
-	yearStats, err := s.activityStats(r.Context(), userID, &yearStart, &yearEnd)
+	yearStats, err := s.activityStats(r.Context(), userID, &yearStart, &yearEnd, tz)
 	if err != nil {
 		s.log.Error("activity year-stats query failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	allTime, err := s.activityStats(r.Context(), userID, nil, nil)
+	allTime, err := s.activityStats(r.Context(), userID, nil, nil, tz)
 	if err != nil {
 		s.log.Error("activity all-time-stats query failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -863,7 +871,7 @@ func (s *Server) handleActivityGraphStats(w http.ResponseWriter, r *http.Request
 // ingested before that have NULL there — COALESCE keeps old and new activities rendering
 // consistently in the same trend line rather than silently undercounting older periods.
 const activityTrendsQuery = `
-SELECT date_trunc($1, started_at AT TIME ZONE 'UTC')::date AS period,
+SELECT date_trunc($1, started_at AT TIME ZONE $5::text)::date AS period,
        COUNT(*),
        COALESCE(SUM(distance_meters), 0),
        COALESCE(SUM(COALESCE(moving_seconds, duration_seconds)), 0),
@@ -907,12 +915,14 @@ func (s *Server) handleActivityTrends(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	today := time.Now().UTC()
-	today = time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.UTC)
+	loc := locationFromContext(r.Context())
+	tz := timezoneFromContext(r.Context())
+	today := time.Now().In(loc)
+	today = time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, loc)
 
 	last := today
 	if v := q.Get("to"); v != "" {
-		t, err := time.Parse(dateLayout, v)
+		t, err := time.ParseInLocation(dateLayout, v, loc)
 		if err != nil {
 			http.Error(w, `invalid "to" date, want YYYY-MM-DD`, http.StatusBadRequest)
 			return
@@ -921,7 +931,7 @@ func (s *Server) handleActivityTrends(w http.ResponseWriter, r *http.Request) {
 	}
 	first := last.AddDate(0, -histogramWindowMonths, 0)
 	if v := q.Get("from"); v != "" {
-		t, err := time.Parse(dateLayout, v)
+		t, err := time.ParseInLocation(dateLayout, v, loc)
 		if err != nil {
 			http.Error(w, `invalid "from" date, want YYYY-MM-DD`, http.StatusBadRequest)
 			return
@@ -934,7 +944,7 @@ func (s *Server) handleActivityTrends(w http.ResponseWriter, r *http.Request) {
 	}
 	end := last.AddDate(0, 0, 1) // exclusive upper bound, matching activityCalendarWindow
 
-	rows, err := s.pool.Query(r.Context(), activityTrendsQuery, bucket, userIDFromContext(r.Context()), first, end)
+	rows, err := s.pool.Query(r.Context(), activityTrendsQuery, bucket, userIDFromContext(r.Context()), first, end, tz)
 	if err != nil {
 		s.log.Error("activity trends query failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
