@@ -6,6 +6,16 @@ This file stays lean and current-only. Once an entry is fixed, its root-cause/fi
 
 ---
 
+### Privacy Trim doesn't round-trip through feet — a US account can save "50" and see "49" on reload
+
+`apps/web/src/ui/SettingsPage.tsx`'s Privacy Trim field, for an imperial (US/LR/MM) Country, displays and accepts the value in feet, converting to/from the server's `privacy_trim_m` column (whole meters — `services/server/migrations/0001_init.sql`) via `format.ts`'s `feetToMeters`/`metersToFeet`, both `Math.round`ed. Two roundings compound: typing "50" saves `Math.round(50 × 0.3048) = 15` meters, and redisplaying that same 15m computes `Math.round(15 / 0.3048) = 49` ft, not 50 — confirmed directly, and not an isolated case: no integer-meters value at all redisplays as exactly 50 ft (checked the neighboring values too). Found while seeding the Demo Customer account's own preset profile (`migrations/0023_demo_customer_profile.sql`, IMPLEMENTATION.md §4.10) with an intended "50 ft," which the migration's own comment now documents as landing on 49 instead.
+
+- [ ] Not a privacy/correctness issue for the trim itself — the stored meters value is exactly what the account intended to within ±1 ft, and trimming a GPS track's endpoint doesn't need feet-level precision. This is purely a UX inconsistency: what a person typed doesn't read back the same after a save-and-reload.
+- [ ] Fix direction: either accept the discrepancy as inherent to a whole-meters column displayed in a different unit (document it, don't chase it further), or store finer-grained precision (the column would need to stop being a plain integer meters value), or stop round-tripping through meters at all for a session that never left imperial (remember the last-typed feet value client-side rather than always re-deriving it from the saved meters) — the last option only helps within one session/page-load, not across a real reload, which is the case that actually surfaces this.
+- [ ] Affects every imperial-country account's Privacy Trim field, not just the Demo Customer account — the demo seed just happened to be where it was noticed.
+
+---
+
 ### Export attribution missing from PNG exports — an ODbL compliance gap in already-shipped functionality
 
 `style.ts:28` already documents that OSM/Protomaps attribution is mandatory, not decorative — the basemap is an ODbL "Produced Work," and the comment states credit "has to be visible on the map and on any export." But `exportMap.ts:165` sets `attributionControl: false` on the offscreen export map instance, and nothing else draws attribution onto any of the export pipeline's canvases before `toBlob()` — so FR-4.10's exported PNGs carry no attribution at all today, contradicting the code's own stated requirement.

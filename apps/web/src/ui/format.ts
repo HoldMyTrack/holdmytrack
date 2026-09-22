@@ -26,6 +26,25 @@ export function unitLabel(system: UnitSystem): 'km' | 'mi' {
   return system === 'imperial' ? 'mi' : 'km';
 }
 
+/** The short unit `formatElevation` below appends — pulled out so a caller that needs just the
+ *  label (SettingsPage.tsx's Privacy Trim field, an editable number, not a formatted string)
+ *  isn't left duplicating the same ternary. */
+export function elevationUnitLabel(system: UnitSystem): 'm' | 'ft' {
+  return system === 'imperial' ? 'ft' : 'm';
+}
+
+/** Bare numeric conversion, not a formatter — no rounding, no unit suffix. For an *editable*
+ *  meters value (SettingsPage.tsx's Privacy Trim) that needs to round-trip through whatever
+ *  unit the account is currently displayed in, unlike every formatter below, which only ever
+ *  produces a final display string. */
+export function metersToFeet(meters: number): number {
+  return meters / METERS_PER_FOOT;
+}
+
+export function feetToMeters(feet: number): number {
+  return feet * METERS_PER_FOOT;
+}
+
 /**
  * A row's fallback primary line, for an activity with no name set (ActivitiesPanel.tsx
  * prefers `activity.name` when present — §4.7's revised decision). The full local datetime,
@@ -96,8 +115,8 @@ export function formatTotalHours(seconds: number): string {
 }
 
 export function formatElevation(meters: number, system: UnitSystem): string {
-  const converted = system === 'imperial' ? meters / METERS_PER_FOOT : meters;
-  return `${Math.round(converted).toLocaleString()} ${system === 'imperial' ? 'ft' : 'm'}`;
+  const converted = system === 'imperial' ? metersToFeet(meters) : meters;
+  return `${Math.round(converted).toLocaleString()} ${elevationUnitLabel(system)}`;
 }
 
 /** "9 Sep" — the import panel's finished rows (ImportPanel.tsx) need "which day did this

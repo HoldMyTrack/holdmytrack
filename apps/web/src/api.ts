@@ -16,6 +16,38 @@ export const API_V1 = '/v1';
 export const TILES_V1 = '/tiles/v1';
 
 /**
+ * An error response body is either plain text (`http.Error(w, "message", code)`, most
+ * endpoints) or JSON shaped like `{"error": "machine_code", "message": "human text"}` (the
+ * handful that need a distinguishable code alongside a human message for the frontend to
+ * branch on — requireVerified's `email_not_verified`, requireNotDemo's `demo_read_only`).
+ * Whichever it is, this pulls out the part actually worth putting in front of a person: the
+ * JSON body's own `message` field when there is one, the plain text otherwise — never the raw
+ * `{"error":...,"message":...}` blob itself, which is what every caller below used to throw
+ * verbatim (reported live: SettingsPage.tsx showing the whole JSON string as its save error).
+ */
+function messageFromErrorBody(text: string, fallback: string): string {
+  if (!text) return fallback;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (parsed && typeof parsed === 'object' && typeof (parsed as { message?: unknown }).message === 'string') {
+      return (parsed as { message: string }).message;
+    }
+  } catch {
+    // Not JSON — a plain-text http.Error body, which already is the message.
+  }
+  return text;
+}
+
+/** `messageFromErrorBody` for the `fetch`-based functions below, which all throw through this
+ *  rather than reading `res.text()` and constructing an `Error` themselves — `uploadFile`'s
+ *  XMLHttpRequest path (no `Response` object to read) calls `messageFromErrorBody` directly
+ *  against `xhr.responseText` instead. */
+async function errorMessageFromResponse(res: Response, fallback: string): Promise<string> {
+  const text = await res.text().catch(() => '');
+  return messageFromErrorBody(text, fallback);
+}
+
+/**
  * Simple email+password auth (services/server/internal/httpapi/auth.go) — every request in
  * this file sends `credentials: 'include'` now (and `uploadFile`'s XHR sets
  * `withCredentials`) so the browser attaches the session cookie these endpoints set/read.
@@ -103,8 +135,7 @@ async function postAuth(path: string, email: string, password: string, extra?: R
     body: JSON.stringify({ email, password, ...extra }),
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `request failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
   }
   const body = (await res.json()) as AuthResponseBody;
   return toAuthUser(body);
@@ -130,8 +161,7 @@ export function login(email: string, password: string): Promise<AuthUser> {
 export async function startDemo(): Promise<DemoUser> {
   const res = await fetch(`${API_BASE_URL}${API_V1}/auth/demo`, { method: 'POST', credentials: 'include' });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `couldn't start the demo (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `couldn't start the demo (${res.status})`));
   }
   const body = (await res.json()) as AuthResponseBody;
   return toProfile(body);
@@ -148,8 +178,7 @@ export async function forgotPassword(email: string): Promise<void> {
     body: JSON.stringify({ email }),
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `request failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
   }
 }
 
@@ -163,8 +192,7 @@ export async function resetPassword(token: string, password: string): Promise<Au
     body: JSON.stringify({ token, password }),
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `request failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
   }
   const body = (await res.json()) as AuthResponseBody;
   return toAuthUser(body);
@@ -181,8 +209,7 @@ export async function verifyEmail(token: string): Promise<AuthUser> {
     body: JSON.stringify({ token }),
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `request failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
   }
   const body = (await res.json()) as AuthResponseBody;
   return toAuthUser(body);
@@ -197,8 +224,7 @@ export async function resendVerification(): Promise<void> {
     credentials: 'include',
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `request failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
   }
 }
 
@@ -215,8 +241,7 @@ export async function changeEmail(email: string): Promise<AuthUser> {
     body: JSON.stringify({ email }),
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `request failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
   }
   const body = (await res.json()) as AuthResponseBody;
   return toAuthUser(body);
@@ -225,8 +250,7 @@ export async function changeEmail(email: string): Promise<AuthUser> {
 export async function logout(): Promise<void> {
   const res = await fetch(`${API_BASE_URL}${API_V1}/auth/logout`, { method: 'POST', credentials: 'include' });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `logout failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `logout failed (${res.status})`));
   }
 }
 
@@ -237,8 +261,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   const res = await fetch(`${API_BASE_URL}${API_V1}/auth/me`, { credentials: 'include' });
   if (res.status === 401) return null;
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `session check failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `session check failed (${res.status})`));
   }
   const body = (await res.json()) as AuthResponseBody;
   return toSessionUser(body);
@@ -266,8 +289,7 @@ export async function updateSettings(patch: {
     }),
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `request failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
   }
   const body = (await res.json()) as AuthResponseBody;
   return toProfile(body);
@@ -280,8 +302,7 @@ export async function uploadAvatar(file: File): Promise<UserProfile> {
   form.append('file', file);
   const res = await fetch(`${API_BASE_URL}${API_V1}/account/avatar`, { method: 'POST', credentials: 'include', body: form });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `upload failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `upload failed (${res.status})`));
   }
   const body = (await res.json()) as AuthResponseBody;
   return toProfile(body);
@@ -290,8 +311,7 @@ export async function uploadAvatar(file: File): Promise<UserProfile> {
 export async function removeAvatar(): Promise<UserProfile> {
   const res = await fetch(`${API_BASE_URL}${API_V1}/account/avatar`, { method: 'DELETE', credentials: 'include' });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `request failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
   }
   const body = (await res.json()) as AuthResponseBody;
   return toProfile(body);
@@ -385,7 +405,7 @@ export function uploadFile(
           reject(new Error('upload succeeded but the response could not be read'));
         }
       } else {
-        reject(new Error(xhr.responseText || `upload failed (${xhr.status})`));
+        reject(new Error(messageFromErrorBody(xhr.responseText, `upload failed (${xhr.status})`)));
       }
     };
     xhr.onerror = () => reject(new Error('upload failed (network error)'));
@@ -475,8 +495,7 @@ export async function getUploadHistory(query: UploadHistoryQuery = {}, signal?: 
     ...(signal ? { signal } : {}),
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `upload history failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `upload history failed (${res.status})`));
   }
   const body = (await res.json()) as UploadHistoryBody;
   return {
@@ -583,8 +602,7 @@ export async function listActivities(query: ActivityQuery = {}, signal?: AbortSi
     credentials: 'include',
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `activity list failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `activity list failed (${res.status})`));
   }
   const body = (await res.json()) as ActivitiesBody;
   return body.activities.map(toActivity);
@@ -610,8 +628,7 @@ export async function updateActivity(
     body: JSON.stringify({ activity_type: patch.activityType, name: patch.name, description: patch.description }),
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `activity update failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `activity update failed (${res.status})`));
   }
   const body = (await res.json()) as ActivityRowBody;
   return toActivity(body);
@@ -629,8 +646,7 @@ export async function deleteActivity(id: string): Promise<void> {
     credentials: 'include',
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `activity delete failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `activity delete failed (${res.status})`));
   }
 }
 
@@ -679,8 +695,7 @@ export async function getDuplicates(signal?: AbortSignal): Promise<DuplicateActi
     ...(signal ? { signal } : {}),
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `duplicates fetch failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `duplicates fetch failed (${res.status})`));
   }
   const body = (await res.json()) as DuplicatesBody;
   return body.duplicates.map((d) => ({
@@ -723,8 +738,7 @@ export async function getActivityTotals(query: ActivityQuery = {}, signal?: Abor
     credentials: 'include',
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `activity summary failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `activity summary failed (${res.status})`));
   }
   const body = (await res.json()) as ActivityTotalsBody;
   return {
@@ -793,8 +807,7 @@ export async function getActivityDayPage(query: DayPageQuery, signal?: AbortSign
     credentials: 'include',
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `activity histogram failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `activity histogram failed (${res.status})`));
   }
   const body = (await res.json()) as HistogramBody;
   return {
@@ -827,8 +840,7 @@ export async function getActivityYearGraph(year: number, signal?: AbortSignal): 
     credentials: 'include',
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `activity year graph failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `activity year graph failed (${res.status})`));
   }
   const body = (await res.json()) as HistogramBody;
   return {
@@ -891,8 +903,7 @@ export async function getActivityGraphStats(year: number, signal?: AbortSignal):
     credentials: 'include',
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `activity graph stats failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `activity graph stats failed (${res.status})`));
   }
   const body = (await res.json()) as ActivityGraphStatsBody;
   return { year: body.year, yearStats: toStatsBlock(body.year_stats), allTime: toStatsBlock(body.all_time) };
@@ -941,8 +952,7 @@ export async function getActivityTrends(bucket: TrendBucket, signal?: AbortSigna
     credentials: 'include',
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `activity trends failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `activity trends failed (${res.status})`));
   }
   const body = (await res.json()) as ActivityTrendsBody;
   return {
@@ -1013,8 +1023,7 @@ export async function getActivityTrackMetrics(
     credentials: 'include',
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `track metrics failed (${res.status})`);
+    throw new Error(await errorMessageFromResponse(res, `track metrics failed (${res.status})`));
   }
   const body = (await res.json()) as ActivityTrackMetricsBody;
   return {

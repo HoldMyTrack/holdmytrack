@@ -2,10 +2,22 @@ import { useRef, useState } from 'react';
 import { API_BASE_URL, removeAvatar, updateSettings, uploadAvatar } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { COUNTRIES } from './countries';
+import { elevationUnitLabel, feetToMeters, metersToFeet } from './format';
 import { Header } from './Header';
 import { TIMEZONES } from './timezones';
+import { unitSystemForCountry, type UnitSystem } from './units';
 
 const MAX_PRIVACY_TRIM_M = 5000;
+
+/** Converts a meters value (what the server always takes/returns) to whatever the input
+ *  should display it as — rounded, since the field is a plain whole-number input, the same
+ *  precision `formatElevation` (format.ts) already uses for a meters-or-feet value. Used to
+ *  seed the field and, in `handleCountryChange` below, to re-express it the moment Country
+ *  changes which unit is implied — the field's own state is *not* kept in meters in between,
+ *  so free typing in either unit never gets silently reconverted underneath the user mid-edit. */
+function trimDisplay(meters: number, system: UnitSystem): string {
+  return String(Math.round(system === 'imperial' ? metersToFeet(meters) : meters));
+}
 
 /**
  * The Settings page (Avatar, Name, Country, Timezone, Privacy Trim) — reached from the account menu's
@@ -14,10 +26,14 @@ const MAX_PRIVACY_TRIM_M = 5000;
  * a default). Same page shell as ProfilePage (`Header` + a back button), since both are
  * private, full-screen detours from the map.
  *
- * Country is the one field with a side effect reaching the rest of the app: it's what
+ * Country is the field with a side effect reaching the rest of the app: it's what
  * `units.ts`'s `useUnitSystem()` derives metric-vs-imperial from, so every distance/pace/
  * elevation display everywhere (not just this page) changes the moment it's saved — that's
  * why Save calls `updateUser()` on success rather than leaving the change to a future reload.
+ * Privacy Trim reacts to Country too, but only within this page and only before Save: its
+ * field is shown (and its max) in the same unit Country implies, converted live off the local,
+ * still-unsaved Country selection (`unitSystemForCountry`, not `useUnitSystem()`), so switching
+ * Country here doesn't leave the trim value looking like it just changed by a factor of ~3.3.
  *
  * Avatar and Name/Country/Timezone/Privacy Trim are two independent save actions, not one
  * combined form submit: the avatar drop-zone commits on drop/pick (matching how a file picker
@@ -37,10 +53,19 @@ export function SettingsPage({ onBack, onOpenProfile }: SettingsPageProps) {
   const [displayName, setDisplayName] = useState(user.displayName);
   const [country, setCountry] = useState(user.country);
   const [timezone, setTimezone] = useState(user.timezone);
-  const [privacyTrimM, setPrivacyTrimM] = useState(String(user.privacyTrimM));
+  const [privacyTrimM, setPrivacyTrimM] = useState(() => trimDisplay(user.privacyTrimM, unitSystemForCountry(user.country)));
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  // Derived from the *local* Country field, not useUnitSystem()'s saved-account value — Privacy
+  // Trim needs to react to what's picked in this form right now, before Save, the same as every
+  // other field here is still just local state until then.
+  const system = unitSystemForCountry(country);
+
+  // The input's own max, in whichever unit is currently shown — MAX_PRIVACY_TRIM_M's imperial
+  // equivalent, not the same number relabeled.
+  const trimMax = system === 'imperial' ? Math.round(metersToFeet(MAX_PRIVACY_TRIM_M)) : MAX_PRIVACY_TRIM_M;
 
   // Any further edit after a successful save invalidates the "Saved" confirmation — it
   // should read as "your last save succeeded," not linger once the form no longer matches
@@ -48,6 +73,30 @@ export function SettingsPage({ onBack, onOpenProfile }: SettingsPageProps) {
   function editField<T>(setter: (v: T) => void, value: T) {
     setSaved(false);
     setter(value);
+  }
+
+  // Country's own onChange, not a plain editField(setCountry, ...) — the one field whose edit
+  // has to also touch a second field. Converts the *currently typed* Privacy Trim value into
+  // the newly-implied unit right here, synchronously, in the same event handler that changes
+  // `country` — deliberately not a useEffect keyed on the derived `system`, which sounds
+  // equivalent but isn't as easy to reason about (it has to compare against a remembered
+  // previous system via a ref, and only actually runs after the render that already changed
+  // the label/max, which is exactly the kind of two-step timing that's easy to get subtly
+  // wrong). Recomputing "old system, new system" directly from the event and doing the
+  // conversion before either state update commits is simpler to verify by inspection and
+  // guarantees the displayed number and the displayed unit change in the same tick, together.
+  function handleCountryChange(nextCountry: string) {
+    const prevSystem = system;
+    const nextSystem = unitSystemForCountry(nextCountry);
+    if (nextSystem !== prevSystem) {
+      setPrivacyTrimM((current) => {
+        const typed = Number(current);
+        if (!Number.isFinite(typed)) return current; // an empty/in-progress edit — leave it alone
+        const meters = prevSystem === 'imperial' ? feetToMeters(typed) : typed;
+        return trimDisplay(meters, nextSystem);
+      });
+    }
+    editField(setCountry, nextCountry);
   }
 
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -82,16 +131,20 @@ export function SettingsPage({ onBack, onOpenProfile }: SettingsPageProps) {
   }
 
   async function handleSave() {
-    const trimValue = Number(privacyTrimM);
-    if (!Number.isFinite(trimValue) || trimValue < 0 || trimValue > MAX_PRIVACY_TRIM_M) {
-      setSaveError(`Privacy trim must be a number between 0 and ${MAX_PRIVACY_TRIM_M}.`);
+    const typedTrim = Number(privacyTrimM);
+    if (!Number.isFinite(typedTrim) || typedTrim < 0 || typedTrim > trimMax) {
+      setSaveError(`Privacy trim must be a number between 0 and ${trimMax} ${elevationUnitLabel(system)}.`);
       return;
     }
+    // The server only ever takes/stores meters (services/server/internal/httpapi/account.go) —
+    // rounded, since privacy_trim_m is a Go int and a fractional feet-to-meters conversion
+    // would fail to decode.
+    const trimMeters = Math.round(system === 'imperial' ? feetToMeters(typedTrim) : typedTrim);
     setSaving(true);
     setSaveError(null);
     setSaved(false);
     try {
-      const profile = await updateSettings({ displayName, country, privacyTrimM: trimValue, timezone });
+      const profile = await updateSettings({ displayName, country, privacyTrimM: trimMeters, timezone });
       updateUser(profile);
       setSaved(true);
     } catch (err) {
@@ -185,7 +238,7 @@ export function SettingsPage({ onBack, onOpenProfile }: SettingsPageProps) {
 
           <label className="settings-page__section">
             <span className="settings-page__label">Country</span>
-            <select className="settings-page__input" value={country} onChange={(e) => editField(setCountry, e.target.value)}>
+            <select className="settings-page__input" value={country} onChange={(e) => handleCountryChange(e.target.value)}>
               <option value="">Not set (metric)</option>
               {COUNTRIES.map((c) => (
                 <option key={c.code} value={c.code}>
@@ -213,17 +266,17 @@ export function SettingsPage({ onBack, onOpenProfile }: SettingsPageProps) {
           </label>
 
           <label className="settings-page__section">
-            <span className="settings-page__label">Privacy trim (meters)</span>
+            <span className="settings-page__label">Privacy trim ({elevationUnitLabel(system)})</span>
             <input
               className="settings-page__input settings-page__input--narrow"
               type="number"
               min={0}
-              max={MAX_PRIVACY_TRIM_M}
+              max={trimMax}
               value={privacyTrimM}
               onChange={(e) => editField(setPrivacyTrimM, e.target.value)}
             />
             <p className="settings-page__hint">
-              Trims this many meters from the start and end of every new track, so it doesn't reveal exactly where you started or
+              Trims this distance from the start and end of every new track, so it doesn't reveal exactly where you started or
               finished. Applies to new uploads only — activities you've already uploaded keep the trim they were processed with.
             </p>
           </label>
