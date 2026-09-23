@@ -15,7 +15,7 @@ This document specifies the Android app's functional behavior as currently imple
 
 ### 1.2 Scope
 
-**In scope**: everything currently built and verified on a physical device — sign in, sign up, and starting a demo account (FR-1); session persistence and server-side re-verification on cold start (FR-1); a full-screen map with Normal, Fog of War, and Heatmap modes over the account's entire history (FR-2); Health Connect onboarding and permission acquisition (FR-3); a foreground sync run with resumable watermark tracking (FR-3); per-activity sync rejection feedback (FR-3); and a sync status/history screen that also surfaces cross-source duplicates (FR-4). Also in scope, verified on an emulator rather than a physical device (noted where it matters — §7): casual in-app GPS recording, its Recorded Activities review/queue screen, and the activity-type gate that keeps a queued recording from silently defeating FR-4's cross-source dedup (FR-5).
+**In scope**: everything currently built and verified on a physical device — sign in, sign up, and starting a demo account (FR-1); session persistence and server-side re-verification on cold start (FR-1); a full-screen map with Normal, Fog of War, and Heatmap modes over the account's entire history (FR-2); Health Connect onboarding and permission acquisition (FR-3); a foreground sync run with resumable watermark tracking (FR-3); per-activity sync rejection feedback (FR-3); and a sync status/history screen that also surfaces cross-source duplicates (FR-4). Also in scope, verified on an emulator rather than a physical device (noted where it matters — §7): casual in-app GPS recording with a searchable activity-type picker, its Recorded Activities review/queue screen with a route preview per row and GPX download, and the activity-type gate that keeps a queued recording from silently defeating FR-4's cross-source dedup (FR-5).
 
 **Out of scope, not yet built**: everything root `docs/ROADMAP.md` Phase 3 (design finalization) and `apps/android/docs/ROADMAP.md` Phase 5 gate — a visual design system, an icon set, a launcher icon, and the date-range/type/hidden-track filter controls the web client already has (the map here always shows the account's unfiltered, entire history). Out of scope as a platform limitation rather than a "not yet": background Health Connect sync (will not be built — see §3.3 note; this does not apply to in-app recording, which is not subject to the same platform constraint — [ADR-0007](../../../docs/adr/0007-in-app-gps-recording-submits-directly.md)), and Samsung Galaxy Watch sync (Samsung does not expose route geometry to Health Connect at all, so every Samsung-sourced session is rejected for having no route, same as any other route-less activity). iOS does not exist. Accessibility (content descriptions, touch-target sizing, large-font and TalkBack testing) has not been done and is scoped to Phase 5. See §9 for the complete list.
 
@@ -38,7 +38,7 @@ In addition to `docs/SPEC.md` §1.4's terms, which this document assumes:
 
 | Actor | Description |
 | :-- | :-- |
-| **Anonymous visitor** | Has not signed in. Sees a full-screen, working basemap with no user layers — the style endpoint is unauthenticated, so a signed-out FitMap is a real map, not a login wall. Can reach the sign-in screen from the map's account button. |
+| **Anonymous visitor** | Has not signed in and holds no session. Sees only the sign-in screen (FR-1.1) — sign in, sign up, or start a demo — and never the map, matching the web client (`docs/SPEC.md` §2). |
 | **Demo user** | Holds a session tied to an ephemeral account (`docs/SPEC.md` FR-2), started from this app exactly as from the web. Full functional access to every feature in this document; the account expires per `docs/SPEC.md` FR-2.2 regardless of which client created it. |
 | **Registered user** | Holds a session tied to a permanent account. Full functional access to every feature in this document, including Health Connect sync — a demo account can sync too, since sync has no account-type branch. |
 
@@ -56,12 +56,12 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 **Behavior**:
 1. Sign in calls `POST /v1/auth/login`; sign up calls `POST /v1/auth/signup`; demo calls `POST /v1/auth/demo` — the same three endpoints the web client uses.
-2. On success, the response's `session_token` field (present on all four session-minting endpoints, specifically for a native caller that has no cookie jar to rely on) is stored via `Session.start`, and the screen closes back to the map.
+2. On success, the response's `session_token` field (present on all four session-minting endpoints, specifically for a native caller that has no cookie jar to rely on) is stored via `Session.start`, and the map replaces this screen.
 3. On failure, the server's own error message is shown inline; the three action buttons are disabled while a request is in flight and re-enabled after.
 
 **Outputs**: A stored bearer token and the account's email (empty for a demo account, which the server deliberately never returns a real email for).
 
-**Notes**: This screen is dismissable back to the map without signing in — reachable, not mandatory, because the map itself is usable while signed out (§4.1).
+**Notes**: This is the app's first screen whenever no session is held — on launch, after sign-out (FR-1.3), and after a stored token is rejected (FR-1.2) — and nothing sits behind it: Back leaves the app. The map is never shown signed out, since a basemap with none of the account's layers is a weak demonstration of the product next to the Demo button here.
 
 ### FR-1.2 Session persistence and re-verification
 
@@ -70,21 +70,21 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 **Behavior**:
 1. On cold start, if a token is stored but not yet marked verified in this process, the map defers attaching any signed-in-only layer, shows "Checking session…", and calls `GET /v1/auth/me`.
 2. A `200` marks the token verified for the rest of the process's lifetime; the map then proceeds as signed in.
-3. A `401` — and only a `401` — clears the stored token and drops to the signed-out map. Any other failure (no network, an unreachable dev stack) leaves the token in place and is retried on the next resume, since it says nothing about whether the credential itself is still good.
+3. A `401` — and only a `401` — clears the stored token and replaces the map with the sign-in screen (FR-1.1). Any other failure (no network, an unreachable dev stack) leaves the token in place and is retried on the next resume, since it says nothing about whether the credential itself is still good.
 
-**Outputs**: Either a confirmed, attached session, or a clean drop to signed-out — never a map that silently 401s on every tile request while looking merely blank.
+**Outputs**: Either a confirmed, attached session, or a clean return to the sign-in screen — never a map that silently 401s on every tile request while looking merely blank.
 
 ### FR-1.3 Sign out
 
 **Description**: Ends the current session, both on the device and on the server.
 
-**Behavior**: `POST /v1/auth/logout` deletes the session row server-side; the stored token and email are cleared locally regardless of whether the request succeeded (a token that can't reach the server to be revoked is not one worth keeping either way). The map's user layers detach immediately and the mode toggle bar hides; the map itself remains, at whatever mode and camera position it was showing.
+**Behavior**: `POST /v1/auth/logout` deletes the session row server-side; the stored token and email are cleared locally regardless of whether the request succeeded (a token that can't reach the server to be revoked is not one worth keeping either way). The app then shows the sign-in screen (FR-1.1) with every other screen cleared from the back stack.
 
 ## 4. FR-2 — Map Visualization
 
-### FR-2.1 Base map, always available
+### FR-2.1 Base map
 
-**Description**: A full-screen map renders on launch regardless of session state.
+**Description**: A full-screen map renders on launch for a signed-in account; with no session, the sign-in screen (FR-1.1) is shown instead and the map is not created at all.
 
 **Behavior**: The style document is fetched unauthenticated from `GET /v1/map/style/{flavor}`, `flavor` chosen from the system's day/night setting (`light` or `dark` — two of the five the API serves; the app does not offer a way to pick the other three or to override the system setting, per `apps/android/docs/ARCHITECTURE.md` §2.1). The camera opens on a whole-world view (equator, zoom 1) until an account's own activity extent is known (FR-2.3). A style or tile load failure is reported on screen as visible text, not only in logcat.
 
@@ -187,13 +187,14 @@ A third way an activity can originate on this app, alongside FR-3's Health Conne
 
 **Description**: A menu item ("GPS Logger", `RecordingActivity`) that records a casual, GPS-only track — a walk, hike, or drive someone would not otherwise bother tracking.
 
-**Preconditions**: `ACCESS_FINE_LOCATION` granted to record. No account or sign-in needed — recording and locally managing rows works signed out; only syncing them does (FR-5.2 step 5).
+**Preconditions**: A session (the menu is on the map, FR-2.1) and `ACCESS_FINE_LOCATION` granted to record. A demo session can record and manage rows locally; only syncing them is blocked (FR-5.2 step 10).
 
 **Behavior**:
-1. The screen opens with Name and Description empty and Activity Type pre-filled `"unknown"` (`recording/RecordingTypes.DEFAULT`) — confirmed on an emulator (not a physical device): "GPS Logger" title, a "Name" field, an "unknown" Type field, a "Description (optional)" field, and a disabled Record button under a "FitMap needs location access to record a GPS track." notice with a "Grant location access" button until location is granted.
-2. Granting location triggers the ordinary system permission dialog (Precise/Approximate × While using the app/Only this time/Don't allow), immediately followed by a notification-permission dialog — both confirmed live; neither blocks Record once resolved either way.
-3. **Record** starts `RecordingService` (a declared foreground service, `FOREGROUND_SERVICE_TYPE_LOCATION`) and switches the screen to a live Time/Distance/Altitude/Speed readout with **Pause**/**Stop** — confirmed live: the readout advanced from a fresh `0:00:00`/`0.00 km` as simulated GPS fixes arrived, independent of the fix interval (the time readout ticks every second off a `Handler`, not off fix arrival).
-4. **Stop** ends the recording, saves it to `recording/db/RecordedActivityStore` (not Room — a plain `SQLiteOpenHelper`, `docs/IMPLEMENTATION.md` §7.2), tagged not-synced, and returns to the map with a "Saved. Find it under Recorded Activities to queue it for sync." toast — confirmed live; no network request happens at this step.
+1. The screen opens with Name and Description empty and Activity Type set to `"unknown"` (`recording/RecordingTypes.DEFAULT`, shown as "Unknown") — confirmed on an emulator (not a physical device): "GPS Logger" title, a "Name" field, an "Unknown" Type field, a "Description (optional)" field, and a disabled Record button under a "FitMap needs location access to record a GPS track." notice with a "Grant location access" button until location is granted.
+2. **Type** is a picker, not a text field — the same behavior as the web edit dialog's Type field (`docs/SPEC.md` FR-5.10): tapping it opens a searchable list of the account's existing types, most-used first with how many activities use each (its server-side activities plus this device's unsynced recordings), then any of walking/hiking/running/cycling/driving the account hasn't used yet. Typing filters the list (case- and accent-insensitive, an exact name first); while the text doesn't exactly match an existing type, a last **Add "…"** row saves it exactly as typed, up to 50 characters. Names are displayed title-cased with underscores as spaces ("dog_walk" → "Dog walk") and stored raw. Confirmed on an emulator: "dog walk" narrowed the list to "Dog walk 583"; "Solowheel" offered only `Add "Solowheel"`, which set the field and was saved with the recording.
+3. Granting location triggers the ordinary system permission dialog (Precise/Approximate × While using the app/Only this time/Don't allow), immediately followed by a notification-permission dialog — both confirmed live; neither blocks Record once resolved either way.
+4. **Record** starts `RecordingService` (a declared foreground service, `FOREGROUND_SERVICE_TYPE_LOCATION`) and switches the screen to a live Time/Distance/Altitude/Speed readout with **Pause**/**Stop** — confirmed live: the readout advanced from a fresh `0:00:00`/`0.00 km` as simulated GPS fixes arrived, independent of the fix interval (the time readout ticks every second off a `Handler`, not off fix arrival).
+5. **Stop** ends the recording, saves it to `recording/db/RecordedActivityStore` (not Room — a plain `SQLiteOpenHelper`, `docs/IMPLEMENTATION.md` §7.2), tagged not-synced, and returns to the map with a "Saved. Find it under Recorded Activities to queue it for sync." toast — confirmed live; no network request happens at this step.
 
 ### FR-5.2 Recorded Activities — review, edit, queue, sync
 
@@ -201,18 +202,19 @@ A third way an activity can originate on this app, alongside FR-3's Health Conne
 
 **Behavior**:
 1. Rows are newest first, filterable by two "All"-default dropdowns (sync status; activity type, rebuilt from whatever distinct types are on file) — confirmed live, including the empty state ("No recorded activities yet.") before any row exists.
-2. Each row reads `"{type} · {distance} km · {status}"` (e.g. "walking · 0.23 km · Queued"), with a checkbox and Edit/Delete buttons.
+2. Each row reads `"{type} · {distance} km · {status}"` (e.g. "walking · 0.23 km · Queued"), with a checkbox, a small preview of the route's shape (the recorded line alone in the map's track colour, no basemap, drawn from the points stored on the device), and Edit/Delete buttons.
 3. **A row still on the unedited `"unknown"` default cannot be queued.** Its checkbox renders disabled, and the row grows a fourth clause explaining why — `"unknown · 0.23 km · Not synced · Set a type to sync"` — confirmed live by recording, stopping without touching Type, and confirming both the checkbox's disabled state and the row text. This exists because `docs/SPEC.md` FR-3.7's cross-source dedup match requires an *exact* `activity_type` match, and an untyped recording can never match a same-walk activity that arrived typed from another source — reproduced live against a local server as the root cause of a real production duplicate (two activities for one walk: one via this screen left on `"unknown"`, one via Health Connect sync reporting `"walking"`) before this gate existed.
-4. Editing the type to a real value — typed freely, or picked from the walk/hike/run/ride/drive suggestions (`recording/RecordingTypes.PRESETS`, an `AutoCompleteTextView`) — and saving re-enables the checkbox; checking it then flips the row to Queued. Confirmed live end to end.
-5. **Editing an already-queued row's type back to blank demotes it to not-synced** the moment Save is tapped, disabling the checkbox again — confirmed live. Edit stays unlocked until a row actually syncs (not just until Stop), so without this the gate in step 3 could be set once and then bypassed by clearing the type afterward; this closes that path.
-6. **Edit** (`RecordingActivity` reused, `EXTRA_RECORDING_ID`) reopens the same screen against the saved row — Record/Pause/Stop replaced by a single Save button, fields pre-filled, stats shown static. Locked (fields disabled, Save hidden, "Already synced — no longer editable.") once the row has synced.
-7. **Sync Now** (the existing Health Connect button, FR-3.2) also drains every queued row in the same tap — `flushRecordedQueue()`, run after the Health Connect pass or after it throws, submitting each as its own `POST /v1/sync/activities` call and marking it synced on success. Confirmed live through the readiness state machine (FR-3.1) up to triggering a sync run; not confirmed end-to-end to a synced row in this pass, since the row queued during verification had been recorded signed out and was therefore account-scoped away from the signed-in test account by the time Sync Now ran (FR-5.3 below) — a correct outcome of that scoping, not a gap in the gate this section documents.
-8. **Delete**, on every row regardless of sync status, asks for confirmation and removes the row from this device only — a synced row's real `Activity` is untouched server-side, which the confirmation dialog states.
-9. A demo session can record and manage rows here, but every sync checkbox is disabled with an explanatory notice — queuing something "Sync Now" can never actually take would be pointless (matches FR-3's own demo gate).
+4. Editing the type to a real value through the Type picker (FR-5.1 step 2) and saving re-enables the checkbox; checking it then flips the row to Queued. Confirmed live end to end.
+5. **Editing an already-queued row's type back to `"unknown"` demotes it to not-synced** the moment Save is tapped, disabling the checkbox again — confirmed live. Edit stays unlocked until a row actually syncs (not just until Stop), so without this the gate in step 3 could be set once and then bypassed by clearing the type afterward; this closes that path.
+6. **Edit** (`RecordingActivity` reused, `EXTRA_RECORDING_ID`) reopens the same screen against the saved row — Record/Pause/Stop replaced by Save and **Download GPX**, fields pre-filled, stats shown static. Locked (fields disabled, Save hidden, "Already synced — no longer editable.") once the row has synced; Download GPX stays available either way.
+7. **Download GPX** opens the system's save screen with a suggested file name (the recording's name, or `fitmap-{id prefix}.gpx`), and writes the track there as GPX 1.1 — name, description and type on the track, and every point's position, time and elevation where known — then confirms with "Track saved." (or "Could not save the track."). No storage permission is involved. Confirmed on an emulator: the saved file in Downloads carried the recorded points and `<type>Solowheel</type>`.
+8. **Sync Now** (the existing Health Connect button, FR-3.2) also drains every queued row in the same tap — `flushRecordedQueue()`, run after the Health Connect pass or after it throws, submitting each as its own `POST /v1/sync/activities` call and marking it synced on success. Confirmed live through the readiness state machine (FR-3.1) up to triggering a sync run; not confirmed end-to-end to a synced row in this pass, since the row queued during verification had been recorded signed out and was therefore account-scoped away from the signed-in test account by the time Sync Now ran (FR-5.3 below) — a correct outcome of that scoping, not a gap in the gate this section documents.
+9. **Delete**, on every row regardless of sync status, asks for confirmation and removes the row from this device only — a synced row's real `Activity` is untouched server-side, which the confirmation dialog states.
+10. A demo session can record and manage rows here, but every sync checkbox is disabled with an explanatory notice — queuing something "Sync Now" can never actually take would be pointless (matches FR-3's own demo gate).
 
 ### FR-5.3 Local storage is scoped per signed-in account
 
-**Description**: Recordings are keyed to whichever account is signed in when they're made (`Session.email`, empty string for signed-out/demo) — the same per-account key `SyncCursor` (FR-3.3) already established.
+**Description**: Recordings are keyed to whichever account is signed in when they're made (`Session.email`, empty string for a demo account) — the same per-account key `SyncCursor` (FR-3.3) already established.
 
 **Behavior**: Switching accounts on one device never shows one account's recordings under another's. Confirmed live, incidentally: a recording made while signed out did not appear in Recorded Activities after signing into a real account, and so could not be queued or synced from that account either — consistent with `docs/IMPLEMENTATION.md` §7.2's own account-scoping note, not a defect.
 

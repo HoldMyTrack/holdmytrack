@@ -35,17 +35,17 @@
             android:hint="@string/recording_name_hint"
             android:inputType="text" />
 
-        <!-- Free text, not a closed vocabulary — a custom type is the point. Still offers
-             RecordingTypes.PRESETS as tap-to-fill suggestions (see that class's doc comment)
-             so most recordings stay on the shared activity_type vocabulary. -->
-        <AutoCompleteTextView
+        <!-- Not typed into directly: a tap opens ActivityTypePicker, a searchable list of the
+             account's existing types with an "Add …" row for a new one — free text, not a
+             closed vocabulary, but steered toward the types already in use. -->
+        <TextView
             android:id="@+id/recording_type"
+            style="@style/Widget.AppCompat.Spinner.Underlined"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:completionThreshold="0"
             android:hint="@string/recording_type_hint"
-            android:inputType="text" />
+            android:textAppearance="?android:attr/textAppearanceMedium" />
 
         <EditText
             android:id="@+id/recording_description"
@@ -177,6 +177,16 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="@string/recording_save"
+                android:visibility="gone" />
+
+            <!-- Edit mode only, and unlike Save still shown once the row is synced and
+                 locked — exporting the track changes nothing about it. -->
+            <Button
+                android:id="@+id/recording_download"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/recording_download"
                 android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>

@@ -14,7 +14,6 @@
     <string name="credentials_required">Enter an email and a password.</string>
     <string name="sign_in_failed">Could not sign in.</string>
 
-    <string name="signed_out">Not signed in — basemap only</string>
     <string name="signed_in_as">Signed in as %1$s</string>
     <string name="signed_in_demo">Signed in to the demo account</string>
     <string name="checking_session">Checking your session…</string>
@@ -40,6 +39,13 @@
     <string name="recording_stop">Stop</string>
     <string name="recording_save">Save</string>
     <string name="recording_edit">Edit</string>
+    <string name="recording_type_search_hint">Search or add a type</string>
+    <string name="recording_type_add">Add “%1$s”</string>
+    <string name="recording_type_new">new</string>
+    <string name="recording_type_no_match">No type matches “%1$s”</string>
+    <string name="recording_download">Download GPX</string>
+    <string name="recording_downloaded">Track saved.</string>
+    <string name="recording_download_failed">Could not save the track.</string>
     <string name="recording_stat_time">Time</string>
     <string name="recording_stat_distance">Distance</string>
     <string name="recording_stat_altitude">Altitude</string>
@@ -60,6 +66,7 @@
     <string name="recorded_row_needs_type">Set a type to sync</string>
     <string name="recorded_demo_notice">The demo account is read-only — recordings can be saved and edited here, but never synced. Create an account to sync your own data.</string>
     <string name="recording_delete">Delete</string>
+    <string name="recorded_row_preview">Route preview</string>
     <string name="recorded_delete_confirm_title">Delete this recording?</string>
     <string name="recorded_delete_confirm_message_unsynced">This only removes it from this device — it was never synced, so there\'s nothing to remove anywhere else. This can\'t be undone.</string>
     <string name="recorded_delete_confirm_message_synced">This removes it from this device only — the activity it already synced stays on your map. This can\'t be undone.</string>

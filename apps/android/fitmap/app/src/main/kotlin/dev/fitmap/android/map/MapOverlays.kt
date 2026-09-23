@@ -25,8 +25,8 @@ enum class MapMode { NORMAL, FOG, HEATMAP }
  * the two server-rendered raster masks.
  *
  * All three are behind `requireAuth` (`services/server/internal/httpapi/server.go`), which is
- * why they are attached and detached with the session rather than added once at style load —
- * a signed-out map is the basemap alone, and the basemap alone is a complete, working map.
+ * why they are attached only once the stored session is verified rather than at style load —
+ * an unverified token would otherwise surface as a wall of 401s on tile requests.
  *
  * Layer ordering is the part that is awkward to retrofit, so it is fixed here: everything goes
  * *beneath* the basemap's first symbol layer. Fog painted over place labels buries them and
@@ -84,7 +84,7 @@ object MapOverlays {
     /** Matches `internal/fog.TileSize` — the server renders 512px masks, not 256px ones. */
     private const val RASTER_TILE_SIZE = 512
 
-    private const val TRACK_COLOR = "#b07e2e"
+    const val TRACK_COLOR = "#b07e2e"
     private const val TRACK_WIDTH = 2.5f
     private const val TRACK_OPACITY = 0.9f
 
@@ -132,22 +132,6 @@ object MapOverlays {
         )
         addTracks(style, beforeId)
         setMode(style, mode)
-    }
-
-    /** Removes every layer before its source — a source still in use cannot be removed. */
-    fun detach(style: Style) {
-        for (layerId in listOf(
-            TRACKS_LAYER_ID, HEATMAP_LAYER_ID, FOG_LAYER_ID,
-            COUNTRY_FOG_LAYER_ID, COUNTRY_HEATMAP_LAYER_ID, REGION_FOG_LAYER_ID, REGION_HEATMAP_LAYER_ID,
-        )) {
-            style.removeLayer(layerId)
-        }
-        for (sourceId in listOf(
-            TRACKS_SOURCE_ID, HEATMAP_SOURCE_ID, FOG_SOURCE_ID,
-            COUNTRY_FOG_SOURCE_ID, COUNTRY_HEATMAP_SOURCE_ID, REGION_FOG_SOURCE_ID, REGION_HEATMAP_SOURCE_ID,
-        )) {
-            style.removeSource(sourceId)
-        }
     }
 
     fun setMode(style: Style, mode: MapMode) {

@@ -5,13 +5,12 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.view.View
-import android.widget.ArrayAdapter
-import android.widget.AutoCompleteTextView
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -21,12 +20,16 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import dev.fitmap.android.R
+import dev.fitmap.android.net.FitMapApi
 import dev.fitmap.android.recording.db.RecordedActivityRecord
 import dev.fitmap.android.recording.db.RecordedActivityStore
 import dev.fitmap.android.recording.db.SyncStatus
+import dev.fitmap.android.recording.db.toGpx
 import java.util.Locale
 import java.util.UUID
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * A plain start/pause/stop GPS recording for a casual, watch-free activity — `docs/VISION.md`
@@ -54,7 +57,7 @@ class RecordingActivity : AppCompatActivity() {
     private lateinit var permissionNotice: TextView
     private lateinit var grantPermission: Button
     private lateinit var nameField: EditText
-    private lateinit var typeField: AutoCompleteTextView
+    private lateinit var typeField: TextView
     private lateinit var descriptionField: EditText
     private lateinit var timeValue: TextView
     private lateinit var distanceValue: TextView
@@ -65,6 +68,15 @@ class RecordingActivity : AppCompatActivity() {
     private lateinit var pauseResumeButton: Button
     private lateinit var stopButton: Button
     private lateinit var saveButton: Button
+    private lateinit var downloadButton: Button
+
+    /** The raw `activity_type` the Type field currently holds — [typeField] only shows its
+     *  formatted label. */
+    private var selectedType = RecordingTypes.DEFAULT
+
+    /** The account's server-side type counts for the Type picker, read once per screen;
+     *  empty until that answers, or if it can't (offline), which still leaves a usable list. */
+    private var serverTypeCounts: Map<String, Int> = emptyMap()
 
     /** Null for a fresh recording; the row being edited otherwise. */
     private val editingId: String? get() = intent.getStringExtra(EXTRA_RECORDING_ID)
@@ -86,6 +98,12 @@ class RecordingActivity : AppCompatActivity() {
             tickHandler.postDelayed(this, 1000)
         }
     }
+
+    /** Edit mode's Download — the system's own "save as" screen, so the user picks where the
+     *  GPX lands (Downloads, a cloud drive) and the app needs no storage permission. */
+    private val downloadLauncher = registerForActivityResult(
+        ActivityResultContracts.CreateDocument(GPX_MIME_TYPE),
+    ) { uri -> uri?.let(::writeGpx) }
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -124,12 +142,24 @@ class RecordingActivity : AppCompatActivity() {
         pauseResumeButton = findViewById(R.id.recording_pause_resume)
         stopButton = findViewById(R.id.recording_stop)
         saveButton = findViewById(R.id.recording_save)
+        downloadButton = findViewById(R.id.recording_download)
 
-        typeField.setAdapter(ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, RecordingTypes.PRESETS))
-        typeField.threshold = 0
-        typeField.setOnClickListener { typeField.showDropDown() }
+        typeField.setOnClickListener { openTypePicker() }
+        FitMapApi.activityTypeCounts { result -> result.onSuccess { serverTypeCounts = it } }
 
         if (editMode) setUpEditMode() else setUpRecordMode()
+    }
+
+    private fun setType(type: String) {
+        selectedType = type
+        typeField.text = RecordingTypes.format(type).ifEmpty { type }
+    }
+
+    private fun openTypePicker() {
+        lifecycleScope.launch {
+            val known = RecordingTypes.known(serverTypeCounts, store.all())
+            ActivityTypePicker.show(this@RecordingActivity, selectedType, known, ::setType)
+        }
     }
 
     // --- Edit mode ----------------------------------------------------------------------
@@ -140,11 +170,13 @@ class RecordingActivity : AppCompatActivity() {
         stopButton.visibility = View.GONE
         saveButton.visibility = View.VISIBLE
         saveButton.setOnClickListener { onSaveEdit() }
+        downloadButton.visibility = View.VISIBLE
+        downloadButton.setOnClickListener { onDownload() }
 
         lifecycleScope.launch {
             val record = store.get(editingId!!) ?: run { finish(); return@launch }
             nameField.setText(record.name)
-            typeField.setText(record.activityType, false)
+            setType(record.activityType)
             descriptionField.setText(record.description)
             renderStats(RecordingStats(
                 elapsedMs = record.durationSeconds * 1000,
@@ -167,7 +199,7 @@ class RecordingActivity : AppCompatActivity() {
         val id = editingId ?: return
         lifecycleScope.launch {
             val record = store.get(id) ?: return@launch
-            val newType = typeField.text.toString().trim().ifEmpty { RecordingTypes.DEFAULT }
+            val newType = selectedType
             // A queued row's type can be cleared back to "unknown" here (Edit stays open until
             // sync, not just until Stop) — RecordedActivitiesActivity's checkbox gate only
             // blocks queuing a row that's *already* unknown, so without this, clearing the type
@@ -190,10 +222,35 @@ class RecordingActivity : AppCompatActivity() {
         }
     }
 
+    /** Available on every saved recording, synced or not — the track is the user's own data
+     *  whatever its sync state, and a synced one is exactly the row whose fields are locked. */
+    private fun onDownload() {
+        val id = editingId ?: return
+        lifecycleScope.launch {
+            val record = store.get(id) ?: return@launch
+            val base = record.name.ifBlank { "fitmap-${record.id.take(8)}" }
+            downloadLauncher.launch("${base.replace(UNSAFE_FILENAME, "_")}.gpx")
+        }
+    }
+
+    private fun writeGpx(uri: Uri) {
+        val id = editingId ?: return
+        lifecycleScope.launch {
+            val record = store.get(id) ?: return@launch
+            val written = withContext(Dispatchers.IO) {
+                runCatching {
+                    contentResolver.openOutputStream(uri)?.use { it.write(record.toGpx().toByteArray()) } != null
+                }.getOrDefault(false)
+            }
+            val message = if (written) R.string.recording_downloaded else R.string.recording_download_failed
+            Toast.makeText(this@RecordingActivity, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     // --- Record mode --------------------------------------------------------------------
 
     private fun setUpRecordMode() {
-        typeField.setText(RecordingTypes.DEFAULT, false)
+        setType(RecordingTypes.DEFAULT)
 
         grantPermission.setOnClickListener { requestPermissions() }
         recordButton.setOnClickListener { onRecord() }
@@ -281,7 +338,7 @@ class RecordingActivity : AppCompatActivity() {
                     id = id,
                     name = nameField.text.toString().trim(),
                     description = descriptionField.text.toString().trim(),
-                    activityType = typeField.text.toString().trim().ifEmpty { RecordingTypes.DEFAULT },
+                    activityType = selectedType,
                     startedAtMs = points.first().time.toEpochMilli(),
                     distanceMeters = stats.distanceM,
                     durationSeconds = stats.elapsedMs / 1000,
@@ -325,5 +382,7 @@ class RecordingActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_RECORDING_ID = "recording_id"
+        private const val GPX_MIME_TYPE = "application/gpx+xml"
+        private val UNSAFE_FILENAME = Regex("[^A-Za-z0-9._ -]")
     }
 }

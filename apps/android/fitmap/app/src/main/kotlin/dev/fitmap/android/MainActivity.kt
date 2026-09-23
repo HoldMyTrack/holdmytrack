@@ -33,10 +33,10 @@ import org.maplibre.android.maps.Style
  * menu (Profile, Sync) both float over the map top-start, rather than living in a bar of their
  * own, mirroring the web client's own on-map mode control (`apps/web/src/map/MapView.tsx`).
  *
- * The basemap draws whether or not anyone is signed in — the style endpoint is unauthenticated
- * and the archive it points at is a plain `pmtiles://` URL — so a signed-out FitMap is a
- * working map rather than a login screen. Signing in is what adds the three user layers, all
- * of which sit behind `requireAuth` server-side.
+ * Never mounted without a session: a signed-out visitor is handed straight to
+ * `SignInActivity`, mirroring web's `AuthGate` (`docs/IMPLEMENTATION.md` §4.13). A bare basemap
+ * with none of the three user layers — all behind `requireAuth` server-side — would be a weak
+ * first impression next to the Demo account that screen offers one tap away.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -74,6 +74,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Before any layout or MapView exists, so a signed-out launch never draws a map at all.
+        if (!Session.isSignedIn) {
+            openSignIn()
+            return
+        }
         setContentView(R.layout.activity_main)
 
         status = findViewById(R.id.status)
@@ -99,9 +104,9 @@ class MainActivity : AppCompatActivity() {
 
         mapView.getMapAsync { instance ->
             map = instance
-            // A whole-world view is the honest starting camera while nothing is signed in and
-            // there is no activity extent to frame; `frameActivities` replaces it with the
-            // user's own once a session exists.
+            // A whole-world view is the honest starting camera until the session is verified
+            // and the activity extent is known; `frameActivities` replaces it with the user's
+            // own, and leaves it for an account with no geometry yet.
             instance.cameraPosition = CameraPosition.Builder()
                 .target(LatLng(20.0, 0.0))
                 .zoom(1.0)
@@ -171,34 +176,38 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Brings the map in line with whatever credential the app currently holds — called both
-     * when the style finishes loading and on every resume, since returning from the Profile
-     * screen (sign-in and sign-out both live there now) is a resume and nothing else would
-     * notice the change.
+     * Brings the map in line with the credential the app holds — called both when the style
+     * finishes loading and on every resume. A session that has gone away by then (the stored
+     * token was revoked) sends the user back to `SignInActivity` rather than leaving a map with
+     * nothing of theirs on it.
      *
      * A token restored from disk is not trusted until the server confirms it. An expired or
      * revoked one would otherwise surface as a wall of 401s on tile requests, which show up
      * only in logcat: on screen it would look like an ordinary blank map.
      */
     private fun syncSession() {
-        val signedIn = Session.isSignedIn
-        if (signedIn && !Session.verified) {
+        if (!Session.isSignedIn) {
+            openSignIn()
+            return
+        }
+        if (!Session.verified) {
             verifyStoredSession()
             return
         }
 
-        modeBar.visibility = if (signedIn) View.VISIBLE else View.GONE
+        modeBar.visibility = View.VISIBLE
 
         val loaded = style ?: return
-        if (signedIn && !overlaysAttached) {
+        if (!overlaysAttached) {
             MapOverlays.attach(loaded, mode)
             overlaysAttached = true
             frameActivities()
-        } else if (!signedIn && overlaysAttached) {
-            MapOverlays.detach(loaded)
-            overlaysAttached = false
-            framed = false
         }
+    }
+
+    private fun openSignIn() {
+        SignInActivity.open(this)
+        finish()
     }
 
     private fun verifyStoredSession() {
@@ -322,11 +331,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onLowMemory() {
         super.onLowMemory()
-        mapView.onLowMemory()
+        if (::mapView.isInitialized) mapView.onLowMemory()
     }
 
+    // A signed-out launch finishes from onCreate before the MapView exists, which skips every
+    // callback above but still reaches this one.
     override fun onDestroy() {
-        mapView.onDestroy()
+        if (::mapView.isInitialized) mapView.onDestroy()
         super.onDestroy()
     }
 

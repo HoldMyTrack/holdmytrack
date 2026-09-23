@@ -1,6 +1,5 @@
 package dev.fitmap.android
 
-import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
@@ -10,8 +9,9 @@ import dev.fitmap.android.net.Session
 
 /**
  * The account half of the burger menu: who is signed in, and the one action available from
- * here — sign in or sign out. `MainActivity` re-reads `Session` on every resume (returning from
- * here is a resume), so nothing further has to be pushed back to the map explicitly.
+ * here — sign out. Only reachable with a session (the map itself is gated behind one), so
+ * signing out replaces the whole back stack with `SignInActivity` rather than returning to a
+ * map that would have nothing left to show.
  */
 class ProfileActivity : AppCompatActivity() {
 
@@ -33,22 +33,17 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private fun render() {
-        val signedIn = Session.isSignedIn
         action.isEnabled = true
-        action.setText(if (signedIn) R.string.sign_out else R.string.sign_in)
-        status.text = when {
-            !signedIn -> getString(R.string.signed_out)
-            Session.email.isEmpty() -> getString(R.string.signed_in_demo)
-            else -> getString(R.string.signed_in_as, Session.email)
+        action.setText(R.string.sign_out)
+        status.text = if (Session.isDemo) {
+            getString(R.string.signed_in_demo)
+        } else {
+            getString(R.string.signed_in_as, Session.email)
         }
     }
 
     private fun onAction() {
-        if (!Session.isSignedIn) {
-            startActivity(Intent(this, SignInActivity::class.java))
-            return
-        }
         action.isEnabled = false
-        FitMapApi.signOut { render() }
+        FitMapApi.signOut { SignInActivity.open(this) }
     }
 }
