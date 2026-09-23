@@ -13,12 +13,17 @@ import type { ViewState } from './viewState';
 /**
  * Never zoom past this, however small the box. A short activity — or one trimmed to almost
  * nothing by the privacy trim — has near-zero extent, and fitBounds on a degenerate box
- * happily zooms to the maximum, landing on a grey rectangle above the basemap's z14 data.
+ * happily zooms to MapLibre's z22 maximum, where the overzoomed z14 basemap has nothing left
+ * to place the track against. z18 is still readable street-level detail.
  */
-const MAX_FLY_ZOOM = 15;
+const MAX_FLY_ZOOM = 18;
 
-/** Room for the docked header and the bottom timeline, plus a margin around the track. */
-const FLY_PADDING = { top: 60, bottom: 60, left: 60, right: 60 };
+/**
+ * The share of the map container the fitted bounds should span along its tighter axis — the
+ * rest is split evenly as padding on each side, which also keeps the track clear of the
+ * docked header and the bottom timeline.
+ */
+const FLY_FILL = 0.75;
 
 /** Long enough to read as a flight rather than a cut, short enough not to feel slow. */
 const FLY_DURATION_MS = 900;
@@ -37,7 +42,11 @@ export function flyToBBox(map: MapLibreMap, bbox: BBox): void {
     [bbox[0], bbox[1]],
     [bbox[2], bbox[3]],
   ];
-  map.fitBounds(bounds, { padding: FLY_PADDING, maxZoom: MAX_FLY_ZOOM, duration: FLY_DURATION_MS });
+  const { clientWidth, clientHeight } = map.getContainer();
+  const x = (clientWidth * (1 - FLY_FILL)) / 2;
+  const y = (clientHeight * (1 - FLY_FILL)) / 2;
+  const padding = { top: y, bottom: y, left: x, right: x };
+  map.fitBounds(bounds, { padding, maxZoom: MAX_FLY_ZOOM, duration: FLY_DURATION_MS });
 }
 
 /** For a bare point+zoom target (a country or world view) rather than an activity's bbox —
