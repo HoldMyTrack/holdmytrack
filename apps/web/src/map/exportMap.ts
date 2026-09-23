@@ -17,10 +17,10 @@ import { ensureTrackLayer, setHiddenTracks } from './tracks';
  * one — the live map is never resized, never flickers, and never pays `preserveDrawingBuffer`'s
  * cost for a feature used rarely.
  *
- * The user frames a region of the live map manually (`ExportPresetDialog.tsx` picks a target
- * shape, `ExportFrame.tsx` positions/sizes it) rather than exporting an automatic fit of
- * whatever happens to be on screen — `exportFramedImage` below is the one entry point this
- * module exports.
+ * The user frames a region of the live map manually (`ExportFrame.tsx` — a frame anchored to
+ * a map position, with its shape picked from its own toolbar) rather than exporting an
+ * automatic fit of whatever happens to be on screen — `exportFramedImage` below is the one
+ * entry point this module exports.
  */
 
 /** The output's longer side, for a Custom frame (no declared target dimensions to aim for
@@ -29,21 +29,15 @@ import { ensureTrackLayer, setHiddenTracks } from './tracks';
  *  a portrait Custom frame's longer side is its height, just as validly. */
 const EXPORT_LONG_SIDE_PX = 2400;
 
-/** How much bigger than the live container's own on-screen size to render the offscreen
- *  instance — the crop in `exportFramedImage` below then pulls just the framed region out of
- *  that, so this needs to comfortably cover the largest preset (1920px) even when the frame
- *  covers only a modest fraction of the container. */
-const EXPORT_SUPERSAMPLE = 3;
-
 /** How long to wait for a render to actually settle before giving up — generous, since a
  *  fresh Map instance has to fetch every tile at this new size/position from nothing, unlike
  *  the live map which usually has most of them cached already. */
 const EXPORT_IDLE_TIMEOUT_MS = 20_000;
 
 /** Attribution font size, as a fraction of the *final* canvas's shorter side — scales with
- *  output resolution (a 566px-tall Instagram landscape crop and a 1920px Story shouldn't read
+ *  output resolution (a 566px-tall Instagram landscape and a 1920px Story shouldn't read
  *  the credit line at the same absolute size) rather than a fixed px value tuned for one
- *  preset and wrong for the rest. Clamped so it never disappears on a tiny custom crop or
+ *  preset and wrong for the rest. Clamped so it never disappears on a small custom export or
  *  overwhelms one on the largest preset. */
 const ATTRIBUTION_FONT_FRACTION = 0.016;
 const ATTRIBUTION_MIN_FONT_PX = 12;
@@ -60,68 +54,51 @@ export interface ExportViewState {
 }
 
 export interface ExportFrameCapture {
-  /** The live map container's own on-screen CSS-pixel rect — `getBoundingClientRect()`, read
-   *  once by the caller right before calling this. The live map must not move or resize while
-   *  a capture is in flight, the same invariant this module already relied on before framing
-   *  existed. */
-  containerRect: DOMRect;
-  /** The frame's own on-screen rect, in the same coordinate space as `containerRect`. */
-  frameRect: DOMRect;
+  /** The frame's center, as a map position — the frame is anchored to the map, not the
+   *  screen, so it may be partly (or wholly) scrolled out of the live viewport by now. */
+  center: { lng: number; lat: number };
+  /** The frame's on-screen size in CSS pixels, at the live map's current zoom. */
+  widthPx: number;
+  heightPx: number;
   /** Exact output pixel dimensions for a platform preset. Omitted for Custom, where the
-   *  crop's own aspect ratio is kept and only scaled so its longer side hits
+   *  frame's own aspect ratio is kept and only scaled so its longer side hits
    *  `EXPORT_LONG_SIDE_PX`. */
   target?: { widthPx: number; heightPx: number };
 }
 
 /**
- * Renders the region inside `capture.frameRect`, at `capture.target`'s exact pixel dimensions
- * (or, for Custom, proportionally scaled the same way this module always has), and resolves to
- * a PNG blob. `liveMap` is read from directly (center/zoom/bearing/pitch) rather than requiring
- * the caller to track those separately — MapView.tsx doesn't keep camera position in React
- * state at all (FR-4.5: the URL hash is the only place it's persisted), so "the current view"
- * only really exists on the live instance itself.
- *
- * True WYSIWYG relative to the frame: the offscreen instance is rendered at
- * `EXPORT_SUPERSAMPLE`× the live container's own size, at the live camera's exact
- * center/zoom/bearing/pitch, so it's pixel-registered to the live view and the frame's rect
- * can be cropped out of it by simple proportional math — no unproject/re-centering needed.
+ * Renders exactly what's inside the frame and resolves to a PNG blob. The offscreen instance
+ * *is* the frame: a container of the frame's own CSS size, centred on the frame's own map
+ * position, at the live camera's zoom/bearing/pitch — so it shows precisely the framed
+ * extent, with labels and line widths at the same proportions as on screen — and rendered
+ * at a `pixelRatio` that makes its backing canvas the output size. "What's in the frame, only
+ * sharper", with no crop step, and independent of whether the frame is still inside the live
+ * viewport. `liveMap` is read from directly for the camera rather than requiring the caller
+ * to track it — MapView.tsx doesn't keep camera position in React state at all (FR-4.5: the
+ * URL hash is the only place it's persisted).
  */
 export async function exportFramedImage(
   liveMap: MapLibreMap,
   state: ExportViewState,
   capture: ExportFrameCapture,
 ): Promise<Blob> {
-  const { containerRect, frameRect, target } = capture;
-  const tempWidth = Math.round(containerRect.width * EXPORT_SUPERSAMPLE);
-  const tempHeight = Math.round(containerRect.height * EXPORT_SUPERSAMPLE);
+  const { center, widthPx, heightPx, target } = capture;
+  const outWidth = target?.widthPx ?? Math.round((widthPx * EXPORT_LONG_SIDE_PX) / Math.max(widthPx, heightPx));
+  const outHeight = target?.heightPx ?? Math.round((heightPx * EXPORT_LONG_SIDE_PX) / Math.max(widthPx, heightPx));
+  const cssWidth = Math.max(1, Math.round(widthPx));
+  const cssHeight = Math.max(1, Math.round(heightPx));
 
-  const { canvas, cleanup } = await renderOffscreen(liveMap, state, tempWidth, tempHeight);
+  const { canvas, cleanup } = await renderOffscreen(liveMap, state, {
+    center,
+    width: cssWidth,
+    height: cssHeight,
+    pixelRatio: outWidth / cssWidth,
+  });
   try {
-    // The offscreen container was sized to tempWidth/tempHeight CSS pixels, but MapLibre backs
-    // its canvas at devicePixelRatio× that (same as the live map) — read the actual ratio back
-    // from the canvas itself rather than trusting `window.devicePixelRatio` at call time, which
-    // sidesteps any drift between the two (e.g. browser zoom changing DPR mid-session).
-    const backingRatio = canvas.width / tempWidth;
-    const pxPerContainerPx = EXPORT_SUPERSAMPLE * backingRatio;
-    const cropX = (frameRect.left - containerRect.left) * pxPerContainerPx;
-    const cropY = (frameRect.top - containerRect.top) * pxPerContainerPx;
-    const cropW = frameRect.width * pxPerContainerPx;
-    const cropH = frameRect.height * pxPerContainerPx;
-
-    const cropCanvas = document.createElement('canvas');
-    cropCanvas.width = Math.max(1, Math.round(cropW));
-    cropCanvas.height = Math.max(1, Math.round(cropH));
-    const cropCtx = cropCanvas.getContext('2d');
-    if (!cropCtx) throw new Error('export: could not create crop canvas context');
-    cropCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropCanvas.width, cropCanvas.height);
-
-    const finalCanvas = target
-      ? scaleCanvas(cropCanvas, target.widthPx, target.heightPx)
-      : scaleCanvasToLongSide(cropCanvas, EXPORT_LONG_SIDE_PX);
-    // On the final canvas, not cropCanvas or the offscreen instance's own — this module's own
-    // doc comment on renderOffscreen explains why: frame position and preset scaling both
-    // happen after those, and attribution needs to land correctly positioned/sized in the
-    // actual output regardless of either.
+    // Always redrawn onto a canvas of the exact output size: the backing canvas can land a
+    // pixel off after rounding (and a preset frame's ratio can differ from its target by a
+    // rounding pixel too), and attribution must go onto a 2D canvas regardless.
+    const finalCanvas = scaleCanvas(canvas, outWidth, outHeight);
     drawAttribution(finalCanvas);
 
     const blob = await new Promise<Blob | null>((resolve) => {
@@ -142,11 +119,6 @@ function scaleCanvas(source: HTMLCanvasElement, widthPx: number, heightPx: numbe
   if (!ctx) throw new Error('export: could not create output canvas context');
   ctx.drawImage(source, 0, 0, source.width, source.height, 0, 0, widthPx, heightPx);
   return out;
-}
-
-function scaleCanvasToLongSide(source: HTMLCanvasElement, longSidePx: number): HTMLCanvasElement {
-  const scale = longSidePx / Math.max(source.width, source.height);
-  return scaleCanvas(source, Math.round(source.width * scale), Math.round(source.height * scale));
 }
 
 /**
@@ -205,20 +177,28 @@ function drawAttribution(canvas: HTMLCanvasElement): void {
   ctx.fillText(ATTRIBUTION_TEXT, baselineX - padX, baselineY);
 }
 
+interface OffscreenView {
+  center: { lng: number; lat: number };
+  /** Container size, CSS pixels. */
+  width: number;
+  height: number;
+  /** Backing-canvas pixels per CSS pixel — what sets the output resolution. */
+  pixelRatio: number;
+}
+
 /**
- * The offscreen-instance/overlay-replay machinery shared by every capture — factored out so
- * `exportFramedImage` above doesn't duplicate it. Attribution bake-in (`drawAttribution`
- * above; the still-unbuilt FitMap-logo item tracked in `docs/ROADMAP.md` will join it) belongs
- * on the *final* canvas in `exportFramedImage` (post-crop, post-scale — the one actually
- * encoded to PNG), not on the canvas this returns, since frame position and preset scaling
- * both happen after this step.
+ * The offscreen-instance/overlay-replay machinery — kept apart from `exportFramedImage` above
+ * so that function reads as the geometry alone. Attribution bake-in (`drawAttribution` above;
+ * the still-unbuilt FitMap-logo item tracked in `docs/ROADMAP.md` will join it) belongs on
+ * the *final* canvas in `exportFramedImage` (post-scale — the one actually encoded to PNG),
+ * not on the canvas this returns.
  */
 async function renderOffscreen(
   liveMap: MapLibreMap,
   state: ExportViewState,
-  width: number,
-  height: number,
+  view: OffscreenView,
 ): Promise<{ canvas: HTMLCanvasElement; cleanup: () => void }> {
+  const { width, height } = view;
   const container = document.createElement('div');
   // Off-screen via position, not display:none — a display:none element has no real layout
   // box, and MapLibre needs one to size its canvas and WebGL context correctly.
@@ -232,8 +212,9 @@ async function renderOffscreen(
   const instance = new MapLibreMap({
     container,
     style: buildStyle({ flavor: state.flavor, origin: basemapOrigin() }),
-    center: liveMap.getCenter(),
+    center: [view.center.lng, view.center.lat],
     zoom: liveMap.getZoom(),
+    pixelRatio: view.pixelRatio,
     bearing: liveMap.getBearing(),
     pitch: liveMap.getPitch(),
     attributionControl: false,

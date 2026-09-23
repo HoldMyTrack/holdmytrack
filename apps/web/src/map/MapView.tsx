@@ -30,8 +30,7 @@ import { ActivitiesPanel } from '../ui/ActivitiesPanel';
 import { ActivityHistogram } from '../ui/ActivityHistogram';
 import { CoverageNotice } from '../ui/CoverageNotice';
 import { ExportButton } from '../ui/ExportButton';
-import { ExportFrame, type FrameRect } from '../ui/ExportFrame';
-import { ExportPresetDialog } from '../ui/ExportPresetDialog';
+import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
 import { dayDiff, todayLocal } from '../ui/dateMath';
 import { Header } from '../ui/Header';
 import type { DateRange } from '../ui/RangePicker';
@@ -56,40 +55,31 @@ export interface MapViewProps {
   onOpenSettings: () => void;
 }
 
-/** The frame-and-capture export flow's own state machine — lives here, not inside
- *  `ExportFrame.tsx`/`ExportPresetDialog.tsx` themselves, since it spans all three of those
- *  components plus the live map instance this component already owns (`ExportButton.tsx` opens
- *  it, `ExportPresetDialog` picks the shape, `ExportFrame` renders/drags it, and capture needs
- *  `map` directly) — the same "callback wiring belongs where the map instance is" reasoning
- *  `ExportButton.tsx`'s own doc comment already gives for why `map` is a prop there. */
+/** The frame-and-capture export flow's own state — lives here, not inside `ExportFrame.tsx`,
+ *  since it spans that component, the header's `ExportButton.tsx` that opens it, and the live
+ *  map instance capture needs directly — the same "callback wiring belongs where the map
+ *  instance is" reasoning `ExportButton.tsx`'s own doc comment gives for why `map` is a prop
+ *  there. */
 type ExportFlow =
   | { stage: 'idle' }
-  | { stage: 'picking' }
-  | { stage: 'framing' | 'capturing'; preset: ExportPreset | 'custom'; rect: FrameRect };
+  | { stage: 'framing' | 'capturing'; preset: ExportPreset | 'custom'; geometry: FrameGeometry };
 
-/** A centered starting rect for a freshly-picked shape. Custom gets a generously-sized default
- *  (70% of the container) so it's immediately visible and easy to grab without the user first
- *  hunting for it. A preset's rect is sized to its own declared aspect ratio — accounting for
- *  the container's own aspect ratio, since `wFrac`/`hFrac` are fractions of two potentially
- *  different container dimensions, not a shared unit — clamped so neither dimension exceeds
- *  80% of the container. */
-function defaultFrameRect(preset: ExportPreset | 'custom', containerRect: DOMRect): FrameRect {
+/** The frame's size, in CSS pixels, for a shape. Custom gets a generous 70% of the container
+ *  so it's immediately visible and easy to grab. A preset keeps its declared aspect ratio,
+ *  fitted inside `fit` (the current frame's size when switching shape, so the frame doesn't
+ *  jump to a very different size) and never more than 80% of either container dimension. */
+function frameSize(
+  preset: ExportPreset | 'custom',
+  container: { width: number; height: number },
+  fit?: { widthPx: number; heightPx: number },
+): { widthPx: number; heightPx: number } {
   if (preset === 'custom') {
-    return { xFrac: 0.15, yFrac: 0.15, wFrac: 0.7, hFrac: 0.7 };
+    return fit ?? { widthPx: container.width * 0.7, heightPx: container.height * 0.7 };
   }
-  const MAX_FRACTION = 0.8;
-  const targetRatio = preset.widthPx / preset.heightPx;
-  const containerRatio = containerRect.width / containerRect.height || 1;
-  let wFrac: number;
-  let hFrac: number;
-  if (targetRatio / containerRatio >= 1) {
-    wFrac = MAX_FRACTION;
-    hFrac = wFrac * (containerRatio / targetRatio);
-  } else {
-    hFrac = MAX_FRACTION;
-    wFrac = hFrac * (targetRatio / containerRatio);
-  }
-  return { xFrac: (1 - wFrac) / 2, yFrac: (1 - hFrac) / 2, wFrac, hFrac };
+  const maxW = Math.min(fit?.widthPx ?? Infinity, container.width * 0.8);
+  const maxH = Math.min(fit?.heightPx ?? Infinity, container.height * 0.8);
+  const ratio = preset.widthPx / preset.heightPx;
+  return maxW / maxH >= ratio ? { widthPx: maxH * ratio, heightPx: maxH } : { widthPx: maxW, heightPx: maxW / ratio };
 }
 
 export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
@@ -347,32 +337,45 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
     scaleUnit: unitSystem,
   });
 
-  const handlePickExportPreset = useCallback((preset: ExportPreset | 'custom') => {
-    const rect = container.current
-      ? defaultFrameRect(preset, container.current.getBoundingClientRect())
-      : { xFrac: 0.15, yFrac: 0.15, wFrac: 0.7, hFrac: 0.7 };
-    setExportFlow({ stage: 'framing', preset, rect });
+  const handleExportOpen = useCallback(() => {
+    if (!map || !container.current) return;
+    const center = map.getCenter();
+    const size = frameSize('custom', { width: container.current.clientWidth, height: container.current.clientHeight });
+    setExportError(null);
+    // The header button toggles: pressing Export again while framing puts the frame away
+    // (but not mid-capture — that finishes or fails first).
+    setExportFlow((flow) => {
+      if (flow.stage === 'framing') return { stage: 'idle' };
+      if (flow.stage === 'capturing') return flow;
+      return { stage: 'framing', preset: 'custom', geometry: { center: { lng: center.lng, lat: center.lat }, ...size } };
+    });
+  }, [map]);
+
+  const handleExportPresetChange = useCallback((preset: ExportPreset | 'custom') => {
+    const el = container.current;
+    if (!el) return;
+    setExportFlow((flow) =>
+      flow.stage === 'framing'
+        ? {
+            stage: 'framing',
+            preset,
+            geometry: { center: flow.geometry.center, ...frameSize(preset, { width: el.clientWidth, height: el.clientHeight }, flow.geometry) },
+          }
+        : flow,
+    );
   }, []);
 
   const handleExportCapture = useCallback(async () => {
-    if (exportFlow.stage !== 'framing' || !map || !container.current) return;
-    const { preset, rect } = exportFlow;
-    setExportFlow({ stage: 'capturing', preset, rect });
+    if (exportFlow.stage !== 'framing' || !map) return;
+    const { preset, geometry } = exportFlow;
+    setExportFlow({ stage: 'capturing', preset, geometry });
     setExportError(null);
     try {
-      const containerRect = container.current.getBoundingClientRect();
-      const frameRect = new DOMRect(
-        containerRect.left + rect.xFrac * containerRect.width,
-        containerRect.top + rect.yFrac * containerRect.height,
-        rect.wFrac * containerRect.width,
-        rect.hFrac * containerRect.height,
-      );
       const blob = await exportFramedImage(
         map,
         { flavor: initial.flavor, mode: mapMode, activityQuery, hiddenIds: [...mapHiddenIds] },
         {
-          containerRect,
-          frameRect,
+          ...geometry,
           ...(preset !== 'custom' && { target: { widthPx: preset.widthPx, heightPx: preset.heightPx } }),
         },
       );
@@ -389,7 +392,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
       setExportError(err instanceof Error ? err.message : String(err));
       // Stays in 'framing', not 'idle' — a failed capture (e.g. a network timeout) shouldn't
       // discard the frame the user just positioned, forcing them to redo it from scratch.
-      setExportFlow((flow) => (flow.stage === 'capturing' ? { stage: 'framing', preset: flow.preset, rect: flow.rect } : flow));
+      setExportFlow((flow) => (flow.stage === 'capturing' ? { stage: 'framing', preset: flow.preset, geometry: flow.geometry } : flow));
     }
   }, [exportFlow, map, initial.flavor, mapMode, activityQuery, mapHiddenIds]);
 
@@ -860,17 +863,10 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
     <div className="app-shell">
       <Header
         importControl={<ImportPanel readOnly={isDemo} onUploaded={handleUploaded} onViewOnMap={viewActivityOnMap} />}
-        exportControl={<ExportButton map={map} onOpen={() => setExportFlow({ stage: 'picking' })} />}
+        exportControl={<ExportButton map={map} active={exportFlow.stage !== 'idle'} onOpen={handleExportOpen} />}
         onOpenProfile={onOpenProfile}
         onOpenSettings={onOpenSettings}
       />
-
-      {exportFlow.stage === 'picking' && (
-        <ExportPresetDialog
-          onPick={handlePickExportPreset}
-          onClose={() => setExportFlow((flow) => (flow.stage === 'picking' ? { stage: 'idle' } : flow))}
-        />
-      )}
 
       <div className="app-body">
         {mapMode === 'normal' && (
@@ -907,16 +903,18 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
 
         <div className="map-root">
           <div ref={container} className="map-canvas" data-testid="map-canvas" />
-          {(exportFlow.stage === 'framing' || exportFlow.stage === 'capturing') && (
+          {map && (exportFlow.stage === 'framing' || exportFlow.stage === 'capturing') && (
             <ExportFrame
+              map={map}
               containerRef={container}
               preset={exportFlow.preset}
-              rect={exportFlow.rect}
+              geometry={exportFlow.geometry}
               busy={exportFlow.stage === 'capturing'}
               error={exportError}
-              onRectChange={(rect) =>
-                setExportFlow((flow) => (flow.stage === 'framing' ? { stage: 'framing', preset: flow.preset, rect } : flow))
+              onGeometryChange={(geometry) =>
+                setExportFlow((flow) => (flow.stage === 'framing' ? { stage: 'framing', preset: flow.preset, geometry } : flow))
               }
+              onPresetChange={handleExportPresetChange}
               onCapture={() => void handleExportCapture()}
               onCancel={handleExportCancel}
             />
