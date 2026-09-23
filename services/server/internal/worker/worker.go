@@ -1,5 +1,5 @@
 // Package worker is cmd/fitmap work: dequeues jobs with FOR UPDATE SKIP LOCKED
-// (IMPLEMENTATION.md §3.8, §4.1) and runs internal/ingest for `ingest` jobs.
+// (IMPLEMENTATION.md §3.8, §4.1) and runs internal/ingest for `ingest` and `edit_track` jobs.
 // No broker, per §1.1 — this poll loop against idx_jobs_runnable is the whole queue.
 package worker
 
@@ -160,6 +160,12 @@ func runJob(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, j job
 			return fmt.Errorf("unmarshal render_fog job: %w", err)
 		}
 		return fog.RenderUser(ctx, pool, store, rj.UserID)
+	case "edit_track":
+		var ej ingest.EditJob
+		if err := json.Unmarshal(j.payload, &ej); err != nil {
+			return fmt.Errorf("unmarshal edit_track job: %w", err)
+		}
+		return ingest.ProcessTrackEdit(ctx, pool, store, ej)
 	default:
 		return fmt.Errorf("unhandled job kind %q (export / reprivacy / provider_sync / retention are out of scope for this task)", j.kind)
 	}

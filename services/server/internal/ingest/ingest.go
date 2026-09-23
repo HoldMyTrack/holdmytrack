@@ -61,55 +61,19 @@ type Result struct {
 }
 
 func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job Job) (Result, error) {
-	obj, err := store.Get(ctx, job.RawPayloadKey)
+	act, points, err := loadTrimmedPoints(ctx, store, job.SourceDetail, job.RawPayloadKey, job.PrivacyTrimM)
 	if err != nil {
-		return Result{}, fmt.Errorf("ingest: fetch raw payload: %w", err)
-	}
-	defer obj.Close()
-
-	act, err := parseByExtensionReader(job.SourceDetail, obj)
-	if err != nil {
-		return Result{}, fmt.Errorf("ingest: parse: %w", err)
+		return Result{}, err
 	}
 	if job.ActivityType != "" {
 		act.ActivityType = job.ActivityType
 	}
 
-	points := TrimEndpoints(act.Points, job.PrivacyTrimM)
-	if len(points) < 2 {
-		return Result{}, fmt.Errorf("ingest: fewer than 2 points survive privacy trim (%d before, %d after)", len(act.Points), len(points))
-	}
-
-	m := computeMetrics(points)
-
-	lons := make([]float64, len(points))
-	lats := make([]float64, len(points))
-	ts := make([]float64, len(points))
-	for i, p := range points {
-		lons[i] = p.Lon
-		lats[i] = p.Lat
-		ts[i] = float64(p.Time.Unix())
-	}
-
-	// §4.1 step 5: simplify for display. Two round trips, not one — see simplify.go for
-	// why ST_SimplifyPreserveTopology can't just be called inline on the LineStringM.
-	simpLons, simpLats, err := simplifyXY(ctx, pool, lons, lats, simplifyToleranceDeg)
+	pp, err := prepareTrack(ctx, pool, points)
 	if err != nil {
 		return Result{}, err
 	}
-	simpTs := matchSimplifiedTimes(lons, lats, ts, simpLons, simpLats)
-
-	elapsedS := make([]int32, len(points))
-	elevM := make([]*float32, len(points))
-	hr := make([]*int16, len(points))
-	distM := make([]float32, len(points))
-	t0 := points[0].Time.Unix()
-	for i, p := range points {
-		elapsedS[i] = int32(p.Time.Unix() - t0)
-		elevM[i] = p.Elevation
-		hr[i] = p.HeartRate
-		distM[i] = float32(m.distM[i])
-	}
+	m := pp.m
 
 	var activityID string
 	var inserted bool
@@ -146,7 +110,7 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 		job.UserID, job.Source, job.SourceDetail, job.ExternalID,
 		act.ActivityType, m.distanceM, m.durationS, m.movingS,
 		m.elevationGainM, m.avgSpeedMps, points[0].Time,
-		simpLons, simpLats, simpTs,
+		pp.simpLons, pp.simpLats, pp.simpTs,
 		job.RawPayloadKey, act.Name, act.Description,
 	).Scan(&activityID, &inserted)
 	if err != nil {
@@ -164,7 +128,7 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	_, err = pool.Exec(ctx, `
 		INSERT INTO activity_streams (activity_id, point_count, elapsed_s, elevation_m, heartrate, dist_m)
 		VALUES ($1, $2, $3, $4, $5, $6)
-	`, activityID, len(points), elapsedS, elevM, hr, distM)
+	`, activityID, len(points), pp.elapsedS, pp.elevM, pp.hr, pp.distM)
 	if err != nil {
 		return Result{}, fmt.Errorf("ingest: persist streams: %w", err)
 	}
@@ -211,6 +175,80 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	}
 
 	return Result{ActivityID: activityID, Persisted: true}, nil
+}
+
+// loadTrimmedPoints is §4.1 steps 2–3: fetch the raw payload, parse it, and apply the privacy
+// trim. Shared by Process and ProcessTrackEdit (edit.go) — an edit replays the user's spec on
+// top of exactly the points a fresh ingest would have kept, never on the untrimmed ends.
+func loadTrimmedPoints(ctx context.Context, store *storage.Store, sourceDetail, rawKey string, trimM float64) (parse.Activity, []parse.Point, error) {
+	obj, err := store.Get(ctx, rawKey)
+	if err != nil {
+		return parse.Activity{}, nil, fmt.Errorf("ingest: fetch raw payload: %w", err)
+	}
+	defer obj.Close()
+
+	act, err := parseByExtensionReader(sourceDetail, obj)
+	if err != nil {
+		return parse.Activity{}, nil, fmt.Errorf("ingest: parse: %w", err)
+	}
+
+	points := TrimEndpoints(act.Points, trimM)
+	if len(points) < 2 {
+		return parse.Activity{}, nil, fmt.Errorf("ingest: fewer than 2 points survive privacy trim (%d before, %d after)", len(act.Points), len(points))
+	}
+	return act, points, nil
+}
+
+// LoadTrimmedPoints is loadTrimmedPoints for the track editor's point endpoint
+// (httpapi's handleActivityTrackPoints), which needs the same post-trim points to show.
+func LoadTrimmedPoints(ctx context.Context, store *storage.Store, sourceDetail, rawKey string, trimM float64) ([]parse.Point, error) {
+	_, points, err := loadTrimmedPoints(ctx, store, sourceDetail, rawKey, trimM)
+	return points, err
+}
+
+// preparedTrack is everything §4.1 steps 5–6 persist, derived from the final point list.
+type preparedTrack struct {
+	m                          metrics
+	simpLons, simpLats, simpTs []float64
+	elapsedS                   []int32
+	elevM                      []*float32
+	hr                         []*int16
+	distM                      []float32
+}
+
+func prepareTrack(ctx context.Context, pool *pgxpool.Pool, points []parse.Point) (preparedTrack, error) {
+	pp := preparedTrack{m: computeMetrics(points)}
+
+	lons := make([]float64, len(points))
+	lats := make([]float64, len(points))
+	ts := make([]float64, len(points))
+	for i, p := range points {
+		lons[i] = p.Lon
+		lats[i] = p.Lat
+		ts[i] = float64(p.Time.Unix())
+	}
+
+	// §4.1 step 5: simplify for display. Two round trips, not one — see simplify.go for
+	// why ST_SimplifyPreserveTopology can't just be called inline on the LineStringM.
+	var err error
+	pp.simpLons, pp.simpLats, err = simplifyXY(ctx, pool, lons, lats, simplifyToleranceDeg)
+	if err != nil {
+		return preparedTrack{}, err
+	}
+	pp.simpTs = matchSimplifiedTimes(lons, lats, ts, pp.simpLons, pp.simpLats)
+
+	pp.elapsedS = make([]int32, len(points))
+	pp.elevM = make([]*float32, len(points))
+	pp.hr = make([]*int16, len(points))
+	pp.distM = make([]float32, len(points))
+	t0 := points[0].Time.Unix()
+	for i, p := range points {
+		pp.elapsedS[i] = int32(p.Time.Unix() - t0)
+		pp.elevM[i] = p.Elevation
+		pp.hr[i] = p.HeartRate
+		pp.distM[i] = float32(pp.m.distM[i])
+	}
+	return pp, nil
 }
 
 // mergeTiles unions two tile lists, dropping duplicates — MarkFogTilesDirty is an upsert, so

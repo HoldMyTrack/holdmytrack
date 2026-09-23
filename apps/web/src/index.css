@@ -741,6 +741,17 @@ body {
   opacity: 0.55;
 }
 
+/* §4.7.7: a row whose track edit is still being reprocessed — its numbers are the pre-edit
+   ones until the job lands, so it reads as unavailable rather than as current data. */
+.activities-panel__row--pending .activities-panel__title,
+.activities-panel__row--pending .activities-panel__meta {
+  opacity: 0.45;
+}
+
+.activities-panel__row--pending .activities-panel__text {
+  cursor: progress;
+}
+
 .activities-panel__hidden-badge {
   flex: none;
   font-size: 10px;
@@ -794,6 +805,7 @@ body {
    mockup: a soft tinted square rather than a bare icon, so the group actions read as one
    family regardless of which one is destructive. */
 .activities-panel__edit,
+.activities-panel__edit-track,
 .activities-panel__delete,
 .activities-panel__visibility,
 .activities-panel__focus {
@@ -812,6 +824,7 @@ body {
 }
 
 .activities-panel__edit:hover:not(:disabled),
+.activities-panel__edit-track:hover:not(:disabled),
 .activities-panel__delete:hover:not(:disabled),
 .activities-panel__visibility:hover:not(:disabled) {
   background: var(--fm-surface-tint-strong);
@@ -822,6 +835,7 @@ body {
    checked yet — visibly inert, not just a hover/click no-op, so "there's nothing to act on"
    reads before anyone hovers for the title tooltip. */
 .activities-panel__edit:disabled,
+.activities-panel__edit-track:disabled,
 .activities-panel__delete:disabled,
 .activities-panel__visibility:disabled,
 .activities-panel__focus:disabled {
@@ -1579,6 +1593,141 @@ body {
   border-radius: 8px;
   background: rgb(255 255 255 / 92%);
   box-shadow: 0 1px 4px rgb(var(--fm-ink-rgb) / 25%);
+}
+
+/* The Edit track window (EditTrackPanel.tsx, §4.7.7) — floats over the map's top-left while
+   one activity is being edited, the same white card treatment as the mode toggle and the
+   track-metric card. The top-left is free because the mode toggle is hidden for the session;
+   the top-right belongs to MapLibre's own zoom/locate controls. */
+.edit-track {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 360px;
+  max-width: calc(100% - 20px);
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 96%);
+  box-shadow: 0 2px 10px rgb(var(--fm-ink-rgb) / 25%);
+  color: var(--fm-ink);
+}
+
+.edit-track__head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.edit-track__title {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.edit-track__subtitle {
+  overflow: hidden;
+  font-size: 12px;
+  color: rgb(var(--fm-ink-rgb) / 60%);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edit-track__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.edit-track__row--footer {
+  padding-top: 10px;
+  border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
+}
+
+.edit-track__spacer {
+  flex: 1;
+}
+
+.edit-track__btn {
+  border: 0;
+  border-radius: 7px;
+  padding: 6px 11px;
+  background: var(--fm-surface-tint);
+  color: var(--fm-ink);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.edit-track__btn:hover:not(:disabled) {
+  background: var(--fm-surface-tint-strong);
+}
+
+.edit-track__btn:disabled {
+  color: var(--fm-ink-faint);
+  cursor: not-allowed;
+}
+
+/* Delete point mode's toggle, while it's on. */
+.edit-track__btn[aria-pressed='true'] {
+  background: rgb(var(--fm-accent-rgb) / 20%);
+  color: var(--fm-accent-strong);
+}
+
+.edit-track__btn--quiet {
+  background: transparent;
+  color: rgb(var(--fm-ink-rgb) / 65%);
+}
+
+.edit-track__btn--primary {
+  background: var(--fm-accent);
+  color: #fff;
+}
+
+.edit-track__btn--primary:hover:not(:disabled) {
+  background: var(--fm-accent-hover);
+}
+
+.edit-track__btn--primary:disabled {
+  background: rgb(var(--fm-accent-rgb) / 35%);
+  color: #fff;
+}
+
+.edit-track__note {
+  margin: 0;
+  font-size: 12px;
+  color: rgb(var(--fm-ink-rgb) / 60%);
+}
+
+.edit-track__error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--fm-danger);
+}
+
+/* MapView wraps the Activities panel and the timeline in this for the session, `inert` while
+   a track is being edited. display: contents keeps the wrapper out of the flex layout; the
+   dimming goes on its children, since a display: contents box has no rendering of its own. */
+.edit-track-lock {
+  display: contents;
+}
+
+.edit-track-lock[inert] > * {
+  opacity: 0.5;
+}
+
+@media (max-width: 768px) {
+  .edit-track {
+    right: 10px;
+    width: auto;
+  }
 }
 
 /* The straight-line pace/HR + elevation profile (TrackProfile.tsx) — deliberately small and

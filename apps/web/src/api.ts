@@ -538,6 +538,11 @@ export interface Activity {
   description: string | null;
   /** [minLon, minLat, maxLon, maxLat], or null for a row with no trajectory. */
   bbox: BBox | null;
+  /** An Edit track reprocess (§4.7.7) is queued or running — the row's numbers and geometry
+   *  are still the pre-edit ones until it finishes. */
+  pending: boolean;
+  /** The track carries a user edit, so "Reset to original track" has something to undo. */
+  edited: boolean;
 }
 
 /** GeoJSON bbox ordering, which is also what MapLibre's fitBounds takes as a flat array. */
@@ -559,6 +564,8 @@ interface ActivityRowBody {
   duration_seconds: number | null;
   description: string | null;
   bbox: number[] | null;
+  pending: boolean;
+  edited: boolean;
 }
 
 interface ActivitiesBody {
@@ -586,6 +593,8 @@ function toActivity(a: ActivityRowBody): Activity {
     durationSeconds: a.duration_seconds,
     description: a.description,
     bbox: a.bbox && a.bbox.length === 4 ? ([...a.bbox] as BBox) : null,
+    pending: a.pending,
+    edited: a.edited,
   };
 }
 
@@ -1039,4 +1048,71 @@ export async function getActivityTrackMetrics(
       ...(p.elevation_m !== undefined ? { elevationM: p.elevation_m } : {}),
     })),
   };
+}
+
+/**
+ * A track edit (§4.7.7), as the server stores it: every value is a point timestamp in unix
+ * milliseconds. A point survives when it's inside `keep` (inclusive; absent keeps everything),
+ * outside every `remove` range (inclusive), and not in `drop`. Mirrors `ingest.TrackEdit`.
+ */
+export interface TrackEdit {
+  keep?: [number, number];
+  remove?: [number, number][];
+  drop?: number[];
+}
+
+/** One recorded point: [lon, lat, unix ms]. */
+export type TrackPoint = [number, number, number];
+
+export interface ActivityTrackPoints {
+  /** Every point the activity is processed from, privacy-trimmed, before the user's edit. */
+  points: TrackPoint[];
+  /** The edit currently applied on top of `points`, or null for an unedited track. */
+  edit: TrackEdit | null;
+}
+
+/** `GET /v1/activities/track-points/{id}` — what the track editor opens with. */
+export async function getActivityTrackPoints(activityId: string, signal?: AbortSignal): Promise<ActivityTrackPoints> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/activities/track-points/${activityId}`, {
+    ...(signal ? { signal } : {}),
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, `track points failed (${res.status})`));
+  }
+  return (await res.json()) as ActivityTrackPoints;
+}
+
+/**
+ * `POST /v1/activities/track-edit/{id}` — the editor's Apply. Sends the complete new edit
+ * (null resets to the original track); the server marks the activity pending and reprocesses
+ * it in the background, so this resolves as soon as that's queued (`202`).
+ */
+export async function saveActivityTrackEdit(activityId: string, edit: TrackEdit | null): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/activities/track-edit/${activityId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ edit }),
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, `track edit failed (${res.status})`));
+  }
+}
+
+/**
+ * `GET /v1/coverage/status` — whether the account still has an unfinished job that changes its
+ * Fog/Heatmap rasters (an upload not yet parsed, a track edit, a re-render). Polled after an
+ * upload or delete by `useCoverageRefresh.ts`, which refetches both layers once this reports
+ * nothing left.
+ */
+export async function getCoverageStatus(signal?: AbortSignal): Promise<{ rendering: boolean }> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/coverage/status`, {
+    ...(signal ? { signal } : {}),
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, `coverage status failed (${res.status})`));
+  }
+  return (await res.json()) as { rendering: boolean };
 }
