@@ -18,15 +18,16 @@ export function fold(s: string): string {
   return s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 }
 
-/** Ranks an exact-term match first ("us" → United States, not Australia), then labels with a
- *  word starting with the query, then anything containing it; the caller's own order (A–Z for
- *  countries, by offset for timezones) is kept within each rank. */
+/** Ranks an exact match first — an exact term ("us" → United States, not Australia) or the
+ *  whole label ("walk" → Walk, before Dog Walk) — then labels with a word starting with the
+ *  query, then anything containing it; the caller's own order (A–Z for countries, by offset
+ *  for timezones) is kept within each rank. */
 function search(options: PickerOption[], query: string): PickerOption[] {
   const q = fold(query.trim());
   const ranked: PickerOption[][] = [[], [], []];
   for (const o of options) {
     const label = fold(o.label);
-    if (o.exact?.some((t) => fold(t) === q)) ranked[0]!.push(o);
+    if (label === q || o.exact?.some((t) => fold(t) === q)) ranked[0]!.push(o);
     else if (label.startsWith(q) || label.includes(` ${q}`)) ranked[1]!.push(o);
     else if (label.includes(q) || fold(o.detail).includes(q) || o.keywords?.some((k) => k.includes(q))) ranked[2]!.push(o);
   }
@@ -43,9 +44,16 @@ export interface SearchPickerProps {
   searchLabel: string;
   /** What "No … matches" says, e.g. "country". */
   noun: string;
+  /** The search input's placeholder; "Search" unless the list is open-ended. */
+  placeholder?: string;
   /** An extra first row whose value is `''` — Country's "Not set (metric)". Shown while
    *  browsing the whole list, left out of search results. */
   unsetOption?: PickerOption;
+  /** Makes the list open-ended: while the search text doesn't exactly match an existing
+   *  option, this builds an extra last row from it (EditActivityDialog's "Add “Solowheel”"),
+   *  so the search field doubles as the field for entering a new value. Returns null for text
+   *  that can't be a value (empty, too long). */
+  createOption?: (text: string) => PickerOption | null;
 }
 
 /**
@@ -55,9 +63,21 @@ export interface SearchPickerProps {
  * jumping through hundreds of entries. Follows the WAI-ARIA combobox pattern: focus stays in
  * the search input while ↑/↓ move the active option (`aria-activedescendant`), Enter picks
  * it, Escape closes and returns focus to the trigger. Dismisses on an outside `pointerdown`,
- * like UserMenu.tsx. CountryPicker.tsx and TimezonePicker.tsx only build the option list.
+ * like UserMenu.tsx. CountryPicker.tsx, TimezonePicker.tsx and ActivityTypePicker.tsx only
+ * build the option list; the last is open-ended (`createOption`), since activity types are
+ * free-form text rather than a fixed vocabulary.
  */
-export function SearchPicker({ options, value, onChange, labelledBy, searchLabel, noun, unsetOption }: SearchPickerProps) {
+export function SearchPicker({
+  options,
+  value,
+  onChange,
+  labelledBy,
+  searchLabel,
+  noun,
+  placeholder = 'Search',
+  unsetOption,
+  createOption,
+}: SearchPickerProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
@@ -67,7 +87,15 @@ export function SearchPicker({ options, value, onChange, labelledBy, searchLabel
   const listId = useId();
 
   const browseList = useMemo(() => (unsetOption ? [unsetOption, ...options] : options), [options, unsetOption]);
-  const shown = useMemo(() => (query.trim() ? search(options, query) : browseList), [options, browseList, query]);
+  const shown = useMemo(() => {
+    const text = query.trim();
+    if (!text) return browseList;
+    const matches = search(options, query);
+    const q = fold(text);
+    const exact = options.some((o) => fold(o.value) === q || fold(o.label) === q);
+    const created = !exact && createOption ? createOption(text) : null;
+    return created ? [...matches, created] : matches;
+  }, [options, browseList, query, createOption]);
   const selected = browseList.find((o) => o.value === value);
 
   function openPicker() {
@@ -200,7 +228,7 @@ export function SearchPicker({ options, value, onChange, labelledBy, searchLabel
               aria-controls={listId}
               aria-autocomplete="list"
               aria-activedescendant={shown[active] ? `${listId}-${active}` : undefined}
-              placeholder="Search"
+              placeholder={placeholder}
               autoComplete="off"
               spellCheck={false}
               value={query}
