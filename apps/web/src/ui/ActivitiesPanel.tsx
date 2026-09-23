@@ -581,7 +581,7 @@ export function ActivitiesPanel({
       {editingActivities && (
         <EditActivityDialog
           activities={editingActivities}
-          knownTypes={facets.map((f) => f.type)}
+          knownTypes={facets}
           onClose={() => setEditingActivities(null)}
           onSaved={onActivityUpdated}
         />

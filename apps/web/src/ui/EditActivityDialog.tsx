@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { updateActivity, type Activity } from '../api';
+import type { TypeFacet } from './activityFacets';
+import { ActivityTypePicker } from './ActivityTypePicker';
 import { formatStartedAt } from './format';
 
 /** Mirrors the backend's own bounds (activities.go's maxActivityTypeLen/maxActivityNameLen/
@@ -23,11 +25,12 @@ const MAX_DESCRIPTION_LEN = 2000;
  * they render disabled with a tooltip explaining why rather than silently doing nothing or
  * (worse) overwriting every checked activity's name/description with one shared value.
  *
- * Type is a plain text field, not a select — §4.7.2 already resolved activity_type as
- * free-form, not a controlled vocabulary, and this is not the place to reintroduce one. The
- * `<datalist>` of `knownTypes` is a convenience (retyping "Ride" is a pick, not a retype),
- * never a constraint: anything typed here, including something nobody has used before
- * ("Solowheel", "Roadtrip"), saves exactly as typed, to every checked activity.
+ * Type is ActivityTypePicker.tsx — the same searchable picker as Settings' Country and
+ * Timezone, listing this account's existing types, but open-ended: §4.7.2 already resolved
+ * activity_type as free-form, not a controlled vocabulary, and this is not the place to
+ * reintroduce one. Picking an existing type is a convenience (retyping "Ride" is a pick, not
+ * a retype), never a constraint: typing something nobody has used before ("Solowheel",
+ * "Roadtrip") offers an "Add" row that saves it exactly as typed, to every checked activity.
  *
  * Name is optional, unlike Type — an activity with none simply falls back to its start
  * datetime as the row's primary line (ActivitiesPanel.tsx). It's never parsed from a source
@@ -38,10 +41,10 @@ export interface EditActivityDialogProps {
   /** At least one. A row click passes exactly one; the toolbar's Edit-selected button passes
    *  the whole checked group, whatever its size. */
   activities: Activity[];
-  /** Every distinct activity_type already in this account's loaded activities — the same set
-   *  the header toolbar's Type dropdown is built from (activityFacets.ts), reused here as
-   *  `<datalist>` suggestions rather than recomputed. */
-  knownTypes: string[];
+  /** Every distinct activity_type already in this account's loaded activities, with counts —
+   *  the same facets the header toolbar's Type dropdown is built from (activityFacets.ts),
+   *  reused here as the Type picker's list rather than recomputed. */
+  knownTypes: TypeFacet[];
   onClose: () => void;
   /** Called once the save actually lands, so the caller can refresh its own activity list —
    *  see ActivitiesPanel.tsx for why that's a plain reload() rather than local patching. */
@@ -132,23 +135,20 @@ export function EditActivityDialog({ activities, knownTypes, onClose, onSaved }:
         {single ? formatStartedAt(single.startedAt) : 'Only Type applies to every checked activity — see below.'}
       </p>
 
-      <label className="settings-page__section">
-        <span className="settings-page__label">Type</span>
-        <input
-          className="settings-page__input"
-          type="text"
-          list="edit-activity-type-suggestions"
+      {/* A <div>, not a <label> like the fields below: a label wrapping the picker would
+          forward every click inside its popover (search box included) to the trigger. */}
+      <div className="settings-page__section">
+        <span className="settings-page__label" id="edit-activity-type-label">
+          Type
+        </span>
+        <ActivityTypePicker
           value={activityType}
-          onChange={(e) => setActivityType(e.target.value)}
+          onChange={setActivityType}
+          known={knownTypes}
+          labelledBy="edit-activity-type-label"
           maxLength={MAX_ACTIVITY_TYPE_LEN}
-          autoFocus
         />
-        <datalist id="edit-activity-type-suggestions">
-          {knownTypes.map((t) => (
-            <option key={t} value={t} />
-          ))}
-        </datalist>
-      </label>
+      </div>
 
       <label className="settings-page__section" title={namedFieldsDisabledReason}>
         <span className="settings-page__label">Name</span>

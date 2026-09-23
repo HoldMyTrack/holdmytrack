@@ -303,7 +303,11 @@ body {
 /* EditActivityDialog.tsx (§4.7.4) — same real-<dialog>/showModal() shape as
    .placeholder-notice above, just wider (the description field needs the room) and its own
    form-field layout reuses .settings-page__* classes rather than duplicating them. */
+/* `overflow: visible` overrides the UA's `overflow: auto` on a modal dialog, so the Type
+   picker's dropdown (ActivityTypePicker.tsx) can hang past the dialog's bottom edge instead
+   of scrolling inside it. */
 .edit-activity-dialog {
+  overflow: visible;
   width: min(28rem, calc(100vw - 40px));
   margin: auto;
   padding: 20px;
