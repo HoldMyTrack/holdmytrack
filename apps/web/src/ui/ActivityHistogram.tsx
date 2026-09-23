@@ -1,5 +1,9 @@
 import type { HistogramBucket } from '../api';
+import { ChevronIcon } from './ChevronIcon';
+import { DateRangeSlider } from './DateRangeSlider';
+import { formatDayLabel } from './format';
 import { RangePicker, type DateRange } from './RangePicker';
+import { MOBILE_QUERY, useMediaQuery } from './useMediaQuery';
 
 /**
  * The docked bottom timeline. The interactive strip is
@@ -20,6 +24,14 @@ import { RangePicker, type DateRange } from './RangePicker';
  * buttons flank the chart itself rather than sitting in the legend — icon-only, actively styled
  * when there's somewhere
  * further to page (canPanEarlier/canPanLater below) and flatly inert otherwise.
+ *
+ * **On a phone, none of that.** The bars, handles and month rail are too small to use with a
+ * fingertip on a phone-width strip, and the legend costs height a short screen can't spare, so
+ * below index.css's phone breakpoint the whole footer is just DateRangeSlider.tsx — two knobs
+ * over a 15-day window of calendar days, stepped 5 days at a time by its own Earlier/Later
+ * buttons, with the selected dates under them. Switched in JS
+ * (`useMediaQuery`), not hidden with CSS, so the desktop chart isn't mounted and measuring
+ * itself behind a phone layout.
  */
 export interface ActivityHistogramProps {
   /** The days-with-activity currently on screen — see useActivityDays. */
@@ -44,14 +56,9 @@ export interface ActivityHistogramProps {
   selectedActiveDays: number;
   /** Forwarded straight to RangePicker.tsx — see its own doc comment. */
   onCapacityChange: (barsPerView: number) => void;
-}
-
-/** "9 MAR 2026", matching main-screen-v6.png's date labels. */
-function formatRangeLabel(date: string): string {
-  const d = new Date(`${date}T00:00:00Z`);
-  const day = d.getUTCDate();
-  const month = d.toLocaleDateString(undefined, { month: 'short', timeZone: 'UTC' }).toUpperCase();
-  return `${day} ${month} ${d.getUTCFullYear()}`;
+  /** The phone slider's two ends: this user's first activity day and today (YYYY-MM-DD). */
+  historyStart: string;
+  today: string;
 }
 
 export function ActivityHistogram({
@@ -65,9 +72,24 @@ export function ActivityHistogram({
   selectedRangeDays,
   selectedActiveDays,
   onCapacityChange,
+  historyStart,
+  today,
 }: ActivityHistogramProps) {
+  const isPhone = useMediaQuery(MOBILE_QUERY);
   const first = days[0];
   const last = days[days.length - 1];
+
+  if (isPhone) {
+    // A selection can predate what's been loaded as history's start only transiently (the
+    // default range resolves from the same page), but never let a knob sit off the scale.
+    const start = selectedRange.from < historyStart ? selectedRange.from : historyStart;
+    const end = selectedRange.to > today ? selectedRange.to : today;
+    return (
+      <footer className="activity-histogram activity-histogram--compact" data-testid="activity-histogram">
+        <DateRangeSlider first={start} last={end} value={selectedRange} onChange={onChangeSelection} />
+      </footer>
+    );
+  }
 
   return (
     <footer className="activity-histogram" data-testid="activity-histogram">
@@ -78,7 +100,7 @@ export function ActivityHistogram({
         <div className="activity-histogram__legend-block">
           <div className="activity-histogram__legend-label">Shown days</div>
           <div className="activity-histogram__range-label" data-testid="visible-window-label">
-            {first && last ? `${formatRangeLabel(first.date)} – ${formatRangeLabel(last.date)}` : '—'}
+            {first && last ? `${formatDayLabel(first.date)} – ${formatDayLabel(last.date)}` : '—'}
           </div>
           <div className="activity-histogram__stats">
             {first && last ? `${days.length} active ${days.length === 1 ? 'day' : 'days'}` : 'No activity days to show'}
@@ -88,7 +110,7 @@ export function ActivityHistogram({
         <div className="activity-histogram__legend-block">
           <div className="activity-histogram__legend-label">Selected range</div>
           <div className="activity-histogram__range-label" data-testid="selected-range-label">
-            {formatRangeLabel(selectedRange.from)} – {formatRangeLabel(selectedRange.to)}
+            {formatDayLabel(selectedRange.from)} – {formatDayLabel(selectedRange.to)}
           </div>
           <div className="activity-histogram__stats" data-testid="selected-range-stats">
             {selectedRangeDays}-day range · {selectedActiveDays} active {selectedActiveDays === 1 ? 'day' : 'days'}
@@ -130,16 +152,5 @@ export function ActivityHistogram({
         </button>
       </div>
     </footer>
-  );
-}
-
-/** A plain chevron for the icon-only Earlier/Later buttons — text labels moved to
- *  `aria-label`/`title` since the buttons now flank the chart at a fixed 34px width. */
-function ChevronIcon({ direction }: { direction: 'left' | 'right' }) {
-  const d = direction === 'left' ? 'M9 4l-6 6 6 6' : 'M7 4l6 6-6 6';
-  return (
-    <svg viewBox="0 0 16 16" width="14" height="14">
-      <path d={d} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
   );
 }

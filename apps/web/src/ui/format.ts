@@ -128,6 +128,15 @@ export function formatShortDate(iso: string): string {
   return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
+/** "9 MAR 2026" — the date-range footer's labels (ActivityHistogram.tsx's legend, the mobile
+ *  DateRangeSlider.tsx), per main-screen-v6.png. Takes a YYYY-MM-DD day, read as UTC so the
+ *  label is exactly that calendar day in every browser time zone. */
+export function formatDayLabel(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  const month = d.toLocaleDateString(undefined, { month: 'short', timeZone: 'UTC' }).toUpperCase();
+  return `${d.getUTCDate()} ${month} ${d.getUTCFullYear()}`;
+}
+
 /** "412 KB" / "1.4 MB" — a dropped or picked file's own size, before any network transfer
  *  has happened, so this can't come from the backend. Binary (1024-based) units, matching
  *  what every OS file picker and Chrome's own devtools already show for a local file. */

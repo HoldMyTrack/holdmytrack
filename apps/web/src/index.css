@@ -3116,91 +3116,84 @@ body {
     max-height: calc(100vh - 84px);
   }
 
-  /* RangePicker.tsx's drag handles are 14px wide at rest — mechanically draggable via touch
-     already (`touch-action: none` is set), but tight for a fingertip. Widened directly
-     rather than via a separate invisible overlay: at rest the handle renders nothing
-     visible (background only appears on hover/active), so a wider hitbox doesn't change
-     the resting appearance, and a wider active-state highlight during a real drag reads as
-     helpful feedback, not a visual bug. Not the full ~44px guideline — the chart itself is
-     often narrower than that on a small phone, and a handle that wide would routinely
-     overlap the opposite one on a short selected range. */
-  .range-picker__handle--start {
-    width: 30px;
-    left: -15px;
-  }
-
-  .range-picker__handle--end {
-    width: 30px;
-    right: -15px;
-  }
-
-  /* The legend column's fixed `var(--panel-width)` and the chart area's flanking buttons
-     don't fit side by side on a ~390px phone — found live the same way the old header-row
-     overflow was (a fixed-width sidebar-aligned column plus a chart area is exactly the
-     "two wide things side by side" shape that already broke once here; see
-     docs/IMPLEMENTATION.md's mobile browser support section for that earlier incident).
-     Stacked instead: legend on top at full width (matching .activities-panel's own mobile
-     `width: 100%` override — same reasoning, a fixed pixel width from panelWidth state makes
-     no sense once the sidebar itself becomes a full-width bottom sheet), chart area below.
-     Found live, a second time, stacking these two on top of each other: the taller stacked
-     footer's own chart area (Earlier/Later + the bars) now lands in the exact bottom 68px of
-     the viewport the collapsed Activities sheet (`position: fixed; bottom: 0`) always
-     occupies — a normal-flow element's position says nothing about what a fixed sibling
-     draws over it, so the sheet was hiding the Earlier/Later buttons entirely rather than
-     merely sitting beside them. This padding-bottom reserves that same 68px so the footer's
-     own real content clears it. The map's own bottom-anchored controls (the scale control,
-     attribution, `.track-metric-toggle`) need no matching offset of their own: the Activities
-     sheet only ever renders in `mapMode === 'normal'` (MapView.tsx), the one mode where this
-     very footer already exists too and already sits between the map's bottom edge and the
-     sheet — the map's real bottom edge never reaches down as far as the sheet in the first
-     place. A now-removed rule lifted those controls anyway, apparently on the assumption the
-     sheet sat flush against the map; with this footer already separating them, that lift just
-     pushed the scale control and attribution text needlessly high up the screen — reported
-     live as them landing "in the middle of the window." */
-  .activity-histogram {
-    flex-direction: column;
+  /* The phone footer is just DateRangeSlider.tsx — ActivityHistogram.tsx swaps out the bar
+     chart and legend below this breakpoint, so none of their desktop rules need a phone
+     variant. Its bottom padding reserves the collapsed Activities sheet's ~68px (plus a
+     little air under the date labels): the sheet is `position: fixed; bottom: 0`, and a
+     normal-flow footer's position says nothing about what a fixed sibling draws over it, so
+     without this the sheet covers the slider. The map's own bottom-anchored controls (the
+     scale control, attribution, `.track-metric-toggle`) need no matching offset: the sheet
+     only renders in `mapMode === 'normal'`, the one mode where this footer also exists and
+     already sits between the map's bottom edge and the sheet. */
+  .activity-histogram--compact {
     height: auto;
-    padding-bottom: 68px;
+    padding: 10px 12px 76px;
   }
+}
 
-  /* Desktop stacks Shown days/Selected range as two full-width blocks in a column sized to
-     its own content (see the base rule's own comment on why side-by-side there truncated
-     dates). On a phone that column becomes this whole footer's full width instead, so the
-     truncation risk that ruled out side-by-side is gone — folded into one row of two columns
-     here so the legend doesn't cost the footer two whole stacked blocks' worth of height on
-     an already-short screen. */
-  .activity-histogram__legend {
-    flex-direction: row;
-    width: 100%;
-    padding: 8px 14px;
-    gap: 12px;
-    border-right: none;
-    border-bottom: 1px solid var(--fm-border);
-  }
+/* DateRangeSlider.tsx — the track line and accent fill are DistanceFilter's own
+   .activity-filters__track/__fill rules; the knobs are its own, and the whole 28px row is the
+   pointer target (a press goes to the nearer knob), so a knob can be narrow without being
+   hard to grab. The track sits inset by half a knob so a knob at either end stays on screen. */
+.date-range-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
 
-  .activity-histogram__legend-block {
-    flex: 1;
-    min-width: 0;
-    text-align: left;
-  }
+/* Earlier · track · Later. The buttons reuse the desktop footer's .range-picker__page look. */
+.date-range-slider__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 
-  .activity-histogram__legend-block:last-child {
-    text-align: right;
-  }
+.date-range-slider__page {
+  width: 32px;
+  height: 32px;
+  touch-action: none;
+}
 
-  .activity-histogram__chart-area {
-    padding: 6px 14px;
-  }
+.date-range-slider__track {
+  position: relative;
+  flex: 1;
+  height: 28px;
+  margin: 0 7px;
+  touch-action: none;
+  cursor: pointer;
+}
 
-  /* `.activity-histogram` is `height: auto` here (it stacks legend above chart-area instead
-     of the desktop row), so there's no definite height for `align-items: stretch` to resolve
-     against — without an explicit height, `.range-picker__chart` (whose own children are all
-     `position: absolute` and so contribute no intrinsic height of their own) would collapse
-     to 0px. Desktop doesn't need this: `.activity-histogram`'s own fixed 104px height is
-     definite, and stretch carries it down through `.activity-histogram__chart-area` to these
-     same two elements correctly. */
-  .range-picker__chart,
-  .range-picker__page {
-    height: 64px;
-  }
+.date-range-slider__track .activity-filters__track,
+.date-range-slider__track .activity-filters__fill {
+  top: 13px;
+}
+
+/* A tall, narrow pill: finger height, but narrow enough that two knobs one day (~18px)
+   apart — the closest they can get — still read as two separate knobs with a gap between. */
+.date-range-slider__knob {
+  position: absolute;
+  top: 1px;
+  width: 14px;
+  height: 26px;
+  box-sizing: border-box;
+  transform: translateX(-50%);
+  border-radius: 7px;
+  border: 2px solid var(--fm-accent);
+  background: var(--fm-surface);
+  box-shadow: 0 1px 3px rgb(var(--fm-ink-rgb) / 20%);
+}
+
+.date-range-slider__knob:focus-visible {
+  outline: 2px solid var(--fm-accent);
+  outline-offset: 2px;
+}
+
+.date-range-slider__labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgb(var(--fm-ink-rgb) / 65%);
 }
