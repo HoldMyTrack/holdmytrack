@@ -993,6 +993,8 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
           selectedRangeDays={selectedRangeDays}
           selectedActiveDays={selectedActiveDays}
           onCapacityChange={setBarsPerView}
+          historyStart={earliest ?? selectedRange?.from ?? today}
+          today={today}
         />
       )}
     </div>

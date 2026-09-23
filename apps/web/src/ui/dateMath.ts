@@ -1,14 +1,11 @@
 /**
  * Day arithmetic on plain YYYY-MM-DD strings.
  *
- * This was a larger module — addDays/dayDiff/clampDate/clampWindow — back when the range
- * picker panned by calendar days and had to keep a `[earliest, today]` window's span intact
- * while clamping it. It pages by days-with-activity now (useActivityDays), which is index
- * arithmetic over an array, so most of that stopped being reachable: the strings sort
- * lexicographically in chronological order, so comparing and clamping dates elsewhere needs
- * no helper at all. `dayDiff` earns its keep back on its own — MapView still needs a real
- * calendar-day count for the histogram header's "N days" stat, which is a question about
- * elapsed time, not about paging through bars.
+ * Deliberately small: the desktop range picker pages by days-with-activity
+ * (useActivityDays), which is index arithmetic over an array, and the strings sort
+ * lexicographically in chronological order, so comparing and clamping dates needs no helper
+ * at all. What's here answers questions about elapsed calendar time: MapView's "N-day range"
+ * stat (`dayDiff`), and the mobile date slider's calendar-day scale (`dayDiff`/`addDays`).
  */
 
 /** "What day is it" for the caller's own browser — the local calendar day, matching what a
@@ -27,4 +24,11 @@ export function todayLocal(): string {
  *  avoids an off-by-one from a DST transition landing inside the range. */
 export function dayDiff(from: string, to: string): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+}
+
+/** `date` moved by `days` calendar days (negative for earlier) — UTC-parsed for the same DST
+ *  reason as dayDiff. The mobile date slider (DateRangeSlider.tsx) works in day offsets from
+ *  its first day and needs this to turn a knob position back into a date. */
+export function addDays(date: string, days: number): string {
+  return new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 }
