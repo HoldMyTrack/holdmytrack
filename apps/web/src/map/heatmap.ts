@@ -1,5 +1,6 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { API_BASE_URL, TILES_V1 } from '../api';
+import { versionedTileURL } from './coverageVersion';
 import { CITY_MIN_ZOOM, COUNTRY_MAX_ZOOM, REGION_MAX_ZOOM, REGION_MIN_ZOOM } from './zoomTiers';
 
 /**
@@ -43,7 +44,7 @@ export function ensureHeatmapLayer(map: MapLibreMap, beforeId: string | undefine
   if (!map.getSource(HEATMAP_SOURCE_ID)) {
     map.addSource(HEATMAP_SOURCE_ID, {
       type: 'raster',
-      tiles: [HEATMAP_TILE_URL],
+      tiles: [versionedTileURL(HEATMAP_TILE_URL)],
       tileSize: 512,
       minzoom: 0,
       maxzoom: 14,
@@ -65,7 +66,7 @@ export function ensureHeatmapLayer(map: MapLibreMap, beforeId: string | undefine
   if (!map.getSource(COUNTRY_HEATMAP_SOURCE_ID)) {
     map.addSource(COUNTRY_HEATMAP_SOURCE_ID, {
       type: 'vector',
-      tiles: [COUNTRY_HEATMAP_TILE_URL],
+      tiles: [versionedTileURL(COUNTRY_HEATMAP_TILE_URL)],
       minzoom: 0,
       maxzoom: COUNTRY_MAX_ZOOM,
     });
@@ -89,7 +90,7 @@ export function ensureHeatmapLayer(map: MapLibreMap, beforeId: string | undefine
   if (!map.getSource(REGION_HEATMAP_SOURCE_ID)) {
     map.addSource(REGION_HEATMAP_SOURCE_ID, {
       type: 'vector',
-      tiles: [REGION_HEATMAP_TILE_URL],
+      tiles: [versionedTileURL(REGION_HEATMAP_TILE_URL)],
       minzoom: REGION_MIN_ZOOM,
       maxzoom: REGION_MAX_ZOOM,
     });
@@ -108,5 +109,18 @@ export function ensureHeatmapLayer(map: MapLibreMap, beforeId: string | undefine
       },
       beforeId,
     );
+  }
+}
+
+/** Re-points this mode's sources at the current coverage version (coverageVersion.ts), so
+ *  MapLibre refetches every tile — the caller bumps the version first. A no-op for a source
+ *  that isn't on the map yet; ensureHeatmapLayer will create it at the current version. */
+export function refreshHeatmapLayers(map: MapLibreMap): void {
+  for (const [sourceId, url] of [
+    [HEATMAP_SOURCE_ID, HEATMAP_TILE_URL],
+    [COUNTRY_HEATMAP_SOURCE_ID, COUNTRY_HEATMAP_TILE_URL],
+    [REGION_HEATMAP_SOURCE_ID, REGION_HEATMAP_TILE_URL],
+  ] as const) {
+    (map.getSource(sourceId) as { setTiles?: (tiles: string[]) => unknown } | undefined)?.setTiles?.([versionedTileURL(url)]);
   }
 }

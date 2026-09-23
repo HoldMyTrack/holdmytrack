@@ -240,6 +240,35 @@ func RenderActivityMasks(ctx context.Context, pool *pgxpool.Pool, store *storage
 	return err
 }
 
+// RemoveActivityMasks deletes one activity's masks for the given tiles, both the
+// activity_tile_masks rows and their objects — the tiles an edited track (internal/ingest's
+// ProcessTrackEdit) no longer touches. Rows go first: a render_fog pass running in between
+// then simply composites without them, rather than failing on a row whose object is gone.
+func RemoveActivityMasks(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, activityID string, tiles [][2]int) error {
+	if len(tiles) == 0 {
+		return nil
+	}
+	xs := make([]int32, 0, len(tiles))
+	ys := make([]int32, 0, len(tiles))
+	for _, t := range tiles {
+		xs = append(xs, int32(t[0]))
+		ys = append(ys, int32(t[1]))
+	}
+	if _, err := pool.Exec(ctx, `
+		DELETE FROM activity_tile_masks m
+		USING unnest($3::int[], $4::int[]) AS t(x, y)
+		WHERE m.activity_id = $1 AND m.zoom = $2 AND m.tile_x = t.x AND m.tile_y = t.y
+	`, activityID, Zoom, xs, ys); err != nil {
+		return err
+	}
+	for _, t := range tiles {
+		if err := store.Remove(ctx, activityMaskObjectKey(activityID, Zoom, t[0], t[1])); err != nil {
+			return fmt.Errorf("remove activity mask z%d/%d/%d: %w", Zoom, t[0], t[1], err)
+		}
+	}
+	return nil
+}
+
 func activityMaskObjectKey(activityID string, zoom, x, y int) string {
 	return fmt.Sprintf("activity-masks/%s/%d/%d/%d.png", activityID, zoom, x, y)
 }

@@ -114,6 +114,9 @@ export interface ActivitiesPanelProps {
    *  (deleting changes distance/duration, editing never does) — MapView's own
    *  handleActivitiesDeleted does more than a plain reload. */
   onActivitiesDeleted: (ids: string[]) => void;
+  /** §4.7.7's Edit track — the toolbar action over exactly one checked activity. MapView owns
+   *  the session itself (hiding the other tracks, the flight, the editor window). */
+  onEditTrack: (activity: Activity) => void;
   /** FR-3.7's "Not yet built" gap, closed: activities cross-source dedup took out of
    *  circulation, each alongside the richer copy that superseded it — mirrors the Android
    *  app's own duplicates section (`SyncStatusActivity`). Never filtered by the date range or
@@ -149,6 +152,7 @@ export function ActivitiesPanel({
   onToggleGroupVisibility,
   onActivityUpdated,
   onActivitiesDeleted,
+  onEditTrack,
   duplicates,
   duplicatesError,
 }: ActivitiesPanelProps) {
@@ -286,6 +290,22 @@ export function ActivitiesPanel({
   // (about to reveal) once any checked activity is currently hidden, open otherwise — matching
   // MapView's toggleGroupVisibility rule (show the whole group the moment any of it is hidden).
   const groupHasHidden = checkedActivities.some((a) => hiddenIds.has(a.id));
+
+  // Edit track works on one activity's points, so it needs exactly one checked row — and one
+  // with a track to edit that isn't already mid-reprocess.
+  const editTrackTarget = checkedActivities.length === 1 ? checkedActivities[0]! : null;
+  const editTrackReason = readOnly
+    ? 'Not available for demo accounts — create an account to edit tracks'
+    : editTrackTarget === null
+      ? 'Check exactly one activity to edit its track'
+      : editTrackTarget.pending
+        ? 'This track is still being processed'
+        : editTrackTarget.bbox === null
+          ? 'No track recorded for this activity'
+          : null;
+  // Pending rows can't be edited or deleted until their reprocess lands — the job would
+  // otherwise race the edit or delete for the same row.
+  const groupHasPending = checkedActivities.some((a) => a.pending);
 
   return (
     <div
@@ -444,8 +464,18 @@ export function ActivitiesPanel({
         </button>
         <button
           type="button"
+          className="activities-panel__edit-track"
+          disabled={editTrackReason !== null}
+          onClick={() => editTrackTarget && onEditTrack(editTrackTarget)}
+          aria-label="Edit the checked activity's track"
+          title={editTrackReason ?? 'Edit track — chop, cut, or delete points'}
+        >
+          <ScissorsIcon />
+        </button>
+        <button
+          type="button"
           className="activities-panel__delete"
-          disabled={readOnly || checked.size === 0}
+          disabled={readOnly || checked.size === 0 || groupHasPending}
           onClick={() => setDeletingGroup(true)}
           aria-label="Delete every checked activity"
           title={readOnly ? 'Not available for demo accounts — create an account to delete activities' : 'Delete checked group'}
@@ -471,6 +501,7 @@ export function ActivitiesPanel({
           const isFocused = focusedId === activity.id;
           const isHovered = hoveredId === activity.id;
           const isHidden = hiddenIds.has(activity.id);
+          const isPending = activity.pending;
           // A user-entered name (§4.7's revised decision) leads; started_at is the fallback
           // for a row that has none — never the reverse, so an activity's date doesn't
           // disappear from the list just because it also has a name (shown in the meta line
@@ -482,6 +513,7 @@ export function ActivitiesPanel({
           // Bold on the map is the union of checked and focused — the row highlight matches.
           if (isChecked || isFocused) classes.push('activities-panel__row--selected');
           if (isHidden) classes.push('activities-panel__row--hidden');
+          if (isPending) classes.push('activities-panel__row--pending');
           return (
             <li
               key={activity.id}
@@ -499,12 +531,16 @@ export function ActivitiesPanel({
                 type="checkbox"
                 className="activities-panel__checkbox"
                 checked={isChecked}
+                // A pending row (§4.7.7) is disabled until its reprocess lands, except that an
+                // already-checked one can still be unchecked.
+                disabled={isPending && !isChecked}
                 aria-label={isChecked ? `Remove ${label} from selection` : `Add ${label} to selection`}
                 onChange={() => onToggle(activity.id)}
               />
               <button
                 type="button"
                 className="activities-panel__text"
+                disabled={isPending}
                 aria-pressed={isFocused}
                 aria-label={`Fly to ${label}`}
                 title={activity.bbox === null ? 'No track recorded for this activity' : label}
@@ -523,6 +559,11 @@ export function ActivitiesPanel({
                   {formatActivityType(activity.activityType)}
                 </span>
               </button>
+              {isPending && (
+                <span className="activities-panel__hidden-badge" title="Applying your track edit">
+                  Pending
+                </span>
+              )}
               {isHidden && <span className="activities-panel__hidden-badge">Hidden</span>}
             </li>
           );
@@ -665,6 +706,19 @@ function TrashIcon() {
       />
       <line x1="6.5" y1="7" x2="6.5" y2="11.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
       <line x1="9.5" y1="7" x2="9.5" y2="11.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Scissors for §4.7.7's Edit track — same viewBox/stroke weight as the rest of the toolbar
+ *  family. */
+function ScissorsIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15">
+      <circle cx="4.2" cy="11.8" r="2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="11.8" cy="11.8" r="2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <line x1="5.6" y1="10.4" x2="12" y2="1.8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <line x1="10.4" y1="10.4" x2="4" y2="1.8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
     </svg>
   );
 }

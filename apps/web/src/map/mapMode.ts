@@ -19,8 +19,12 @@ export type MapMode = 'normal' | 'fog' | 'heatmap';
  * Applies visibility for all three overlay layers per mode. A no-op for whichever layer
  * isn't on the map yet (relevant right after a styledata swap, before reattachOverlays has
  * re-added everything) rather than throwing.
+ *
+ * `editingTrack` is the Edit track session (§4.7.7): every other activity disappears while
+ * one is being edited, and the edited one is drawn by its own overlay (trackEdit.ts), so the
+ * shared tracks layer and its bands are hidden outright rather than filtered.
  */
-export function setMapMode(map: MapLibreMap, mode: MapMode): void {
+export function setMapMode(map: MapLibreMap, mode: MapMode, editingTrack = false): void {
   setVisible(map, FOG_LAYER_ID, mode === 'fog');
   setVisible(map, COUNTRY_FOG_LAYER_ID, mode === 'fog');
   setVisible(map, REGION_FOG_LAYER_ID, mode === 'fog');
@@ -28,11 +32,11 @@ export function setMapMode(map: MapLibreMap, mode: MapMode): void {
   setVisible(map, COUNTRY_HEATMAP_LAYER_ID, mode === 'heatmap');
   setVisible(map, REGION_HEATMAP_LAYER_ID, mode === 'heatmap');
   // Tracks stay visible only in Normal — both Fog and Heatmap hide them (§4.2.2).
-  setVisible(map, TRACKS_LAYER_ID, mode === 'normal');
+  setVisible(map, TRACKS_LAYER_ID, mode === 'normal' && !editingTrack);
   // FR-4.8: a focused activity's colored zone segments are a second layer over the shared
   // tracks layer (trackBands.ts) — not covered by the tracks toggle above — so switching to
   // Fog/Heatmap has to hide it too, or it keeps rendering over the raster.
-  setVisible(map, BAND_LAYER_ID, mode === 'normal');
+  setVisible(map, BAND_LAYER_ID, mode === 'normal' && !editingTrack);
 }
 
 function setVisible(map: MapLibreMap, layerId: string, visible: boolean): void {

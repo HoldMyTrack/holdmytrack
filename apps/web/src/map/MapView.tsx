@@ -6,8 +6,9 @@ import { WORLD_VIEW } from './config';
 import { countryView } from './countryView';
 import { exportFramedImage } from './exportMap';
 import type { ExportPreset } from './exportPresets';
-import { ensureFogLayer } from './fog';
-import { ensureHeatmapLayer } from './heatmap';
+import { bumpCoverageVersion } from './coverageVersion';
+import { ensureFogLayer, refreshFogLayers } from './fog';
+import { ensureHeatmapLayer, refreshHeatmapLayers } from './heatmap';
 import { setMapMode, type MapMode } from './mapMode';
 import { labelInsertionPoint } from './layers';
 import { type Flavor } from './style';
@@ -20,6 +21,7 @@ import {
   setSelectedTracks,
   setTrackInteractivityHandlers,
 } from './tracks';
+import { useCoverageRefresh } from './useCoverageRefresh';
 import { useMapInstance } from './useMapInstance';
 import { DEFAULT_FLAVOR, parseHash, replaceHash, type HashState, type ViewState } from './viewState';
 import { getActivityTrackMetrics, type Activity, type ActivityTrackMetrics } from '../api';
@@ -27,6 +29,7 @@ import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
 import { ActivitiesPanel } from '../ui/ActivitiesPanel';
 import { ActivityHistogram } from '../ui/ActivityHistogram';
+import { EditTrackPanel } from '../ui/EditTrackPanel';
 import { ExportButton } from '../ui/ExportButton';
 import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
 import { dayDiff, todayLocal } from '../ui/dateMath';
@@ -44,6 +47,10 @@ import { useDuplicates } from '../ui/useDuplicates';
  *  the old explicit "Fit map" button — see IMPLEMENTATION.md §4.7) — long enough that ticking
  *  three boxes in a row flies once, at the end, not three times. */
 const SELECTION_FLY_DEBOUNCE_MS = 300;
+
+/** How often the list is re-read while an Edit track reprocess is pending — the job is one
+ *  activity's worth of ingest, so a few seconds is the right order of magnitude. */
+const EDIT_PENDING_POLL_MS = 2000;
 
 export interface MapViewProps {
   /** Wires the account menu's "Profile" item — App.tsx owns which screen is showing, MapView
@@ -146,6 +153,14 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
   // trackMetrics.heartrateAvailable says every point actually has one.
   const [trackMetrics, setTrackMetrics] = useState<ActivityTrackMetrics | null>(null);
   const [bandMetric, setBandMetric] = useState<BandMetric>('speed');
+  // Bumped when an Edit track reprocess finishes, so the focused activity's bands/profile are
+  // refetched against its new points — the fetch below is otherwise keyed on the id alone.
+  const [trackMetricsVersion, setTrackMetricsVersion] = useState(0);
+
+  // The Edit track session (§4.7.7) — at most one activity at a time. While it's set, every
+  // other track is hidden, the panel and timeline are inert, and EditTrackPanel owns the map.
+  const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
+  const editingTrack = editingActivityId !== null;
 
   // The list/summary filter — the highlighted band in the range picker. The picker's own pan
   // position is not here on purpose: it lives in useActivityDays and the two are independent,
@@ -311,6 +326,10 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
     () => new Set(activities.map((a) => a.startedAt.slice(0, 10))).size,
     [activities],
   );
+
+  // Rows with an Edit track reprocess still pending (§4.7.7) — read by the polling and
+  // completion effects further down, and by the bands effect.
+  const pendingIds = useMemo(() => activities.filter((a) => a.pending).map((a) => a.id), [activities]);
 
   const activityDistanceBounds = useMemo(() => distanceBounds(activities), [activities]);
   const facets = useMemo(() => typeFacets(activities, distanceFilter), [activities, distanceFilter]);
@@ -612,13 +631,17 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
   // hoveredActivityId state below. Clicking away from every track (onClickAway) clears focus
   // the same way — reported live as the missing counterpart to clicking a track — but leaves
   // the checked group alone, matching that the two never touch each other in either direction.
+  //
+  // While a track is being edited the tracks layer is hidden, so every click would read as a
+  // click away — and in Delete point mode, every click is aimed at a point. The handlers go
+  // quiet for the session instead.
   useEffect(() => {
-    setTrackInteractivityHandlers({
-      onSelect: focusActivity,
-      onHover: setHoveredActivityId,
-      onClickAway: () => setFocusedActivityId(null),
-    });
-  }, [focusActivity]);
+    setTrackInteractivityHandlers(
+      editingTrack
+        ? { onSelect: () => {}, onHover: () => {}, onClickAway: () => {} }
+        : { onSelect: focusActivity, onHover: setHoveredActivityId, onClickAway: () => setFocusedActivityId(null) },
+    );
+  }, [focusActivity, editingTrack]);
 
   // The single source of truth for which tracks are bold on the map: the union of the checked
   // group and the focused row, however each got that way — a row's checkbox for the former, a
@@ -671,7 +694,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
         if (!controller.signal.aborted) setTrackMetrics(null);
       });
     return () => controller.abort();
-  }, [focusedActivityId]);
+  }, [focusedActivityId, trackMetricsVersion]);
 
   // Draws (or clears) the colored zone segments themselves — separate from the fetch effect
   // above so switching the Pace/Heart rate toggle re-renders instantly from data already in
@@ -681,14 +704,22 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
   // same track (trackBands.ts's own doc comment), kept painting it regardless, since this
   // effect never checked mapHiddenIds. Re-showing it draws the band again from data already in
   // hand, no refetch, same as the Pace/Heart rate toggle above.
+  //
+  // Nor while the focused activity has a track edit pending: the metrics in hand describe its
+  // pre-edit points, and the bands are drawn wider than and on top of the track itself, so
+  // they'd paint the old shape over the new one until the refetch lands.
+  const focusedPending = useMemo(
+    () => focusedActivityId !== null && pendingIds.includes(focusedActivityId),
+    [focusedActivityId, pendingIds],
+  );
   useEffect(() => {
     if (!map) return;
-    if (trackMetrics && focusedActivityId !== null && !mapHiddenIds.has(focusedActivityId)) {
+    if (trackMetrics && focusedActivityId !== null && !mapHiddenIds.has(focusedActivityId) && !focusedPending) {
       setTrackBands(map, trackMetrics.points, bandMetric);
     } else {
       clearTrackBands(map);
     }
-  }, [map, trackMetrics, bandMetric, focusedActivityId, mapHiddenIds]);
+  }, [map, trackMetrics, bandMetric, focusedActivityId, mapHiddenIds, focusedPending]);
 
   // The blue band's effect on the map: when the selected date range changes, the tracks
   // layer's own tile query has to change with it, or the map keeps showing activities
@@ -705,6 +736,11 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
   // (both called once in `reattachOverlays` below, with no query) never have anything to
   // refresh against.
 
+  // Fog/Heatmap are re-rendered by a queued job after an upload or delete, so they can't be
+  // refetched right away like the tracks layer — this waits for the account's coverage jobs
+  // to drain, then refetches both (useCoverageRefresh.ts).
+  const watchCoverage = useCoverageRefresh(map);
+
   // A finished upload is a new track on the map and a new row in every §4.7 response, so
   // refresh all four together rather than let the header badge fall behind the geometry.
   const handleUploaded = useCallback(() => {
@@ -714,7 +750,9 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
     reloadHistogram();
     // A finished upload/sync is also the one thing that can produce a new duplicate.
     duplicates.refresh();
-  }, [map, activityQuery, reloadActivities, reloadTotals, reloadHistogram, duplicates.refresh]);
+    // Deletes come through here too (handleActivitiesDeleted), so this covers both.
+    watchCoverage();
+  }, [map, activityQuery, reloadActivities, reloadTotals, reloadHistogram, duplicates.refresh, watchCoverage]);
 
   // §4.7.5/§4.7.6: one or more deleted activities need the exact same four-part refresh a
   // finished upload does (unlike editing type/description, deleting changes distance/duration
@@ -747,6 +785,89 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
     [handleUploaded],
   );
 
+  // §4.7.7's Edit track: the toolbar's action over exactly one checked activity. Flies there
+  // the same way a row click does, then hands the map to EditTrackPanel until it closes.
+  const startEditTrack = useCallback(
+    (activity: Activity) => {
+      setHoveredActivityId(null);
+      setEditingActivityId(activity.id);
+      fitToSelection([activity]);
+    },
+    [fitToSelection],
+  );
+  // Activities whose edit was applied from this tab and whose finished reprocess hasn't been
+  // picked up yet — see the completion effect below for why seeing the row go Pending isn't
+  // enough on its own.
+  const awaitingEditIdsRef = useRef<Set<string>>(new Set());
+  const closeEditTrack = useCallback(
+    (applied: boolean) => {
+      if (applied && editingActivityId !== null) awaitingEditIdsRef.current.add(editingActivityId);
+      setEditingActivityId(null);
+      // The row now reads Pending — the effects below poll until the reprocess lands.
+      if (applied) reloadActivities();
+    },
+    [editingActivityId, reloadActivities],
+  );
+  const editingActivity = useMemo(
+    () => (editingActivityId === null ? null : (activities.find((a) => a.id === editingActivityId) ?? null)),
+    [activities, editingActivityId],
+  );
+  // The session can't outlive its activity — deleted from another tab, say, and gone from the
+  // next reload. Without this the map would stay locked with no editor left to close it.
+  useEffect(() => {
+    if (editingActivityId !== null && editingActivity === null && !activitiesLoading) setEditingActivityId(null);
+  }, [editingActivityId, editingActivity, activitiesLoading]);
+
+  // While any row is pending, re-read the list every few seconds. Keyed on `activities`
+  // itself, so each landed reload schedules the next and polling stops by itself once nothing
+  // is pending any more.
+  useEffect(() => {
+    if (pendingIds.length === 0) return;
+    const timer = window.setTimeout(reloadActivities, EDIT_PENDING_POLL_MS);
+    return () => window.clearTimeout(timer);
+  }, [pendingIds, reloadActivities]);
+
+  // A row that stops being pending has new points, distance and duration: the drawn track,
+  // the totals, the timeline bars and (if it's focused) its bands all need the new version.
+  //
+  // Two ways to tell a reprocess finished. A row seen Pending and now not is the obvious one,
+  // but it misses the common case: the job is often done within milliseconds of being
+  // claimed, before the list reload Apply triggers has even come back, so that row is never
+  // seen Pending at all — found live, with the focused activity's bands still drawing the
+  // pre-edit shape over the edited track. So an activity applied from this tab also counts as
+  // finished the first time a list fetched after the Apply shows it not pending. Keyed on
+  // `pendingIds`, a new array per fetched list, and the list fetch Apply starts aborts any
+  // earlier one, so every list this sees after the Apply really was fetched after it.
+  const previousPendingRef = useRef<ReadonlySet<string>>(new Set());
+  const lastPendingIdsRef = useRef<string[] | null>(null);
+  useEffect(() => {
+    // Only a newly fetched list says anything new — the other dependencies (the map, the
+    // range) re-run this against the list already in hand, which may predate the Apply.
+    if (pendingIds === lastPendingIdsRef.current) return;
+    lastPendingIdsRef.current = pendingIds;
+    const now = new Set(pendingIds);
+    let finished = [...previousPendingRef.current].some((id) => !now.has(id));
+    previousPendingRef.current = now;
+    for (const id of awaitingEditIdsRef.current) {
+      if (now.has(id)) continue;
+      awaitingEditIdsRef.current.delete(id);
+      finished = true;
+    }
+    if (!finished) return;
+    if (map) {
+      refreshTrackLayer(map, activityQuery);
+      // The server re-renders the account's Fog/Heatmap tiles before it clears Pending
+      // (ProcessTrackEdit), so fetching them again now gets the edited coverage — including
+      // the Country/Region tiers, since an edit can un-visit a region too.
+      bumpCoverageVersion();
+      refreshFogLayers(map);
+      refreshHeatmapLayers(map);
+    }
+    reloadTotals();
+    reloadHistogram();
+    setTrackMetricsVersion((v) => v + 1);
+  }, [pendingIds, map, activityQuery, reloadTotals, reloadHistogram]);
+
   /**
    * Re-attach anything that is not part of the basemap style.
    *
@@ -772,7 +893,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
       // see trackBands.ts's own doc comment for why this is a second layer rather than a
       // change to the shared one.
       ensureBandLayer(instance, beforeId);
-      setMapMode(instance, mapMode);
+      setMapMode(instance, mapMode, editingTrack);
       // Same reasoning as setMapMode just above: addLayer always starts the tracks layer
       // with no filter, so a styledata that recreates it would otherwise silently un-hide
       // everything the eye icon/TYPE/DISTANCE filters had hidden. Both setMapMode and
@@ -784,11 +905,11 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
       // styledata mid-focus would otherwise silently wipe whatever bands were showing until
       // the selection happened to change again. Same mapHiddenIds check as the live effect
       // above: a styledata while the focused activity is hidden must not repaint its band.
-      if (trackMetrics && focusedActivityId !== null && !mapHiddenIds.has(focusedActivityId)) {
+      if (trackMetrics && focusedActivityId !== null && !mapHiddenIds.has(focusedActivityId) && !focusedPending) {
         setTrackBands(instance, trackMetrics.points, bandMetric);
       }
     },
-    [mapMode, mapHiddenIds, activityQuery, trackMetrics, bandMetric, focusedActivityId],
+    [mapMode, editingTrack, mapHiddenIds, activityQuery, trackMetrics, bandMetric, focusedActivityId, focusedPending],
   );
 
   useEffect(() => {
@@ -810,8 +931,8 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
   // need to flip the layer's visibility — reattachOverlays only re-runs on styledata.
   useEffect(() => {
     if (!map) return;
-    setMapMode(map, mapMode);
-  }, [map, mapMode]);
+    setMapMode(map, mapMode, editingTrack);
+  }, [map, mapMode, editingTrack]);
 
   // Keep the hash current. `moveend` rather than `move`: one rewrite per gesture,
   // not one per animation frame.
@@ -839,35 +960,41 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
 
       <div className="app-body">
         {mapMode === 'normal' && (
-          <ActivitiesPanel
-            readOnly={isDemo}
-            activities={filteredActivities}
-            loading={activitiesLoading}
-            error={activitiesError}
-            totals={totals}
-            facets={facets}
-            excludedTypes={excludedTypes}
-            onToggleType={toggleType}
-            distanceBounds={activityDistanceBounds}
-            distanceFilter={distanceFilter}
-            onChangeDistance={setDistanceFilter}
-            onResetFilters={resetActivityFilters}
-            checked={checkedActivityIds}
-            focusedId={focusedActivityId}
-            hoveredId={hoveredActivityId}
-            onToggle={toggleActivityChecked}
-            onFocus={focusActivity}
-            onHoverActivity={setHoveredActivityId}
-            onClear={clearSelection}
-            onSelectAll={selectAll}
-            onShowSelected={showSelected}
-            hiddenIds={hiddenActivityIds}
-            onToggleGroupVisibility={toggleGroupVisibility}
-            onActivityUpdated={reloadActivities}
-            onActivitiesDeleted={handleActivitiesDeleted}
-            duplicates={duplicates.duplicates}
-            duplicatesError={duplicates.error}
-          />
+          // Inert for the whole Edit track session: changing the range, the selection or a
+          // filter underneath an open editor would pull the activity out from under it.
+          // display: contents keeps the wrapper out of the flex layout.
+          <div className="edit-track-lock" inert={editingTrack}>
+            <ActivitiesPanel
+              readOnly={isDemo}
+              activities={filteredActivities}
+              loading={activitiesLoading}
+              error={activitiesError}
+              totals={totals}
+              facets={facets}
+              excludedTypes={excludedTypes}
+              onToggleType={toggleType}
+              distanceBounds={activityDistanceBounds}
+              distanceFilter={distanceFilter}
+              onChangeDistance={setDistanceFilter}
+              onResetFilters={resetActivityFilters}
+              checked={checkedActivityIds}
+              focusedId={focusedActivityId}
+              hoveredId={hoveredActivityId}
+              onToggle={toggleActivityChecked}
+              onFocus={focusActivity}
+              onHoverActivity={setHoveredActivityId}
+              onClear={clearSelection}
+              onSelectAll={selectAll}
+              onShowSelected={showSelected}
+              hiddenIds={hiddenActivityIds}
+              onToggleGroupVisibility={toggleGroupVisibility}
+              onActivityUpdated={reloadActivities}
+              onActivitiesDeleted={handleActivitiesDeleted}
+              onEditTrack={startEditTrack}
+              duplicates={duplicates.duplicates}
+              duplicatesError={duplicates.error}
+            />
+          </div>
         )}
 
         <div className="map-root">
@@ -888,33 +1015,36 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
               onCancel={handleExportCancel}
             />
           )}
-          <div className="map-mode-toggle" role="group" aria-label="Map mode" data-testid="map-mode-toggle">
-            <button
-              type="button"
-              className={mapMode === 'normal' ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
-              aria-pressed={mapMode === 'normal'}
-              onClick={() => changeMapMode('normal')}
-            >
-              Normal
-            </button>
-            <button
-              type="button"
-              className={mapMode === 'fog' ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
-              aria-pressed={mapMode === 'fog'}
-              onClick={() => changeMapMode('fog')}
-            >
-              Fog
-            </button>
-            <button
-              type="button"
-              className={mapMode === 'heatmap' ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
-              aria-pressed={mapMode === 'heatmap'}
-              onClick={() => changeMapMode('heatmap')}
-            >
-              Heatmap
-            </button>
-          </div>
-          {trackMetrics && (
+          {map && editingActivity && <EditTrackPanel map={map} activity={editingActivity} onClose={closeEditTrack} />}
+          {!editingTrack && (
+            <div className="map-mode-toggle" role="group" aria-label="Map mode" data-testid="map-mode-toggle">
+              <button
+                type="button"
+                className={mapMode === 'normal' ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
+                aria-pressed={mapMode === 'normal'}
+                onClick={() => changeMapMode('normal')}
+              >
+                Normal
+              </button>
+              <button
+                type="button"
+                className={mapMode === 'fog' ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
+                aria-pressed={mapMode === 'fog'}
+                onClick={() => changeMapMode('fog')}
+              >
+                Fog
+              </button>
+              <button
+                type="button"
+                className={mapMode === 'heatmap' ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
+                aria-pressed={mapMode === 'heatmap'}
+                onClick={() => changeMapMode('heatmap')}
+              >
+                Heatmap
+              </button>
+            </div>
+          )}
+          {trackMetrics && !editingTrack && (
             <div className="track-metric-toggle" data-testid="track-metric-toggle">
               {/* Only worth a toggle when there's something to toggle to — an activity with
                   no heart-rate coverage just shows pace, with no single-option control for
@@ -950,20 +1080,22 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
       </div>
 
       {mapMode === 'normal' && (
-        <ActivityHistogram
-          days={visibleDays}
-          onPan={panBy}
-          pageStep={pageStep}
-          canPanEarlier={canPanEarlier}
-          canPanLater={canPanLater}
-          selectedRange={selectedRange ?? { from: today, to: today }}
-          onChangeSelection={changeSelectedRange}
-          selectedRangeDays={selectedRangeDays}
-          selectedActiveDays={selectedActiveDays}
-          onCapacityChange={setBarsPerView}
-          historyStart={earliest ?? selectedRange?.from ?? today}
-          today={today}
-        />
+        <div className="edit-track-lock" inert={editingTrack}>
+          <ActivityHistogram
+            days={visibleDays}
+            onPan={panBy}
+            pageStep={pageStep}
+            canPanEarlier={canPanEarlier}
+            canPanLater={canPanLater}
+            selectedRange={selectedRange ?? { from: today, to: today }}
+            onChangeSelection={changeSelectedRange}
+            selectedRangeDays={selectedRangeDays}
+            selectedActiveDays={selectedActiveDays}
+            onCapacityChange={setBarsPerView}
+            historyStart={earliest ?? selectedRange?.from ?? today}
+            today={today}
+          />
+        </div>
       )}
     </div>
   );

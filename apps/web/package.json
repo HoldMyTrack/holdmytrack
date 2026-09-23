@@ -13,7 +13,8 @@
     "build:style": "node scripts/build-style.mjs",
     "verify:style": "node scripts/build-style.mjs --check",
     "verify:map": "node --test tests/smoke.mjs",
-    "verify:build": "node --test tests/build.mjs"
+    "verify:build": "node --test tests/build.mjs",
+    "test:unit": "node --test tests/editTrackOps.test.mjs"
   },
   "dependencies": {
     "@protomaps/basemaps": "5.7.2",

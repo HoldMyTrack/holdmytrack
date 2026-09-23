@@ -76,7 +76,8 @@ func parseActivityFilter(q url.Values, loc *time.Location) (activityFilter, erro
 // below shares that same order for the same reason.
 const listActivitiesQuery = `
 SELECT id, started_at, activity_type, name, distance_meters, duration_seconds, description,
-       ST_XMin(trajectory), ST_YMin(trajectory), ST_XMax(trajectory), ST_YMax(trajectory)
+       ST_XMin(trajectory), ST_YMin(trajectory), ST_XMax(trajectory), ST_YMax(trajectory),
+       edit_pending, track_edit IS NOT NULL
 FROM activities
 WHERE user_id = $1
   AND superseded_by IS NULL
@@ -113,6 +114,11 @@ type activityRow struct {
 	// [minLon, minLat, maxLon, maxLat] — GeoJSON's bbox ordering — or null when the row has
 	// no geometry. §3.3 allows a null trajectory, and a client must not fly the map nowhere.
 	BBox []float64 `json:"bbox"`
+	// Pending is true while an Edit track reprocess (§4.7.7) is queued or running — the row's
+	// numbers and geometry are still the pre-edit ones. Edited is true once the track carries
+	// a user edit, which is what makes "Reset to original track" meaningful.
+	Pending bool `json:"pending"`
+	Edited  bool `json:"edited"`
 }
 
 // rowScanner is the common surface of pgx.Row (QueryRow) and pgx.Rows (Query's iteration) —
@@ -129,7 +135,7 @@ func scanActivityRow(row rowScanner) (activityRow, error) {
 	// either has a trajectory or doesn't, but pgx has no reason to know that.
 	var minLon, minLat, maxLon, maxLat *float64
 	if err := row.Scan(&a.ID, &a.StartedAt, &a.ActivityType, &a.Name, &a.DistanceMeters, &a.DurationSeconds, &a.Description,
-		&minLon, &minLat, &maxLon, &maxLat); err != nil {
+		&minLon, &minLat, &maxLon, &maxLat, &a.Pending, &a.Edited); err != nil {
 		return activityRow{}, err
 	}
 	if minLon != nil && minLat != nil && maxLon != nil && maxLat != nil {
@@ -202,7 +208,8 @@ const maxActivityNameLen = 200
 // trackMetricsQuery — a non-owned or nonexistent id is indistinguishable from "not found."
 const activityByIDQuery = `
 SELECT id, started_at, activity_type, name, distance_meters, duration_seconds, description,
-       ST_XMin(trajectory), ST_YMin(trajectory), ST_XMax(trajectory), ST_YMax(trajectory)
+       ST_XMin(trajectory), ST_YMin(trajectory), ST_XMax(trajectory), ST_YMax(trajectory),
+       edit_pending, track_edit IS NOT NULL
 FROM activities
 WHERE id = $1 AND user_id = $2`
 

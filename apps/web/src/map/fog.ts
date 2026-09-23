@@ -1,14 +1,16 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { API_BASE_URL, TILES_V1 } from '../api';
+import { versionedTileURL } from './coverageVersion';
 import { CITY_MIN_ZOOM, COUNTRY_MAX_ZOOM, REGION_MAX_ZOOM, REGION_MIN_ZOOM } from './zoomTiers';
 
 /**
  * The Fog of War raster layer (IMPLEMENTATION.md §4.2). Unlike tracks, Fog of War is never
  * scoped by the date range/TYPE/DISTANCE/hidden-track state that drives Normal mode — it
  * shows true all-time coverage, unconditionally (a place once cleared stays cleared, which is
- * the whole point of the mechanic). There is therefore no query to build or refresh: one
- * fixed tile URL, set once and never changed. See heatmap.ts, which has its own fixed URL for
- * the same reason, just a different fixed rolling window computed server-side.
+ * the whole point of the mechanic). There is therefore no query to build: one fixed tile URL,
+ * changed only by the cache-busting version coverageVersion.ts bumps when an Edit track
+ * changes coverage under an open page. See heatmap.ts, which has its own fixed URL for the
+ * same reason, just a different fixed rolling window computed server-side.
  *
  * Below city zoom (§4.2.4), this per-pixel raster is replaced entirely by the Country/Region
  * fill layers below — the two tiers are mutually exclusive by MapLibre `minzoom`/`maxzoom`,
@@ -48,7 +50,7 @@ export function ensureFogLayer(map: MapLibreMap, beforeId: string | undefined): 
   if (!map.getSource(FOG_SOURCE_ID)) {
     map.addSource(FOG_SOURCE_ID, {
       type: 'raster',
-      tiles: [FOG_TILE_URL],
+      tiles: [versionedTileURL(FOG_TILE_URL)],
       tileSize: 512,
       minzoom: 0,
       maxzoom: 14,
@@ -70,7 +72,7 @@ export function ensureFogLayer(map: MapLibreMap, beforeId: string | undefined): 
   if (!map.getSource(COUNTRY_FOG_SOURCE_ID)) {
     map.addSource(COUNTRY_FOG_SOURCE_ID, {
       type: 'vector',
-      tiles: [COUNTRY_FOG_TILE_URL],
+      tiles: [versionedTileURL(COUNTRY_FOG_TILE_URL)],
       minzoom: 0,
       maxzoom: COUNTRY_MAX_ZOOM,
     });
@@ -94,7 +96,7 @@ export function ensureFogLayer(map: MapLibreMap, beforeId: string | undefined): 
   if (!map.getSource(REGION_FOG_SOURCE_ID)) {
     map.addSource(REGION_FOG_SOURCE_ID, {
       type: 'vector',
-      tiles: [REGION_FOG_TILE_URL],
+      tiles: [versionedTileURL(REGION_FOG_TILE_URL)],
       minzoom: REGION_MIN_ZOOM,
       maxzoom: REGION_MAX_ZOOM,
     });
@@ -113,5 +115,18 @@ export function ensureFogLayer(map: MapLibreMap, beforeId: string | undefined): 
       },
       beforeId,
     );
+  }
+}
+
+/** Re-points this mode's sources at the current coverage version (coverageVersion.ts), so
+ *  MapLibre refetches every tile — the caller bumps the version first. A no-op for a source
+ *  that isn't on the map yet; ensureFogLayer will create it at the current version. */
+export function refreshFogLayers(map: MapLibreMap): void {
+  for (const [sourceId, url] of [
+    [FOG_SOURCE_ID, FOG_TILE_URL],
+    [COUNTRY_FOG_SOURCE_ID, COUNTRY_FOG_TILE_URL],
+    [REGION_FOG_SOURCE_ID, REGION_FOG_TILE_URL],
+  ] as const) {
+    (map.getSource(sourceId) as { setTiles?: (tiles: string[]) => unknown } | undefined)?.setTiles?.([versionedTileURL(url)]);
   }
 }

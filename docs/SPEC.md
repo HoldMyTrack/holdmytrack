@@ -4,7 +4,7 @@
 | :-- | :-- |
 | **Version** | 1.0 |
 | **Status** | Current — describes Phase 0/1 functionality as built |
-| **Last updated** | 2026-09-20 |
+| **Last updated** | 2026-09-23 |
 | **Related documents** | `VISION.md` (product scope, market rationale, phase roadmap — the authority on *what ships and why*); `ARCHITECTURE.md` (system-level shape, key decisions, the stack); `IMPLEMENTATION.md` (schema, each feature's own implementation — the authority on *how it's built*); `AGENTS.md` (repository orientation) |
 
 ## 1. Introduction
@@ -15,7 +15,7 @@ This document specifies FitMap's functional behavior as currently implemented: w
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and privacy trim, FR-1.7; email verification, FR-1.8), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, the date-range picker, the per-account activity graph, password recovery, and distance/time trends (FR-9 below).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and privacy trim, FR-1.7; email verification, FR-1.8), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), the date-range picker, the per-account activity graph, password recovery, and distance/time trends (FR-9 below).
 
 **Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), explorer-tile gamification, the rest of "Export" (story cards, animated reveals — high-resolution map export itself is built, FR-4.10 below), and user-defined privacy zones (a `privacy_zones` table exists in the schema — `IMPLEMENTATION.md` §3.7 — but no endpoint or UI creates or applies one today; only the endpoint-trim privacy control in FR-8.1 below, user-adjustable via FR-1.7's Settings page, is functional). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against FitMap being a health or fitness advisor, and pace/heart-rate stay as per-activity route context (FR-4.9) rather than an analysed, all-time performance record. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
@@ -255,7 +255,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 2. Each file uploads independently, as its own `POST /v1/activities/upload` request (multipart), and is tracked independently — one file failing does not affect the others.
 3. For each file: server validates its extension and size, computes a content hash to check for a duplicate (FR-3.5), persists the raw file, and enqueues a background parsing job.
 4. The Files tab shows each file's live status (uploading, with a progress percentage; then "Processing…") until the background job finishes.
-5. Once ingestion completes, the activity appears automatically in the Activities panel, the map, and every summary that reflects the current date range — no page reload is required.
+5. Once ingestion completes, the activity appears automatically in the Activities panel, the map, and every summary that reflects the current date range — no page reload is required. Its Fog-of-War/Heatmap coverage follows a few seconds later, once the background re-render finishes, also without a reload.
 
 **Outputs**: One new `Activity` per successfully ingested file, each with a parsed trajectory, distance, duration, and (where the source file provides it) heart rate/elevation data.
 
@@ -575,7 +575,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Behavior**:
 1. Clicking the toolbar's Delete icon opens a confirmation dialog naming how many activities are checked and their combined distance, stating plainly that this can't be undone; nothing is deleted until the user confirms.
 2. Confirming removes every checked activity and everything derived from each one: its recorded stream data and its rendered coverage masks.
-3. The Fog-of-War/Heatmap view updates to reflect the deletion — coverage a deleted activity was the only source for reverts to unrevealed, not left showing stale coverage for data that no longer exists.
+3. The Fog-of-War/Heatmap view updates to reflect the deletion — coverage a deleted activity was the only source for reverts to unrevealed, not left showing stale coverage for data that no longer exists. An open page picks this up on its own once the background re-render finishes, without a reload.
 4. Canceling the confirmation, or dismissing it, leaves every checked activity untouched.
 
 **Outputs**: Every deleted activity, and everything derived from it, no longer exists; every list, filter, total, and aggregate that previously included it reflects the removal, in one combined refresh rather than once per deleted activity.
@@ -596,6 +596,32 @@ All upload functionality requires an active session (demo or registered — FR-1
 ### FR-5.13 Delete group
 
 **Description**: The header toolbar's Delete icon — see FR-5.11, which this number and FR-5.11 both describe: deleting one activity and deleting several are the same mechanism, not two.
+
+### FR-5.14 Edit track
+
+**Description**: A signed-in user removes unwanted recorded points from one of their activities — typically the stretch recorded after forgetting to stop a GPS recorder (wandering a mall, sitting at home), which inflates distance and duration and draws noise onto the map and into Fog-of-War/Heatmap coverage. Three edits are offered: Chop (keep only the part between two points), Cut (remove the part between two points and join them), and Delete point (remove single points). The original recording is never modified, so an edit can always be reset.
+
+**Preconditions**: Active session, not a demo account; exactly one activity is checked (FR-5.6); that activity has a recorded track, isn't a superseded duplicate (FR-3.7), and isn't already Pending (behavior 7 below). The toolbar's Edit track icon is disabled otherwise, with a tooltip saying why.
+
+**Inputs**: The toolbar's Edit track icon over the one checked activity; then, inside the editor, a two-knob range slider, the Chop/Cut/Delete point/Undo/Reset/Cancel/Apply buttons, and clicks on points on the map.
+
+**Behavior**:
+1. Opening the editor flies the map to the activity (the same fit as FR-5.5's row click), hides every other activity's track, and draws this one from its full-resolution recorded points — every point visible — rather than the simplified display track. The points are the ones the activity is processed from: already privacy-trimmed (FR-8.1) with the account's current trim, so the trimmed-off ends are never sent to the client. The Activities panel, the date-range picker, and the map-mode toggle are inert for the whole session.
+2. The slider's two knobs start at the track's ends and are positioned along the track in recording order (point by point, not by distance — a stationary stretch is many points over almost no distance). The readout shows each knob's distance from the start and its clock time. Moving the knobs only previews: the part outside the knobs is drawn dashed and faded, and hovering Cut switches the preview to the part between them, with the two knob points joined straight across.
+3. **Chop** keeps only the points from one knob to the other, inclusive. **Cut** removes the points strictly between the knobs, keeping both knob points and joining them. **Delete point** toggles a mode in which clicking a point on the map removes it. Each is one step; after Chop or Cut the knobs return to the new track's ends. None of them can leave fewer than two points — the buttons are disabled, and a point click is ignored, when it would.
+4. **Undo** reverts exactly one step, and can be repeated back through every step of the session to the track as it was when the editor opened (also Cmd/Ctrl+Z). **Reset** (shown whenever the track currently has any edit, including one saved in an earlier session) returns to the track as originally recorded, as one more undoable step. **Cancel** discards every step of the session, restores the map, and closes the editor; nothing is saved.
+5. **Apply** (enabled once there is at least one step) sends the session's net result as one edit and closes the editor. The server stores it and reprocesses the activity in the background from its original recording: distance, duration, moving time, elevation gain, start time (a Chop can move it), the display track, per-point stream data, its Fog-of-War/Heatmap coverage (FR-4.2/FR-4.3), and its country/region matches (FR-4.2's zoomed-out tiers) are all recomputed. A Cut's joining segment counts toward distance; the time gap it spans counts toward elapsed duration but not moving time.
+6. Reprocessing does not re-run cross-source duplicate detection (FR-3.7): the edited activity stays whichever copy it was.
+7. Until reprocessing finishes the activity is **Pending**: its row shows a Pending badge with its pre-edit numbers, its text and checkbox are disabled, and Edit track and Delete are unavailable for it. The Activities panel re-reads the list every few seconds while any row is Pending; Pending lasts until everything in behavior 5 is recomputed, Fog-of-War and Heatmap included; when it clears, the row, the totals, the date-range picker's bars, the drawn track, and the Fog-of-War/Heatmap layers (at every zoom tier) all update without a page reload. If reprocessing fails, the activity simply stops being Pending and keeps its previous track and numbers.
+8. An edit is stored as ranges and points identified by recording time, not by position in the point list, so it keeps meaning the same points if the privacy trim later changes. A track whose timestamps are missing or run backwards can't be edited.
+
+**Outputs**: The activity's stored edit (none, after a Reset) and every value derived from its points, as listed in behavior 5.
+
+**Error cases**:
+- The activity doesn't exist, belongs to another account, is a superseded duplicate, or already has an edit Pending → `409 Conflict` on Apply, indistinguishable from each other; opening the editor on an activity that doesn't exist or belongs to another account → `404 Not Found`.
+- The activity has no stored original recording, or its timestamps are missing or run backwards → `409 Conflict` when opening the editor, shown in the editor window.
+- A range whose start is after its end → `400 Bad Request`.
+- An edit that would leave fewer than two points (possible only through the API directly) → accepted, then fails during reprocessing; the activity is left as it was.
 
 ## 8. FR-6 — Date Range Picker
 
@@ -645,7 +671,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Description**: Every uploaded activity has its start and end trimmed by a radius (100 meters by default) before being stored or rendered, so a recorded route never reveals the exact location an activity started or ended (typically home). The radius is user-adjustable (FR-1.7's Settings page, "Privacy trim"), 0–200 meters, 0 meaning trimming is turned off entirely.
 
-**Behavior**: Applied automatically to every ingested activity, at ingest time. Changing the value in Settings only affects uploads from that point forward — it is not retroactive: already-ingested activities keep whatever trim was in effect when they were processed, and the only way to re-trim one against a new value is to re-upload the original file (privacy trimming happens server-side against the raw payload each time, never against already-persisted, already-trimmed points).
+**Behavior**: Applied automatically to every ingested activity, at ingest time. Changing the value in Settings only affects uploads from that point forward — it is not retroactive: already-ingested activities keep whatever trim was in effect when they were processed. The exception is an activity reprocessed by an Edit track (FR-5.14), which is re-trimmed with the account's current value as part of that reprocessing (privacy trimming happens server-side against the raw payload each time, never against already-persisted, already-trimmed points).
 
 ### FR-8.2 Data isolation
 
