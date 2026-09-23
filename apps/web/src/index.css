@@ -2222,6 +2222,14 @@ body {
   color: var(--fm-ink);
 }
 
+/* Onboarding's one-paragraph explanation under the title (SettingsPage's `onboarding` prop). */
+.settings-page__intro {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: rgb(var(--fm-ink-rgb) / 70%);
+}
+
 .settings-page__section {
   display: flex;
   flex-direction: column;
@@ -2576,11 +2584,6 @@ body {
   font-size: 8.5px;
   font-weight: 700;
   color: rgb(var(--fm-ink-rgb) / 60%);
-}
-
-.search-picker__flag--none {
-  border: 1px dashed rgb(var(--fm-ink-rgb) / 25%);
-  box-shadow: none;
 }
 
 .search-picker__empty {

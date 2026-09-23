@@ -46,9 +46,12 @@ export interface SearchPickerProps {
   noun: string;
   /** The search input's placeholder; "Search" unless the list is open-ended. */
   placeholder?: string;
-  /** An extra first row whose value is `''` — Country's "Not set (metric)". Shown while
+  /** An extra first row whose value is `''`, for a field that can be left unset. Shown while
    *  browsing the whole list, left out of search results. */
   unsetOption?: PickerOption;
+  /** What the closed picker shows while `value` is `''` and no row carries that value — a
+   *  prompt for a required field (Country's "Choose a country"), never itself selectable. */
+  emptyLabel?: string;
   /** Makes the list open-ended: while the search text doesn't exactly match an existing
    *  option, this builds an extra last row from it (EditActivityDialog's "Add “Solowheel”"),
    *  so the search field doubles as the field for entering a new value. Returns null for text
@@ -76,6 +79,7 @@ export function SearchPicker({
   noun,
   placeholder = 'Search',
   unsetOption,
+  emptyLabel,
   createOption,
 }: SearchPickerProps) {
   const [open, setOpen] = useState(false);
@@ -201,6 +205,8 @@ export function SearchPicker({
               <span className={`search-picker__label${selected.value ? '' : ' search-picker__label--unset'}`}>{selected.label}</span>
               <span className="search-picker__detail">{selected.detail}</span>
             </>
+          ) : value === '' && emptyLabel ? (
+            <span className="search-picker__label search-picker__label--unset">{emptyLabel}</span>
           ) : (
             // A value the list doesn't carry (e.g. a timezone this browser's tz database
             // doesn't know) — shown as-is rather than blank, like the old <select>'s extra option.
