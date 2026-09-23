@@ -5,7 +5,7 @@
   "sources": {
     "protomaps": {
       "type": "vector",
-      "url": "pmtiles://__FITMAP_BASEMAP_ORIGIN__/basemap/ohio.pmtiles",
+      "url": "pmtiles://__FITMAP_BASEMAP_ORIGIN__/basemap/basemap.pmtiles",
       "attribution": "<a href=\"https://protomaps.com\">Protomaps</a> © <a href=\"https://openstreetmap.org\">OpenStreetMap</a>"
     }
   },

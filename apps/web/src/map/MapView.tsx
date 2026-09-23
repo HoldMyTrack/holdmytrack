@@ -2,16 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { flyToBBox, flyToView, unionBBox } from './bbox';
-import { browserOrigin, WORLD_VIEW } from './config';
+import { WORLD_VIEW } from './config';
 import { countryView } from './countryView';
-import { centreIsOutside, readCoverageBounds, type CoverageBounds } from './coverage';
 import { exportFramedImage } from './exportMap';
 import type { ExportPreset } from './exportPresets';
 import { ensureFogLayer } from './fog';
 import { ensureHeatmapLayer } from './heatmap';
 import { setMapMode, type MapMode } from './mapMode';
 import { labelInsertionPoint } from './layers';
-import { archiveUrl, type Flavor } from './style';
+import { type Flavor } from './style';
 import { clearTrackBands, ensureBandLayer, setTrackBands, type BandMetric } from './trackBands';
 import {
   ensureTrackLayer,
@@ -28,7 +27,6 @@ import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
 import { ActivitiesPanel } from '../ui/ActivitiesPanel';
 import { ActivityHistogram } from '../ui/ActivityHistogram';
-import { CoverageNotice } from '../ui/CoverageNotice';
 import { ExportButton } from '../ui/ExportButton';
 import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
 import { dayDiff, todayLocal } from '../ui/dateMath';
@@ -108,8 +106,6 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
   });
 
   const container = useRef<HTMLDivElement>(null);
-  const [bounds, setBounds] = useState<CoverageBounds | null>(null);
-  const [outside, setOutside] = useState(false);
   const [exportFlow, setExportFlow] = useState<ExportFlow>({ stage: 'idle' });
   const [exportError, setExportError] = useState<string | null>(null);
   // Normal is what already rendered before fog existed — it needed no new work to count
@@ -832,33 +828,6 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
     };
   }, [map]);
 
-  // Coverage bounds come from the archive header, so the notice can never drift
-  // out of sync with whatever extract is actually deployed.
-  useEffect(() => {
-    let cancelled = false;
-    readCoverageBounds(archiveUrl(browserOrigin()))
-      .then((value) => {
-        if (!cancelled) setBounds(value);
-      })
-      .catch((error: unknown) => {
-        // Non-fatal: without bounds we simply never show the notice.
-        console.error('Could not read basemap coverage bounds', error);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!map || !bounds) return;
-    const check = () => setOutside(centreIsOutside(map, bounds));
-    check();
-    map.on('moveend', check);
-    return () => {
-      map.off('moveend', check);
-    };
-  }, [map, bounds]);
-
   return (
     <div className="app-shell">
       <Header
@@ -945,7 +914,6 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
               Heatmap
             </button>
           </div>
-          {outside && <CoverageNotice />}
           {trackMetrics && (
             <div className="track-metric-toggle" data-testid="track-metric-toggle">
               {/* Only worth a toggle when there's something to toggle to — an activity with

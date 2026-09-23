@@ -199,22 +199,7 @@ describe('basemap foundation', () => {
     assert.match(html, /openstreetmap\.org/, 'OpenStreetMap link');
   });
 
-  it('7. leaving the extract shows the coverage notice, not a grey void', async () => {
-    assert.equal(
-      await page.getByTestId('coverage-notice').count(),
-      0,
-      'notice hidden inside coverage',
-    );
-
-    // Indianapolis — comfortably outside the Ohio bbox.
-    await page.evaluate(() => window.__fitmap.jumpTo({ center: [-86.1581, 39.7684], zoom: 11 }));
-    await page.getByTestId('coverage-notice').waitFor({ state: 'visible', timeout: 10_000 });
-
-    await page.evaluate(() => window.__fitmap.jumpTo({ center: [-82.9988, 39.9612], zoom: 12 }));
-    await page.getByTestId('coverage-notice').waitFor({ state: 'hidden', timeout: 10_000 });
-  });
-
-  it('8. renders a screenshot for visual diffing', async () => {
+  it('7. renders a screenshot for visual diffing', async () => {
     await page.evaluate(() => window.__fitmap.jumpTo({ center: [-82.9988, 39.9612], zoom: 12 }));
     await styleLoaded();
     await page.waitForFunction(() => window.__fitmap.areTilesLoaded(), undefined, {

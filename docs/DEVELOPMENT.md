@@ -23,11 +23,11 @@ Env vars (`POSTGRES_*`, `S3_*`) are Compose interpolation, set in `/.env` (see `
 Confirmed working end to end as of 2026-09-13 (`linux/aarch64` VM, Docker 29.7.2, Compose v5.5.1) — re-confirmed repeatedly since via `verify:map`/`verify:build` after each feature, most recently password recovery. Re-run the full checklist below after any change to `compose.yaml`, either Dockerfile, or the Vite config — containerisation is the part most likely to break silently.
 
 1. `docker compose up` → `localhost:5173` renders Columbus with streets, labels and sprites, in both light and dark.
-2. Edit `apps/web/src/ui/CoverageNotice.tsx` on the host → the container's Vite logs an `hmr update` line within a second or two, with no manual refresh needed. If not, set `VITE_WATCH_POLL=1` and confirm that was the cause.
-3. `curl -H "Range: bytes=0-1023" http://localhost:5173/basemap/ohio.pmtiles` → `206`, never a full-file `200`.
-4. `docker compose --profile test run --rm test npm run verify:map` → all 8 checks pass.
+2. Edit `apps/web/src/ui/VersionBanner.tsx` on the host → the container's Vite logs an `hmr update` line within a second or two, with no manual refresh needed. If not, set `VITE_WATCH_POLL=1` and confirm that was the cause.
+3. `curl -H "Range: bytes=0-1023" http://localhost:5173/basemap/basemap.pmtiles` → `206`, never a full-file `200`.
+4. `docker compose --profile test run --rm test npm run verify:map` → all 7 checks pass.
 5. `docker compose --profile test run --rm test sh -c 'npm run build && npm run verify:build'` → all 4 checks pass, including the worker-asset check.
-6. `docker compose run --rm web pmtiles show public/basemap/ohio.pmtiles` → z0–14, 63,948 addressed tiles, proving no host binary is needed.
+6. `docker compose run --rm web pmtiles show public/basemap/basemap.pmtiles` → z0–14, 63,948 addressed tiles, proving no host binary is needed.
 7. `cd apps/web && npm run dev` still works and binds loopback-only (`Network: use --host to expose`) since `VITE_DEV_HOST` is unset outside the container — the container is the default path, not the only one.
 
 Step 4 was the riskiest part of the whole design going in: SwiftShader WebGL under headless Chromium on `linux/arm64` was the one combination that had never been verified. It passed cleanly on first run.
@@ -69,7 +69,7 @@ Local development runs in Docker; the containerised path is the default, not the
 docker compose up                   # web on :5173, api on :8080, plus db/minio/worker
 docker compose --profile test run --rm test npm run verify:map
 docker compose --profile test run --rm test sh -c 'npm run build && npm run verify:build'
-docker compose run --rm web pmtiles show public/basemap/ohio.pmtiles
+docker compose run --rm web pmtiles show public/basemap/basemap.pmtiles
 
 curl -F file=@activity.gpx http://localhost:8080/v1/activities/upload
 docker compose exec db psql -U fitmap -d fitmap -c 'SELECT * FROM activities;'

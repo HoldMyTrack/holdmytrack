@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# Cut the FitMap basemap extract from a remote Protomaps planet build.
+# Cut the dev basemap extract from a remote Protomaps planet build. Production serves the
+# whole planet build unmodified from R2 (docs/DEPLOY.md §5), so nothing there is cut here.
 #
 # Nothing close to the 138 GB planet build is downloaded: pmtiles extract reads the
 # remote archive over HTTP range requests and pulls only the tiles inside BBOX.
@@ -23,7 +24,7 @@ BBOX=-84.85,38.35,-80.50,42.35          # minLon,minLat,maxLon,maxLat
 # TODO: resolve the newest key automatically from that URL when BUILD is unset, keeping
 # this pin as an explicit override — otherwise the next re-cut past the retention window
 # fails with a 404 and no obvious cause (root README, "Known costs").
-BUILD=https://build.protomaps.com/20260910.pmtiles
+BUILD=https://build.protomaps.com/20260922.pmtiles
 
 # z14, not z15. The planet build is z0-15 and the top level carries roughly three
 # quarters of the bytes; for a statewide bbox that is the difference between a
@@ -33,7 +34,8 @@ MAXZOOM=14
 
 cd "$(dirname "$0")/.."
 mkdir -p public/basemap
-OUT="public/basemap/${REGION}.pmtiles"
+# One fixed name whatever the region, because config.ts's PMTILES_PATH names it.
+OUT="public/basemap/basemap.pmtiles"
 
 if [[ -n "${DRY_RUN:-}" ]]; then
   pmtiles extract "$BUILD" "$OUT" \
