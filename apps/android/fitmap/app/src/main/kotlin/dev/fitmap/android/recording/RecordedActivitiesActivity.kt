@@ -158,6 +158,15 @@ class RecordedActivitiesActivity : AppCompatActivity() {
             },
         )
 
+        val previewSize = (48 * resources.displayMetrics.density).toInt()
+        row.addView(
+            TrackSilhouetteView(this).apply {
+                setPoints(record.points)
+                contentDescription = getString(R.string.recorded_row_preview)
+            },
+            LinearLayout.LayoutParams(previewSize, previewSize).apply { marginEnd = previewSize / 4 },
+        )
+
         val textColumn = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)

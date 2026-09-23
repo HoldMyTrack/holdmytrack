@@ -286,6 +286,25 @@ object FitMapApi {
         call(request, ::parseBounds, onResult)
     }
 
+    /**
+     * How many of the account's activities use each `activity_type` — what the GPS Logger's
+     * Type picker lists, the same per-type counts the web client's Type facet is built from.
+     * Read from the same unpaginated `GET /v1/activities` as [activityBounds], since there is
+     * no dedicated facets endpoint and this list already carries every live row.
+     */
+    fun activityTypeCounts(onResult: (Result<Map<String, Int>>) -> Unit) {
+        val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/activities").build()
+        call(request, { body ->
+            val activities = JSONObject(body).getJSONArray("activities")
+            buildMap {
+                for (i in 0 until activities.length()) {
+                    val type = activities.getJSONObject(i).optString("activity_type")
+                    if (type.isNotEmpty()) merge(type, 1, Int::plus)
+                }
+            }
+        }, onResult)
+    }
+
     private fun parseBounds(body: String): DoubleArray? {
         val activities = JSONObject(body).getJSONArray("activities")
         var union: DoubleArray? = null
