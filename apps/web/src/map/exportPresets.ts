@@ -1,15 +1,15 @@
 /**
- * Platform image-size presets for the frame-and-capture export flow (`ExportPresetDialog.tsx`,
- * `ExportFrame.tsx`). Dimensions from Hootsuite's social-media-image-sizes guide
+ * Platform image-size presets for the frame-and-capture export flow (`ExportFrame.tsx`'s shape
+ * dropdown, `exportMap.ts`'s output size). Dimensions from Hootsuite's social-media-image-sizes guide
  * (blog.hootsuite.com/social-media-image-sizes-guide), profile-picture and cover-photo sizes
  * excluded — this feature frames map content, not an account avatar. A standalone data file
- * rather than inline in a component, since both the picker dialog and the capture pipeline's
+ * rather than inline in a component, since both the shape dropdown and the capture pipeline's
  * target-dimension lookup need it, and platform-declared sizes are the kind of thing worth
  * being able to find and refresh in one place without hunting through UI code.
  *
- * `group`/`row` double as the picker's grid coordinates — platform columns, resolution rows —
- * not just a label; `EXPORT_PLATFORMS`/`EXPORT_PRESET_ROWS` fix the column/row order so the
- * dialog doesn't hardcode a second copy of it.
+ * `group`/`row` are the dropdown's structure — one option group per platform, one option per
+ * resolution row — not just a label; `EXPORT_PLATFORMS`/`EXPORT_PRESET_ROWS` fix that order so
+ * the dropdown doesn't hardcode a second copy of it.
  */
 export interface ExportPreset {
   id: string;

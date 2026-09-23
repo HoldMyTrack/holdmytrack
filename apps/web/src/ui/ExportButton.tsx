@@ -4,10 +4,11 @@ export interface ExportButtonProps {
   /** `null` before the live map has finished loading — the button stays disabled until
    *  then, same as every other map-dependent control in this app. */
   map: MapLibreMap | null;
-  /** Opens the shape-picker (`ExportPresetDialog.tsx`) — this button no longer captures
-   *  directly. Busy/error state now belongs to the frame's own capture step
-   *  (`ExportFrame.tsx`), since the picker/frame/capture sequence spans components this
-   *  button doesn't own. */
+  /** Whether the export frame is currently shown — the button reads as pressed while it is. */
+  active: boolean;
+  /** Shows the export frame (`ExportFrame.tsx`), or puts it away if it's already shown — this
+   *  button never captures directly. Busy/error state belongs to the frame's own Capture
+   *  step, since the frame/capture sequence spans components this button doesn't own. */
   onOpen: () => void;
 }
 
@@ -19,9 +20,16 @@ export interface ExportButtonProps {
  * instance is" reasoning Header.tsx's own doc comment already gives for why `importControl`
  * is a prop.
  */
-export function ExportButton({ map, onOpen }: ExportButtonProps) {
+export function ExportButton({ map, active, onOpen }: ExportButtonProps) {
   return (
-    <button type="button" className="export-button" data-testid="export-button" onClick={onOpen} disabled={!map}>
+    <button
+      type="button"
+      className="export-button"
+      data-testid="export-button"
+      aria-pressed={active}
+      onClick={onOpen}
+      disabled={!map}
+    >
       Export
     </button>
   );

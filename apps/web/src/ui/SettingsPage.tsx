@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react';
 import { API_BASE_URL, removeAvatar, updateSettings, uploadAvatar } from '../api';
 import { useAuth } from '../auth/AuthContext';
-import { COUNTRIES } from './countries';
+import { CountryPicker } from './CountryPicker';
 import { elevationUnitLabel, feetToMeters, metersToFeet } from './format';
 import { Header } from './Header';
-import { TIMEZONES } from './timezones';
+import { TimezonePicker } from './TimezonePicker';
 import { unitSystemForCountry, type UnitSystem } from './units';
 
 const MAX_PRIVACY_TRIM_CM = 20000;
@@ -41,7 +41,7 @@ function trimDisplay(cm: number, system: UnitSystem): string {
  * Avatar and Name/Country/Timezone/Privacy Trim are two independent save actions, not one
  * combined form submit: the avatar drop-zone commits on drop/pick (matching how a file picker
  * already reads as "done" the instant a file is chosen), while Name/Country/Timezone/Privacy
- * Trim share one Save button since they're plain text/number/select fields with nothing to
+ * Trim share one Save button since they're plain text/number/picker fields with nothing to
  * commit until asked to.
  */
 export interface SettingsPageProps {
@@ -240,34 +240,27 @@ export function SettingsPage({ onBack, onOpenProfile }: SettingsPageProps) {
             />
           </label>
 
-          <label className="settings-page__section">
-            <span className="settings-page__label">Country</span>
-            <select className="settings-page__input" value={country} onChange={(e) => handleCountryChange(e.target.value)}>
-              <option value="">Not set (metric)</option>
-              {COUNTRIES.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+          {/* Country and Timezone are <div>s, not <label>s like their neighbours: a label
+              wrapping a picker would forward every click inside its popover (search box
+              included) to the trigger. */}
+          <div className="settings-page__section">
+            <span className="settings-page__label" id="settings-country-label">
+              Country
+            </span>
+            <CountryPicker value={country} onChange={handleCountryChange} labelledBy="settings-country-label" />
             <p className="settings-page__hint">Decides whether distance, pace and elevation show in km/m or mi/ft, everywhere in the app.</p>
-          </label>
+          </div>
 
-          <label className="settings-page__section">
-            <span className="settings-page__label">Timezone</span>
-            <select className="settings-page__input" value={timezone} onChange={(e) => editField(setTimezone, e.target.value)}>
-              {!TIMEZONES.includes(timezone) && <option value={timezone}>{timezone}</option>}
-              {TIMEZONES.map((tz) => (
-                <option key={tz} value={tz}>
-                  {tz}
-                </option>
-              ))}
-            </select>
+          <div className="settings-page__section">
+            <span className="settings-page__label" id="settings-timezone-label">
+              Timezone
+            </span>
+            <TimezonePicker value={timezone} onChange={(tz) => editField(setTimezone, tz)} labelledBy="settings-timezone-label" />
             <p className="settings-page__hint">
               Decides which calendar day an activity falls on everywhere in the app (the histogram, the activity graph, date filtering).
               Auto-detected from your browser when you signed up; change it here if you're somewhere else now.
             </p>
-          </label>
+          </div>
 
           <label className="settings-page__section">
             <span className="settings-page__label">Privacy trim ({elevationUnitLabel(system)})</span>
