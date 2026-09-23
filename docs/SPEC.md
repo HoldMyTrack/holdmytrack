@@ -157,7 +157,7 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 
 **Preconditions**: An active session.
 
-**Inputs**: An image file (PNG, JPEG, or WebP, up to 5 MB) for Avatar; free text for Name; a country selected from a standard list for Country; an IANA timezone name selected from the browser's own supported list for Timezone; a whole number for Privacy Trim, in whichever unit Country currently implies (meters, 0–200, for metric; feet, 0–656, for imperial — the same 200m ceiling, just expressed in the displayed unit). Stored server-side at centimeter precision, not whole meters, so a whole-foot input (1 ft = 30.48 cm exactly) always redisplays as the exact number typed.
+**Inputs**: An image file (PNG, JPEG, or WebP, up to 5 MB) for Avatar; free text for Name; a country selected from a standard list for Country, searchable by name or ISO code; an IANA timezone name selected from the browser's own supported list for Timezone, listed by current GMT offset and searchable by place, region, or offset; a whole number for Privacy Trim, in whichever unit Country currently implies (meters, 0–200, for metric; feet, 0–656, for imperial — the same 200m ceiling, just expressed in the displayed unit). Stored server-side at centimeter precision, not whole meters, so a whole-foot input (1 ft = 30.48 cm exactly) always redisplays as the exact number typed.
 
 **Behavior**:
 1. Avatar uploads and removals take effect immediately (`POST`/`DELETE /v1/account/avatar`) — each is its own action, not gated behind a separate save step. The account menu's own avatar button reflects whichever image is current everywhere in the app the moment it changes, with no reload.

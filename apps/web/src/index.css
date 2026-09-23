@@ -2234,6 +2234,225 @@ body {
 .activity-graph__cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+/* SearchPicker.tsx — Settings' Country and Timezone fields. The trigger matches
+   .settings-page__input's box so it sits in the form like any other field; the panel hangs
+   under it, same anchoring as .user-menu's dropdown. Rows are leading (a flag, a GMT offset)
+   · label · muted detail, right-aligned. */
+.search-picker {
+  position: relative;
+}
+
+.search-picker__trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid rgb(var(--fm-ink-rgb) / 18%);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--fm-ink);
+  background: var(--fm-surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.search-picker__trigger:focus-visible,
+.search-picker__trigger--open {
+  outline: 2px solid var(--fm-accent);
+  outline-offset: 1px;
+}
+
+.search-picker__value {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  min-height: 22px;
+}
+
+.search-picker__chevron {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: rgb(var(--fm-ink-rgb) / 50%);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 120ms ease;
+}
+
+.search-picker__trigger--open .search-picker__chevron {
+  transform: rotate(180deg);
+}
+
+.search-picker__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  background: var(--fm-surface);
+  border: 1px solid rgb(var(--fm-ink-rgb) / 10%);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgb(var(--fm-ink-rgb) / 18%);
+}
+
+.search-picker__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: var(--fm-surface-tint);
+}
+
+.search-picker__search svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: rgb(var(--fm-ink-rgb) / 55%);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.search-picker__search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  color: var(--fm-ink);
+  outline: none;
+}
+
+.search-picker__search input::placeholder {
+  color: rgb(var(--fm-ink-rgb) / 45%);
+}
+
+/* `position: relative` makes the list the rows' offsetParent — CountryPicker scrolls the
+   active row into view off its offsetTop. */
+.search-picker__list {
+  position: relative;
+  max-height: 300px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--fm-ink-rgb) / 20%) transparent;
+}
+
+.search-picker__option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: 14px;
+  color: var(--fm-ink);
+  cursor: pointer;
+}
+
+.search-picker__option--active {
+  background: rgb(var(--fm-ink-rgb) / 4%);
+  border-color: rgb(var(--fm-ink-rgb) / 10%);
+}
+
+.search-picker__option--selected {
+  font-weight: 600;
+}
+
+.search-picker__option--selected .search-picker__detail {
+  color: var(--fm-accent-strong);
+}
+
+.search-picker__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* TimezonePicker.tsx's "(GMT+05:30)" — fixed width and tabular digits, so every place name
+   starts in the same column however the offsets differ. */
+.search-picker__offset {
+  flex-shrink: 0;
+  min-width: 92px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: rgb(var(--fm-ink-rgb) / 60%);
+}
+
+.search-picker__label--unset {
+  color: rgb(var(--fm-ink-rgb) / 55%);
+}
+
+.search-picker__detail {
+  flex-shrink: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: rgb(var(--fm-ink-rgb) / 45%);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A round flag: the rectangular emoji, scaled up and clipped to a circle so its middle band
+   fills the disc (what circle-flag icon sets draw, without shipping ~250 SVGs). */
+.search-picker__flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgb(var(--fm-ink-rgb) / 10%);
+}
+
+.search-picker__flag-emoji {
+  font-size: 30px;
+  line-height: 1;
+}
+
+/* No flag emoji on this platform (Windows) — show the code on a tinted disc instead. */
+.search-picker__flag--text {
+  background: var(--fm-surface-tint-strong);
+  font-size: 8.5px;
+  font-weight: 700;
+  color: rgb(var(--fm-ink-rgb) / 60%);
+}
+
+.search-picker__flag--none {
+  border: 1px dashed rgb(var(--fm-ink-rgb) / 25%);
+  box-shadow: none;
+}
+
+.search-picker__empty {
+  padding: 14px 8px;
+  font-size: 13px;
+  color: rgb(var(--fm-ink-rgb) / 55%);
+  text-align: center;
+}
+
   gap: 1px;
   margin-bottom: 28px;
   background: rgb(var(--fm-ink-rgb) / 8%);
