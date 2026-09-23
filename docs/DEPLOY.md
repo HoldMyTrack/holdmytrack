@@ -24,15 +24,24 @@ cp .env.prod.example .env.prod
 
 Fill in every value — see that file's own comments for what each one means and why it has no default (unlike dev's `.env.example`, nothing here is safe to leave as a placeholder). `APP_BASE_URL` and `DOMAIN` both need the real domain from step 3; get `APP_BASE_URL`'s `https://` scheme right — `auth.go`'s session cookie derives its `Secure` flag from it, and password-reset emails link back into it.
 
-## 5. Basemap: pick one
+## 5. Basemap
 
-The basemap archive (`.pmtiles`) is deliberately excluded from every Docker build context (`apps/web/.dockerignore`), so the `web` image never has it baked in. Two options:
+The basemap is the full Protomaps planet build (z0–15, ~138 GB), served unmodified from a public R2 bucket. The archive is deliberately excluded from every Docker build context (`apps/web/.dockerignore`), so the `web` image never has it baked in.
 
-**A — bind-mount it (simplest, no rebuild to update).** `apps/web/scripts/build-basemap.sh` is what cuts dev's small Ohio extract from the remote Protomaps planet build via `pmtiles extract`; the same script with `REGION`/`BBOX` widened (up to the whole planet, at real `.pmtiles` size — `VISION.md` §4.3 prices this at ~138 GB) is how you'd cut whatever coverage you actually want. Put the result somewhere on the VPS (e.g. `/srv/fitmap/basemap/planet.pmtiles`) and uncomment `compose.prod.yml`'s `web` service's volume line, pointing at that path. Leave `VITE_BASEMAP_ORIGIN` empty in `.env.prod`.
+1. Create a second R2 bucket for the basemap (e.g. `fitmap-basemap`), separate from the app's private one, and enable public access on it. Public access is either the bucket's `r2.dev` URL, which is rate-limited and meant for development, or a custom domain, which needs the domain's DNS zone on Cloudflare.
+2. Add a CORS rule to that bucket: allowed origins `https://<your-domain>`, allowed methods `GET, HEAD`, allowed headers `range, if-match`, exposed headers `etag` (`IMPLEMENTATION.md` §5.4).
+3. Pick a dated build key from `https://build-metadata.protomaps.dev/builds.json`, download it (`curl -C - -o planet.pmtiles https://build.protomaps.com/<YYYYMMDD>.pmtiles`), and check its md5 against the listed `md5sum`.
+4. Upload under the build's dated prefix, with an R2 API token that can write to the bucket:
+   ```
+   aws s3 cp planet.pmtiles s3://fitmap-basemap/<YYYYMMDD>/basemap/basemap.pmtiles --endpoint-url https://<account-id>.r2.cloudflarestorage.com
+   aws s3 cp --recursive apps/web/public/basemap/fonts s3://fitmap-basemap/<YYYYMMDD>/basemap/fonts --endpoint-url ...
+   aws s3 cp --recursive apps/web/public/basemap/sprites s3://fitmap-basemap/<YYYYMMDD>/basemap/sprites --endpoint-url ...
+   ```
+5. Set `VITE_BASEMAP_ORIGIN` in `.env.prod` to the public origin plus that prefix (e.g. `https://pub-xxxx.r2.dev/20260922`), with no trailing slash. It's a *build*-time value for the web bundle, and `compose.prod.yml` also passes it to `api` as `BASEMAP_ORIGIN` for the style document native clients fetch. Changing it later needs `docker compose -f compose.prod.yml build web` and an `up -d`, not just a restart.
 
-**B — host it on R2/a CDN (matches `VISION.md`'s actual intended production architecture — worth doing once tile-read costs matter enough to want a CDN in front of it).** Upload the archive plus `apps/web/public/basemap/fonts/` and `.../sprites/` to a public R2 bucket (or a CDN in front of one), then set `VITE_BASEMAP_ORIGIN` in `.env.prod` to that bucket's/CDN's origin (e.g. `https://basemap.example.com`) — no trailing slash. This is a *build*-time value; changing it later needs `docker compose -f compose.prod.yml build web`, not just a restart.
+Moving to a newer build repeats steps 3–5 under a new prefix. The old prefix stays readable until you delete it, so tabs already open keep working.
 
-Start with A. Move to B when tile-read volume actually justifies it.
+A deployment without R2 can serve the archive same-origin instead: leave `VITE_BASEMAP_ORIGIN` empty and uncomment `compose.prod.yml`'s `web` volume line, pointing it at the archive on the host. That needs the whole archive on the VPS's own disk.
 
 ## 6. Bring it up
 

@@ -1552,8 +1552,8 @@ body {
 }
 
 /* Speed/heart-rate colored zone segments (trackBands.ts) — bottom-left of the map, the one
-   corner .map-mode-toggle (top-left), the coverage notice (top-center), and MapLibre's own
-   zoom/geolocate controls (top-right) all leave free. */
+   corner .map-mode-toggle (top-left) and MapLibre's own zoom/geolocate controls (top-right)
+   leave free. */
 .track-metric-toggle {
   position: absolute;
   /* Stacked above MapLibre's own ScaleControl (useMapInstance.ts, also 'bottom-left') rather
@@ -2024,22 +2024,6 @@ body {
   background: var(--fm-surface);
   cursor: pointer;
   font-size: 13px;
-}
-
-.coverage-notice {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 3;
-  max-width: min(34rem, calc(100% - 2rem));
-  padding: 10px 14px;
-  border-radius: 8px;
-  font-size: 13px;
-  line-height: 1.45;
-  color: var(--fm-ink);
-  background: rgb(255 244 214 / 96%);
-  box-shadow: 0 1px 6px rgb(var(--fm-ink-rgb) / 28%);
 }
 
 /* §4.8's Profile screen — a normal scrolling page, unlike the map screen's fixed-height

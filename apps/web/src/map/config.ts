@@ -8,7 +8,7 @@
  */
 
 /** Must match the string the style uses, so the pmtiles Protocol shares one archive instance. */
-export const PMTILES_PATH = '/basemap/ohio.pmtiles';
+export const PMTILES_PATH = '/basemap/basemap.pmtiles';
 
 /** MapLibre substitutes {fontstack} and {range}; the fontstack names contain spaces. */
 export const GLYPHS_PATH = '/basemap/fonts/{fontstack}/{range}.pbf';

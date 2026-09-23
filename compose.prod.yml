@@ -71,6 +71,10 @@ services:
       # non-Secure one it's suspicious of over HTTPS in some browsers) rather than erroring
       # loudly, so it's worth double-checking in .env.prod before first run.
       APP_BASE_URL: ${APP_BASE_URL}
+      # The origin the style document GET /v1/map/style/{flavor} hands native clients
+      # resolves the basemap against — the same value the web bundle bakes in, so both
+      # clients read one archive. Empty falls back to APP_BASE_URL (config.go).
+      BASEMAP_ORIGIN: ${VITE_BASEMAP_ORIGIN:-}
     depends_on:
       db: { condition: service_healthy }
 
@@ -103,11 +107,12 @@ services:
     build:
       context: ./apps/web
       target: serve
-      # Empty (the default) means the basemap archive isn't baked into this image at all
-      # (apps/web/Dockerfile's own comment explains why) — see the commented bind mount
-      # below for the simplest fix, or set this to an R2/CDN origin and rebuild. Either
-      # way this is a *build*-time value (Vite bakes it into the bundle) — changing it
-      # needs `docker compose -f compose.prod.yml build web`, not just a restart.
+      # The R2/CDN origin the basemap archive, fonts and sprites are read from. Empty means
+      # same-origin, and since the archive is never baked into this image
+      # (apps/web/Dockerfile's own comment explains why) that needs the commented bind
+      # mount below. Either way this is a *build*-time value (Vite bakes it into the
+      # bundle) — changing it needs `docker compose -f compose.prod.yml build web`, not
+      # just a restart.
       args:
         VITE_BASEMAP_ORIGIN: ${VITE_BASEMAP_ORIGIN:-}
         # Same GIT_SHA as the api service's build args, below — baked into the bundle so
@@ -130,13 +135,11 @@ services:
       # has.
       - caddy_data:/data
       - caddy_config:/config
-      # Simplest way to actually serve the basemap with VITE_BASEMAP_ORIGIN left unset
-      # (same-origin): bind-mount the real archive (and, if you've customized them,
-      # fonts/sprites) into the built image's static root at the exact path
-      # apps/web/src/map/config.ts's PMTILES_PATH names. Uncomment and point at wherever
-      # you've put the real planet extract on this host — no rebuild needed to update it,
-      # just a container restart. See docs/DEPLOY.md.
-      - /srv/fitmap/basemap/ohio.pmtiles:/srv/web/basemap/ohio.pmtiles:ro
+      # Only for a deployment serving the basemap same-origin (VITE_BASEMAP_ORIGIN left
+      # unset): bind-mount the archive into the built image's static root at the exact
+      # path apps/web/src/map/config.ts's PMTILES_PATH names — no rebuild needed to update
+      # it, just a container restart. See docs/DEPLOY.md §5.
+      # - /srv/fitmap/basemap/basemap.pmtiles:/srv/web/basemap/basemap.pmtiles:ro
     depends_on:
       - api
 

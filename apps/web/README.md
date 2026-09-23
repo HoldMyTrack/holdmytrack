@@ -45,11 +45,10 @@ src/map/
   worker.ts                # gives MapLibre a worker URL that survives bundling
   style.ts                 # buildStyle() — pure, DOM-free, reused by headless render
   layers.ts                # layer-ordering helpers (fog/track insertion points)
-  coverage.ts              # archive bounds, and whether a point is inside them
   useMapInstance.ts        # map lifecycle, StrictMode-safe
   viewState.ts             # <-> URL hash
   MapView.tsx
-src/ui/                    # UploadPanel, CoverageNotice
+src/ui/                    # UploadPanel and the rest of the UI
 ```
 
 ## Three things that are easy to break

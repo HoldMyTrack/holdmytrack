@@ -442,7 +442,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 ### FR-4.6 Coverage notice
 
-**Description**: If the user pans or zooms the map outside the area the base map actually covers, a notice is shown instead of a blank/grey map; it disappears once the view returns inside the covered area.
+**Description**: The base map covers the whole planet at every zoom level, so there is no out-of-coverage area and no notice for one. Streets and labels are present wherever the user pans.
 
 ### FR-4.7 Find my location
 

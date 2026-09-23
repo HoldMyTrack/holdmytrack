@@ -80,8 +80,3 @@ export function buildStyle(options: BuildStyleOptions): StyleSpecification {
     layers: layers(BASEMAP_SOURCE, namedFlavor(flavor), { lang }),
   };
 }
-
-/** The archive URL the style will resolve to — the key the Protocol caches under. */
-export function archiveUrl(origin: string, pmtilesPath: string = PMTILES_PATH): string {
-  return `${origin.replace(/\/$/, '')}${pmtilesPath}`;
-}
