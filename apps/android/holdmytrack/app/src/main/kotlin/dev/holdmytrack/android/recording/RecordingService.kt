@@ -45,8 +45,8 @@ data class RecordingStats(
 )
 
 /**
- * A foreground, GPS-only recording — Phase 7's own answer to "foreground service or plain
- * background location?" (`apps/android/docs/ROADMAP.md`): an ordinary background process is
+ * A foreground, GPS-only recording — a declared foreground service rather than plain
+ * background location (`apps/android/docs/IMPLEMENTATION.md` §7): an ordinary background process is
  * free for the OS to kill, and continuous GPS is a battery cost a user needs visible feedback
  * about, so this runs as a declared foreground service with a persistent notification for as
  * long as a recording is in progress, tied to start/pause/resume/stop rather than to any
@@ -62,8 +62,13 @@ data class RecordingStats(
  * notification. A recording shorter than [MIN_DURATION_MS] of moving time (pauses excluded),
  * or with fewer than two fixes, is dropped rather than saved. Otherwise it's inserted into
  * `RecordedActivityStore` as [SyncStatus.NOT_SYNCED] with no name or description and the
- * account's last-used type ([RecordingTypes.lastUsed]) — nothing is asked while recording;
- * Recorded Activities' Edit is where those get set.
+ * account's last-used type ([RecordingTypes.lastUsed]) — nothing is asked while recording —
+ * and then `RecordingActivity`'s Save screen opens on the new row for name, type and
+ * description. The row is already stored by then, so leaving that screen with Back keeps it
+ * as saved here; Save screen's Discard is the only way it goes. The notification's Stop is
+ * routed through `MainActivity` rather than straight here, so an app window is in the
+ * foreground for that screen to open over (a service can't start an activity from the
+ * background).
  *
  * **Foreground-only in the Path 2 sense doesn't apply here.** `docs/adr/
  * 0007-in-app-gps-recording-submits-directly.md` is explicit: Phase 3's foreground-only sync
@@ -203,7 +208,7 @@ class RecordingService : Service() {
         // stops being foreground, and the insert must still finish.
         saveScope.launch {
             RecordedActivityStore(context).insert(record)
-            Toast.makeText(context, R.string.recording_saved_locally, Toast.LENGTH_SHORT).show()
+            context.startActivity(RecordingActivity.saveIntent(context, record.id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
     }
 
@@ -294,7 +299,19 @@ class RecordingService : Service() {
                     ACTION_TOGGLE,
                 ),
             )
-            .addAction(action(R.drawable.ic_record_stop, R.string.recording_stop, ACTION_STOP))
+            .addAction(
+                Notification.Action.Builder(
+                    Icon.createWithResource(this, R.drawable.ic_record_stop),
+                    getString(R.string.recording_stop),
+                    PendingIntent.getActivity(
+                        this, ACTION_STOP.hashCode(),
+                        Intent(this, MainActivity::class.java)
+                            .setAction(ACTION_STOP)
+                            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                        PendingIntent.FLAG_IMMUTABLE,
+                    ),
+                ).build(),
+            )
         if (recording) {
             builder.setContentTitle(getString(R.string.recording_notification_title))
                 .setShowWhen(true)

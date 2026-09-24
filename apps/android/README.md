@@ -4,6 +4,6 @@
 
 - `holdmytrack/` — the app itself, currently the client shell: a full-screen map and nothing else yet. Building it and pointing it at an API are covered in its own README.
 - `poc-healthconnect/` — a throwaway diagnostic that answered the roadmap's Phase 1 questions about what Health Connect really hands over, kept only until its findings are all recorded.
-- `docs/ROADMAP.md` — the phase plan, the two platform constraints it is designed around, and the server-side work it depends on.
+- `docs/ROADMAP.md` — the phase plan, and the two platform constraints it is designed around.
 
 Not containerised, and not planned to be: the Android SDK, the emulator and a physical device for Health Connect testing all live on the host.

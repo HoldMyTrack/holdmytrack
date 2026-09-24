@@ -89,10 +89,10 @@
     </LinearLayout>
 
     <!-- One-tap GPS recording (MainActivity.onRecordTap): tap to start, tap again to pause or
-         resume, long-press to stop. Translucent, bottom-centre, so it's reachable one-handed
+         resume, hold for two seconds to stop (RecordButton draws the countdown ring). Translucent, bottom-centre, so it's reachable one-handed
          and the map still reads through it. The bottom margin is raised by the gesture bar's
          inset in MainActivity.insetSystemBars. -->
-    <ImageButton
+    <dev.holdmytrack.android.recording.RecordButton
         android:id="@+id/record_button"
         android:layout_width="72dp"
         android:layout_height="72dp"
