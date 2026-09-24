@@ -95,7 +95,7 @@ export interface ActivitiesPanelProps {
   /** Checks every currently-listed row — the header checkbox's "check all" state. */
   onSelectAll: () => void;
   /** Checks every unchecked listed row and unchecks every checked one — the toolbar's
-   *  "Inverse" button beside the header checkbox. */
+   *  invert-selection icon beside the header checkbox. */
   onInvertSelection: () => void;
   /** Flies to fit the current checked group without changing it. */
   onShowSelected: () => void;
@@ -367,7 +367,7 @@ export function ActivitiesPanel({
 
       {/* The header toolbar — right above the row list. There are no more per-row action
           icons to stay column-aligned with (Visible/Edit/Delete all moved here, operating on
-          the checked group), so this is a plain compact strip: select-all checkbox, Inverse, the Type
+          the checked group), so this is a plain compact strip: select-all checkbox, the invert-selection icon, the Type
           dropdown, a spacer, the three group-action chips, a divider, then the one
           accent-tinted "focus the map on this group" action. */}
       <div className="activities-panel__toolbar">
@@ -386,9 +386,15 @@ export function ActivitiesPanel({
           className="activities-panel__invert"
           disabled={activities.length === 0}
           onClick={onInvertSelection}
-          title="Check the unchecked activities and uncheck the checked ones"
+          aria-label="Invert selection"
+          title="Invert selection — check the unchecked activities and uncheck the checked ones"
         >
-          Inverse
+          {/* A checkbox-sized square split on the diagonal, one half filled — reads as a
+              sibling of the select-all checkbox beside it rather than a separate text chip. */}
+          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="none" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M14.5 1.5V11.5a3 3 0 0 1-3 3H1.5Z" fill="currentColor" />
+          </svg>
         </button>
 
         <div className="activities-panel__type-dropdown" ref={typeFilterRef}>

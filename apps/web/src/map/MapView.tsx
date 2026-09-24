@@ -555,7 +555,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
     fitToSelection(visible);
   }, [filteredActivities, mapHiddenIds, fitToSelection]);
 
-  // The toolbar's "Inverse" button — checks every listed row that isn't checked and unchecks
+  // The toolbar's invert-selection icon — checks every listed row that isn't checked and unchecks
   // every one that is. Same scope as selectAll: only rows the panel currently lists, so a
   // checked row outside the current TYPE/DISTANCE filters is dropped rather than kept checked
   // out of sight. Flies to fit the new group, or — when inverting leaves nothing checked —
