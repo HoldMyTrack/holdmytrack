@@ -18,11 +18,11 @@ import logoUrl from '../assets/logo.png';
 export interface AuthGateProps {
   /** Called once a session actually exists — App.tsx swaps this screen out for the real app. */
   onAuthenticated: (user: SessionUser) => void;
-  /** Present only when reached from an already-live session (UserMenu's "Demo session — save
-   *  this", IMPLEMENTATION.md §4.10) rather than before any session exists at
+  /** Present only when reached from an already-live session (UserMenu's "Create your own
+   *  account", IMPLEMENTATION.md §4.10) rather than before any session exists at
    *  all. Swaps "Try it now — no signup" for a "← Back" link — starting a second demo while
    *  already in one would just abandon the first, silently — and starts the form in signup
-   *  mode instead of signin, since "save this" only ever means creating an account. */
+   *  mode instead of signin, since "Create your own account" only ever means creating one. */
   onCancel?: () => void;
   /** Present only when the URL carried a password-reset token (App.tsx reads a `reset_token`
    *  query param once, ahead of its own session check — IMPLEMENTATION.md

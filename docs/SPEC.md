@@ -257,7 +257,7 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 **Inputs**: Email address, password (minimum 8 characters) — the same inputs as FR-1.1.
 
 **Behavior**:
-1. From the account menu, the user selects "Demo session — save this," which presents the same sign-up screen a new visitor sees (FR-1.1), with a "← Back" option instead of the "try demo" option (starting a second demo while already in one would abandon the first).
+1. From the account menu, which shows the demo account's name ("Demo User") where a real account shows its email, the user selects "Create your own account," which presents the same sign-up screen a new visitor sees (FR-1.1), with a "← Back" option instead of the "try demo" option (starting a second demo while already in one would abandon the first).
 2. The user submits an email and password.
 3. The server creates a plain new account (FR-1.1's normal behavior) — the shared Demo Customer account itself is untouched, exactly as every other concurrent demo visitor's session leaves it.
 4. The user is signed in to the new account, held on FR-1.8's verify-email screen exactly like any other fresh signup.

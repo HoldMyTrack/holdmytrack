@@ -48,7 +48,7 @@ function takeQueryParam(name: string): string | null {
 
 export function App() {
   const [auth, setAuth] = useState<AuthState>('checking');
-  // UserMenu's "Demo session — save this" (IMPLEMENTATION.md §4.10) — turning
+  // UserMenu's "Create your own account" (IMPLEMENTATION.md §4.10) — turning
   // a demo into a real account means showing AuthGate again, the exact same page a new
   // visitor sees, not a second bespoke form. Lives here rather than as a fourth AuthState
   // value because it's orthogonal to `auth` itself: the session doesn't change (or even get
