@@ -750,8 +750,9 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Preconditions**: A signed-in or demo session (the button lives in the app header).
 
 **Behavior**:
-1. While no Open Collective is configured (`OPEN_COLLECTIVE_SLUG` empty), clicking Donate opens a notice explaining that donations aren't open yet, and nothing else happens.
-2. Once one is configured, Donate is a link to `https://opencollective.com/<slug>/donate`, opened in a new tab so the map is kept; choosing an amount, one-off or monthly, and paying all happen on Open Collective.
+1. The button shows a heart icon followed by "Donate"; on a phone-width screen (≤768px) it shows the heart alone.
+2. While no Open Collective is configured (`OPEN_COLLECTIVE_SLUG` empty), clicking Donate opens a notice explaining that donations aren't open yet, and nothing else happens.
+3. Once one is configured, Donate is a link to `https://opencollective.com/<slug>/donate`, opened in a new tab so the map is kept; choosing an amount, one-off or monthly, and paying all happen on Open Collective.
 
 ## 14. Non-Functional Requirements (summary)
 
