@@ -3120,6 +3120,35 @@ a.user-menu__item {
   background: rgb(var(--fm-ink-rgb) / 10%);
 }
 
+.auth-gate__google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid rgb(var(--fm-ink-rgb) / 15%);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--fm-surface);
+  color: var(--fm-ink);
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.auth-gate__google:hover {
+  background: rgb(var(--fm-ink-rgb) / 4%);
+}
+
+.auth-gate__google[aria-disabled='true'] {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.auth-gate__google-mark {
+  width: 18px;
+  height: 18px;
+}
+
 .auth-gate__demo {
   border: 1px solid rgb(var(--fm-ink-rgb) / 15%);
   border-radius: 8px;

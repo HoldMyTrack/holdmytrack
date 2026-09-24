@@ -75,6 +75,12 @@ services:
       # resolves the basemap against — the same value the web bundle bakes in, so both
       # clients read one archive. Empty falls back to APP_BASE_URL (config.go).
       BASEMAP_ORIGIN: ${VITE_BASEMAP_ORIGIN:-}
+      # Sign in with Google (docs/SPEC.md FR-1.9, docs/DEPLOY.md) — optional; empty turns it
+      # off. The redirect URL defaults to APP_BASE_URL + /v1/auth/google/callback (config.go),
+      # which is right here because Caddy serves the app and the API from one origin.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-}
     depends_on:
       db: { condition: service_healthy }
 

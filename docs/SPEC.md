@@ -15,7 +15,7 @@ This document specifies HoldMyTrack's functional behavior as currently implement
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and privacy trim, FR-1.7; email verification, FR-1.8), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), and the public About page (FR-10).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and privacy trim, FR-1.7; email verification, FR-1.8; Sign in with Google on the web, FR-1.9), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), and the public About page (FR-10).
 
 **Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), explorer-tile gamification, the rest of "Export" (story cards, animated reveals — high-resolution map export itself is built, FR-4.10 below), and user-defined privacy zones (a `privacy_zones` table exists in the schema — `IMPLEMENTATION.md` §3.7 — but no endpoint or UI creates or applies one today; only the endpoint-trim privacy control in FR-8.1 below, user-adjustable via FR-1.7's Settings page, is functional). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace/heart-rate stay as per-activity route context (FR-4.9) rather than an analysed, all-time performance record. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
@@ -30,7 +30,7 @@ Engineers implementing against or modifying this system, QA deriving test cases,
 | **Activity** | One recorded exercise session (a run, ride, hike, swim, etc.) with a start time, and usually a GPS trajectory and heart-rate data. |
 | **Track** | An activity's GPS trajectory, as rendered on the map. |
 | **Session** | A signed-in browser's authentication state, held as an opaque cookie. |
-| **Registered user** | An account with a real email and password, created via sign-up or by upgrading a demo account. |
+| **Registered user** | An account with a real email and a password, a linked Google identity, or both — created via sign-up (FR-1.1) or Sign in with Google (FR-1.9). |
 | **Demo user** | An ephemeral account created via "Try it now — no signup," functionally identical to a registered user except for its lifetime (FR-2.2 below). |
 | **Fog of War** | A map mode that shows a dark veil over everywhere the signed-in user has *not* recorded an activity, so recorded routes appear as "cleared" ground. |
 | **Heatmap** | A map mode that shades every recorded location by how many times it's been crossed, brightest where crossed most. |
@@ -42,7 +42,7 @@ Engineers implementing against or modifying this system, QA deriving test cases,
 | :-- | :-- |
 | **Anonymous visitor** | Has not signed in and holds no session. Can reach the sign-in/sign-up screen and start a demo. Cannot see any activity data or use the map. |
 | **Demo user** | Holds a session tied to an ephemeral account (FR-2). Full functional access to every feature a registered user has, except the account itself expires after 24 hours unless upgraded (FR-2.3). |
-| **Registered user** | Holds a session tied to a permanent account (email + password). Full functional access to every feature in this document. |
+| **Registered user** | Holds a session tied to a permanent account (email + password, or Google — FR-1.9). Full functional access to every feature in this document. |
 
 There is no administrator role, no multi-tenancy beyond per-account data isolation, and no concept of one account viewing another's data (FR-8.2).
 
@@ -86,7 +86,7 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 **Outputs**: A valid session cookie; the account's email is returned to the client.
 
 **Error cases**:
-- Email not found, account not yet claimed (no password ever set), or password mismatch → `401 Unauthorized` with a single generic message ("invalid email or password") in every case — the system does not distinguish these to a caller, so it cannot be used to discover which emails are registered.
+- Email not found, account with no password set (never claimed, or Google-only — FR-1.9), or password mismatch → `401 Unauthorized` with a single generic message ("invalid email or password") in every case — the system does not distinguish these to a caller, so it cannot be used to discover which emails are registered.
 
 ### FR-1.3 Sign out
 
@@ -121,7 +121,7 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 
 **Behavior**:
 1. Client submits an email address to `POST /v1/auth/forgot-password`.
-2. If that email matches a real, claimed account, the server creates a reset token (valid 1 hour, single-use) and emails a link containing it to that address.
+2. If that email matches a real, claimed account — one with a password, or a Google-only account (FR-1.9), for which this is how a first password gets set — the server creates a reset token (valid 1 hour, single-use) and emails a link containing it to that address.
 3. The server responds identically (`200 OK`, the same generic confirmation message) whether or not the email matched an account, so the response cannot be used to discover which emails are registered.
 
 **Outputs**: A generic confirmation message. No indication of whether an email was actually sent.
@@ -197,6 +197,30 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 - More than 5 resend requests for the same account within an hour → `429 Too Many Requests`.
 
 **Notes**: This reverses an earlier, deliberately simpler version of FR-1 that had no email verification at all — added once real Health Connect/cloud sync made an unrecoverable, mistyped-email account a real cost (server-side ingest work stranded on an account nobody can get back into), not because the original simplicity was a mistake.
+
+### FR-1.9 Sign in with Google
+
+**Description**: A visitor signs in, or creates an account, with a Google account instead of an email and password. Web client only; the Android app does not offer it yet.
+
+**Preconditions**: The deployment has Google OAuth credentials configured. Without them, `GET /v1/auth/providers` reports `{"google": false}`, the client shows no Google button, and the start and callback endpoints below return `404 Not Found`.
+
+**Inputs**: The Google account the visitor picks on Google's own account chooser; the browser's IANA timezone, sent automatically as with FR-1.1.
+
+**Behavior**:
+1. Client calls `GET /v1/auth/providers`; when `google` is `true`, the sign-in screen shows "Continue with Google" above the email/password form.
+2. Clicking it navigates the whole page to `GET /v1/auth/google/start?tz=<timezone>`. The server sets a short-lived (10-minute) cookie holding a random `state` value and a PKCE verifier, and redirects to Google's consent screen, always showing the account chooser.
+3. Google redirects back to `GET /v1/auth/google/callback`. The server checks `state` against the cookie (and clears the cookie either way), exchanges the authorization code with Google, and reads the Google account's stable id, email and name. A Google account whose email Google itself reports as unverified is refused.
+4. The server picks the account:
+   - An account already linked to this Google account is signed in, even if its HoldMyTrack email has since changed.
+   - Otherwise, a real (non-demo) account with the same email is linked to this Google account and signed in; the email counts as verified from then on (FR-1.8). If that account's email had **not** been verified, its password is also removed and all its sessions and outstanding reset/verification links are ended — whoever chose that password never proved they own the address.
+   - Otherwise, a new account is created: already verified, display name taken from the Google profile, timezone from step 2 (falling back to UTC, as FR-1.1).
+5. The server creates a session (30-day expiry) exactly as FR-1.2 does and redirects to the app's root, where FR-1.4's session check picks it up. A new account then continues to FR-1.7's first-run Settings page.
+
+**Outputs**: A valid session cookie and a redirect to the app.
+
+**Error cases**: Every failure — the visitor cancelled on Google's screen, a missing or mismatched `state`, the code exchange failed, the Google email is unverified, or the matching account is already linked to a *different* Google account — redirects to the app with `?auth_error=google`, and the sign-in screen shows a generic "Couldn't sign in with Google" message. The cause is logged server-side, not revealed in the URL.
+
+**Notes**: A Google-only account has no password, so FR-1.2 rejects it with the same generic error as any other mismatch; it can set a password at any time through FR-1.5/FR-1.6, after which both ways in work. Changing the account's email (FR-1.8 step 4) leaves the Google link in place.
 
 ## 4. FR-2 — No-Signup Demo
 

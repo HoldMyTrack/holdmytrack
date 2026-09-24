@@ -118,6 +118,13 @@ services:
       # separate env anchor and does not inherit this — a real deployment always enforces the
       # gate. Set SKIP_EMAIL_VERIFICATION=false locally to exercise the real gate by hand.
       SKIP_EMAIL_VERIFICATION: ${SKIP_EMAIL_VERIFICATION:-true}
+      # Sign in with Google (docs/SPEC.md FR-1.9) — off unless GOOGLE_CLIENT_ID is set, the
+      # same "empty is a working default" stance as SMTP_HOST. Dev needs GOOGLE_REDIRECT_URL
+      # pointed at the API's own origin (http://localhost:8080/v1/auth/google/callback), since
+      # here Vite and the API are two origins; see .env.example.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-}
     depends_on:
       db: { condition: service_healthy }
 

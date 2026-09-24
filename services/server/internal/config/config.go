@@ -44,6 +44,16 @@ type Config struct {
 	// mount immediately with no token to fetch out of a mailbox that doesn't exist in CI.
 	// Never set this in a real deployment. Only read by `serve`.
 	SkipEmailVerification bool
+	// Google* configure "Sign in with Google" (docs/SPEC.md FR-1.9). An empty GoogleClientID
+	// turns the feature off entirely — GET /v1/auth/providers reports it unavailable and the
+	// web client hides the button — so, like SMTP_HOST, leaving these unset is a working
+	// default rather than a half-configured one. GoogleRedirectURL defaults to AppBaseURL's
+	// own /v1/auth/google/callback, right for any deployment serving the app and the API
+	// from one origin (ADR 0006); local dev overrides it because Vite (5173) and the API
+	// (8080) are separate origins there. Only read by `serve`.
+	GoogleClientID     string
+	GoogleClientSecret string
+	GoogleRedirectURL  string
 }
 
 func Load() (Config, error) {
@@ -67,6 +77,14 @@ func Load() (Config, error) {
 		// same reason auth.go derives the session cookie's Secure flag from it: two env
 		// vars that must agree are two env vars that can disagree.
 		c.BasemapOrigin = c.AppBaseURL
+	}
+	c.GoogleClientID = env("GOOGLE_CLIENT_ID", "")
+	c.GoogleClientSecret = env("GOOGLE_CLIENT_SECRET", "")
+	if c.GoogleRedirectURL = env("GOOGLE_REDIRECT_URL", ""); c.GoogleRedirectURL == "" {
+		c.GoogleRedirectURL = c.AppBaseURL + "/v1/auth/google/callback"
+	}
+	if c.GoogleClientID != "" && c.GoogleClientSecret == "" {
+		return c, fmt.Errorf("config: GOOGLE_CLIENT_SECRET is required when GOOGLE_CLIENT_ID is set")
 	}
 	if c.DatabaseURL == "" {
 		// Built from the POSTGRES_* Compose-interpolation vars in .env.example, the same
