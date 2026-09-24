@@ -18,21 +18,20 @@
             android:layout_height="wrap_content"
             android:paddingBottom="16dp"
             android:text="@string/sync_rationale"
-            android:textSize="14sp" />
+            android:textAppearance="?attr/textAppearanceBodyLarge" />
 
         <TextView
             android:id="@+id/sync_status"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:textAppearance="?attr/textAppearanceTitleMedium" />
 
         <TextView
             android:id="@+id/sync_instructions"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingTop="12dp"
-            android:textSize="14sp"
+            android:textAppearance="?attr/textAppearanceBodyLarge"
             android:visibility="gone" />
 
         <Button
@@ -45,12 +44,14 @@
              uses one so far ("sync what's reachable anyway"). -->
         <Button
             android:id="@+id/sync_secondary"
+            style="@style/Widget.HoldMyTrack.Button.Outlined"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:visibility="gone" />
 
         <Button
             android:id="@+id/sync_open_health_connect"
+            style="@style/Widget.HoldMyTrack.Button.Outlined"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/sync_open_health_connect" />
@@ -59,6 +60,7 @@
              history is worth reading precisely when a sync has not worked. -->
         <Button
             android:id="@+id/sync_history"
+            style="@style/Widget.HoldMyTrack.Button.Text"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/status_history" />
@@ -69,7 +71,7 @@
             android:layout_height="wrap_content"
             android:paddingTop="16dp"
             android:textIsSelectable="true"
-            android:textSize="13sp"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
             android:visibility="gone" />
     </LinearLayout>
 </ScrollView>

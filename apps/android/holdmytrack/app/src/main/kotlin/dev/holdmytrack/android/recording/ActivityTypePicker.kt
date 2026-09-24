@@ -1,6 +1,5 @@
 package dev.holdmytrack.android.recording
 
-import android.app.AlertDialog
 import android.content.Context
 import android.graphics.Typeface
 import android.text.Editable
@@ -15,6 +14,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.holdmytrack.android.R
 import java.text.Normalizer
 
@@ -72,7 +72,7 @@ object ActivityTypePicker {
         adapter.shown = options
         list.adapter = adapter
 
-        val dialog = AlertDialog.Builder(context)
+        val dialog = MaterialAlertDialogBuilder(context)
             .setTitle(R.string.recording_type_hint)
             .setView(content)
             .setNegativeButton(android.R.string.cancel, null)

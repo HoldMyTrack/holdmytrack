@@ -1,19 +1,19 @@
 package dev.holdmytrack.android.recording
 
-import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
-import android.widget.Button
 import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.holdmytrack.android.R
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.recording.db.RecordedActivityRecord
@@ -174,7 +174,7 @@ class RecordedActivitiesActivity : AppCompatActivity() {
         textColumn.addView(
             TextView(this).apply {
                 text = record.name.ifBlank { formatDate(record.startedAtMs) }
-                textSize = 15f
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyLarge)
             },
         )
         textColumn.addView(
@@ -190,13 +190,14 @@ class RecordedActivitiesActivity : AppCompatActivity() {
                 } else {
                     subtitle
                 }
-                textSize = 12f
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+                setTextColor(getColor(R.color.hmt_ink_secondary))
             },
         )
         row.addView(textColumn)
 
         row.addView(
-            Button(this).apply {
+            MaterialButton(this, null, androidx.appcompat.R.attr.borderlessButtonStyle).apply {
                 text = getString(R.string.recording_edit)
                 setOnClickListener {
                     startActivity(
@@ -210,8 +211,9 @@ class RecordedActivitiesActivity : AppCompatActivity() {
         // Every row here is unsynced, so Delete discards the only copy — the confirmation
         // dialog below says so.
         row.addView(
-            Button(this).apply {
+            MaterialButton(this, null, androidx.appcompat.R.attr.borderlessButtonStyle).apply {
                 text = getString(R.string.recording_delete)
+                setTextColor(getColor(R.color.hmt_danger))
                 setOnClickListener { confirmDelete(record) }
             },
         )
@@ -220,7 +222,7 @@ class RecordedActivitiesActivity : AppCompatActivity() {
     }
 
     private fun confirmDelete(record: RecordedActivityRecord) {
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(R.string.recorded_delete_confirm_title)
             .setMessage(R.string.recorded_delete_confirm_message)
             .setPositiveButton(R.string.recording_delete) { _, _ ->

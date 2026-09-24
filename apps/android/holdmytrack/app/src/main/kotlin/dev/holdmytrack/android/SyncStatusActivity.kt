@@ -148,7 +148,7 @@ class SyncStatusActivity : AppCompatActivity() {
             this.text = text
             textSize = 13f
             setPadding(0, 8, 0, 8)
-            if (failed) setTextColor(FAILED_COLOR)
+            if (failed) setTextColor(getColor(R.color.hmt_danger))
         }
 
     /** The `source` values §3.3 defines, said the way a person would say them. */
@@ -167,7 +167,6 @@ class SyncStatusActivity : AppCompatActivity() {
     private companion object {
         const val HISTORY_PAGE = 25
         const val POLL_INTERVAL_MS = 2_000L
-        const val FAILED_COLOR = 0xFFEF5350.toInt()
         val DATE_FORMAT: DateTimeFormatter =
             DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM).withZone(ZoneId.systemDefault())
     }

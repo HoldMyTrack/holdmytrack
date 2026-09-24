@@ -23,6 +23,16 @@ The map, and the state that governs what's drawn on it.
 - **MapLibre's `MapView` owns a native renderer and a GL surface**, so every one of `onStart`/`onResume`/`onPause`/`onStop`/`onSaveInstanceState`/`onLowMemory`/`onDestroy` forwards to the equivalent `mapView.on*` call. Missing any one of these is a leaked surface or a crash on rotation, not a subtle bug — this is why the full set is present even though several of them are otherwise empty boilerplate.
 - **Style flavor follows the system day/night setting** (`Configuration.UI_MODE_NIGHT_MASK`), resolving to `light` or `dark` — two of the five flavors `GET /v1/map/style/{flavor}` serves. There is deliberately no in-app override; inventing one is Phase 5's decision to make (`apps/android/docs/ROADMAP.md`), not this shell's.
 
+### 1.3 Theme (`res/values/themes.xml`)
+
+Every Activity uses one of two themes, both built on `Theme.Material3.Light`: `Theme.HoldMyTrack` (with an action bar, for every screen with a title) and `Theme.HoldMyTrack.Map` (no action bar, for `MainActivity`'s edge-to-edge map). The palette lives in `res/values/colors.xml` as the web's `--fm-*` custom properties (`apps/web/src/index.css`) copied value for value, and `Base.Theme.HoldMyTrack` maps it onto Material's color roles once — accent `#B07E2E` as primary, ink `#202B25` as on-surface and secondary, cream `#F7F4EC` as background and surface, the web's danger red as error. It is light only because the web has no dark palette to carry over; the map's own style flavor still follows the system setting independently (§1.2). Dynamic color is not applied, so the user's wallpaper never replaces the palette.
+
+- **Shape is the web's, not Material's.** Buttons and small components take an 8dp radius (`ShapeAppearance.HoldMyTrack.Small`) rather than Material 3's fully rounded pill.
+- **Button hierarchy comes from theme attributes**, so a plain `<Button>` in a layout inflates as a filled `MaterialButton`, and the secondary styles are named rather than hand-set: `Widget.HoldMyTrack.Button.Outlined` (also `materialButtonOutlinedStyle`) and `Widget.HoldMyTrack.Button.Text` (also `borderlessButtonStyle`, which is what `RecordedActivitiesActivity`'s code-built Edit/Delete buttons resolve).
+- **The map-mode toggle is a `MaterialButtonToggleGroup`** (single selection, one always selected) on a near-white `bg_map_chrome` panel, after the web's `.map-mode-toggle`: `MainActivity.setMode` sets `isChecked`, and `color/map_mode_text`/`map_mode_bg` turn the checked button ink-filled with white text.
+- **Form fields are outlined `TextInputLayout`s**, with the id on the inner `TextInputEditText` so the Activities' `EditText` bindings are unchanged. The recording form's Type field is one too, made non-focusable with a drop-down end icon, so a tap still opens `ActivityTypePicker` rather than a keyboard.
+- **Dialogs use `MaterialAlertDialogBuilder`**, not the platform `android.app.AlertDialog`, which would ignore the app theme.
+
 ## 2. Authentication & Session
 
 ### 2.1 `net/Session`

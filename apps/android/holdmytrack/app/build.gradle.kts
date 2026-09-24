@@ -51,6 +51,7 @@ android {
 dependencies {
     implementation(libs.maplibre)
     implementation(libs.appcompat)
+    implementation(libs.material)
     implementation(libs.okhttp)
     implementation(libs.health.connect)
     // Coroutines are not a style preference here: every HealthConnectClient read is a suspend

@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.content.res.Configuration
-import android.graphics.Typeface
 import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
@@ -20,6 +19,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.google.android.material.button.MaterialButton
 import dev.holdmytrack.android.map.MapMode
 import dev.holdmytrack.android.map.MapOverlays
 import dev.holdmytrack.android.net.ApiException
@@ -60,7 +60,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var status: TextView
     private lateinit var menuButton: Button
     private lateinit var modeBar: View
-    private lateinit var modeButtons: Map<MapMode, Button>
+    private lateinit var modeButtons: Map<MapMode, MaterialButton>
     private lateinit var recordButton: RecordButton
 
     private var map: MapLibreMap? = null
@@ -402,8 +402,7 @@ class MainActivity : AppCompatActivity() {
         mode = next
         modeButtons.forEach { (value, button) ->
             val active = value == next
-            button.setTypeface(null, if (active) Typeface.BOLD else Typeface.NORMAL)
-            button.alpha = if (active) 1f else INACTIVE_MODE_ALPHA
+            button.isChecked = active
         }
         style?.takeIf { overlaysAttached }?.let { MapOverlays.setMode(it, next) }
     }
@@ -502,7 +501,6 @@ class MainActivity : AppCompatActivity() {
 
     private companion object {
         const val TAG = "HoldMyTrack"
-        const val INACTIVE_MODE_ALPHA = 0.6f
         const val FRAME_PADDING_PX = 64
         const val MAX_FRAME_ZOOM = 15.0
 

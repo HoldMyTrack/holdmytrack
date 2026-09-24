@@ -18,7 +18,7 @@ The Android app is a **single Gradle module against the platform SDK directly** 
 
 | Decision | Reason |
 | :--- | :--- |
-| Views + AppCompat, not Compose | The four screens predate the design freeze (root `docs/ROADMAP.md` Phase 3, after Mobile); Compose vs. Views is Phase 5's first open decision (`apps/android/docs/ROADMAP.md`, "Decide the UI toolkit"), not yet made |
+| Material 3 on Views, not Compose | Compose would rewrite every existing screen before styling could start, and host MapLibre's `MapView` through `AndroidView` interop on the screen that matters most; Material brings the token vocabulary the design freeze will fill in. Reasoning in full: `apps/android/docs/ROADMAP.md` Phase 5, "Decide the UI toolkit" |
 | Bearer token (`Authorization: Bearer <session-id>`), not a cookie jar | Two separate HTTP stacks need the credential — the app's own client and MapLibre Native's internal tile fetcher, which never sees the app's cookie jar. A per-request interceptor reaches both; a cookie jar reaches only one — [ADR-0001](../../../docs/adr/0001-three-independent-ingest-paths.md) |
 | One shared `OkHttpClient` for the app *and* for MapLibre Native | `HttpRequestUtil.setOkHttpClient` (`HoldMyTrackApplication.onCreate`) replaces the map SDK's own client with the app's, so one interceptor is the only place the token can go missing from |
 | Foreground-only Health Connect sync — no background service, no `WorkManager` job | `ExerciseRouteResult.ConsentRequired` comes back for background reads regardless of grant state (measured, Phase 1) — a background sync would advance the watermark past routes it never actually read, producing a history complete except for the map |
@@ -62,8 +62,8 @@ This app is the smaller of the two boxes root `docs/ARCHITECTURE.md` §1.2 draws
 
 | Component | Add it when |
 | :--- | :--- |
-| Compose | The UI toolkit decision (Phase 5) lands on it — not blocked on the design freeze itself, and worth deciding early since it changes the cost of everything after it |
-| A design system / token set | The design freeze (root `docs/ROADMAP.md` Phase 3) ships its output for this app to adopt — see `apps/android/docs/ROADMAP.md` Phase 5 |
+| Compose | The app outgrows "a handful of screens" — Phase 5 chose Material 3 on Views, and Views/Compose interop means any later move can go one screen at a time |
+| The final palette, type scale and fonts | The design freeze (root `docs/ROADMAP.md` Phase 3) ships them — until then the theme carries the web's palette provisionally (`apps/android/docs/IMPLEMENTATION.md` §1.3) |
 | Date-range / type / hidden-track filters on the map | Phase 5's "Filter controls" item — fitting the web's date-range picker and eye-icon set onto a phone is a design problem before an implementation one |
 | Background sync of any kind | Never, for Health Connect routes specifically — the platform constraint this app is built around, not a sequencing gap |
 | An encrypted token store | A threat model beyond "physical access to the device's own private storage" is identified — not the case today |
@@ -74,7 +74,7 @@ This app is the smaller of the two boxes root `docs/ARCHITECTURE.md` §1.2 draws
 
 ## 2. Technical Stack
 
-* **Language**: **Kotlin**, targeting the platform SDK directly — `androidx.appcompat` Views (`AppCompatActivity`, `findViewById`), not Compose. AGP 9's built-in Kotlin support is used directly; the separate `org.jetbrains.kotlin.android` plugin is not applied (applying it alongside AGP 9's built-in support is an error).
+* **Language**: **Kotlin**, targeting the platform SDK directly — `androidx.appcompat` Views (`AppCompatActivity`, `findViewById`), not Compose, styled with Material Components for Android (`com.google.android.material` 1.13.0, a Material 3 theme — §1.1). AGP 9's built-in Kotlin support is used directly; the separate `org.jetbrains.kotlin.android` plugin is not applied (applying it alongside AGP 9's built-in support is an error).
 * **Build**: Gradle 9.4.0 (Android Gradle Plugin), wrapped (`./gradlew`) so the wrapper pins the version rather than depending on whatever Gradle happens to be on the host. JDK 17 or 21 — the range the Android Gradle Plugin supports. `compileSdk`/`targetSdk` 37, `minSdk` 34 (§1.1). Not containerized: the SDK (`/opt/homebrew/share/android-commandlinetools`, platform + build-tools 37), `adb`, and the physical device Health Connect testing needs all live on the host, per `apps/android/README.md`.
 * **Map rendering**: **MapLibre Native** (`org.maplibre.gl:android-sdk`) 13.6.1 — chosen at 11.8.0+ specifically because that's where built-in, native `pmtiles://` support landed (refined through 13.0.2's tile-compression handling and 13.3.0's ambient cache), so the app needs neither a custom PMTiles reader nor a server-side `{z}/{x}/{y}` re-tiling endpoint (`docs/ARCHITECTURE.md` §2's web-side pmtiles JS plugin has no Android equivalent to write). Consumes the exact style document `GET /v1/map/style/{flavor}` serves, via `Style.Builder().fromUri(...)` — nothing reimplemented (§2.1).
 * **Networking**: **OkHttp** 4.12.0 directly — declared as an explicit dependency (not left as MapLibre's transitive one) because the app builds its own `OkHttpClient` and hands that same instance to the map SDK (`net/HoldMyTrackApi.kt`), so the version is a direct compile dependency, not an implementation detail of the map library. Pinned to the version MapLibre 13.6.1's own POM already resolves to. No Retrofit, no Moshi/Gson — five endpoints are read and written with `org.json` directly.
