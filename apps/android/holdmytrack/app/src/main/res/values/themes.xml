@@ -96,6 +96,18 @@
         <item name="android:checkable">true</item>
     </style>
 
+    <!-- A square icon-only button on the map's near-white chrome panel (Find my location). -->
+    <style name="Widget.HoldMyTrack.Button.MapIcon" parent="Widget.Material3.Button.IconButton">
+        <item name="shapeAppearance">@style/ShapeAppearance.HoldMyTrack.Small</item>
+        <item name="backgroundTint">@color/hmt_map_chrome</item>
+        <item name="iconTint">@color/hmt_ink</item>
+        <item name="iconGravity">textStart</item>
+        <item name="iconPadding">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:padding">12dp</item>
+    </style>
+
     <style name="Widget.HoldMyTrack.ActionBar" parent="Widget.Material3.ActionBar.Solid">
         <item name="background">@color/hmt_bg</item>
         <item name="elevation">0dp</item>
