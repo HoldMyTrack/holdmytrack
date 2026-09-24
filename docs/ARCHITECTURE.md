@@ -65,7 +65,7 @@ Everything server-side runs as one binary in two modes (`serve` and `work`) agai
 
 **All three paths converge on one pipeline.** They differ only in how bytes arrive; from `IMPLEMENTATION.md` §4.1 step 2 onward the code is identical. This is the property that makes three paths affordable to maintain.
 
-**Today's actual deployable surface is smaller than this diagram** — Path 1/Path 2 and the mobile apps don't exist yet (`docs/ROADMAP.md` tracks that gap), and there is no production deployment running anywhere yet either (`docs/DEPLOY.md`/`IMPLEMENTATION.md` §5.8 is the scaffolding for one, not a live one). This diagram is the target the current Path-3-only web app is one slice of, not a claim about what's live today.
+**Today's actual deployable surface is smaller than this diagram** — Path 1 (cloud connectors) and the iOS app don't exist yet (`docs/ROADMAP.md` tracks that gap), and the one live deployment, `https://holdmytrack.com`, is a single-VPS sandbox rather than Production (`docs/DEPLOY.md`, `IMPLEMENTATION.md` §5.8). This diagram is the target today's web app and Android app are one slice of, not a claim about what's live today.
 
 ### 1.3 Deliberately deferred
 

@@ -1,6 +1,6 @@
 # Deploying HoldMyTrack — minimal single-VPS setup
 
-The smallest deployment that's actually production-shaped: one small VPS running `compose.prod.yml` (Postgres+PostGIS, `api`, `worker`, and Caddy in front of the built frontend), plus Cloudflare R2 for object storage. See `docs/VISION.md` §4.3 for the cost model this is built around, and `docs/ROADMAP.md`'s "Production deployment" section for what's still open beyond this (backups, monitoring, spend caps, DPIA — this document only covers getting a working deployment live, not everything a real public launch needs).
+The smallest deployment that's actually production-shaped: one small VPS running `compose.prod.yml` (Postgres+PostGIS, `api`, `worker`, and Caddy in front of the built frontend), plus Cloudflare R2 for object storage. See `docs/VISION.md` §4.3 for the cost model this is built around, and `docs/ROADMAP.md`'s "Production deployment" section for what's still open on the operational side (backups, host hardening, monitoring); spend caps and the compliance work (DPIA, EU-region hosting) are that file's Phases 5 and 6. This document only covers getting a working deployment live, not everything a real public launch needs.
 
 ## 1. Provision the VPS
 
@@ -89,4 +89,4 @@ GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-f
 
 ## What this doesn't cover
 
-Per `docs/ROADMAP.md`'s "Production deployment" checklist, still open beyond this minimal setup: backups and a restore drill, per-user quotas and rate limits with a spend cap, cost-per-user monitoring, and the compliance work (DPIA, EU-region hosting) a genuine public launch needs regardless of how small the deployment is. This document gets you to "it's live," not to "it's ready for the public."
+Per `docs/ROADMAP.md`, still open beyond this minimal setup: backups and a restore drill, host hardening, log rotation and monitoring (its "Production deployment" section), per-user quotas and rate limits with a spend cap (Phase 5), and the compliance work (DPIA, EU-region hosting — Phase 6) a genuine public launch needs regardless of how small the deployment is. This document gets you to "it's live," not to "it's ready for the public."
