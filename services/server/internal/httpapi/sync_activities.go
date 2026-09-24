@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/fitmap/fitmap/services/server/internal/parse"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
 )
 
 // syncSources is the `source` allowlist this endpoint accepts — IMPLEMENTATION.md §4.0 names

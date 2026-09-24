@@ -1,7 +1,7 @@
 # Reverse proxy + TLS + static frontend, for the minimal single-VPS deployment
 # (docs/technical_implementation_plan.md's deployment section, DEPLOY.md).
 #
-# {$DOMAIN} is a real domain (e.g. fitmap.example.com), passed in via compose.prod.yml's
+# {$DOMAIN} is a real domain (e.g. holdmytrack.example.com), passed in via compose.prod.yml's
 # `DOMAIN` env var — Caddy obtains and renews its own Let's Encrypt certificate for it
 # automatically, no certbot/cron step required. Do not use "localhost" or an IP address
 # here; Caddy only attempts ACME issuance for a real domain name.

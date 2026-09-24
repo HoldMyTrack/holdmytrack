@@ -38,7 +38,7 @@ services:
   # Applies migrations, then exits — api/worker depend on this completing, not on `db`
   # alone, matching compose.yaml's own reasoning for the identical split there.
   migrate:
-    image: fitmap-server
+    image: holdmytrack-server
     build: &server-build
       context: ./services/server
       target: dev
@@ -79,7 +79,7 @@ services:
       db: { condition: service_healthy }
 
   api:
-    image: fitmap-server
+    image: holdmytrack-server
     build: *server-build
     restart: unless-stopped
     command: ["serve"]
@@ -91,7 +91,7 @@ services:
     # by service name (`api:8080`), never directly from outside.
 
   worker:
-    image: fitmap-server
+    image: holdmytrack-server
     build: *server-build
     restart: unless-stopped
     command: ["work"]
@@ -139,7 +139,7 @@ services:
       # unset): bind-mount the archive into the built image's static root at the exact
       # path apps/web/src/map/config.ts's PMTILES_PATH names — no rebuild needed to update
       # it, just a container restart. See docs/DEPLOY.md §5.
-      # - /srv/fitmap/basemap/basemap.pmtiles:/srv/web/basemap/basemap.pmtiles:ro
+      # - /srv/holdmytrack/basemap/basemap.pmtiles:/srv/web/basemap/basemap.pmtiles:ro
     depends_on:
       - api
 

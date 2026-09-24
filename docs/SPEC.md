@@ -330,7 +330,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Description**: The Android app reads a signed-in account's exercise history from Health Connect and syncs it to HoldMyTrack — a second ingest path (Path 2) alongside file upload above, distinct from a file the user explicitly picked.
 
-**Preconditions**: Signed in on the Android app (`apps/android/fitmap`); Health Connect installed, with the Exercise permission granted plus the separately-granted "Access exercise routes" permission — a session with no route geometry can't be placed on the map, so it's rejected at sync time rather than persisted without one (see step 3).
+**Preconditions**: Signed in on the Android app (`apps/android/holdmytrack`); Health Connect installed, with the Exercise permission granted plus the separately-granted "Access exercise routes" permission — a session with no route geometry can't be placed on the map, so it's rejected at sync time rather than persisted without one (see step 3).
 
 **Inputs**: Health Connect exercise sessions with route geometry, read **foreground-only** — `READ_EXERCISE_ROUTES` returns `ConsentRequired` in the background regardless of what's granted, a platform constraint rather than a client choice. `READ_HEALTH_DATA_HISTORY`, requested separately, extends the otherwise 30-day-only read window.
 

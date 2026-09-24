@@ -14,7 +14,7 @@ type statusResponse struct {
 
 // handleActivityStatus lets the frontend find out what handleUpload's "enqueued" response
 // actually resolved to. That response is necessarily optimistic — the ingest job runs
-// asynchronously in cmd/fitmap work — so without this, a failed job (a GPX with no track
+// asynchronously in cmd/holdmytrack work — so without this, a failed job (a GPX with no track
 // points, say) looked identical in the UI to a successful one: the widget just said
 // "enqueued" and the map silently never updated, with no signal that anything went wrong.
 //

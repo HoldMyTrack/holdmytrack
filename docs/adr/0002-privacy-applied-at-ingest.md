@@ -6,7 +6,7 @@ Accepted.
 
 ## Context
 
-A Fog of War map is, by construction, a precise record of where a person lives and when they're away from home — Strava's 2018 global heatmap incident is the canonical example of exactly this kind of data leaking in a way its own users never expected. FitMap's core privacy controls (endpoint trimming, user-defined privacy zones) exist specifically to prevent that, by removing the sensitive points — the start/end of a track, or any point inside a zone — before a route is ever a fog reveal, a track line, or an export.
+A Fog of War map is, by construction, a precise record of where a person lives and when they're away from home — Strava's 2018 global heatmap incident is the canonical example of exactly this kind of data leaking in a way its own users never expected. HoldMyTrack's core privacy controls (endpoint trimming, user-defined privacy zones) exist specifically to prevent that, by removing the sensitive points — the start/end of a track, or any point inside a zone — before a route is ever a fog reveal, a track line, or an export.
 
 The obvious place to apply that removal is wherever the map is actually drawn: filter the points at render time, right before they become pixels. That would also be the most flexible point, since a user could add a privacy zone and see it applied immediately everywhere, with no reprocessing.
 
@@ -24,6 +24,6 @@ Adding a privacy zone after the fact means re-processing already-ingested activi
 ## Consequences
 
 - Every current and future renderer (fog, tracks, colored bands, export, and any print pipeline built later) inherits correct privacy behavior automatically, with nothing extra to implement or to get wrong.
-- Raw, unclipped payloads have to be retained server-side to make retroactive re-clipping possible at all — which makes them, by FitMap's own account, "the most sensitive artifact in the system" (`IMPLEMENTATION.md` §7), requiring encryption at rest and aggressive, scheduled expiry (§5.7). An activity whose raw payload has already expired by the time a new privacy zone is added simply can't be retroactively re-clipped — an accepted limit of the retention window, not a bug.
+- Raw, unclipped payloads have to be retained server-side to make retroactive re-clipping possible at all — which makes them, by HoldMyTrack's own account, "the most sensitive artifact in the system" (`IMPLEMENTATION.md` §7), requiring encryption at rest and aggressive, scheduled expiry (§5.7). An activity whose raw payload has already expired by the time a new privacy zone is added simply can't be retroactively re-clipped — an accepted limit of the retention window, not a bug.
 - Adding a privacy zone is not instant for existing history — it requires a real background job over every activity that zone affects, not an immediate render-time change.
 - This decision is exactly why the no-signup demo account (ADR-0004) could safely reuse the real ingest pipeline: privacy enforcement is identical for a demo account and a real one, with nothing demo-specific to get wrong.

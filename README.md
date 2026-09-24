@@ -5,7 +5,7 @@ A free, community-funded platform for tracking outdoor activities and seeing the
 ## Layout
 
 ```
-fitmap/
+holdmytrack/
 ├── compose.yaml                 # single entry point for local dev
 ├── compose.prod.yml             # minimal single-VPS production deployment
 ├── Makefile                     # thin wrapper over compose; `make help`
@@ -38,9 +38,9 @@ fitmap/
         ├── go.mod  go.sum
         ├── README.md            # the serve/work/migrate contract and the open decisions
         ├── Dockerfile
-        ├── cmd/fitmap/          # main.go: serve / work / migrate
+        ├── cmd/holdmytrack/          # main.go: serve / work / migrate
         ├── internal/            # config, db, parse, ingest, mail, storage, httpapi, worker
-        └── migrations/          # embedded *.sql, applied in order by `cmd/fitmap migrate`
+        └── migrations/          # embedded *.sql, applied in order by `cmd/holdmytrack migrate`
 ```
 
 This tree is the canonical one; do not let a second tree exist anywhere else to disagree with it.

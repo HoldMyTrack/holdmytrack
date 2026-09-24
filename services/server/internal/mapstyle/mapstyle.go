@@ -35,7 +35,7 @@ var styles embed.FS
 // built artifact has to serve every deployment — dev resolves basemap assets against the
 // app's own origin, a production deployment may resolve them against a CDN. Must match
 // ORIGIN_PLACEHOLDER in apps/web/scripts/build-style.mjs.
-const originPlaceholder = "__FITMAP_BASEMAP_ORIGIN__"
+const originPlaceholder = "__HOLDMYTRACK_BASEMAP_ORIGIN__"
 
 // ErrUnknownFlavor is returned for a flavor with no embedded document, so the caller can
 // answer 404 rather than 500 — an unknown flavor is a bad request path, not a server fault.

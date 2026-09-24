@@ -22,13 +22,13 @@ const OHIO_BOUNDS = { minLon: -84.85, minLat: 38.35, maxLon: -80.5, maxLat: 42.3
 const SHOTS = new URL('./screenshots/', import.meta.url);
 
 // App.tsx now gates everything behind AuthGate (services/server/internal/httpapi/auth.go) —
-// a fresh browser context has no session cookie, so MapView (and window.__fitmap) would
+// a fresh browser context has no session cookie, so MapView (and window.__holdmytrack) would
 // never mount without signing in first. A dedicated test account, not the real one: `signup`
 // only *claims* the seeded placeholder user on the very first signup ever, so reusing this
 // fixed email is safe to call every run — after the first, the email is taken and this just
 // logs in instead.
 const API_BASE = process.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
-const TEST_EMAIL = 'smoke-test@fitmap.local';
+const TEST_EMAIL = 'smoke-test@holdmytrack.local';
 const TEST_PASSWORD = 'smoke-test-password';
 
 async function ensureSignedIn(context) {
@@ -70,7 +70,7 @@ async function waitForServer(url, timeoutMs = 60_000) {
 /** Resolves once MapLibre reports the style fully loaded. */
 async function styleLoaded() {
   const stillLoaded = () =>
-    page.waitForFunction(() => Boolean(window.__fitmap) && window.__fitmap.isStyleLoaded(), undefined, {
+    page.waitForFunction(() => Boolean(window.__holdmytrack) && window.__holdmytrack.isStyleLoaded(), undefined, {
       timeout: 45_000,
     });
   await stillLoaded();
@@ -85,7 +85,7 @@ async function styleLoaded() {
 
 const camera = () =>
   page.evaluate(() => {
-    const m = window.__fitmap;
+    const m = window.__holdmytrack;
     const c = m.getCenter();
     return { lng: c.lng, lat: c.lat, zoom: m.getZoom() };
   });
@@ -134,7 +134,7 @@ after(async () => {
 describe('basemap foundation', () => {
   it('1. archive reports the expected zoom range and bounds', async () => {
     const src = await page.evaluate(() => {
-      const source = window.__fitmap.getSource('protomaps');
+      const source = window.__holdmytrack.getSource('protomaps');
       return { bounds: source.bounds, minzoom: source.minzoom, maxzoom: source.maxzoom };
     });
     assert.equal(src.minzoom, 0, 'archive minzoom');
@@ -148,13 +148,13 @@ describe('basemap foundation', () => {
 
   it('2. style is loaded and carries the full basemap layer stack', async () => {
     const info = await page.evaluate(() => {
-      const layers = window.__fitmap.getStyle().layers;
+      const layers = window.__holdmytrack.getStyle().layers;
       return {
-        loaded: window.__fitmap.isStyleLoaded(),
+        loaded: window.__holdmytrack.isStyleLoaded(),
         count: layers.length,
         symbols: layers.filter((l) => l.type === 'symbol').length,
         firstSymbol: layers.find((l) => l.type === 'symbol')?.id,
-        rendered: window.__fitmap.queryRenderedFeatures().length,
+        rendered: window.__holdmytrack.queryRenderedFeatures().length,
       };
     });
     assert.ok(info.loaded, 'isStyleLoaded()');
@@ -185,7 +185,7 @@ describe('basemap foundation', () => {
     assert.ok(Math.abs(restored.lng - -82.9988) < 1e-4, `lng restored (${restored.lng})`);
     assert.ok(Math.abs(restored.zoom - 12) < 1e-6, `zoom restored (${restored.zoom})`);
 
-    await page.evaluate(() => window.__fitmap.jumpTo({ center: [-81.6944, 41.4993], zoom: 13 }));
+    await page.evaluate(() => window.__holdmytrack.jumpTo({ center: [-81.6944, 41.4993], zoom: 13 }));
     await page.waitForFunction(() => window.location.hash.includes('41.49'), undefined, {
       timeout: 10_000,
     });
@@ -200,9 +200,9 @@ describe('basemap foundation', () => {
   });
 
   it('7. renders a screenshot for visual diffing', async () => {
-    await page.evaluate(() => window.__fitmap.jumpTo({ center: [-82.9988, 39.9612], zoom: 12 }));
+    await page.evaluate(() => window.__holdmytrack.jumpTo({ center: [-82.9988, 39.9612], zoom: 12 }));
     await styleLoaded();
-    await page.waitForFunction(() => window.__fitmap.areTilesLoaded(), undefined, {
+    await page.waitForFunction(() => window.__holdmytrack.areTilesLoaded(), undefined, {
       timeout: 30_000,
     });
     const shot = new URL('columbus-light.png', SHOTS).pathname;

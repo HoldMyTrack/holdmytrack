@@ -145,7 +145,7 @@ body {
   gap: 10px;
 }
 
-/* Colors match docs/UI/exports/fitmap-map-screen-standalone.html's live prototype exactly
+/* Colors match docs/UI/exports/holdmytrack-map-screen-standalone.html's live prototype exactly
    (read via getComputedStyle, not eyeballed) — orange rather than the app's usual blue
    specifically so Donate doesn't read as just another neutral nav action; it's how HoldMyTrack
    is funded (business_plan.md §6), not a footnote. */
@@ -1809,7 +1809,7 @@ body {
 }
 
 /* §4.0.1's import control — a dropdown panel with Files/Sync tabs, not a hover popover
-   (docs/UI/exports/fitmap-map-screen-standalone.html's live prototype). `position: relative`
+   (docs/UI/exports/holdmytrack-map-screen-standalone.html's live prototype). `position: relative`
    anchors the dropdown under the trigger button, the same arrangement as .user-menu's own
    dropdown. */
 .import-panel {

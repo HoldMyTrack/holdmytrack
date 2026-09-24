@@ -4,7 +4,7 @@
 // small embedded runner. Chose the embedded runner — at two migration files, a dependency
 // whose entire job is "read embedded SQL files in order, skip the ones already applied" is
 // not worth pulling in a library for. The one hard requirement from the README (works from
-// go:embed, runs as `fitmap migrate`) is satisfied without one.
+// go:embed, runs as `holdmytrack migrate`) is satisfied without one.
 package db
 
 import (
@@ -15,7 +15,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/fitmap/fitmap/services/server/migrations"
+	"github.com/HoldMyTrack/holdmytrack/services/server/migrations"
 )
 
 var migrationsFS = migrations.FS

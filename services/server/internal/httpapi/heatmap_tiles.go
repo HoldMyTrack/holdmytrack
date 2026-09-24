@@ -9,7 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/fitmap/fitmap/services/server/internal/fog"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
 )
 
 // handleHeatmapTile serves §4.2.2's additive-intensity mask as a ready-to-draw RGBA PNG.

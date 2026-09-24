@@ -40,7 +40,7 @@ registerHooks({
 const { buildStyle, FLAVORS } = await import('../src/map/style.ts');
 
 /** Must match originPlaceholder in services/server/internal/mapstyle/mapstyle.go. */
-const ORIGIN_PLACEHOLDER = '__FITMAP_BASEMAP_ORIGIN__';
+const ORIGIN_PLACEHOLDER = '__HOLDMYTRACK_BASEMAP_ORIGIN__';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const outDir = resolvePath(here, '../../../services/server/internal/mapstyle/styles');

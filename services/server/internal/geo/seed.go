@@ -16,7 +16,7 @@ import (
 // existed. New activities never need this: MatchActivity (match.go) runs at ingest time for
 // each one as it's created.
 //
-// Registered as the `seed-admin-boundaries` subcommand (cmd/fitmap/main.go), mirroring
+// Registered as the `seed-admin-boundaries` subcommand (cmd/holdmytrack/main.go), mirroring
 // seed-demo-customer's shape.
 func SeedAdminBoundaries(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger) error {
 	countryIDs, err := seedCountries(ctx, pool)

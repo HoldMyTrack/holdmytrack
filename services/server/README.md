@@ -1,10 +1,10 @@
 # HoldMyTrack Server
 
-`cmd/fitmap serve`, `work` and `migrate` are real now: the Path-3 upload endpoint, its job-queue worker, and the embedded-migration runner. This file still exists for the same reason it always did — so the decisions below are recorded before someone has to re-derive them, and so `IMPLEMENTATION.md`'s contract for this service is written down next to the code that implements it.
+`cmd/holdmytrack serve`, `work` and `migrate` are real now: the Path-3 upload endpoint, its job-queue worker, and the embedded-migration runner. This file still exists for the same reason it always did — so the decisions below are recorded before someone has to re-derive them, and so `IMPLEMENTATION.md`'s contract for this service is written down next to the code that implements it.
 
 ## The contract
 
-**One binary, two modes.** `docs/ARCHITECTURE.md` §1.2 is explicit: "Everything server-side runs as one binary in two modes (`serve` and `work`) against one database." That is `cmd/fitmap` with subcommands, not `cmd/server` plus `cmd/worker`:
+**One binary, two modes.** `docs/ARCHITECTURE.md` §1.2 is explicit: "Everything server-side runs as one binary in two modes (`serve` and `work`) against one database." That is `cmd/holdmytrack` with subcommands, not `cmd/server` plus `cmd/worker`:
 
 | Subcommand | What it is |
 | :-- | :-- |

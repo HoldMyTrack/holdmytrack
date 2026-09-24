@@ -1,7 +1,7 @@
-// Module path is provisional — see README.md, "Open decisions". It is declared here at
+// Module path matches the repository, github.com/HoldMyTrack/holdmytrack. It is declared here at
 // services/server rather than at the repository root on purpose: a root module makes
 // `go build ./...` and gopls walk apps/web/node_modules and apps/web/dist.
-module github.com/fitmap/fitmap/services/server
+module github.com/HoldMyTrack/holdmytrack/services/server
 
 go 1.25.0
 

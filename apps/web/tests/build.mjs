@@ -31,7 +31,7 @@ const failures = [];
 // Same reasoning as smoke.mjs: App.tsx now gates everything behind AuthGate, so a fresh
 // browser context needs a real session cookie before the map can mount at all.
 const API_BASE = process.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
-const TEST_EMAIL = 'smoke-test@fitmap.local';
+const TEST_EMAIL = 'smoke-test@holdmytrack.local';
 const TEST_PASSWORD = 'smoke-test-password';
 
 async function ensureSignedIn(context) {

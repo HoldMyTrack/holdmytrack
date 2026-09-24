@@ -8,7 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/fitmap/fitmap/services/server/internal/ingest"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 )
 
 // trackPointsResponse is what the track editor (§4.7.7) opens with: every point the activity
