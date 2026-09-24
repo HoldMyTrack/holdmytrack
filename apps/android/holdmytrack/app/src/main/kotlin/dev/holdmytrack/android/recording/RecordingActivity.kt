@@ -1,7 +1,11 @@
 package dev.holdmytrack.android.recording
 
+import android.app.AlertDialog
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -24,6 +28,11 @@ import kotlinx.coroutines.withContext
  * notification (`MainActivity`, `RecordingService`), which ask nothing, so this is where a
  * recording's name, type and description get set, and where its GPX can be downloaded.
  *
+ * Also the Save screen `RecordingService` opens the moment a recording stops ([saveIntent]):
+ * the same form, titled "Save recording", with Discard in place of Download GPX. The row is
+ * already stored with the account's last-used type by then, so Type arrives pre-filled and
+ * Back keeps the recording as it is — only Discard removes it.
+ *
  * Every row here is unsynced — a synced recording is deleted from the device
  * (`SyncActivity.flushRecordedQueue`) — so there's no read-only state to render.
  */
@@ -45,6 +54,8 @@ class RecordingActivity : AppCompatActivity() {
 
     private val editingId: String get() = intent.getStringExtra(EXTRA_RECORDING_ID)!!
 
+    private val isSaveScreen: Boolean get() = intent.getBooleanExtra(EXTRA_JUST_STOPPED, false)
+
     /** The system's own "save as" screen, so the user picks where the GPX lands (Downloads, a
      *  cloud drive) and the app needs no storage permission. */
     private val downloadLauncher = registerForActivityResult(
@@ -64,7 +75,16 @@ class RecordingActivity : AppCompatActivity() {
 
         typeField.setOnClickListener { openTypePicker() }
         findViewById<Button>(R.id.recording_save).setOnClickListener { onSave() }
-        findViewById<Button>(R.id.recording_download).setOnClickListener { onDownload() }
+        val download: Button = findViewById(R.id.recording_download)
+        download.setOnClickListener { onDownload() }
+        if (isSaveScreen) {
+            setTitle(R.string.recording_save_title)
+            download.visibility = View.GONE
+            findViewById<Button>(R.id.recording_discard).apply {
+                visibility = View.VISIBLE
+                setOnClickListener { confirmDiscard() }
+            }
+        }
         HoldMyTrackApi.activityTypeCounts { result -> result.onSuccess { serverTypeCounts = it } }
 
         lifecycleScope.launch {
@@ -116,6 +136,20 @@ class RecordingActivity : AppCompatActivity() {
         }
     }
 
+    private fun confirmDiscard() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.recording_discard_confirm_title)
+            .setMessage(R.string.recording_discard_confirm_message)
+            .setPositiveButton(R.string.recording_discard) { _, _ ->
+                lifecycleScope.launch {
+                    store.delete(editingId)
+                    finish()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
     private fun onDownload() {
         lifecycleScope.launch {
             val record = store.get(editingId) ?: return@launch
@@ -139,6 +173,13 @@ class RecordingActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_RECORDING_ID = "recording_id"
+        private const val EXTRA_JUST_STOPPED = "just_stopped"
+
+        /** The Save screen for a recording that has just stopped — see the class doc. */
+        fun saveIntent(context: Context, recordingId: String): Intent =
+            Intent(context, RecordingActivity::class.java)
+                .putExtra(EXTRA_RECORDING_ID, recordingId)
+                .putExtra(EXTRA_JUST_STOPPED, true)
         private const val GPX_MIME_TYPE = "application/gpx+xml"
         private val UNSAFE_FILENAME = Regex("[^A-Za-z0-9._ -]")
     }

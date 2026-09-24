@@ -10,12 +10,10 @@ import android.graphics.Typeface
 import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
-import android.view.HapticFeedbackConstants
 import android.view.View
 import android.view.ViewGroup.MarginLayoutParams
 import android.view.WindowInsets
 import android.widget.Button
-import android.widget.ImageButton
 import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
@@ -27,6 +25,7 @@ import dev.holdmytrack.android.map.MapOverlays
 import dev.holdmytrack.android.net.ApiException
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
+import dev.holdmytrack.android.recording.RecordButton
 import dev.holdmytrack.android.recording.RecordedActivitiesActivity
 import dev.holdmytrack.android.recording.RecordingService
 import dev.holdmytrack.android.recording.RecordingState
@@ -45,8 +44,8 @@ import org.maplibre.android.maps.Style
  * own, mirroring the web client's own on-map mode control (`apps/web/src/map/MapView.tsx`).
  *
  * Also the one place GPS recording is controlled from in the app: a record button floats
- * bottom-centre (tap to start, tap to pause/resume, long-press to stop — `RecordingService`
- * does the rest, and its notification offers the same controls). While a recording is in
+ * bottom-centre (tap to start, tap to pause/resume, hold for two seconds to stop —
+ * `RecordingService` does the rest, and its notification offers the same controls). While a recording is in
  * progress the map shows only that recording's live track: the mode toggle and every history
  * layer are hidden (`MapOverlays.setRecording`), and the camera follows the latest fix.
  *
@@ -62,7 +61,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var menuButton: Button
     private lateinit var modeBar: View
     private lateinit var modeButtons: Map<MapMode, Button>
-    private lateinit var recordButton: ImageButton
+    private lateinit var recordButton: RecordButton
 
     private var map: MapLibreMap? = null
     private var style: Style? = null
@@ -154,9 +153,10 @@ class MainActivity : AppCompatActivity() {
 
         recordButton = findViewById(R.id.record_button)
         recordButton.setOnClickListener { onRecordTap() }
-        recordButton.setOnLongClickListener { onRecordLongPress() }
+        recordButton.onHoldComplete = ::stopRecording
 
         insetSystemBars()
+        if (savedInstanceState == null) handleStopIntent(intent)
 
         mapView = findViewById(R.id.map_view)
         mapView.onCreate(savedInstanceState)
@@ -186,6 +186,21 @@ class MainActivity : AppCompatActivity() {
                 renderRecording()
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleStopIntent(intent)
+    }
+
+    /** The notification's Stop comes through here rather than straight to `RecordingService`
+     *  (`RecordingService.buildNotification`): the Save screen that follows a stop needs an app
+     *  window in the foreground to open over. Ignored when relaunched from recents, which
+     *  replays the last intent — that would stop a recording started since. */
+    private fun handleStopIntent(intent: Intent) {
+        if (intent.action != RecordingService.ACTION_STOP) return
+        if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
+        stopRecording()
     }
 
     /**
@@ -293,15 +308,11 @@ class MainActivity : AppCompatActivity() {
         if (missing.isEmpty()) startRecording() else permissionLauncher.launch(missing.toTypedArray())
     }
 
-    /** Long-press stops — deliberately not a plain tap, so a stray touch can pause a recording
-     *  but never end it. Consumed even when idle, so a long-press never falls through to a tap
-     *  that would start one. */
-    private fun onRecordLongPress(): Boolean {
-        if (isRecording()) {
-            recordButton.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-            startService(RecordingService.intent(this, RecordingService.ACTION_STOP))
-        }
-        return true
+    /** A two-second hold stops (`RecordButton`) — deliberately not a plain tap, so a stray
+     *  touch can pause a recording but never end it. `RecordingService` then opens the Save
+     *  screen over the map. */
+    private fun stopRecording() {
+        startService(RecordingService.intent(this, RecordingService.ACTION_STOP))
     }
 
     private fun startRecording() {
@@ -322,6 +333,7 @@ class MainActivity : AppCompatActivity() {
         recordButton.setImageResource(icon)
         recordButton.setBackgroundResource(background)
         recordButton.contentDescription = getString(description)
+        recordButton.holdEnabled = active
         if (modeBarReady) modeBar.visibility = if (active) View.GONE else View.VISIBLE
 
         val loaded = style ?: return

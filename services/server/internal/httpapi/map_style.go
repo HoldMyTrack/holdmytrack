@@ -10,7 +10,7 @@ import (
 
 // handleMapStyle serves the MapLibre style document for one flavor — ARCHITECTURE.md §2.1's
 // "serve the style as a document from the API", the prerequisite Android's map rendering
-// blocks on (apps/android/docs/ROADMAP.md, Phase 2).
+// blocks on (apps/android/docs/ARCHITECTURE.md §2.1).
 //
 // The document's basemap asset URLs (glyphs, sprites, the .pmtiles archive) are resolved
 // against this server's configured BASEMAP_ORIGIN at request time rather than baked in at
@@ -22,7 +22,7 @@ import (
 // pmtiles package's registered protocol and MapLibre Native answers natively (built in since
 // Android 11.8.0 / iOS 6.10.0). So one document serves both: no native client needs the
 // archive re-exposed as `{z}/{x}/{y}`, confirmed on a physical Android device reading this
-// endpoint's own output (apps/android/docs/ROADMAP.md, Phase 2).
+// endpoint's own output (apps/android/docs/ARCHITECTURE.md §2.1).
 func (s *Server) handleMapStyle(w http.ResponseWriter, r *http.Request) {
 	flavor := strings.TrimSuffix(r.PathValue("flavor"), ".json")
 
