@@ -556,13 +556,13 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Notes**: A hidden activity (FR-5.8) can still be focused (FR-5.5) or checked; the system excludes hidden activities from the fly-to bounds specifically so the camera never flies to an area with nothing drawn on it. A row that is both focused and checked renders with the same single highlight treatment as either alone — there is no visually distinct "both" state.
 
-### FR-5.7 Select all / Clear / Focus on map
+### FR-5.7 Select all / Clear / Inverse / Focus on map
 
-**Description**: A master checkbox in the header toolbar selects or clears every currently listed activity at once; a separate toolbar icon re-flies to fit the current checked group on demand.
+**Description**: A master checkbox in the header toolbar selects or clears every currently listed activity at once, an **Inverse** button beside it flips which listed activities are checked, and a separate toolbar icon re-flies to fit the current checked group on demand.
 
-**Behavior**: The header checkbox reflects the checked group's state against the currently listed (TYPE/DISTANCE-filtered) rows — checked once every listed row is checked, unchecked once none are, and indeterminate for a partial selection. Clicking it when unchecked or indeterminate checks every listed row and flies to fit them all; clicking it when fully checked empties the checked group and flies the camera to fit every currently visible activity in the date range (respecting the hidden-activity set). The toolbar's accent-tinted **Focus on map** icon, disabled when nothing is checked, re-flies to fit the current checked group without changing it — for recovering the view after panning away from it. This is also the only way to fly to a single checked activity's own bounds by group rather than by row-click (FR-5.5).
+**Behavior**: The header checkbox reflects the checked group's state against the currently listed (TYPE/DISTANCE-filtered) rows — checked once every listed row is checked, unchecked once none are, and indeterminate for a partial selection. Clicking it when unchecked or indeterminate checks every listed row and flies to fit them all; clicking it when fully checked empties the checked group and flies the camera to fit every currently visible activity in the date range (respecting the hidden-activity set). **Inverse**, disabled when no activity is listed, checks every listed row that wasn't checked and unchecks every one that was; a checked activity that isn't currently listed (excluded by TYPE/DISTANCE) ends up unchecked. It then flies to fit the new group, or — if the result is an empty group — to every currently visible activity, the same as clearing. The toolbar's accent-tinted **Focus on map** icon, disabled when nothing is checked, re-flies to fit the current checked group without changing it — for recovering the view after panning away from it. This is also the only way to fly to a single checked activity's own bounds by group rather than by row-click (FR-5.5).
 
-**Notes**: Neither control affects the row-click focus (FR-5.5) — a focused row keeps its own highlight regardless of the header checkbox or Focus on map.
+**Notes**: None of these controls affects the row-click focus (FR-5.5) — a focused row keeps its own highlight regardless of the header checkbox, Inverse, or Focus on map.
 
 ### FR-5.8 Hide/show a track
 
