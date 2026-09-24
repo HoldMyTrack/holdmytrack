@@ -8,5 +8,10 @@ dist
 # from the image. Patterns need **/ — a bare *.pmtiles matches only the context root.
 **/*.pmtiles
 
+# Personal per-machine Vite overrides (e.g. VITE_BASEMAP_ORIGIN pointed at production
+# tiles) — the dev container reads them through the bind mount; no image should bake them in.
+.env.local
+.env.*.local
+
 # Playwright output.
 tests/screenshots

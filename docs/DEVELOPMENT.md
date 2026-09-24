@@ -18,6 +18,21 @@ docker compose up            # http://localhost:5173
 
 Env vars (`POSTGRES_*`, `S3_*`) are Compose interpolation, set in `/.env` (see `.env.example`) — never in `apps/web/.env`, and never seen by Vite. No custom `networks:` block: Compose's default network already resolves `db`/`minio` by service name.
 
+### Seeding a fresh database
+
+`migrate` creates the schema and the Demo Customer's `users` row, but no data — two one-off subcommands fill that in, and `docker compose up` runs neither. Without them, "Try it now" signs into a demo account with zero activities, and Fog/Heatmap's Country/Region zoom tiers have no boundaries to draw. Run both once against any new or recreated database:
+
+```bash
+docker compose run --rm api seed-admin-boundaries   # Natural Earth country/region polygons (IMPLEMENTATION.md §4.2.4)
+docker compose run --rm api seed-demo-customer      # the Demo Customer's 611 GPX activities (IMPLEMENTATION.md §4.10 / SPEC.md FR-2.2)
+```
+
+Boundaries first, so the demo's activities get their country/region matches at ingest — the other order also works, since `seed-admin-boundaries` backfills matches for activities already present, just with one more pass. Both are idempotent: re-running skips whatever is already loaded. `seed-demo-customer` pushes every file through the real ingest pipeline, so it takes a few minutes.
+
+### The local basemap covers Ohio only — or point dev at production's planet tiles
+
+`apps/web/public/basemap/basemap.pmtiles` is a regional extract (roughly Ohio, z0–14, cut by `npm run basemap`), so anything outside it renders as bare background. To see the whole planet locally, add `VITE_BASEMAP_ORIGIN=https://tiles.holdmytrack.com/<YYYYMMDD>` (the dated prefix production uses, `docs/DEPLOY.md` §5) to `apps/web/.env.local` and restart `web`. That only works because the basemap bucket's CORS policy lists `http://localhost:5173` alongside the production origin — without it every tile, font and sprite request fails CORS. Each tile loaded counts as a production R2 request. `.env.local` is in `apps/web/.dockerignore`, so the `test` image never picks the override up and `verify:map` keeps using the local extract.
+
 ## Verification
 
 Confirmed working end to end as of 2026-09-13 (`linux/aarch64` VM, Docker 29.7.2, Compose v5.5.1) — re-confirmed repeatedly since via `verify:map`/`verify:build` after each feature, most recently password recovery. Re-run the full checklist below after any change to `compose.yaml`, either Dockerfile, or the Vite config — containerisation is the part most likely to break silently.
