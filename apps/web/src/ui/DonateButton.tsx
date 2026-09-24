@@ -1,14 +1,16 @@
 import { useState } from 'react';
+import { OPEN_COLLECTIVE_SLUG, openCollectiveDonateUrl } from '../funding';
 import { PlaceholderNotice, type NoticeContent } from './PlaceholderNotice';
 
 /**
- * The header's Donate button. A placeholder: no payment integration, no navigation, no link
- * out — clicking it explains that and nothing else happens.
+ * The header's Donate button. With `OPEN_COLLECTIVE_SLUG` set (funding.ts) it is a plain link
+ * to that collective's Open Collective contribution page, opened in a new tab so the map
+ * behind it isn't lost — the payment itself, and the public ledger it lands in, live entirely
+ * on Open Collective. Until then it stays a placeholder that explains donations aren't open.
  *
- * It is in the nav bar this early anyway because donations are not a feature HoldMyTrack adds on
+ * It is in the nav bar either way because donations are not a feature HoldMyTrack adds on
  * later, they are how it is funded at all (docs/VISION.md §5 — recurring community
- * donations with public accounting, no subscription tier, no paywalled feature). Wiring one
- * up is real work that isn't in scope here; saying so plainly is not.
+ * donations with public accounting, no subscription tier, no paywalled feature).
  */
 const DONATE_NOTICE: NoticeContent = {
   title: 'Donations aren’t open yet',
@@ -18,6 +20,21 @@ const DONATE_NOTICE: NoticeContent = {
 
 export function DonateButton() {
   const [open, setOpen] = useState(false);
+
+  if (OPEN_COLLECTIVE_SLUG) {
+    return (
+      <a
+        className="donate-button"
+        data-testid="donate-button"
+        href={openCollectiveDonateUrl(OPEN_COLLECTIVE_SLUG)}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Support HoldMyTrack on Open Collective"
+      >
+        Donate
+      </a>
+    );
+  }
 
   return (
     <>
