@@ -31,6 +31,10 @@ Gradle itself is not a prerequisite — the committed wrapper (`./gradlew`) pins
 adb reverse tcp:8081 tcp:8081
 adb reverse tcp:5173 tcp:5173
 ./gradlew installDebug -Pholdmytrack.apiBaseUrl=http://127.0.0.1:8081
+
+# Against production. The basemap comes from the style document's own URLs, so nothing
+# else needs forwarding.
+./gradlew assembleDebug -Pholdmytrack.apiBaseUrl=https://holdmytrack.com
 ```
 
 Cleartext `http://` is permitted in debug builds only (`app/src/debug/AndroidManifest.xml`), so a release build cannot quietly ship pointing at one.
