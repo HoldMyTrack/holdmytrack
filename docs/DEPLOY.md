@@ -1,4 +1,4 @@
-# Deploying FitMap — minimal single-VPS setup
+# Deploying HoldMyTrack — minimal single-VPS setup
 
 The smallest deployment that's actually production-shaped: one small VPS running `compose.prod.yml` (Postgres+PostGIS, `api`, `worker`, and Caddy in front of the built frontend), plus Cloudflare R2 for object storage. See `docs/VISION.md` §4.3 for the cost model this is built around, and `docs/ROADMAP.md`'s "Production deployment" section for what's still open beyond this (backups, monitoring, spend caps, DPIA — this document only covers getting a working deployment live, not everything a real public launch needs).
 
@@ -28,14 +28,14 @@ Fill in every value — see that file's own comments for what each one means and
 
 The basemap is the full Protomaps planet build (z0–15, ~138 GB), served unmodified from a public R2 bucket. The archive is deliberately excluded from every Docker build context (`apps/web/.dockerignore`), so the `web` image never has it baked in.
 
-1. Create a second R2 bucket for the basemap (e.g. `fitmap-basemap`), separate from the app's private one, and enable public access on it. Public access is either the bucket's `r2.dev` URL, which is rate-limited and meant for development, or a custom domain, which needs the domain's DNS zone on Cloudflare.
+1. Create a second R2 bucket for the basemap (e.g. `holdmytrack-basemap`), separate from the app's private one, and enable public access on it. Public access is either the bucket's `r2.dev` URL, which is rate-limited and meant for development, or a custom domain, which needs the domain's DNS zone on Cloudflare.
 2. Add a CORS rule to that bucket: allowed origins `https://<your-domain>`, allowed methods `GET, HEAD`, allowed headers `range, if-match`, exposed headers `etag` (`IMPLEMENTATION.md` §5.4).
 3. Pick a dated build key from `https://build-metadata.protomaps.dev/builds.json`, download it (`curl -C - -o planet.pmtiles https://build.protomaps.com/<YYYYMMDD>.pmtiles`), and check its md5 against the listed `md5sum`.
 4. Upload under the build's dated prefix, with an R2 API token that can write to the bucket:
    ```
-   aws s3 cp planet.pmtiles s3://fitmap-basemap/<YYYYMMDD>/basemap/basemap.pmtiles --endpoint-url https://<account-id>.r2.cloudflarestorage.com
-   aws s3 cp --recursive apps/web/public/basemap/fonts s3://fitmap-basemap/<YYYYMMDD>/basemap/fonts --endpoint-url ...
-   aws s3 cp --recursive apps/web/public/basemap/sprites s3://fitmap-basemap/<YYYYMMDD>/basemap/sprites --endpoint-url ...
+   aws s3 cp planet.pmtiles s3://holdmytrack-basemap/<YYYYMMDD>/basemap/basemap.pmtiles --endpoint-url https://<account-id>.r2.cloudflarestorage.com
+   aws s3 cp --recursive apps/web/public/basemap/fonts s3://holdmytrack-basemap/<YYYYMMDD>/basemap/fonts --endpoint-url ...
+   aws s3 cp --recursive apps/web/public/basemap/sprites s3://holdmytrack-basemap/<YYYYMMDD>/basemap/sprites --endpoint-url ...
    ```
 5. Set `VITE_BASEMAP_ORIGIN` in `.env.prod` to the public origin plus that prefix (e.g. `https://pub-xxxx.r2.dev/20260922`), with no trailing slash. It's a *build*-time value for the web bundle, and `compose.prod.yml` also passes it to `api` as `BASEMAP_ORIGIN` for the style document native clients fetch. Changing it later needs `docker compose -f compose.prod.yml build web` and an `up -d`, not just a restart.
 

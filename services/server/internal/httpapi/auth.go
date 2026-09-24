@@ -24,7 +24,7 @@ import (
 // share the same token-table shape. Rate limiting is partially built: see demoLimiter/forgotPasswordLimiter
 // below, added specifically because their endpoints are reachable with no credentials at all.
 
-const sessionCookieName = "fitmap_session"
+const sessionCookieName = "holdmytrack_session"
 
 // sessionTTL is deliberately long — a single-user personal app with no "remember me"
 // checkbox should just stay signed in, not force a re-login every few hours.
@@ -105,7 +105,7 @@ type authResponse struct {
 // existing credential still valid," not a place to reissue one.
 type authResponseWithSession struct {
 	authResponse
-	// SessionToken is the same value already set as the fitmap_session cookie in this same
+	// SessionToken is the same value already set as the holdmytrack_session cookie in this same
 	// response — a browser client can ignore this field entirely, it already has the
 	// credential via Set-Cookie. A native client with no shared cookie jar (or one that needs
 	// to inject the credential into MapLibre Native's own tile requests, which bypass the
@@ -266,12 +266,12 @@ func (s *Server) sendVerificationEmail(ctx context.Context, userID, email string
 
 	link := fmt.Sprintf("%s/?verify_token=%s", s.appBaseURL, tokenID)
 	body := fmt.Sprintf(
-		"Welcome to FitMap! Confirm this email address to unlock your account:\n\n%s\n\n"+
-			"This link works once and expires in 24 hours. If you didn't create a FitMap "+
+		"Welcome to HoldMyTrack! Confirm this email address to unlock your account:\n\n%s\n\n"+
+			"This link works once and expires in 24 hours. If you didn't create a HoldMyTrack "+
 			"account, you can safely ignore this email.",
 		link,
 	)
-	return s.mailer.Send(ctx, email, "Verify your FitMap email", body)
+	return s.mailer.Send(ctx, email, "Verify your HoldMyTrack email", body)
 }
 
 // handleLogin serves `POST /v1/auth/login`.
@@ -456,12 +456,12 @@ func (s *Server) sendPasswordReset(ctx context.Context, email string) error {
 
 	link := fmt.Sprintf("%s/?reset_token=%s", s.appBaseURL, tokenID)
 	body := fmt.Sprintf(
-		"Someone requested a password reset for this FitMap account.\n\n"+
+		"Someone requested a password reset for this HoldMyTrack account.\n\n"+
 			"Reset it here (expires in 1 hour, and only works once):\n%s\n\n"+
 			"If you didn't request this, you can safely ignore this email.",
 		link,
 	)
-	return s.mailer.Send(ctx, email, "Reset your FitMap password", body)
+	return s.mailer.Send(ctx, email, "Reset your HoldMyTrack password", body)
 }
 
 type resetPasswordRequest struct {
@@ -754,7 +754,7 @@ func clientIP(r *http.Request) string {
 	return host
 }
 
-// startSession returns the new session id, alongside setting it as the fitmap_session
+// startSession returns the new session id, alongside setting it as the holdmytrack_session
 // cookie — a browser client needs nothing more, but the four callers that mint a fresh
 // session (signup, login, demo-start, reset-password) also thread this value into
 // authResponseWithSession.SessionToken, apps/android/docs/ROADMAP.md's "Decide the mobile
@@ -790,7 +790,7 @@ func (s *Server) startSession(w http.ResponseWriter, ctx context.Context, userID
 // sessionIDFromRequest strips exactly this before treating the remainder as a session id.
 const bearerPrefix = "Bearer "
 
-// sessionIDFromRequest reads the session id a caller presented: the fitmap_session cookie
+// sessionIDFromRequest reads the session id a caller presented: the holdmytrack_session cookie
 // for a browser (checked first — the long-established, higher-volume path), falling back to
 // `Authorization: Bearer <session-id>` for a native client. This is not a second credential
 // system — it's the same sessions.id value, just presented a second way, because a mobile

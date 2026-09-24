@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fitmap/fitmap/services/server/internal/parse"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
 )
 
 // editFixture is ten points one second apart, walking north.

@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "dev.fitmap.poc.healthconnect"
+    namespace = "dev.holdmytrack.poc.healthconnect"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "dev.fitmap.poc.healthconnect"
+        applicationId = "dev.holdmytrack.poc.healthconnect"
         // 34 is where Health Connect became part of the platform. The PoC pins it there on
         // purpose: below 34 Health Connect is a separately-installed APK the app has to
         // detect and route around, which is a different question from the one this PoC

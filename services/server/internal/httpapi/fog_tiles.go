@@ -9,7 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/fitmap/fitmap/services/server/internal/fog"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
 )
 
 // handleFogTile serves §4.2's coverage mask as a ready-to-draw white-veil RGBA PNG:

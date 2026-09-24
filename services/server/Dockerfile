@@ -9,7 +9,7 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -ldflags "-X main.gitSHA=${GIT_SHA}" -o /out/fitmap ./cmd/fitmap
+RUN CGO_ENABLED=0 go build -ldflags "-X main.gitSHA=${GIT_SHA}" -o /out/holdmytrack ./cmd/holdmytrack
 
 # The Takeout import path (internal/httpapi/takeout_upload.go) shells out to `pathify`
 # (github.com/np25071984/pathify) rather than reimplementing its Google Health/Fitbit
@@ -19,10 +19,10 @@ RUN CGO_ENABLED=0 go build -ldflags "-X main.gitSHA=${GIT_SHA}" -o /out/fitmap .
 FROM rust:1.88-bookworm AS pathify-build
 RUN cargo install pathify-cli --version 1.4.0 --locked
 
-# distroless/cc, not distroless/static: `fitmap` itself is a static Go binary either image
+# distroless/cc, not distroless/static: `holdmytrack` itself is a static Go binary either image
 # would run, but `pathify` is a normal dynamically-linked Rust binary and needs libc/libgcc,
 # which only the cc variant provides. Still no shell and no package manager either way.
 FROM gcr.io/distroless/cc-debian12 AS dev
-COPY --from=build /out/fitmap /usr/local/bin/fitmap
+COPY --from=build /out/holdmytrack /usr/local/bin/holdmytrack
 COPY --from=pathify-build /usr/local/cargo/bin/pathify /usr/local/bin/pathify
-ENTRYPOINT ["/usr/local/bin/fitmap"]
+ENTRYPOINT ["/usr/local/bin/holdmytrack"]

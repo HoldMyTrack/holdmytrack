@@ -50,7 +50,7 @@ func Load() (Config, error) {
 	c := Config{
 		DatabaseURL:  env("DATABASE_URL", ""),
 		S3Endpoint:   env("S3_ENDPOINT", ""),
-		S3Bucket:     env("S3_BUCKET", "fitmap-dev"),
+		S3Bucket:     env("S3_BUCKET", "holdmytrack-dev"),
 		S3AccessKey:  env("S3_ACCESS_KEY", ""),
 		S3SecretKey:  env("S3_SECRET_KEY", ""),
 		ListenAddr:   env("LISTEN_ADDR", ":8080"),
@@ -72,9 +72,9 @@ func Load() (Config, error) {
 		// Built from the POSTGRES_* Compose-interpolation vars in .env.example, the same
 		// values db's compose service is configured with, rather than requiring a second
 		// full DSN to be kept in sync by hand.
-		user := env("POSTGRES_USER", "fitmap")
-		pass := env("POSTGRES_PASSWORD", "fitmap")
-		name := env("POSTGRES_DB", "fitmap")
+		user := env("POSTGRES_USER", "holdmytrack")
+		pass := env("POSTGRES_PASSWORD", "holdmytrack")
+		name := env("POSTGRES_DB", "holdmytrack")
 		host := env("POSTGRES_HOST", "db")
 		port := env("POSTGRES_PORT_INTERNAL", "5432") // container-internal, not the published host port
 		c.DatabaseURL = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", user, pass, host, port, name)

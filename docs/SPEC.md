@@ -1,4 +1,4 @@
-# FitMap: Spec
+# HoldMyTrack: Spec
 
 | | |
 | :-- | :-- |
@@ -11,13 +11,13 @@
 
 ### 1.1 Purpose
 
-This document specifies FitMap's functional behavior as currently implemented: what the system does, from the point of view of a user or of another system calling its API — not why it was built that way (`VISION.md`) or how it is implemented internally (`IMPLEMENTATION.md`). Each functional requirement (FR) is written to be independently testable: given the stated preconditions and inputs, the stated behavior and outputs should be observable.
+This document specifies HoldMyTrack's functional behavior as currently implemented: what the system does, from the point of view of a user or of another system calling its API — not why it was built that way (`VISION.md`) or how it is implemented internally (`IMPLEMENTATION.md`). Each functional requirement (FR) is written to be independently testable: given the stated preconditions and inputs, the stated behavior and outputs should be observable.
 
 ### 1.2 Scope
 
 **In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and privacy trim, FR-1.7; email verification, FR-1.8), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), the date-range picker, the per-account activity graph, password recovery, and distance/time trends (FR-9 below).
 
-**Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), explorer-tile gamification, the rest of "Export" (story cards, animated reveals — high-resolution map export itself is built, FR-4.10 below), and user-defined privacy zones (a `privacy_zones` table exists in the schema — `IMPLEMENTATION.md` §3.7 — but no endpoint or UI creates or applies one today; only the endpoint-trim privacy control in FR-8.1 below, user-adjustable via FR-1.7's Settings page, is functional). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against FitMap being a health or fitness advisor, and pace/heart-rate stay as per-activity route context (FR-4.9) rather than an analysed, all-time performance record. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
+**Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), explorer-tile gamification, the rest of "Export" (story cards, animated reveals — high-resolution map export itself is built, FR-4.10 below), and user-defined privacy zones (a `privacy_zones` table exists in the schema — `IMPLEMENTATION.md` §3.7 — but no endpoint or UI creates or applies one today; only the endpoint-trim privacy control in FR-8.1 below, user-adjustable via FR-1.7's Settings page, is functional). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace/heart-rate stay as per-activity route context (FR-4.9) rather than an analysed, all-time performance record. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
 ### 1.3 Intended audience
 
@@ -153,24 +153,27 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 
 ### FR-1.7 Account settings
 
-**Description**: A signed-in user (real or demo — FR-2) edits their own profile: Avatar, Name, Country, Timezone, and Privacy Trim (FR-8.1). Reached from the account menu's "Settings" item, a separate screen from the activity graph (FR-7).
+**Description**: A signed-in user (real or demo — FR-2) edits their own profile: Avatar, Name, Country, Timezone, and Privacy Trim (FR-8.1). Reached from the account menu's "Settings" item, a separate screen from the activity graph (FR-7) — and, for a real account that has never saved it, shown automatically in place of the map (behavior 6).
+
+**Name** is an optional display label, not an identifier: it isn't unique, two accounts may share one, and nothing signs in with it — the email address identifies an account. Nothing outside this page displays it yet.
 
 **Preconditions**: An active session.
 
-**Inputs**: An image file (PNG, JPEG, or WebP, up to 5 MB) for Avatar; free text for Name; a country selected from a standard list for Country, searchable by name or ISO code; an IANA timezone name selected from the browser's own supported list for Timezone, listed by current GMT offset and searchable by place, region, or offset; a whole number for Privacy Trim, in whichever unit Country currently implies (meters, 0–200, for metric; feet, 0–656, for imperial — the same 200m ceiling, just expressed in the displayed unit). Stored server-side at centimeter precision, not whole meters, so a whole-foot input (1 ft = 30.48 cm exactly) always redisplays as the exact number typed.
+**Inputs**: An image file (PNG, JPEG, or WebP, up to 5 MB) for Avatar; free text for Name (optional); a country selected from a standard list for Country (required — there is no "not set" choice), searchable by name or ISO code; an IANA timezone name selected from the browser's own supported list for Timezone, listed by current GMT offset and searchable by place, region, or offset; a whole number for Privacy Trim, in whichever unit Country currently implies (meters, 0–200, for metric; feet, 0–656, for imperial — the same 200m ceiling, just expressed in the displayed unit). Stored server-side at centimeter precision, not whole meters, so a whole-foot input (1 ft = 30.48 cm exactly) always redisplays as the exact number typed.
 
 **Behavior**:
 1. Avatar uploads and removals take effect immediately (`POST`/`DELETE /v1/account/avatar`) — each is its own action, not gated behind a separate save step. The account menu's own avatar button reflects whichever image is current everywhere in the app the moment it changes, with no reload.
 2. Name, Country, Timezone, and Privacy Trim save together as one action (`PATCH /v1/account/settings`) — editing one and leaving without saving discards all four, not just the one touched.
-3. **Country decides which unit system the entire app displays distance, pace, and elevation in** — metric (km, min/km, meters) for every country except the United States, Liberia, and Myanmar, which see imperial (mi, min/mi, feet). Leaving Country unset defaults to metric. This takes effect the moment it's saved, across every screen that shows one of these values (the Activities panel, the date-range picker, the activity graph, Trends, the per-activity pace/elevation profile, and the map's own distance scale) — none of it requires a reload.
+3. **Country decides which unit system the entire app displays distance, pace, and elevation in** — metric (km, min/km, meters) for every country except the United States, Liberia, and Myanmar, which see imperial (mi, min/mi, feet). An account that has never saved a Country (only possible before its first save — behavior 6) displays metric. This takes effect the moment it's saved, across every screen that shows one of these values (the Activities panel, the date-range picker, the activity graph, Trends, the per-activity pace/elevation profile, and the map's own distance scale) — none of it requires a reload. Save is disabled until a Country is chosen.
 4. **Timezone decides which calendar day an activity is grouped under everywhere the app buckets by day** — the date-range picker's histogram, the activity graph's daily grid and stat cards, `GET /v1/activities/trends`, and date-range filtering. Auto-resolved from the browser at signup (FR-1.1) and editable here afterward; unlike Country, it has no "unset" state — every account always has one, defaulting to UTC until changed.
 5. **Privacy Trim's own field also follows Country, live, before Save.** It's shown and edited in Country's implied unit within this page the moment Country is changed here — not only after a save — so switching Country doesn't leave the same typed number silently meaning a different real-world distance. The value entered is converted to centimeters and stored as such; FR-8.1's trim radius is always a centimeters value server-side regardless of which unit it was entered in.
+6. **First run.** A real, verified account with no Country — one that has never saved this page, which is every new account right after FR-1.8's verification link — sees this page instead of the map, titled "Welcome — set up your account", with a short explanation of why Country and Timezone matter. There is no way back to the map from it (no back link; the account menu offers only sign-out). Timezone is prefilled with the one auto-detected at signup, to confirm or change; Country starts empty. "Save and continue" is disabled until a Country is chosen; saving shows the map straight away, and every later visit goes directly to the map. Reloading before saving shows this page again. A demo account never sees it.
 
 **Outputs**: The account's current Avatar, Name, Country, Timezone, and Privacy Trim value, always reflecting the last successful save (or the account's defaults, if never changed) — reloading the app never reverts to something stale.
 
 **Error cases**:
 - An unsupported image type or a file over 5 MB → `415`/`413`, and the image is not saved.
-- Country outside the supported list, Timezone not a valid IANA zone name, or Privacy Trim outside its displayed unit's range (0–200 meters, or 0–656 feet — the same limit) → `400 Bad Request`, and none of the four fields in that save are applied (a full-replace save either succeeds as a whole or not at all).
+- Country missing or outside the supported list, Timezone not a valid IANA zone name, or Privacy Trim outside its displayed unit's range (0–200 meters, or 0–656 feet — the same limit) → `400 Bad Request`, and none of the four fields in that save are applied (a full-replace save either succeeds as a whole or not at all).
 
 ### FR-1.8 Email verification
 
@@ -183,7 +186,8 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 2. Clicking the link submits the token to `POST /v1/auth/verify-email`. On success, the server marks the account verified, invalidates every other outstanding verification token for it, and creates a fresh session for whichever browser opened the link — regardless of whether that browser already held a session of its own, so the link works from any device.
 3. While waiting, the account holder can request another copy of the link (`POST /v1/auth/resend-verification`, rate-limited to 5 per hour per account) without needing to already know it was lost or expired.
 4. The account holder can also change the address on file (`PATCH /v1/auth/email`) before ever verifying — correcting a typo the original signup made, since a resend alone cannot fix a wrong address. Any change resets the account back to unverified and sends a new link to the new address, whether or not the account was already verified.
-5. Until verified, every route other than `GET /v1/auth/me`, `POST /v1/auth/logout`, and the three endpoints above returns `403 Forbidden` with a distinguishable error rather than the normal response.
+5. Once verified, the account continues to FR-1.7's first-run Settings page, not straight to the map, until Country and Timezone have been saved once.
+6. Until verified, every route other than `GET /v1/auth/me`, `POST /v1/auth/logout`, and the three endpoints above returns `403 Forbidden` with a distinguishable error rather than the normal response.
 
 **Outputs**: `verify-email` and `reset-password` both return a valid session cookie for the account on success. `resend-verification` and `change-email` return a confirmation; `change-email` also returns the account's current (now-unverified) profile.
 
@@ -324,9 +328,9 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 ### FR-3.6 Mobile sync (Android / Health Connect)
 
-**Description**: The Android app reads a signed-in account's exercise history from Health Connect and syncs it to FitMap — a second ingest path (Path 2) alongside file upload above, distinct from a file the user explicitly picked.
+**Description**: The Android app reads a signed-in account's exercise history from Health Connect and syncs it to HoldMyTrack — a second ingest path (Path 2) alongside file upload above, distinct from a file the user explicitly picked.
 
-**Preconditions**: Signed in on the Android app (`apps/android/fitmap`); Health Connect installed, with the Exercise permission granted plus the separately-granted "Access exercise routes" permission — a session with no route geometry can't be placed on the map, so it's rejected at sync time rather than persisted without one (see step 3).
+**Preconditions**: Signed in on the Android app (`apps/android/holdmytrack`); Health Connect installed, with the Exercise permission granted plus the separately-granted "Access exercise routes" permission — a session with no route geometry can't be placed on the map, so it's rejected at sync time rather than persisted without one (see step 3).
 
 **Inputs**: Health Connect exercise sessions with route geometry, read **foreground-only** — `READ_EXERCISE_ROUTES` returns `ConsentRequired` in the background regardless of what's granted, a platform constraint rather than a client choice. `READ_HEALTH_DATA_HISTORY`, requested separately, extends the otherwise 30-day-only read window.
 
@@ -335,7 +339,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 2. A foreground sync run reads sessions ascending from the account's own last confirmed position (a cursor keyed on both an instant and the record ids already handled at it, not a bare timestamp — two sessions can share a start instant), classifies each one, and posts batches to `POST /v1/sync/activities`.
 3. A session with no route (an indoor workout, or any Samsung Galaxy Watch session — Samsung doesn't expose route geometry via Health Connect at all) is skipped and reported as such, not treated as a failure; the cursor still advances past it.
 4. A route that exists but can't be read this run (`ConsentRequired`, e.g. the app was backgrounded mid-run) is reported distinctly from "no route" and blocks the cursor from advancing past it, so a resumed run retries it rather than skipping it permanently.
-5. Each synced activity is idempotent on the Health Connect record's own id and flows through the exact same ingest pipeline FR-3.1's file upload uses. Activity type is normalized onto FitMap's existing vocabulary (Health Connect's `biking` becomes `cycling`, etc.), so it doesn't fragment the TYPE filter or defeat FR-3.7's cross-source matching.
+5. Each synced activity is idempotent on the Health Connect record's own id and flows through the exact same ingest pipeline FR-3.1's file upload uses. Activity type is normalized onto HoldMyTrack's existing vocabulary (Health Connect's `biking` becomes `cycling`, etc.), so it doesn't fragment the TYPE filter or defeat FR-3.7's cross-source matching.
 
 **Outputs**: One new `Activity` per synced session with a route; a per-run summary (synced / skipped-no-route / rejected, each with its own reason) on the sync screen; and a persistent history via the same `GET /v1/uploads` FR-3.4 already describes — a Health Connect sync and a file upload are the same kind of ingest job, not two separate histories.
 
@@ -490,7 +494,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 6. While a capture is generating, the Capture button shows a busy state; a failure (e.g. a timeout waiting for tiles to load at export resolution) is reported inline, near the buttons, and the frame stays in place rather than being discarded — the user is not forced to reposition it and retry from scratch.
 7. Escape, or the frame's own Close button, puts the frame away and returns to the normal map view with nothing captured. A successful capture also puts it away.
 
-**Outputs**: On a successful capture, a PNG file download, named `fitmap-{date}.png`. OSM/Protomaps attribution is baked into the image's own pixels, in the bottom-right corner over a translucent backing plate — not optional or user-removable, since the basemap is an ODbL "Produced Work" and credit is a license requirement on any distributed export, not a preference (`IMPLEMENTATION.md` §5.6).
+**Outputs**: On a successful capture, a PNG file download, named `holdmytrack-{date}.png`. OSM/Protomaps attribution is baked into the image's own pixels, in the bottom-right corner over a translucent backing plate — not optional or user-removable, since the basemap is an ODbL "Produced Work" and credit is a license requirement on any distributed export, not a preference (`IMPLEMENTATION.md` §5.6).
 
 **Notes**: This is one of three things `VISION.md` §4.2 groups under "Export" — story cards and animated reveals are not built. Colored zone segments (FR-4.8) are not reflected in a capture even when currently shown on screen — exporting a single focused activity's bands is a narrower case not covered by this slice. Vector/SVG output is not offered; raster (PNG) only. Platform preset dimensions are curated from Hootsuite's social-media-image-sizes guide; profile-picture/cover-photo sizes are excluded, since this feature frames map content, not an account avatar.
 
@@ -735,4 +739,4 @@ The following are named in `VISION.md`'s roadmap but have no functional requirem
 - User-defined privacy zones (beyond the fixed endpoint trim in FR-8.1)
 - Dark-theme variant of the Fog of War veil (the theme parameter is accepted but currently has no visual effect on the veil itself)
 
-Deliberately out of scope, not a "not yet" — built and then cut, not planned to return: Oura and other recovery-data sources (sleep, HRV, readiness), best-effort curves, personal bests, power curves, and training load. `VISION.md` §1.1 draws a hard line against FitMap being a health or fitness advisor; pace and heart rate stay as per-activity route context (FR-4.9), not an analysed, all-time performance record.
+Deliberately out of scope, not a "not yet" — built and then cut, not planned to return: Oura and other recovery-data sources (sleep, HRV, readiness), best-effort curves, personal bests, power curves, and training load. `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor; pace and heart rate stay as per-activity route context (FR-4.9), not an analysed, all-time performance record.

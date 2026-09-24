@@ -18,10 +18,10 @@ RUN apt-get update \
 COPY --from=protomaps/go-pmtiles:v1.31.2 /go-pmtiles /usr/local/bin/pmtiles
 # Staged outside /app/node_modules, because that path is a volume mount at runtime.
 COPY --from=deps /app/node_modules /opt/deps/node_modules
-COPY docker/entrypoint.sh /usr/local/bin/fitmap-entrypoint
-RUN chmod +x /usr/local/bin/fitmap-entrypoint
+COPY docker/entrypoint.sh /usr/local/bin/holdmytrack-entrypoint
+RUN chmod +x /usr/local/bin/holdmytrack-entrypoint
 EXPOSE 5173 4173
-ENTRYPOINT ["fitmap-entrypoint"]
+ENTRYPOINT ["holdmytrack-entrypoint"]
 CMD ["npm", "run", "dev"]
 
 FROM dev AS test

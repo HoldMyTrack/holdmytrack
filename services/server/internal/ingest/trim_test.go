@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fitmap/fitmap/services/server/internal/parse"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
 )
 
 func pt(lat, lon float64, t time.Time) parse.Point {

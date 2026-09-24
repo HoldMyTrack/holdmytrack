@@ -1,4 +1,4 @@
-# FitMap web client
+# HoldMyTrack web client
 
 React + MapLibre GL JS on a self-hosted Protomaps basemap. This is the Phase 1 foundation described in `docs/ARCHITECTURE.md` (§1.2), `IMPLEMENTATION.md` (§5.4) and `VISION.md` (§5.2).
 

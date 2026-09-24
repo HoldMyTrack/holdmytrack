@@ -2,9 +2,9 @@
 
 Orientation for coding agents working in this repository. Read this first, then the one document below that covers what you are about to change.
 
-## What FitMap is
+## What HoldMyTrack is
 
-FitMap is a free, community-funded platform for tracking outdoor activities and seeing the accumulated shape of where you have been. It aggregates activity history the user already has — from watches, from cloud services, from files — and turns it into maps and exploration stats worth looking at. Three things it deliberately is **not**: it does not record workouts (no start button, no live GPS — it begins where the watch's recording ends), it has no social graph yet (no feed, follows, kudos, segments or leaderboards; see `docs/VISION.md` §5.5–§5.6 for why that ordering is deliberate rather than merely cautious), and it is not a health or fitness advisor (no HR zones, no training load, no recovery/readiness, no sleep tracking — pace and heart rate are shown per activity as route context, not analysed as a coaching product). It is funded by recurring community donations with public accounting, so there is no subscription tier to design around and no paywalled feature to hide behind.
+HoldMyTrack is a free, community-funded platform for tracking outdoor activities and seeing the accumulated shape of where you have been. It aggregates activity history the user already has — from watches, from cloud services, from files — and turns it into maps and exploration stats worth looking at. Three things it deliberately is **not**: it does not record workouts (no start button, no live GPS — it begins where the watch's recording ends), it has no social graph yet (no feed, follows, kudos, segments or leaderboards; see `docs/VISION.md` §5.5–§5.6 for why that ordering is deliberate rather than merely cautious), and it is not a health or fitness advisor (no HR zones, no training load, no recovery/readiness, no sleep tracking — pace and heart rate are shown per activity as route context, not analysed as a coaching product). It is funded by recurring community donations with public accounting, so there is no subscription tier to design around and no paywalled feature to hide behind.
 
 ## Which document to read, for what
 
@@ -27,7 +27,7 @@ For repository layout, the root `README.md` is now the authority — it absorbed
 
 `VISION.md`, `ARCHITECTURE.md` and `IMPLEMENTATION.md` cite each other by section number (`§5.2`, `§1.2`) rather than by page or quotation; `SPEC.md` cites all three the same way, but internally cites its own requirements as `FR-N.M`, not `§N.M` — its own top-level section numbers don't align with the FR groups (Introduction and Actors sit ahead of FR-1), so `§8` inside that document does not mean "FR-8." `ARCHITECTURE.md` and `IMPLEMENTATION.md` were one document until this content was split out — existing citations to what's now `ARCHITECTURE.md` §1/§2 keep the exact section numbers they already had, just pointing at a different file now; `IMPLEMENTATION.md` itself starts at §3 for the same reason. When you change something any of these documents specifies, update the document in the same change — a citation that no longer matches the code (or another document) is worse than no citation. `SPEC.md` and `IMPLEMENTATION.md` are the pair most likely to need a matching edit together: a change to one almost always means a small edit to the other.
 
-This file stays limited to orientation — the table above, `What FitMap is`, and the Markdown convention below. If you're about to write what a feature does, how it works, or why it was built a particular way, that belongs in `SPEC.md` (what) or `IMPLEMENTATION.md` (how/why), not here.
+This file stays limited to orientation — the table above, `What HoldMyTrack is`, and the Markdown convention below. If you're about to write what a feature does, how it works, or why it was built a particular way, that belongs in `SPEC.md` (what) or `IMPLEMENTATION.md` (how/why), not here.
 
 ## Markdown Formatting Style
 

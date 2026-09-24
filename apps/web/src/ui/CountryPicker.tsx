@@ -43,11 +43,10 @@ function Flag({ code, emoji }: { code: string; emoji: boolean }) {
 }
 
 let options: PickerOption[] | undefined;
-let unset: PickerOption | undefined;
 
 /** Built once, on first render — COUNTRIES never changes, and the flag check needs a DOM. */
-function countryOptions(): [PickerOption[], PickerOption] {
-  if (!options || !unset) {
+function countryOptions(): PickerOption[] {
+  if (!options) {
     const emoji = supportsFlagEmoji();
     options = COUNTRIES.map((c) => ({
       value: c.code,
@@ -56,31 +55,24 @@ function countryOptions(): [PickerOption[], PickerOption] {
       leading: <Flag code={c.code} emoji={emoji} />,
       exact: [c.code],
     }));
-    unset = {
-      value: '',
-      label: 'Not set (metric)',
-      detail: '',
-      leading: <span className="search-picker__flag search-picker__flag--none" aria-hidden="true" />,
-    };
   }
-  return [options, unset];
+  return options;
 }
 
 export interface CountryPickerProps {
-  /** An ISO 3166-1 alpha-2 code from countries.ts, or `''` for unset. */
+  /** An ISO 3166-1 alpha-2 code from countries.ts, or `''` while none has been chosen yet — a
+   *  real account can't save Settings without one (FR-1.7), so there's no "unset" row to pick. */
   value: string;
   onChange: (code: string) => void;
   labelledBy: string;
 }
 
-/** Settings' Country field: SearchPicker rows of round flag · name · ISO code, A–Z, with
- *  "Not set (metric)" first. */
+/** Settings' Country field: SearchPicker rows of round flag · name · ISO code, A–Z. */
 export function CountryPicker({ value, onChange, labelledBy }: CountryPickerProps) {
-  const [list, unsetOption] = countryOptions();
   return (
     <SearchPicker
-      options={list}
-      unsetOption={unsetOption}
+      options={countryOptions()}
+      emptyLabel="Choose a country"
       value={value}
       onChange={onChange}
       labelledBy={labelledBy}

@@ -134,7 +134,7 @@ function scaleCanvas(source: HTMLCanvasElement, widthPx: number, heightPx: numbe
  * text can disappear against a same-toned background, the same "needs to read regardless of
  * what's underneath" reasoning `IMPLEMENTATION.md` §4.2 already used for fog's own veil.
  *
- * `docs/ROADMAP.md`'s FitMap-logo item shares this same lower-right corner and this same draw
+ * `docs/ROADMAP.md`'s HoldMyTrack-logo item shares this same lower-right corner and this same draw
  * call site by design — landing it later just means a second small draw call here, not a new
  * pass over the canvas.
  */
@@ -189,7 +189,7 @@ interface OffscreenView {
 /**
  * The offscreen-instance/overlay-replay machinery — kept apart from `exportFramedImage` above
  * so that function reads as the geometry alone. Attribution bake-in (`drawAttribution` above;
- * the still-unbuilt FitMap-logo item tracked in `docs/ROADMAP.md` will join it) belongs on
+ * the still-unbuilt HoldMyTrack-logo item tracked in `docs/ROADMAP.md` will join it) belongs on
  * the *final* canvas in `exportFramedImage` (post-scale — the one actually encoded to PNG),
  * not on the canvas this returns.
  */

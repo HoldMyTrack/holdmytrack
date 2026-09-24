@@ -105,7 +105,7 @@ export function useMapInstance({
       // Handle for the headless verification run. Dev-only: the production bundle
       // should not hand a live WebGL map to anything that asks.
       if (import.meta.env.DEV) {
-        (window as unknown as { __fitmap?: MapLibreMap }).__fitmap = instance;
+        (window as unknown as { __holdmytrack?: MapLibreMap }).__holdmytrack = instance;
       }
     });
 

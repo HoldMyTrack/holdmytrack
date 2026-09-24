@@ -40,7 +40,7 @@ CREATE TABLE connections (
     last_synced_at    TIMESTAMPTZ,
     last_record_at    TIMESTAMPTZ,            -- watermark: newest activity already ingested
     UNIQUE (user_id, provider),
-    UNIQUE (provider, provider_user_id)       -- one provider account maps to one FitMap user
+    UNIQUE (provider, provider_user_id)       -- one provider account maps to one HoldMyTrack user
 );
 
 -- §3.3 activities

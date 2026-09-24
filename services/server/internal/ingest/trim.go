@@ -3,7 +3,7 @@ package ingest
 import (
 	"time"
 
-	"github.com/fitmap/fitmap/services/server/internal/parse"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
 )
 
 // TrimEndpoints drops points within trimM meters of walked distance from each end of the

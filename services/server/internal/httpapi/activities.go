@@ -14,7 +14,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/fitmap/fitmap/services/server/internal/ingest"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 )
 
 // activityFilter is the from/to/types filter shape shared by §4.3's tracks tiles and all

@@ -1,4 +1,4 @@
-// Package worker is cmd/fitmap work: dequeues jobs with FOR UPDATE SKIP LOCKED
+// Package worker is cmd/holdmytrack work: dequeues jobs with FOR UPDATE SKIP LOCKED
 // (IMPLEMENTATION.md §3.8, §4.1) and runs internal/ingest for `ingest` and `edit_track` jobs.
 // No broker, per §1.1 — this poll loop against idx_jobs_runnable is the whole queue.
 package worker
@@ -14,9 +14,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/fitmap/fitmap/services/server/internal/fog"
-	"github.com/fitmap/fitmap/services/server/internal/ingest"
-	"github.com/fitmap/fitmap/services/server/internal/storage"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 )
 
 const pollInterval = 500 * time.Millisecond

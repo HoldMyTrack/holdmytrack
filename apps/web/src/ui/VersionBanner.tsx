@@ -44,7 +44,7 @@ export function VersionBanner() {
   if (!stale) return null;
   return (
     <div className="version-banner" role="status" data-testid="version-banner">
-      A new version of FitMap is available.
+      A new version of HoldMyTrack is available.
       <button type="button" className="version-banner__refresh" onClick={() => window.location.reload()}>
         Refresh
       </button>

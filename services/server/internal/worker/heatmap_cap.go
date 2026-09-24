@@ -7,8 +7,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/fitmap/fitmap/services/server/internal/fog"
-	"github.com/fitmap/fitmap/services/server/internal/ingest"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 )
 
 // recomputeHeatmapCaps is what keeps each account's users.heatmap_cap (migrations/

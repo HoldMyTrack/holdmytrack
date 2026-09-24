@@ -397,7 +397,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `fitmap-${new Date().toISOString().slice(0, 10)}.png`;
+      a.download = `holdmytrack-${new Date().toISOString().slice(0, 10)}.png`;
       document.body.appendChild(a);
       a.click();
       a.remove();

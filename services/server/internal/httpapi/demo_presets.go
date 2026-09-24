@@ -12,8 +12,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/fitmap/fitmap/services/server/internal/ingest"
-	"github.com/fitmap/fitmap/services/server/internal/storage"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 )
 
 // DemoCustomerUserID is the one persistent, shared demo account every "Try Demo" visitor's

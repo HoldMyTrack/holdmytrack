@@ -6,8 +6,8 @@ import (
 	"image"
 	"image/png"
 
-	"github.com/fitmap/fitmap/services/server/internal/fog"
-	"github.com/fitmap/fitmap/services/server/internal/storage"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 )
 
 // loadMaskOrBlank fetches and decodes a stored fog_tiles mask, or returns a blank (all-zero)

@@ -1,4 +1,4 @@
-// Package httpapi is cmd/fitmap serve — currently just the Path 3 upload endpoint
+// Package httpapi is cmd/holdmytrack serve — currently just the Path 3 upload endpoint
 // (IMPLEMENTATION.md §4.0/§4.1 step 1). Uses stdlib net/http's ServeMux
 // method+pattern routing (Go 1.22+) rather than a router dependency — the "HTTP router and
 // database access" open decision in services/server/README.md, resolved toward the smallest
@@ -22,9 +22,9 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/fitmap/fitmap/services/server/internal/ingest"
-	"github.com/fitmap/fitmap/services/server/internal/mail"
-	"github.com/fitmap/fitmap/services/server/internal/storage"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mail"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 )
 
 // maxUploadBytes bounds the single read into memory this handler does. The parse step
@@ -202,7 +202,7 @@ type uploadResponse struct {
 
 // handleUpload is §4.1 step 1 only: validate, compute the idempotency key, persist the raw
 // payload, enqueue an `ingest` job, return. No parsing happens here — see internal/ingest,
-// run by cmd/fitmap work.
+// run by cmd/holdmytrack work.
 //
 // A `.zip` archive takes a different path entirely (handleZipUpload,
 // IMPLEMENTATION.md §4.0.1's bulk-import case) — bypassing §4.0.1's 20-file client-side

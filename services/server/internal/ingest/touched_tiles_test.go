@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fitmap/fitmap/services/server/internal/fog"
-	"github.com/fitmap/fitmap/services/server/internal/parse"
-	"github.com/fitmap/fitmap/services/server/internal/tilemath"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/tilemath"
 )
 
 func touchedTileSet(tiles [][2]int) map[[2]int]bool {

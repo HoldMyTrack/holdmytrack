@@ -4,5 +4,5 @@
 -- not a design to build further features on. The fixed UUID matches
 -- internal/httpapi.PlaceholderUserID.
 INSERT INTO users (id, email, privacy_trim_m)
-VALUES ('00000000-0000-0000-0000-000000000001', 'demo@fitmap.invalid', 200)
+VALUES ('00000000-0000-0000-0000-000000000001', 'demo@holdmytrack.invalid', 200)
 ON CONFLICT (id) DO NOTHING;

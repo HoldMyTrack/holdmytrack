@@ -45,13 +45,18 @@ function trimDisplay(cm: number, system: UnitSystem): string {
  * commit until asked to.
  */
 export interface SettingsPageProps {
-  onBack: () => void;
+  /** Absent in onboarding — there's no map to go back to yet. */
+  onBack?: () => void;
   /** Lets the account menu jump straight to Profile without detouring back through the map
-   *  first — the same cross-link ProfilePage offers back to Settings. */
-  onOpenProfile: () => void;
+   *  first — the same cross-link ProfilePage offers back to Settings. Absent in onboarding. */
+  onOpenProfile?: () => void;
+  /** First run (FR-1.7): a verified real account with no Country lands here instead of the map
+   *  (App.tsx), with no way back to a map it hasn't unlocked yet. Saving with a Country is what
+   *  lets App.tsx move on — `updateUser` below changes the very field its gate reads. */
+  onboarding?: boolean;
 }
 
-export function SettingsPage({ onBack, onOpenProfile }: SettingsPageProps) {
+export function SettingsPage({ onBack, onOpenProfile, onboarding = false }: SettingsPageProps) {
   const { user, updateUser } = useAuth();
   const [displayName, setDisplayName] = useState(user.displayName);
   const [country, setCountry] = useState(user.country);
@@ -134,6 +139,13 @@ export function SettingsPage({ onBack, onOpenProfile }: SettingsPageProps) {
   }
 
   async function handleSave() {
+    // Country is required (the server rejects an empty one too) — it decides metric vs
+    // imperial everywhere, so there's no sensible "unset" to save. Timezone always has a
+    // value (auto-detected at signup, or UTC), so it needs no check of its own here.
+    if (!country) {
+      setSaveError('Choose a country before saving.');
+      return;
+    }
     const typedTrim = Number(privacyTrim);
     if (!Number.isFinite(typedTrim) || typedTrim < 0 || typedTrim > trimMax) {
       setSaveError(`Privacy trim must be a number between 0 and ${trimMax} ${elevationUnitLabel(system)}.`);
@@ -160,14 +172,22 @@ export function SettingsPage({ onBack, onOpenProfile }: SettingsPageProps) {
 
   return (
     <div className="app-shell">
-      <Header onBrandClick={onBack} onOpenProfile={onOpenProfile} />
+      <Header {...(onBack ? { onBrandClick: onBack } : {})} {...(onOpenProfile ? { onOpenProfile } : {})} />
       <main className="profile-page__body">
-        <button type="button" className="profile-page__back" onClick={onBack}>
-          ← Back to map
-        </button>
+        {onBack && (
+          <button type="button" className="profile-page__back" onClick={onBack}>
+            ← Back to map
+          </button>
+        )}
 
         <section className="settings-page" aria-label="Settings">
-          <h1 className="settings-page__title">Settings</h1>
+          <h1 className="settings-page__title">{onboarding ? 'Welcome — set up your account' : 'Settings'}</h1>
+          {onboarding && (
+            <p className="settings-page__intro">
+              Two things before your map: your country sets whether distances show in km or miles, and your timezone sets which day
+              each activity falls on. You can change both here later.
+            </p>
+          )}
 
           <div className="settings-page__section">
             <span className="settings-page__label">Avatar</span>
@@ -248,7 +268,9 @@ export function SettingsPage({ onBack, onOpenProfile }: SettingsPageProps) {
               Country
             </span>
             <CountryPicker value={country} onChange={handleCountryChange} labelledBy="settings-country-label" />
-            <p className="settings-page__hint">Decides whether distance, pace and elevation show in km/m or mi/ft, everywhere in the app.</p>
+            <p className="settings-page__hint">
+              {country ? '' : 'Required. '}Decides whether distance, pace and elevation show in km/m or mi/ft, everywhere in the app.
+            </p>
           </div>
 
           <div className="settings-page__section">
@@ -280,8 +302,14 @@ export function SettingsPage({ onBack, onOpenProfile }: SettingsPageProps) {
 
           {saveError && <p className="settings-page__error">{saveError}</p>}
           <div className="settings-page__save-row">
-            <button type="button" className="settings-page__submit" disabled={saving} onClick={() => void handleSave()}>
-              {saving ? 'Saving…' : 'Save'}
+            <button
+              type="button"
+              className="settings-page__submit"
+              disabled={saving || !country}
+              title={country ? undefined : 'Choose a country first'}
+              onClick={() => void handleSave()}
+            >
+              {saving ? 'Saving…' : onboarding ? 'Save and continue' : 'Save'}
             </button>
             {saved && !saving && <span className="settings-page__saved">Saved</span>}
           </div>

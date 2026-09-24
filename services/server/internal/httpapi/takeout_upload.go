@@ -74,7 +74,7 @@ func (s *Server) handleTakeoutUpload(w http.ResponseWriter, r *http.Request, dat
 	ctx := r.Context()
 	userID := userIDFromContext(ctx)
 
-	tempDir, err := os.MkdirTemp("", "fitmap-takeout-*")
+	tempDir, err := os.MkdirTemp("", "holdmytrack-takeout-*")
 	if err != nil {
 		s.log.Error("takeout temp dir failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)

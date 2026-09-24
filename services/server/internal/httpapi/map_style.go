@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/fitmap/fitmap/services/server/internal/mapstyle"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mapstyle"
 )
 
 // handleMapStyle serves the MapLibre style document for one flavor — ARCHITECTURE.md §2.1's

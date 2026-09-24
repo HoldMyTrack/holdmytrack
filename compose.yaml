@@ -1,4 +1,4 @@
-name: fitmap
+name: holdmytrack
 
 # `web`, `db`, `minio`, `api` and `worker` all start by default now that there is a binary
 # to run — only the `test` profile stays opt-in, since it rebuilds and re-runs a
@@ -63,14 +63,14 @@ services:
   db:
     image: postgis/postgis:16-3.4
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-fitmap}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fitmap}
-      POSTGRES_DB: ${POSTGRES_DB:-fitmap}
+      POSTGRES_USER: ${POSTGRES_USER:-holdmytrack}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-holdmytrack}
+      POSTGRES_DB: ${POSTGRES_DB:-holdmytrack}
     ports: ["127.0.0.1:${POSTGRES_PORT:-5432}:5432"]
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fitmap}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-holdmytrack}"]
       interval: 5s
       retries: 10
 
@@ -78,13 +78,13 @@ services:
     image: minio/minio
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-fitmap}
-      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-fitmap-dev-secret}
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-holdmytrack}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-holdmytrack-dev-secret}
     ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
     volumes:
       - miniodata:/data
     # No healthcheck here: rather than assume a specific client binary ships in this image,
-    # cmd/fitmap retries its own Postgres and MinIO connections with backoff at startup
+    # cmd/holdmytrack retries its own Postgres and MinIO connections with backoff at startup
     # (internal/config's callers), so api/worker/migrate tolerate minio still starting up.
 
   # Applies migrations, then exits — api/worker depend on this completing, not on `db`
@@ -93,13 +93,13 @@ services:
     build: { context: ./services/server, target: dev }
     command: ["migrate"]
     environment: &server-env
-      POSTGRES_USER: ${POSTGRES_USER:-fitmap}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fitmap}
-      POSTGRES_DB: ${POSTGRES_DB:-fitmap}
+      POSTGRES_USER: ${POSTGRES_USER:-holdmytrack}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-holdmytrack}
+      POSTGRES_DB: ${POSTGRES_DB:-holdmytrack}
       S3_ENDPOINT: http://minio:9000
-      S3_BUCKET: ${S3_BUCKET:-fitmap-dev}
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-fitmap}
-      S3_SECRET_KEY: ${S3_SECRET_KEY:-fitmap-dev-secret}
+      S3_BUCKET: ${S3_BUCKET:-holdmytrack-dev}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-holdmytrack}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-holdmytrack-dev-secret}
       # Password reset (internal/mail) — SMTP_HOST empty is a valid, intentional default:
       # `serve` logs the reset email (and its real link) instead of sending one, so the whole
       # flow works in dev/test with no real credentials. Only `api` actually reads these

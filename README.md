@@ -1,11 +1,11 @@
-# FitMap
+# HoldMyTrack
 
 A free, community-funded platform for tracking outdoor activities and seeing the accumulated shape of where you have been. It aggregates the activity history you already have — from watches, from cloud services, from files — and turns it into maps and exploration stats worth looking at. It does not record workouts, it is not a health or fitness advisor, and it has no social graph. See [`docs/VISION.md` §1](docs/VISION.md#1-executive-summary).
 
 ## Layout
 
 ```
-fitmap/
+holdmytrack/
 ├── compose.yaml                 # single entry point for local dev
 ├── compose.prod.yml             # minimal single-VPS production deployment
 ├── Makefile                     # thin wrapper over compose; `make help`
@@ -34,13 +34,13 @@ fitmap/
 │       ├── src/
 │       └── tests/
 └── services/
-    └── server/                  # the "FitMap Server" of docs/ARCHITECTURE.md §1.2
+    └── server/                  # the "HoldMyTrack Server" of docs/ARCHITECTURE.md §1.2
         ├── go.mod  go.sum
         ├── README.md            # the serve/work/migrate contract and the open decisions
         ├── Dockerfile
-        ├── cmd/fitmap/          # main.go: serve / work / migrate
+        ├── cmd/holdmytrack/          # main.go: serve / work / migrate
         ├── internal/            # config, db, parse, ingest, mail, storage, httpapi, worker
-        └── migrations/          # embedded *.sql, applied in order by `cmd/fitmap migrate`
+        └── migrations/          # embedded *.sql, applied in order by `cmd/holdmytrack migrate`
 ```
 
 This tree is the canonical one; do not let a second tree exist anywhere else to disagree with it.

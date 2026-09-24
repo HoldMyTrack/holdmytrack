@@ -44,8 +44,15 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	req.DisplayName = strings.TrimSpace(req.DisplayName)
 	req.Country = strings.ToUpper(strings.TrimSpace(req.Country))
-	if req.Country != "" && !countryCodePattern.MatchString(req.Country) {
-		http.Error(w, "country must be a two-letter code, or empty to unset", http.StatusBadRequest)
+	// Required: Country decides metric vs imperial everywhere, and the web app's first-run
+	// gate (FR-1.7) treats an empty one as "Settings never saved" — letting a save clear it
+	// would send the account back through onboarding.
+	if req.Country == "" {
+		http.Error(w, "country is required", http.StatusBadRequest)
+		return
+	}
+	if !countryCodePattern.MatchString(req.Country) {
+		http.Error(w, "country must be a two-letter code", http.StatusBadRequest)
 		return
 	}
 	if req.PrivacyTrimCm < 0 || req.PrivacyTrimCm > maxPrivacyTrimCm {
@@ -63,10 +70,10 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	// NULLIF, not a Go-side branch on "" — an empty display name or country means "unset",
-	// same as every other nullable text column this API already treats that way.
+	// NULLIF, not a Go-side branch on "" — an empty display name means "unset", same as every
+	// other nullable text column this API already treats that way.
 	if _, err := s.pool.Exec(ctx, `
-		UPDATE users SET display_name = NULLIF($2, ''), country = NULLIF($3, ''), privacy_trim_cm = $4, timezone = $5
+		UPDATE users SET display_name = NULLIF($2, ''), country = $3, privacy_trim_cm = $4, timezone = $5
 		WHERE id = $1
 	`, userID, req.DisplayName, req.Country, req.PrivacyTrimCm, tz); err != nil {
 		s.log.Error("update settings failed", "err", err)

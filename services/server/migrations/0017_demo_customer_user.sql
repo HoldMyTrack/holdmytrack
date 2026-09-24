@@ -7,5 +7,5 @@
 -- enough out that internal/worker/demo_purge.go's `demo_expires_at < NOW()` sweep never
 -- matches it — no purge-worker changes needed.
 INSERT INTO users (id, email, demo_expires_at, privacy_trim_m)
-VALUES ('22222222-2222-2222-2222-222222222222', 'demo-customer@fitmap.invalid', '9999-12-31 00:00:00+00', 200)
+VALUES ('22222222-2222-2222-2222-222222222222', 'demo-customer@holdmytrack.invalid', '9999-12-31 00:00:00+00', 200)
 ON CONFLICT (id) DO NOTHING;

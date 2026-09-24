@@ -1,6 +1,6 @@
-# FitMap: Development
+# HoldMyTrack: Development
 
-The practical guide to running FitMap locally, verifying a change, and not rediscovering the same bug twice. `docs/ARCHITECTURE.md` covers *why* the system is shaped this way; `docs/IMPLEMENTATION.md` covers *how* each feature works; this document covers neither — it's the day-to-day operating manual.
+The practical guide to running HoldMyTrack locally, verifying a change, and not rediscovering the same bug twice. `docs/ARCHITECTURE.md` covers *why* the system is shaped this way; `docs/IMPLEMENTATION.md` covers *how* each feature works; this document covers neither — it's the day-to-day operating manual.
 
 ## Running it locally
 
@@ -14,7 +14,7 @@ docker compose up            # http://localhost:5173
 
 ### The backend's compose services
 
-`db` (`postgis/postgis:16-3.4`), `minio` (stands in for Cloudflare R2 locally), `migrate` (applies the schema, then exits), `api` (`cmd/fitmap serve`) and `worker` (`cmd/fitmap work`) all start by default with `docker compose up` — `api` and `worker` build from the *same* `services/server` image with different `command:` arguments, not two separate images, per `docs/ARCHITECTURE.md` §1.2's "one binary, two modes." `api`/`worker`/`migrate` depend on `db` being healthy; `api`/`worker` also depend on `migrate` completing successfully, so a fresh `docker compose up` can't race the schema. There's no healthcheck on `minio` specifically — `cmd/fitmap` retries its own Postgres and MinIO connections with backoff at startup instead of requiring one, since not every `minio` image build can be assumed to ship a specific health-check client binary.
+`db` (`postgis/postgis:16-3.4`), `minio` (stands in for Cloudflare R2 locally), `migrate` (applies the schema, then exits), `api` (`cmd/holdmytrack serve`) and `worker` (`cmd/holdmytrack work`) all start by default with `docker compose up` — `api` and `worker` build from the *same* `services/server` image with different `command:` arguments, not two separate images, per `docs/ARCHITECTURE.md` §1.2's "one binary, two modes." `api`/`worker`/`migrate` depend on `db` being healthy; `api`/`worker` also depend on `migrate` completing successfully, so a fresh `docker compose up` can't race the schema. There's no healthcheck on `minio` specifically — `cmd/holdmytrack` retries its own Postgres and MinIO connections with backoff at startup instead of requiring one, since not every `minio` image build can be assumed to ship a specific health-check client binary.
 
 Env vars (`POSTGRES_*`, `S3_*`) are Compose interpolation, set in `/.env` (see `.env.example`) — never in `apps/web/.env`, and never seen by Vite. No custom `networks:` block: Compose's default network already resolves `db`/`minio` by service name.
 
@@ -72,7 +72,7 @@ docker compose --profile test run --rm test sh -c 'npm run build && npm run veri
 docker compose run --rm web pmtiles show public/basemap/basemap.pmtiles
 
 curl -F file=@activity.gpx http://localhost:8080/v1/activities/upload
-docker compose exec db psql -U fitmap -d fitmap -c 'SELECT * FROM activities;'
+docker compose exec db psql -U holdmytrack -d holdmytrack -c 'SELECT * FROM activities;'
 docker compose logs worker -f               # watch ingest jobs process
 ```
 

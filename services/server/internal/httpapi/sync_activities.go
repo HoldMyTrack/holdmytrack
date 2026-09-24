@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/fitmap/fitmap/services/server/internal/parse"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
 )
 
 // syncSources is the `source` allowlist this endpoint accepts — IMPLEMENTATION.md §4.0 names
 // the two on-device platforms for Path 2 (iOS/HealthKit, Android/Health Connect), and §4.0.4
-// adds "recorded" for in-app GPS recording (ADR-0007) — authored by FitMap itself rather than
+// adds "recorded" for in-app GPS recording (ADR-0007) — authored by HoldMyTrack itself rather than
 // read from a platform health store, but the same batched wire shape either way. Path 1
 // (webhooks) and Path 3 (upload) have their own endpoints and their own `source` values, so
 // this list doesn't need to anticipate those.

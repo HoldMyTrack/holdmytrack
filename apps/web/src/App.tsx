@@ -168,11 +168,29 @@ export function App() {
   // `auth` is already narrowed to a real SessionUser by the two early returns above, so this
   // closure can merge directly into it rather than needing setAuth's functional-updater form.
   const updateUser = (patch: UserProfile) => setAuth({ ...auth, ...patch });
+  const authValue = { user: auth, signOut: handleSignOut, requestUpgrade: () => setUpgrading(true), updateUser };
+
+  // First run (FR-1.7): a verified real account with no Country confirms Country and Timezone
+  // before seeing anything — both decide how every number and day in the app reads. Derived
+  // from the data rather than a separate "onboarded" flag: Country can't be saved empty any
+  // more, so an empty one means Settings has never been saved. Saving goes through
+  // updateUser, which sets `country` and lets this fall through to the map on the next render.
+  // A demo account is never gated: it's read-only and can't save Settings at all.
+  if ('email' in auth && !auth.country) {
+    return (
+      <>
+        <VersionBanner />
+        <AuthProvider value={authValue}>
+          <SettingsPage onboarding />
+        </AuthProvider>
+      </>
+    );
+  }
 
   return (
     <>
       <VersionBanner />
-      <AuthProvider value={{ user: auth, signOut: handleSignOut, requestUpgrade: () => setUpgrading(true), updateUser }}>
+      <AuthProvider value={authValue}>
         <AuthenticatedApp />
       </AuthProvider>
     </>

@@ -87,12 +87,43 @@ body {
 .app-header__brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 16px;
   font-family: var(--fm-font-serif);
-  font-weight: 600;
-  font-size: 17px;
-  letter-spacing: 0;
+  font-size: 21px;
+  letter-spacing: 0.2px;
+  line-height: 1;
   color: var(--fm-ink);
+}
+
+.app-header__logo {
+  display: block;
+  height: 42px;
+  width: auto;
+}
+
+.app-header__wordmark-light {
+  font-weight: 400;
+  color: #4a5750;
+}
+
+.app-header__wordmark-bold {
+  font-weight: 800;
+  color: #9a6b1e;
+}
+
+.app-header__divider {
+  width: 1px;
+  height: 22px;
+  background: var(--fm-border-strong);
+}
+
+.app-header__tagline {
+  font-family: var(--fm-font-serif);
+  font-size: 14px;
+  font-style: italic;
+  font-weight: 400;
+  color: var(--fm-ink-secondary);
+  white-space: nowrap;
 }
 
 /* Only ProfilePage renders the brand as a button (Header's onBrandClick) — reset every
@@ -106,23 +137,6 @@ body {
   cursor: pointer;
 }
 
-.app-header__mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border: 2px solid var(--fm-accent);
-  border-radius: 5px;
-}
-
-.app-header__mark-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  border: 2px solid var(--fm-accent);
-}
-
 /* Donate, the import control and the account menu, pushed to the trailing end together. */
 .app-header__actions {
   margin-left: auto;
@@ -131,9 +145,9 @@ body {
   gap: 10px;
 }
 
-/* Colors match docs/UI/exports/fitmap-map-screen-standalone.html's live prototype exactly
+/* Colors match docs/UI/exports/holdmytrack-map-screen-standalone.html's live prototype exactly
    (read via getComputedStyle, not eyeballed) — orange rather than the app's usual blue
-   specifically so Donate doesn't read as just another neutral nav action; it's how FitMap
+   specifically so Donate doesn't read as just another neutral nav action; it's how HoldMyTrack
    is funded (business_plan.md §6), not a footnote. */
 .donate-button {
   border: 1px solid var(--fm-donate);
@@ -1795,7 +1809,7 @@ body {
 }
 
 /* §4.0.1's import control — a dropdown panel with Files/Sync tabs, not a hover popover
-   (docs/UI/exports/fitmap-map-screen-standalone.html's live prototype). `position: relative`
+   (docs/UI/exports/holdmytrack-map-screen-standalone.html's live prototype). `position: relative`
    anchors the dropdown under the trigger button, the same arrangement as .user-menu's own
    dropdown. */
 .import-panel {
@@ -2222,6 +2236,14 @@ body {
   color: var(--fm-ink);
 }
 
+/* Onboarding's one-paragraph explanation under the title (SettingsPage's `onboarding` prop). */
+.settings-page__intro {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: rgb(var(--fm-ink-rgb) / 70%);
+}
+
 .settings-page__section {
   display: flex;
   flex-direction: column;
@@ -2576,11 +2598,6 @@ body {
   font-size: 8.5px;
   font-weight: 700;
   color: rgb(var(--fm-ink-rgb) / 60%);
-}
-
-.search-picker__flag--none {
-  border: 1px dashed rgb(var(--fm-ink-rgb) / 25%);
-  box-shadow: none;
 }
 
 .search-picker__empty {
@@ -2950,12 +2967,18 @@ body {
 .auth-gate__brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   font-family: var(--fm-font-serif);
-  font-weight: 600;
-  font-size: 16px;
-  letter-spacing: 0;
+  font-size: 19px;
+  letter-spacing: 0.2px;
+  line-height: 1;
   color: var(--fm-ink);
+}
+
+.auth-gate__logo {
+  display: block;
+  height: 36px;
+  width: auto;
 }
 
 .auth-gate__title {
@@ -3226,8 +3249,18 @@ body {
   }
 
   .app-header__brand {
-    font-size: 14px;
+    font-size: 15px;
     gap: 6px;
+  }
+
+  .app-header__logo {
+    height: 30px;
+  }
+
+  /* No room for the tagline beside four actions on a phone — the wordmark alone carries it. */
+  .app-header__divider,
+  .app-header__tagline {
+    display: none;
   }
 
   .donate-button,

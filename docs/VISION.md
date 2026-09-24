@@ -1,24 +1,24 @@
-# Vision: FitMap
+# Vision: HoldMyTrack
 
 ## 1. Executive Summary
 
-FitMap is a **free, community-funded platform for tracking outdoor activities and seeing the accumulated shape of where you have been** — how much ground you've covered, how well you've explored the places you live and travel through, and where you go most. It aggregates the activity history you already have — from watches, from cloud services, from files — and turns it into maps and exploration stats worth looking at.
+HoldMyTrack is a **free, community-funded platform for tracking outdoor activities and seeing the accumulated shape of where you have been** — how much ground you've covered, how well you've explored the places you live and travel through, and where you go most. It aggregates the activity history you already have — from watches, from cloud services, from files — and turns it into maps and exploration stats worth looking at.
 
 It targets people who already track workouts and want a better way to *see* the result, without adopting another real-time GPS tracker and without paying for the privilege.
 
-FitMap's wedge is:
+HoldMyTrack's wedge is:
 
-1. **Visual quality as the product.** Competitors are functional and largely ugly. FitMap treats the render — smooth fog edges, considered typography, print-grade output — as the thing worth building.
+1. **Visual quality as the product.** Competitors are functional and largely ugly. HoldMyTrack treats the render — smooth fog edges, considered typography, print-grade output — as the thing worth building.
 2. **Source independence.** Three independent ingest paths (§4.1) mean the product survives any single provider revoking access, changing terms, or pricing itself out of reach. This is a deliberate structural choice, not a convenience.
 3. **Free, and funded in the open.** No subscription, no paywalled features, no ads, no selling data. Running costs are covered by recurring community funding with public accounting (§6).
 
-### 1.1 What FitMap is not
+### 1.1 What HoldMyTrack is not
 
 Worth stating early, because the shorthand for this product is "a free Strava" and that overstates it in three specific ways:
 
-* **FitMap is not a fitness tracker.** The mobile app can record a plain GPS track as a convenience — a road trip, a dog walk, a forest walk, anything you'd otherwise need a separate tool running for (§4.1) — but it captures GPS only: no heart rate, cadence, power or other sensor data, no training metrics, no ambition to match a dedicated watch's battery life or accuracy. If you already track workouts on a watch, that stays the better tool for the job; FitMap keeps ingesting its output exactly as it always has.
-* **FitMap has no social network yet.** No feed, no follows, no kudos, no segments, no leaderboards. Athlete social networking is a stated direction (§5.5) and is deliberately out of scope until the core works — see §5.6 for why that ordering is not just caution.
-* **FitMap is not a health or fitness advisor.** No HR zones, no training load, no recovery or readiness scores, no sleep tracking. Pace and heart rate are shown per activity as context for the route, not analysed as a coaching product — an outdoor GPS tracker is what this is, not a health platform wearing a map as a skin.
+* **HoldMyTrack is not a fitness tracker.** The mobile app can record a plain GPS track as a convenience — a road trip, a dog walk, a forest walk, anything you'd otherwise need a separate tool running for (§4.1) — but it captures GPS only: no heart rate, cadence, power or other sensor data, no training metrics, no ambition to match a dedicated watch's battery life or accuracy. If you already track workouts on a watch, that stays the better tool for the job; HoldMyTrack keeps ingesting its output exactly as it always has.
+* **HoldMyTrack has no social network yet.** No feed, no follows, no kudos, no segments, no leaderboards. Athlete social networking is a stated direction (§5.5) and is deliberately out of scope until the core works — see §5.6 for why that ordering is not just caution.
+* **HoldMyTrack is not a health or fitness advisor.** No HR zones, no training load, no recovery or readiness scores, no sleep tracking. Pace and heart rate are shown per activity as context for the route, not analysed as a coaching product — an outdoor GPS tracker is what this is, not a health platform wearing a map as a skin.
 
 What is left is an aggregator and a map for exploring where you've been — not an analytics platform and not a coach. That is a smaller product than Strava and a more defensible one: it competes on the axis Strava is weakest on rather than the axis where Strava has a decade of network effects.
 
@@ -29,10 +29,10 @@ What is left is an aggregator and a map for exploring where you've been — not 
 ### 2.1 Mission Statement
 To let athletes, runners, cyclists and explorers see and keep the shape of where they have been — without a subscription, and without surrendering their data.
 
-**Tagline**: "FitMap — Keep the shape of your outdoor journeys." Not a fitness-tracker claim (§1.1 is explicit that FitMap isn't one) — FitMap still motivates and supports people doing fitness activities and syncing them in to see the result, it just isn't the tool doing the tracking itself.
+**Tagline**: "HoldMyTrack — Every journey, mapped." Not a fitness-tracker claim (§1.1 is explicit that HoldMyTrack isn't one) — HoldMyTrack still motivates and supports people doing fitness activities and syncing them in to see the result, it just isn't the tool doing the tracking itself.
 
 ### 2.2 Value Proposition
-* **No tracking friction** — fits existing workflows; FitMap never asks to record a workout.
+* **No tracking friction** — fits existing workflows; HoldMyTrack never asks to record a workout.
 * **Bring everything** — one place for data scattered across a watch, a cloud service and a folder of old exports.
 * **Exploration insight** — how much ground you've covered this year versus last, how well a neighborhood is explored, and where you go most.
 * **Gamified exploration** — "Fog of War" and explorer-tile mechanics turn routine training into map discovery.
@@ -56,7 +56,7 @@ Digital fitness tracking continues to grow, and the major platforms remain focus
 
 ### 3.3 Competitive Landscape
 
-| Product | Overlap with FitMap | Pricing | Gap FitMap exploits |
+| Product | Overlap with HoldMyTrack | Pricing | Gap HoldMyTrack exploits |
 | :--- | :--- | :--- | :--- |
 | **Strava** | The incumbent: recording, analysis, social, heatmap | Free tier + ~$12/mo | Paywalls analysis; single-source-first; no fog mechanic; visually conservative |
 | **Statshunters** | Explorer tiles + heatmap on Strava | Free / donation | Utilitarian UI; Strava-only |
@@ -69,13 +69,13 @@ Digital fitness tracking continues to grow, and the major platforms remain focus
 
 **Two honest observations about this table.**
 
-First, **almost every product in it ingests via the Strava API**, which makes them Strava satellites — they inherit Strava's terms and die if Strava changes them. FitMap's three independent paths (§4.1) are the structural answer, and notably **Strava itself is not one of our sources**: the largest existing activity archive reaches us only through manual export (§4.1), which is friction we should be honest about rather than hide.
+First, **almost every product in it ingests via the Strava API**, which makes them Strava satellites — they inherit Strava's terms and die if Strava changes them. HoldMyTrack's three independent paths (§4.1) are the structural answer, and notably **Strava itself is not one of our sources**: the largest existing activity archive reaches us only through manual export (§4.1), which is friction we should be honest about rather than hide.
 
-Second, **Intervals.icu and Runalyze already prove the model we are choosing** — serious, free, donation-funded fitness analysis with real users. They are validation that this can work and evidence that it stays small. Neither is a venture-scale business, and FitMap should not pretend it is planning to be one.
+Second, **Intervals.icu and Runalyze already prove the model we are choosing** — serious, free, donation-funded fitness analysis with real users. They are validation that this can work and evidence that it stays small. Neither is a venture-scale business, and HoldMyTrack should not pretend it is planning to be one.
 
 **Implication for strategy:** feature parity is achievable in weeks and is not defensible. The defensible assets are render quality, breadth of ingest, and being genuinely free.
 
-**A deliberate visual trade-off.** Fog of World and similar apps draw fog over satellite imagery, and much of their appeal is the texture the reveal exposes — rooftops, tree canopy, water. FitMap renders over a self-hosted *vector* basemap instead. Imagery would mean a metered tile provider billed per request, on pan/zoom traffic that earns nothing — an unacceptable cost for a free product. The consequence is real and should be owned rather than discovered late: the reveal will look different, and differentiation has to be carried by render quality and typography. Measured reference numbers are in `IMPLEMENTATION.md` §4.2.1.
+**A deliberate visual trade-off.** Fog of World and similar apps draw fog over satellite imagery, and much of their appeal is the texture the reveal exposes — rooftops, tree canopy, water. HoldMyTrack renders over a self-hosted *vector* basemap instead. Imagery would mean a metered tile provider billed per request, on pan/zoom traffic that earns nothing — an unacceptable cost for a free product. The consequence is real and should be owned rather than discovered late: the reveal will look different, and differentiation has to be carried by render quality and typography. Measured reference numbers are in `IMPLEMENTATION.md` §4.2.1.
 
 ---
 
@@ -104,14 +104,14 @@ Native apps reading the platform health store. Target set: **Apple Watch (Health
 These are not equivalent, and the difference is verified rather than assumed:
 
 * **Apple Watch → HealthKit** exposes `HKWorkoutRoute`. Full GPS geometry is available on-device to a native iOS app.
-* **Samsung Galaxy Watch → Health Connect** does **not** expose route geometry. Samsung's own developer documentation states that `EXERCISE_ROUTE` data cannot be accessed from Samsung Health via Health Connect. FitMap only ingests activities that have a route, so Samsung sync cannot deliver activities into FitMap today — every Samsung-sourced session arrives with no geometry and is rejected at sync time, not silently dropped or shown as a metrics-only entry.
+* **Samsung Galaxy Watch → Health Connect** does **not** expose route geometry. Samsung's own developer documentation states that `EXERCISE_ROUTE` data cannot be accessed from Samsung Health via Health Connect. HoldMyTrack only ingests activities that have a route, so Samsung sync cannot deliver activities into HoldMyTrack today — every Samsung-sourced session arrives with no geometry and is rejected at sync time, not silently dropped or shown as a metrics-only entry.
 
 Two further Android platform constraints apply to any Health Connect route read:
 
 * `READ_EXERCISE_ROUTES` **cannot be requested programmatically**; the user must grant it manually in Health Connect settings or via the route request activity.
 * **Routes written by other apps cannot be read in the background** — Health Connect returns `ExerciseRouteResult.ConsentRequired` even with "Always allow" granted.
 
-So Android on-device sync is foreground-only, and Samsung Galaxy Watch is unsupported — it never provides the route geometry FitMap requires. Product copy must not promise otherwise. This is a platform constraint, not an implementation shortcut.
+So Android on-device sync is foreground-only, and Samsung Galaxy Watch is unsupported — it never provides the route geometry HoldMyTrack requires. Product copy must not promise otherwise. This is a platform constraint, not an implementation shortcut.
 
 #### Path 3 — Direct manual file upload
 
@@ -132,7 +132,7 @@ Before engineering begins:
 
 #### Casual in-app GPS recording — mobile-only, and not a fourth path
 
-Distinct from the three paths above, which each bring in a user's *existing* history from somewhere else: the mobile app can also originate an activity itself, for someone who has no watch running and does not want to install a separate tracker for a one-off walk or drive. Start, optionally pause, and stop a GPS-only recording directly in FitMap; on stop, the recorded track submits through the same ingest pipeline every other source already uses (`ARCHITECTURE.md` §1.1, `IMPLEMENTATION.md` §4.1) — no new server-side path, no separate privacy story, no dedupe case beyond what already exists for two overlapping recordings of the same activity.
+Distinct from the three paths above, which each bring in a user's *existing* history from somewhere else: the mobile app can also originate an activity itself, for someone who has no watch running and does not want to install a separate tracker for a one-off walk or drive. Start, optionally pause, and stop a GPS-only recording directly in HoldMyTrack; on stop, the recorded track submits through the same ingest pipeline every other source already uses (`ARCHITECTURE.md` §1.1, `IMPLEMENTATION.md` §4.1) — no new server-side path, no separate privacy story, no dedupe case beyond what already exists for two overlapping recordings of the same activity.
 
 This isn't a resilience decision the way Paths 1–3 are — §4.1's provider-independence argument doesn't apply, since it depends on no external provider at all. It's a convenience feature: one fewer tool to install for someone who just wants a casual walk or drive on the map, with no export and no import in the way. **Scope stays deliberately narrow — GPS only.** No heart rate, cadence, power, or any other sensor; no training-load or coaching output; not a replacement for a dedicated fitness tracker (§1.1). Phased in on Android first, then iOS (§5.4); see `apps/android/docs/ROADMAP.md` for the plan.
 
@@ -215,7 +215,7 @@ Sequenced so the unconditional ingest path ships first and the ones that depend 
 * Free high-resolution export.
 
 ### 5.4 Phase 3: Mobile (Months 7–9)
-* Android app — Health Connect. Samsung Galaxy Watch sync is unsupported (Samsung never exposes route geometry, and FitMap only ingests activities that have one). Built first of the pair regardless, so the Path 2 sync contract is designed against the more constrained platform.
+* Android app — Health Connect. Samsung Galaxy Watch sync is unsupported (Samsung never exposes route geometry, and HoldMyTrack only ingests activities that have one). Built first of the pair regardless, so the Path 2 sync contract is designed against the more constrained platform.
 * iOS app — HealthKit and Apple Watch, the stronger of the two on-device paths.
 * In-app GPS recording (Android, then iOS) — a plain start/pause/stop track capture for casual, watch-free activities, submitted through the existing ingest pipeline; no new server-side work beyond the mobile clients themselves (§4.1).
 * Explorer-tile gamification and coverage stats.
@@ -235,7 +235,7 @@ A free product with no headcount should not ship a location-sharing social netwo
 
 ### 6.1 The model
 
-**FitMap is free. All features, all sources, all exports, no ads, no data sales, no tiers.**
+**HoldMyTrack is free. All features, all sources, all exports, no ads, no data sales, no tiers.**
 
 Running costs are covered by **ongoing community funding** — recurring monthly support through a platform such as Open Collective, GitHub Sponsors or Patreon.
 

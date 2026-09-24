@@ -12,9 +12,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/fitmap/fitmap/services/server/internal/parse"
-	"github.com/fitmap/fitmap/services/server/internal/storage"
-	"github.com/fitmap/fitmap/services/server/internal/tilemath"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/tilemath"
 )
 
 // RenderUser is the `render_fog` job body: re-render every z14 tile currently marked dirty

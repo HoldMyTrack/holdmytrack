@@ -7,7 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/fitmap/fitmap/services/server/internal/storage"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 )
 
 // demoPurgeBatchSize bounds one sweep the same way the job queue bounds one claim loop —

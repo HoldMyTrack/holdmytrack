@@ -8,8 +8,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/fitmap/fitmap/services/server/internal/fog"
-	"github.com/fitmap/fitmap/services/server/internal/ingest"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 )
 
 // ageOutHeatmapWindow is what slides Heatmap's rolling window (fog.HeatmapWindowDays) forward

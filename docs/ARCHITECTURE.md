@@ -1,14 +1,14 @@
-# FitMap: Architecture
+# HoldMyTrack: Architecture
 
 The canonical reference for *how the system is put together* — the top-level shape, the key decisions behind it, the stack, and what's deliberately not built yet. `docs/ IMPLEMENTATION.md` picks up from here with the schema and the feature-by- feature "how it's built" detail (ingest, fog, tiles, accounts, deployment); this document does not duplicate that, and that document no longer duplicates this.
 
-> **Scope note.** FitMap mainly ingests activities it didn't record. The one planned exception is casual, GPS-only recording in the mobile app itself (`VISION.md` §1.1, §4.1) — everything about how an activity reaches and moves through the system beyond that capture step is unchanged: a stopped recording submits through the same ingest pipeline every other source already uses (§1.1 below). There is still no social graph — see `VISION.md` §5.6 for why that stays out of scope.
+> **Scope note.** HoldMyTrack mainly ingests activities it didn't record. The one planned exception is casual, GPS-only recording in the mobile app itself (`VISION.md` §1.1, §4.1) — everything about how an activity reaches and moves through the system beyond that capture step is unchanged: a stopped recording submits through the same ingest pipeline every other source already uses (§1.1 below). There is still no social graph — see `VISION.md` §5.6 for why that stays out of scope.
 
 ---
 
 ## 1. Architecture Overview
 
-FitMap is a **modular monolith** backed by PostgreSQL/PostGIS, fed by three independent ingest paths. Coverage rendering is precomputed on ingest rather than assembled per request, which is the central architectural decision and the one that keeps the rest simple.
+HoldMyTrack is a **modular monolith** backed by PostgreSQL/PostGIS, fed by three independent ingest paths. Coverage rendering is precomputed on ingest rather than assembled per request, which is the central architectural decision and the one that keeps the rest simple.
 
 A second constraint now shapes every decision: **the service is free and community-funded** (`VISION.md` §6), so per-user cost must be bounded by design. That is not a deployment concern to handle later; it changes the schema, the retention policy and the tile strategy. See `IMPLEMENTATION.md` §5.7.
 
@@ -37,7 +37,7 @@ graph TD
 
     Web["Web App (upload + view)"]
     Mobile["Mobile Apps (sync + view)"]
-    Api["FitMap Server (single deployable)"]
+    Api["HoldMyTrack Server (single deployable)"]
     Worker["Workers (same binary, queue mode)"]
     CDN["CDN"]
     Basemap["Protomaps planet .pmtiles"]
