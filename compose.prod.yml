@@ -124,6 +124,8 @@ services:
       - "443:443"
     environment:
       DOMAIN: ${DOMAIN}
+      # Extra names redirected to DOMAIN alongside www (apps/web/docker/Caddyfile).
+      REDIRECT_DOMAINS: ${REDIRECT_DOMAINS:-}
       # Flip via scripts/maintenance.sh (recreates just this container), not by hand — see
       # docs/DEPLOY.md's "Maintenance mode" section and apps/web/docker/Caddyfile.
       MAINTENANCE_MODE: ${MAINTENANCE_MODE:-false}

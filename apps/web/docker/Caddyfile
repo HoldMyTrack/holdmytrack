@@ -47,3 +47,14 @@
 
 	encode gzip
 }
+
+# Every other name that should land on the app — www, plus any retired domains listed in
+# REDIRECT_DOMAINS (space-separated, e.g. "olddomain.com www.olddomain.com") — gets a
+# permanent redirect to {$DOMAIN}, keeping the path and query. Caddy issues a certificate
+# for each name here too, so each one needs DNS pointed at this server or its ACME request
+# keeps failing (the main site is unaffected; the failures just repeat in `logs web`).
+# {$REDIRECT_DOMAINS} is substituted before parsing, so leaving it empty just drops it
+# from the address list instead of producing an invalid one.
+www.{$DOMAIN} {$REDIRECT_DOMAINS} {
+	redir https://{$DOMAIN}{uri} permanent
+}

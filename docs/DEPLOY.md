@@ -14,7 +14,7 @@ Any small Docker-capable VPS works — 2 vCPU / 4 GB RAM is comfortable headroom
 
 ## 3. Point DNS at the server
 
-Add an `A` record for your domain (or a subdomain, e.g. `app.example.com`) pointing at the VPS's public IP. Caddy (step 5) needs this to resolve correctly *before* it first starts, or its automatic Let's Encrypt certificate request will fail.
+Add an `A` record for your domain (or a subdomain, e.g. `app.example.com`) pointing at the VPS's public IP. Caddy (step 6) needs this to resolve correctly *before* it first starts, or its automatic Let's Encrypt certificate request will fail. Also point `www.<your-domain>` at the same server (a `CNAME` to the apex is enough): Caddy always redirects `www` to the apex and requests a certificate for it, and so for any retired domain listed in `REDIRECT_DOMAINS`. With the zone on Cloudflare, keep these records DNS-only (grey cloud) — Cloudflare's proxy caps uploads at 100 MB, below what a bulk export archive can reach.
 
 ## 4. Fill in the production env file
 
