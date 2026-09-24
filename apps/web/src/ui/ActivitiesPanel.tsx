@@ -94,6 +94,9 @@ export interface ActivitiesPanelProps {
   onClear: () => void;
   /** Checks every currently-listed row — the header checkbox's "check all" state. */
   onSelectAll: () => void;
+  /** Checks every unchecked listed row and unchecks every checked one — the toolbar's
+   *  "Inverse" button beside the header checkbox. */
+  onInvertSelection: () => void;
   /** Flies to fit the current checked group without changing it. */
   onShowSelected: () => void;
   /** Activities currently hidden from the map — dims the row (there's no per-row eye icon any
@@ -147,6 +150,7 @@ export function ActivitiesPanel({
   onHoverActivity,
   onClear,
   onSelectAll,
+  onInvertSelection,
   onShowSelected,
   hiddenIds,
   onToggleGroupVisibility,
@@ -363,7 +367,7 @@ export function ActivitiesPanel({
 
       {/* The header toolbar — right above the row list. There are no more per-row action
           icons to stay column-aligned with (Visible/Edit/Delete all moved here, operating on
-          the checked group), so this is a plain compact strip: select-all checkbox, the Type
+          the checked group), so this is a plain compact strip: select-all checkbox, Inverse, the Type
           dropdown, a spacer, the three group-action chips, a divider, then the one
           accent-tinted "focus the map on this group" action. */}
       <div className="activities-panel__toolbar">
@@ -377,6 +381,15 @@ export function ActivitiesPanel({
           title={allChecked ? 'Uncheck all' : 'Check all'}
           onChange={() => (allChecked || someChecked ? onClear() : onSelectAll())}
         />
+        <button
+          type="button"
+          className="activities-panel__invert"
+          disabled={activities.length === 0}
+          onClick={onInvertSelection}
+          title="Check the unchecked activities and uncheck the checked ones"
+        >
+          Inverse
+        </button>
 
         <div className="activities-panel__type-dropdown" ref={typeFilterRef}>
           <button

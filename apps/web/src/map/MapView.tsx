@@ -555,6 +555,18 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
     fitToSelection(visible);
   }, [filteredActivities, mapHiddenIds, fitToSelection]);
 
+  // The toolbar's "Inverse" button — checks every listed row that isn't checked and unchecks
+  // every one that is. Same scope as selectAll: only rows the panel currently lists, so a
+  // checked row outside the current TYPE/DISTANCE filters is dropped rather than kept checked
+  // out of sight. Flies to fit the new group, or — when inverting leaves nothing checked —
+  // out to everything drawn, exactly as clearSelection would.
+  const invertSelection = useCallback(() => {
+    const inverted = filteredActivities.filter((a) => !checkedActivityIds.has(a.id));
+    setCheckedActivityIds(new Set(inverted.map((a) => a.id)));
+    const group = inverted.length > 0 ? inverted : activities;
+    fitToSelection(group.filter((a) => !mapHiddenIds.has(a.id)));
+  }, [filteredActivities, checkedActivityIds, activities, mapHiddenIds, fitToSelection]);
+
   // "Show selected" — no state change, just a manual re-trigger of the same fly-to-fit the
   // debounced checkbox effect above already computes, for after panning away from the group.
   const showSelected = useCallback(() => {
@@ -985,6 +997,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
               onHoverActivity={setHoveredActivityId}
               onClear={clearSelection}
               onSelectAll={selectAll}
+              onInvertSelection={invertSelection}
               onShowSelected={showSelected}
               hiddenIds={hiddenActivityIds}
               onToggleGroupVisibility={toggleGroupVisibility}
