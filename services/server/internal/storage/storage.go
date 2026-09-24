@@ -1,7 +1,7 @@
-// Package storage wraps the S3-compatible object store (MinIO locally, R2 in production —
+// Package storage wraps the S3-compatible object store (RustFS locally, R2 in production —
 // docs/ARCHITECTURE.md §2). minio-go was chosen over the AWS SDK for the open
 // "HTTP router and database access" — well, storage-client — decision: it's purpose-built
-// for S3-compatible endpoints including MinIO and R2, and pulls in far less than
+// for any S3-compatible endpoint, RustFS and R2 included, and pulls in far less than
 // aws-sdk-go-v2 for the two operations this needs (put, get).
 package storage
 
@@ -41,7 +41,7 @@ func New(endpoint, accessKey, secretKey, bucket string) (*Store, error) {
 	return &Store{client: client, bucket: bucket}, nil
 }
 
-// EnsureBucket creates the bucket if it doesn't exist yet — dev/MinIO convenience; R2
+// EnsureBucket creates the bucket if it doesn't exist yet — a local-dev convenience; R2
 // buckets are provisioned out of band in production.
 func (s *Store) EnsureBucket(ctx context.Context) error {
 	ok, err := s.client.BucketExists(ctx, s.bucket)

@@ -50,9 +50,9 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// db and minio are separate compose services with their own startup time; retrying
+	// db and the object store are separate compose services with their own startup time; retrying
 	// here means api/worker/migrate don't need a fragile healthcheck-based `depends_on`
-	// condition on minio specifically (see compose.yaml's comment on that).
+	// condition on the object store specifically (see compose.yaml's comment on that).
 	var pool *pgxpool.Pool
 	err = retry(ctx, log, "db connect", func() (err error) {
 		pool, err = db.Open(ctx, cfg.DatabaseURL)
@@ -78,7 +78,7 @@ func main() {
 			log.Error("storage", "err", err)
 			os.Exit(1)
 		}
-		if err := retry(ctx, log, "minio ensure bucket", func() error { return store.EnsureBucket(ctx) }); err != nil {
+		if err := retry(ctx, log, "storage ensure bucket", func() error { return store.EnsureBucket(ctx) }); err != nil {
 			log.Error("storage bucket", "err", err)
 			os.Exit(1)
 		}
@@ -127,7 +127,7 @@ func main() {
 			log.Error("storage", "err", err)
 			os.Exit(1)
 		}
-		if err := retry(ctx, log, "minio ensure bucket", func() error { return store.EnsureBucket(ctx) }); err != nil {
+		if err := retry(ctx, log, "storage ensure bucket", func() error { return store.EnsureBucket(ctx) }); err != nil {
 			log.Error("storage bucket", "err", err)
 			os.Exit(1)
 		}
@@ -156,7 +156,7 @@ func main() {
 	}
 }
 
-// retry gives dependency services (db, minio) room to finish starting up without requiring
+// retry gives dependency services (db, object store) room to finish starting up without requiring
 // a healthcheck for each one specifically. 15 attempts at 2s apart is 30s, comfortably past
 // a cold `docker compose up` on this stack.
 func retry(ctx context.Context, log *slog.Logger, what string, fn func() error) error {

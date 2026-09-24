@@ -1,11 +1,11 @@
 name: holdmytrack
 
-# `web`, `db`, `minio`, `api` and `worker` all start by default now that there is a binary
+# `web`, `db`, `rustfs`, `api` and `worker` all start by default now that there is a binary
 # to run — only the `test` profile stays opt-in, since it rebuilds and re-runs a
 # multi-second Playwright suite that a plain `docker compose up` shouldn't pay for.
 #
 # No custom `networks:` block: Compose's default network already gives service-name DNS, so
-# `api`/`worker` reach `db:5432` and `minio:9000` by service name.
+# `api`/`worker` reach `db:5432` and `rustfs:9000` by service name.
 
 services:
   web:
@@ -80,18 +80,22 @@ services:
       interval: 5s
       retries: 10
 
-  minio:                      # stands in for Cloudflare R2 locally
-    image: minio/minio
-    command: server /data --console-address ":9001"
+  # Stands in for Cloudflare R2 locally. RustFS rather than MinIO: MinIO archived its
+  # open-source edition and pulled the free minio/minio images from Docker Hub and quay.io,
+  # so a fresh machine or a CI runner can no longer pull them. Any S3-compatible server
+  # works here — internal/storage speaks plain S3 through minio-go. Pinned, so an upstream
+  # release can't change the stack under us.
+  rustfs:
+    image: rustfs/rustfs:1.0.0
     environment:
-      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-holdmytrack}
-      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-holdmytrack-dev-secret}
-    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY:-holdmytrack}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_KEY:-holdmytrack-dev-secret}
+    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]   # S3 API, web console
     volumes:
-      - miniodata:/data
+      - rustfsdata:/data
     # No healthcheck here: rather than assume a specific client binary ships in this image,
-    # cmd/holdmytrack retries its own Postgres and MinIO connections with backoff at startup
-    # (internal/config's callers), so api/worker/migrate tolerate minio still starting up.
+    # cmd/holdmytrack retries its own Postgres and object-storage connections with backoff
+    # at startup (internal/config's callers), so api/worker/migrate tolerate it still starting.
 
   # Applies migrations, then exits — api/worker depend on this completing, not on `db`
   # alone, so a fresh `docker compose up` never races the schema.
@@ -102,7 +106,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-holdmytrack}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-holdmytrack}
       POSTGRES_DB: ${POSTGRES_DB:-holdmytrack}
-      S3_ENDPOINT: http://minio:9000
+      S3_ENDPOINT: http://rustfs:9000
       S3_BUCKET: ${S3_BUCKET:-holdmytrack-dev}
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-holdmytrack}
       S3_SECRET_KEY: ${S3_SECRET_KEY:-holdmytrack-dev-secret}
@@ -143,7 +147,7 @@ services:
     ports: ["127.0.0.1:${API_PORT:-8080}:8080"]
     depends_on:
       db: { condition: service_healthy }
-      minio: { condition: service_started }
+      rustfs: { condition: service_started }
       migrate: { condition: service_completed_successfully }
 
   worker:                     # the same binary, mode `work`
@@ -152,10 +156,10 @@ services:
     environment: *server-env
     depends_on:
       db: { condition: service_healthy }
-      minio: { condition: service_started }
+      rustfs: { condition: service_started }
       migrate: { condition: service_completed_successfully }
 
 volumes:
   web-node-modules:
   pgdata:
-  miniodata:
+  rustfsdata:

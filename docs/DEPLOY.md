@@ -10,7 +10,7 @@ Any small Docker-capable VPS works — 2 vCPU / 4 GB RAM is comfortable headroom
 
 1. Create an R2 bucket in the Cloudflare dashboard.
 2. Create an R2 API token scoped to that bucket (Account → R2 → Manage API Tokens) — this gives you the access key, secret key, and the account-specific S3-compatible endpoint (`https://<account-id>.r2.cloudflarestorage.com`). None of this is the same as a Cloudflare account-wide API token.
-3. No code change is needed for this — `internal/storage/storage.go` already talks to any S3-compatible endpoint via `minio-go`; local dev's MinIO container is a stand-in for exactly this.
+3. No code change is needed for this — `internal/storage/storage.go` already talks to any S3-compatible endpoint via `minio-go`; local dev's RustFS container is a stand-in for exactly this.
 
 ## 3. Point DNS at the server
 

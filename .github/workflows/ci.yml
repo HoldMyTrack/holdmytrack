@@ -53,7 +53,7 @@ jobs:
       - run: npm run test:unit
       - run: npm run verify:style
 
-  # `make verify verify-build`: the whole dev stack (db, minio, migrate, api) plus headless
+  # `make verify verify-build`: the whole dev stack (db, rustfs, migrate, api) plus headless
   # Chromium, exactly as it runs locally.
   e2e:
     name: Map verification (make verify, verify-build)

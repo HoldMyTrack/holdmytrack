@@ -14,7 +14,7 @@ docker compose up            # http://localhost:5173
 
 ### The backend's compose services
 
-`db` (`postgis/postgis:16-3.4`), `minio` (stands in for Cloudflare R2 locally), `migrate` (applies the schema, then exits), `api` (`cmd/holdmytrack serve`) and `worker` (`cmd/holdmytrack work`) all start by default with `docker compose up` — `api` and `worker` build from the *same* `services/server` image with different `command:` arguments, not two separate images, per `docs/ARCHITECTURE.md` §1.2's "one binary, two modes." `api`/`worker`/`migrate` depend on `db` being healthy; `api`/`worker` also depend on `migrate` completing successfully, so a fresh `docker compose up` can't race the schema. There's no healthcheck on `minio` specifically — `cmd/holdmytrack` retries its own Postgres and MinIO connections with backoff at startup instead of requiring one, since not every `minio` image build can be assumed to ship a specific health-check client binary.
+`db` (`postgis/postgis:16-3.4`), `rustfs` (RustFS, an S3-compatible server standing in for Cloudflare R2 locally; it replaced MinIO once MinIO stopped publishing free images), `migrate` (applies the schema, then exits), `api` (`cmd/holdmytrack serve`) and `worker` (`cmd/holdmytrack work`) all start by default with `docker compose up` — `api` and `worker` build from the *same* `services/server` image with different `command:` arguments, not two separate images, per `docs/ARCHITECTURE.md` §1.2's "one binary, two modes." `api`/`worker`/`migrate` depend on `db` being healthy; `api`/`worker` also depend on `migrate` completing successfully, so a fresh `docker compose up` can't race the schema. There's no healthcheck on `minio` specifically — `cmd/holdmytrack` retries its own Postgres and MinIO connections with backoff at startup instead of requiring one, since not every `minio` image build can be assumed to ship a specific health-check client binary.
 
 Env vars (`POSTGRES_*`, `S3_*`) are Compose interpolation, set in `/.env` (see `.env.example`) — never in `apps/web/.env`, and never seen by Vite. No custom `networks:` block: Compose's default network already resolves `db`/`minio` by service name.
 
@@ -51,7 +51,7 @@ Step 4 was the riskiest part of the whole design going in: SwiftShader WebGL und
 
 Also confirmed against a live stack, not assumed:
 
-- `docker compose up` brings up `web`, `db`, `minio`, `migrate`, `api` and `worker` together; `migrate` applies every `*.sql` file under `services/server/migrations/` (embedded via `go:embed`, tracked in `schema_migrations`) and exits.
+- `docker compose up` brings up `web`, `db`, `rustfs`, `migrate`, `api` and `worker` together; `migrate` applies every `*.sql` file under `services/server/migrations/` (embedded via `go:embed`, tracked in `schema_migrations`) and exits.
 - A real `.gpx` upload (`curl -F file=@sample.gpx http://localhost:8080/v1/activities/upload`) round-trips through the job queue into `activities` and `activity_streams`, with a correctly typed `LINESTRING M` trajectory.
 - A real `.tcx` upload round-trips the same way, including heart rate.
 - **Idempotency** (`IMPLEMENTATION.md` §4.0's explicit invariant): the same file uploaded twice sequentially returns `already_processed` from the fast-path check; five *concurrent* uploads of identical new content all enqueue (the fast path can't see each other), but the persist-time `ON CONFLICT (user_id, source, external_id) DO NOTHING` still collapses them to exactly one `activities` row and one `activity_streams` row.
@@ -85,7 +85,7 @@ All verified directly against the repo, the registries, or a real `docker compos
 Local development runs in Docker; the containerised path is the default, not the only one.
 
 ```bash
-docker compose up                   # web on :5173, api on :8080, plus db/minio/worker
+docker compose up                   # web on :5173, api on :8080, plus db/rustfs/worker
 docker compose --profile test run --rm test npm run verify:map
 docker compose --profile test run --rm test sh -c 'npm run build && npm run verify:build'
 docker compose run --rm web pmtiles show public/basemap/basemap.pmtiles
