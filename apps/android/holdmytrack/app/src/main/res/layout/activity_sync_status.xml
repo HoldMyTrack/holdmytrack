@@ -16,8 +16,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingBottom="8dp"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:textAppearance="?attr/textAppearanceTitleMedium" />
 
         <LinearLayout
             android:id="@+id/status_rows"
@@ -34,8 +33,7 @@
             android:paddingTop="24dp"
             android:paddingBottom="4dp"
             android:text="@string/status_duplicates_heading"
-            android:textSize="14sp"
-            android:textStyle="bold"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
             android:visibility="gone" />
 
         <LinearLayout

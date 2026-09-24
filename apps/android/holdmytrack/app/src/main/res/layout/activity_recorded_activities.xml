@@ -31,7 +31,7 @@
         android:layout_height="wrap_content"
         android:padding="16dp"
         android:text="@string/recorded_demo_notice"
-        android:textSize="13sp"
+        android:textAppearance="?attr/textAppearanceBodyMedium"
         android:visibility="gone" />
 
     <TextView
@@ -40,7 +40,7 @@
         android:layout_height="wrap_content"
         android:padding="24dp"
         android:text="@string/recorded_empty"
-        android:textSize="14sp"
+        android:textAppearance="?attr/textAppearanceBodyLarge"
         android:visibility="gone" />
 
     <ScrollView

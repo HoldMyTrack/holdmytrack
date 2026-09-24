@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Material 3 on Views (apps/android/docs/ROADMAP.md Phase 5, "Decide the UI toolkit"): the
+     colors in colors.xml mapped onto Material's color roles once, so every widget picks them up
+     from the theme rather than from literals. Light only, like the web. Dynamic color is
+     deliberately not applied — it would replace this palette with one derived from the user's
+     wallpaper. -->
+<resources>
+    <style name="Base.Theme.HoldMyTrack" parent="Theme.Material3.Light">
+        <item name="colorPrimary">@color/hmt_accent</item>
+        <item name="colorOnPrimary">@color/hmt_surface</item>
+        <item name="colorPrimaryContainer">@color/hmt_accent_container</item>
+        <item name="colorOnPrimaryContainer">@color/hmt_ink</item>
+        <item name="colorSecondary">@color/hmt_ink</item>
+        <item name="colorOnSecondary">@color/hmt_surface</item>
+        <item name="colorSecondaryContainer">@color/hmt_surface_tint_strong</item>
+        <item name="colorOnSecondaryContainer">@color/hmt_ink</item>
+        <item name="colorError">@color/hmt_danger</item>
+        <item name="colorOnError">@color/hmt_surface</item>
+        <item name="colorErrorContainer">@color/hmt_danger_container</item>
+        <item name="colorOnErrorContainer">@color/hmt_ink</item>
+
+        <item name="android:colorBackground">@color/hmt_bg</item>
+        <item name="colorOnBackground">@color/hmt_ink</item>
+        <item name="colorSurface">@color/hmt_bg</item>
+        <item name="colorOnSurface">@color/hmt_ink</item>
+        <item name="colorOnSurfaceVariant">@color/hmt_ink_secondary</item>
+        <item name="colorSurfaceContainerLowest">@color/hmt_surface</item>
+        <item name="colorSurfaceContainerLow">@color/hmt_surface</item>
+        <item name="colorSurfaceContainer">@color/hmt_surface_tint</item>
+        <item name="colorSurfaceContainerHigh">@color/hmt_surface_tint_strong</item>
+        <item name="colorSurfaceContainerHighest">@color/hmt_divider_tint</item>
+        <item name="colorOutline">@color/hmt_border_strong</item>
+        <item name="colorOutlineVariant">@color/hmt_border</item>
+
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+
+        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.HoldMyTrack.Small</item>
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.HoldMyTrack.Medium</item>
+        <item name="shapeAppearanceCornerSmall">@style/ShapeAppearance.HoldMyTrack.Small</item>
+        <item name="shapeAppearanceCornerMedium">@style/ShapeAppearance.HoldMyTrack.Medium</item>
+        <item name="materialButtonStyle">@style/Widget.HoldMyTrack.Button</item>
+        <item name="materialButtonOutlinedStyle">@style/Widget.HoldMyTrack.Button.Outlined</item>
+        <item name="borderlessButtonStyle">@style/Widget.HoldMyTrack.Button.Text</item>
+        <item name="textInputStyle">@style/Widget.Material3.TextInputLayout.OutlinedBox</item>
+        <item name="actionBarStyle">@style/Widget.HoldMyTrack.ActionBar</item>
+    </style>
+
+    <!-- Every screen with a title: the sign-in, sync, history, profile and recording forms. -->
+    <style name="Theme.HoldMyTrack" parent="Base.Theme.HoldMyTrack" />
+
+    <!-- The map: edge to edge, no action bar, chrome floating over the GL surface. -->
+    <style name="Theme.HoldMyTrack.Map" parent="Base.Theme.HoldMyTrack">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+
+    <!-- The web's 8px radius, rather than Material's fully rounded pill buttons. -->
+    <style name="ShapeAppearance.HoldMyTrack.Small" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">8dp</item>
+    </style>
+
+    <style name="ShapeAppearance.HoldMyTrack.Medium" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">10dp</item>
+    </style>
+
+    <style name="Widget.HoldMyTrack.Button" parent="Widget.Material3.Button">
+        <item name="shapeAppearance">@style/ShapeAppearance.HoldMyTrack.Small</item>
+    </style>
+
+    <style name="Widget.HoldMyTrack.Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="shapeAppearance">@style/ShapeAppearance.HoldMyTrack.Small</item>
+        <item name="strokeColor">@color/hmt_border_strong</item>
+        <item name="android:textColor">@color/hmt_ink</item>
+    </style>
+
+    <style name="Widget.HoldMyTrack.Button.Text" parent="Widget.Material3.Button.TextButton">
+        <item name="shapeAppearance">@style/ShapeAppearance.HoldMyTrack.Small</item>
+        <item name="android:textColor">@color/hmt_accent_strong</item>
+    </style>
+
+    <!-- The map's Normal / Fog / Heatmap toggle, after the web's .map-mode-toggle__btn: ink
+         text on nothing, and ink fill with white text when active. -->
+    <style name="Widget.HoldMyTrack.Button.MapMode" parent="Widget.Material3.Button.TextButton">
+        <item name="shapeAppearance">@style/ShapeAppearance.HoldMyTrack.Small</item>
+        <item name="android:textColor">@color/map_mode_text</item>
+        <item name="backgroundTint">@color/map_mode_bg</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:checkable">true</item>
+    </style>
+
+    <style name="Widget.HoldMyTrack.ActionBar" parent="Widget.Material3.ActionBar.Solid">
+        <item name="background">@color/hmt_bg</item>
+        <item name="elevation">0dp</item>
+    </style>
+
+    <style name="TextAppearance.HoldMyTrack.Error" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textColor">?attr/colorError</item>
+    </style>
+</resources>

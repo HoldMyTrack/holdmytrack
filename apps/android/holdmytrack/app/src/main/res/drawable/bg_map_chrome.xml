@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The floating map chrome's panel, after the web's .map-mode-toggle: near-white, 8px corners. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/hmt_map_chrome" />
+    <corners android:radius="8dp" />
+</shape>

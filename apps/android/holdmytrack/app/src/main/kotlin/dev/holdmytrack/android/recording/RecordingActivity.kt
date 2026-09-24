@@ -1,6 +1,5 @@
 package dev.holdmytrack.android.recording
 
-import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -13,6 +12,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.holdmytrack.android.R
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.recording.db.RecordedActivityStore
@@ -137,7 +137,7 @@ class RecordingActivity : AppCompatActivity() {
     }
 
     private fun confirmDiscard() {
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(R.string.recording_discard_confirm_title)
             .setMessage(R.string.recording_discard_confirm_message)
             .setPositiveButton(R.string.recording_discard) { _, _ ->

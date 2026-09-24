@@ -90,14 +90,14 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 ### FR-2.2 Three map modes: Normal, Fog of War, Heatmap
 
-**Description**: The same three mutually exclusive views `docs/SPEC.md` FR-4.1–FR-4.4 define, switched by one three-way toggle in the map's bottom bar. Only visible/available once signed in.
+**Description**: The same three mutually exclusive views `docs/SPEC.md` FR-4.1–FR-4.4 define, switched by one three-way toggle at the map's top-left, under the menu button. Only visible/available once signed in.
 
 **Behavior**:
 1. **Normal** draws the account's tracks as a single-color vector line layer (`GET /tiles/v1/tracks/{z}/{x}/{y}.mvt`).
 2. **Fog** replaces the tracks with the server-rendered dark-veil raster (`GET /tiles/v1/fog/{z}/{x}/{y}.png`); tracks are hidden.
 3. **Heatmap** replaces the tracks with the server-rendered intensity raster (`GET /tiles/v1/heatmap/{z}/{x}/{y}.png`); tracks are hidden.
 4. All three layers sit beneath the basemap's first label layer, so place names stay legible; within that, the active raster (fog or heatmap) is drawn beneath the tracks layer so a cleared route reads as visible through the fog rather than obscured by it — the same ordering the web client uses.
-5. The active mode's button is shown bold and at full opacity; the other two are dimmed.
+5. The active mode's button is filled (dark ink, white text); the other two are plain text on the toggle's light panel.
 6. While a GPS recording is in progress (FR-5.1) the toggle is hidden and none of the three modes' layers are drawn — the map shows only that recording. The previously selected mode returns when the recording stops.
 
 **Notes — no filtering**: Every tile URL is unfiltered. All three endpoints accept `from`/`to`/`types`/`exclude`, and an absent filter already means "no restriction" server-side, so this app always shows the account's complete history — there is no date-range picker, TYPE filter, or per-track hide/show control on Android today (Phase 5 item, `apps/android/docs/ROADMAP.md`). This is a scope gap relative to the web client, not a bug.
@@ -239,7 +239,7 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 
 Named here rather than left implicit, the way `docs/SPEC.md` §16 does for the wider system:
 
-- **No visual design system.** No icon set, no launcher icon, no color/type/spacing tokens — four functional screens waiting on root `docs/ROADMAP.md` Phase 3's design freeze (`apps/android/docs/ROADMAP.md` Phase 5).
+- **No final visual design.** No icon set and no final palette, type scale or fonts — the app is themed with the web's palette as a provisional stand-in (Material 3), and its screens wait on root `docs/ROADMAP.md` Phase 3's design freeze (`apps/android/docs/ROADMAP.md` Phase 5). The app's own chrome is light only; only the map follows the system dark setting.
 - **No filter controls.** The map always shows the account's complete, unfiltered history; there is no Android equivalent of the web's date-range picker, TYPE/DISTANCE filters, or per-track hide/show.
 - **No accessibility work done.** No content descriptions, no verified touch-target sizing, untested under a large system font or TalkBack.
 - **Samsung Galaxy Watch is unsupported**, not degraded — Samsung does not expose route geometry to Health Connect at all, so every Samsung-sourced session is rejected for having no route, indistinguishable at sync time from an ordinary indoor workout.

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/map_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
@@ -17,18 +18,16 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="top"
-        android:background="#CC000000"
+        android:background="@color/hmt_ink"
         android:padding="12dp"
-        android:textColor="#FFFFFF"
+        android:textColor="@color/hmt_surface"
         android:textSize="13sp"
         android:visibility="gone" />
 
     <!-- Floating chrome over the map, top-start: the burger menu above the map-mode toggle,
          mirroring the web client's own top-left mode control (apps/web/src/index.css's
          .map-mode-toggle) rather than a bar pinned along the bottom. Kept clear of MapLibre's
-         own compass, which sits top-end. Plain on purpose: the design freeze is Phase 3 of the
-         root roadmap, after Mobile, so there is no token system or type scale to build against
-         and inventing one here would only have to be undone. -->
+         own compass, which sits top-end. Styled from the theme (res/values/themes.xml). -->
     <LinearLayout
         android:id="@+id/top_start_bar"
         android:layout_width="wrap_content"
@@ -37,55 +36,56 @@
         android:layout_margin="12dp"
         android:orientation="vertical">
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/menu_button"
+            style="@style/Widget.HoldMyTrack.Button.Outlined"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="start"
-            android:background="#CC000000"
+            android:backgroundTint="@color/hmt_map_chrome"
             android:contentDescription="@string/menu_button"
-            android:minWidth="0dp"
-            android:minHeight="0dp"
+            android:minWidth="48dp"
             android:paddingStart="16dp"
-            android:paddingTop="8dp"
             android:paddingEnd="16dp"
-            android:paddingBottom="8dp"
             android:text="@string/menu_button"
-            android:textColor="#FFFFFF" />
+            app:strokeWidth="0dp" />
 
         <!-- Only shown to a signed-in account: all three layers the toggle switches between
              are behind requireAuth, so there is nothing for it to do without a session. -->
-        <LinearLayout
+        <com.google.android.material.button.MaterialButtonToggleGroup
             android:id="@+id/mode_bar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="start"
             android:layout_marginTop="6dp"
-            android:background="#CC000000"
-            android:orientation="horizontal"
-            android:visibility="gone">
+            android:background="@drawable/bg_map_chrome"
+            android:elevation="2dp"
+            android:padding="3dp"
+            android:visibility="gone"
+            app:selectionRequired="true"
+            app:singleSelection="true">
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/mode_normal"
+                style="@style/Widget.HoldMyTrack.Button.MapMode"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:minWidth="0dp"
                 android:text="@string/mode_normal" />
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/mode_fog"
+                style="@style/Widget.HoldMyTrack.Button.MapMode"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:minWidth="0dp"
                 android:text="@string/mode_fog" />
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/mode_heatmap"
+                style="@style/Widget.HoldMyTrack.Button.MapMode"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:minWidth="0dp"
                 android:text="@string/mode_heatmap" />
-        </LinearLayout>
+        </com.google.android.material.button.MaterialButtonToggleGroup>
     </LinearLayout>
 
     <!-- One-tap GPS recording (MainActivity.onRecordTap): tap to start, tap again to pause or

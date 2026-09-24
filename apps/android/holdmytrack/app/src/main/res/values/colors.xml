@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The web client's palette (apps/web/src/index.css, the fm- custom properties), carried over value for
+     value so the two clients read as one product. Provisional until root Phase 3's design freeze;
+     that pass replaces these values here, and nothing else should need to change. The web has no
+     dark palette, so neither does this. -->
+<resources>
+    <color name="hmt_bg">#F7F4EC</color>
+    <color name="hmt_surface">#FFFFFF</color>
+    <color name="hmt_surface_tint">#F6F3E9</color>
+    <color name="hmt_surface_tint_strong">#F1EEE3</color>
+    <color name="hmt_divider_tint">#EFEAD9</color>
+
+    <color name="hmt_ink">#202B25</color>
+    <color name="hmt_ink_secondary">#6C7A70</color>
+    <color name="hmt_ink_muted">#8B9186</color>
+    <color name="hmt_ink_faint">#B7AF9A</color>
+
+    <color name="hmt_border">#E6E1D2</color>
+    <color name="hmt_border_strong">#DCD6C4</color>
+
+    <color name="hmt_accent">#B07E2E</color>
+    <color name="hmt_accent_strong">#93691F</color>
+    <color name="hmt_accent_container">#F3E6CE</color>
+
+    <color name="hmt_danger">#AA3333</color>
+    <color name="hmt_danger_container">#F6DEDA</color>
+    <color name="hmt_success">#2F8A4E</color>
+
+    <!-- The floating map chrome's background: the web's rgb(255 255 255 / 92%). -->
+    <color name="hmt_map_chrome">#EBFFFFFF</color>
+</resources>
