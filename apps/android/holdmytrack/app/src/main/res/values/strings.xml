@@ -25,15 +25,11 @@
     <string name="menu_button">☰</string>
     <string name="menu_profile">Profile</string>
     <string name="menu_sync">Sync</string>
-    <string name="menu_gps_logger">GPS Logger</string>
     <string name="menu_recorded_activities">Recorded Activities</string>
 
-    <string name="recording_needs_permission">HoldMyTrack needs location access to record a GPS track.</string>
-    <string name="recording_grant_permission">Grant location access</string>
     <string name="recording_name_hint">Name</string>
     <string name="recording_type_hint">Activity type</string>
     <string name="recording_description_hint">Description (optional)</string>
-    <string name="recording_record">Record</string>
     <string name="recording_pause">Pause</string>
     <string name="recording_resume">Resume</string>
     <string name="recording_stop">Stop</string>
@@ -48,28 +44,29 @@
     <string name="recording_download_failed">Could not save the track.</string>
     <string name="recording_stat_time">Time</string>
     <string name="recording_stat_distance">Distance</string>
-    <string name="recording_stat_altitude">Altitude</string>
-    <string name="recording_stat_speed">Speed</string>
     <string name="recording_stat_placeholder">—</string>
-    <string name="recording_not_enough_points">Not enough GPS data to save this recording — try recording for longer before stopping.</string>
     <string name="recording_saved_locally">Saved. Find it under Recorded Activities to queue it for sync.</string>
-    <string name="recording_locked_synced">Already synced — no longer editable.</string>
+    <string name="recording_too_short">Too short — not saved.</string>
+    <string name="recording_needs_location">HoldMyTrack needs location access to record a GPS track.</string>
+    <string name="recording_edit_title">Edit recording</string>
+    <string name="record_button_start">Start recording</string>
+    <string name="record_button_pause">Pause recording. Long-press to stop.</string>
+    <string name="record_button_resume">Resume recording. Long-press to stop.</string>
     <string name="recording_notification_channel">GPS recording</string>
-    <string name="recording_notification_title">Recording a GPS activity</string>
+    <string name="recording_notification_title">Recording</string>
+    <string name="recording_notification_title_paused">Paused · %1$s</string>
 
     <string name="recorded_empty">No recorded activities yet.</string>
     <string name="recorded_filter_all">All</string>
     <string name="recorded_status_not_synced">Not synced</string>
     <string name="recorded_status_queued">Queued</string>
-    <string name="recorded_status_synced">Synced</string>
     <string name="recorded_row_subtitle">%1$s · %2$.2f km · %3$s</string>
     <string name="recorded_row_needs_type">Set a type to sync</string>
     <string name="recorded_demo_notice">The demo account is read-only — recordings can be saved and edited here, but never synced. Create an account to sync your own data.</string>
     <string name="recording_delete">Delete</string>
     <string name="recorded_row_preview">Route preview</string>
     <string name="recorded_delete_confirm_title">Delete this recording?</string>
-    <string name="recorded_delete_confirm_message_unsynced">This only removes it from this device — it was never synced, so there\'s nothing to remove anywhere else. This can\'t be undone.</string>
-    <string name="recorded_delete_confirm_message_synced">This removes it from this device only — the activity it already synced stays on your map. This can\'t be undone.</string>
+    <string name="recorded_delete_confirm_message">It hasn\'t been synced, so this is the only copy. This can\'t be undone.</string>
 
     <string name="sync_title">Sync from Health Connect</string>
     <string name="sync_rationale">HoldMyTrack reads your recorded exercise sessions and their GPS routes from Health Connect, and adds the outdoor ones to your map. It reads nothing else — no heart rate, no weight, no sleep — and it never writes anything back. Sessions recorded indoors have no route, so they are skipped.</string>

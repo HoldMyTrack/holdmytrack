@@ -11,23 +11,6 @@
         android:orientation="vertical"
         android:padding="24dp">
 
-        <TextView
-            android:id="@+id/recording_permission_notice"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingBottom="12dp"
-            android:text="@string/recording_needs_permission"
-            android:textSize="14sp"
-            android:visibility="gone" />
-
-        <Button
-            android:id="@+id/recording_grant_permission"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:text="@string/recording_grant_permission"
-            android:visibility="gone" />
-
         <EditText
             android:id="@+id/recording_name"
             android:layout_width="match_parent"
@@ -62,7 +45,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
             android:columnCount="2"
-            android:rowCount="2">
+            android:rowCount="1">
 
             <TextView
                 android:layout_width="0dp"
@@ -95,49 +78,7 @@
                 android:text="@string/recording_stat_placeholder"
                 android:textSize="20sp"
                 android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_columnWeight="1"
-                android:layout_marginTop="16dp"
-                android:text="@string/recording_stat_altitude"
-                android:textSize="12sp" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_columnWeight="1"
-                android:layout_marginTop="16dp"
-                android:text="@string/recording_stat_speed"
-                android:textSize="12sp" />
-
-            <TextView
-                android:id="@+id/recording_stat_altitude_value"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_columnWeight="1"
-                android:text="@string/recording_stat_placeholder"
-                android:textSize="20sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/recording_stat_speed_value"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_columnWeight="1"
-                android:text="@string/recording_stat_placeholder"
-                android:textSize="20sp"
-                android:textStyle="bold" />
         </GridLayout>
-
-        <TextView
-            android:id="@+id/recording_status"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:textSize="14sp"
-            android:visibility="gone" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -146,48 +87,18 @@
             android:orientation="horizontal">
 
             <Button
-                android:id="@+id/recording_record"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/recording_record" />
-
-            <Button
-                android:id="@+id/recording_pause_resume"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/recording_pause"
-                android:visibility="gone" />
-
-            <Button
-                android:id="@+id/recording_stop"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/recording_stop"
-                android:visibility="gone" />
-
-            <!-- Edit mode only (RecordingActivity launched with EXTRA_RECORDING_ID) — takes
-                 the same row the Record/Pause/Stop buttons use, since the two modes never
-                 show buttons at the same time. -->
-            <Button
                 android:id="@+id/recording_save"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="@string/recording_save"
-                android:visibility="gone" />
+                android:text="@string/recording_save" />
 
-            <!-- Edit mode only, and unlike Save still shown once the row is synced and
-                 locked — exporting the track changes nothing about it. -->
             <Button
                 android:id="@+id/recording_download"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="@string/recording_download"
-                android:visibility="gone" />
+                android:text="@string/recording_download" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

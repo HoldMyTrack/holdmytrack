@@ -14,7 +14,6 @@ import dev.holdmytrack.android.health.HealthConnect
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.recording.db.RecordedActivityStore
-import dev.holdmytrack.android.recording.db.SyncStatus
 import dev.holdmytrack.android.recording.db.toSyncJson
 import dev.holdmytrack.android.sync.SyncCursor
 import dev.holdmytrack.android.sync.SyncProgress
@@ -210,7 +209,7 @@ class SyncActivity : AppCompatActivity() {
     private fun cursor() = SyncCursor(this, Session.email)
 
     /**
-     * Health Connect sync, then whatever GPS Logger recordings `RecordedActivitiesActivity`'s
+     * Health Connect sync, then whatever GPS recordings `RecordedActivitiesActivity`'s
      * checkbox has queued — one button, both sources, since submitting a queued recording is
      * exactly the same batched endpoint Health Connect sync already posts to
      * (`docs/IMPLEMENTATION.md` §4.0.4). The recorded flush runs even when Health Connect
@@ -242,8 +241,9 @@ class SyncActivity : AppCompatActivity() {
         }
     }
 
-    /** Submits every locally queued GPS Logger recording (`RecordedActivityStore`,
-     *  `SyncStatus.QUEUED`) and marks each one [SyncStatus.SYNCED] on success. A rejected or
+    /** Submits every locally queued GPS recording (`RecordedActivityStore`,
+     *  `SyncStatus.QUEUED`) and deletes each one from the device on success — it lives on the
+     *  server from then on, in the activity list and on the map. A rejected or
      *  failed submit is left queued rather than reverted — the same resumable-retry posture
      *  `SyncRunner`'s own watermark already uses, so the next "Sync Now" tries it again with
      *  no action needed from the user. */
@@ -255,7 +255,7 @@ class SyncActivity : AppCompatActivity() {
             val status = runCatching { HoldMyTrackApi.syncActivities(listOf(record.toSyncJson()), HoldMyTrackApi.SOURCE_RECORDED) }
                 .getOrNull()?.firstOrNull()?.status
             if (status == "enqueued" || status == "already_processed") {
-                store.setSyncStatus(record.id, SyncStatus.SYNCED)
+                store.delete(record.id)
                 synced++
             } else {
                 failed++

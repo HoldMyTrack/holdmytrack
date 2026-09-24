@@ -1,24 +1,35 @@
 package dev.holdmytrack.android
 
+import android.Manifest
+import android.content.ComponentName
 import android.content.Intent
+import android.content.ServiceConnection
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Typeface
 import android.os.Bundle
+import android.os.IBinder
 import android.util.Log
+import android.view.HapticFeedbackConstants
 import android.view.View
 import android.view.ViewGroup.MarginLayoutParams
 import android.view.WindowInsets
 import android.widget.Button
+import android.widget.ImageButton
 import android.widget.PopupMenu
 import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import dev.holdmytrack.android.map.MapMode
 import dev.holdmytrack.android.map.MapOverlays
 import dev.holdmytrack.android.net.ApiException
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.recording.RecordedActivitiesActivity
-import dev.holdmytrack.android.recording.RecordingActivity
+import dev.holdmytrack.android.recording.RecordingService
+import dev.holdmytrack.android.recording.RecordingState
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -33,6 +44,12 @@ import org.maplibre.android.maps.Style
  * menu (Profile, Sync) both float over the map top-start, rather than living in a bar of their
  * own, mirroring the web client's own on-map mode control (`apps/web/src/map/MapView.tsx`).
  *
+ * Also the one place GPS recording is controlled from in the app: a record button floats
+ * bottom-centre (tap to start, tap to pause/resume, long-press to stop — `RecordingService`
+ * does the rest, and its notification offers the same controls). While a recording is in
+ * progress the map shows only that recording's live track: the mode toggle and every history
+ * layer are hidden (`MapOverlays.setRecording`), and the camera follows the latest fix.
+ *
  * Never mounted without a session: a signed-out visitor is handed straight to
  * `SignInActivity`, mirroring web's `AuthGate` (`docs/IMPLEMENTATION.md` §4.13). A bare basemap
  * with none of the three user layers — all behind `requireAuth` server-side — would be a weak
@@ -45,6 +62,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var menuButton: Button
     private lateinit var modeBar: View
     private lateinit var modeButtons: Map<MapMode, Button>
+    private lateinit var recordButton: ImageButton
 
     private var map: MapLibreMap? = null
     private var style: Style? = null
@@ -72,6 +90,47 @@ class MainActivity : AppCompatActivity() {
      *  `onResume` calls `syncSession`, and returning from the Profile screen is one. */
     private var verifying = false
 
+    /** Whether `syncSession` has got as far as showing the mode toggle — recording hides it,
+     *  and ending a recording must not show it before the session would have. */
+    private var modeBarReady = false
+
+    /** Bound from `onStart` to `onStop` to watch the recording; null between the two, or
+     *  before the bind answers. Null reads as [RecordingState.IDLE]. */
+    private var recorder: RecordingService? = null
+    private var recorderBound = false
+
+    /** Whether the camera has already flown in to the current recording's first fix; later
+     *  fixes only pan, so the user's chosen zoom sticks. Reset when a recording ends. */
+    private var followingRecording = false
+
+    private val recorderConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName, binder: IBinder) {
+            val service = (binder as RecordingService.LocalBinder).service
+            recorder = service
+            service.onChange = ::renderRecording
+            renderRecording()
+        }
+
+        override fun onServiceDisconnected(name: ComponentName) {
+            recorder = null
+            renderRecording()
+        }
+    }
+
+    /** Asked for on the first tap of the record button, not up front: location is what
+     *  recording needs, and asking at the moment of recording is when the reason is obvious.
+     *  Notifications ride along — without them the recording runs invisibly, with no Pause or
+     *  Stop in the shade — but only location is required to start. */
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) {
+        if (hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
+            startRecording()
+        } else {
+            Toast.makeText(this, R.string.recording_needs_location, Toast.LENGTH_LONG).show()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Before any layout or MapView exists, so a signed-out launch never draws a map at all.
@@ -92,6 +151,10 @@ class MainActivity : AppCompatActivity() {
         modeButtons.forEach { (value, button) -> button.setOnClickListener { setMode(value) } }
         menuButton.setOnClickListener { showMenu(it) }
         setMode(mode)
+
+        recordButton = findViewById(R.id.record_button)
+        recordButton.setOnClickListener { onRecordTap() }
+        recordButton.setOnLongClickListener { onRecordLongPress() }
 
         insetSystemBars()
 
@@ -118,7 +181,9 @@ class MainActivity : AppCompatActivity() {
             instance.setStyle(Style.Builder().fromUri(styleUrl())) { loaded ->
                 style = loaded
                 status.visibility = View.GONE
+                MapOverlays.attachLiveTrack(loaded)
                 syncSession()
+                renderRecording()
             }
         }
     }
@@ -142,10 +207,13 @@ class MainActivity : AppCompatActivity() {
         val topStartBar: View = findViewById(R.id.top_start_bar)
         val barTopMargin = (topStartBar.layoutParams as MarginLayoutParams).topMargin
         val statusPadding = status.paddingTop
+        val recordBottomMargin = (recordButton.layoutParams as MarginLayoutParams).bottomMargin
         findViewById<View>(R.id.map_root).setOnApplyWindowInsetsListener { _, insets ->
             val bars = insets.getInsets(WindowInsets.Type.systemBars())
             (topStartBar.layoutParams as MarginLayoutParams).topMargin = barTopMargin + bars.top
             topStartBar.requestLayout()
+            (recordButton.layoutParams as MarginLayoutParams).bottomMargin = recordBottomMargin + bars.bottom
+            recordButton.requestLayout()
             status.setPadding(status.paddingLeft, statusPadding + bars.top, status.paddingRight, status.paddingBottom)
             systemBarInsetTop = bars.top
             applyCompassMargin()
@@ -195,13 +263,85 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        modeBar.visibility = View.VISIBLE
+        modeBarReady = true
+        modeBar.visibility = if (isRecording()) View.GONE else View.VISIBLE
 
         val loaded = style ?: return
         if (!overlaysAttached) {
             MapOverlays.attach(loaded, mode)
             overlaysAttached = true
+            if (isRecording()) MapOverlays.setRecording(loaded, true, mode)
             frameActivities()
+        }
+    }
+
+    private fun isRecording() = (recorder?.state ?: RecordingState.IDLE) != RecordingState.IDLE
+
+    private fun hasPermission(permission: String) =
+        ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+
+    /** Idle: start (asking for permissions first if they're missing). Recording or paused:
+     *  toggle between the two. Nothing here ever asks for a name or a type — see
+     *  `RecordingService`'s class doc for where those come from. */
+    private fun onRecordTap() {
+        if (isRecording()) {
+            startService(RecordingService.intent(this, RecordingService.ACTION_TOGGLE))
+            return
+        }
+        val missing = listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.POST_NOTIFICATIONS)
+            .filterNot(::hasPermission)
+        if (missing.isEmpty()) startRecording() else permissionLauncher.launch(missing.toTypedArray())
+    }
+
+    /** Long-press stops — deliberately not a plain tap, so a stray touch can pause a recording
+     *  but never end it. Consumed even when idle, so a long-press never falls through to a tap
+     *  that would start one. */
+    private fun onRecordLongPress(): Boolean {
+        if (isRecording()) {
+            recordButton.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            startService(RecordingService.intent(this, RecordingService.ACTION_STOP))
+        }
+        return true
+    }
+
+    private fun startRecording() {
+        ContextCompat.startForegroundService(this, RecordingService.intent(this, RecordingService.ACTION_START))
+    }
+
+    /** Brings the button, the mode toggle, the map's layers, the live track and the camera in
+     *  line with the recording's state — called on bind, on every state change and fix the
+     *  service reports, and once the style has loaded. */
+    private fun renderRecording() {
+        val state = recorder?.state ?: RecordingState.IDLE
+        val active = state != RecordingState.IDLE
+        val (icon, background, description) = when (state) {
+            RecordingState.IDLE -> Triple(R.drawable.ic_record_start, R.drawable.bg_record_button, R.string.record_button_start)
+            RecordingState.RECORDING -> Triple(R.drawable.ic_record_pause, R.drawable.bg_record_button_recording, R.string.record_button_pause)
+            RecordingState.PAUSED -> Triple(R.drawable.ic_record_resume, R.drawable.bg_record_button_paused, R.string.record_button_resume)
+        }
+        recordButton.setImageResource(icon)
+        recordButton.setBackgroundResource(background)
+        recordButton.contentDescription = getString(description)
+        if (modeBarReady) modeBar.visibility = if (active) View.GONE else View.VISIBLE
+
+        val loaded = style ?: return
+        if (overlaysAttached) MapOverlays.setRecording(loaded, active, mode)
+        val points = if (active) recorder?.points().orEmpty() else emptyList()
+        MapOverlays.updateLiveTrack(loaded, points)
+
+        if (!active) {
+            followingRecording = false
+            return
+        }
+        val instance = map ?: return
+        val last = points.lastOrNull() ?: return
+        val target = LatLng(last.lat, last.lon)
+        if (!followingRecording) {
+            followingRecording = true
+            val zoom = maxOf(instance.cameraPosition.zoom, RECORDING_ZOOM)
+            instance.animateCamera(CameraUpdateFactory.newLatLngZoom(target, zoom), FRAME_DURATION_MS)
+        } else {
+            instance.easeCamera(CameraUpdateFactory.newLatLng(target))
         }
     }
 
@@ -234,13 +374,11 @@ class MainActivity : AppCompatActivity() {
         val menu = PopupMenu(this, anchor)
         menu.menu.add(0, MENU_PROFILE, 0, R.string.menu_profile)
         menu.menu.add(0, MENU_SYNC, 1, R.string.menu_sync)
-        menu.menu.add(0, MENU_GPS_LOGGER, 2, R.string.menu_gps_logger)
-        menu.menu.add(0, MENU_RECORDED_ACTIVITIES, 3, R.string.menu_recorded_activities)
+        menu.menu.add(0, MENU_RECORDED_ACTIVITIES, 2, R.string.menu_recorded_activities)
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 MENU_PROFILE -> startActivity(Intent(this, ProfileActivity::class.java))
                 MENU_SYNC -> startActivity(Intent(this, SyncActivity::class.java))
-                MENU_GPS_LOGGER -> startActivity(Intent(this, RecordingActivity::class.java))
                 MENU_RECORDED_ACTIVITIES -> startActivity(Intent(this, RecordedActivitiesActivity::class.java))
             }
             true
@@ -272,6 +410,8 @@ class MainActivity : AppCompatActivity() {
         HoldMyTrackApi.activityBounds { result ->
             val box = result.getOrNull() ?: return@activityBounds
             val instance = map ?: return@activityBounds
+            // Reopening the app mid-recording: the camera belongs to the live track.
+            if (isRecording()) return@activityBounds
             val bounds = LatLngBounds.from(box[3], box[2], box[1], box[0])
             val fitted = instance.getCameraForLatLngBounds(bounds, IntArray(4) { FRAME_PADDING_PX })
                 ?: return@activityBounds
@@ -306,6 +446,7 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         mapView.onStart()
+        recorderBound = bindService(Intent(this, RecordingService::class.java), recorderConnection, BIND_AUTO_CREATE)
     }
 
     override fun onResume() {
@@ -320,6 +461,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onStop() {
+        if (recorderBound) {
+            recorder?.onChange = null
+            unbindService(recorderConnection)
+            recorderBound = false
+            recorder = null
+        }
         mapView.onStop()
         super.onStop()
     }
@@ -346,10 +493,13 @@ class MainActivity : AppCompatActivity() {
         const val INACTIVE_MODE_ALPHA = 0.6f
         const val FRAME_PADDING_PX = 64
         const val MAX_FRAME_ZOOM = 15.0
+
+        /** Where the camera flies to on a recording's first fix — street level, so the line
+         *  visibly grows from the first few metres rather than being a dot on a city. */
+        const val RECORDING_ZOOM = 16.0
         const val FRAME_DURATION_MS = 900
         const val MENU_PROFILE = 1
         const val MENU_SYNC = 2
-        const val MENU_GPS_LOGGER = 3
-        const val MENU_RECORDED_ACTIVITIES = 4
+        const val MENU_RECORDED_ACTIVITIES = 3
     }
 }

@@ -18,7 +18,7 @@ import kotlinx.coroutines.withContext
  * `FusedLocationProviderClient`, plain `OkHttp` over Retrofit).
  */
 private class RecordingDbHelper(context: Context) :
-    SQLiteOpenHelper(context.applicationContext, "holdmytrack-recordings.db", null, 2) {
+    SQLiteOpenHelper(context.applicationContext, "holdmytrack-recordings.db", null, 3) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -41,12 +41,18 @@ private class RecordingDbHelper(context: Context) :
     }
 
     // Version 2 added `account` (see RecordedActivityStore's class doc for why it was
-    // missing). No real users predate this yet, so a plain drop-and-recreate is the same
-    // "no migration tooling needed pre-launch" call the server side already makes rather than
-    // hand-writing an ALTER TABLE this table will never need again.
+    // missing). No real users predate that, so from version 1 a plain drop-and-recreate is the
+    // same "no migration tooling needed pre-launch" call the server side already makes.
+    // Version 3 changed no columns: a synced row is now deleted rather than kept with a
+    // `synced` status, so upgrading clears the rows that status left behind — and keeps the
+    // unsynced ones, which exist nowhere else.
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        db.execSQL("DROP TABLE IF EXISTS $TABLE")
-        onCreate(db)
+        if (oldVersion < 2) {
+            db.execSQL("DROP TABLE IF EXISTS $TABLE")
+            onCreate(db)
+            return
+        }
+        db.execSQL("DELETE FROM $TABLE WHERE sync_status = 'synced'")
     }
 
     companion object {
@@ -55,8 +61,9 @@ private class RecordingDbHelper(context: Context) :
 }
 
 /**
- * All local GPS Logger recordings — insert on Stop, edited from `RecordedActivitiesActivity`,
- * drained by `SyncActivity`'s "Sync Now" for whatever's [SyncStatus.QUEUED]. One instance per
+ * Every local GPS recording not yet on the server — inserted by `RecordingService` on Stop,
+ * edited from `RecordedActivitiesActivity`, and drained by `SyncActivity`'s "Sync Now" for
+ * whatever's [SyncStatus.QUEUED], each row deleted once the server has it. One instance per
  * caller is fine; `SQLiteOpenHelper` itself keeps the single underlying connection.
  *
  * **Every read and write is scoped to the currently signed-in account.** Recording works
@@ -117,18 +124,9 @@ class RecordedActivityStore(context: Context) {
         Unit
     }
 
-    /**
-     * Removes this device's own copy of the recording — always available, regardless of
-     * [SyncStatus], per the decision this shipped with. Deliberately local-only, not a mirror
-     * of `handleDeleteActivity`'s server-side purge (§4.7.4's FR-5.11): a [SyncStatus.SYNCED]
-     * row already has a real, separate `Activity` on the server (its own map coverage, its
-     * own presence in the web app), and this store holds no reference back to that row's
-     * server-assigned id to delete it by — only the client-generated `external_id` it was
-     * submitted under. Deleting the real activity too would need that id threaded back from
-     * the sync response, which nothing here captures today. The confirmation dialog that
-     * calls this (`RecordedActivitiesActivity`) says so explicitly for a synced row, rather
-     * than letting "Delete" read as a promise this doesn't keep.
-     */
+    /** Removes a row — the user's Delete in `RecordedActivitiesActivity` (the only copy,
+     *  since nothing here has synced), or `SyncActivity.flushRecordedQueue` once the server
+     *  has accepted it and the activity lives there instead. */
     suspend fun delete(id: String) = withContext(Dispatchers.IO) {
         helper.writableDatabase.delete(RecordingDbHelper.TABLE, "id = ? AND account = ?", arrayOf(id, account()))
         Unit

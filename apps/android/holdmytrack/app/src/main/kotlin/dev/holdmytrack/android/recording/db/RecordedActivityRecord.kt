@@ -5,24 +5,24 @@ import java.time.Instant
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Sync state a locally recorded activity moves through. Deliberately three values, not more
- *  — a failed submit simply leaves a row [QUEUED] rather than introducing a fourth "failed"
+/** Sync state a locally recorded activity moves through. Deliberately two values, not more
+ *  — a successful submit deletes the row from the device (the activity now lives on the
+ *  server), and a failed one simply leaves it [QUEUED] rather than introducing a "failed"
  *  state, so the next "Sync Now" retries it without the user having to notice or re-check
  *  anything (the same resumable-retry posture Health Connect sync already has). */
 object SyncStatus {
     const val NOT_SYNCED = "not_synced"
     const val QUEUED = "queued"
-    const val SYNCED = "synced"
 }
 
 /**
- * One GPS Logger recording, persisted locally the moment Stop is pressed rather than
- * submitted immediately — submission is now a separate, explicit step (`RecordedActivitiesActivity`'s
+ * One GPS recording, persisted locally by `RecordingService` the moment it stops rather than
+ * submitted immediately — submission is a separate, explicit step (`RecordedActivitiesActivity`'s
  * sync checkbox plus the Sync screen's existing "Sync Now", extended to also walk rows here
- * marked [SyncStatus.QUEUED]).
+ * marked [SyncStatus.QUEUED]), after which the row is deleted from the device.
  *
  * [id] is the same client-generated UUID used as `external_id` on the wire
- * (`docs/IMPLEMENTATION.md` §4.0.4) — minted once at Record, stable through edits and retries.
+ * (`docs/IMPLEMENTATION.md` §4.0.4) — minted once at Stop, stable through edits and retries.
  */
 data class RecordedActivityRecord(
     val id: String,
@@ -35,13 +35,10 @@ data class RecordedActivityRecord(
     val points: List<RecordedPoint>,
     val syncStatus: String,
     val createdAtMs: Long,
-) {
-    val editable: Boolean get() = syncStatus != SyncStatus.SYNCED
-}
+)
 
 /** The exact shape `POST /v1/sync/activities` accepts for one batch entry
- *  (`docs/IMPLEMENTATION.md` §4.0.3/§4.0.4) — reused unchanged from what `RecordingActivity`
- *  used to build inline before submission became deferred. */
+ *  (`docs/IMPLEMENTATION.md` §4.0.3/§4.0.4). */
 fun RecordedActivityRecord.toSyncJson(): JSONObject {
     val pointsArray = JSONArray()
     for (point in points) {
