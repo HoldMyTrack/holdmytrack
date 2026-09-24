@@ -26,7 +26,7 @@ type Activity struct {
 	ActivityType string // 'run' | 'ride' | 'hike' | ... — best-effort from the source file
 	Points       []Point
 	// Name and Description are empty for every file-format parser (GPX/TCX/FIT never carry a
-	// title FitMap trusts here) and for Health Connect/HealthKit sync. Path 2's JSON wire
+	// title HoldMyTrack trusts here) and for Health Connect/HealthKit sync. Path 2's JSON wire
 	// format is the one source that can set them directly (`docs/IMPLEMENTATION.md` §4.0.4,
 	// in-app GPS recording) — ingest.Process persists them at creation when non-empty, the
 	// same NULLIF-on-empty convention `handleUpdateActivity` uses for an edit after the fact.

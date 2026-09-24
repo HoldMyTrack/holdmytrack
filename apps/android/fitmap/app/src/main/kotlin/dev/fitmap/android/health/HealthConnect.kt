@@ -104,7 +104,7 @@ object HealthConnect {
      *
      * **Not the app's own permission page, and not for want of trying.** The platform does
      * publish `HealthConnectManager.ACTION_MANAGE_HEALTH_PERMISSIONS`, which takes a package
-     * name and would land exactly on FitMap's page — but the activity behind it is guarded by
+     * name and would land exactly on HoldMyTrack's page — but the activity behind it is guarded by
      * `android.permission.GRANT_RUNTIME_PERMISSIONS`, a signature permission, so launching it
      * from here is a `SecurityException` that kills the process. Confirmed on a device, first
      * by the crash and then by querying the resolver directly.

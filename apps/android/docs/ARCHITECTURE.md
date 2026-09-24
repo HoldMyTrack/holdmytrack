@@ -1,4 +1,4 @@
-# FitMap for Android: Architecture
+# HoldMyTrack for Android: Architecture
 
 The canonical reference for *how the Android app is put together* — its shape, the decisions behind it, and the stack. `apps/android/docs/IMPLEMENTATION.md` picks up from here with the file-by-file "how it's built" detail; this document does not duplicate that. `docs/ARCHITECTURE.md` covers the system this app is one client of — the server, the three ingest paths, the shared style document — and is assumed background throughout.
 
@@ -12,7 +12,7 @@ The Android app is a **single Gradle module against the platform SDK directly** 
 
 **The app has a local write path now, not none.** Before Phase 7, everything it showed — the map, the tracks, the sync history — was a read against the same server the web client reads, and the one thing it *sent* (Health Connect sync batches) was normalized on-device and handed directly to the same ingestion pipeline every other path runs through (`docs/IMPLEMENTATION.md` §4.0–§4.1), with nothing kept locally beyond the two `SharedPreferences` files below. Phase 7 added a genuine local write: `recording/db/RecordedActivityStore` (`docs/IMPLEMENTATION.md` §7.2) persists a recording — including its buffered points — the moment Stop is tapped, independent of whether or when it's ever synced, and is the first state this app holds that the server doesn't already know about. It stays a client, not a second source of truth, once a row does sync: nothing here re-derives or caches what the server then holds, and a synced row's local copy exists only so its own sync-status and Edit-lock can be shown (`apps/android/docs/SPEC.md` FR-5.2).
 
-**The sync path and the display path are two disjoint, one-way pipes that never intersect on-device.** `sync/SyncRunner.kt` reads Health Connect and posts to `POST /v1/sync/activities`; `map/MapOverlays.kt` reads map tiles from `GET /tiles/v1/{tracks,fog,heatmap}` — both always against `BuildConfig.API_BASE_URL`, i.e. the FitMap server, never Health Connect. There is no code path anywhere in this app that renders a Health Connect record directly onto the map, and no code path in the sync engine that reads a tile. Once an activity has been synced, the app has no memory of it having come from Health Connect at all — the map renders the account's server-side history exactly as it would for a file upload or a cloud-provider push, and would keep working identically if Health Connect were removed entirely and every activity arrived by upload instead.
+**The sync path and the display path are two disjoint, one-way pipes that never intersect on-device.** `sync/SyncRunner.kt` reads Health Connect and posts to `POST /v1/sync/activities`; `map/MapOverlays.kt` reads map tiles from `GET /tiles/v1/{tracks,fog,heatmap}` — both always against `BuildConfig.API_BASE_URL`, i.e. the HoldMyTrack server, never Health Connect. There is no code path anywhere in this app that renders a Health Connect record directly onto the map, and no code path in the sync engine that reads a tile. Once an activity has been synced, the app has no memory of it having come from Health Connect at all — the map renders the account's server-side history exactly as it would for a file upload or a cloud-provider push, and would keep working identically if Health Connect were removed entirely and every activity arrived by upload instead.
 
 ### 1.1 Key decisions and their reasons
 
@@ -34,9 +34,9 @@ The Android app is a **single Gradle module against the platform SDK directly** 
 ```mermaid
 graph TD
     HC["Health Connect store\n(fed by Fitbit / other apps)"]
-    App["FitMap Android app\n(this repo, one Gradle module)"]
+    App["HoldMyTrack Android app\n(this repo, one Gradle module)"]
     MLN["MapLibre Native\n(own HTTP stack)"]
-    Api["FitMap Server\n(docs/ARCHITECTURE.md)"]
+    Api["HoldMyTrack Server\n(docs/ARCHITECTURE.md)"]
     Style["GET /v1/map/style/{flavor}"]
     Tiles["GET /tiles/v1/{tracks,fog,heatmap}"]
     Sync["POST /v1/sync/activities"]
@@ -84,7 +84,7 @@ This app is the smaller of the two boxes root `docs/ARCHITECTURE.md` §1.2 draws
 
 ### 2.1 One style document, consumed unmodified
 
-`buildStyle()` in the web client (`apps/web/src/map/style.ts`) remains the single definition of FitMap's map style, served as a document by `GET /v1/map/style/{flavor}` (`docs/ARCHITECTURE.md` §2.1). This app adds nothing to that pipeline: `MainActivity` calls `Style.Builder().fromUri(styleUrl())` with the served URL and renders exactly what comes back, archive URL included. Flavor selection is the one piece of client logic — `light` or `dark` of the five the API serves, chosen from `Configuration.UI_MODE_NIGHT_MASK` rather than an in-app preference, since the design pass (root `docs/ROADMAP.md` Phase 3) has not decided whether Android needs one (`apps/android/docs/ROADMAP.md` Phase 5).
+`buildStyle()` in the web client (`apps/web/src/map/style.ts`) remains the single definition of HoldMyTrack's map style, served as a document by `GET /v1/map/style/{flavor}` (`docs/ARCHITECTURE.md` §2.1). This app adds nothing to that pipeline: `MainActivity` calls `Style.Builder().fromUri(styleUrl())` with the served URL and renders exactly what comes back, archive URL included. Flavor selection is the one piece of client logic — `light` or `dark` of the five the API serves, chosen from `Configuration.UI_MODE_NIGHT_MASK` rather than an in-app preference, since the design pass (root `docs/ROADMAP.md` Phase 3) has not decided whether Android needs one (`apps/android/docs/ROADMAP.md` Phase 5).
 
 Because MapLibre Native reads `pmtiles://` natively, the "why bake fog's inversion server-side" argument in `docs/ARCHITECTURE.md` §2.1 pays off a second time here for free: there is no shader to write against MapLibre Native's own bindings, because there is no shader on this client at all — fog and heatmap arrive as ready-to-draw RGBA PNGs the same way they do on web (`docs/IMPLEMENTATION.md` §4.2, §4.2.2).
 

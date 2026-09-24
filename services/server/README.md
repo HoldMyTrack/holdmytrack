@@ -1,4 +1,4 @@
-# FitMap Server
+# HoldMyTrack Server
 
 `cmd/fitmap serve`, `work` and `migrate` are real now: the Path-3 upload endpoint, its job-queue worker, and the embedded-migration runner. This file still exists for the same reason it always did — so the decisions below are recorded before someone has to re-derive them, and so `IMPLEMENTATION.md`'s contract for this service is written down next to the code that implements it.
 

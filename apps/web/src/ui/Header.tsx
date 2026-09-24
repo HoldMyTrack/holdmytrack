@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { DonateButton } from './DonateButton';
 import { UserMenu } from './UserMenu';
+import logoUrl from '../assets/logo.png';
 
 /**
  * Docked top chrome: the brand mark, then Donate, the import control and the account menu at
@@ -18,7 +19,7 @@ import { UserMenu } from './UserMenu';
  * The order is deliberate: Import sits nearest Export because both are the two things this
  * bar actually lets you do with your data (in, then out), Export sits nearest the account
  * menu as the newer of the two, and Donate leads into both rather than trailing off the end,
- * since donations are how FitMap is funded rather than a footnote (docs/VISION.md §5).
+ * since donations are how HoldMyTrack is funded rather than a footnote (docs/VISION.md §5).
  */
 export interface HeaderProps {
   /** Rendered between Donate and the account menu. */
@@ -43,10 +44,11 @@ export interface HeaderProps {
 export function Header({ importControl, exportControl, onBrandClick, onOpenProfile, onOpenSettings }: HeaderProps) {
   const brand = (
     <>
-      <span className="app-header__mark" aria-hidden="true">
-        <span className="app-header__mark-dot" />
+      <img className="app-header__logo" src={logoUrl} alt="" aria-hidden="true" />
+      <span className="app-header__wordmark">
+        <span className="app-header__wordmark-light">HoldMy</span>
+        <span className="app-header__wordmark-bold">Track</span>
       </span>
-      FitMap
     </>
   );
   return (
@@ -58,6 +60,8 @@ export function Header({ importControl, exportControl, onBrandClick, onOpenProfi
       ) : (
         <div className="app-header__brand">{brand}</div>
       )}
+      <span className="app-header__divider" aria-hidden="true" />
+      <span className="app-header__tagline">Every journey, mapped.</span>
       <nav className="app-header__actions" aria-label="Main">
         <DonateButton />
         {importControl}

@@ -14,7 +14,7 @@ import androidx.health.connect.client.records.ExerciseSessionRecord
  * mislabelled activity; `internal/parse/fit_sport.go` avoids the same hazard the other way,
  * by generating its own enum names from a verified source.
  *
- * **The names are not Health Connect's own everywhere, and that matters.** FitMap's existing
+ * **The names are not Health Connect's own everywhere, and that matters.** HoldMyTrack's existing
  * ingest paths speak the FIT vocabulary — a bike ride uploaded as a `.FIT` file lands as
  * `cycling` — while Health Connect calls the same thing `biking`. Left alone, one ride synced
  * from a watch and uploaded from a file would be two different activity types, which splits

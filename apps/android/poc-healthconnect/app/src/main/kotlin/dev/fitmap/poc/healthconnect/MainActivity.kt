@@ -137,7 +137,7 @@ class MainActivity : AppCompatActivity() {
             if (granted.none { it.endsWith("READ_EXERCISE_ROUTES") }) {
                 log("\nREAD_EXERCISE_ROUTES is NOT granted. Grant it by hand:")
                 log("Settings > Security & privacy > Health Connect > App permissions >")
-                log("FitMap HC PoC > 'Exercise routes' > Allow all")
+                log("HoldMyTrack HC PoC > 'Exercise routes' > Allow all")
             }
         }
     }

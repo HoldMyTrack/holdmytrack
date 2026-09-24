@@ -272,7 +272,7 @@ class SyncActivity : AppCompatActivity() {
 
     /**
      * The per-activity outcome of a run, which is the whole of Phase 3's rejection feedback:
-     * why a session the user can see in Health Connect never appeared in FitMap. It says which
+     * why a session the user can see in Health Connect never appeared in HoldMyTrack. It says which
      * were skipped for having no route — an ordinary indoor workout, not a fault — separately
      * from which the server actually refused, and with the server's own reason, since the two
      * are different things and a single "couldn't sync" would conflate them.

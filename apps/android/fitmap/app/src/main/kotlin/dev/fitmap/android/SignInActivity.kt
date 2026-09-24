@@ -22,7 +22,7 @@ import dev.fitmap.android.net.Session
  * that would have to be thrown away.
  *
  * The app's first screen whenever no session is held, mirroring web's `AuthGate`: a bare
- * basemap with no tracks, fog or heatmap is a weak demonstration of what FitMap does, and the
+ * basemap with no tracks, fog or heatmap is a weak demonstration of what HoldMyTrack does, and the
  * Demo button here is a much stronger one, one tap away. So `MainActivity` never mounts the map
  * without a session — it hands off to [open] instead — and this screen is the root of its own
  * task, with nothing behind it to fall back to: Back leaves the app rather than revealing a map

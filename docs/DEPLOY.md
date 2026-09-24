@@ -1,4 +1,4 @@
-# Deploying FitMap — minimal single-VPS setup
+# Deploying HoldMyTrack — minimal single-VPS setup
 
 The smallest deployment that's actually production-shaped: one small VPS running `compose.prod.yml` (Postgres+PostGIS, `api`, `worker`, and Caddy in front of the built frontend), plus Cloudflare R2 for object storage. See `docs/VISION.md` §4.3 for the cost model this is built around, and `docs/ROADMAP.md`'s "Production deployment" section for what's still open beyond this (backups, monitoring, spend caps, DPIA — this document only covers getting a working deployment live, not everything a real public launch needs).
 

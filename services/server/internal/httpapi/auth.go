@@ -266,12 +266,12 @@ func (s *Server) sendVerificationEmail(ctx context.Context, userID, email string
 
 	link := fmt.Sprintf("%s/?verify_token=%s", s.appBaseURL, tokenID)
 	body := fmt.Sprintf(
-		"Welcome to FitMap! Confirm this email address to unlock your account:\n\n%s\n\n"+
-			"This link works once and expires in 24 hours. If you didn't create a FitMap "+
+		"Welcome to HoldMyTrack! Confirm this email address to unlock your account:\n\n%s\n\n"+
+			"This link works once and expires in 24 hours. If you didn't create a HoldMyTrack "+
 			"account, you can safely ignore this email.",
 		link,
 	)
-	return s.mailer.Send(ctx, email, "Verify your FitMap email", body)
+	return s.mailer.Send(ctx, email, "Verify your HoldMyTrack email", body)
 }
 
 // handleLogin serves `POST /v1/auth/login`.
@@ -456,12 +456,12 @@ func (s *Server) sendPasswordReset(ctx context.Context, email string) error {
 
 	link := fmt.Sprintf("%s/?reset_token=%s", s.appBaseURL, tokenID)
 	body := fmt.Sprintf(
-		"Someone requested a password reset for this FitMap account.\n\n"+
+		"Someone requested a password reset for this HoldMyTrack account.\n\n"+
 			"Reset it here (expires in 1 hour, and only works once):\n%s\n\n"+
 			"If you didn't request this, you can safely ignore this email.",
 		link,
 	)
-	return s.mailer.Send(ctx, email, "Reset your FitMap password", body)
+	return s.mailer.Send(ctx, email, "Reset your HoldMyTrack password", body)
 }
 
 type resetPasswordRequest struct {

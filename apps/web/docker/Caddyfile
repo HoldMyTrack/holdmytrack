@@ -28,7 +28,7 @@
 		header Content-Type "text/html; charset=utf-8"
 		respond * `<!doctype html><meta charset="utf-8"><title>Down for maintenance</title>
 <body style="font:1rem system-ui;text-align:center;padding:4rem 1rem"><h1>Be right back</h1>
-<p>FitMap is down for scheduled maintenance. Try again in a few minutes.</p>` 503
+<p>HoldMyTrack is down for scheduled maintenance. Try again in a few minutes.</p>` 503
 	}
 
 	@backend path /v1/* /tiles/* /healthz

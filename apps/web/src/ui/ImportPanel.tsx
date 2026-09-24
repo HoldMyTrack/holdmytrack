@@ -327,7 +327,7 @@ export function ImportPanel({ onUploaded, readOnly = false, onViewOnMap }: Impor
             </>
           ) : (
             <p className="import-panel__hint">
-              Synced from the FitMap Android app — Health Connect activity and GPS Logger recordings land here once you
+              Synced from the HoldMyTrack Android app — Health Connect activity and GPS Logger recordings land here once you
               tap "Sync Now" on your phone.
             </p>
           )}

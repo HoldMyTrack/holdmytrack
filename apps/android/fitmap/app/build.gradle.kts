@@ -13,7 +13,7 @@ android {
         // 34 (Android 14) is where Health Connect became part of the platform. Below it,
         // Health Connect is a Play-installed APK the app has to detect, route the user into
         // installing, and then re-check — a whole second provider state machine, on a
-        // configuration Phase 1's route findings were never measured against. FitMap ingests
+        // configuration Phase 1's route findings were never measured against. HoldMyTrack ingests
         // GPS sessions from a watch, so the devices it loses are not the ones it serves.
         minSdk = 34
         // Play's requirement is currently API 36 and rises annually; 37 is the newest

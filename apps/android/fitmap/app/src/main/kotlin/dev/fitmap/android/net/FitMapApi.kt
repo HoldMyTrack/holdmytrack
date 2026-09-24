@@ -112,7 +112,7 @@ object FitMapApi {
         .build()
 
     /**
-     * Attaches the session token to every request bound for FitMap's own API, and to nothing
+     * Attaches the session token to every request bound for HoldMyTrack's own API, and to nothing
      * else. Runs per request rather than being configured once, so a sign-in, sign-out or
      * expiry takes effect on the very next tile without anything being re-registered — the
      * property the roadmap picked this hook for.

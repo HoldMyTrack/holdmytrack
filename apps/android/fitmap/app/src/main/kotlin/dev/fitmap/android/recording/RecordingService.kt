@@ -40,7 +40,7 @@ data class RecordingStats(
  * **Foreground-only in the Path 2 sense doesn't apply here.** `docs/adr/
  * 0007-in-app-gps-recording-submits-directly.md` is explicit: Phase 3's foreground-only sync
  * exists because a route written by another app can't be trusted to a background read
- * (`ConsentRequired`) — there is no other app's data being asked for here, FitMap is recording
+ * (`ConsentRequired`) — there is no other app's data being asked for here, HoldMyTrack is recording
  * its own. This is a foreground *service*, not a foreground-only *permission* restriction.
  *
  * **Buffering is an in-memory list, deliberately not solving crash recovery.** A phone call or

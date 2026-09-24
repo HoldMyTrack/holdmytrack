@@ -8,7 +8,7 @@
     <!--
       Exactly two Health Connect permissions, and no more. Declaring types the product does
       not demonstrably use is a known Play rejection cause (docs/VISION.md §7), so heart rate,
-      distance, calories and the rest stay out: FitMap ingests outdoor GPS routes, and a route
+      distance, calories and the rest stay out: HoldMyTrack ingests outdoor GPS routes, and a route
       needs the session and its geometry, nothing else.
 
       READ_HEALTH_DATA_IN_BACKGROUND is deliberately absent. Phase 1 measured that it buys
@@ -24,8 +24,8 @@
       READ_HEALTH_DATA_HISTORY is not a fourth data type — it is a time window over the ones
       already declared. Without it Health Connect hands back only the last 30 days, which was
       not a guess: the first sync on a real device read exactly 30 days and Health Connect's
-      own screen said "FitMap can read data added after August 17, 2026". A 30-day map is not
-      what this product is; FitMap exists to show the accumulated shape of where someone has
+      own screen said "HoldMyTrack can read data added after August 17, 2026". A 30-day map is not
+      what this product is; HoldMyTrack exists to show the accumulated shape of where someone has
       been, from history they already have. So this is asked for, and it is still the whole
       list — three permissions, one data type.
     -->

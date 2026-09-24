@@ -55,7 +55,7 @@ data class SyncProgress(val scanned: Int, val synced: Int)
  *
  * **A session with no route is terminal, not a failure.** Half the sessions Phase 1 measured
  * had none, and the reason is ordinary: a gym session, a swim or a rowing machine has no
- * trajectory by its nature. FitMap's scope is outdoor GPS tracking (`docs/VISION.md` §1.1), so
+ * trajectory by its nature. HoldMyTrack's scope is outdoor GPS tracking (`docs/VISION.md` §1.1), so
  * these are skipped by design rather than retried forever or represented as gaps.
  */
 class SyncRunner(
@@ -230,7 +230,7 @@ class SyncRunner(
      *
      * Elevation is sent when the location carries it and omitted otherwise, rather than
      * defaulted to zero — an unknown altitude is not sea level. Heart rate is never sent: it
-     * lives in a separate record type behind a separate permission, and FitMap declares only
+     * lives in a separate record type behind a separate permission, and HoldMyTrack declares only
      * what it uses.
      *
      * Built off the main thread: a long ride is tens of thousands of points, and serialising
@@ -273,7 +273,7 @@ class SyncRunner(
         const val MAX_POINTS_PER_ACTIVITY = 50_000
 
         const val CONSENT_REQUIRED =
-            "Health Connect would not hand over a route. Keep FitMap on screen while syncing, " +
+            "Health Connect would not hand over a route. Keep HoldMyTrack on screen while syncing, " +
                 "check that exercise routes are still allowed, then sync again — nothing after " +
                 "that activity has been synced, so none of it is lost."
     }

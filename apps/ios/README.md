@@ -1,4 +1,4 @@
-# FitMap for iOS — not implemented
+# HoldMyTrack for iOS — not implemented
 
 Phase 3 (`docs/VISION.md` §5.4): Swift, with HealthKit and Apple Watch as the on-device ingest path — the stronger of the two mobile routes, and the second of the pair to be built. Android goes first so the Path 2 sync contract is designed against the harder platform; iOS inherits it. Rendering is MapLibre Native against the same style document the web client builds (`docs/ARCHITECTURE.md` §2.1).
 

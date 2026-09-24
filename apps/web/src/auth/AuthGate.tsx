@@ -11,6 +11,7 @@ import {
   type AuthUser,
   type SessionUser,
 } from '../api';
+import logoUrl from '../assets/logo.png';
 
 export interface AuthGateProps {
   /** Called once a session actually exists — App.tsx swaps this screen out for the real app. */
@@ -52,10 +53,11 @@ type Screen = 'form' | 'forgot' | 'forgot-sent';
 function Brand() {
   return (
     <div className="auth-gate__brand">
-      <span className="app-header__mark" aria-hidden="true">
-        <span className="app-header__mark-dot" />
+      <img className="auth-gate__logo" src={logoUrl} alt="" aria-hidden="true" />
+      <span className="app-header__wordmark">
+        <span className="app-header__wordmark-light">HoldMy</span>
+        <span className="app-header__wordmark-bold">Track</span>
       </span>
-      FitMap
     </div>
   );
 }

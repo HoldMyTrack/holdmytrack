@@ -342,7 +342,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private companion object {
-        const val TAG = "FitMap"
+        const val TAG = "HoldMyTrack"
         const val INACTIVE_MODE_ALPHA = 0.6f
         const val FRAME_PADDING_PX = 64
         const val MAX_FRAME_ZOOM = 15.0

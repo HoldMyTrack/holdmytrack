@@ -1,8 +1,8 @@
 # fitmap-android
 
-The FitMap Android app (`apps/android/docs/ROADMAP.md`). It renders the map, holds a session, and syncs exercise sessions in from Health Connect: a full-screen MapLibre Native map drawing the style document the API serves at `GET /v1/map/style/{flavor}`, sign-in against the same accounts the web client uses, the Normal / Fog of War / Heatmap toggle over the user's own layers, and Path 2 on-device ingest into `POST /v1/sync/activities`.
+The HoldMyTrack Android app (`apps/android/docs/ROADMAP.md`). It renders the map, holds a session, and syncs exercise sessions in from Health Connect: a full-screen MapLibre Native map drawing the style document the API serves at `GET /v1/map/style/{flavor}`, sign-in against the same accounts the web client uses, the Normal / Fog of War / Heatmap toggle over the user's own layers, and Path 2 on-device ingest into `POST /v1/sync/activities`.
 
-The basemap draws whether or not anyone is signed in — the style endpoint is unauthenticated and the archive it points at is a plain `pmtiles://` URL that MapLibre Native reads natively — so a signed-out FitMap is a working map rather than a login wall. Signing in is what adds the three user layers, every one of which is behind `requireAuth` server-side.
+The basemap draws whether or not anyone is signed in — the style endpoint is unauthenticated and the archive it points at is a plain `pmtiles://` URL that MapLibre Native reads natively — so a signed-out HoldMyTrack is a working map rather than a login wall. Signing in is what adds the three user layers, every one of which is behind `requireAuth` server-side.
 
 ## Build requirements
 
@@ -44,11 +44,11 @@ Everything is under `app/src/main/kotlin/dev/fitmap/android/`:
 - `ProfileActivity.kt` — the account half of the burger menu: who is signed in, and sign in/out.
 - `SignInActivity.kt` — sign in, create an account, or start a demo account.
 - `net/Session.kt` — the session token, held process-wide and mirrored to private `SharedPreferences`.
-- `net/FitMapApi.kt` — the whole HTTP surface: the shared `OkHttpClient`, the interceptor that attaches the token to FitMap's own origin and nowhere else, and the five calls the app makes.
+- `net/FitMapApi.kt` — the whole HTTP surface: the shared `OkHttpClient`, the interceptor that attaches the token to HoldMyTrack's own origin and nowhere else, and the five calls the app makes.
 - `map/MapOverlays.kt` — the tracks, fog and heatmap layers, their ordering beneath the basemap's labels, and the three-way mode toggle.
 - `SyncActivity.kt` — Health Connect onboarding and the sync run. Also registered for `ACTION_SHOW_PERMISSIONS_RATIONALE`, so Health Connect opens it as the app's own explanation of what it reads.
 - `health/HealthConnect.kt` — availability, the three permissions, and the readiness states the onboarding walks through.
-- `health/ExerciseTypes.kt` — Health Connect's exercise type to FitMap's `activity_type`, normalised onto the vocabulary the other ingest paths already produce.
+- `health/ExerciseTypes.kt` — Health Connect's exercise type to HoldMyTrack's `activity_type`, normalised onto the vocabulary the other ingest paths already produce.
 - `sync/SyncCursor.kt` — the watermark. Read its comment before changing anything about it.
 - `sync/SyncRunner.kt` — one foreground sync run: read, classify, batch, post, advance.
 - `SyncStatusActivity.kt` — sync history, pending work, failure detail, and the activities cross-source deduplication took out of circulation because they were already here from another source.
@@ -60,7 +60,7 @@ Alongside:
 
 ## Syncing from Health Connect
 
-Three permissions, one data type. `READ_EXERCISE` and `READ_HEALTH_DATA_HISTORY` are ordinary requests; **`READ_EXERCISE_ROUTES` cannot be requested at all** and has to be granted in Health Connect → FitMap → *Additional access* → *Access exercise routes* → *Always allow*. The sync screen says so, because that screen is two levels down and nothing links to it. Without the history permission Health Connect serves only the last 30 days — measured, not assumed.
+Three permissions, one data type. `READ_EXERCISE` and `READ_HEALTH_DATA_HISTORY` are ordinary requests; **`READ_EXERCISE_ROUTES` cannot be requested at all** and has to be granted in Health Connect → HoldMyTrack → *Additional access* → *Access exercise routes* → *Always allow*. The sync screen says so, because that screen is two levels down and nothing links to it. Without the history permission Health Connect serves only the last 30 days — measured, not assumed.
 
 The run is foreground-only and stops when the screen does, which is a platform constraint rather than a choice: routes written by other apps read back as `ConsentRequired` in the background whatever is granted. That is safe rather than lossy because the watermark only moves over activities the server has already confirmed, so an interrupted run is simply repeated. **If you change one thing in `sync/`, read `SyncCursor`'s comment first** — advancing it past a record whose route was not read produces a history that is complete except for the map, which is worse than no sync at all.
 

@@ -1,6 +1,6 @@
-# FitMap: Development
+# HoldMyTrack: Development
 
-The practical guide to running FitMap locally, verifying a change, and not rediscovering the same bug twice. `docs/ARCHITECTURE.md` covers *why* the system is shaped this way; `docs/IMPLEMENTATION.md` covers *how* each feature works; this document covers neither — it's the day-to-day operating manual.
+The practical guide to running HoldMyTrack locally, verifying a change, and not rediscovering the same bug twice. `docs/ARCHITECTURE.md` covers *why* the system is shaped this way; `docs/IMPLEMENTATION.md` covers *how* each feature works; this document covers neither — it's the day-to-day operating manual.
 
 ## Running it locally
 

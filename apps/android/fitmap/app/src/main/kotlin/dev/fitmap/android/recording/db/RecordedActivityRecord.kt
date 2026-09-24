@@ -62,13 +62,13 @@ fun RecordedActivityRecord.toSyncJson(): JSONObject {
 
 /**
  * The recording as a GPX 1.1 file — `RecordingActivity`'s Download. GPX rather than the sync
- * payload's JSON because it is what every other mapping tool opens, and FitMap's own upload
+ * payload's JSON because it is what every other mapping tool opens, and HoldMyTrack's own upload
  * accepts it too, so a downloaded track can come straight back in. One `<trkseg>`: a pause
  * leaves no gap in [points] to split on, since nothing is recorded while paused.
  */
 fun RecordedActivityRecord.toGpx(): String = buildString {
     append("""<?xml version="1.0" encoding="UTF-8"?>""").append('\n')
-    append("""<gpx version="1.1" creator="FitMap" xmlns="http://www.topografix.com/GPX/1/1">""").append('\n')
+    append("""<gpx version="1.1" creator="HoldMyTrack" xmlns="http://www.topografix.com/GPX/1/1">""").append('\n')
     append("  <trk>\n")
     if (name.isNotBlank()) append("    <name>").append(xmlEscape(name)).append("</name>\n")
     if (description.isNotBlank()) append("    <desc>").append(xmlEscape(description)).append("</desc>\n")
