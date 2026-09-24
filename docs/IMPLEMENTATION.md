@@ -990,6 +990,18 @@ Timezone rows are (GMT offset) · place · region — "(GMT−04:00) New York ·
 
 ---
 
+### 4.14 Public About page (FR-10)
+
+**Built.** `apps/web/about.html` is a second Vite entry beside `index.html` (`vite.config.ts`'s `build.rollupOptions.input`), not a route inside the React app. It is plain HTML with its own stylesheet, `src/about/about.css`, and no script at all, so a crawler reads it as served and a visitor doesn't download the map bundle to read a page of text. Vite still processes it: the logo and stylesheet references come out as hashed `/assets/` URLs like the app's own.
+
+**Served at `/about` without an extension.** Caddy's SPA fallback is `try_files {path} {path}.html /index.html` (`apps/web/docker/Caddyfile`), so `/about` resolves to `about.html` before falling through to the app. Vite's dev server does the same `.html` lookup on its own, so dev needs no extra config.
+
+**`about.css` duplicates a handful of `index.css` tokens and the `.app-header__*` look** rather than importing `index.css`, which is ~3,000 lines of app styling the page doesn't use. The header and colors have to be kept in step by hand; the file's opening comment says so.
+
+**"Try the demo" links to `/`, it doesn't start a demo.** A link that opened a demo session on page load would be followed by any crawler that runs JavaScript and would use up `demoLimiter`'s 5-per-hour-per-IP budget (§4.10) for nothing, so starting a demo stays behind the sign-in screen's own button.
+
+**Linked from two places**: the sign-in screen (`AuthGate.tsx`, "What is HoldMyTrack?" under the card — `.auth-gate` became a column to hold it) and the account menu (`UserMenu.tsx`, "About HoldMyTrack", a real `<a>` since it leaves the app). `public/robots.txt` keeps crawlers off `/v1/` and `/tiles/`; `public/sitemap.xml` lists `/` and `/about`.
+
 ## 5. Engineering Risks & Mitigations
 
 ### 5.1 Ingest path risk, per path
@@ -1077,7 +1089,7 @@ New, and specific to being free (`VISION.md` §4.3, §6.3). Costs scale with use
 
 ### 5.9 Mobile browser support
 
-**Built, but not actually usable yet.** The layout decisions below exist in code and were deliberately designed, not guessed at — but the real mobile experience has been reported directly as unusable, not merely rough, so this needs rework (real-device testing, not just CSS review) before it can be called done. No mobile mockup ever existed for this — this section, not a design doc, was meant to be the record of the actual layout decisions, and still is for whoever picks this back up. Investigated directly before building: zero `@media` queries existed anywhere in `index.css`; the Activities panel was a permanent, fixed-width (260–560px, drag-resizable) sidebar; roughly seven interaction sites were hover-only with no touch equivalent; `RangePicker.tsx`'s drag handles were 14px wide (`touch-action: none` was already set, so mechanically draggable, just tight for a fingertip); `Header.tsx`'s Donate/Upload/Export controls were plain text buttons with no icon fallback for a narrow screen. **Decided directly with the user, not assumed:** the Activities panel becomes a collapsible bottom sheet (not a separate Map/List tab screen), and scope is "core flows fully touch-usable," not full parity with every hover-dependent FR — `TrackProfile.tsx`'s colored-band/elevation values (FR-4.9) and the map-track-hover ↔ Activities-row-underline highlight (FR-4.1/FR-5.4) stay mouse-only, documented in `SPEC.md` §13 as a deliberate boundary, not a gap discovered later.
+**Built, but not actually usable yet.** The layout decisions below exist in code and were deliberately designed, not guessed at — but the real mobile experience has been reported directly as unusable, not merely rough, so this needs rework (real-device testing, not just CSS review) before it can be called done. No mobile mockup ever existed for this — this section, not a design doc, was meant to be the record of the actual layout decisions, and still is for whoever picks this back up. Investigated directly before building: zero `@media` queries existed anywhere in `index.css`; the Activities panel was a permanent, fixed-width (260–560px, drag-resizable) sidebar; roughly seven interaction sites were hover-only with no touch equivalent; `RangePicker.tsx`'s drag handles were 14px wide (`touch-action: none` was already set, so mechanically draggable, just tight for a fingertip); `Header.tsx`'s Donate/Upload/Export controls were plain text buttons with no icon fallback for a narrow screen. **Decided directly with the user, not assumed:** the Activities panel becomes a collapsible bottom sheet (not a separate Map/List tab screen), and scope is "core flows fully touch-usable," not full parity with every hover-dependent FR — `TrackProfile.tsx`'s colored-band/elevation values (FR-4.9) and the map-track-hover ↔ Activities-row-underline highlight (FR-4.1/FR-5.4) stay mouse-only, documented in `SPEC.md` §14 as a deliberate boundary, not a gap discovered later.
 
 **One new `@media (max-width: 768px)` layer**, isolated at the end of `index.css` — every rule above it is the desktop layout, unmodified and confirmed unaffected (the existing desktop-viewport `verify:map`/`verify:build` suites were re-run unmodified specifically to prove this, not just assumed from the media query's isolation).
 

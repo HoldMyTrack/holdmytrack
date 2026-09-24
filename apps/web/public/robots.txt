@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /v1/
+Disallow: /tiles/
+
+Sitemap: https://holdmytrack.com/sitemap.xml

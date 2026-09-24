@@ -1,0 +1,320 @@
+/* The public About page (about.html) — a static page outside the React app, so it carries
+   its own small stylesheet instead of pulling in index.css. The tokens and the header
+   mirror index.css's :root palette and .app-header__* rules; keep them in step. */
+:root {
+  color-scheme: light;
+  --fm-font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --fm-font-serif: 'Fraunces', serif;
+  --fm-bg: #f7f4ec;
+  --fm-surface: #fff;
+  --fm-surface-tint: #f6f3e9;
+  --fm-ink: #202b25;
+  --fm-ink-secondary: #6c7a70;
+  --fm-ink-muted: #8b9186;
+  --fm-border: #e6e1d2;
+  --fm-border-strong: #dcd6c4;
+  --fm-accent: #b07e2e;
+  --fm-accent-strong: #93691f;
+  --fm-accent-hover: #8a611f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--fm-font-sans);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--fm-ink);
+  background: var(--fm-bg);
+}
+
+a {
+  color: var(--fm-accent-strong);
+}
+
+a:hover {
+  color: var(--fm-accent-hover);
+}
+
+code {
+  font-size: 0.9em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--fm-surface-tint);
+  border: 1px solid var(--fm-border);
+}
+
+/* Header — same shape as the app's .app-header. */
+.about-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 64px;
+  padding: 0 28px;
+  background: var(--fm-surface);
+  border-bottom: 1px solid var(--fm-border);
+}
+
+.about-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  text-decoration: none;
+}
+
+.about-header__logo {
+  display: block;
+  height: 42px;
+  width: auto;
+}
+
+.about-wordmark {
+  font-family: var(--fm-font-serif);
+  font-size: 21px;
+  letter-spacing: 0.2px;
+  line-height: 1;
+}
+
+.about-wordmark__light {
+  font-weight: 400;
+  color: #4a5750;
+}
+
+.about-wordmark__bold {
+  font-weight: 800;
+  color: #9a6b1e;
+}
+
+.about-header__divider {
+  width: 1px;
+  height: 22px;
+  background: var(--fm-border-strong);
+}
+
+.about-header__tagline {
+  font-family: var(--fm-font-serif);
+  font-size: 14px;
+  font-style: italic;
+  color: var(--fm-ink-secondary);
+  white-space: nowrap;
+}
+
+.about-header__open {
+  margin-left: auto;
+}
+
+/* Buttons */
+.about-button {
+  display: inline-block;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  color: #fff;
+  background: var(--fm-accent);
+  border: 1px solid var(--fm-accent);
+}
+
+.about-button:hover {
+  color: #fff;
+  background: var(--fm-accent-hover);
+  border-color: var(--fm-accent-hover);
+}
+
+.about-button--quiet {
+  color: #3e4a43;
+  background: var(--fm-surface);
+  border-color: var(--fm-border-strong);
+  font-weight: 500;
+}
+
+.about-button--quiet:hover {
+  color: var(--fm-ink);
+  background: var(--fm-surface-tint);
+  border-color: var(--fm-border-strong);
+}
+
+/* Content */
+.about-main {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 56px 24px 32px;
+}
+
+.about-hero h1 {
+  margin: 0 0 16px;
+  font-family: var(--fm-font-serif);
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.3px;
+}
+
+.about-lede {
+  margin: 0;
+  max-width: 44rem;
+  font-size: 18px;
+  color: var(--fm-ink-secondary);
+}
+
+.about-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.about-section {
+  margin-top: 56px;
+}
+
+.about-section h2 {
+  margin: 0 0 16px;
+  font-family: var(--fm-font-serif);
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.about-section p {
+  margin: 0 0 12px;
+  max-width: 44rem;
+}
+
+.about-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.about-cards li {
+  padding: 20px 22px;
+  background: var(--fm-surface);
+  border: 1px solid var(--fm-border);
+  border-radius: 10px;
+}
+
+.about-cards h3 {
+  margin: 0 0 6px;
+  font-family: var(--fm-font-serif);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.about-cards p {
+  margin: 0;
+  font-size: 15px;
+  color: var(--fm-ink-secondary);
+}
+
+.about-list {
+  margin: 0;
+  padding-left: 20px;
+  max-width: 44rem;
+}
+
+.about-list li + li {
+  margin-top: 8px;
+}
+
+.about-contact {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.about-contact li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--fm-border);
+}
+
+.about-contact__label {
+  min-width: 9rem;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--fm-ink-muted);
+  line-height: 1.9;
+}
+
+.about-muted {
+  color: var(--fm-ink-secondary);
+  font-size: 15px;
+}
+
+.about-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  max-width: 880px;
+  margin: 24px auto 0;
+  padding: 24px 24px 40px;
+  border-top: 1px solid var(--fm-border);
+  font-size: 14px;
+  color: var(--fm-ink-muted);
+}
+
+@media (max-width: 768px) {
+  .about-header {
+    height: 56px;
+    padding: 0 16px;
+    gap: 8px;
+  }
+
+  .about-header__brand {
+    gap: 8px;
+  }
+
+  .about-header__logo {
+    height: 30px;
+  }
+
+  .about-wordmark {
+    font-size: 16px;
+  }
+
+  .about-header__divider,
+  .about-header__tagline {
+    display: none;
+  }
+
+  .about-header__open {
+    padding: 7px 11px;
+    font-size: 13px;
+  }
+
+  .about-main {
+    padding: 36px 16px 24px;
+  }
+
+  .about-hero h1 {
+    font-size: 30px;
+  }
+
+  .about-lede {
+    font-size: 16px;
+  }
+
+  .about-section {
+    margin-top: 44px;
+  }
+
+  .about-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .about-footer {
+    padding: 20px 16px 32px;
+  }
+}

@@ -427,6 +427,9 @@ export function AuthGate({ onAuthenticated, onCancel, resetToken, verifyToken, u
           </>
         )}
       </form>
+      <a className="auth-gate__about" href="/about">
+        What is HoldMyTrack?
+      </a>
     </div>
   );
 }

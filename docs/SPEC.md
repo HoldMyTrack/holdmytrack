@@ -15,7 +15,7 @@ This document specifies HoldMyTrack's functional behavior as currently implement
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and privacy trim, FR-1.7; email verification, FR-1.8), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), the date-range picker, the per-account activity graph, password recovery, and distance/time trends (FR-9 below).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and privacy trim, FR-1.7; email verification, FR-1.8), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), and the public About page (FR-10).
 
 **Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), explorer-tile gamification, the rest of "Export" (story cards, animated reveals — high-resolution map export itself is built, FR-4.10 below), and user-defined privacy zones (a `privacy_zones` table exists in the schema — `IMPLEMENTATION.md` §3.7 — but no endpoint or UI creates or applies one today; only the endpoint-trim privacy control in FR-8.1 below, user-adjustable via FR-1.7's Settings page, is functional). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace/heart-rate stay as per-activity route context (FR-4.9) rather than an analysed, all-time performance record. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
@@ -700,7 +700,22 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Notes**: "Moving time" falls back to elapsed time for any activity ingested before moving- time detection existed — those activities have no moving-time figure of their own, so this bucket-level total uses whichever one each activity actually has, rather than a bucket going silently short. Best-effort curves and personal bests (formerly FR-9.2/FR-9.3) were built and then cut — deliberately out of scope, see §1.2 and §14.
 
-## 12. Non-Functional Requirements (summary)
+## 12. FR-10 — Public About page
+
+### FR-10.1 About page
+
+**Description**: A public page at `/about` that explains what HoldMyTrack is, who it is for, what it deliberately is not, how it is funded, and how to reach the project. It is the one page a visitor or a search engine can read without an account.
+
+**Preconditions**: None — no session is needed, and having one changes nothing on the page.
+
+**Behavior**:
+1. `GET /about` returns a static HTML page; it needs no JavaScript and makes no API calls.
+2. The page shows the HoldMyTrack header (logo, wordmark, tagline) and sections for: what HoldMyTrack is, why someone might want it, what it isn't, how it is funded, and Contact — the email address `hello@holdmytrack.com` and the GitHub repository `https://github.com/HoldMyTrack/holdmytrack`.
+3. "Try the demo — no signup" and "Open the app" link to `/`, the sign-in screen, where the demo starts from its own button (FR-2.1). The page never starts a demo session itself.
+4. The page is reachable from the sign-in screen ("What is HoldMyTrack?", below the form) and from the account menu ("About HoldMyTrack") for a signed-in or demo session.
+5. `/robots.txt` allows crawling except for `/v1/` and `/tiles/`, and points to `/sitemap.xml`, which lists `/` and `/about`.
+
+## 13. Non-Functional Requirements (summary)
 
 This section summarizes cross-cutting behavior specified elsewhere in this document, for convenience — it does not introduce new requirements.
 
@@ -713,7 +728,7 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 | **No reload required** | Every list/summary this document describes updates itself automatically as background processing completes (FR-3.1, FR-3.4) — a manual page reload is never required to see current data. |
 | **Idempotency** | Re-submitting the same activity content (FR-3.5) or the same password-reset token (FR-1.6) never has an effect beyond the first time. |
 
-## 13. Mobile Browser Support
+## 14. Mobile Browser Support
 
 **Known issue**: The behavior below is what was designed and implemented, but the actual mobile experience has been reported directly as unusable, not just rough — this section describes intent, not a verified, working feature. Treat it as broken until re-verified on a real device and re-confirmed; see `docs/ROADMAP.md`'s "Mobile browser support" item (Phase 3).
 
@@ -727,7 +742,7 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 
 **Explicitly not built** (hover-only, no touch equivalent, unlike Trends above — a continuous position read with no discrete point to tap, not a per-bar value): the colored zone segments' and pace/heart-rate + elevation profile's exact hover values (FR-4.8, FR-4.9), and the two-way map-track-hover ↔ Activities-row-underline highlight (FR-4.1, FR-5.4). Both remain mouse-only; a touchscreen user can still see the colored bands and elevation curve themselves, and can still focus/select a track by tapping it, just not read an exact value by touch alone the way a mouse hover shows one.
 
-## 14. Out-of-scope items, tracked for future revisions of this document
+## 15. Out-of-scope items, tracked for future revisions of this document
 
 The following are named in `VISION.md`'s roadmap but have no functional requirements in this document because they are not yet built:
 

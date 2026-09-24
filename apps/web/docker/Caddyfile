@@ -38,10 +38,11 @@
 
 	# The SPA fallback: any path that isn't the API and doesn't match a real file (e.g. a
 	# deep link straight to a client-side route) still serves index.html, letting the
-	# client-side app take over routing from there.
+	# client-side app take over routing from there. `{path}.html` comes first so a static
+	# page like about.html answers at its extensionless URL (/about).
 	handle {
 		root * /srv/web
-		try_files {path} /index.html
+		try_files {path} {path}.html /index.html
 		file_server
 	}
 
