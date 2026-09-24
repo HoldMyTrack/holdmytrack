@@ -203,7 +203,7 @@ func loadCrispMask(ctx context.Context, store *storage.Store, key string) (*imag
 // to re-run for the same activity (a redelivered ingest job).
 //
 // Called from ingest.Process with the points already in memory (pre-simplification, already
-// privacy-trimmed) — unlike the old per-tile re-render this replaces, this never reads raw
+// privacy-clipped) — unlike the old per-tile re-render this replaces, this never reads raw
 // payloads back from object storage for the activity that triggered it. Ingest-time
 // rendering cost is now proportional to just this one activity's own tiles, independent of
 // how many *other* activities already touch them — the old design re-parsed every one of

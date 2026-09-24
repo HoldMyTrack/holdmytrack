@@ -421,7 +421,7 @@ func (s *Server) handleDeleteActivity(w http.ResponseWriter, r *http.Request) {
 // that won a deduplication collision is exactly when those come back: `superseded_by` is
 // `ON DELETE SET NULL`, so the displaced copy becomes live again the moment this row goes, and
 // its own coverage has to be composited back in. Its tiles are not necessarily a subset of
-// this row's — a privacy trim or a shorter recording can leave each copy touching tiles the
+// this row's — a Private location clip or a shorter recording can leave each copy touching tiles the
 // other never did — so they are collected rather than assumed.
 func (s *Server) activityFogTiles(ctx context.Context, activityID string) ([][2]int, error) {
 	rows, err := s.pool.Query(ctx,

@@ -11,7 +11,7 @@ import android.content.SharedPreferences
  * Process-wide rather than per-Activity because two unrelated HTTP surfaces read it — the
  * app's own API calls, and MapLibre Native's internal tile fetching, which never goes through
  * the app's client at all. That split is exactly why the roadmap chose a bearer token over a
- * cookie jar (`apps/android/docs/ROADMAP.md`, "Decide the mobile auth surface"): one
+ * cookie jar (`apps/android/docs/ARCHITECTURE.md` §1.1): one
  * per-request interceptor can reach both, a cookie jar reaches only the first.
  *
  * The token is mirrored in a `@Volatile` field as well as in SharedPreferences because the

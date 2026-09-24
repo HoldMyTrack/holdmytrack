@@ -68,7 +68,7 @@ type syncActivitiesResponse struct {
 
 // handleSyncActivities serves IMPLEMENTATION.md §4.0's `POST /v1/sync/activities` — Path 2's
 // batched normalized points. Like handleUpload (§4.1 step 1), this only validates, persists
-// the raw payload, and enqueues an `ingest` job per activity; no parsing or privacy trimming
+// the raw payload, and enqueues an `ingest` job per activity; no parsing or privacy clipping
 // happens inline. ingest.Process needs no Path-2-specific branch at all: each activity's raw
 // payload is stored as JSON and read back through parse.ByExtension's ".json" case
 // (parse.ParseJSON), the same "differ only in how bytes arrive, converge on §4.1 step 2"
@@ -120,7 +120,7 @@ func (s *Server) syncOneActivity(ctx context.Context, userID, source string, act
 		result.Status, result.Error = "rejected", "external_id is required"
 		return result
 	}
-	// Same >= 2 raw points floor ingest.Process itself enforces post-privacy-trim
+	// Same >= 2 raw points floor ingest.Process itself enforces on the raw points
 	// (internal/ingest.Process) — a coarse pre-check here, not a claim that every activity
 	// clearing it will also survive the trim; that deeper rejection still happens
 	// asynchronously in the worker, exactly as it already does for Path 3 uploads.

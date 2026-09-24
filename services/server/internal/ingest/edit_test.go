@@ -67,8 +67,8 @@ func TestTrackEditApply(t *testing.T) {
 	}
 }
 
-// The spec addresses points by time, so a different privacy trim — which removes a different
-// number of points off each end — must leave the edit meaning the same points.
+// The spec addresses points by time, so a different Private location clip — which removes a
+// different number of points off each end — must leave the edit meaning the same points.
 func TestTrackEditSurvivesDifferentTrim(t *testing.T) {
 	points, ms := editFixture()
 	edit := TrackEdit{Remove: [][2]int64{{ms[4], ms[5]}}}

@@ -108,8 +108,8 @@ type authResponseWithSession struct {
 	// response — a browser client can ignore this field entirely, it already has the
 	// credential via Set-Cookie. A native client with no shared cookie jar (or one that needs
 	// to inject the credential into MapLibre Native's own tile requests, which bypass the
-	// app's own HTTP client — apps/android/docs/ROADMAP.md's "Decide the mobile auth
-	// surface") stores this and sends it back as `Authorization: Bearer <SessionToken>`.
+	// app's own HTTP client — apps/android/docs/ARCHITECTURE.md §1.1's bearer-token
+	// decision) stores this and sends it back as `Authorization: Bearer <SessionToken>`.
 	SessionToken string `json:"session_token"`
 }
 
@@ -758,8 +758,8 @@ func clientIP(r *http.Request) string {
 // startSession returns the new session id, alongside setting it as the holdmytrack_session
 // cookie — a browser client needs nothing more, but the four callers that mint a fresh
 // session (signup, login, demo-start, reset-password) also thread this value into
-// authResponseWithSession.SessionToken, apps/android/docs/ROADMAP.md's "Decide the mobile
-// auth surface" bearer-token path for a native client with no browser-style cookie handling.
+// authResponseWithSession.SessionToken, apps/android/docs/ARCHITECTURE.md §1.1's
+// bearer-token path for a native client with no browser-style cookie handling.
 func (s *Server) startSession(w http.ResponseWriter, ctx context.Context, userID string, ttl time.Duration) (string, error) {
 	expiresAt := time.Now().Add(ttl)
 	var sessionID string
@@ -796,7 +796,7 @@ const bearerPrefix = "Bearer "
 // `Authorization: Bearer <session-id>` for a native client. This is not a second credential
 // system — it's the same sessions.id value, just presented a second way, because a mobile
 // app needs to inject it into MapLibre Native's own tile requests via a per-request header
-// hook (apps/android/docs/ROADMAP.md's "Decide the mobile auth surface"), which a cookie
+// hook (apps/android/docs/ARCHITECTURE.md §1.1's bearer-token decision), which a cookie
 // sitting in the app's own cookie jar wouldn't reach.
 func sessionIDFromRequest(r *http.Request) (string, bool) {
 	if cookie, err := r.Cookie(sessionCookieName); err == nil && cookie.Value != "" {
