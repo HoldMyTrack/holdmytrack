@@ -87,13 +87,15 @@ type Server struct {
 	basemapOrigin         string
 	version               string
 	skipEmailVerification bool
+	google                googleOAuth
 }
 
-func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail.Sender, appBaseURL, basemapOrigin, version string, skipEmailVerification bool) *Server {
+func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail.Sender, appBaseURL, basemapOrigin, version string, skipEmailVerification bool, google GoogleOAuthConfig) *Server {
 	s := &Server{
 		pool: pool, store: store, log: log, mux: http.NewServeMux(), mailer: mailer,
 		appBaseURL: appBaseURL, basemapOrigin: basemapOrigin, version: version,
 		skipEmailVerification: skipEmailVerification,
+		google:                newGoogleOAuth(google),
 	}
 	s.mux.HandleFunc(route("POST", "/auth/signup"), s.handleSignup)
 	s.mux.HandleFunc(route("POST", "/auth/login"), s.handleLogin)
@@ -103,6 +105,11 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(route("POST", "/auth/forgot-password"), s.handleForgotPassword)
 	s.mux.HandleFunc(route("POST", "/auth/reset-password"), s.handleResetPassword)
 	s.mux.HandleFunc(route("POST", "/auth/verify-email"), s.handleVerifyEmail)
+	// Sign in with Google (google_auth.go) — GET, not POST: start and callback are both
+	// full-page browser navigations, not fetch() calls.
+	s.mux.HandleFunc(route("GET", "/auth/providers"), s.handleAuthProviders)
+	s.mux.HandleFunc(route("GET", "/auth/google/start"), s.handleGoogleStart)
+	s.mux.HandleFunc(route("GET", "/auth/google/callback"), s.handleGoogleCallback)
 	// Plain requireAuth, not requireVerified — these two exist specifically to help an
 	// account that hasn't verified yet (auth.go's own doc comments on each).
 	s.mux.HandleFunc(route("POST", "/auth/resend-verification"), s.requireAuth(s.handleResendVerification))

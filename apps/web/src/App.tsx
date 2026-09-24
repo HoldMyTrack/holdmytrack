@@ -31,6 +31,21 @@ function AuthenticatedApp() {
  */
 type AuthState = 'checking' | 'signed-out' | SessionUser;
 
+/** Reads a one-shot query param (an emailed link's token, a sign-in redirect's error) and
+ *  strips it from the URL in the same pass — a refresh must not re-trigger it, and it
+ *  shouldn't linger in browser history once read. */
+function takeQueryParam(name: string): string | null {
+  const params = new URLSearchParams(window.location.search);
+  const value = params.get(name);
+  if (value) {
+    params.delete(name);
+    const rest = params.toString();
+    const path = window.location.pathname + (rest ? `?${rest}` : '') + window.location.hash;
+    window.history.replaceState(null, '', path);
+  }
+  return value;
+}
+
 export function App() {
   const [auth, setAuth] = useState<AuthState>('checking');
   // UserMenu's "Demo session — save this" (IMPLEMENTATION.md §4.10) — turning
@@ -44,31 +59,15 @@ export function App() {
   // refresh mid-form must not re-trigger it, and it shouldn't linger in browser history once
   // read). Checked independently of `auth`, ahead of every branch below: arriving via a
   // clicked email link is unambiguous intent, outranking even an already-live session.
-  const [resetToken, setResetToken] = useState<string | null>(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('reset_token');
-    if (token) {
-      params.delete('reset_token');
-      const rest = params.toString();
-      const path = window.location.pathname + (rest ? `?${rest}` : '') + window.location.hash;
-      window.history.replaceState(null, '', path);
-    }
-    return token;
-  });
+  const [resetToken, setResetToken] = useState(() => takeQueryParam('reset_token'));
 
   // Same read-once-and-strip pattern as resetToken above, for docs/ROADMAP.md's email
   // verification link (`?verify_token=...`).
-  const [verifyToken, setVerifyToken] = useState<string | null>(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('verify_token');
-    if (token) {
-      params.delete('verify_token');
-      const rest = params.toString();
-      const path = window.location.pathname + (rest ? `?${rest}` : '') + window.location.hash;
-      window.history.replaceState(null, '', path);
-    }
-    return token;
-  });
+  const [verifyToken, setVerifyToken] = useState(() => takeQueryParam('verify_token'));
+
+  // And again for a failed Google sign-in (`?auth_error=google`, google_auth.go's
+  // handleGoogleCallback) — shown once on the sign-in screen, never re-shown on refresh.
+  const [authError] = useState(() => takeQueryParam('auth_error'));
 
   useEffect(() => {
     getCurrentUser()
@@ -128,7 +127,7 @@ export function App() {
     return (
       <>
         <VersionBanner />
-        <AuthGate onAuthenticated={handleAuthenticated} />
+        <AuthGate onAuthenticated={handleAuthenticated} authError={authError} />
       </>
     );
   }

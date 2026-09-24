@@ -155,6 +155,29 @@ export function login(email: string, password: string): Promise<AuthUser> {
   return postAuth(`${API_V1}/auth/login`, email, password);
 }
 
+/** Which optional sign-in methods this deployment has configured (google_auth.go's
+ *  handleAuthProviders) — read at runtime rather than baked in at build time, so the button
+ *  never appears on a deployment whose server can't complete the flow. A failed request reads
+ *  as "none": email+password never depends on this. */
+export async function getAuthProviders(): Promise<{ google: boolean }> {
+  try {
+    const res = await fetch(`${API_BASE_URL}${API_V1}/auth/providers`, { credentials: 'include' });
+    if (!res.ok) return { google: false };
+    return (await res.json()) as { google: boolean };
+  } catch {
+    return { google: false };
+  }
+}
+
+/** Where "Continue with Google" navigates — a full-page navigation, not a fetch(): the server
+ *  redirects on to Google and back (docs/SPEC.md FR-1.9), ending with the ordinary session
+ *  cookie set and a redirect to the app's root, where App.tsx's usual getCurrentUser check
+ *  picks the session up. `tz` plays `signup`'s `timezone` role for a brand-new account. */
+export function googleSignInUrl(): string {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return `${API_BASE_URL}${API_V1}/auth/google/start?tz=${encodeURIComponent(tz)}`;
+}
+
 /** VISION.md §8.2's "no-signup, drag-a-file-in, see-your-fog-map page" — a real
  *  session behind the scenes (auth.go's handleDemoStart), so nothing else in this file needs
  *  a demo-specific branch: uploads, tiles, everything just works once this resolves. */

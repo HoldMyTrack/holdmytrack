@@ -17,10 +17,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Simple email+password auth, server-side sessions (migrations/0006_sessions.sql) — resolved
-// toward the smallest thing that removes the old placeholder-user stand-in, not a
-// third-party identity provider: no vendor to depend on, the same bias Path 3 uploads already
-// made. Password reset (IMPLEMENTATION.md §4.11) and email verification (docs/SPEC.md FR-1.8)
+// Email+password auth, server-side sessions (migrations/0006_sessions.sql) — resolved toward
+// the smallest thing that removes the old placeholder-user stand-in, with no vendor to depend
+// on, the same bias Path 3 uploads already made. Sign in with Google (google_auth.go) is an
+// optional second way into the same accounts and the same sessions, off unless configured —
+// email+password never depends on it. Password reset (IMPLEMENTATION.md §4.11) and email verification (docs/SPEC.md FR-1.8)
 // share the same token-table shape. Rate limiting is partially built: see demoLimiter/forgotPasswordLimiter
 // below, added specifically because their endpoints are reachable with no credentials at all.
 
@@ -430,14 +431,18 @@ func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// sendPasswordReset looks up a real, claimed account (password_hash IS NOT NULL — excludes
-// unclaimed placeholder rows and demo accounts, whose email is an internal placeholder nobody
-// can type in anyway) and, if one exists, creates a token and emails the reset link. A no-op
+// sendPasswordReset looks up a real, claimed account — one with a password or a linked Google
+// identity (a Google-only account sets its first password this way, docs/SPEC.md FR-1.5);
+// excludes the unclaimed placeholder row and demo accounts, whose email is an internal
+// placeholder nobody can type in anyway — and, if one exists, creates a token and emails the reset link. A no-op
 // for an unmatched email: handleForgotPassword responds the same way either way, so there is
 // nothing to report back here except a genuine infrastructure failure.
 func (s *Server) sendPasswordReset(ctx context.Context, email string) error {
 	var userID string
-	err := s.pool.QueryRow(ctx, `SELECT id FROM users WHERE email = $1 AND password_hash IS NOT NULL`, email).Scan(&userID)
+	err := s.pool.QueryRow(ctx, `
+		SELECT id FROM users
+		WHERE email = $1 AND demo_expires_at IS NULL AND (password_hash IS NOT NULL OR google_sub IS NOT NULL)
+	`, email).Scan(&userID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}

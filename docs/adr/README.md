@@ -17,6 +17,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0006](0006-minimal-deployment-same-origin-caddy.md) | Minimal deployment serves frontend and API from one origin via Caddy |
 | [0007](0007-in-app-gps-recording-submits-directly.md) | In-app GPS recording submits directly to the sync endpoint, not via a Health Connect/HealthKit round-trip |
 | [0008](0008-vector-tiles-for-country-region-boundary-tiers.md) | The Country/Region zoom tiers are live vector tiles, not a second precomputed raster pyramid |
+| [0009](0009-google-sign-in-server-side-code-flow.md) | Sign in with Google is a server-side authorization-code flow with no OAuth library, auto-linking by verified email |
 
 ## Writing a new one
 
