@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-09-21.
+Last updated: 2026-09-24.
 
 ## How to read this document
 
@@ -27,13 +27,6 @@ Checkboxes are the source of truth for progress; re-check them against the three
 - [x] Add meta description + Open Graph/Twitter card tags to `apps/web/index.html` (title already set) — the login/signup page itself is still worth describing correctly, even with no map content behind it. No `og:image`/`twitter:image` yet — the logo exists now (`apps/web/src/assets/logo.png`, also the favicon), but nobody has made a proper 1200×630 share card from it.
 - [x] Add `robots.txt` and a sitemap once there's a concrete public page worth indexing — the About page (`SPEC.md` FR-10) is that page; `apps/web/public/robots.txt` and `sitemap.xml` list `/` and `/about`.
 - [x] Decide what search intent this targets before writing copy — decided: "free Strava alternative" and "fog of war app," both used in `apps/web/index.html`'s meta description/OG/Twitter tags alongside `VISION.md` §1's verbatim identity sentence. "Activity heatmap tracker" was considered and dropped — narrower than what HoldMyTrack actually is, and Heatmap is one of three map modes, not the product's identity.
-
-### HoldMyTrack logo watermark on exports — free brand exposure, drawn in the same pass as a separately-tracked attribution fix
-
-`docs/KNOWN_ISSUES.md` tracks a compliance bug on this same code path (exported PNGs currently carry no OSM/Protomaps attribution at all, despite `style.ts:28`'s own comment stating it's required on every export). This item is the feature half of that `exportMap.ts` change, not the bug fix itself: a small HoldMyTrack logo/wordmark, worth landing in the same pass since both need to be baked into the raster itself before `toBlob()`, not just shown via the live map's DOM-based `AttributionControl`, which the export path bypasses entirely.
-
-- [ ] Add a small HoldMyTrack logo/wordmark in a non-competing corner of the export (sharing the same lower-corner strip the attribution fix will use, small and low-contrast, never covering map content) — free brand exposure on exports that get shared, which fits `VISION.md` §6's free-forever, donation-funded, no-ad-budget model. Several free, sharing-driven apps (Strava, Peloton, Duolingo) put the same kind of subtle mark on their own shareable images for the same reason.
-- [ ] On by default, with a simple toggle to turn it off per export (or a persisted preference) — a courtesy, not a paywall gate, since there is no paid tier here to protect. Unlike the attribution fix (a license requirement, not a preference), this one is genuinely optional.
 
 ### Production deployment — a sandbox is live at `holdmytrack.com`, not yet Production
 
