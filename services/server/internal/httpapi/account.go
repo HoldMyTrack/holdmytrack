@@ -10,24 +10,18 @@ import (
 	"strings"
 )
 
-// The Settings page (Avatar, Name, Country, Timezone, Privacy Trim) — see
+// The Settings page (Avatar, Name, Country, Timezone) — see
 // migrations/0001_init.sql's users table (display_name/country/avatar_key/
 // avatar_content_type/avatar_updated_at) and migrations/0021_user_timezone.sql (timezone).
-// Country, Timezone and Privacy Trim are covered by handleUpdateSettings; the avatar is a
+// Name, Country and Timezone are covered by handleUpdateSettings; the avatar is a
 // separate content type entirely, so it gets its own three endpoints below.
 
 var countryCodePattern = regexp.MustCompile(`^[A-Z]{2}$`)
 
-// maxPrivacyTrimCm is a sanity ceiling, not a claim that 200 m of trim is ever a good idea —
-// it exists to reject an obviously-wrong value (a typo with an extra digit), not to opine on
-// what a reasonable trim looks like.
-const maxPrivacyTrimCm = 20000
-
 type updateSettingsRequest struct {
-	DisplayName   string `json:"display_name"`
-	Country       string `json:"country"`
-	PrivacyTrimCm int    `json:"privacy_trim_cm"`
-	Timezone      string `json:"timezone"`
+	DisplayName string `json:"display_name"`
+	Country     string `json:"country"`
+	Timezone    string `json:"timezone"`
 }
 
 // handleUpdateSettings serves `PATCH /v1/account/settings` — a full replace of all three
@@ -55,10 +49,6 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "country must be a two-letter code", http.StatusBadRequest)
 		return
 	}
-	if req.PrivacyTrimCm < 0 || req.PrivacyTrimCm > maxPrivacyTrimCm {
-		http.Error(w, fmt.Sprintf("privacy_trim_cm must be between 0 and %d", maxPrivacyTrimCm), http.StatusBadRequest)
-		return
-	}
 	// Unlike Country, timezone has no "unset" state (the column is NOT NULL DEFAULT 'UTC' —
 	// migrations/0021_user_timezone.sql) — Settings always sends the field's current
 	// selection, so an empty/unloadable value here means a malformed request, not a deliberate
@@ -73,9 +63,9 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	// NULLIF, not a Go-side branch on "" — an empty display name means "unset", same as every
 	// other nullable text column this API already treats that way.
 	if _, err := s.pool.Exec(ctx, `
-		UPDATE users SET display_name = NULLIF($2, ''), country = $3, privacy_trim_cm = $4, timezone = $5
+		UPDATE users SET display_name = NULLIF($2, ''), country = $3, timezone = $4
 		WHERE id = $1
-	`, userID, req.DisplayName, req.Country, req.PrivacyTrimCm, tz); err != nil {
+	`, userID, req.DisplayName, req.Country, tz); err != nil {
 		s.log.Error("update settings failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

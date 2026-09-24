@@ -32,6 +32,7 @@ import { ActivityHistogram } from '../ui/ActivityHistogram';
 import { EditTrackPanel } from '../ui/EditTrackPanel';
 import { ExportButton } from '../ui/ExportButton';
 import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
+import { PrivateLocationsPanel } from '../ui/PrivateLocationsPanel';
 import { dayDiff, todayLocal } from '../ui/dateMath';
 import { Header } from '../ui/Header';
 import type { DateRange } from '../ui/RangePicker';
@@ -58,6 +59,8 @@ export interface MapViewProps {
   onOpenProfile: () => void;
   /** Same shape as onOpenProfile, for the account menu's "Settings" item. */
   onOpenSettings: () => void;
+  /** Mount with the Private locations window already open — Settings' link to it. */
+  initialPrivateLocationsOpen?: boolean;
 }
 
 /** The frame-and-capture export flow's own state — lives here, not inside `ExportFrame.tsx`,
@@ -87,7 +90,7 @@ function frameSize(
   return maxW / maxH >= ratio ? { widthPx: maxH * ratio, heightPx: maxH } : { widthPx: maxW, heightPx: maxW / ratio };
 }
 
-export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
+export function MapView({ onOpenProfile, onOpenSettings, initialPrivateLocationsOpen = false }: MapViewProps) {
   // docs/SPEC.md FR-2.1–FR-2.3: a demo account is
   // read-only (no upload/sync, no edit/delete) — see ActivitiesPanel's own readOnly prop and
   // the importControl below. `'email' in user` is the same narrowing api.ts's SessionUser
@@ -161,6 +164,10 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
   // other track is hidden, the panel and timeline are inert, and EditTrackPanel owns the map.
   const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
   const editingTrack = editingActivityId !== null;
+
+  // The Private locations window (FR-8.1). Shares the top-left corner with the Edit track
+  // window, so the two never open together — each one closes the other.
+  const [privateLocationsOpen, setPrivateLocationsOpen] = useState(initialPrivateLocationsOpen);
 
   // The list/summary filter — the highlighted band in the range picker. The picker's own pan
   // position is not here on purpose: it lives in useActivityDays and the two are independent,
@@ -802,6 +809,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
   const startEditTrack = useCallback(
     (activity: Activity) => {
       setHoveredActivityId(null);
+      setPrivateLocationsOpen(false);
       setEditingActivityId(activity.id);
       fitToSelection([activity]);
     },
@@ -820,6 +828,24 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
     },
     [editingActivityId, reloadActivities],
   );
+  // A saved or deleted Private location reprocesses every activity it could clip. The list
+  // reload shows those rows Pending right away, and the Pending poll below refreshes the map
+  // when they finish — but a batch that's done before the reload even returns is never seen
+  // Pending at all, so the coverage watch refreshes everything once the server has drained.
+  const handlePrivateLocationsChanged = useCallback(() => {
+    reloadActivities();
+    watchCoverage(() => {
+      if (map) refreshTrackLayer(map, activityQuery);
+      reloadActivities();
+      reloadTotals();
+      reloadHistogram();
+      setTrackMetricsVersion((v) => v + 1);
+    });
+  }, [map, activityQuery, reloadActivities, reloadTotals, reloadHistogram, watchCoverage]);
+  // Not while a track is being edited — that session owns the map until it closes.
+  const openPrivateLocations = useCallback(() => {
+    if (!editingTrack) setPrivateLocationsOpen(true);
+  }, [editingTrack]);
   const editingActivity = useMemo(
     () => (editingActivityId === null ? null : (activities.find((a) => a.id === editingActivityId) ?? null)),
     [activities, editingActivityId],
@@ -968,6 +994,7 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
         exportControl={<ExportButton map={map} active={exportFlow.stage !== 'idle'} onOpen={handleExportOpen} />}
         onOpenProfile={onOpenProfile}
         onOpenSettings={onOpenSettings}
+        onOpenPrivateLocations={openPrivateLocations}
       />
 
       <div className="app-body">
@@ -1029,6 +1056,14 @@ export function MapView({ onOpenProfile, onOpenSettings }: MapViewProps) {
             />
           )}
           {map && editingActivity && <EditTrackPanel map={map} activity={editingActivity} onClose={closeEditTrack} />}
+          {map && privateLocationsOpen && !editingTrack && (
+            <PrivateLocationsPanel
+              map={map}
+              readOnly={isDemo}
+              onChanged={handlePrivateLocationsChanged}
+              onClose={() => setPrivateLocationsOpen(false)}
+            />
+          )}
           {!editingTrack && (
             <div className="map-mode-toggle" role="group" aria-label="Map mode" data-testid="map-mode-toggle">
               <button

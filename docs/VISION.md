@@ -149,7 +149,7 @@ This isn't a resilience decision the way Paths 1–3 are — §4.1's provider-in
 | **Distance & coverage trends** | See how much ground you've covered this period vs last | Weekly/monthly distance, moving-time and elevation trends |
 | **Filtering** | Slice the history | Activity type, date range, geographic bounding box, source |
 | **Export** | Free, unrestricted | Print-grade raster/vector export, story cards, animated reveals — no watermark, no tier |
-| **Privacy Controls** | Table stakes, see §7 | Privacy zones, automatic start/end trimming, per-map share scoping |
+| **Privacy Controls** | Table stakes, see §7 | Private locations (user-defined privacy zones), per-map share scoping |
 
 **Pace and heart rate are shown per activity, not analysed as a training product.** They're a supporting detail on the route, not a pillar — the pillars are the map and the exploration stats. The schema carries per-point streams (`IMPLEMENTATION.md` §3.3) for exactly this, and no more.
 
@@ -260,8 +260,8 @@ What is available instead is recognition, not capability: a supporter badge, a c
 
 Non-negotiable. A Fog of War map is a precise map of where a person lives — the 2018 Strava heatmap incident is the canonical warning, and an individual fog map is far more revealing than an aggregate one.
 
-* **Privacy zones** — user-defined radii excluded from every render and export.
-* **Automatic endpoint trimming** — trim the first and last N metres of every track by default, opt-out rather than opt-in.
+* **Private locations** — user-defined circles (home, work) excluded from every render and export. Today the leading and trailing parts of a track inside one are hidden; splitting a track that merely passes through one is still to come.
+* **No blanket endpoint trimming** — an earlier default trimmed the first and last N metres of every track. It was dropped: on a multi-day trail every day's start and end is a campsite or trailhead, so it cut a gap into the trail at each day boundary while protecting nothing there. The places worth hiding are the ones the user names — see ADR-0010.
 * **Applied at ingest, server-side** — before anything is persisted or indexed, per `IMPLEMENTATION.md` §4.1. Privacy applied at render time leaks through any bug in the render path.
 * **Share scoping** — shared maps and exports must respect zones; an exported file is permanent and cannot be recalled.
 * **Legal basis** — location and health data are special-category personal data under GDPR Art. 9: explicit consent, a DPIA before launch, a documented retention policy, working export and deletion, EU-region hosting for EU users. **Being free changes none of this.** There is no small-project exemption, and the compliance burden is one of the few fixed costs a donation model has to carry regardless of scale.

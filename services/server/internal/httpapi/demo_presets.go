@@ -23,12 +23,6 @@ import (
 // without ever being swept by internal/worker/demo_purge.go.
 const DemoCustomerUserID = "22222222-2222-2222-2222-222222222222"
 
-// demoActivityPrivacyTrimM matches the real-account default (server.go's signup path), not
-// zero: unlike the old hand-written presets' invented coordinates, these are real recorded GPS
-// tracks around a real location, so they get the same endpoint privacy trim a real account's
-// own uploads would.
-const demoActivityPrivacyTrimM = 200
-
 //go:embed demo_data/*.gpx
 var demoData embed.FS
 
@@ -92,7 +86,6 @@ func SeedDemoCustomer(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 			SourceDetail:  filename,
 			ExternalID:    externalID,
 			RawPayloadKey: rawKey,
-			PrivacyTrimM:  demoActivityPrivacyTrimM,
 		}
 		result, err := ingest.Process(ctx, pool, store, job)
 		if err != nil {

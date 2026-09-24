@@ -61,13 +61,11 @@ func RenderUser(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, u
 	return nil
 }
 
-// Privacy trim is no longer re-applied here: RenderActivityMasks renders from points already
-// trimmed once at ingest, and renderAndStoreTile now composites already-rendered masks
-// rather than re-parsing raw payloads with the user's *current* trim setting. This is a
-// latent gap for a feature that doesn't exist yet (there is no way to change
-// `users.privacy_trim_cm` today, and no reprivacy job — §7 — reads it back): when one is
-// built, it needs to re-call RenderActivityMasks with freshly re-trimmed points per affected
-// activity, not just re-render a tile from its existing masks.
+// Private locations are never re-applied here: RenderActivityMasks renders from points
+// already clipped at ingest, and renderAndStoreTile composites those masks rather than
+// re-parsing raw payloads. A location change goes through the `reprivacy` job instead, which
+// re-renders each affected activity's own masks from freshly clipped points (internal/ingest's
+// ProcessReprivacy) before this recomposites.
 
 // userHeatmapCap reads the account's own users.heatmap_cap (migrations/0019_heatmap_cap.sql)
 // — kept current by internal/worker/heatmap_cap.go's daily sweep (cap.go's

@@ -1765,6 +1765,80 @@ a.user-menu__item {
   color: var(--fm-danger);
 }
 
+/* The Private locations window (PrivateLocationsPanel.tsx) reuses the Edit track window's
+   shell and buttons; these are only its own list and fields. */
+.private-locations {
+  /* Below the map-mode toggle rather than over it — unlike Edit track, which hides that
+     toggle, this window keeps Normal/Fog/Heatmap available so a circle can be placed against
+     whichever view shows the problem. Scrolls rather than running off a short screen. */
+  top: 54px;
+  max-height: calc(100% - 64px);
+  overflow-y: auto;
+}
+
+.private-locations .edit-track__subtitle {
+  white-space: normal;
+}
+
+.private-locations__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.private-locations__item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  border-radius: 7px;
+  padding: 6px 8px;
+  background: transparent;
+  color: var(--fm-ink);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.private-locations__item:hover,
+.private-locations__item[aria-pressed='true'] {
+  background: var(--fm-surface-tint);
+}
+
+.private-locations__name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.private-locations__radius {
+  flex: none;
+  color: rgb(var(--fm-ink-rgb) / 60%);
+}
+
+.private-locations__editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.private-locations__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.private-locations__slider {
+  width: 100%;
+  accent-color: var(--fm-accent);
+}
+
 /* MapView wraps the Activities panel and the timeline in this for the session, `inert` while
    a track is being edited. display: contents keeps the wrapper out of the flex layout; the
    dimming goes on its children, since a display: contents box has no rendering of its own. */
@@ -2256,7 +2330,7 @@ a.user-menu__item {
   cursor: pointer;
 }
 
-/* SettingsPage.tsx — Avatar, Name, Country, Privacy Trim. Shares .profile-page__body/
+/* SettingsPage.tsx — Avatar, Name, Country, Timezone. Shares .profile-page__body/
    __back above for the page shell (same "private, full-screen detour from the map" shape),
    its own classes below only for what's actually different: a form, not a grid. */
 .settings-page {

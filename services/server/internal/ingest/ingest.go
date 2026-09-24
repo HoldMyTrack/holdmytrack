@@ -35,12 +35,11 @@ const simplifyToleranceDeg = 0.00003
 // Job is what the `ingest` job's payload carries — everything the worker needs that isn't
 // already in the raw payload itself.
 type Job struct {
-	UserID        string  `json:"user_id"`
-	Source        string  `json:"source"`
-	SourceDetail  string  `json:"source_detail"`
-	ExternalID    string  `json:"external_id"`
-	RawPayloadKey string  `json:"raw_payload_key"`
-	PrivacyTrimM  float64 `json:"privacy_trim_m"`
+	UserID        string `json:"user_id"`
+	Source        string `json:"source"`
+	SourceDetail  string `json:"source_detail"`
+	ExternalID    string `json:"external_id"`
+	RawPayloadKey string `json:"raw_payload_key"`
 	// ActivityType overrides whatever the parser itself reports, when set. Empty means "use
 	// the parsed value" (the zero value already does the right thing for every existing
 	// caller). This exists for the Google Takeout import path
@@ -61,17 +60,24 @@ type Result struct {
 }
 
 func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job Job) (Result, error) {
-	act, points, err := loadTrimmedPoints(ctx, store, job.SourceDetail, job.RawPayloadKey, job.PrivacyTrimM)
+	act, points, err := loadClippedPoints(ctx, pool, store, job.UserID, job.SourceDetail, job.RawPayloadKey)
 	if err != nil {
 		return Result{}, err
 	}
 	if job.ActivityType != "" {
 		act.ActivityType = job.ActivityType
 	}
+	// A track entirely inside Private locations is still persisted, just with no geometry:
+	// dropping it would lose it for good, even after the location that hides it is deleted.
+	hidden := points == nil
+	startedAt := act.Points[0].Time
 
-	pp, err := prepareTrack(ctx, pool, points)
-	if err != nil {
-		return Result{}, err
+	var pp preparedTrack
+	if !hidden {
+		if pp, err = prepareTrack(ctx, pool, points); err != nil {
+			return Result{}, err
+		}
+		startedAt = points[0].Time
 	}
 	m := pp.m
 
@@ -88,13 +94,7 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 				$1, $2, $3, $4,
 				$5, $6, $7, $8,
 				$9, $10, $11,
-				ST_SetSRID(
-					ST_MakeLine(ARRAY(
-						SELECT ST_MakePointM(lon, lat, t)
-						FROM unnest($12::float8[], $13::float8[], $14::float8[]) AS pt(lon, lat, t)
-					)),
-					4326
-				),
+				`+trajectorySQL("$12", "$13", "$14")+`,
 				$15, NULLIF($16, ''), NULLIF($17, '')
 			)
 			ON CONFLICT (user_id, source, external_id) WHERE external_id IS NOT NULL DO NOTHING -- $15 = raw_payload_key
@@ -109,7 +109,7 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	`,
 		job.UserID, job.Source, job.SourceDetail, job.ExternalID,
 		act.ActivityType, m.distanceM, m.durationS, m.movingS,
-		m.elevationGainM, m.avgSpeedMps, points[0].Time,
+		m.elevationGainM, m.avgSpeedMps, startedAt,
 		pp.simpLons, pp.simpLats, pp.simpTs,
 		job.RawPayloadKey, act.Name, act.Description,
 	).Scan(&activityID, &inserted)
@@ -123,6 +123,10 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 		// successful ingest already has its streams. Fog is skipped too: nothing new
 		// happened, so no tile needs marking dirty again.
 		return Result{ActivityID: activityID, Persisted: false}, nil
+	}
+	if hidden {
+		// No streams, masks, tiles or regions: there is nothing visible to derive them from.
+		return Result{ActivityID: activityID, Persisted: true}, nil
 	}
 
 	_, err = pool.Exec(ctx, `
@@ -177,10 +181,14 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	return Result{ActivityID: activityID, Persisted: true}, nil
 }
 
-// loadTrimmedPoints is §4.1 steps 2–3: fetch the raw payload, parse it, and apply the privacy
-// trim. Shared by Process and ProcessTrackEdit (edit.go) — an edit replays the user's spec on
-// top of exactly the points a fresh ingest would have kept, never on the untrimmed ends.
-func loadTrimmedPoints(ctx context.Context, store *storage.Store, sourceDetail, rawKey string, trimM float64) (parse.Activity, []parse.Point, error) {
+// loadClippedPoints is §4.1 steps 2–3: fetch the raw payload, parse it, and clip it against
+// the account's Private locations, read now rather than when the job was enqueued. Shared by
+// Process and reprocessActivity (edit.go) — an edit replays the user's spec on top of exactly
+// the points a fresh ingest would have kept, never on hidden ones.
+//
+// The returned points are nil when the whole track lies inside Private locations; act still
+// carries the parsed metadata (type, name, start time) the caller persists either way.
+func loadClippedPoints(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID, sourceDetail, rawKey string) (parse.Activity, []parse.Point, error) {
 	obj, err := store.Get(ctx, rawKey)
 	if err != nil {
 		return parse.Activity{}, nil, fmt.Errorf("ingest: fetch raw payload: %w", err)
@@ -191,19 +199,35 @@ func loadTrimmedPoints(ctx context.Context, store *storage.Store, sourceDetail, 
 	if err != nil {
 		return parse.Activity{}, nil, fmt.Errorf("ingest: parse: %w", err)
 	}
-
-	points := TrimEndpoints(act.Points, trimM)
-	if len(points) < 2 {
-		return parse.Activity{}, nil, fmt.Errorf("ingest: fewer than 2 points survive privacy trim (%d before, %d after)", len(act.Points), len(points))
+	if len(act.Points) < 2 {
+		return parse.Activity{}, nil, fmt.Errorf("ingest: fewer than 2 points recorded (%d)", len(act.Points))
 	}
-	return act, points, nil
+
+	zones, err := LoadZones(ctx, pool, userID)
+	if err != nil {
+		return parse.Activity{}, nil, fmt.Errorf("ingest: load private locations: %w", err)
+	}
+	return act, ClipEnds(act.Points, zones), nil
 }
 
-// LoadTrimmedPoints is loadTrimmedPoints for the track editor's point endpoint
-// (httpapi's handleActivityTrackPoints), which needs the same post-trim points to show.
-func LoadTrimmedPoints(ctx context.Context, store *storage.Store, sourceDetail, rawKey string, trimM float64) ([]parse.Point, error) {
-	_, points, err := loadTrimmedPoints(ctx, store, sourceDetail, rawKey, trimM)
+// LoadClippedPoints is loadClippedPoints for the track editor's point endpoint
+// (httpapi's handleActivityTrackPoints), which needs the same post-clip points to show.
+func LoadClippedPoints(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID, sourceDetail, rawKey string) ([]parse.Point, error) {
+	_, points, err := loadClippedPoints(ctx, pool, store, userID, sourceDetail, rawKey)
 	return points, err
+}
+
+// trajectorySQL builds the display LineStringM from three parallel lon/lat/epoch-seconds
+// array parameters, or NULL when they hold fewer than two points — an activity entirely
+// inside Private locations (§3.3 allows a null trajectory, and every reader already copes).
+func trajectorySQL(lons, lats, ts string) string {
+	return `CASE WHEN cardinality(` + lons + `::float8[]) >= 2 THEN ST_SetSRID(
+					ST_MakeLine(ARRAY(
+						SELECT ST_MakePointM(lon, lat, t)
+						FROM unnest(` + lons + `::float8[], ` + lats + `::float8[], ` + ts + `::float8[]) AS pt(lon, lat, t)
+					)),
+					4326
+				) END`
 }
 
 // preparedTrack is everything §4.1 steps 5–6 persist, derived from the final point list.

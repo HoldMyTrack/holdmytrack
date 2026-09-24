@@ -134,6 +134,10 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(route("GET", "/activities/track-metrics/{id}"), s.requireVerified(s.handleActivityTrackMetrics))
 	s.mux.HandleFunc(route("GET", "/activities/track-points/{id}"), s.requireVerified(s.handleActivityTrackPoints))
 	s.mux.HandleFunc(route("POST", "/activities/track-edit/{id}"), s.requireNotDemo(s.handleActivityTrackEdit))
+	s.mux.HandleFunc(route("GET", "/private-locations"), s.requireVerified(s.handleListPrivateLocations))
+	s.mux.HandleFunc(route("POST", "/private-locations"), s.requireNotDemo(s.handleCreatePrivateLocation))
+	s.mux.HandleFunc(route("PATCH", "/private-locations/{id}"), s.requireNotDemo(s.handleUpdatePrivateLocation))
+	s.mux.HandleFunc(route("DELETE", "/private-locations/{id}"), s.requireNotDemo(s.handleDeletePrivateLocation))
 	s.mux.HandleFunc(route("GET", "/uploads"), s.requireVerified(s.handleListUploads))
 	s.mux.HandleFunc(route("GET", "/coverage/status"), s.requireVerified(s.handleCoverageStatus))
 	s.mux.HandleFunc(route("POST", "/sync/activities"), s.requireNotDemo(s.handleSyncActivities))
@@ -370,12 +374,7 @@ func (s *Server) persistAndEnqueue(ctx context.Context, p uploadFileParams) (ext
 		SourceDetail:  p.Filename,
 		ExternalID:    externalID,
 		RawPayloadKey: rawKey,
-		// The uploading account's own current setting (IMPLEMENTATION.md §4.12), not a
-		// hardcoded default — requireAuth already loaded it onto ctx as part of authInfo
-		// (auth.go), so every persistAndEnqueue caller gets it for free, including
-		// handleZipUpload's/handleTakeoutUpload's per-file loops within the same request.
-		PrivacyTrimM: float64(privacyTrimCmFromContext(ctx)) / 100,
-		ActivityType: p.ActivityType,
+		ActivityType:  p.ActivityType,
 	}
 	payload, err := json.Marshal(job)
 	if err != nil {

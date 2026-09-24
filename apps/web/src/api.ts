@@ -66,7 +66,6 @@ export interface UserProfile {
   displayName: string;
   country: string;
   avatarUrl: string;
-  privacyTrimCm: number;
   /** IANA zone name (e.g. "America/New_York"), never `''` — unlike displayName/country there
    *  is no "unset" state (services/server/migrations/0021_user_timezone.sql's column is
    *  `NOT NULL DEFAULT 'UTC'`). Drives every day-bucketing query server-side
@@ -105,7 +104,6 @@ interface AuthResponseBody {
   display_name: string;
   country: string;
   avatar_url: string;
-  privacy_trim_cm: number;
   timezone: string;
 }
 
@@ -114,7 +112,6 @@ function toProfile(body: AuthResponseBody): UserProfile {
     displayName: body.display_name,
     country: body.country,
     avatarUrl: body.avatar_url,
-    privacyTrimCm: body.privacy_trim_cm,
     timezone: body.timezone,
   };
 }
@@ -290,14 +287,13 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   return toSessionUser(body);
 }
 
-/** SettingsPage.tsx's Save button — a full replace of all four fields at once (`PATCH
+/** SettingsPage.tsx's Save button — a full replace of all three fields at once (`PATCH
  *  /v1/account/settings`), not per-field auto-save. Returns the updated profile so the
  *  caller can merge it into AuthContext directly (`useAuth().updateUser`) with no extra
  *  round trip. */
 export async function updateSettings(patch: {
   displayName: string;
   country: string;
-  privacyTrimCm: number;
   timezone: string;
 }): Promise<UserProfile> {
   const res = await fetch(`${API_BASE_URL}${API_V1}/account/settings`, {
@@ -307,7 +303,6 @@ export async function updateSettings(patch: {
     body: JSON.stringify({
       display_name: patch.displayName,
       country: patch.country,
-      privacy_trim_cm: patch.privacyTrimCm,
       timezone: patch.timezone,
     }),
   });
@@ -1088,7 +1083,7 @@ export interface TrackEdit {
 export type TrackPoint = [number, number, number];
 
 export interface ActivityTrackPoints {
-  /** Every point the activity is processed from, privacy-trimmed, before the user's edit. */
+  /** Every point the activity is processed from, clipped by Private locations, before the user's edit. */
   points: TrackPoint[];
   /** The edit currently applied on top of `points`, or null for an unedited track. */
   edit: TrackEdit | null;
@@ -1120,6 +1115,70 @@ export async function saveActivityTrackEdit(activityId: string, edit: TrackEdit 
   });
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, `track edit failed (${res.status})`));
+  }
+}
+
+/** One of the account's Private locations (FR-8.1): a circle whose contents are clipped off
+ *  the ends of every track at ingest. `name` is `''` when unset. */
+export interface PrivateLocation {
+  id: string;
+  name: string;
+  lon: number;
+  lat: number;
+  radiusM: number;
+}
+
+/** What POST and PATCH send — the whole circle, never a partial update. */
+export type PrivateLocationInput = Omit<PrivateLocation, 'id'>;
+
+interface PrivateLocationBody {
+  id: string;
+  name: string;
+  lon: number;
+  lat: number;
+  radius_m: number;
+}
+
+function toPrivateLocation(body: PrivateLocationBody): PrivateLocation {
+  return { id: body.id, name: body.name, lon: body.lon, lat: body.lat, radiusM: body.radius_m };
+}
+
+export const PRIVATE_LOCATION_MIN_RADIUS_M = 50;
+export const PRIVATE_LOCATION_MAX_RADIUS_M = 2000;
+
+export async function listPrivateLocations(signal?: AbortSignal): Promise<PrivateLocation[]> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/private-locations`, {
+    ...(signal ? { signal } : {}),
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, `private locations failed (${res.status})`));
+  }
+  return ((await res.json()) as PrivateLocationBody[]).map(toPrivateLocation);
+}
+
+/**
+ * Creates (no `id`) or replaces a Private location. The server marks every activity the old or
+ * new circle could clip as pending and reprocesses them in the background, so this resolves as
+ * soon as that's queued — the Activity List's Pending badges show the rest.
+ */
+export async function savePrivateLocation(input: PrivateLocationInput, id?: string): Promise<PrivateLocation> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/private-locations${id ? `/${id}` : ''}`, {
+    method: id ? 'PATCH' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ name: input.name, lon: input.lon, lat: input.lat, radius_m: input.radiusM }),
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, `saving the private location failed (${res.status})`));
+  }
+  return toPrivateLocation((await res.json()) as PrivateLocationBody);
+}
+
+export async function deletePrivateLocation(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/private-locations/${id}`, { method: 'DELETE', credentials: 'include' });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, `deleting the private location failed (${res.status})`));
   }
 }
 
