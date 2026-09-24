@@ -17,10 +17,25 @@ import { VersionBanner } from './ui/VersionBanner';
  * than re-checking one.
  */
 function AuthenticatedApp() {
-  const [view, setView] = useState<'map' | 'profile' | 'settings'>('map');
+  const [view, setView] = useState<'map' | 'profile' | 'settings' | 'private-locations'>('map');
   if (view === 'profile') return <ProfilePage onBack={() => setView('map')} onOpenSettings={() => setView('settings')} />;
-  if (view === 'settings') return <SettingsPage onBack={() => setView('map')} onOpenProfile={() => setView('profile')} />;
-  return <MapView onOpenProfile={() => setView('profile')} onOpenSettings={() => setView('settings')} />;
+  if (view === 'settings') {
+    return (
+      <SettingsPage
+        onBack={() => setView('map')}
+        onOpenProfile={() => setView('profile')}
+        onOpenPrivateLocations={() => setView('private-locations')}
+      />
+    );
+  }
+  // 'private-locations' is the map, arriving with that window already open (Settings' link).
+  return (
+    <MapView
+      onOpenProfile={() => setView('profile')}
+      onOpenSettings={() => setView('settings')}
+      initialPrivateLocationsOpen={view === 'private-locations'}
+    />
+  );
 }
 
 /**

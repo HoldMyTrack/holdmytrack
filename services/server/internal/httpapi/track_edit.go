@@ -23,9 +23,9 @@ type trackPointsResponse struct {
 
 // handleActivityTrackPoints serves `GET /v1/activities/track-points/{id}`. The points come
 // from the raw payload — the only place full-resolution positions survive (§4.1 step 6) — and
-// are privacy-trimmed with the account's current setting before they leave the server: the
-// raw payload still holds the trimmed-off ends, and returning them would hand the client the
-// very home location the trim exists to hide.
+// are clipped against the account's current Private locations before they leave the server:
+// the raw payload still holds the hidden ends, and returning them would hand the client the
+// very places those locations exist to hide.
 func (s *Server) handleActivityTrackPoints(w http.ResponseWriter, r *http.Request) {
 	activityID := r.PathValue("id")
 	userID := userIDFromContext(r.Context())
@@ -52,10 +52,14 @@ func (s *Server) handleActivityTrackPoints(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	points, err := ingest.LoadTrimmedPoints(ctx, s.store, sourceDetail, *rawKey, float64(privacyTrimCmFromContext(ctx))/100)
+	points, err := ingest.LoadClippedPoints(ctx, s.pool, s.store, userID, sourceDetail, *rawKey)
 	if err != nil {
 		s.log.Error("track points load failed", "activity_id", activityID, "err", err)
 		http.Error(w, "couldn't read this activity's recorded points", http.StatusConflict)
+		return
+	}
+	if points == nil {
+		http.Error(w, "this activity is entirely inside your private locations", http.StatusConflict)
 		return
 	}
 	if err := ingest.EditableTimestamps(points); err != nil {

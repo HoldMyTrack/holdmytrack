@@ -166,7 +166,13 @@ func runJob(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, j job
 			return fmt.Errorf("unmarshal edit_track job: %w", err)
 		}
 		return ingest.ProcessTrackEdit(ctx, pool, store, ej)
+	case "reprivacy":
+		var rj ingest.ReprivacyJob
+		if err := json.Unmarshal(j.payload, &rj); err != nil {
+			return fmt.Errorf("unmarshal reprivacy job: %w", err)
+		}
+		return ingest.ProcessReprivacy(ctx, pool, store, j.id, rj)
 	default:
-		return fmt.Errorf("unhandled job kind %q (export / reprivacy / provider_sync / retention are out of scope for this task)", j.kind)
+		return fmt.Errorf("unhandled job kind %q (export / provider_sync / retention are out of scope for this task)", j.kind)
 	}
 }

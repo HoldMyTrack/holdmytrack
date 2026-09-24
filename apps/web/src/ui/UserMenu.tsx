@@ -29,9 +29,12 @@ export interface UserMenuProps {
   onOpenProfile?: (() => void) | undefined;
   /** Same shape as onOpenProfile, for SettingsPage. */
   onOpenSettings?: (() => void) | undefined;
+  /** Opens the map's Private locations window — only passed by the map screen, the one
+   *  place those circles can be drawn. */
+  onOpenPrivateLocations?: (() => void) | undefined;
 }
 
-export function UserMenu({ onOpenProfile, onOpenSettings }: UserMenuProps) {
+export function UserMenu({ onOpenProfile, onOpenSettings, onOpenPrivateLocations }: UserMenuProps) {
   const { user, signOut, requestUpgrade } = useAuth();
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -128,6 +131,20 @@ export function UserMenu({ onOpenProfile, onOpenSettings }: UserMenuProps) {
               }}
             >
               Settings
+            </button>
+          )}
+          {onOpenPrivateLocations && (
+            <button
+              type="button"
+              role="menuitem"
+              className="user-menu__item"
+              data-testid="user-menu-private-locations"
+              onClick={() => {
+                setOpen(false);
+                onOpenPrivateLocations();
+              }}
+            >
+              Private locations
             </button>
           )}
           {/* A plain link, not a navigation callback: About is the static about.html page,

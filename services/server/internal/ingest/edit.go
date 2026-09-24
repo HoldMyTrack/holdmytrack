@@ -16,9 +16,9 @@ import (
 )
 
 // TrackEdit is a user's edit to an activity's recorded points (IMPLEMENTATION.md §4.7.7),
-// stored in activities.track_edit and replayed on top of the parsed, privacy-trimmed points
+// stored in activities.track_edit and replayed on top of the parsed, privacy-clipped points
 // every time the activity is processed. Every value is a point timestamp in unix
-// milliseconds, never a point index: indices shift whenever the privacy trim changes,
+// milliseconds, never a point index: indices shift whenever a Private location changes,
 // timestamps don't.
 //
 // A point survives when it lies inside Keep (inclusive; nil keeps everything), outside every
@@ -111,7 +111,7 @@ type EditJob struct {
 	Edit       *TrackEdit `json:"edit"`
 }
 
-// ProcessTrackEdit reprocesses one activity with a new edit spec: the same parse → trim →
+// ProcessTrackEdit reprocesses one activity with a new edit spec: the same parse → clip →
 // metrics → simplify → masks pipeline as Process, ending in an UPDATE of the existing row
 // instead of an INSERT. On any failure the activity's edit_pending flag is cleared again, so a
 // failed edit leaves the activity as it was rather than stuck showing Pending.
@@ -129,122 +129,12 @@ func ProcessTrackEdit(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 }
 
 func processTrackEdit(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job EditJob) error {
-	var sourceDetail string
-	var rawKey *string
-	var trimCm int
-	err := pool.QueryRow(ctx, `
-		SELECT COALESCE(a.source_detail, ''), a.raw_payload_key, u.privacy_trim_cm
-		FROM activities a JOIN users u ON u.id = a.user_id
-		WHERE a.id = $1 AND a.user_id = $2
-	`, job.ActivityID, job.UserID).Scan(&sourceDetail, &rawKey, &trimCm)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil // deleted while the job was queued: nothing left to edit
+	edit := job.Edit
+	if edit == nil {
+		edit = &TrackEdit{} // reset: an explicitly empty spec, not "keep the stored one"
 	}
-	if err != nil {
-		return fmt.Errorf("edit: load activity: %w", err)
-	}
-	if rawKey == nil {
-		return errors.New("edit: activity has no raw payload to reprocess")
-	}
-
-	// The account's current Privacy Trim, the same value the editor's own point list was
-	// trimmed with (handleActivityTrackPoints) — so what the user saw is what gets processed.
-	points, err := LoadTrimmedPoints(ctx, store, sourceDetail, *rawKey, float64(trimCm)/100)
-	if err != nil {
-		return err
-	}
-	var editJSON []byte
-	if job.Edit != nil && !job.Edit.IsEmpty() {
-		points = job.Edit.Apply(points)
-		if editJSON, err = json.Marshal(job.Edit); err != nil {
-			return err
-		}
-	}
-	if len(points) < 2 {
-		return fmt.Errorf("edit: fewer than 2 points survive the edit (%d)", len(points))
-	}
-
-	pp, err := prepareTrack(ctx, pool, points)
-	if err != nil {
-		return err
-	}
-	m := pp.m
-
-	oldTiles, err := ActivityTiles(ctx, pool, job.ActivityID)
-	if err != nil {
-		return fmt.Errorf("edit: read old tiles: %w", err)
-	}
-
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
-
-	// started_at moves with a Chop — the activity now starts where its first kept point does.
-	// in_heatmap_window follows it, the same predicate migrations/0018 backfilled with.
-	if _, err := tx.Exec(ctx, `
-		UPDATE activities SET
-			distance_meters = $3, duration_seconds = $4, moving_seconds = $5,
-			elevation_gain_m = $6, avg_speed_mps = $7, started_at = $8,
-			trajectory = ST_SetSRID(
-				ST_MakeLine(ARRAY(
-					SELECT ST_MakePointM(lon, lat, t)
-					FROM unnest($9::float8[], $10::float8[], $11::float8[]) AS pt(lon, lat, t)
-				)),
-				4326
-			),
-			track_edit = $12::jsonb,
-			in_heatmap_window = ($8 >= NOW() - make_interval(days => $13))
-		WHERE id = $1 AND user_id = $2
-	`, job.ActivityID, job.UserID,
-		m.distanceM, m.durationS, m.movingS, m.elevationGainM, m.avgSpeedMps, points[0].Time,
-		pp.simpLons, pp.simpLats, pp.simpTs,
-		editJSON, fog.HeatmapWindowDays,
-	); err != nil {
-		return fmt.Errorf("edit: update activity: %w", err)
-	}
-	if _, err := tx.Exec(ctx, `
-		INSERT INTO activity_streams (activity_id, point_count, elapsed_s, elevation_m, heartrate, dist_m)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		ON CONFLICT (activity_id) DO UPDATE SET
-			point_count = EXCLUDED.point_count, elapsed_s = EXCLUDED.elapsed_s,
-			elevation_m = EXCLUDED.elevation_m, heartrate = EXCLUDED.heartrate, dist_m = EXCLUDED.dist_m
-	`, job.ActivityID, len(points), pp.elapsedS, pp.elevM, pp.hr, pp.distM); err != nil {
-		return fmt.Errorf("edit: update streams: %w", err)
-	}
-	// Country/Region matches are insert-only (geo.MatchActivity), so an edit that removed the
-	// only part of a track inside some region has to clear the old matches first.
-	if _, err := tx.Exec(ctx, `DELETE FROM activity_country WHERE activity_id = $1`, job.ActivityID); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(ctx, `DELETE FROM activity_region WHERE activity_id = $1`, job.ActivityID); err != nil {
-		return err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return err
-	}
-
-	// Masks: re-render every tile the edited track touches (overwriting in place), then drop
-	// the ones it no longer touches. Overwriting rather than clearing first means a tile the
-	// track still crosses never goes through a moment with no mask for this activity.
-	newTiles := computeTouchedTiles(points, FogZoom)
-	if err := fog.RenderActivityMasks(ctx, pool, store, job.ActivityID, points, newTiles); err != nil {
-		return fmt.Errorf("edit: render activity masks: %w", err)
-	}
-	if err := fog.RemoveActivityMasks(ctx, pool, store, job.ActivityID, tilesNotIn(oldTiles, newTiles)); err != nil {
-		return fmt.Errorf("edit: remove stale masks: %w", err)
-	}
-
-	if err := geo.MatchActivity(ctx, pool, job.ActivityID); err != nil {
-		return fmt.Errorf("edit: match admin boundaries: %w", err)
-	}
-
-	// Old ∪ new: a tile the edit cut the track out of needs recompositing just as much as one
-	// it still crosses. Deduplication is deliberately not re-run (§4.7.7) — the edit changes
-	// this copy's distance, not which copy of the ride is the real one.
-	if err := MarkFogTilesDirty(ctx, pool, job.UserID, mergeTiles(oldTiles, newTiles)); err != nil {
-		return fmt.Errorf("edit: mark fog tiles dirty: %w", err)
+	if err := reprocessActivity(ctx, pool, store, job.UserID, job.ActivityID, edit); err != nil {
+		return fmt.Errorf("edit: %w", err)
 	}
 	// Rendered here rather than enqueued as a `render_fog` job the way ingest does it: Pending
 	// promises the client that once it clears, *everything* derived from the points — Fog and
@@ -255,11 +145,171 @@ func processTrackEdit(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 	if err := fog.RenderUser(ctx, pool, store, job.UserID); err != nil {
 		return fmt.Errorf("edit: render fog/heatmap: %w", err)
 	}
-	if _, err := pool.Exec(ctx,
-		`UPDATE activities SET edit_pending = false WHERE id = $1 AND user_id = $2`,
-		job.ActivityID, job.UserID,
-	); err != nil {
+	// A Private location change queued while this edit ran reprocesses the activity again;
+	// its badge stays on until that lands.
+	if _, err := pool.Exec(ctx, `
+		UPDATE activities a SET edit_pending = false
+		WHERE a.id = $1 AND a.user_id = $2
+		  AND NOT EXISTS (
+			SELECT 1 FROM jobs j
+			WHERE j.user_id = $2 AND j.kind = 'reprivacy' AND j.state = 'pending'
+			  AND j.payload->'activity_ids' ? a.id::text
+		  )
+	`, job.ActivityID, job.UserID); err != nil {
 		return fmt.Errorf("edit: clear edit_pending: %w", err)
+	}
+	return nil
+}
+
+// errFewPointsAfterEdit is a user's edit leaving less than a line — rejected, unlike a Private
+// location hiding the whole track, which is a valid outcome (the activity just has no geometry).
+var errFewPointsAfterEdit = errors.New("fewer than 2 points survive the edit")
+
+// reprocessActivity re-derives one activity from its raw payload: parse, clip against the
+// account's current Private locations, apply a track edit, then update metrics, trajectory,
+// streams, masks and regions, and mark every tile it touched before or after dirty. It neither
+// renders those tiles nor clears edit_pending — its callers decide when (§4.7.7's edit_track
+// does both straight away; a `reprivacy` job once for the whole batch).
+//
+// edit == nil replays the activity's stored track_edit unchanged; otherwise edit replaces it
+// (empty meaning reset). An activity deleted meanwhile is skipped without error.
+func reprocessActivity(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID, activityID string, edit *TrackEdit) error {
+	var sourceDetail string
+	var rawKey *string
+	var storedEdit []byte
+	err := pool.QueryRow(ctx, `
+		SELECT COALESCE(source_detail, ''), raw_payload_key, track_edit
+		FROM activities WHERE id = $1 AND user_id = $2
+	`, activityID, userID).Scan(&sourceDetail, &rawKey, &storedEdit)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil // deleted while the job was queued: nothing left to reprocess
+	}
+	if err != nil {
+		return fmt.Errorf("load activity: %w", err)
+	}
+	if rawKey == nil {
+		return errors.New("activity has no raw payload to reprocess")
+	}
+
+	userEdit := edit != nil
+	if !userEdit && storedEdit != nil {
+		edit = &TrackEdit{}
+		if err := json.Unmarshal(storedEdit, edit); err != nil {
+			return fmt.Errorf("stored track edit unreadable: %w", err)
+		}
+	}
+
+	// Clipped with the account's current Private locations — the same points the editor's own
+	// list was built from (handleActivityTrackPoints), so what the user saw is what's processed.
+	act, points, err := loadClippedPoints(ctx, pool, store, userID, sourceDetail, *rawKey)
+	if err != nil {
+		return err
+	}
+	var editJSON []byte
+	if edit != nil && !edit.IsEmpty() {
+		if points != nil {
+			points = edit.Apply(points)
+		}
+		if editJSON, err = json.Marshal(edit); err != nil {
+			return err
+		}
+	}
+	if len(points) < 2 {
+		if userEdit && points != nil {
+			return errFewPointsAfterEdit
+		}
+		points = nil // hidden by Private locations, or by a stored edit on top of them
+	}
+
+	startedAt := act.Points[0].Time
+	var pp preparedTrack
+	if points != nil {
+		if pp, err = prepareTrack(ctx, pool, points); err != nil {
+			return err
+		}
+		startedAt = points[0].Time
+	}
+	m := pp.m
+
+	oldTiles, err := ActivityTiles(ctx, pool, activityID)
+	if err != nil {
+		return fmt.Errorf("read old tiles: %w", err)
+	}
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
+
+	// started_at moves with a Chop — the activity now starts where its first kept point does.
+	// in_heatmap_window follows it, the same predicate migrations/0018 backfilled with.
+	// track_edit is only rewritten by a user's edit; a reprivacy pass leaves it as stored.
+	if _, err := tx.Exec(ctx, `
+		UPDATE activities SET
+			distance_meters = $3, duration_seconds = $4, moving_seconds = $5,
+			elevation_gain_m = $6, avg_speed_mps = $7, started_at = $8,
+			trajectory = `+trajectorySQL("$9", "$10", "$11")+`,
+			track_edit = CASE WHEN $14 THEN $12::jsonb ELSE track_edit END,
+			in_heatmap_window = ($8 >= NOW() - make_interval(days => $13))
+		WHERE id = $1 AND user_id = $2
+	`, activityID, userID,
+		m.distanceM, m.durationS, m.movingS, m.elevationGainM, m.avgSpeedMps, startedAt,
+		pp.simpLons, pp.simpLats, pp.simpTs,
+		editJSON, fog.HeatmapWindowDays, userEdit,
+	); err != nil {
+		return fmt.Errorf("update activity: %w", err)
+	}
+	if points == nil {
+		if _, err := tx.Exec(ctx, `DELETE FROM activity_streams WHERE activity_id = $1`, activityID); err != nil {
+			return fmt.Errorf("delete streams: %w", err)
+		}
+	} else if _, err := tx.Exec(ctx, `
+		INSERT INTO activity_streams (activity_id, point_count, elapsed_s, elevation_m, heartrate, dist_m)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (activity_id) DO UPDATE SET
+			point_count = EXCLUDED.point_count, elapsed_s = EXCLUDED.elapsed_s,
+			elevation_m = EXCLUDED.elevation_m, heartrate = EXCLUDED.heartrate, dist_m = EXCLUDED.dist_m
+	`, activityID, len(points), pp.elapsedS, pp.elevM, pp.hr, pp.distM); err != nil {
+		return fmt.Errorf("update streams: %w", err)
+	}
+	// Country/Region matches are insert-only (geo.MatchActivity), so a reprocess that removed
+	// the only part of a track inside some region has to clear the old matches first.
+	if _, err := tx.Exec(ctx, `DELETE FROM activity_country WHERE activity_id = $1`, activityID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM activity_region WHERE activity_id = $1`, activityID); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+
+	// Masks: re-render every tile the new track touches (overwriting in place), then drop
+	// the ones it no longer touches. Overwriting rather than clearing first means a tile the
+	// track still crosses never goes through a moment with no mask for this activity.
+	var newTiles [][2]int
+	if points != nil {
+		newTiles = computeTouchedTiles(points, FogZoom)
+		if err := fog.RenderActivityMasks(ctx, pool, store, activityID, points, newTiles); err != nil {
+			return fmt.Errorf("render activity masks: %w", err)
+		}
+	}
+	if err := fog.RemoveActivityMasks(ctx, pool, store, activityID, tilesNotIn(oldTiles, newTiles)); err != nil {
+		return fmt.Errorf("remove stale masks: %w", err)
+	}
+
+	if points != nil {
+		if err := geo.MatchActivity(ctx, pool, activityID); err != nil {
+			return fmt.Errorf("match admin boundaries: %w", err)
+		}
+	}
+
+	// Old ∪ new: a tile the reprocess cut the track out of needs recompositing just as much as
+	// one it still crosses. Deduplication is deliberately not re-run (§4.7.7) — this changes
+	// the copy's geometry, not which copy of the ride is the real one.
+	if err := MarkFogTilesDirty(ctx, pool, userID, mergeTiles(oldTiles, newTiles)); err != nil {
+		return fmt.Errorf("mark fog tiles dirty: %w", err)
 	}
 	return nil
 }

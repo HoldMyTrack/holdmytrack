@@ -2,28 +2,11 @@ import { useRef, useState } from 'react';
 import { API_BASE_URL, removeAvatar, updateSettings, uploadAvatar } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { CountryPicker } from './CountryPicker';
-import { elevationUnitLabel, feetToMeters, metersToFeet } from './format';
 import { Header } from './Header';
 import { TimezonePicker } from './TimezonePicker';
-import { unitSystemForCountry, type UnitSystem } from './units';
-
-const MAX_PRIVACY_TRIM_CM = 20000;
-
-/** Converts a centimeters value (what the server always takes/returns — cm precision, not
- *  whole meters, is what lets a feet input round-trip back to the exact number typed; see
- *  IMPLEMENTATION.md's Settings-page note) to whatever the input should display it as —
- *  rounded, since the field is a plain whole-number input, the same precision
- *  `formatElevation` (format.ts) already uses for a meters-or-feet value. Used to seed the
- *  field and, in `handleCountryChange` below, to re-express it the moment Country changes
- *  which unit is implied — the field's own state is *not* kept in centimeters in between, so
- *  free typing in either unit never gets silently reconverted underneath the user mid-edit. */
-function trimDisplay(cm: number, system: UnitSystem): string {
-  const meters = cm / 100;
-  return String(Math.round(system === 'imperial' ? metersToFeet(meters) : meters));
-}
 
 /**
- * The Settings page (Avatar, Name, Country, Timezone, Privacy Trim) — reached from the account menu's
+ * The Settings page (Avatar, Name, Country, Timezone) — reached from the account menu's
  * "Settings" item (UserMenu.tsx), a separate screen from ProfilePage.tsx rather than wired
  * into `profile-v1.png`'s own still-unbuilt "Edit profile" button (a direct user choice, not
  * a default). Same page shell as ProfilePage (`Header` + a back button), since both are
@@ -33,16 +16,14 @@ function trimDisplay(cm: number, system: UnitSystem): string {
  * `units.ts`'s `useUnitSystem()` derives metric-vs-imperial from, so every distance/pace/
  * elevation display everywhere (not just this page) changes the moment it's saved — that's
  * why Save calls `updateUser()` on success rather than leaving the change to a future reload.
- * Privacy Trim reacts to Country too, but only within this page and only before Save: its
- * field is shown (and its max) in the same unit Country implies, converted live off the local,
- * still-unsaved Country selection (`unitSystemForCountry`, not `useUnitSystem()`), so switching
- * Country here doesn't leave the trim value looking like it just changed by a factor of ~3.3.
  *
- * Avatar and Name/Country/Timezone/Privacy Trim are two independent save actions, not one
- * combined form submit: the avatar drop-zone commits on drop/pick (matching how a file picker
- * already reads as "done" the instant a file is chosen), while Name/Country/Timezone/Privacy
- * Trim share one Save button since they're plain text/number/picker fields with nothing to
- * commit until asked to.
+ * Avatar and Name/Country/Timezone are two independent save actions, not one combined form
+ * submit: the avatar drop-zone commits on drop/pick (matching how a file picker already reads
+ * as "done" the instant a file is chosen), while Name/Country/Timezone share one Save button
+ * since they're plain text/picker fields with nothing to commit until asked to.
+ *
+ * Private locations (FR-8.1) aren't edited here — they're circles, and only the map can show
+ * one — so this page just links to the map's own window for them.
  */
 export interface SettingsPageProps {
   /** Absent in onboarding — there's no map to go back to yet. */
@@ -54,26 +35,18 @@ export interface SettingsPageProps {
    *  (App.tsx), with no way back to a map it hasn't unlocked yet. Saving with a Country is what
    *  lets App.tsx move on — `updateUser` below changes the very field its gate reads. */
   onboarding?: boolean;
+  /** Opens the map with its Private locations window. Absent in onboarding, like onBack. */
+  onOpenPrivateLocations?: () => void;
 }
 
-export function SettingsPage({ onBack, onOpenProfile, onboarding = false }: SettingsPageProps) {
+export function SettingsPage({ onBack, onOpenProfile, onOpenPrivateLocations, onboarding = false }: SettingsPageProps) {
   const { user, updateUser } = useAuth();
   const [displayName, setDisplayName] = useState(user.displayName);
   const [country, setCountry] = useState(user.country);
   const [timezone, setTimezone] = useState(user.timezone);
-  const [privacyTrim, setPrivacyTrim] = useState(() => trimDisplay(user.privacyTrimCm, unitSystemForCountry(user.country)));
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-
-  // Derived from the *local* Country field, not useUnitSystem()'s saved-account value — Privacy
-  // Trim needs to react to what's picked in this form right now, before Save, the same as every
-  // other field here is still just local state until then.
-  const system = unitSystemForCountry(country);
-
-  // The input's own max, in whichever unit is currently shown — MAX_PRIVACY_TRIM_CM's imperial
-  // equivalent, not the same number relabeled.
-  const trimMax = system === 'imperial' ? Math.round(metersToFeet(MAX_PRIVACY_TRIM_CM / 100)) : MAX_PRIVACY_TRIM_CM / 100;
 
   // Any further edit after a successful save invalidates the "Saved" confirmation — it
   // should read as "your last save succeeded," not linger once the form no longer matches
@@ -81,30 +54,6 @@ export function SettingsPage({ onBack, onOpenProfile, onboarding = false }: Sett
   function editField<T>(setter: (v: T) => void, value: T) {
     setSaved(false);
     setter(value);
-  }
-
-  // Country's own onChange, not a plain editField(setCountry, ...) — the one field whose edit
-  // has to also touch a second field. Converts the *currently typed* Privacy Trim value into
-  // the newly-implied unit right here, synchronously, in the same event handler that changes
-  // `country` — deliberately not a useEffect keyed on the derived `system`, which sounds
-  // equivalent but isn't as easy to reason about (it has to compare against a remembered
-  // previous system via a ref, and only actually runs after the render that already changed
-  // the label/max, which is exactly the kind of two-step timing that's easy to get subtly
-  // wrong). Recomputing "old system, new system" directly from the event and doing the
-  // conversion before either state update commits is simpler to verify by inspection and
-  // guarantees the displayed number and the displayed unit change in the same tick, together.
-  function handleCountryChange(nextCountry: string) {
-    const prevSystem = system;
-    const nextSystem = unitSystemForCountry(nextCountry);
-    if (nextSystem !== prevSystem) {
-      setPrivacyTrim((current) => {
-        const typed = Number(current);
-        if (!Number.isFinite(typed)) return current; // an empty/in-progress edit — leave it alone
-        const meters = prevSystem === 'imperial' ? feetToMeters(typed) : typed;
-        return trimDisplay(meters * 100, nextSystem);
-      });
-    }
-    editField(setCountry, nextCountry);
   }
 
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -146,21 +95,11 @@ export function SettingsPage({ onBack, onOpenProfile, onboarding = false }: Sett
       setSaveError('Choose a country before saving.');
       return;
     }
-    const typedTrim = Number(privacyTrim);
-    if (!Number.isFinite(typedTrim) || typedTrim < 0 || typedTrim > trimMax) {
-      setSaveError(`Privacy trim must be a number between 0 and ${trimMax} ${elevationUnitLabel(system)}.`);
-      return;
-    }
-    // The server only ever takes/stores centimeters (services/server/internal/httpapi/
-    // account.go) — rounded to the nearest cm, not the nearest meter, since privacy_trim_cm
-    // is a Go int: cm precision is what lets a feet input round-trip back to the exact number
-    // typed (docs/IMPLEMENTATION.md's Settings-page note), unlike the old whole-meters column.
-    const trimCm = Math.round((system === 'imperial' ? feetToMeters(typedTrim) : typedTrim) * 100);
     setSaving(true);
     setSaveError(null);
     setSaved(false);
     try {
-      const profile = await updateSettings({ displayName, country, privacyTrimCm: trimCm, timezone });
+      const profile = await updateSettings({ displayName, country, timezone });
       updateUser(profile);
       setSaved(true);
     } catch (err) {
@@ -267,7 +206,7 @@ export function SettingsPage({ onBack, onOpenProfile, onboarding = false }: Sett
             <span className="settings-page__label" id="settings-country-label">
               Country
             </span>
-            <CountryPicker value={country} onChange={handleCountryChange} labelledBy="settings-country-label" />
+            <CountryPicker value={country} onChange={(c) => editField(setCountry, c)} labelledBy="settings-country-label" />
             <p className="settings-page__hint">
               {country ? '' : 'Required. '}Decides whether distance, pace and elevation show in km/m or mi/ft, everywhere in the app.
             </p>
@@ -284,21 +223,20 @@ export function SettingsPage({ onBack, onOpenProfile, onboarding = false }: Sett
             </p>
           </div>
 
-          <label className="settings-page__section">
-            <span className="settings-page__label">Privacy trim ({elevationUnitLabel(system)})</span>
-            <input
-              className="settings-page__input settings-page__input--narrow"
-              type="number"
-              min={0}
-              max={trimMax}
-              value={privacyTrim}
-              onChange={(e) => editField(setPrivacyTrim, e.target.value)}
-            />
-            <p className="settings-page__hint">
-              Trims this distance from the start and end of every new track, so it doesn't reveal exactly where you started or
-              finished. Applies to new uploads only — activities you've already uploaded keep the trim they were processed with.
-            </p>
-          </label>
+          {onOpenPrivateLocations && (
+            <div className="settings-page__section">
+              <span className="settings-page__label">Private locations</span>
+              <p className="settings-page__hint">
+                Circles on the map — home, work — that your tracks never show inside. Any part of an activity that starts or ends
+                in one is hidden everywhere, including your own map.
+              </p>
+              <div>
+                <button type="button" className="settings-page__button" onClick={onOpenPrivateLocations}>
+                  Manage on the map
+                </button>
+              </div>
+            </div>
+          )}
 
           {saveError && <p className="settings-page__error">{saveError}</p>}
           <div className="settings-page__save-row">

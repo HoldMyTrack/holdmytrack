@@ -39,9 +39,11 @@ export interface HeaderProps {
   /** Same shape as onOpenProfile, for the account menu's "Settings" item — passed by the map
    *  screen and by ProfilePage; SettingsPage omits it for the matching reason. */
   onOpenSettings?: () => void;
+  /** The account menu's "Private locations" item — passed by the map screen only. */
+  onOpenPrivateLocations?: () => void;
 }
 
-export function Header({ importControl, exportControl, onBrandClick, onOpenProfile, onOpenSettings }: HeaderProps) {
+export function Header({ importControl, exportControl, onBrandClick, onOpenProfile, onOpenSettings, onOpenPrivateLocations }: HeaderProps) {
   const brand = (
     <>
       <img className="app-header__logo" src={logoUrl} alt="" aria-hidden="true" />
@@ -66,7 +68,7 @@ export function Header({ importControl, exportControl, onBrandClick, onOpenProfi
         <DonateButton />
         {importControl}
         {exportControl}
-        <UserMenu onOpenProfile={onOpenProfile} onOpenSettings={onOpenSettings} />
+        <UserMenu onOpenProfile={onOpenProfile} onOpenSettings={onOpenSettings} onOpenPrivateLocations={onOpenPrivateLocations} />
       </nav>
     </header>
   );

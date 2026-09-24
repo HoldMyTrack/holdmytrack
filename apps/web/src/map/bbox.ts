@@ -11,8 +11,8 @@ import type { ViewState } from './viewState';
  */
 
 /**
- * Never zoom past this, however small the box. A short activity — or one trimmed to almost
- * nothing by the privacy trim — has near-zero extent, and fitBounds on a degenerate box
+ * Never zoom past this, however small the box. A short activity — or one clipped to almost
+ * nothing by a Private location — has near-zero extent, and fitBounds on a degenerate box
  * happily zooms to MapLibre's z22 maximum, where the overzoomed z14 basemap has nothing left
  * to place the track against. z18 is still readable street-level detail.
  */

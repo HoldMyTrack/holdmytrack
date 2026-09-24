@@ -27,22 +27,17 @@ export function unitLabel(system: UnitSystem): 'km' | 'mi' {
 }
 
 /** The short unit `formatElevation` below appends — pulled out so a caller that needs just the
- *  label (SettingsPage.tsx's Privacy Trim field, an editable number, not a formatted string)
+ *  label (PrivateLocationsPanel.tsx's radius readout, a number shown beside a slider)
  *  isn't left duplicating the same ternary. */
 export function elevationUnitLabel(system: UnitSystem): 'm' | 'ft' {
   return system === 'imperial' ? 'ft' : 'm';
 }
 
-/** Bare numeric conversion, not a formatter — no rounding, no unit suffix. For an *editable*
- *  meters value (SettingsPage.tsx's Privacy Trim) that needs to round-trip through whatever
- *  unit the account is currently displayed in, unlike every formatter below, which only ever
- *  produces a final display string. */
+/** Bare numeric conversion, not a formatter — no rounding, no unit suffix. For a meters value
+ *  a caller rounds and labels itself (PrivateLocationsPanel.tsx's radius), unlike every
+ *  formatter below, which only ever produces a final display string. */
 export function metersToFeet(meters: number): number {
   return meters / METERS_PER_FOOT;
-}
-
-export function feetToMeters(feet: number): number {
-  return feet * METERS_PER_FOOT;
 }
 
 /**

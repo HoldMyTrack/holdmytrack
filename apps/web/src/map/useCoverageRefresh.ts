@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { getCoverageStatus } from '../api';
 import { bumpCoverageVersion } from './coverageVersion';
@@ -21,9 +21,14 @@ const MAX_POLLS = 90;
  * source. Each call restarts the watch rather than joining one already running: a second
  * upload or delete can enqueue its jobs just after an in-flight read already came back
  * "done", and restarting is what guarantees that read isn't the last word.
+ *
+ * `onDone`, when given, runs after that refetch — for a caller whose change also moves things
+ * the coverage rasters don't cover (a Private location change reprocesses whole activities),
+ * and which can't otherwise tell when the server has finished.
  */
-export function useCoverageRefresh(map: MapLibreMap | null): () => void {
+export function useCoverageRefresh(map: MapLibreMap | null): (onDone?: () => void) => void {
   const [generation, setGeneration] = useState(0);
+  const onDoneRef = useRef<(() => void) | undefined>(undefined);
 
   useEffect(() => {
     if (generation === 0 || !map) return;
@@ -41,6 +46,7 @@ export function useCoverageRefresh(map: MapLibreMap | null): () => void {
           bumpCoverageVersion();
           refreshFogLayers(map);
           refreshHeatmapLayers(map);
+          onDoneRef.current?.();
         })
         .catch(() => {
           // A failed read just ends this watch; the next upload or delete starts another.
@@ -53,5 +59,8 @@ export function useCoverageRefresh(map: MapLibreMap | null): () => void {
     };
   }, [generation, map]);
 
-  return useCallback(() => setGeneration((g) => g + 1), []);
+  return useCallback((onDone?: () => void) => {
+    onDoneRef.current = onDone;
+    setGeneration((g) => g + 1);
+  }, []);
 }

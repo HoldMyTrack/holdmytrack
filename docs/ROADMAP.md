@@ -115,7 +115,7 @@ Connecting the app to third-party services, and the explorer-tile scoring work t
 An engineering requirement, can land alongside any of the above (`IMPLEMENTATION.md` §5.7).
 
 - [ ] Retention/dormancy policy: tier `activity_streams` to cold storage or drop it after N months of inactivity (`users.last_seen_at`), keeping summaries and fog rasters so the map still renders; warn by email first; recoverable by re-upload.
-- [ ] Raw payload expiry schedule (object storage) — note this caps how far back a future `reprivacy` job or re-trim can reach; document the tradeoff wherever it's implemented.
+- [ ] Raw payload expiry schedule (object storage) — note this caps how far back a `reprivacy` job (a Private location change) can reach; document the tradeoff wherever it's implemented.
 - [ ] Per-user quotas (activity count, total points) — bounds one pathological account's cost, not a monetization lever.
 - [ ] Rate limits on upload, export, and tile requests (the auth endpoints already have `fixedWindowLimiter` — reuse it), plus a CDN/object-store spend cap.
 - [ ] Cost-per-active-user measurement from day one — the number that decides whether `VISION.md` §6's funding model actually works.
@@ -132,12 +132,13 @@ Non-negotiable, GDPR Art. 9 special-category data (`VISION.md` §7).
 - [ ] Health Connect data-type declarations in the Play Console, scoped to only what's actually used (Phase 2 builds the app; the declaration work belongs here).
 - [ ] Confirm we don't need a cookie consent banner — as of this writing the web client sets exactly one cookie (`holdmytrack_session`: `HttpOnly`, `SameSite=Lax`, `Secure` under HTTPS, no `localStorage`/analytics/tracking anywhere in `apps/web`), which should fall under the ePrivacy Directive Art. 5(3) "strictly necessary" exemption — no consent required, only a plain-language disclosure in the privacy policy. Re-check this conclusion at launch time (cookie/analytics usage can drift) and again the day anything non-essential (analytics, an ad pixel, marketing tracking) is added, since that would flip the answer.
 
-### Privacy zones (schema exists, nothing else does — `privacy_zones` table, §3.7)
+### Private locations (`privacy_zones` table, §3.7; FR-8.1)
 
-- [ ] Creation UI (likely on the map, or from SettingsPage.tsx alongside Privacy Trim).
-- [ ] `POST`/`DELETE` endpoints for a zone.
-- [ ] Apply at ingest (§4.1 step 3 already has the placeholder logic for this — wire a real zone set in).
-- [ ] Retroactive `reprivacy` job (`jobs.kind = 'reprivacy'`, §7): re-parses each affected activity's raw payload and re-runs ingest steps 2–6 against the new zone set — the same code path as initial ingest, not a bespoke re-clip. Also mark affected fog/heatmap tiles dirty.
+- [x] Creation UI — on the map (`PrivateLocationsPanel.tsx`, opened from the account menu or Settings).
+- [x] `GET`/`POST`/`PATCH`/`DELETE /v1/private-locations` endpoints.
+- [x] Apply at ingest — the leading and trailing parts of a track inside a location (§4.1 step 3's `ClipEnds`); replaces the fixed endpoint trim (ADR-0010).
+- [x] Retroactive `reprivacy` job (§7) — affected activities show Pending until reprocessed.
+- [ ] Split a track that passes *through* a Private location mid-way: store `activities.trajectory` as a multi-part geometry (MultiLineString, or gap markers) so the inside part can be dropped without drawing a chord across the circle. Touches the tracks tile, the track editor, colored bands/profile (which assume one line), and Android's track rendering.
 
 ---
 

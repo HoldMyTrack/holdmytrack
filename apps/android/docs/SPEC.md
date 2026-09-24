@@ -108,7 +108,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 **Description**: On first attaching the user layers each app session, the camera flies to fit the account's full activity extent, once.
 
-**Behavior**: `GET /v1/activities` is read once per session start, and the bounding box of every row's `bbox` field is unioned client-side (rows with no `bbox` — no recorded trajectory — are skipped). The camera animates to fit that box, capped at zoom 15 so a single very short or heavily privacy-trimmed activity doesn't zoom in on an empty rectangle past the basemap's own z14 data. An account with no geometry at all stays at the whole-world view. Re-attaching the session (e.g., returning from the sign-in screen without actually changing account) does not re-fly the camera a second time in the same app session.
+**Behavior**: `GET /v1/activities` is read once per session start, and the bounding box of every row's `bbox` field is unioned client-side (rows with no `bbox` — no recorded trajectory — are skipped). The camera animates to fit that box, capped at zoom 15 so a single very short activity, or one heavily clipped by a Private location, doesn't zoom in on an empty rectangle past the basemap's own z14 data. An account with no geometry at all stays at the whole-world view. Re-attaching the session (e.g., returning from the sign-in screen without actually changing account) does not re-fly the camera a second time in the same app session.
 
 ### FR-2.4 Attribution
 

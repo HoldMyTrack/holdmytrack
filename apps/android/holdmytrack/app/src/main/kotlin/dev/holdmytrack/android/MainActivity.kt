@@ -411,8 +411,8 @@ class MainActivity : AppCompatActivity() {
     /**
      * Moves the camera to cover everything the account has uploaded, once per session.
      *
-     * The zoom is capped because a single short activity — or one trimmed to almost nothing by
-     * the privacy trim — has a near-zero extent, and fitting the camera to that box lands well
+     * The zoom is capped because a single short activity — or one clipped to almost nothing by
+     * a Private location — has a near-zero extent, and fitting the camera to that box lands well
      * past the basemap's z14 data, on a grey rectangle. An account with no geometry yet is left
      * at the world view, which is the truthful thing to show for a history that is empty.
      */
