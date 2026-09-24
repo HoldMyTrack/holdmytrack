@@ -1,5 +1,6 @@
 import { Map as MapLibreMap } from 'maplibre-gl';
 import { API_BASE_URL, type ActivityQuery } from '../api';
+import logoUrl from '../assets/logo.png';
 import { basemapOrigin } from './config';
 import { ensureFogLayer } from './fog';
 import { ensureHeatmapLayer } from './heatmap';
@@ -45,6 +46,16 @@ const ATTRIBUTION_MAX_FONT_PX = 28;
 /** Distance from the canvas's bottom-right corner to the credit line's own corner, same
  *  fraction-of-shorter-side scaling as the font size above. */
 const ATTRIBUTION_MARGIN_FRACTION = 0.014;
+
+/** The HoldMyTrack watermark's wordmark font size, relative to the attribution's own font
+ *  size rather than its own fraction — the two share one lower strip, so they scale together
+ *  and the mark stays the same modest step larger than the credit line at every output size. */
+const WATERMARK_FONT_SCALE = 1.15;
+/** The logo glyph's height, as a multiple of the wordmark's font size. */
+const WATERMARK_LOGO_SCALE = 1.7;
+/** Drawn at partial opacity with no backing plate — a signature, not a banner competing with
+ *  the map for attention. */
+const WATERMARK_ALPHA = 0.7;
 
 export interface ExportViewState {
   flavor: Flavor;
@@ -99,7 +110,8 @@ export async function exportFramedImage(
     // pixel off after rounding (and a preset frame's ratio can differ from its target by a
     // rounding pixel too), and attribution must go onto a 2D canvas regardless.
     const finalCanvas = scaleCanvas(canvas, outWidth, outHeight);
-    drawAttribution(finalCanvas);
+    const stripBottom = drawAttribution(finalCanvas);
+    await drawWatermark(finalCanvas, stripBottom, state.flavor);
 
     const blob = await new Promise<Blob | null>((resolve) => {
       finalCanvas.toBlob(resolve, 'image/png');
@@ -134,20 +146,15 @@ function scaleCanvas(source: HTMLCanvasElement, widthPx: number, heightPx: numbe
  * text can disappear against a same-toned background, the same "needs to read regardless of
  * what's underneath" reasoning `IMPLEMENTATION.md` §4.2 already used for fog's own veil.
  *
- * `docs/ROADMAP.md`'s HoldMyTrack-logo item shares this same lower-right corner and this same draw
- * call site by design — landing it later just means a second small draw call here, not a new
- * pass over the canvas.
+ * `drawWatermark` below shares this same lower strip, mirrored into the bottom-left corner,
+ * with the same `stripMetrics` sizing so the two scale together and keep the same corner margin.
+ * Returns the plate's bottom edge, so the watermark can end on exactly the same line.
  */
-function drawAttribution(canvas: HTMLCanvasElement): void {
+function drawAttribution(canvas: HTMLCanvasElement): number {
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('export: could not create attribution canvas context');
 
-  const shortSide = Math.min(canvas.width, canvas.height);
-  const fontPx = Math.min(
-    ATTRIBUTION_MAX_FONT_PX,
-    Math.max(ATTRIBUTION_MIN_FONT_PX, shortSide * ATTRIBUTION_FONT_FRACTION),
-  );
-  const margin = Math.max(fontPx * 0.5, shortSide * ATTRIBUTION_MARGIN_FRACTION);
+  const { fontPx, margin } = stripMetrics(canvas);
   const padX = fontPx * 0.5;
   const padY = fontPx * 0.3;
 
@@ -175,6 +182,86 @@ function drawAttribution(canvas: HTMLCanvasElement): void {
 
   ctx.fillStyle = '#ffffff';
   ctx.fillText(ATTRIBUTION_TEXT, baselineX - padX, baselineY);
+  return baselineY + descent + padY;
+}
+
+/** The lower strip's shared sizing: the attribution font size and the corner margin, both
+ *  scaled off the canvas's shorter side. */
+function stripMetrics(canvas: HTMLCanvasElement): { fontPx: number; margin: number } {
+  const shortSide = Math.min(canvas.width, canvas.height);
+  const fontPx = Math.min(
+    ATTRIBUTION_MAX_FONT_PX,
+    Math.max(ATTRIBUTION_MIN_FONT_PX, shortSide * ATTRIBUTION_FONT_FRACTION),
+  );
+  const margin = Math.max(fontPx * 0.5, shortSide * ATTRIBUTION_MARGIN_FRACTION);
+  return { fontPx, margin };
+}
+
+/**
+ * Bakes the HoldMyTrack logo and "HoldMyTrack" wordmark into the bottom-left corner of
+ * `canvas` in place — the opposite end of the attribution's lower strip, with the same corner
+ * margin and its bottom edge on `bottomY` (the attribution plate's own bottom edge), so the
+ * two never overlap and the map's middle stays clear. Always drawn, like attribution — every
+ * export carries it.
+ * The wordmark copies `Header.tsx`'s own brand: "HoldMy" regular, "Track" bold, in the header's
+ * serif font. Unlike attribution it has no backing plate, just `WATERMARK_ALPHA` overall, so
+ * its colors follow the basemap flavor instead: the header's own dark ink/amber on light
+ * flavors, light counterparts on `dark`/`black`.
+ *
+ * The logo is the same bundled `logo.png` the header uses, so it's same-origin and drawing it
+ * doesn't taint the canvas `toBlob()` reads. The serif font is awaited first because canvas
+ * `fillText` doesn't wait for a web font — it just uses the fallback if the font isn't loaded
+ * yet. Neither wait can fail the export: a font that never loads falls back to `serif`, and a
+ * logo that fails to decode leaves the wordmark on its own.
+ */
+async function drawWatermark(canvas: HTMLCanvasElement, bottomY: number, flavor: Flavor): Promise<void> {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('export: could not create watermark canvas context');
+
+  const { fontPx: attributionFontPx, margin } = stripMetrics(canvas);
+  const fontPx = attributionFontPx * WATERMARK_FONT_SCALE;
+  const logoH = fontPx * WATERMARK_LOGO_SCALE;
+  const gap = fontPx * 0.35;
+  const lightFont = `400 ${fontPx}px Fraunces, serif`;
+  const boldFont = `800 ${fontPx}px Fraunces, serif`;
+
+  const [logo] = await Promise.all([
+    loadImage(logoUrl).catch(() => null),
+    document.fonts?.load(lightFont).catch(() => undefined),
+    document.fonts?.load(boldFont).catch(() => undefined),
+  ]);
+
+  ctx.font = lightFont;
+  const lightWidth = ctx.measureText('HoldMy').width;
+
+  const logoW = logo ? (logo.naturalWidth / logo.naturalHeight) * logoH : 0;
+  const midY = bottomY - Math.max(logoH, fontPx) / 2;
+  const dark = flavor === 'dark' || flavor === 'black';
+
+  ctx.save();
+  ctx.globalAlpha = WATERMARK_ALPHA;
+
+  let x = margin;
+  if (logo) {
+    ctx.drawImage(logo, x, midY - logoH / 2, logoW, logoH);
+    x += logoW + gap;
+  }
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = dark ? '#e6ebe8' : '#4a5750';
+  ctx.font = lightFont;
+  ctx.fillText('HoldMy', x, midY);
+  // The header's "Track" amber, lightened on dark flavors so it still reads there.
+  ctx.fillStyle = dark ? '#e0a84a' : '#9a6b1e';
+  ctx.font = boldFont;
+  ctx.fillText('Track', x + lightWidth, midY);
+  ctx.restore();
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  const img = new Image();
+  img.src = src;
+  return img.decode().then(() => img);
 }
 
 interface OffscreenView {
@@ -188,10 +275,10 @@ interface OffscreenView {
 
 /**
  * The offscreen-instance/overlay-replay machinery — kept apart from `exportFramedImage` above
- * so that function reads as the geometry alone. Attribution bake-in (`drawAttribution` above;
- * the still-unbuilt HoldMyTrack-logo item tracked in `docs/ROADMAP.md` will join it) belongs on
- * the *final* canvas in `exportFramedImage` (post-scale — the one actually encoded to PNG),
- * not on the canvas this returns.
+ * so that function reads as the geometry alone. Attribution and watermark bake-in
+ * (`drawAttribution`/`drawWatermark` above) belongs on the *final* canvas in
+ * `exportFramedImage` (post-scale — the one actually encoded to PNG), not on the canvas this
+ * returns.
  */
 async function renderOffscreen(
   liveMap: MapLibreMap,
