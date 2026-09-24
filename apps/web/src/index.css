@@ -253,6 +253,11 @@ body {
   background: rgb(var(--fm-ink-rgb) / 6%);
 }
 
+/* The About entry is an <a>, not a <button> — drop the link styling so it matches. */
+a.user-menu__item {
+  text-decoration: none;
+}
+
 .user-menu__item:disabled {
   color: rgb(var(--fm-ink-rgb) / 45%);
   cursor: default;
@@ -2944,11 +2949,22 @@ body {
    to sit inside of, since signing in is a precondition for either existing. */
 .auth-gate {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 16px;
   min-height: 100vh;
   padding: 24px;
   background: var(--fm-bg);
+}
+
+.auth-gate__about {
+  font-size: 13px;
+  color: var(--fm-ink-secondary);
+}
+
+.auth-gate__about:hover {
+  color: var(--fm-accent-strong);
 }
 
 .auth-gate__card {

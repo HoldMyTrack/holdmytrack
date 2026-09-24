@@ -233,7 +233,7 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 
 ## 9. Known Limitations & Out-of-Scope Items
 
-Named here rather than left implicit, the way `docs/SPEC.md` §14 does for the wider system:
+Named here rather than left implicit, the way `docs/SPEC.md` §15 does for the wider system:
 
 - **No visual design system.** No icon set, no launcher icon, no color/type/spacing tokens — four functional screens waiting on root `docs/ROADMAP.md` Phase 3's design freeze (`apps/android/docs/ROADMAP.md` Phase 5).
 - **No filter controls.** The map always shows the account's complete, unfiltered history; there is no Android equivalent of the web's date-range picker, TYPE/DISTANCE filters, or per-track hide/show.

@@ -123,6 +123,11 @@ export function UserMenu({ onOpenProfile, onOpenSettings }: UserMenuProps) {
               Settings
             </button>
           )}
+          {/* A plain link, not a navigation callback: About is the static about.html page,
+              outside this app, so it's a real page load (and back returns here). */}
+          <a role="menuitem" className="user-menu__item" href="/about">
+            About HoldMyTrack
+          </a>
           <button
             type="button"
             role="menuitem"

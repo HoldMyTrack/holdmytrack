@@ -42,5 +42,10 @@ export default defineConfig({
     // At ~326 MB that is slow but correct for Phase 1; production moves it to
     // object storage (IMPLEMENTATION.md §5.4).
     chunkSizeWarningLimit: 1500,
+    // Two pages: the app itself, and the static public About page (about.html), which
+    // needs no JavaScript and stays readable without an account. Caddy serves it at /about.
+    rollupOptions: {
+      input: { main: 'index.html', about: 'about.html' },
+    },
   },
 });
