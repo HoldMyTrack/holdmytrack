@@ -51,6 +51,12 @@ services:
       - web-node-modules:/app/node_modules
     environment:
       VITE_DEV_HOST: "0.0.0.0"
+      # Pinned because the bind mount above also exposes a developer's apps/web/.env.local,
+      # and Vite reads it: an API base pointed elsewhere leaves the suite stuck on the
+      # sign-in screen, and a planet basemap origin fails its Ohio-bounds check. Real env
+      # vars outrank every .env file, and an empty VITE_BASEMAP_ORIGIN means same-origin.
+      VITE_API_BASE_URL: "http://localhost:8080"
+      VITE_BASEMAP_ORIGIN: ""
       # No GPU in the container. Chromium >=130 refuses to fall back to SwiftShader for
       # WebGL without an explicit flag, and MapLibre is WebGL. Without these the map
       # never renders and the failure does not name its cause.

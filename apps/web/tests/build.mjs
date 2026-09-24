@@ -102,7 +102,9 @@ describe('production build', () => {
   it('emits the maplibre worker as a real asset', async () => {
     const res = await fetch(`${BASE}/`);
     const html = await res.text();
-    const entry = html.match(/\/assets\/index-[\w-]+\.js/)?.[0];
+    // Whatever module script index.html loads, not a fixed name: the chunk is named after
+    // its rollup input (vite.config.ts), which is `main` since about.html became a second one.
+    const entry = html.match(/<script type="module"[^>]*src="(\/assets\/[\w-]+\.js)"/)?.[1];
     assert.ok(entry, 'entry chunk in index.html');
     const js = await (await fetch(`${BASE}${entry}`)).text();
     const worker = js.match(/\/assets\/maplibre-gl-worker-[\w-]+\.js/)?.[0];

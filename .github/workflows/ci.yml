@@ -1,0 +1,83 @@
+# Runs the checks that already exist (docs/DEVELOPMENT.md's verification checklist) on every
+# push and pull request. CI only: nothing here deploys. Auto-deploy is deliberately gated on
+# backups existing first (docs/ROADMAP.md, "CI on push/PR").
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: Go tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: services/server/go.mod
+          cache-dependency-path: services/server/go.sum
+      - run: go test -coverprofile=coverage.out ./...
+      # Coverage of the Go unit tests only: the Playwright suites exercise far more of the
+      # server but aren't instrumented. Informational (codecov.yml), never a merge gate, and
+      # an upload failure doesn't fail the build.
+      - uses: codecov/codecov-action@v5
+        with:
+          files: services/server/coverage.out
+          flags: go
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  web:
+    name: Web typecheck and unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test:unit
+      - run: npm run verify:style
+
+  # `make verify verify-build`: the whole dev stack (db, minio, migrate, api) plus headless
+  # Chromium, exactly as it runs locally.
+  e2e:
+    name: Map verification (make verify, verify-build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      # The basemap extract is gitignored and cut from a dated Protomaps build that the
+      # bucket only keeps for about a week (apps/web/scripts/build-basemap.sh). Keyed on
+      # that script, so bumping its BUILD pin or bbox cuts a fresh one; a cache miss after
+      # the pinned build has aged out fails here with a 404, and the fix is bumping BUILD.
+      - uses: actions/cache@v4
+        id: basemap
+        with:
+          path: apps/web/public/basemap/basemap.pmtiles
+          key: basemap-${{ hashFiles('apps/web/scripts/build-basemap.sh') }}
+      - if: steps.basemap.outputs.cache-hit != 'true'
+        run: make basemap
+      - run: make verify verify-build
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: apps/web/tests/screenshots/
+          if-no-files-found: ignore
+      - if: failure()
+        run: docker compose logs api migrate
