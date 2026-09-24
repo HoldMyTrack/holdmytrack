@@ -15,7 +15,7 @@ This document specifies HoldMyTrack's functional behavior as currently implement
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and privacy trim, FR-1.7; email verification, FR-1.8; Sign in with Google on the web, FR-1.9), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), and the public About page (FR-10).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and privacy trim, FR-1.7; email verification, FR-1.8; Sign in with Google on the web, FR-1.9), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About page (FR-10), and the Donate link out to Open Collective (FR-11).
 
 **Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), explorer-tile gamification, the rest of "Export" (story cards, animated reveals — high-resolution map export itself is built, FR-4.10 below), and user-defined privacy zones (a `privacy_zones` table exists in the schema — `IMPLEMENTATION.md` §3.7 — but no endpoint or UI creates or applies one today; only the endpoint-trim privacy control in FR-8.1 below, user-adjustable via FR-1.7's Settings page, is functional). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace/heart-rate stay as per-activity route context (FR-4.9) rather than an analysed, all-time performance record. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
@@ -741,7 +741,20 @@ All upload functionality requires an active session (demo or registered — FR-1
 4. The page is reachable from the sign-in screen ("What is HoldMyTrack?", below the form) and from the account menu ("About HoldMyTrack") for a signed-in or demo session.
 5. `/robots.txt` allows crawling except for `/v1/` and `/tiles/`, and points to `/sitemap.xml`, which lists `/` and `/about`.
 
-## 13. Non-Functional Requirements (summary)
+## 13. FR-11 — Donations
+
+### FR-11.1 Donate
+
+**Description**: The header's Donate button is how a visitor reaches HoldMyTrack's funding — recurring community donations with a public ledger on Open Collective (`VISION.md` §6.1). HoldMyTrack itself takes no payment and stores nothing about a donation.
+
+**Preconditions**: A signed-in or demo session (the button lives in the app header).
+
+**Behavior**:
+1. The button shows a heart icon followed by "Donate"; on a phone-width screen (≤768px) it shows the heart alone.
+2. While no Open Collective is configured (`OPEN_COLLECTIVE_SLUG` empty), clicking Donate opens a notice explaining that donations aren't open yet, and nothing else happens.
+3. Once one is configured, Donate is a link to `https://opencollective.com/<slug>/donate`, opened in a new tab so the map is kept; choosing an amount, one-off or monthly, and paying all happen on Open Collective.
+
+## 14. Non-Functional Requirements (summary)
 
 This section summarizes cross-cutting behavior specified elsewhere in this document, for convenience — it does not introduce new requirements.
 
@@ -754,7 +767,7 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 | **No reload required** | Every list/summary this document describes updates itself automatically as background processing completes (FR-3.1, FR-3.4) — a manual page reload is never required to see current data. |
 | **Idempotency** | Re-submitting the same activity content (FR-3.5) or the same password-reset token (FR-1.6) never has an effect beyond the first time. |
 
-## 14. Mobile Browser Support
+## 15. Mobile Browser Support
 
 **Known issue**: The behavior below is what was designed and implemented, but the actual mobile experience has been reported directly as unusable, not just rough — this section describes intent, not a verified, working feature. Treat it as broken until re-verified on a real device and re-confirmed; see `docs/ROADMAP.md`'s "Mobile browser support" item (Phase 3).
 
@@ -768,7 +781,7 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 
 **Explicitly not built** (hover-only, no touch equivalent, unlike Trends above — a continuous position read with no discrete point to tap, not a per-bar value): the colored zone segments' and pace/heart-rate + elevation profile's exact hover values (FR-4.8, FR-4.9), and the two-way map-track-hover ↔ Activities-row-underline highlight (FR-4.1, FR-5.4). Both remain mouse-only; a touchscreen user can still see the colored bands and elevation curve themselves, and can still focus/select a track by tapping it, just not read an exact value by touch alone the way a mouse hover shows one.
 
-## 15. Out-of-scope items, tracked for future revisions of this document
+## 16. Out-of-scope items, tracked for future revisions of this document
 
 The following are named in `VISION.md`'s roadmap but have no functional requirements in this document because they are not yet built:
 

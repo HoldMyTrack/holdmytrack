@@ -150,6 +150,9 @@ body {
    specifically so Donate doesn't read as just another neutral nav action; it's how HoldMyTrack
    is funded (business_plan.md §6), not a footnote. */
 .donate-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 1px solid var(--fm-donate);
   border-radius: 8px;
   padding: 6px 12px;
@@ -158,7 +161,14 @@ body {
   font-weight: 600;
   font-size: 13px;
   color: var(--fm-donate-text);
+  text-decoration: none;
   cursor: pointer;
+}
+
+.donate-button__icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
 }
 
 .donate-button:hover {
@@ -3346,6 +3356,17 @@ a.user-menu__item {
   .export-button {
     padding: 6px 9px;
     font-size: 12.5px;
+  }
+
+  /* Heart only on a phone — the header was already ~30px wider than a 390px viewport with
+     the word alone, and the heart is recognizable without it (GitHub's own Sponsor
+     heart). The button's aria-label keeps its accessible name. */
+  .donate-button {
+    padding: 6px 8px;
+  }
+
+  .donate-button__label {
+    display: none;
   }
 
   /* Desktop anchors this dropdown to its own trigger's right edge (`right: 0` on the rule
