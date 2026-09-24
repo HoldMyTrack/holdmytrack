@@ -939,21 +939,33 @@ a.user-menu__item {
   background: var(--fm-surface-tint-strong);
 }
 
-/* Same chip as the Type trigger beside it, minus the caret — a plain one-shot action. */
+/* An icon, not a text chip — sized to sit beside the 15px select-all checkbox as its
+   sibling (a checkbox outline split diagonally, half filled), with a little padding for a
+   usable hit area. Muted ink rather than the checkbox's accent: it's an action, not state. */
 .activities-panel__invert {
-  border: 1px solid var(--fm-border-panel);
-  border-radius: 7px;
-  padding: 7px 11px;
-  background: var(--fm-surface-tint);
-  color: var(--fm-ink);
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 500;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 23px;
+  height: 23px;
+  margin-left: -6px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  color: rgb(var(--fm-ink-rgb) / 60%);
   cursor: pointer;
+}
+
+.activities-panel__invert svg {
+  width: 15px;
+  height: 15px;
 }
 
 .activities-panel__invert:hover:not(:disabled) {
   background: var(--fm-surface-tint-strong);
+  color: var(--fm-ink);
 }
 
 .activities-panel__invert:disabled {
@@ -3297,8 +3309,7 @@ a.user-menu__item {
     height: 34px;
   }
 
-  .activities-panel__type-trigger,
-  .activities-panel__invert {
+  .activities-panel__type-trigger {
     padding: 8px 6px;
   }
 
