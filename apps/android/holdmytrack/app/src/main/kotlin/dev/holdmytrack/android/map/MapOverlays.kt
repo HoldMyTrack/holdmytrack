@@ -1,16 +1,22 @@
 package dev.holdmytrack.android.map
 
 import dev.holdmytrack.android.BuildConfig
+import dev.holdmytrack.android.recording.RecordedPoint
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.layers.RasterLayer
 import org.maplibre.android.style.layers.SymbolLayer
+import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.android.style.sources.RasterSource
 import org.maplibre.android.style.sources.TileSet
 import org.maplibre.android.style.sources.VectorSource
+import org.maplibre.geojson.FeatureCollection
+import org.maplibre.geojson.LineString
+import org.maplibre.geojson.Point
 
 /**
  * The three mutually exclusive views `docs/IMPLEMENTATION.md` §4.2.2 names — one toggle, not
@@ -98,6 +104,21 @@ object MapOverlays {
     private const val HEATMAP_FILL_COLOR = "#b07e2e"
     private const val HEATMAP_FILL_OPACITY = 0.45f
 
+    /** Every user layer [attach] adds — what [setRecording] hides wholesale. */
+    private val USER_LAYER_IDS = listOf(
+        FOG_LAYER_ID, HEATMAP_LAYER_ID,
+        COUNTRY_FOG_LAYER_ID, COUNTRY_HEATMAP_LAYER_ID,
+        REGION_FOG_LAYER_ID, REGION_HEATMAP_LAYER_ID,
+        TRACKS_LAYER_ID,
+    )
+
+    private const val LIVE_TRACK_SOURCE_ID = "live-track"
+    private const val LIVE_TRACK_LAYER_ID = "live-track-line"
+    private const val LIVE_POSITION_SOURCE_ID = "live-position"
+    private const val LIVE_POSITION_LAYER_ID = "live-position-dot"
+    private const val LIVE_TRACK_WIDTH = 4f
+    private const val LIVE_POSITION_RADIUS = 6f
+
     /**
      * Adds all three layers, hidden or visible per [mode]. Safe to call against a style that
      * already has them: a style reload (a day/night flavor swap) discards custom layers, so
@@ -142,6 +163,61 @@ object MapOverlays {
         setVisible(style, COUNTRY_HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
         setVisible(style, REGION_HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
         setVisible(style, TRACKS_LAYER_ID, mode == MapMode.NORMAL)
+    }
+
+    /**
+     * While a recording is in progress the map shows that recording and nothing else — no
+     * history tracks, no fog, no heatmap, whichever [mode] was selected. Ending it restores
+     * [mode]. Only the user layers are touched; the live track ([attachLiveTrack]) is always
+     * on and simply empty when nothing is recording.
+     */
+    fun setRecording(style: Style, recording: Boolean, mode: MapMode) {
+        if (recording) USER_LAYER_IDS.forEach { setVisible(style, it, false) } else setMode(style, mode)
+    }
+
+    /**
+     * The in-progress recording's line and a dot at its latest fix, drawn from the points
+     * `RecordingService` holds on the device — not from the server, which has never seen them.
+     * Added on top of everything, labels included: it's the one thing on the map that
+     * matters while recording. Unlike [attach] this needs no session, so it goes on at style
+     * load. Re-runnable, like [attach].
+     */
+    fun attachLiveTrack(style: Style) {
+        if (style.getSource(LIVE_TRACK_SOURCE_ID) == null) style.addSource(GeoJsonSource(LIVE_TRACK_SOURCE_ID))
+        if (style.getSource(LIVE_POSITION_SOURCE_ID) == null) style.addSource(GeoJsonSource(LIVE_POSITION_SOURCE_ID))
+        if (style.getLayer(LIVE_TRACK_LAYER_ID) == null) {
+            style.addLayer(
+                LineLayer(LIVE_TRACK_LAYER_ID, LIVE_TRACK_SOURCE_ID).withProperties(
+                    PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                    PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+                    PropertyFactory.lineColor(TRACK_COLOR),
+                    PropertyFactory.lineWidth(LIVE_TRACK_WIDTH),
+                ),
+            )
+        }
+        if (style.getLayer(LIVE_POSITION_LAYER_ID) == null) {
+            style.addLayer(
+                CircleLayer(LIVE_POSITION_LAYER_ID, LIVE_POSITION_SOURCE_ID).withProperties(
+                    PropertyFactory.circleColor(TRACK_COLOR),
+                    PropertyFactory.circleRadius(LIVE_POSITION_RADIUS),
+                    PropertyFactory.circleStrokeColor("#ffffff"),
+                    PropertyFactory.circleStrokeWidth(2f),
+                ),
+            )
+        }
+    }
+
+    /** Redraws the live track from scratch — an empty list clears it. */
+    fun updateLiveTrack(style: Style, points: List<RecordedPoint>) {
+        val coordinates = points.map { Point.fromLngLat(it.lon, it.lat) }
+        val empty = FeatureCollection.fromFeatures(emptyList())
+        style.getSourceAs<GeoJsonSource>(LIVE_TRACK_SOURCE_ID)?.let { source ->
+            if (coordinates.size < 2) source.setGeoJson(empty) else source.setGeoJson(LineString.fromLngLats(coordinates))
+        }
+        style.getSourceAs<GeoJsonSource>(LIVE_POSITION_SOURCE_ID)?.let { source ->
+            val last = coordinates.lastOrNull()
+            if (last == null) source.setGeoJson(empty) else source.setGeoJson(last)
+        }
     }
 
     /**

@@ -104,16 +104,18 @@
             android:label="@string/status_title"
             android:theme="@style/Theme.AppCompat.DayNight" />
 
-        <!-- Not exported: reached only from MainActivity's burger menu, never by another app. -->
+        <!-- Not exported: reached only from Recorded Activities' Edit, never by another app. -->
         <activity
             android:name=".recording.RecordingActivity"
             android:exported="false"
-            android:label="@string/menu_gps_logger"
+            android:label="@string/recording_edit_title"
             android:theme="@style/Theme.AppCompat.DayNight" />
 
         <!-- A foreground service so GPS keeps running while the screen is off — an ordinary
              background process is free game for the OS to kill, and a killed recording with
-             no recovery is worse than the app not offering this at all. -->
+             no recovery is worse than the app not offering this at all. Started by the map's
+             record button and by its own notification's Pause/Resume and Stop actions, all
+             through explicit intents, so it never needs exporting. -->
         <service
             android:name=".recording.RecordingService"
             android:exported="false"

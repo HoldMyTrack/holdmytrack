@@ -26,11 +26,12 @@ import java.time.format.FormatStyle
 import kotlinx.coroutines.launch
 
 /**
- * Every GPS Logger recording on this device, filterable by sync status and activity type —
- * the review-and-queue step the deferred-sync design added: `RecordingActivity`'s Stop no
- * longer submits anything, so this is where a recording actually gets marked to go out (the
- * per-row checkbox) and where `RecordingActivity`'s Edit button leads back to, reused as-is
- * (`docs/SPEC.md` FR-3.8 / `apps/android/docs/ROADMAP.md` Phase 7).
+ * Every GPS recording on this device that hasn't synced yet, filterable by sync status and
+ * activity type — the review-and-queue step: Stop (`RecordingService`) only saves locally, so
+ * this is where a recording actually gets marked to go out (the per-row checkbox) and where
+ * Edit (`RecordingActivity`) is reached (`docs/SPEC.md` FR-3.8 / `apps/android/docs/ROADMAP.md`
+ * Phase 7). A row leaves this list once it syncs — it's deleted from the device, and lives on
+ * the server from then on.
  *
  * Rows are built in code rather than from a row layout, matching `SyncStatusActivity`'s own
  * convention for the same reason it states there: no component vocabulary exists yet to build
@@ -48,7 +49,7 @@ class RecordedActivitiesActivity : AppCompatActivity() {
     private var all: List<RecordedActivityRecord> = emptyList()
 
     /** Index-aligned with `statusFilter`'s adapter — null means "All". */
-    private val statusValues = listOf(null, SyncStatus.NOT_SYNCED, SyncStatus.QUEUED, SyncStatus.SYNCED)
+    private val statusValues = listOf(null, SyncStatus.NOT_SYNCED, SyncStatus.QUEUED)
 
     /** Index-aligned with `typeFilter`'s adapter; rebuilt whenever the underlying activity
      *  types on file change, so null (index 0, "All types") is the only value guaranteed to
@@ -71,7 +72,6 @@ class RecordedActivitiesActivity : AppCompatActivity() {
                 getString(R.string.recorded_filter_all),
                 getString(R.string.recorded_status_not_synced),
                 getString(R.string.recorded_status_queued),
-                getString(R.string.recorded_status_synced),
             ),
         )
         val filterListener = object : AdapterView.OnItemSelectedListener {
@@ -82,8 +82,8 @@ class RecordedActivitiesActivity : AppCompatActivity() {
         typeFilter.onItemSelectedListener = filterListener
     }
 
-    /** Re-read on every resume, not just on create — returning from Edit (or from a Stop that
-     *  just added a new row) is a resume, and there is no other signal that the underlying
+    /** Re-read on every resume, not just on create — returning from Edit (or from a Sync that
+     *  just removed rows) is a resume, and there is no other signal that the underlying
      *  table changed. */
     override fun onResume() {
         super.onResume()
@@ -146,7 +146,7 @@ class RecordedActivitiesActivity : AppCompatActivity() {
                 // httpapi/auth.go) — so queuing is blocked here too, matching the Sync
                 // screen's own demo gate: no point letting a demo account queue something
                 // "Sync Now" can never actually take.
-                isEnabled = record.syncStatus != SyncStatus.SYNCED && !Session.isDemo && !needsType
+                isEnabled = !Session.isDemo && !needsType
                 setOnCheckedChangeListener { _, checked ->
                     val newStatus = if (checked) SyncStatus.QUEUED else SyncStatus.NOT_SYNCED
                     lifecycleScope.launch {
@@ -185,7 +185,7 @@ class RecordedActivitiesActivity : AppCompatActivity() {
                     record.distanceMeters / 1000.0,
                     statusLabel(record.syncStatus),
                 )
-                text = if (needsType && record.syncStatus != SyncStatus.SYNCED) {
+                text = if (needsType) {
                     "$subtitle · ${getString(R.string.recorded_row_needs_type)}"
                 } else {
                     subtitle
@@ -207,11 +207,8 @@ class RecordedActivitiesActivity : AppCompatActivity() {
             },
         )
 
-        // Always enabled, regardless of sync status — unlike Edit, which locks once synced,
-        // there's nothing left for a synced row's own fields to protect against, and removing
-        // a row from this device's list is a decision the user can always make. Local-only:
-        // see RecordedActivityStore.delete's own doc comment for why a synced row's real
-        // server-side activity isn't touched, and the confirmation dialog below says so too.
+        // Every row here is unsynced, so Delete discards the only copy — the confirmation
+        // dialog below says so.
         row.addView(
             Button(this).apply {
                 text = getString(R.string.recording_delete)
@@ -223,14 +220,9 @@ class RecordedActivitiesActivity : AppCompatActivity() {
     }
 
     private fun confirmDelete(record: RecordedActivityRecord) {
-        val message = if (record.syncStatus == SyncStatus.SYNCED) {
-            R.string.recorded_delete_confirm_message_synced
-        } else {
-            R.string.recorded_delete_confirm_message_unsynced
-        }
         AlertDialog.Builder(this)
             .setTitle(R.string.recorded_delete_confirm_title)
-            .setMessage(message)
+            .setMessage(R.string.recorded_delete_confirm_message)
             .setPositiveButton(R.string.recording_delete) { _, _ ->
                 lifecycleScope.launch {
                     store.delete(record.id)
@@ -245,7 +237,6 @@ class RecordedActivitiesActivity : AppCompatActivity() {
 
     private fun statusLabel(status: String) = when (status) {
         SyncStatus.QUEUED -> getString(R.string.recorded_status_queued)
-        SyncStatus.SYNCED -> getString(R.string.recorded_status_synced)
         else -> getString(R.string.recorded_status_not_synced)
     }
 
