@@ -19,6 +19,10 @@ export interface ExportButtonProps {
  * `map` is passed in rather than read here, the same "callback wiring belongs where the map
  * instance is" reasoning Header.tsx's own doc comment already gives for why `importControl`
  * is a prop.
+ *
+ * A camera icon rather than the word "Export": what it makes is a picture of the map, and the
+ * icon says so where "Export" read as a data export. The accessible name and the hover
+ * tooltip carry the words.
  */
 export function ExportButton({ map, active, onOpen }: ExportButtonProps) {
   return (
@@ -27,10 +31,15 @@ export function ExportButton({ map, active, onOpen }: ExportButtonProps) {
       className="export-button"
       data-testid="export-button"
       aria-pressed={active}
+      aria-label="Export map image"
+      title="Export map image"
       onClick={onOpen}
       disabled={!map}
     >
-      Export
+      <svg className="export-button__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M3.5 8.5a2 2 0 0 1 2-2h2.3l1.4-2.2a1 1 0 0 1 .85-.46h3.9a1 1 0 0 1 .85.46l1.4 2.2h2.3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" />
+        <circle cx="12" cy="13" r="3.6" />
+      </svg>
     </button>
   );
 }

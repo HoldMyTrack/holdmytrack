@@ -126,6 +126,44 @@ body {
   white-space: nowrap;
 }
 
+/* AboutMenu.tsx — a text menu just before the account menu, not a bordered button like the
+   actions: it's navigation, not something to do with your data. Its dropdown reuses the
+   account menu's panel and items, anchored under the trigger's trailing edge the same way. */
+.about-menu {
+  position: relative;
+  display: flex;
+}
+
+.about-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fm-ink);
+  cursor: pointer;
+}
+
+.about-menu__trigger:hover,
+.about-menu__trigger[aria-expanded='true'] {
+  background: rgb(var(--fm-ink-rgb) / 6%);
+}
+
+.about-menu__caret {
+  width: 9px;
+  height: 6px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 /* Only ProfilePage renders the brand as a button (Header's onBrandClick) — reset every
    button default so "go back to the map" looks identical to the map screen's plain, inert
    brand mark rather than looking like a new control. */
@@ -263,9 +301,15 @@ body {
   background: rgb(var(--fm-ink-rgb) / 6%);
 }
 
-/* The About entry is an <a>, not a <button> — drop the link styling so it matches. */
+/* AboutMenu.tsx's entries, and the account menu's phone-only About, are <a>s, not <button>s —
+   drop the link styling so they match. */
 a.user-menu__item {
   text-decoration: none;
+}
+
+/* Shown only at phone widths (see the header's media query), where AboutMenu is hidden. */
+.user-menu__item--phone-only {
+  display: none;
 }
 
 .user-menu__item:disabled {
@@ -1628,6 +1672,14 @@ a.user-menu__item {
   color: #fff;
 }
 
+/* Separates Normal from the two coverage views (Fog, Heatmap) — the choice is two-level. */
+.map-mode-toggle__divider {
+  align-self: stretch;
+  width: 1px;
+  margin: 4px 3px;
+  background: var(--fm-border-strong);
+}
+
 /* Speed/heart-rate colored zone segments (trackBands.ts) — bottom-left of the map, the one
    corner .map-mode-toggle (top-left) and MapLibre's own zoom/geolocate controls (top-right)
    leave free. */
@@ -1967,15 +2019,29 @@ a.user-menu__item {
 }
 
 .export-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--fm-border-strong);
   border-radius: 8px;
-  padding: 6px 12px;
+  padding: 6px 9px;
   background: var(--fm-surface);
   font: inherit;
   font-weight: 600;
   font-size: 13px;
   color: var(--fm-ink);
   cursor: pointer;
+}
+
+/* Stroked like the account menu's glyph, sized to the text buttons' line height so the header's
+   actions stay one height. */
+.export-button__icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
 }
 
 .export-button:hover:not(:disabled) {
@@ -3424,6 +3490,16 @@ a.user-menu__item {
   .app-header__divider,
   .app-header__tagline {
     display: none;
+  }
+
+  /* Nor for the About menu: the header is already at a 390px phone's full width without it.
+     About moves into the account menu instead (UserMenu.tsx's phone-only item). */
+  .about-menu {
+    display: none;
+  }
+
+  .user-menu__item--phone-only {
+    display: block;
   }
 
   .donate-button,

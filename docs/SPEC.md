@@ -452,7 +452,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 ### FR-4.4 Mode is mutually exclusive
 
-**Description**: Normal, Fog, and Heatmap are three views of the same underlying data, not independent toggles — exactly one is active at a time.
+**Description**: Normal, Fog, and Heatmap are three views of the same underlying data, not independent toggles — exactly one is active at a time. The toggle separates Normal from the two coverage views with a divider (Normal | Fog, Heatmap), since the choice is two-level: the plain map, or one of the two coverage views; the Android app uses the same divider (`apps/android/docs/SPEC.md` FR-2.2).
 
 ### FR-4.5 Base map, theming, and the opening view
 
@@ -511,7 +511,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Preconditions**: Active session; the map has finished its initial load. No activity selection is required — the user frames whatever region of the map they want manually, independent of any checked/focused activity.
 
 **Behavior**:
-1. Clicking Export shows a Custom frame — no fixed aspect ratio — centred on the current view at about 70% of the map's size, marked only by a dashed border. Clicking Export again while the frame is shown puts it away. The map is not dimmed or obscured anywhere.
+1. Clicking the header's camera button ("Export map image") shows a Custom frame — no fixed aspect ratio — centred on the current view at about 70% of the map's size, marked only by a dashed border. Clicking it again while the frame is shown puts it away. The map is not dimmed or obscured anywhere.
 2. The frame is anchored to the map: panning the map carries the frame with it, and zooming keeps the frame the same size on screen (so it holds more or less of the map). The frame may be panned partly or fully out of view and still be captured.
 3. The frame blocks nothing: pan, zoom and click all work inside the frame exactly as outside it. Dragging the frame's border moves the frame; dragging one of its four corner handles resizes it, with the opposite corner staying put. A Custom frame resizes freely; a platform preset keeps its aspect ratio while resizing.
 4. A toolbar sits centred just above the frame's top edge (moving inside the frame when there's no room above it) with a shape dropdown, Close and Capture. The dropdown offers Custom plus every platform image-size preset, grouped by platform (Instagram, Facebook, X) and listing each resolution/shape that platform has (Square, Portrait, Landscape, Story) with its pixel size; not every platform has every shape (e.g. X has no Story or Portrait). Choosing a shape keeps the frame's center and fits the new aspect ratio within its current size. Close cancels with nothing captured. Capture captures exactly the region inside the frame at that moment — the current zoom, rotation, theme, and map mode, at a resolution well above the on-screen canvas: the picked preset's exact declared pixel dimensions, or for Custom the frame's own aspect ratio with its longer side at a fixed ceiling. In Normal mode the captured region reflects the current date-range/hidden-track filters; Fog captures its all-time coverage and Heatmap its current rolling window (FR-4.2/FR-4.3), regardless of what Normal mode's filters were set to before switching.
@@ -755,7 +755,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 1. `GET /about` returns a static HTML page; it needs no JavaScript and makes no API calls.
 2. The page shows the HoldMyTrack header (logo, wordmark, tagline) and sections for: what HoldMyTrack is, why someone might want it, what it isn't, how it is funded, and Contact — the email address `hello@holdmytrack.com` and the GitHub repository `https://github.com/HoldMyTrack/holdmytrack`.
 3. "Try the demo — no signup" and "Open the app" link to `/`, the sign-in screen, where the demo starts from its own button (FR-2.1). The page never starts a demo session itself.
-4. The page is reachable from the sign-in screen ("What is HoldMyTrack?", below the form) and from the account menu ("About HoldMyTrack") for a signed-in or demo session.
+4. The page is reachable from the sign-in screen ("What is HoldMyTrack?", below the form) and, for a signed-in or demo session, from the header's "About" menu, just before the account menu — About HoldMyTrack, How it's funded (`/about#funding`) and Contact (`/about#contact`). On a phone-width screen, where the header has no room for that menu, "About HoldMyTrack" is in the account menu instead.
 5. `/robots.txt` allows crawling except for `/v1/` and `/tiles/`, and points to `/sitemap.xml`, which lists `/` and `/about`.
 
 ## 13. FR-11 — Donations
