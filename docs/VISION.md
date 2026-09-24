@@ -260,7 +260,7 @@ What is available instead is recognition, not capability: a supporter badge, a c
 
 Non-negotiable. A Fog of War map is a precise map of where a person lives — the 2018 Strava heatmap incident is the canonical warning, and an individual fog map is far more revealing than an aggregate one.
 
-* **Private locations** — user-defined circles (home, work) excluded from every render and export. Today the leading and trailing parts of a track inside one are hidden; splitting a track that merely passes through one is still to come.
+* **Private locations** — user-defined circles (home, work) excluded from every render and export. The leading and trailing parts of a track inside one are hidden; a track that merely passes through one is shown whole, since passing by reveals nothing about where someone starts or ends.
 * **No blanket endpoint trimming** — an earlier default trimmed the first and last N metres of every track. It was dropped: on a multi-day trail every day's start and end is a campsite or trailhead, so it cut a gap into the trail at each day boundary while protecting nothing there. The places worth hiding are the ones the user names — see ADR-0010.
 * **Applied at ingest, server-side** — before anything is persisted or indexed, per `IMPLEMENTATION.md` §4.1. Privacy applied at render time leaks through any bug in the render path.
 * **Share scoping** — shared maps and exports must respect zones; an exported file is permanent and cannot be recalled.

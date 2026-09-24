@@ -17,7 +17,7 @@ The accounts are private. The trim protected nothing from anyone except the owne
 - **Remove the fixed endpoint trim entirely** — the column, the Settings field, the API field, the ingest step.
 - **Private locations** (the long-planned `privacy_zones`, `IMPLEMENTATION.md` §3.7) become the only privacy clipping: circles the user places on the map, 50–2000 m. At ingest, a track's leading and trailing points inside any of them are dropped and each end moved onto the circle's edge. Everything outside every circle keeps its full recorded geometry.
 - **Changes are retroactive**: each create/move/resize/delete reprocesses the affected activities from their raw payloads (`reprivacy` job), marking them Pending in the Activities panel until done.
-- **Ends only, for now.** A track passing *through* a circle mid-way is left whole; splitting it needs a multi-part trajectory and is a ROADMAP item.
+- **Ends only.** A track passing *through* a circle mid-way is left whole. What a Private location protects is where a track starts and ends; passing by reveals neither, so it isn't worth splitting the track into a multi-part trajectory.
 - **Stats follow the visible part**, as they did under the trim.
 - **No backfill.** Activities already ingested keep the trim they were processed with until something reprocesses them (an Edit track, or a Private location change that includes them).
 
@@ -27,13 +27,14 @@ The accounts are private. The trim protected nothing from anyone except the owne
 - **Trim only endpoints that recur** — cluster start/end points and trim only near clusters hit several times (home), leaving one-off campsites alone. Closer to the real intent, but it's an automatic guess about what a user considers private, it still leaves the ring-around-home tell, and it's more machinery than letting the user say so. Could still come back as *suggested* Private locations.
 - **Skip the trim where consecutive activities join up.** Fixes the trail, but a normal out-and-back from home also "joins up" at home — it would un-hide exactly the place the trim was for.
 - **Keep the stored track whole and apply privacy only on the way out** (export, sharing). Gives the owner an undistorted view, but contradicts ADR-0002 — every output path would have to re-implement the exclusion — and leaves screenshots of the owner's own map, the product's main marketing channel, unprotected.
+- **Split tracks that pass through a circle mid-way** — store `activities.trajectory` as a multi-part geometry (MultiLineString, or gap markers) and drop the inside part. Rejected: a pass-through reveals neither end of the track, so there's nothing for it to protect, and every track consumer (the tracks tile, the track editor, colored bands and the elevation profile, Android's track rendering) assumes a single line and would have to change. Bridging the gap with a straight line instead would still draw a chord through the circle.
 - **Backfill on deploy** (reprocess every existing activity with no trim). Rejected by choice: existing accounts had no Private locations yet, so every home would reappear at once, with no consent to that change.
 
 ## Consequences
 
 - Multi-day trails, and any activity that doesn't start or end somewhere private, fog continuously and report their real distance.
 - Protection is opt-in: an account with no Private locations hides nothing. The Settings page and the account menu point to the map window, and the demo account ships with one, to make that visible.
-- A track passing through a circle still shows inside it until splitting lands.
+- A track passing through a circle shows inside it. That is intended: it shows someone passed by, not that they started or stopped there.
 - A circle change can reprocess hundreds of activities in one job; the fog/heatmap render runs once per batch to keep that affordable.
 - Pre-change activities keep their trim indefinitely unless reprocessed — accepted, and documented in `SPEC.md` FR-8.1.
 - Retroactive clipping is bounded by raw-payload retention (`IMPLEMENTATION.md` §5.7), as ADR-0002 already noted.
