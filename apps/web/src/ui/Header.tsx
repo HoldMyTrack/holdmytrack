@@ -1,12 +1,16 @@
 import type { ReactNode } from 'react';
+import { AboutMenu } from './AboutMenu';
 import { DonateButton } from './DonateButton';
 import { UserMenu } from './UserMenu';
 import logoUrl from '../assets/logo.png';
 
 /**
- * Docked top chrome: the brand mark, then Donate, the import control and the account menu at
- * the trailing end. The Activities toggle that used to live here is gone — the panel it
- * opened is now a permanent left sidebar (ActivitiesPanel, rendered directly by MapView), not
+ * Docked top chrome: the brand mark and tagline, then Donate, the import and export controls,
+ * the About menu and the account menu at the trailing end. About is a text menu rather than a
+ * bordered button like the actions before it: it's navigation, not something to do with your
+ * data.
+ * The Activities toggle that used to live here is gone — the panel it opened is now a
+ * permanent left sidebar (ActivitiesPanel, rendered directly by MapView), not
  * something to show or hide, since there is always at least one activity to look at once
  * anything has been imported.
  *
@@ -68,6 +72,7 @@ export function Header({ importControl, exportControl, onBrandClick, onOpenProfi
         <DonateButton />
         {importControl}
         {exportControl}
+        <AboutMenu />
         <UserMenu onOpenProfile={onOpenProfile} onOpenSettings={onOpenSettings} onOpenPrivateLocations={onOpenPrivateLocations} />
       </nav>
     </header>

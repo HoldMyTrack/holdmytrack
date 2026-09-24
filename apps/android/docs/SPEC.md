@@ -90,14 +90,14 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 ### FR-2.2 Three map modes: Normal, Fog of War, Heatmap
 
-**Description**: The same three mutually exclusive views `docs/SPEC.md` FR-4.1–FR-4.4 define, switched by one three-way toggle at the map's top-left, under the menu button. Only visible/available once signed in.
+**Description**: The same three mutually exclusive views `docs/SPEC.md` FR-4.1–FR-4.4 define, switched by a toggle at the map's top-left, in one row beside the menu button, with a divider between Normal and the two coverage views (Normal | Fog, Heatmap), as on the web. Only visible/available once signed in.
 
 **Behavior**:
 1. **Normal** draws the account's tracks as a single-color vector line layer (`GET /tiles/v1/tracks/{z}/{x}/{y}.mvt`).
 2. **Fog** replaces the tracks with the server-rendered dark-veil raster (`GET /tiles/v1/fog/{z}/{x}/{y}.png`); tracks are hidden.
 3. **Heatmap** replaces the tracks with the server-rendered intensity raster (`GET /tiles/v1/heatmap/{z}/{x}/{y}.png`); tracks are hidden.
 4. All three layers sit beneath the basemap's first label layer, so place names stay legible; within that, the active raster (fog or heatmap) is drawn beneath the tracks layer so a cleared route reads as visible through the fog rather than obscured by it — the same ordering the web client uses.
-5. The active mode's button is filled (dark ink, white text); the other two are plain text on the toggle's light panel.
+5. Exactly one of the three is active at a time; tapping the active one leaves it active. Its button is filled (dark ink, white text); the other two are plain text on the toggle's light panel.
 6. While a GPS recording is in progress (FR-5.1) the toggle is hidden and none of the three modes' layers are drawn — the map shows only that recording. The previously selected mode returns when the recording stops.
 
 **Notes — no filtering**: Every tile URL is unfiltered. All three endpoints accept `from`/`to`/`types`/`exclude`, and an absent filter already means "no restriction" server-side, so this app always shows the account's complete history — there is no date-range picker, TYPE filter, or per-track hide/show control on Android today (Phase 5 item, `apps/android/docs/ROADMAP.md`). This is a scope gap relative to the web client, not a bug.
@@ -113,6 +113,16 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 ### FR-2.4 Attribution
 
 **Description**: MapLibre Native's own attribution control is left enabled and renders the ODbL credit the style document's basemap source carries — required, not decorative, since the Protomaps basemap is a Produced Work under that license (`docs/IMPLEMENTATION.md` §5.6).
+
+### FR-2.5 Find my location
+
+**Description**: A button at the right end of the map's top row (the row with the menu button and the mode toggle), that shows the user's position and moves the camera to it — the Android counterpart of the web map's geolocate control.
+
+**Behavior**:
+1. The first tap asks for location permission (the system dialog offers Precise or Approximate; either is enough). If it's refused, a message says location access is needed to show where you are, and nothing else happens.
+2. With permission, the map shows a position dot and flies to it, at zoom 14 or closer if the map is already zoomed in further. The camera then follows the position until the user pans the map; tapping again re-centres.
+3. Nothing is located before the first tap.
+4. While a GPS recording is in progress (FR-5.1) the button is hidden; the recording already keeps the camera on its latest fix.
 
 ## 5. FR-3 — Health Connect Sync (Path 2)
 

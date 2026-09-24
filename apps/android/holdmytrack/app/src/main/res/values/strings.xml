@@ -23,6 +23,8 @@
     <string name="mode_heatmap">Heatmap</string>
 
     <string name="menu_button">☰</string>
+    <string name="locate_button">Find my location</string>
+    <string name="locate_needs_location">HoldMyTrack needs location access to show where you are.</string>
     <string name="menu_profile">Profile</string>
     <string name="menu_sync">Sync</string>
     <string name="menu_recorded_activities">Recorded Activities</string>

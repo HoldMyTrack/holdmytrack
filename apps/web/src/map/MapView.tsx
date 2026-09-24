@@ -1074,6 +1074,8 @@ export function MapView({ onOpenProfile, onOpenSettings, initialPrivateLocations
               >
                 Normal
               </button>
+              {/* Normal on one side, the two coverage views on the other: two levels of choice. */}
+              <span className="map-mode-toggle__divider" aria-hidden="true" />
               <button
                 type="button"
                 className={mapMode === 'fog' ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}

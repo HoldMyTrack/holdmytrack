@@ -1,6 +1,7 @@
 package dev.holdmytrack.android
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
@@ -33,6 +34,8 @@ import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
+import org.maplibre.android.location.LocationComponentActivationOptions
+import org.maplibre.android.location.modes.CameraMode
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
@@ -62,6 +65,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var modeBar: View
     private lateinit var modeButtons: Map<MapMode, MaterialButton>
     private lateinit var recordButton: RecordButton
+    private lateinit var locateButton: MaterialButton
 
     private var map: MapLibreMap? = null
     private var style: Style? = null
@@ -130,6 +134,18 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Asked for on the first tap of Find my location. Approximate is enough to show the
+     *  user roughly where they are, so either grant counts. */
+    private val locatePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) {
+        if (hasLocationPermission()) {
+            showMyLocation()
+        } else {
+            Toast.makeText(this, R.string.locate_needs_location, Toast.LENGTH_LONG).show()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Before any layout or MapView exists, so a signed-out launch never draws a map at all.
@@ -154,6 +170,9 @@ class MainActivity : AppCompatActivity() {
         recordButton = findViewById(R.id.record_button)
         recordButton.setOnClickListener { onRecordTap() }
         recordButton.onHoldComplete = ::stopRecording
+
+        locateButton = findViewById(R.id.locate_button)
+        locateButton.setOnClickListener { onLocateTap() }
 
         insetSystemBars()
         if (savedInstanceState == null) handleStopIntent(intent)
@@ -207,7 +226,7 @@ class MainActivity : AppCompatActivity() {
      * Keeps the floating chrome clear of the status bar and the gesture navigation pill.
      *
      * Not optional at this target SDK: from API 35 the system draws every app edge to edge and
-     * ignores the old opt-out. The burger/mode chrome sits at the top in a `layout_margin`ed
+     * ignores the old opt-out. The top row (burger, modes, Find my location) sits in a `layout_margin`ed
      * `LinearLayout`, which has no `fitsSystemWindows` of its own, so without this it renders
      * underneath the status bar's own icons — found exactly that way, the compass included,
      * both behind the clock and battery indicator on a real device. The map itself is left
@@ -219,14 +238,14 @@ class MainActivity : AppCompatActivity() {
      * misses out.
      */
     private fun insetSystemBars() {
-        val topStartBar: View = findViewById(R.id.top_start_bar)
-        val barTopMargin = (topStartBar.layoutParams as MarginLayoutParams).topMargin
+        val topBar: View = findViewById(R.id.top_bar)
+        val barTopMargin = (topBar.layoutParams as MarginLayoutParams).topMargin
         val statusPadding = status.paddingTop
         val recordBottomMargin = (recordButton.layoutParams as MarginLayoutParams).bottomMargin
         findViewById<View>(R.id.map_root).setOnApplyWindowInsetsListener { _, insets ->
             val bars = insets.getInsets(WindowInsets.Type.systemBars())
-            (topStartBar.layoutParams as MarginLayoutParams).topMargin = barTopMargin + bars.top
-            topStartBar.requestLayout()
+            (topBar.layoutParams as MarginLayoutParams).topMargin = barTopMargin + bars.top
+            topBar.requestLayout()
             (recordButton.layoutParams as MarginLayoutParams).bottomMargin = recordBottomMargin + bars.bottom
             recordButton.requestLayout()
             status.setPadding(status.paddingLeft, statusPadding + bars.top, status.paddingRight, status.paddingBottom)
@@ -234,12 +253,14 @@ class MainActivity : AppCompatActivity() {
             applyCompassMargin()
             insets
         }
+        // The compass sits below the top row, whose height is only known once it's laid out.
+        topBar.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyCompassMargin() }
     }
 
     /**
      * MapLibre's own compass control defaults to top-end with a small fixed margin, unaware of
      * the status bar — found sitting directly behind the clock/battery indicator on a real
-     * device. Called from both `insetSystemBars` and `getMapAsync` because whichever of the
+     * device — and of the top row, whose Find my location button shares that corner. Called from both `insetSystemBars` and `getMapAsync` because whichever of the
      * inset callback and the map-ready callback fires second is the one that actually has
      * everything it needs.
      */
@@ -250,9 +271,12 @@ class MainActivity : AppCompatActivity() {
             compassBaseMarginTop = settings.compassMarginTop
             compassBaseMarginCaptured = true
         }
+        // Below the top row (burger, modes, Find my location), which already sits below the
+        // status bar; before that row is laid out, below the status bar at least.
+        val belowTopBar = findViewById<View>(R.id.top_bar).bottom
         settings.setCompassMargins(
             settings.compassMarginLeft,
-            compassBaseMarginTop + systemBarInsetTop,
+            compassBaseMarginTop + maxOf(systemBarInsetTop, belowTopBar),
             settings.compassMarginRight,
             settings.compassMarginBottom,
         )
@@ -319,6 +343,44 @@ class MainActivity : AppCompatActivity() {
         ContextCompat.startForegroundService(this, RecordingService.intent(this, RecordingService.ACTION_START))
     }
 
+    private fun hasLocationPermission() =
+        hasPermission(Manifest.permission.ACCESS_FINE_LOCATION) || hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+
+    private fun onLocateTap() {
+        if (hasLocationPermission()) {
+            showMyLocation()
+        } else {
+            locatePermissionLauncher.launch(
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+            )
+        }
+    }
+
+    /**
+     * Turns on MapLibre's own position dot and puts the camera in tracking mode, which flies to
+     * the first fix (or the last known one) and then follows it until the user pans — the same
+     * behavior as the web map's geolocate control. Activated lazily, on the first tap, so a
+     * user who never asks is never located.
+     */
+    @SuppressLint("MissingPermission") // Only reached once hasLocationPermission() holds.
+    private fun showMyLocation() {
+        val instance = map ?: return
+        val loaded = style ?: return
+        val location = instance.locationComponent
+        if (!location.isLocationComponentActivated) {
+            location.activateLocationComponent(LocationComponentActivationOptions.Builder(this, loaded).build())
+        }
+        location.isLocationComponentEnabled = true
+        location.setCameraMode(
+            CameraMode.TRACKING,
+            FRAME_DURATION_MS.toLong(),
+            maxOf(instance.cameraPosition.zoom, LOCATE_ZOOM),
+            null,
+            null,
+            null,
+        )
+    }
+
     /** Brings the button, the mode toggle, the map's layers, the live track and the camera in
      *  line with the recording's state — called on bind, on every state change and fix the
      *  service reports, and once the style has loaded. */
@@ -335,6 +397,7 @@ class MainActivity : AppCompatActivity() {
         recordButton.contentDescription = getString(description)
         recordButton.holdEnabled = active
         if (modeBarReady) modeBar.visibility = if (active) View.GONE else View.VISIBLE
+        locateButton.visibility = if (active) View.GONE else View.VISIBLE
 
         val loaded = style ?: return
         if (overlaysAttached) MapOverlays.setRecording(loaded, active, mode)
@@ -350,6 +413,10 @@ class MainActivity : AppCompatActivity() {
         val target = LatLng(last.lat, last.lon)
         if (!followingRecording) {
             followingRecording = true
+            // The recording's own follow (below) owns the camera now, not Find my location's.
+            if (instance.locationComponent.isLocationComponentActivated) {
+                instance.locationComponent.cameraMode = CameraMode.NONE
+            }
             val zoom = maxOf(instance.cameraPosition.zoom, RECORDING_ZOOM)
             instance.animateCamera(CameraUpdateFactory.newLatLngZoom(target, zoom), FRAME_DURATION_MS)
         } else {
@@ -507,6 +574,10 @@ class MainActivity : AppCompatActivity() {
         /** Where the camera flies to on a recording's first fix — street level, so the line
          *  visibly grows from the first few metres rather than being a dot on a city. */
         const val RECORDING_ZOOM = 16.0
+
+        /** Find my location's minimum zoom — neighbourhood level, so the dot lands in streets
+         *  the user recognises; a closer zoom the user already chose is kept. */
+        const val LOCATE_ZOOM = 14.0
         const val FRAME_DURATION_MS = 900
         const val MENU_PROFILE = 1
         const val MENU_SYNC = 2
