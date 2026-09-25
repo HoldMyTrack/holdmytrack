@@ -233,7 +233,7 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 1. Client calls `POST /v1/auth/demo`.
 2. Server opens a session against one persistent, shared **Demo Customer** account — not a fresh account created per visitor. That account is pre-seeded, once, out of band (not per request — see FR-2.2), with a real, richly-populated history: roughly 611 activities spanning about 7 months, a mix of walks, dog walks, bike rides, local errands, and a few multi-day road trips, based around Cleveland, OH — which its Settings profile (Name "Demo User," Country United States, Timezone America/New_York) matches, rather than being left at generic column defaults — plus one Private location, "Home," a 250 m circle over the area nearly every trip starts from (FR-8.1).
 3. Server creates a session for this visitor (24-hour expiry) and sets it as a cookie. Any number of visitors can hold their own session against the same shared account at once — they all see identical data.
-4. Client is signed in and shown the map, with the account's full history already visible in every mode (Normal, Fog of War, Heatmap) and every read-only feature (filtering, the activity graph, export) exactly as a registered user has it. **A demo account cannot upload, sync, edit, or delete an activity, or change its avatar/settings** — every such request is rejected regardless of what a client attempts, whether or not its own UI still offers the control. Creating a real account (FR-1.1) is the only way to save one's own data. Both clients also gate this proactively rather than relying on the rejection alone: the web app disables the Import control with an explanation (`ImportPanel.tsx`'s `readOnly` prop) and the Android app disables Sync Now and hides the Health Connect permission flow with the same explanation (FR-3.8) — a demo session can still record and manage GPS Logger recordings locally on Android, since nothing about that reaches the server until sync is attempted.
+4. Client is signed in and shown the map, with the account's full history already visible in every mode (Normal, Fog of War, Heatmap) and every read-only feature (filtering, the activity graph, export) exactly as a registered user has it. **A demo account cannot upload, sync, edit, or delete an activity, or change its avatar/settings** — every such request is rejected regardless of what a client attempts, whether or not its own UI still offers the control. Creating a real account (FR-1.1) is the only way to save one's own data. Both clients also gate this proactively rather than relying on the rejection alone: the web app replaces the Sync tab's drop zone with an explanation (`SyncTab.tsx`'s `readOnly` prop) and the Android app disables Sync Now and hides the Health Connect permission flow with the same explanation (FR-3.8) — a demo session can still record and manage GPS Logger recordings locally on Android, since nothing about that reaches the server until sync is attempted.
 
 **Outputs**: A valid session cookie for the shared Demo Customer account, already showing its full activity history.
 
@@ -278,10 +278,10 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Inputs**: One or more files, each a `.gpx`, `.fit`, or `.tcx` file no larger than 64 MiB. Up to 20 individually-selected files per batch (a larger selection is rejected client-side in full, before any upload begins, with a message directing the user to a `.zip` archive instead — FR-3.2).
 
 **Behavior**:
-1. User drags files onto the Import panel's Files tab, or selects them via a file picker.
+1. User drags files onto the drop zone in the Activities panel's Sync tab (FR-3.4), or selects them via a file picker.
 2. Each file uploads independently, as its own `POST /v1/activities/upload` request (multipart), and is tracked independently — one file failing does not affect the others.
 3. For each file: server validates its extension and size, computes a content hash to check for a duplicate (FR-3.5), persists the raw file, and enqueues a background parsing job.
-4. The Files tab shows each file's live status (uploading, with a progress percentage; then "Processing…") until the background job finishes.
+4. The Sync tab's history shows each file's live status (uploading, with a progress percentage; then "Processing…") until the background job finishes.
 5. Once ingestion completes, the activity appears automatically in the Activities panel, the map, and every summary that reflects the current date range — no page reload is required. Its Fog-of-War/Heatmap coverage follows a few seconds later, once the background re-render finishes, also without a reload.
 
 **Outputs**: One new `Activity` per successfully ingested file, each with a parsed trajectory, distance, duration, and (where the source file provides it) heart rate/elevation data.
@@ -321,7 +321,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Inputs**: A Google Takeout export `.zip` archive (detected automatically by its internal folder structure — no separate upload flow to choose).
 
 **Behavior**:
-1. User uploads the Takeout export `.zip` through the same Files tab as FR-3.1/FR-3.2.
+1. User uploads the Takeout export `.zip` through the same Sync-tab drop zone as FR-3.1/FR-3.2.
 2. Server recognizes the archive's shape as a Takeout export (rather than a plain `.zip`) and extracts one activity file per recorded activity that has GPS data (activity types with no GPS in the export — e.g. a logged swim with no route — are skipped, not treated as errors).
 3. Each extracted activity is ingested exactly as FR-3.1 describes, attributed to the Takeout source.
 
@@ -329,17 +329,18 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 ### FR-3.4 Import status and history
 
-**Description**: A user can see the status of in-progress and past uploads and syncs, and jump from a finished one straight to it on the map. The header's "Import" control (renamed from "Upload activity" once a second ingest source existed — FR-3.6) opens a dropdown with two tabs: **Files** (drag/drop, `.zip`, and Google Takeout — FR-3.1–FR-3.3, unchanged) and **Sync** (Health Connect and in-app GPS recording activity synced from the Android app — FR-3.6, FR-3.8). Sync is a read-only status view, not a "sync now" button: that sync is phone-triggered, and nothing in the web app can request it (`apps/android/docs/SPEC.md` §7.4's own "Ask every time"/"Always allow" split is the closest analogue, and it lives entirely on the phone).
+**Description**: A user can see the status of in-progress and past uploads and syncs, and jump from a finished one straight to it on the map. The Activities panel has two tabs, **Activities** (the list, FR-5) and **Sync**. The Sync tab holds the file drop zone and picker (`.gpx`/`.fit`/`.tcx`, `.zip`, and Google Takeout — FR-3.1–FR-3.3) above one history list of everything imported into the account, whatever the source: uploaded files alongside activity synced from the Android app (Health Connect and in-app GPS recording — FR-3.6, FR-3.8). The web can't start a phone sync; the history is a read-only status view, not a "sync now" button: that sync is phone-triggered, and nothing in the web app can request it (`apps/android/docs/SPEC.md` §7.4's own "Ask every time"/"Always allow" split is the closest analogue, and it lives entirely on the phone).
 
 **Preconditions**: Active session.
 
 **Behavior**:
-1. The Import control's badge shows a live count of jobs still processing, combined across both tabs, regardless of which tab is currently open.
-2. Each tab shows its own paginated list (5 per page) of every matching job ever recorded for this account, each showing: a title (the filename, for a Files row; the source name — "Health Connect," "GPS Logger" — for a Sync row, since a synced job's own filename is a platform-assigned id with nothing human-readable in it), status ("Processing…" / "Ready" / "Failed"), and — once ready — the activity's date and distance.
-3. While anything in a tab is still processing, that tab's list refreshes automatically (polled every 1.5 seconds) until every row settles to "Ready" or "Failed" — no manual refresh needed. Both tabs poll independently and simultaneously, regardless of which one is currently showing, since a job finishing in the tab that isn't open still has to reach the map.
-4. A "View on map" action appears on every finished (`"Ready"`) row, on either tab. Clicking it closes the Import dropdown, focuses that activity exactly as clicking its row in the Activities panel would (FR-5.5) — track bolded, camera flown to fit it — and, if the activity's own date falls outside the currently selected date range (FR-6), first narrows the selected range to just that one day (the same mechanism a manual single-day pick already uses — FR-6.5) before focusing, rather than focusing something the Activities panel isn't currently showing at all.
+1. The Sync tab's badge shows a live count of this session's uploads in flight plus every job still processing for the account, visible whichever tab is open.
+2. The history is one paginated list (5 per page) of every job ever recorded for this account, newest first, each showing: a title (the filename for an uploaded file; the source name — "Health Connect," "GPS Logger" — for a synced one, since a synced job's own filename is a platform-assigned id with nothing human-readable in it), status ("Processing…" / "Ready" / "Failed"), and — once ready — the activity's date and distance. Files still uploading are listed above it with a progress percentage.
+3. While anything is still processing, the history refreshes automatically (polled every 1.5 seconds) until every row settles to "Ready" or "Failed" — no manual refresh needed. Polling and uploads carry on while the Activities tab is showing, or the panel is hidden in Fog of War/Heatmap mode, since a job finishing still has to reach the map.
+4. For a demo session, the drop zone is replaced by a note that importing isn't available for demo accounts.
+5. A "View on map" action appears on every finished (`"Ready"`) row. Clicking it switches the panel back to the Activities tab, focuses that activity exactly as clicking its row in the Activities panel would (FR-5.5) — track bolded, camera flown to fit it — and, if the activity's own date falls outside the currently selected date range (FR-6), first narrows the selected range to just that one day (the same mechanism a manual single-day pick already uses — FR-6.5) before focusing, rather than focusing something the Activities panel isn't currently showing at all.
 
-**Outputs**: `GET /v1/uploads?limit=&offset=&source=` returns the current page, the total count (scoped to `source` when given), and how many are still processing (always the global count, unscoped, for the badge). `source` is a comma-separated filter — `upload,takeout` for the Files tab, `healthconnect,healthkit,recorded` for Sync — omitted for the unfiltered combined view neither tab actually uses today. Each row also carries `source` and, once the job has produced one, the resulting activity's own `id` — what the "View on map" action targets.
+**Outputs**: `GET /v1/uploads?limit=&offset=&source=` returns the current page, the total count (scoped to `source` when given), and how many are still processing (always the global count, unscoped, for the badge). `source` is an optional comma-separated filter (e.g. `upload,takeout`); the Sync tab omits it, for the combined view. Each row also carries `source` and, once the job has produced one, the resulting activity's own `id` — what the "View on map" action targets.
 
 ### FR-3.5 Duplicate detection
 
@@ -771,7 +772,6 @@ Only one track is hovered and only one is focused at a time; any number can be c
 4. The page is reachable from the sign-in screen ("What is HoldMyTrack?", below the form) and, for a signed-in or demo session, from the header's "Info" menu, just before the account menu — About (`/about`) and Help (`/help`, FR-10.2). On a phone-width screen, where the header has no room for that menu, both entries are in the account menu instead.
 5. `/robots.txt` allows crawling except for `/v1/` and `/tiles/`, and points to `/sitemap.xml`, which lists `/` and `/about`.
 
-## 13. FR-11 — Donations
 ### FR-10.2 Help page
 
 **Description**: A public page at `/help` that describes how the web app works. It is a placeholder for now: a heading and a line saying the guide is on its way, with the contact email.
@@ -783,6 +783,7 @@ Only one track is hovered and only one is focused at a time; any number can be c
 2. The page is reachable from the app header's "Info" menu (FR-10.1 point 4) and from the same menu in the About page's header, and links back to `/` and `/about` from its footer.
 3. Until it has real content, the page carries `<meta name="robots" content="noindex">` and is not listed in `/sitemap.xml`.
 
+## 13. FR-11 — Donations
 
 ### FR-11.1 Donate
 

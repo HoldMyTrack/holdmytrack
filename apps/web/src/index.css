@@ -546,17 +546,39 @@ a.user-menu__item {
   background: rgb(var(--fm-accent-rgb) / 35%);
 }
 
+/* The panel's tab strip (ActivitiesPanel.tsx: Activities | Sync). Each tab keeps the serif
+   heading look the panel title had before there were two; the inactive one is just dimmed,
+   and the active one carries an accent underline like the other tab strips here. */
 .activities-panel__head {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  padding: var(--fm-space-16) var(--fm-space-16) var(--fm-space-4);
+  gap: var(--fm-space-20);
+  padding: var(--fm-space-12) var(--fm-space-16) 0;
+  margin-bottom: var(--fm-space-8);
+  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 8%);
 }
 
-.activities-panel__heading {
+.activities-panel__tab {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--fm-space-8);
+  margin-bottom: -1px;
+  padding: 0 0 var(--fm-space-6);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  opacity: 0.45;
+}
+
+.activities-panel__tab:hover {
+  opacity: 0.75;
+}
+
+.activities-panel__tab[aria-selected='true'] {
+  border-bottom-color: var(--fm-accent);
+  opacity: 1;
 }
 
 .activities-panel__heading-text {
@@ -998,8 +1020,8 @@ a.user-menu__item {
   background: var(--fm-border);
 }
 
-/* Anchors the dropdown panel under its trigger — same arrangement .import-panel/.user-menu
-   already use for their own dropdowns. No fixed width any more (nothing below it to stay
+/* Anchors the dropdown panel under its trigger — same arrangement .user-menu
+   already uses for its own dropdown. No fixed width any more (nothing below it to stay
    column-aligned with) — sized to its own label/caret like the mockup's chip. */
 .activities-panel__type-dropdown {
   position: relative;
@@ -2015,41 +2037,6 @@ a.user-menu__item {
   white-space: nowrap;
 }
 
-/* §4.0.1's import control — a dropdown panel with Files/Sync tabs, not a hover popover
-   (docs/UI/exports/holdmytrack-map-screen-standalone.html's live prototype). `position: relative`
-   anchors the dropdown under the trigger button, the same arrangement as .user-menu's own
-   dropdown. */
-.import-panel {
-  position: relative;
-}
-
-.import-panel__trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fm-space-6);
-  border: 1px solid var(--fm-border-strong);
-  border-radius: var(--fm-radius-md);
-  padding: var(--fm-space-6) var(--fm-space-12);
-  background: var(--fm-surface);
-  font: inherit;
-  font-weight: var(--fm-weight-semibold);
-  font-size: var(--fm-text-md);
-  color: var(--fm-ink);
-  cursor: pointer;
-}
-
-.import-panel__trigger:hover:not(:disabled) {
-  background: rgb(var(--fm-ink-rgb) / 4%);
-}
-
-/* A demo account (ImportPanel's own readOnly prop) — visibly inert, not just a click no-op
-   that silently never opens the dropdown. */
-.import-panel__trigger:disabled {
-  color: rgb(var(--fm-ink-rgb) / 35%);
-  border-color: rgb(var(--fm-ink-rgb) / 8%);
-  cursor: not-allowed;
-}
-
 .export-button {
   display: inline-flex;
   align-items: center;
@@ -2088,11 +2075,11 @@ a.user-menu__item {
   color: var(--fm-accent-strong);
 }
 
-/* This session's in-flight count plus every pending job for this user globally (see
-   useUploadHistory's own comment on why the latter isn't scoped to whichever page happens
-   to be open) — visible even with the dropdown closed, so progress doesn't disappear the
-   moment it's collapsed. */
-.import-panel__badge {
+/* The Sync tab's badge (ActivitiesPanel.tsx): this session's in-flight uploads plus every
+   pending job for this user globally (see useUploadHistory's own comment on why the latter
+   isn't scoped to whichever page happens to be open) — shown on the tab itself, so progress
+   stays visible while the Activities tab is. */
+.activities-panel__sync-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2106,70 +2093,28 @@ a.user-menu__item {
   font-weight: var(--fm-weight-bold);
 }
 
-.import-panel__caret {
-  display: inline-flex;
-  color: rgb(var(--fm-ink-rgb) / 45%);
-}
-
-.import-panel__dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  width: min(24rem, calc(100vw - 40px));
-  max-height: min(32rem, calc(100vh - 100px));
-  padding: var(--fm-space-16);
-  background: var(--fm-surface);
-  border: 1px solid rgb(var(--fm-ink-rgb) / 10%);
-  border-radius: var(--fm-radius-lg);
-  box-shadow: var(--fm-shadow-lg);
+/* SyncTab.tsx — the Activities panel's second tab, taking the place of the list, filters and
+   footer below the panel head; scrolls on its own like the list does. */
+.sync-tab {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  padding: var(--fm-space-4) var(--fm-space-16) var(--fm-space-16);
 }
 
-/* The Files/Sync tab strip — ImportPanel.tsx's own doc comment has the reasoning for why
-   these are two tabs rather than one combined list. A plain underline-on-active treatment,
-   matching how little visual weight the rest of this dropdown spends on chrome. */
-.import-panel__tabs {
-  display: flex;
-  gap: var(--fm-space-4);
-  margin: 0 0 var(--fm-space-10);
-  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 10%);
-}
-
-.import-panel__tab {
-  padding: 0 var(--fm-space-2) var(--fm-space-8);
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: none;
-  font: inherit;
-  font-weight: var(--fm-weight-semibold);
-  font-size: var(--fm-text-md);
-  color: rgb(var(--fm-ink-rgb) / 55%);
-  cursor: pointer;
-}
-
-.import-panel__tab:hover {
-  color: var(--fm-ink);
-}
-
-.import-panel__tab--active {
-  border-bottom-color: var(--fm-accent);
-  color: var(--fm-ink);
-}
-
-.import-panel__hint {
-  margin: 0 0 var(--fm-space-10);
+.sync-tab__hint {
+  margin: var(--fm-space-10) 0;
   font-size: var(--fm-text-sm);
   color: rgb(var(--fm-ink-rgb) / 55%);
 }
 
-.import-panel__dropzone {
+.sync-tab__dropzone {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 64px;
+  gap: var(--fm-space-4);
+  height: 88px;
   border: 1px dashed rgb(var(--fm-ink-rgb) / 25%);
   border-radius: var(--fm-radius-md);
   font-size: var(--fm-text-md);
@@ -2178,17 +2123,22 @@ a.user-menu__item {
   text-align: center;
 }
 
-.import-panel__dropzone--drag {
+.sync-tab__dropzone--drag {
   border-color: var(--fm-accent);
   background: rgb(var(--fm-accent-rgb) / 6%);
   color: var(--fm-accent);
 }
 
-.import-panel__input {
+.sync-tab__dropzone-hint {
+  font-size: var(--fm-text-xs);
+  color: rgb(var(--fm-ink-rgb) / 45%);
+}
+
+.sync-tab__input {
   display: none;
 }
 
-.import-panel__notices {
+.sync-tab__notices {
   list-style: none;
   margin: var(--fm-space-10) 0 0;
   padding: 0;
@@ -2197,7 +2147,7 @@ a.user-menu__item {
   gap: var(--fm-space-6);
 }
 
-.import-panel__notice {
+.sync-tab__notice {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -2210,12 +2160,12 @@ a.user-menu__item {
   color: var(--fm-ink);
 }
 
-.import-panel__notice--error {
+.sync-tab__notice--error {
   background: rgb(var(--fm-danger-rgb) / 8%);
   color: var(--fm-danger);
 }
 
-.import-panel__notice-dismiss {
+.sync-tab__notice-dismiss {
   display: inline-flex;
   flex: none;
   border: 0;
@@ -2227,7 +2177,7 @@ a.user-menu__item {
   cursor: pointer;
 }
 
-.import-panel__list-head {
+.sync-tab__list-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -2235,7 +2185,7 @@ a.user-menu__item {
   margin: var(--fm-space-16) 0 var(--fm-space-6);
 }
 
-.import-panel__list-title {
+.sync-tab__list-title {
   font-size: var(--fm-text-xs);
   font-weight: var(--fm-weight-bold);
   letter-spacing: 0.06em;
@@ -2243,19 +2193,19 @@ a.user-menu__item {
   color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
-.import-panel__list-summary {
+.sync-tab__list-summary {
   font-size: var(--fm-text-xs);
   color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
-.import-panel__rows {
+.sync-tab__rows {
   list-style: none;
   margin: 0;
   padding: 0;
   border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
 }
 
-.import-panel__row {
+.sync-tab__row {
   display: flex;
   align-items: center;
   gap: var(--fm-space-8);
@@ -2263,7 +2213,7 @@ a.user-menu__item {
   border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 6%);
 }
 
-.import-panel__row-name {
+.sync-tab__row-name {
   flex: 1;
   min-width: 0;
   font-size: var(--fm-text-md);
@@ -2274,7 +2224,7 @@ a.user-menu__item {
   white-space: nowrap;
 }
 
-.import-panel__row-size {
+.sync-tab__row-size {
   flex: none;
   font-size: var(--fm-text-xs);
   color: rgb(var(--fm-ink-rgb) / 45%);
@@ -2282,7 +2232,7 @@ a.user-menu__item {
   text-align: right;
 }
 
-.import-panel__row-detail {
+.sync-tab__row-detail {
   flex: none;
   display: flex;
   flex-direction: column;
@@ -2291,20 +2241,20 @@ a.user-menu__item {
   min-width: 6.5rem;
 }
 
-.import-panel__row-status {
+.sync-tab__row-status {
   font-size: var(--fm-text-xs);
   color: rgb(var(--fm-ink-rgb) / 55%);
 }
 
-.import-panel__row-status--error {
+.sync-tab__row-status--error {
   color: var(--fm-danger);
 }
 
-.import-panel__row-status--ready {
+.sync-tab__row-status--ready {
   color: var(--fm-success);
 }
 
-.import-panel__row-meta {
+.sync-tab__row-meta {
   font-size: var(--fm-text-2xs);
   color: rgb(var(--fm-ink-rgb) / 45%);
 }
@@ -2312,7 +2262,7 @@ a.user-menu__item {
 /* ROADMAP.md's "View on map" action — plain text, not a button-styled control, to stay
    visually subordinate to the row's own status/date/distance rather than competing with them
    for attention in an already-tight detail column. */
-.import-panel__row-view {
+.sync-tab__row-view {
   border: 0;
   background: none;
   padding: 0;
@@ -2324,7 +2274,7 @@ a.user-menu__item {
   cursor: pointer;
 }
 
-.import-panel__progress {
+.sync-tab__progress {
   display: block;
   width: 6.5rem;
   height: 4px;
@@ -2333,24 +2283,24 @@ a.user-menu__item {
   overflow: hidden;
 }
 
-.import-panel__progress-fill {
+.sync-tab__progress-fill {
   display: block;
   height: 100%;
   background: var(--fm-accent);
   transition: width 120ms linear;
 }
 
-.import-panel__note {
+.sync-tab__note {
   padding: var(--fm-space-10) 0;
   font-size: var(--fm-text-sm);
   color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
-.import-panel__note--error {
+.sync-tab__note--error {
   color: var(--fm-danger);
 }
 
-.import-panel__pager {
+.sync-tab__pager {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2360,12 +2310,12 @@ a.user-menu__item {
   color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
-.import-panel__pager-buttons {
+.sync-tab__pager-buttons {
   display: flex;
   gap: var(--fm-space-4);
 }
 
-.import-panel__pager-buttons button {
+.sync-tab__pager-buttons button {
   border: 1px solid rgb(var(--fm-ink-rgb) / 15%);
   border-radius: var(--fm-radius-sm);
   width: 24px;
@@ -2374,7 +2324,7 @@ a.user-menu__item {
   cursor: pointer;
 }
 
-.import-panel__pager-buttons button:disabled {
+.sync-tab__pager-buttons button:disabled {
   opacity: 0.35;
   cursor: default;
 }
@@ -3535,23 +3485,6 @@ a.user-menu__item {
 
   .donate-button__label {
     display: none;
-  }
-
-  /* Desktop anchors this dropdown to its own trigger's right edge (`right: 0` on the rule
-     above), which only stays on screen because Import happens to be the header's rightmost
-     action there. On a phone it sits between Export and the account menu (Header.tsx's fixed
-     order), so a dropdown nearly as wide as the viewport anchored to that trigger runs off the
-     left edge instead — reported live as the import window landing partly out of the
-     viewport. Fixed to the screen's own edges instead, the same "stop anchoring to a button
-     that isn't at either edge" fix the Activities panel's bottom sheet already needed; `top:
-     64px` clears the header's fixed 56px height plus the same 8px gap the desktop rule uses. */
-  .import-panel__dropdown {
-    position: fixed;
-    top: 64px;
-    left: 10px;
-    right: 10px;
-    width: auto;
-    max-height: calc(100vh - 84px);
   }
 
   /* The phone footer is just DateRangeSlider.tsx — ActivityHistogram.tsx swaps out the bar

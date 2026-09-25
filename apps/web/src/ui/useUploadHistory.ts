@@ -15,9 +15,9 @@ export interface UploadHistoryState {
 }
 
 /**
- * Backs ImportPanel.tsx's Files/Sync tabs (§4.0.1) — a paginated read of `GET /v1/uploads`
+ * Backs the Sync tab's history (useImports.ts, §4.0.1) — a paginated read of `GET /v1/uploads`
  * that also polls while anything is still processing, so a row visibly flips from
- * "Processing" to "Ready"/"Failed" without the panel needing to be closed and reopened.
+ * "Processing" to "Ready"/"Failed" without the tab needing to be left and reopened.
  * Polling is keyed on the response's own `processing` count (every pending job for this
  * user, not just this page) rather than scanning this page's rows for one still processing:
  * a page with nothing in-flight on it shouldn't keep polling just because some *other* page
@@ -25,13 +25,12 @@ export interface UploadHistoryState {
  * screen — polling this same page is the simplest thing that keeps both cases correct,
  * since whichever page is open is the one that needs to notice a change.
  *
- * One call per tab, both always mounted regardless of which tab is currently showing — a
- * Files-tab job finishing while the Sync tab happens to be open still has to reach `onPoll`
- * (which refreshes the map), so polling can't be conditional on tab visibility the way the
- * *rendered* rows already are. `sources` (a stable array reference — pass a module-level
- * constant, not an inline literal, or its identity changing every render would restart the
- * poll loop) scopes which rows this instance's own page counts; omit it for the unfiltered
- * combined view.
+ * Called from MapView (via useImports), not from the tab that renders it — a job finishing
+ * while the Sync tab isn't showing still has to reach `onPoll` (which refreshes the map), so
+ * polling can't be conditional on the tab's visibility the way the *rendered* rows are.
+ * `sources` (a stable array reference — pass a module-level constant, not an inline literal,
+ * or its identity changing every render would restart the poll loop) scopes which rows this
+ * instance's own page counts; omit it for the unfiltered combined view.
  *
  * `onPoll` fires after every *poll-driven* read (not the initial one, and not the one
  * `refresh()` triggers) — the one reliable signal that a job may have actually finished

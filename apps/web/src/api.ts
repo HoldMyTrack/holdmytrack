@@ -447,9 +447,9 @@ export interface UploadHistoryRow {
   filename: string;
   externalId: string;
   /** `"upload"` | `"takeout"` | `"healthconnect"` | `"healthkit"` | `"recorded"` — what
-   *  ImportPanel.tsx's Files/Sync tabs filter by, and (for a Files row) what makes `filename`
-   *  worth showing at all; a synced row's own filename is a raw external id, never meant to
-   *  be read directly (`formatSourceLabel` is what a Sync row's title actually shows). */
+   *  `sources` filters by, and (for an uploaded file) what makes `filename` worth showing at
+   *  all; a synced row's own filename is a raw external id, never meant to be read directly
+   *  (`formatSourceLabel` is what SyncTab.tsx shows as a synced row's title instead). */
   source: string;
   status: 'processing' | 'done' | 'failed';
   error?: string;
@@ -497,8 +497,7 @@ export interface UploadHistoryQuery {
   limit?: number;
   offset?: number;
   /** Comma-joined server-side, matching §4.3's own `types` filter convention — absent means
-   *  every source, which is what an unfiltered combined view (rather than ImportPanel.tsx's
-   *  own Files/Sync tabs) would ask for. */
+   *  every source — what SyncTab.tsx's one combined history asks for. */
   sources?: readonly string[];
 }
 

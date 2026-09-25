@@ -38,11 +38,11 @@ import { Header } from '../ui/Header';
 import type { DateRange } from '../ui/RangePicker';
 import { TrackProfile } from '../ui/TrackProfile';
 import { useUnitSystem } from '../ui/units';
-import { ImportPanel } from '../ui/ImportPanel';
 import { useActivityDays } from '../ui/useActivityDays';
 import { useActivityList } from '../ui/useActivityList';
 import { useActivityTotals } from '../ui/useActivityTotals';
 import { useDuplicates } from '../ui/useDuplicates';
+import { useImports } from '../ui/useImports';
 
 /** How long a checkbox-selection spree pauses before the map auto-flies to fit it (replacing
  *  the old explicit "Fit map" button — see IMPLEMENTATION.md §4.7) — long enough that ticking
@@ -515,7 +515,7 @@ export function MapView({ onOpenProfile, onOpenSettings, initialPrivateLocations
     [activities, mapHiddenIds, fitToSelection],
   );
 
-  // ROADMAP.md's "View on map" item — ImportPanel.tsx's per-row action, reusing focusActivity
+  // ROADMAP.md's "View on map" item — SyncTab.tsx's per-row action, reusing focusActivity
   // above rather than inventing a second fly-to mechanism. The one thing a row click doesn't
   // already handle: the target activity may not be in the currently selected date range (an
   // old Takeout import, a Health Connect backfill), in which case focusActivity would silently
@@ -771,7 +771,7 @@ export function MapView({ onOpenProfile, onOpenSettings, initialPrivateLocations
   const watchCoverage = useCoverageRefresh(map);
 
   // A finished upload is a new track on the map and a new row in every §4.7 response, so
-  // refresh all four together rather than let the header badge fall behind the geometry.
+  // refresh all four together rather than let the Sync tab's badge fall behind the geometry.
   const handleUploaded = useCallback(() => {
     if (map) refreshTrackLayer(map, activityQuery);
     reloadActivities();
@@ -782,6 +782,10 @@ export function MapView({ onOpenProfile, onOpenSettings, initialPrivateLocations
     // Deletes come through here too (handleActivitiesDeleted), so this covers both.
     watchCoverage();
   }, [map, activityQuery, reloadActivities, reloadTotals, reloadHistogram, duplicates.refresh, watchCoverage]);
+
+  // The Sync tab's upload queue and history — held here rather than in the tab, so an upload
+  // and its polling survive the panel unmounting (Fog/Heatmap) or showing the other tab.
+  const imports = useImports(handleUploaded);
 
   // §4.7.5/§4.7.6: one or more deleted activities need the exact same four-part refresh a
   // finished upload does (unlike editing type/description, deleting changes distance/duration
@@ -1000,7 +1004,6 @@ export function MapView({ onOpenProfile, onOpenSettings, initialPrivateLocations
   return (
     <div className="app-shell">
       <Header
-        importControl={<ImportPanel readOnly={isDemo} onUploaded={handleUploaded} onViewOnMap={viewActivityOnMap} />}
         exportControl={<ExportButton map={map} active={exportFlow.stage !== 'idle'} onOpen={handleExportOpen} />}
         onOpenProfile={onOpenProfile}
         onOpenSettings={onOpenSettings}
@@ -1043,6 +1046,8 @@ export function MapView({ onOpenProfile, onOpenSettings, initialPrivateLocations
               onEditTrack={startEditTrack}
               duplicates={duplicates.duplicates}
               duplicatesError={duplicates.error}
+              imports={imports}
+              onViewOnMap={viewActivityOnMap}
             />
           </div>
         )}
