@@ -20,7 +20,13 @@ const pagesTarget = process.env.API_PROXY_TARGET ?? 'http://localhost:8080';
 // proxying them here makes dev behave the same, with the pages on this origin like the app.
 // /v1 is for the header's avatar image — the React app itself calls the API directly at
 // VITE_API_BASE_URL and never goes through this.
-const pageRoutes = ['^/(about|help|contacts|logout)$', '^/static/', '^/v1/'];
+// Vite matches these against the URL with its query string, hence the `(\?|$)` endings.
+const pageRoutes = [
+  '^/(about|help|contacts|logout|signin|signup|demo|forgot|reset|verify)(\\?|$)',
+  '^/verify-pending(/|\\?|$)',
+  '^/static/',
+  '^/v1/',
+];
 
 export default defineConfig({
   plugins: [react()],

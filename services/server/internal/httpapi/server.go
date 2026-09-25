@@ -179,6 +179,20 @@ func (s *Server) registerPages() {
 	s.mux.HandleFunc("GET /contacts", s.staticPage("contacts", "Contacts — HoldMyTrack", "How to reach the HoldMyTrack project: email, code and issues.", false))
 	s.mux.Handle("GET /static/", s.pages.StaticHandler())
 	s.mux.HandleFunc("POST /logout", s.sameOrigin(s.handleLogoutPage))
+	// auth_pages.go — every POST is a form, so every POST is behind sameOrigin.
+	s.mux.HandleFunc("GET /signin", s.handleSignInPage)
+	s.mux.HandleFunc("POST /signin", s.sameOrigin(s.handleSignInForm))
+	s.mux.HandleFunc("GET /signup", s.handleSignUpPage)
+	s.mux.HandleFunc("POST /signup", s.sameOrigin(s.handleSignUpForm))
+	s.mux.HandleFunc("POST /demo", s.sameOrigin(s.handleDemoForm))
+	s.mux.HandleFunc("GET /forgot", s.handleForgotPage)
+	s.mux.HandleFunc("POST /forgot", s.sameOrigin(s.handleForgotForm))
+	s.mux.HandleFunc("GET /reset", s.handleResetPage)
+	s.mux.HandleFunc("POST /reset", s.sameOrigin(s.handleResetForm))
+	s.mux.HandleFunc("GET /verify", s.handleVerifyPage)
+	s.mux.HandleFunc("GET /verify-pending", s.handleVerifyPendingPage)
+	s.mux.HandleFunc("POST /verify-pending/resend", s.sameOrigin(s.handleVerifyResendForm))
+	s.mux.HandleFunc("POST /verify-pending/email", s.sameOrigin(s.handleVerifyChangeEmailForm))
 }
 
 // ServeHTTP sets CORS headers before delegating to the mux. This has to happen here, not

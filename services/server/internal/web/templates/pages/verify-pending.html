@@ -1,0 +1,20 @@
+{{define "content"}}{{with .Page}}
+<main class="auth-page">
+  <div class="auth-card">
+    <h1 class="auth-card__title">Verify your email</h1>
+    <p class="auth-card__hint">We sent a confirmation link to <strong>{{.Email}}</strong>. Click it to unlock your account.</p>
+    {{with .Notice}}<p class="auth-card__notice" role="status">{{.}}</p>{{end}}
+    {{with .Error}}<p class="auth-card__error" role="alert">{{.}}</p>{{end}}
+    <form method="post" action="/verify-pending/resend">
+      <button type="submit" class="auth-card__submit">Resend verification email</button>
+    </form>
+    <form class="auth-card__form" method="post" action="/verify-pending/email">
+      <label class="auth-card__field"><span>Typed the wrong address? Change it:</span><input type="email" name="email" value="{{.Email}}" required autocomplete="email" /></label>
+      <button type="submit" class="auth-card__secondary">Save new email</button>
+    </form>
+    <form method="post" action="/logout">
+      <button type="submit" class="auth-card__link auth-card__link--button">← Sign out</button>
+    </form>
+  </div>
+</main>
+{{end}}{{end}}

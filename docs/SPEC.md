@@ -48,6 +48,19 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 
 ## 3. FR-1 — Authentication & Account Management
 
+**On the web, every screen in this section is a server-rendered page** (`IMPLEMENTATION.md` §4.19) with the shared page header (FR-10.4), and every form on them is refused (`403`) unless its `Origin` — or, without one, its `Referer` — is the app's own origin:
+
+| Page | Purpose |
+| :-- | :-- |
+| `GET`/`POST /signin` | Sign in (FR-1.2); links to sign-up and "Forgot password?", "Continue with Google" when configured (FR-1.9), and "Try it now — no signup" (`POST /demo`, FR-2.1). `?error=google` shows FR-1.9's failure message. |
+| `GET`/`POST /signup` | Sign up (FR-1.1, FR-2.3) |
+| `GET`/`POST /forgot` | Request a reset link (FR-1.5); answers "Check your email" whatever the address |
+| `GET`/`POST /reset?token=` | Set a new password from the emailed link (FR-1.6) |
+| `GET /verify?token=` | The emailed verification link itself (FR-1.8) |
+| `GET /verify-pending` | A signed-in, unverified account's holding page: resend (`POST /verify-pending/resend`), change the address (`POST /verify-pending/email`), or sign out (FR-1.8) |
+
+A failed form comes back as the same page, at the failure's status (`400`, `401`, `409`, `429`), with the server's message and the typed email kept. A successful one redirects: to `/verify-pending` for a real account that hasn't verified its email, otherwise to the map (`/`). A visit to `/signin` or `/signup` with a real account already signed in redirects the same way; a demo session can still sign in, or sign up (FR-2.3). The JSON endpoints named below are what the Android app calls and what these pages share their behavior with. Links in emails sent before the pages existed pointed at `/?reset_token=` and `/?verify_token=`; the map page forwards those to `/reset` and `/verify`.
+
 ### FR-1.1 Sign up
 
 **Description**: An anonymous visitor creates a new registered account.
@@ -57,7 +70,7 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 **Inputs**: Email address, password (minimum 8 characters); the browser's own IANA timezone, sent automatically (not user-entered) and optional — see step 3.
 
 **Behavior**:
-1. Client submits email + password + its own detected timezone to `POST /v1/auth/signup`.
+1. Client submits email + password + its own detected timezone to `POST /v1/auth/signup` (the web's `/signup` form fills the timezone from the browser with a one-line script; without it the account starts on UTC).
 2. Server validates the email is a syntactically valid address and the password meets the minimum length.
 3. Server hashes the password (bcrypt) and creates a new `users` row — always a fresh row, whether or not the caller's browser holds a live demo session (see FR-2.3, revised). The submitted timezone is validated against the IANA tz database and stored if valid; missing or invalid falls back to UTC rather than rejecting the signup (FR-1.7 covers editing it afterward).
 4. Server creates a session (30-day expiry) and sets it as an `HttpOnly` cookie, and sends a verification email (FR-1.8).
@@ -107,7 +120,7 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 **Behavior**:
 1. Client calls `GET /v1/auth/me` with whatever session cookie it currently holds.
 2. If the cookie names a live, unexpired session, the server returns the account's identity (`200 OK`).
-3. Otherwise the server returns `401 Unauthorized`, and the client shows the sign-in screen.
+3. Otherwise the server returns `401 Unauthorized`, and the client shows the sign-in screen (on the web, the map page redirects to `/signin`; a signed-in real account whose email isn't verified is redirected to `/verify-pending` instead).
 
 **Notes**: A session's validity is checked in the database on every request (not trusted from the cookie's own stated expiry), so a session ended server-side (FR-1.3, or invalidated by a password reset, FR-1.6) stops working immediately even if the browser still holds the cookie. Sessions last 30 days from creation. The response also reports whether the account's email is verified (always `true` for a demo account) — the client uses this to decide whether to show the map or FR-1.8's verify screen.
 
@@ -182,7 +195,7 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 
 **Behavior**:
 1. On signup (FR-1.1) and whenever the email address changes (step 4 below), the server emails a link containing a verification token (valid 24 hours, single-use) to the address on file.
-2. Clicking the link submits the token to `POST /v1/auth/verify-email`. On success, the server marks the account verified, invalidates every other outstanding verification token for it, and creates a fresh session for whichever browser opened the link — regardless of whether that browser already held a session of its own, so the link works from any device.
+2. The link opens `/verify?token=…`, which verifies the token the same way `POST /v1/auth/verify-email` does (the endpoint the Android app would call). A missing, expired, used or malformed token shows "This verification link is invalid or has expired." On success, the server marks the account verified, invalidates every other outstanding verification token for it, and creates a fresh session for whichever browser opened the link — regardless of whether that browser already held a session of its own, so the link works from any device.
 3. While waiting, the account holder can request another copy of the link (`POST /v1/auth/resend-verification`, rate-limited to 5 per hour per account) without needing to already know it was lost or expired.
 4. The account holder can also change the address on file (`PATCH /v1/auth/email`) before ever verifying — correcting a typo the original signup made, since a resend alone cannot fix a wrong address. Any change resets the account back to unverified and sends a new link to the new address, whether or not the account was already verified.
 5. Once verified, the account continues to FR-1.7's first-run Settings page, not straight to the map, until Country and Timezone have been saved once.
@@ -206,8 +219,8 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 **Inputs**: The Google account the visitor picks on Google's own account chooser; the browser's IANA timezone, sent automatically as with FR-1.1.
 
 **Behavior**:
-1. Client calls `GET /v1/auth/providers`; when `google` is `true`, the sign-in screen shows "Continue with Google" above the email/password form.
-2. Clicking it navigates the whole page to `GET /v1/auth/google/start?tz=<timezone>`. The server sets a short-lived (10-minute) cookie holding a random `state` value and a PKCE verifier, and redirects to Google's consent screen, always showing the account chooser.
+1. When the server has Google credentials configured (what `GET /v1/auth/providers` reports as `google: true`), the sign-in and sign-up pages show "Continue with Google" above the email/password form.
+2. Clicking it navigates the whole page to `GET /v1/auth/google/start?tz=<timezone>` (a one-line script adds the browser's timezone; without it a new account starts on UTC). The server sets a short-lived (10-minute) cookie holding a random `state` value and a PKCE verifier, and redirects to Google's consent screen, always showing the account chooser.
 3. Google redirects back to `GET /v1/auth/google/callback`. The server checks `state` against the cookie (and clears the cookie either way), exchanges the authorization code with Google, and reads the Google account's stable id, email and name. A Google account whose email Google itself reports as unverified is refused.
 4. The server picks the account:
    - An account already linked to this Google account is signed in, even if its HoldMyTrack email has since changed.
@@ -217,7 +230,7 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 
 **Outputs**: A valid session cookie and a redirect to the app.
 
-**Error cases**: Every failure — the visitor cancelled on Google's screen, a missing or mismatched `state`, the code exchange failed, the Google email is unverified, or the matching account is already linked to a *different* Google account — redirects to the app with `?auth_error=google`, and the sign-in screen shows a generic "Couldn't sign in with Google" message. The cause is logged server-side, not revealed in the URL.
+**Error cases**: Every failure — the visitor cancelled on Google's screen, a missing or mismatched `state`, the code exchange failed, the Google email is unverified, or the matching account is already linked to a *different* Google account — redirects to `/signin?error=google`, which shows a generic "Couldn't sign in with Google. Please try again." message. The cause is logged server-side, not revealed in the URL.
 
 **Notes**: A Google-only account has no password, so FR-1.2 rejects it with the same generic error as any other mismatch; it can set a password at any time through FR-1.5/FR-1.6, after which both ways in work. Changing the account's email (FR-1.8 step 4) leaves the Google link in place.
 
@@ -230,7 +243,7 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 **Preconditions**: No active session.
 
 **Behavior**:
-1. Client calls `POST /v1/auth/demo`.
+1. Client calls `POST /v1/auth/demo` — on the web, the sign-in page's "Try it now — no signup" button submits `POST /demo`, which does the same and redirects to the map. Starts are rate-limited to 5 per hour per address; over the limit the sign-in page shows the error.
 2. Server opens a session against one persistent, shared **Demo Customer** account — not a fresh account created per visitor. That account is pre-seeded, once, out of band (not per request — see FR-2.2), with a real, richly-populated history: roughly 611 activities spanning about 7 months, a mix of walks, dog walks, bike rides, local errands, and a few multi-day road trips, based around Cleveland, OH — which its Settings profile (Name "Demo User," Country United States, Timezone America/New_York) matches, rather than being left at generic column defaults — plus one Private location, "Home," a 250 m circle over the area nearly every trip starts from (FR-8.1).
 3. Server creates a session for this visitor (24-hour expiry) and sets it as a cookie. Any number of visitors can hold their own session against the same shared account at once — they all see identical data.
 4. Client is signed in and shown the map, with the account's full history already visible in every mode (Normal, Fog of War, Heatmap) and every read-only feature (filtering, the activity graph, export) exactly as a registered user has it. **A demo account cannot upload, sync, edit, or delete an activity, or change its avatar/settings** — every such request is rejected regardless of what a client attempts, whether or not its own UI still offers the control. Creating a real account (FR-1.1) is the only way to save one's own data. Both clients also gate this proactively rather than relying on the rejection alone: the web app replaces the Sync tab's drop zone with an explanation (`SyncTab.tsx`'s `readOnly` prop) and the Android app disables Sync Now and hides the Health Connect permission flow with the same explanation (FR-3.8) — a demo session can still record and manage GPS Logger recordings locally on Android, since nothing about that reaches the server until sync is attempted.
@@ -256,10 +269,10 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 **Inputs**: Email address, password (minimum 8 characters) — the same inputs as FR-1.1.
 
 **Behavior**:
-1. From the account menu, which shows the demo account's name ("Demo User") where a real account shows its email, the user selects "Create your own account," which presents the same sign-up screen a new visitor sees (FR-1.1), with a "← Back" option instead of the "try demo" option (starting a second demo while already in one would abandon the first).
+1. From the account menu, which shows the demo account's name ("Demo User") where a real account shows its email, the user selects "Create your own account," which opens the same sign-up page a new visitor sees (`/signup`, FR-1.1), with "← Back to the map" in place of the sign-in page's "try demo" option (starting a second demo while already in one would abandon the first).
 2. The user submits an email and password.
 3. The server creates a plain new account (FR-1.1's normal behavior) — the shared Demo Customer account itself is untouched, exactly as every other concurrent demo visitor's session leaves it.
-4. The user is signed in to the new account, held on FR-1.8's verify-email screen exactly like any other fresh signup.
+4. The user is signed in to the new account and sent to FR-1.8's verify-email page (`/verify-pending`), exactly like any other fresh signup.
 
 **Outputs**: A new, unverified registered account — not the demo account, and not carrying any of its activity history.
 
@@ -770,8 +783,8 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 **Behavior**:
 1. `GET /about` returns the page.
 2. It has sections for: what HoldMyTrack is, why someone might want it, what it isn't, how it is funded (section id `funding`), and a pointer to Contacts (FR-10.3).
-3. "Try the demo — no signup" links to `/`, the sign-in screen, where the demo starts from its own button (FR-2.1). The page never starts a demo session itself.
-4. About, Help and Contacts are reachable from the sign-in screen ("What is HoldMyTrack?", below the form, links to About), from every page's header and footer (FR-10.4), and from the map page's header "Info" menu, just before the account menu. On a phone-width screen, where the map page's header has no room for that menu, its three entries are in the account menu instead.
+3. "Try the demo — no signup" links to `/signin`, where the demo starts from its own button (FR-2.1). The page never starts a demo session itself.
+4. About, Help and Contacts are reachable from every page's header and footer (FR-10.4) — the sign-in pages included — and from the map page's header "Info" menu, just before the account menu. On a phone-width screen, where the map page's header has no room for that menu, its three entries are in the account menu instead.
 5. `/robots.txt` allows crawling except for `/v1/` and `/tiles/`, and points to `/sitemap.xml`, which lists `/`, `/about` and `/contacts`.
 
 ### FR-10.2 Help page
@@ -799,7 +812,7 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 
 **Behavior**:
 1. The header shows the logo, wordmark and tagline (the brand links to `/`), then Donate (FR-11.1), an "Info" menu listing About, Help and Contacts with the current page marked, and the account area.
-2. Signed out, the account area is a "Sign in" link to `/`. With a session (real or demo), it is an account menu showing the account's avatar (or a generic icon) that opens to the account's email (a demo session shows its display name instead), "Map" (`/`), and "Sign out".
+2. Signed out, the account area is a "Sign in" link to `/signin`. With a session (real or demo), it is an account menu showing the account's avatar (or a generic icon) that opens to the account's email (a demo session shows its display name instead), "Map" (`/`), and "Sign out".
 3. Both menus open and close without JavaScript.
 4. "Sign out" submits `POST /logout`, which ends the session the same way `POST /v1/auth/logout` does and redirects to `/`. The request is refused (`403`) unless its `Origin` header — or, without one, its `Referer` — is the app's own origin.
 5. On a phone-width screen (≤768px) the tagline is hidden and Donate shows its heart alone; the Info and account menus stay.

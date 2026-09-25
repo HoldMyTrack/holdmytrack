@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { getCurrentUser, logout, type SessionUser, type UserProfile } from './api';
-import { AuthGate } from './auth/AuthGate';
 import { AuthProvider } from './auth/AuthContext';
 import { MapView } from './map/MapView';
 import { clearSavedView } from './map/viewState';
@@ -39,150 +38,64 @@ function AuthenticatedApp() {
 }
 
 /**
- * `null` (checking), a real or demo user, or the string `'signed-out'` — not just
- * `SessionUser | null`, so "haven't asked yet" and "asked, and there's no session" render
- * differently: the former shows nothing rather than flashing the sign-in form for the common
- * case (a valid session cookie already present) before `getCurrentUser` resolves.
+ * `'checking'` until `getCurrentUser` answers — the map renders nothing rather than flashing
+ * before a session is confirmed. Signed out, or signed in but unverified, never reaches a
+ * state here: those leave for the server-rendered pages instead (see `landing` below).
  */
-type AuthState = 'checking' | 'signed-out' | SessionUser;
+type AuthState = 'checking' | SessionUser;
 
-/** Reads a one-shot query param (an emailed link's token, a sign-in redirect's error) and
- *  strips it from the URL in the same pass — a refresh must not re-trigger it, and it
- *  shouldn't linger in browser history once read. */
-function takeQueryParam(name: string): string | null {
+/**
+ * Where a visit to `/` has to go instead of the map, if anywhere. The sign-in, sign-up,
+ * password-reset and email-verification screens are server-rendered pages now (ADR-0012,
+ * IMPLEMENTATION.md §4.19), not this app's. Emails sent before that linked here with a query
+ * param (`?reset_token=`, `?verify_token=`), and Google's callback used to report a failure
+ * as `?auth_error=`; those still arrive for a while, so they're forwarded to the page that
+ * handles each now. Goes away once `/` itself is served by the Go server (ADR-0012's next step).
+ */
+function legacyLanding(): string | null {
   const params = new URLSearchParams(window.location.search);
-  const value = params.get(name);
-  if (value) {
-    params.delete(name);
-    const rest = params.toString();
-    const path = window.location.pathname + (rest ? `?${rest}` : '') + window.location.hash;
-    window.history.replaceState(null, '', path);
-  }
-  return value;
+  const reset = params.get('reset_token');
+  if (reset) return `/reset?token=${encodeURIComponent(reset)}`;
+  const verify = params.get('verify_token');
+  if (verify) return `/verify?token=${encodeURIComponent(verify)}`;
+  if (params.get('auth_error')) return '/signin?error=google';
+  return null;
 }
 
 export function App() {
   const [auth, setAuth] = useState<AuthState>('checking');
-  // UserMenu's "Create your own account" (IMPLEMENTATION.md §4.10) — turning
-  // a demo into a real account means showing AuthGate again, the exact same page a new
-  // visitor sees, not a second bespoke form. Lives here rather than as a fourth AuthState
-  // value because it's orthogonal to `auth` itself: the session doesn't change (or even get
-  // touched) until AuthGate's own onAuthenticated fires below.
-  const [upgrading, setUpgrading] = useState(false);
-  // A password-reset email's link (IMPLEMENTATION.md §4.11) lands here as
-  // `?reset_token=...` — read once, lazily, and stripped from the URL in the same pass (a
-  // refresh mid-form must not re-trigger it, and it shouldn't linger in browser history once
-  // read). Checked independently of `auth`, ahead of every branch below: arriving via a
-  // clicked email link is unambiguous intent, outranking even an already-live session.
-  const [resetToken, setResetToken] = useState(() => takeQueryParam('reset_token'));
-
-  // Same read-once-and-strip pattern as resetToken above, for docs/ROADMAP.md's email
-  // verification link (`?verify_token=...`).
-  const [verifyToken, setVerifyToken] = useState(() => takeQueryParam('verify_token'));
-
-  // And again for a failed Google sign-in (`?auth_error=google`, google_auth.go's
-  // handleGoogleCallback) — shown once on the sign-in screen, never re-shown on refresh.
-  const [authError] = useState(() => takeQueryParam('auth_error'));
 
   useEffect(() => {
+    const legacy = legacyLanding();
+    if (legacy) {
+      window.location.replace(legacy);
+      return;
+    }
     getCurrentUser()
-      .then((user) => setAuth(user ?? 'signed-out'))
-      .catch(() => setAuth('signed-out'));
+      .then((user) => {
+        // No session → the sign-in page; a real account that hasn't confirmed its email →
+        // the page that says so (the map has nothing to show it yet).
+        if (!user) window.location.replace('/signin');
+        else if ('email' in user && !user.emailVerified) window.location.replace('/verify-pending');
+        else setAuth(user);
+      })
+      .catch(() => window.location.replace('/signin'));
   }, []);
 
-  // Every app-initiated identity change (a sign-in/sign-up/demo-start completing, or a
-  // sign-out) clears whatever camera position the URL hash carries before flipping `auth` —
-  // otherwise MapView's next mount can inherit a previous session's leftover position and skip
-  // its own fly-to-most-recent fallback entirely (see clearSavedView's own doc comment,
-  // viewState.ts). Deliberately *not* called on the mount-time getCurrentUser check above,
-  // where an existing hash is a legitimate same-session "return to where I was" on a plain
-  // page refresh, not a stale leftover.
-  const handleAuthenticated = (user: SessionUser) => {
-    clearSavedView();
-    setAuth(user);
-  };
-  const handleSignOut = async () => {
+  if (auth === 'checking') return <VersionBanner />;
+
+  // Clears the camera position the URL hash carries before leaving, so whoever signs in next
+  // on this browser doesn't inherit it (clearSavedView's own doc comment, viewState.ts).
+  const signOut = async () => {
     await logout();
     clearSavedView();
-    setAuth('signed-out');
+    window.location.assign('/signin');
   };
-
-  if (resetToken) {
-    return (
-      <>
-        <VersionBanner />
-        <AuthGate
-          resetToken={resetToken}
-          onAuthenticated={(user) => {
-            handleAuthenticated(user);
-            setResetToken(null);
-          }}
-        />
-      </>
-    );
-  }
-
-  if (verifyToken) {
-    return (
-      <>
-        <VersionBanner />
-        <AuthGate
-          verifyToken={verifyToken}
-          onAuthenticated={(user) => {
-            handleAuthenticated(user);
-            setVerifyToken(null);
-          }}
-        />
-      </>
-    );
-  }
-
-  if (auth === 'checking') return <VersionBanner />;
-  if (auth === 'signed-out') {
-    return (
-      <>
-        <VersionBanner />
-        <AuthGate onAuthenticated={handleAuthenticated} authError={authError} />
-      </>
-    );
-  }
-
-  // A real (non-demo) account whose email isn't confirmed yet — docs/ROADMAP.md's "Email
-  // verification + demo without real ingest" gate. Checked ahead of `upgrading` and the real
-  // app below: an unverified account has nothing to show yet regardless of anything else.
-  if ('email' in auth && !auth.emailVerified) {
-    return (
-      <>
-        <VersionBanner />
-        <AuthGate unverifiedUser={auth} onAuthenticated={handleAuthenticated} onSignOut={() => void handleSignOut()} />
-      </>
-    );
-  }
-
-  // AuthenticatedApp (and MapView with it) fully unmounts for this — a deliberate tradeoff,
-  // not an oversight: the uploaded-during-the-demo data is server-side and untouched either
-  // way, but the map's own transient view state (camera, filters, selection) resets on
-  // cancel. Accepted in exchange for reusing AuthGate exactly as it already is, rather than
-  // building a second overlay-only presentation of the same form just to keep that state.
-  if (upgrading) {
-    return (
-      <>
-        <VersionBanner />
-        <AuthGate
-          onAuthenticated={(user) => {
-            handleAuthenticated(user);
-            setUpgrading(false);
-          }}
-          onCancel={() => setUpgrading(false)}
-        />
-      </>
-    );
-  }
-
-  // `auth` is already narrowed to a real SessionUser by the two early returns above, so this
-  // closure can merge directly into it rather than needing setAuth's functional-updater form.
   const updateUser = (patch: UserProfile) => setAuth({ ...auth, ...patch });
-  const authValue = { user: auth, signOut: handleSignOut, requestUpgrade: () => setUpgrading(true), updateUser };
+  // UserMenu's "Create your own account" (a demo session only) — the sign-up page, which
+  // offers "Back to the map" in place of another demo while one is held.
+  const requestUpgrade = () => window.location.assign('/signup');
+  const authValue = { user: auth, signOut, requestUpgrade, updateUser };
 
   // First run (FR-1.7): a verified real account with no Country confirms Country and Timezone
   // before seeing anything — both decide how every number and day in the app reads. Derived

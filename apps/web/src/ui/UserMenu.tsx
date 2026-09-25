@@ -15,12 +15,11 @@ import { useAuth } from '../auth/AuthContext';
  * the generic glyph until then rather than initials, matching how a not-yet-set field reads
  * elsewhere in this app (an em dash, not a fabricated stand-in).
  *
- * A demo session (VISION.md §8.2, AuthGate's "Try it now") shows the shared account's
+ * A demo session (VISION.md §8.2, the sign-in page's "Try it now") shows the shared account's
  * display name ("Demo User") in place of an email — the account is read-only, so there is
  * nothing of the visitor's to "save" — followed by "Create your own account", whose
- * `requestUpgrade()` hands off to App.tsx, which swaps the whole screen to the exact same
- * AuthGate a new visitor sees (IMPLEMENTATION.md §4.10) rather than a second, bespoke form
- * living in this dropdown.
+ * `requestUpgrade()` leaves for the same sign-up page a new visitor uses (IMPLEMENTATION.md
+ * §4.10) rather than a second, bespoke form living in this dropdown.
  */
 export interface UserMenuProps {
   /** Navigates to ProfilePage. Optional (and explicitly `| undefined`, not just `?:` — see
@@ -163,9 +162,8 @@ export function UserMenu({ onOpenProfile, onOpenSettings, onOpenPrivateLocations
             disabled={signingOut}
             onClick={() => {
               setSigningOut(true);
-              // Not setOpen(false) first — App.tsx unmounts this whole menu the moment
-              // signOut() resolves (back to AuthGate), so there is no dropdown left open to
-              // close by then anyway.
+              // Not setOpen(false) first — signOut() leaves for the sign-in page once it
+              // resolves (App.tsx), so there is no dropdown left open to close by then anyway.
               void signOut().finally(() => setSigningOut(false));
             }}
           >

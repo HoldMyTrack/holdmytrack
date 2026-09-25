@@ -111,7 +111,7 @@ func (s *Server) handleGoogleStart(w http.ResponseWriter, r *http.Request) {
 
 // handleGoogleCallback serves `GET /v1/auth/google/callback` — where Google sends the browser
 // back. Every failure, whatever its cause (the user cancelled, a stale or forged state, Google
-// unreachable, an unusable id_token), lands on the same `?auth_error=google` redirect: the
+// unreachable, an unusable id_token), lands on the same `/signin?error=google` redirect: the
 // detail goes to the log, not the URL, for handleLogin's same "don't tell a caller more than it
 // needs" reasoning.
 func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
@@ -121,7 +121,7 @@ func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	fail := func(msg string, err error) {
 		s.log.Warn("google sign-in failed: "+msg, "err", err)
-		http.Redirect(w, r, s.appBaseURL+"/?auth_error=google", http.StatusFound)
+		http.Redirect(w, r, s.appBaseURL+"/signin?error=google", http.StatusFound)
 	}
 
 	// Single-use: cleared before anything else, whatever the outcome.

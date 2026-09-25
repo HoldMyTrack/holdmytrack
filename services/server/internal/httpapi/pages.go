@@ -8,24 +8,20 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 )
 
-// The server-rendered pages (ADR-0012, IMPLEMENTATION.md §4.17): internal/web renders them,
+// The server-rendered pages (ADR-0012, IMPLEMENTATION.md §4.19): internal/web renders them,
 // this file decides who is asking. Unlike the /v1 JSON routes, a page never answers 401 — a
 // signed-out visitor gets the page with a "Sign in" link where the account menu would be.
+// The auth pages themselves — sign in, sign up, reset, verify — are in auth_pages.go.
 
 // pageUser is the optional-auth lookup every page does: the signed-in account as the header
 // shows it, or nil for no session (or an expired one). Unlike requireAuth it never rejects,
 // and an unverified account still counts as signed in — the header only needs a name.
+// (auth_pages.go's pageAccount is the same lookup with the session's flags kept.)
 func (s *Server) pageUser(r *http.Request) *web.User {
-	userID, ok := s.currentUserID(r)
-	if !ok {
-		return nil
+	if acct := s.pageAccount(r); acct != nil {
+		return acct.user
 	}
-	resp, err := s.loadAuthResponse(r.Context(), userID)
-	if err != nil {
-		s.log.Error("page user lookup failed", "err", err)
-		return nil
-	}
-	return &web.User{Email: resp.Email, DisplayName: resp.DisplayName, AvatarURL: resp.AvatarURL, IsDemo: resp.IsDemo}
+	return nil
 }
 
 // staticPage serves a page whose content is the same for everyone — only the header differs.

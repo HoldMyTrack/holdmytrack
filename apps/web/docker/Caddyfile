@@ -35,7 +35,11 @@
 	# same page paths httpapi's registerPages serves and apps/web/vite.config.ts proxies in
 	# dev. Listed one by one until the map page is served by Go too; then this flips to
 	# "everything that isn't a static asset".
-	@backend path /v1/* /tiles/* /healthz /about /help /contacts /logout /static/*
+	@backend {
+		path /v1/* /tiles/* /healthz /static/*
+		path /about /help /contacts /logout
+		path /signin /signup /demo /forgot /reset /verify /verify-pending /verify-pending/*
+	}
 	handle @backend {
 		reverse_proxy api:8080
 	}

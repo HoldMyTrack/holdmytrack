@@ -1,0 +1,18 @@
+{{define "content"}}{{with .Page}}
+<main class="auth-page">
+  <div class="auth-card">
+    {{if .Sent}}
+    <h1 class="auth-card__title">Check your email</h1>
+    <p class="auth-card__hint">If an account exists for that email, a reset link is on its way — it works once and expires in an hour.</p>
+    {{else}}
+    <h1 class="auth-card__title">Reset your password</h1>
+    <form class="auth-card__form" method="post" action="/forgot">
+      <label class="auth-card__field"><span>Email</span><input type="email" name="email" value="{{.Email}}" required autocomplete="email" /></label>
+      {{with .Error}}<p class="auth-card__error" role="alert">{{.}}</p>{{end}}
+      <button type="submit" class="auth-card__submit">Send reset link</button>
+    </form>
+    {{end}}
+    <a class="auth-card__link" href="/signin">← Back to sign in</a>
+  </div>
+</main>
+{{end}}{{end}}

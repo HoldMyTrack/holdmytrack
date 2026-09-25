@@ -51,9 +51,9 @@ async function errorMessageFromResponse(res: Response, fallback: string): Promis
  * Simple email+password auth (services/server/internal/httpapi/auth.go) — every request in
  * this file sends `credentials: 'include'` now (and `uploadFile`'s XHR sets
  * `withCredentials`) so the browser attaches the session cookie these endpoints set/read.
- * `signup`/`login` throw on failure rather than returning a result union, matching every
- * other function here's "throw with the server's own message" convention — the caller
- * (AuthGate.tsx) catches and displays it.
+ * Signing in, signing up, password reset and email verification are server-rendered pages
+ * (ADR-0012), not calls from here; this app only reads the session (`getCurrentUser`) and
+ * ends it (`logout`).
  */
 /** The Settings page's own fields (SettingsPage.tsx) — carried by both `AuthUser` and
  *  `DemoUser` uniformly, since a demo account is a real `users` row with real column
@@ -79,7 +79,7 @@ export interface AuthUser extends UserProfile {
   /** docs/SPEC.md FR-1.8 — always `true` for a
    *  `DemoUser` (the gate never applies to one, so that type doesn't carry this field at all),
    *  reflects the account's real `users.email_verified` column for a real one. App.tsx checks
-   *  this to decide whether to render the map or AuthGate's verify-email screen. */
+   *  this to decide whether to render the map or leave for the verify-email page. */
   emailVerified: boolean;
 }
 
@@ -122,149 +122,6 @@ function toAuthUser(body: AuthResponseBody): AuthUser {
 
 function toSessionUser(body: AuthResponseBody): SessionUser {
   return body.isDemo ? toProfile(body) : toAuthUser(body);
-}
-
-async function postAuth(path: string, email: string, password: string, extra?: Record<string, unknown>): Promise<AuthUser> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ email, password, ...extra }),
-  });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
-  }
-  const body = (await res.json()) as AuthResponseBody;
-  return toAuthUser(body);
-}
-
-/** Sends the browser's own IANA zone (`Intl.DateTimeFormat().resolvedOptions().timeZone`) as
- *  a one-time signup-only default — auth.go's `handleSignup` falls back to `'UTC'` if this is
- *  missing or the server can't load it, so there's nothing to validate client-side here; the
- *  account can always change it later in Settings (SettingsPage.tsx). `login` sends no such
- *  field — the account's stored value, not the browser's, is authoritative from then on. */
-export function signup(email: string, password: string): Promise<AuthUser> {
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  return postAuth(`${API_V1}/auth/signup`, email, password, { timezone });
-}
-
-export function login(email: string, password: string): Promise<AuthUser> {
-  return postAuth(`${API_V1}/auth/login`, email, password);
-}
-
-/** Which optional sign-in methods this deployment has configured (google_auth.go's
- *  handleAuthProviders) — read at runtime rather than baked in at build time, so the button
- *  never appears on a deployment whose server can't complete the flow. A failed request reads
- *  as "none": email+password never depends on this. */
-export async function getAuthProviders(): Promise<{ google: boolean }> {
-  try {
-    const res = await fetch(`${API_BASE_URL}${API_V1}/auth/providers`, { credentials: 'include' });
-    if (!res.ok) return { google: false };
-    return (await res.json()) as { google: boolean };
-  } catch {
-    return { google: false };
-  }
-}
-
-/** Where "Continue with Google" navigates — a full-page navigation, not a fetch(): the server
- *  redirects on to Google and back (docs/SPEC.md FR-1.9), ending with the ordinary session
- *  cookie set and a redirect to the app's root, where App.tsx's usual getCurrentUser check
- *  picks the session up. `tz` plays `signup`'s `timezone` role for a brand-new account. */
-export function googleSignInUrl(): string {
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  return `${API_BASE_URL}${API_V1}/auth/google/start?tz=${encodeURIComponent(tz)}`;
-}
-
-/** VISION.md §8.2's "no-signup, drag-a-file-in, see-your-fog-map page" — a real
- *  session behind the scenes (auth.go's handleDemoStart), so nothing else in this file needs
- *  a demo-specific branch: uploads, tiles, everything just works once this resolves. */
-export async function startDemo(): Promise<DemoUser> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/auth/demo`, { method: 'POST', credentials: 'include' });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `couldn't start the demo (${res.status})`));
-  }
-  const body = (await res.json()) as AuthResponseBody;
-  return toProfile(body);
-}
-
-/** IMPLEMENTATION.md §4.11's password recovery. Always resolves — never rejects on "no such
- *  account," matching the backend's own deliberate non-leaking response — there is nothing
- *  more specific for a caller to do differently either way. */
-export async function forgotPassword(email: string): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/auth/forgot-password`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ email }),
-  });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
-  }
-}
-
-/** Never a `DemoUser` — a reset always targets a real, already-claimed account (the backend
- *  only ever creates a reset token for one — see auth.go's sendPasswordReset). */
-export async function resetPassword(token: string, password: string): Promise<AuthUser> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/auth/reset-password`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ token, password }),
-  });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
-  }
-  const body = (await res.json()) as AuthResponseBody;
-  return toAuthUser(body);
-}
-
-/** docs/ROADMAP.md's verification link (`?verify_token=...`) — App.tsx reads it the same way
- *  it already reads `reset_token`. Never a `DemoUser`, same reasoning as `resetPassword`: the
- *  backend only ever mints one of these tokens for a real account. */
-export async function verifyEmail(token: string): Promise<AuthUser> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/auth/verify-email`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ token }),
-  });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
-  }
-  const body = (await res.json()) as AuthResponseBody;
-  return toAuthUser(body);
-}
-
-/** The verify-email screen's "resend" action (AuthGate.tsx) — the caller is already signed in
- *  but unverified, so this needs no email/token of its own, just the session cookie already
- *  attached. */
-export async function resendVerification(): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/auth/resend-verification`, {
-    method: 'POST',
-    credentials: 'include',
-  });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
-  }
-}
-
-/** The verify-email screen's "change email" action — corrects a mistyped signup address
- *  before it's ever been confirmed (docs/ROADMAP.md: "resend alone doesn't help someone who
- *  typed the address wrong in the first place"). Resets emailVerified to false on the caller's
- *  side too, matching what the backend just did, so AuthGate keeps showing the verify screen
- *  for the new address rather than briefly reading as verified. */
-export async function changeEmail(email: string): Promise<AuthUser> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/auth/email`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ email }),
-  });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
-  }
-  const body = (await res.json()) as AuthResponseBody;
-  return toAuthUser(body);
 }
 
 export async function logout(): Promise<void> {

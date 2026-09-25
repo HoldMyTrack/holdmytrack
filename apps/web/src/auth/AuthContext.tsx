@@ -12,12 +12,10 @@ import type { SessionUser, UserProfile } from '../api';
  */
 export interface AuthContextValue {
   user: SessionUser;
-  /** Ends the session server-side and clears it here — App.tsx re-renders back to AuthGate
-   *  once this resolves, since `user` becoming unreachable is what that gate is keyed on. */
+  /** Ends the session server-side, then leaves for the sign-in page (App.tsx). */
   signOut: () => Promise<void>;
-  /** UserMenu's "Create your own account" — App.tsx is the only thing that can act on this,
-   *  since turning a demo into a real account means swapping the whole screen to AuthGate
-   *  (IMPLEMENTATION.md §4.10), which only the top-level view switch owns. */
+  /** UserMenu's "Create your own account" — leaves for the server-rendered sign-up page
+   *  (App.tsx, IMPLEMENTATION.md §4.10). */
   requestUpgrade: () => void;
   /** Merges a Settings-page save's response into the live `user` — SettingsPage.tsx calls
    *  this right after `updateSettings`/`uploadAvatar`/`removeAvatar` resolve, so the header

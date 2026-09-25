@@ -408,6 +408,169 @@ code {
   color: var(--fm-ink-muted);
 }
 
+/* The auth pages (signin/signup/forgot/reset/verify/verify-pending): one centered card, the
+   same look as the React sign-in screen they replaced (index.css's former .auth-gate). */
+.auth-page {
+  display: flex;
+  justify-content: center;
+  padding: 56px 16px 32px;
+}
+
+.auth-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 22rem;
+  padding: 24px;
+  background: var(--fm-surface);
+  border: 1px solid rgb(var(--fm-ink-rgb) / 10%);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgb(var(--fm-ink-rgb) / 18%);
+  line-height: 1.4;
+}
+
+.auth-card__title {
+  margin: 0;
+  font-family: var(--fm-font-serif);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.auth-card__form,
+.auth-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+}
+
+.auth-card__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: rgb(var(--fm-ink-rgb) / 60%);
+}
+
+.auth-card__field input {
+  padding: 10px;
+  border: 1px solid rgb(var(--fm-ink-rgb) / 18%);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--fm-ink);
+}
+
+.auth-card__field input:focus {
+  outline: 2px solid var(--fm-accent);
+  outline-offset: 1px;
+}
+
+.auth-card__forgot {
+  align-self: flex-end;
+  margin-top: -6px;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.auth-card__error,
+.auth-card__notice {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.auth-card__error {
+  background: rgb(170 51 51 / 8%);
+  color: #a33;
+}
+
+.auth-card__notice {
+  background: rgb(176 126 46 / 10%);
+  color: var(--fm-ink);
+}
+
+.auth-card__hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgb(var(--fm-ink-rgb) / 65%);
+}
+
+.auth-card__submit,
+.auth-card__secondary,
+.auth-card__google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  border-radius: 8px;
+  padding: 10px;
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.auth-card__submit {
+  border: 0;
+  background: var(--fm-accent);
+  color: #fff;
+}
+
+.auth-card__submit:hover {
+  background: var(--fm-accent-hover);
+}
+
+.auth-card__secondary,
+.auth-card__google {
+  border: 1px solid rgb(var(--fm-ink-rgb) / 15%);
+  background: var(--fm-surface);
+  color: var(--fm-ink);
+}
+
+.auth-card__secondary:hover,
+.auth-card__google:hover {
+  color: var(--fm-ink);
+  background: rgb(var(--fm-ink-rgb) / 4%);
+}
+
+.auth-card__link {
+  align-self: center;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.auth-card__link--button {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--fm-accent-strong);
+  cursor: pointer;
+}
+
+.auth-card__divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: rgb(var(--fm-ink-rgb) / 40%);
+}
+
+.auth-card__divider::before,
+.auth-card__divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgb(var(--fm-ink-rgb) / 10%);
+}
+
 /* index.css's phone header: tighter, no tagline, Donate as a heart alone. Unlike the map
    page's header, the Info menu stays — without Import/Export there is room for it. */
 @media (max-width: 768px) {

@@ -87,8 +87,8 @@ type PageData struct {
 	Canonical string
 }
 
-// Renderer parses each page template together with the shared layout and header, once at
-// startup — or on every render when reload is set (dev).
+// Renderer parses each page template together with the shared layout, header and partials
+// (every templates/*.html), once at startup — or on every render when reload is set (dev).
 type Renderer struct {
 	fsys    fs.FS
 	reload  bool
@@ -128,7 +128,8 @@ func (r *Renderer) parse() (map[string]*template.Template, error) {
 	for _, file := range files {
 		name := path.Base(file)
 		name = name[:len(name)-len(".html")]
-		t, err := template.New("layout.html").Funcs(funcs).ParseFS(r.fsys, "templates/layout.html", "templates/header.html", file)
+		// Every templates/*.html (the layout, the header, shared partials) goes with each page.
+		t, err := template.New("layout.html").Funcs(funcs).ParseFS(r.fsys, "templates/*.html", file)
 		if err != nil {
 			return nil, fmt.Errorf("web: parse %s: %w", file, err)
 		}

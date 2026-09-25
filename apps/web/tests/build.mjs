@@ -28,7 +28,7 @@ let page;
 let partial = 0;
 const failures = [];
 
-// Same reasoning as smoke.mjs: App.tsx now gates everything behind AuthGate, so a fresh
+// Same reasoning as smoke.mjs: App.tsx sends a signed-out visit to /signin, so a fresh
 // browser context needs a real session cookie before the map can mount at all.
 const API_BASE = process.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
 const TEST_EMAIL = 'smoke-test@holdmytrack.local';

@@ -73,7 +73,7 @@ The shipped UI so far is functional scaffolding, not a finished product. Partly 
 - [ ] Server-rendered pages sharing one header, React kept for the map page ([ADR-0012](adr/0012-server-rendered-pages-react-for-the-map.md), `IMPLEMENTATION.md` §4.19), in shippable steps:
   - [x] Import moves out of the header into the Activities panel's Sync tab (`IMPLEMENTATION.md` §4.0.1).
   - [x] The rendering foundation (`internal/web`, the shared header, Sign out as a same-origin-checked form) with About, Help and Contacts as its first pages (`IMPLEMENTATION.md` §4.14).
-  - [ ] Sign-in, sign-up, password reset, email verification and demo start as pages, replacing `AuthGate.tsx`; email links move to `/verify?token=`/`/reset?token=`, with the old `/?…_token=` forms still redirected.
+  - [x] Sign-in, sign-up, password reset, email verification and demo start as pages, replacing `AuthGate.tsx`; email links move to `/verify?token=`/`/reset?token=`, with the old `/?…_token=` forms still redirected (`IMPLEMENTATION.md` §4.19).
   - [ ] The map page served by Go with the shared header, replacing `Header.tsx`/`UserMenu.tsx`/`InfoMenu.tsx`/`DonateButton.tsx`; Export becomes a map control; Caddy and Vite's proxy flip to "everything but static assets goes to Go"; the onboarding gate moves server-side.
   - [ ] Settings as a page (`/settings`), a plain form with native selects.
   - [ ] Profile as a page (`/profile`), the year grids and trends rendered server-side.

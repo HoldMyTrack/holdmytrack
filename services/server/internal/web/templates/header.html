@@ -2,7 +2,7 @@
      brand, tagline, Donate, the Info menu, the account menu — until phase 5 makes that page
      render this template too. The two menus are <details> dropdowns: they open and close with
      no script. Sign out is a form POST to /logout (pages.go), not a link, so a GET from
-     another site can't end someone's session. */}}
+     another site can't end someone's session. Signed out, the account menu is a Sign in link. */}}
 {{define "header"}}
 <header class="page-header">
   <a class="page-header__brand" href="/">
@@ -36,7 +36,7 @@
       </div>
     </details>
     {{else}}
-    <a class="page-button page-button--quiet" href="/">Sign in</a>
+    <a class="page-button page-button--quiet" href="/signin">Sign in</a>
     {{end}}
   </nav>
 </header>

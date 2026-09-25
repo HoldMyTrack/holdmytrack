@@ -1,0 +1,22 @@
+{{define "content"}}{{with .Page}}
+<main class="auth-page">
+  <div class="auth-card">
+    <h1 class="auth-card__title">Create your account</h1>
+    {{if .Google}}{{template "google" .}}{{end}}
+    <form class="auth-card__form" method="post" action="/signup">
+      <label class="auth-card__field"><span>Email</span><input type="email" name="email" value="{{.Email}}" required autocomplete="email" /></label>
+      <label class="auth-card__field"><span>Password</span><input type="password" name="password" required minlength="8" autocomplete="new-password" /></label>
+      {{/* The account's starting timezone (FR-1.7) — the browser knows it, the server can't.
+           Without the script the account starts on UTC and Settings asks anyway. */}}
+      <input type="hidden" name="timezone" id="signup-timezone" />
+      <script>
+        try { document.getElementById('signup-timezone').value = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
+      </script>
+      {{with .Error}}<p class="auth-card__error" role="alert">{{.}}</p>{{end}}
+      <button type="submit" class="auth-card__submit">Create account</button>
+    </form>
+    <a class="auth-card__link" href="/signin">Already have an account? Sign in</a>
+    {{if .Upgrading}}<a class="auth-card__link" href="/">← Back to the map</a>{{end}}
+  </div>
+</main>
+{{end}}{{end}}
