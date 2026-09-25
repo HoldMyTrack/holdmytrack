@@ -21,6 +21,7 @@ func TestRenderApp(t *testing.T) {
 	for _, want := range []string{
 		`<script type="module" src="/assets/app.js?v=abc123"></script>`,
 		`<link rel="stylesheet" href="/assets/app.css?v=abc123" />`,
+		`<link rel="stylesheet" href="/static/tokens.css?v=abc123" />`,
 		`<link rel="stylesheet" href="/static/header.css?v=abc123" />`,
 		`class="page-header"`,
 		`<div id="root"></div>`,

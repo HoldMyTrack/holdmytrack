@@ -1,29 +1,8 @@
 /* The shared page header (templates/header.html, ADR-0012) — on every server-rendered page,
    and alone on the React app's shell (templates/app/app.html), where apps/web/src/index.css
-   styles everything below it. So only header rules here, all under the header's own classes,
-   plus the --fm-* tokens they use: this file must not restyle the app underneath. The tokens
-   repeat index.css's :root values; keep them in step. */
-:root {
-  color-scheme: light;
-  --fm-font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --fm-font-serif: 'Fraunces', serif;
-  --fm-bg: #f7f4ec;
-  --fm-surface: #fff;
-  --fm-surface-tint: #f6f3e9;
-  --fm-ink: #202b25;
-  --fm-ink-rgb: 32 43 37;
-  --fm-ink-secondary: #6c7a70;
-  --fm-ink-muted: #8b9186;
-  --fm-border: #e6e1d2;
-  --fm-border-strong: #dcd6c4;
-  --fm-accent: #b07e2e;
-  --fm-accent-strong: #93691f;
-  --fm-accent-hover: #8a611f;
-  --fm-donate: #b0532f;
-  --fm-donate-hover: #96431f;
-  --fm-donate-text: #fff7ee;
-}
-
+   styles everything below it. So only header rules here, all under the header's own classes:
+   this file must not restyle the app underneath. The --fm-* tokens it uses are tokens.css,
+   loaded first everywhere. */
 .page-header {
   position: relative;
   z-index: 5;

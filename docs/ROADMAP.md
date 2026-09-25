@@ -69,7 +69,7 @@ The shipped UI so far is functional scaffolding, not a finished product. Partly 
 
 - [x] A real icon set — Lucide (`lucide-react`) replaces every hand-drawn inline SVG icon and text-glyph caret on the web (`IMPLEMENTATION.md` §4.17); Android adopts the same set in its own Phase 5.
 - [x] Real typography — Inter for text, Fraunces for headings and the wordmark (`--fm-font-sans`/`--fm-font-serif`, loaded from Google Fonts in `index.html`).
-- [x] An actual design system — the `--fm-*` palette plus spacing, radius, type, weight and elevation scales in `index.css`'s `:root`, used by every declaration except a few deliberate literals (`IMPLEMENTATION.md` §4.18). The one literal color left in use is `#fff` (12 uses), plus two single-use colors.
+- [x] An actual design system — the `--fm-*` palette plus spacing, radius, type, weight and elevation scales in one shared `tokens.css` (served by the Go server, loaded by every page and the map app), used by every declaration except a few deliberate literals (`IMPLEMENTATION.md` §4.18). The one literal color left in use is `#fff` (12 uses), plus two single-use colors.
 - [ ] Server-rendered pages sharing one header, React kept for the map page ([ADR-0012](adr/0012-server-rendered-pages-react-for-the-map.md), `IMPLEMENTATION.md` §4.19), in shippable steps:
   - [x] Import moves out of the header into the Activities panel's Sync tab (`IMPLEMENTATION.md` §4.0.1).
   - [x] The rendering foundation (`internal/web`, the shared header, Sign out as a same-origin-checked form) with About, Help and Contacts as its first pages (`IMPLEMENTATION.md` §4.14).
