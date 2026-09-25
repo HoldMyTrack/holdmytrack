@@ -284,3 +284,19 @@ func TestNotFound(t *testing.T) {
 		t.Errorf("/static/header.css: status %d", rec.Code)
 	}
 }
+
+func TestNormalizeTimezoneStoresCurrentNames(t *testing.T) {
+	for in, want := range map[string]string{
+		"Asia/Calcutta":    "Asia/Kolkata",
+		" Europe/Kiev ":    "Europe/Kyiv",
+		"America/New_York": "America/New_York",
+		"Asia/Kolkata":     "Asia/Kolkata",
+	} {
+		if got, ok := normalizeTimezone(in); !ok || got != want {
+			t.Errorf("normalizeTimezone(%q) = %q, %v; want %q", in, got, ok, want)
+		}
+	}
+	if _, ok := normalizeTimezone("Mars/Olympus"); ok {
+		t.Errorf("an unknown zone was accepted")
+	}
+}

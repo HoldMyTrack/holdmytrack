@@ -15,6 +15,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 )
 
 // Email+password auth, server-side sessions (migrations/0006_sessions.sql) — resolved toward
@@ -60,9 +62,11 @@ type authRequest struct {
 	Timezone string `json:"timezone"`
 }
 
-// normalizeTimezone validates raw against the IANA tz database via time.LoadLocation. Returns
-// ok=false for empty or unloadable input; the caller decides what that means for its own
-// endpoint (handleSignup falls back to "UTC", handleUpdateSettings rejects with a 400).
+// normalizeTimezone validates raw against the IANA tz database via time.LoadLocation, and
+// returns it under its current name (web.CurrentTimezoneName: a browser reports Asia/Calcutta,
+// the account stores Asia/Kolkata). Returns ok=false for empty or unloadable input; the caller
+// decides what that means for its own endpoint (createAccount falls back to "UTC",
+// saveSettings rejects with a 400).
 func normalizeTimezone(raw string) (tz string, ok bool) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -71,7 +75,7 @@ func normalizeTimezone(raw string) (tz string, ok bool) {
 	if _, err := time.LoadLocation(raw); err != nil {
 		return "", false
 	}
-	return raw, true
+	return web.CurrentTimezoneName(raw), true
 }
 
 // authResponse is the one shape every auth endpoint and handleMe returns — see

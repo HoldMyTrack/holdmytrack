@@ -172,7 +172,7 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 
 **Preconditions**: An active session.
 
-**Inputs**: An image file (PNG, JPEG, or WebP, up to 5 MB) for Avatar; free text for Name (optional); a country chosen from a list of ISO 3166-1 countries by name for Country (required — there is no "not set" choice); an IANA timezone chosen from CLDR's list for Timezone, grouped by region, sorted by place and labelled with its GMT offset today ("New York · GMT−04:00"), with UTC and the account's own saved zone always included.
+**Inputs**: An image file (PNG, JPEG, or WebP, up to 5 MB) for Avatar; free text for Name (optional); a country chosen from a list of ISO 3166-1 countries by name for Country (required — there is no "not set" choice); an IANA timezone for Timezone, chosen from the zones browsers know under IANA's current names (Kolkata, not Calcutta; Kyiv, not Kiev), grouped by region, sorted by place and labelled with its GMT offset today ("New York · GMT−04:00"), with UTC and the account's own saved zone always included. A zone given under a former name — which browsers still report at signup — is stored under its current one.
 
 **Behavior**:
 1. Avatar uploads and removals take effect immediately — each is its own action (`POST /settings/avatar`, `POST /settings/avatar/remove`; for an API client, `POST`/`DELETE /v1/account/avatar`), not gated behind a separate save step; choosing a file uploads it. The page, header included, shows the new avatar when it reloads after the upload.

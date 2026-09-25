@@ -30,12 +30,25 @@ type TimezoneGroup struct {
 	Options []TimezoneOption
 }
 
+// CurrentTimezoneName is id under its current IANA name — Asia/Kolkata for Asia/Calcutta,
+// Europe/Kyiv for Europe/Kiev (timezoneRenames) — or id itself when it hasn't been renamed.
+// Browsers still report the old spellings (CLDR keeps them), so the server applies this to
+// every zone it's given before storing it.
+func CurrentTimezoneName(id string) string {
+	if current, ok := timezoneRenames[id]; ok {
+		return current
+	}
+	return id
+}
+
 // TimezoneGroups builds the Settings page's Timezone list as of `at` (offsets are today's, so
 // a DST zone shows whichever side of its change `at` falls on). `current` — the account's
-// saved zone — is added if the list doesn't have it, so a stale list never hides anyone's own
+// saved zone, under its current name, so one saved before a rename is still the one
+// selected — is added if the list doesn't have it, so a stale list never hides anyone's own
 // setting — as is UTC, which the list lacks. A zone Go can't load is left out, except
 // `current`, which is shown without an offset.
 func TimezoneGroups(at time.Time, current string) []TimezoneGroup {
+	current = CurrentTimezoneName(current)
 	// UTC isn't in CLDR's list, but it's where an account lands when signup couldn't read the
 	// browser's zone, and a reasonable deliberate choice too — so it's always offered.
 	ids := append(append([]string(nil), TimezoneIDs...), "UTC")
