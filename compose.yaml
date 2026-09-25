@@ -70,6 +70,7 @@ services:
     shm_size: "1gb"      # Docker's 64 MB /dev/shm is not enough for a 1280x800 map
 
   db:
+    # Before moving to an image on Debian 13 or later, see docs/DEPLOY.md §9 (time zones).
     image: postgis/postgis:16-3.4
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-holdmytrack}
