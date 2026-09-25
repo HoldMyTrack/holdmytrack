@@ -10,6 +10,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"log/slog"
+	"mime"
 	"net"
 	"net/smtp"
 )
@@ -84,13 +85,19 @@ func (s *smtpSender) Send(ctx context.Context, to, subject, body string) error {
 	if err != nil {
 		return fmt.Errorf("mail: DATA: %w", err)
 	}
-	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s\r\n",
-		s.from, to, subject, body)
-	if _, err := w.Write([]byte(msg)); err != nil {
+	if _, err := w.Write(message(s.from, to, subject, body)); err != nil {
 		return fmt.Errorf("mail: write body: %w", err)
 	}
 	if err := w.Close(); err != nil {
 		return fmt.Errorf("mail: close body: %w", err)
 	}
 	return client.Quit()
+}
+
+// message is the whole email as sent. The subject is RFC 2047-encoded: a header may only
+// carry ASCII, and a translated subject (a Russian one) isn't — mime.QEncoding leaves an
+// ASCII subject exactly as it was. The body needs no such step; Content-Type declares it UTF-8.
+func message(from, to, subject, body string) []byte {
+	return fmt.Appendf(nil, "From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s\r\n",
+		from, to, mime.QEncoding.Encode("utf-8", subject), body)
 }

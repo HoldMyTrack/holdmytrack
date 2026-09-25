@@ -242,12 +242,14 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 | **Safe interruption** | A sync run cancelled at any point leaves no partial, unconfirmed state — the watermark only advances over confirmed-terminal records (FR-3.3). |
 | **No reload required** | The sync history screen updates itself by polling while work is outstanding, and stops polling once settled (FR-4.1). |
 | **Idempotency** | Re-syncing the same Health Connect record never creates a duplicate activity — the server keys on the platform's own record id (FR-3.2, `docs/IMPLEMENTATION.md` §4.0.3). |
+| **Language** | English or Russian, following the phone's language or the app's own per-app language setting; any other language gets English. The app sends its language as `Accept-Language`, so the server's messages match it (`docs/SPEC.md` FR-13.1). |
 
 ## 9. Known Limitations & Out-of-Scope Items
 
-Named here rather than left implicit, the way `docs/SPEC.md` §17 does for the wider system:
+Named here rather than left implicit, the way `docs/SPEC.md` §18 does for the wider system:
 
 - **No final visual design.** No icon set and no final palette, type scale or fonts — the app is themed with the web's palette as a provisional stand-in (Material 3), and its screens wait on root `docs/ROADMAP.md` Phase 3's design freeze (`apps/android/docs/ROADMAP.md` Phase 5). The app's own chrome is light only; only the map follows the system dark setting.
+- **The account's Language setting isn't applied.** The web's Settings choice (`docs/SPEC.md` FR-1.7) changes the web only; the app follows the phone or its per-app language.
 - **No filter controls.** The map always shows the account's complete, unfiltered history; there is no Android equivalent of the web's date-range picker, TYPE/DISTANCE filters, or per-track hide/show.
 - **No accessibility work done.** No content descriptions, no verified touch-target sizing, untested under a large system font or TalkBack.
 - **Samsung Galaxy Watch is unsupported**, not degraded — Samsung does not expose route geometry to Health Connect at all, so every Samsung-sourced session is rejected for having no route, indistinguishable at sync time from an ordinary indoor workout.

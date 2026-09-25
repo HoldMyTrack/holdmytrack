@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { uploadFile, type UploadOutcome, type ZipEntryResult } from '../api';
 import { useUploadHistory, type UploadHistoryState } from './useUploadHistory';
+import { t, tn } from '../i18n';
 
 /** §4.0.1's cap on an individually-selected (non-`.zip`) batch — `.zip` archives bypass this
  *  entirely, since they exist specifically for bulk historical imports. */
@@ -48,10 +49,10 @@ function summarizeZip(outcome: Extract<UploadOutcome, { kind: 'zip' }>): string 
     },
     { added: 0, skipped: 0 },
   );
-  const parts = [`${counts.added} ${counts.added === 1 ? 'file' : 'files'} added`];
-  if (counts.skipped > 0) parts.push(`${counts.skipped} skipped`);
-  const suffix = outcome.truncated ? ' (archive had more files than could be processed in one batch)' : '';
-  return `${outcome.filename}: ${parts.join(', ')}${suffix}`;
+  const parts = [tn('imports.files_added', counts.added)];
+  if (counts.skipped > 0) parts.push(t('imports.skipped', { n: counts.skipped }));
+  const summary = t('imports.zip_summary', { filename: outcome.filename, parts: parts.join(', ') });
+  return outcome.truncated ? `${summary} ${t('imports.zip_truncated')}` : summary;
 }
 
 /**
@@ -98,12 +99,12 @@ export function useImports(onUploaded?: () => void): ImportsState {
           // job (persistAndEnqueue's dedupe check short-circuits before that), so it never
           // becomes a new row in the history list either — without this notice, dropping an
           // already-uploaded file here would look like nothing happened at all.
-          pushNotice('info', `${outcome.filename} was already uploaded before.`);
+          pushNotice('info', t('imports.already_uploaded', { filename: outcome.filename }));
         }
         onUploaded?.();
         refresh();
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'upload failed';
+        const message = error instanceof Error ? error.message : t('imports.upload_failed');
         setInFlight((prev) => prev.map((f) => (f.id === id ? { ...f, status: 'error', error: message } : f)));
       }
     },
@@ -120,7 +121,7 @@ export function useImports(onUploaded?: () => void): ImportsState {
       if (plains.length > MAX_PLAIN_FILES) {
         pushNotice(
           'error',
-          `Too many files selected (${plains.length}) — zip them and upload the archive instead.`,
+          t('imports.too_many', { n: plains.length }),
         );
         accepted = [];
       }

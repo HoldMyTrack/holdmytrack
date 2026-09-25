@@ -12,6 +12,7 @@ import { buildStyle, type Flavor } from './style';
 import { basemapOrigin } from './config';
 import type { ViewState } from './viewState';
 import { API_BASE_URL } from '../api';
+import { t } from '../i18n';
 
 /**
  * Owns one MapLibre Map's lifecycle for one container element.
@@ -75,6 +76,20 @@ export function useMapInstance({
       // origin so the basemap's pmtiles archive, fonts and sprites (a different origin,
       // and not resources auth applies to anyway) aren't sent credentials they don't need.
       transformRequest: (url) => (url.startsWith(API_BASE_URL) ? { url, credentials: 'include' } : { url }),
+      // MapLibre's own controls' labels (zoom, locate, the scale bar's units) in the page's
+      // language; keys MapLibre has but this app's controls never show stay its English.
+      locale: {
+        'Map.Title': t('maplibre.map'),
+        'NavigationControl.ZoomIn': t('maplibre.zoom_in'),
+        'NavigationControl.ZoomOut': t('maplibre.zoom_out'),
+        'GeolocateControl.FindMyLocation': t('maplibre.find_location'),
+        'GeolocateControl.LocationNotAvailable': t('maplibre.location_unavailable'),
+        'AttributionControl.ToggleAttribution': t('maplibre.toggle_attribution'),
+        'ScaleControl.Meters': t('unit.m'),
+        'ScaleControl.Kilometers': t('unit.km'),
+        'ScaleControl.Feet': t('unit.ft'),
+        'ScaleControl.Miles': t('unit.mi'),
+      },
     });
 
     instance.addControl(new NavigationControl({ showCompass: false }), 'top-right');

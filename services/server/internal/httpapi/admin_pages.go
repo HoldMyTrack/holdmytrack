@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 )
 
@@ -37,8 +38,10 @@ type adminUserRow struct {
 	IsAdmin     bool
 	Verified    bool
 	Activities  string
-	First, Last string // "" when the account has no activities
-	Distance    string
+	// ActivityCount is Activities as a number, for its plural form.
+	ActivityCount int64
+	First, Last   string // "" when the account has no activities
+	Distance      string
 }
 
 // adminUserView is what templates/pages/admin-user.html reads from PageData.Page.
@@ -88,13 +91,15 @@ func (s *Server) handleAdminPage(w http.ResponseWriter, r *http.Request) {
 	if acct == nil {
 		return
 	}
-	users, err := s.adminUsers(r.Context(), "", web.Imperial(acct.profile.Country))
+	lang := pageLang(acct, r)
+	l := i18n.Get(lang)
+	users, err := s.adminUsers(r.Context(), l, "", web.Imperial(acct.profile.Country))
 	if err != nil {
 		s.log.Error("admin page failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	s.pages.Render(w, http.StatusOK, "admin", web.PageData{Title: "Admin — HoldMyTrack", Path: "/admin", NoIndex: true, User: acct.user, Page: adminUsersView{Users: users}})
+	s.pages.Render(w, http.StatusOK, "admin", web.PageData{Title: l.T("meta.admin_title"), Path: "/admin", NoIndex: true, User: acct.user, Page: adminUsersView{Users: users}, Lang: lang})
 }
 
 // GET /admin/users/{id}.
@@ -113,27 +118,29 @@ func (s *Server) handleAdminUserPage(w http.ResponseWriter, r *http.Request) {
 		page = p
 	}
 	imperial := web.Imperial(acct.profile.Country)
+	lang := pageLang(acct, r)
+	l := i18n.Get(lang)
 
-	users, err := s.adminUsers(r.Context(), userID, imperial)
+	users, err := s.adminUsers(r.Context(), l, userID, imperial)
 	if err == nil && len(users) == 0 {
 		s.notFound(w, r)
 		return
 	}
 	var view adminUserView
 	if err == nil {
-		view, err = s.adminUserActivities(r.Context(), users[0], page, imperial)
+		view, err = s.adminUserActivities(r.Context(), l, users[0], page, imperial)
 	}
 	if err != nil {
 		s.log.Error("admin user page failed", "err", err, "user_id", userID)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	s.pages.Render(w, http.StatusOK, "admin-user", web.PageData{Title: adminUserLabel(view.User) + " — Admin — HoldMyTrack", Path: r.URL.Path, NoIndex: true, User: acct.user, Page: view})
+	s.pages.Render(w, http.StatusOK, "admin-user", web.PageData{Title: l.T("meta.admin_user_title", "name", adminUserLabel(view.User)), Path: r.URL.Path, NoIndex: true, User: acct.user, Page: view, Lang: lang})
 }
 
 // adminUsers lists every account, newest first, or just userID's when it's set. Counts and
 // distance are over live activities only — a superseded duplicate isn't one the account shows.
-func (s *Server) adminUsers(ctx context.Context, userID string, imperial bool) ([]adminUserRow, error) {
+func (s *Server) adminUsers(ctx context.Context, l *i18n.Localizer, userID string, imperial bool) ([]adminUserRow, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT u.id, u.email, COALESCE(u.display_name, ''), u.created_at, COALESCE(u.country, ''),
 		       u.timezone, u.demo_expires_at IS NOT NULL, u.is_admin, u.email_verified,
@@ -163,8 +170,9 @@ func (s *Server) adminUsers(ctx context.Context, userID string, imperial bool) (
 		}
 		loc := adminLocation(u.Timezone)
 		u.SignedUp = created.In(loc).Format("2006-01-02")
-		u.Activities = web.FormatInt(count)
-		u.Distance = web.FormatTotalDistance(meters, imperial)
+		u.ActivityCount = count
+		u.Activities = l.Int(count)
+		u.Distance = web.FormatTotalDistance(l, meters, imperial)
 		if first != nil && last != nil {
 			u.First, u.Last = first.In(loc).Format("2006-01-02"), last.In(loc).Format("2006-01-02")
 		}
@@ -175,7 +183,7 @@ func (s *Server) adminUsers(ctx context.Context, userID string, imperial bool) (
 
 // adminUserActivities is one page of u's activities, newest first — superseded and hidden ones
 // included, marked as such, since the panel is for seeing what's actually stored.
-func (s *Server) adminUserActivities(ctx context.Context, u adminUserRow, page int, imperial bool) (adminUserView, error) {
+func (s *Server) adminUserActivities(ctx context.Context, l *i18n.Localizer, u adminUserRow, page int, imperial bool) (adminUserView, error) {
 	view := adminUserView{User: u}
 	var total int
 	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM activities WHERE user_id = $1`, u.ID).Scan(&total); err != nil {
@@ -187,7 +195,7 @@ func (s *Server) adminUserActivities(ctx context.Context, u adminUserRow, page i
 	}
 	if offset >= total {
 		// A page past the end (a stale link after deletions): empty, with a way back.
-		view.Range = "No activities on this page"
+		view.Range = l.T("admin.range_empty")
 		view.PrevHref = adminUserHref(u.ID, 1)
 		return view, nil
 	}
@@ -222,7 +230,7 @@ func (s *Server) adminUserActivities(ctx context.Context, u adminUserRow, page i
 			return view, fmt.Errorf("admin: scan activity: %w", err)
 		}
 		a.Started = started.In(loc).Format("2006-01-02 15:04")
-		a.Distance = web.FormatDistance(meters, imperial)
+		a.Distance = web.FormatDistance(l, meters, imperial)
 		a.Duration = adminDuration(seconds)
 		view.Activities = append(view.Activities, a)
 	}
@@ -230,7 +238,7 @@ func (s *Server) adminUserActivities(ctx context.Context, u adminUserRow, page i
 		return view, fmt.Errorf("admin: list activities: %w", err)
 	}
 
-	view.Range = adminRange(offset, len(view.Activities), total)
+	view.Range = adminRange(l, offset, len(view.Activities), total)
 	if page > 1 {
 		view.PrevHref = adminUserHref(u.ID, page-1)
 	}
@@ -241,8 +249,8 @@ func (s *Server) adminUserActivities(ctx context.Context, u adminUserRow, page i
 }
 
 // adminRange is "1–100 of 250".
-func adminRange(offset, n, total int) string {
-	return fmt.Sprintf("%s–%s of %s", web.FormatInt(int64(offset+1)), web.FormatInt(int64(offset+n)), web.FormatInt(int64(total)))
+func adminRange(l *i18n.Localizer, offset, n, total int) string {
+	return l.T("admin.range", "from", offset+1, "to", offset+n, "total", total)
 }
 
 func adminUserHref(userID string, page int) string {

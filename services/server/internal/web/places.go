@@ -99,3 +99,12 @@ func formatOffset(seconds int) string {
 	}
 	return fmt.Sprintf("GMT%s%02d:%02d", sign, seconds/3600, seconds%3600/60)
 }
+
+// CountriesIn is the Settings page's Country list in lang, sorted by name in that language —
+// Countries itself for English, and for a language without its own list.
+func CountriesIn(lang string) []Country {
+	if lang == "ru" {
+		return countriesRU
+	}
+	return Countries
+}

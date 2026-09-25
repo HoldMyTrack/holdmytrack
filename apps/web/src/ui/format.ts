@@ -1,4 +1,5 @@
 import type { UnitSystem } from './units';
+import { lang, t, tMaybe } from '../i18n';
 
 /**
  * Display formatting for real activity rows and totals. Kept apart from api.ts so the
@@ -22,15 +23,15 @@ const EM_DASH = '—';
 const METERS_PER_MILE = 1609.344;
 const METERS_PER_FOOT = 0.3048;
 
-export function unitLabel(system: UnitSystem): 'km' | 'mi' {
-  return system === 'imperial' ? 'mi' : 'km';
+export function unitLabel(system: UnitSystem): string {
+  return system === 'imperial' ? t('unit.mi') : t('unit.km');
 }
 
 /** The short unit `formatElevation` below appends — pulled out so a caller that needs just the
  *  label (PrivateLocationsPanel.tsx's radius readout, a number shown beside a slider)
  *  isn't left duplicating the same ternary. */
-export function elevationUnitLabel(system: UnitSystem): 'm' | 'ft' {
-  return system === 'imperial' ? 'ft' : 'm';
+export function elevationUnitLabel(system: UnitSystem): string {
+  return system === 'imperial' ? t('unit.ft') : t('unit.m');
 }
 
 /** Bare numeric conversion, not a formatter — no rounding, no unit suffix. For a meters value
@@ -48,7 +49,7 @@ export function metersToFeet(meters: number): number {
 export function formatStartedAt(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString(lang, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -63,7 +64,7 @@ export function formatStartedAt(iso: string): string {
  *  `formatDistance`, which includes its own suffix. */
 export function distanceValue(meters: number, system: UnitSystem): string {
   const converted = system === 'imperial' ? meters / METERS_PER_MILE : meters / 1000;
-  return converted.toFixed(1);
+  return converted.toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: false });
 }
 
 export function formatDistance(meters: number | null, system: UnitSystem): string {
@@ -88,9 +89,9 @@ export function formatDuration(seconds: number | null): string {
   if (seconds === null) return EM_DASH;
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m`;
-  return `${seconds}s`;
+  if (h > 0) return t('duration.hm', { h, m });
+  if (m > 0) return t('duration.m', { m });
+  return t('duration.s', { s: seconds });
 }
 
 /**
@@ -102,12 +103,12 @@ export function formatDuration(seconds: number | null): string {
  */
 export function formatTotalDistance(meters: number, system: UnitSystem): string {
   const converted = system === 'imperial' ? meters / METERS_PER_MILE : meters / 1000;
-  return `${converted.toLocaleString(undefined, { maximumFractionDigits: converted < 10 ? 1 : 0 })} ${unitLabel(system)}`;
+  return `${converted.toLocaleString(lang, { maximumFractionDigits: converted < 10 ? 1 : 0 })} ${unitLabel(system)}`;
 }
 
 export function formatElevation(meters: number, system: UnitSystem): string {
   const converted = system === 'imperial' ? metersToFeet(meters) : meters;
-  return `${Math.round(converted).toLocaleString()} ${elevationUnitLabel(system)}`;
+  return `${Math.round(converted).toLocaleString(lang)} ${elevationUnitLabel(system)}`;
 }
 
 /** "9 Sep" — the Sync tab's finished rows (SyncTab.tsx) need "which day did this
@@ -116,7 +117,7 @@ export function formatElevation(meters: number, system: UnitSystem): string {
 export function formatShortDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  return d.toLocaleDateString(lang, { day: 'numeric', month: 'short' });
 }
 
 /** "9 MAR 2026" — the date-range footer's labels (ActivityHistogram.tsx's legend, the mobile
@@ -124,7 +125,7 @@ export function formatShortDate(iso: string): string {
  *  label is exactly that calendar day in every browser time zone. */
 export function formatDayLabel(date: string): string {
   const d = new Date(`${date}T00:00:00Z`);
-  const month = d.toLocaleDateString(undefined, { month: 'short', timeZone: 'UTC' }).toUpperCase();
+  const month = d.toLocaleDateString(lang, { month: 'short', timeZone: 'UTC' }).toUpperCase();
   return `${d.getUTCDate()} ${month} ${d.getUTCFullYear()}`;
 }
 
@@ -132,9 +133,9 @@ export function formatDayLabel(date: string): string {
  *  has happened, so this can't come from the backend. Binary (1024-based) units, matching
  *  what every OS file picker and Chrome's own devtools already show for a local file. */
 export function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024) return t('size.b', { v: bytes });
+  if (bytes < 1024 * 1024) return t('size.kb', { v: Math.round(bytes / 1024) });
+  return t('size.mb', { v: (bytes / (1024 * 1024)).toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) });
 }
 
 /**
@@ -146,6 +147,8 @@ export function formatFileSize(bytes: number): string {
  * it is itself a real value a parser can report, not a special case.
  */
 export function formatActivityType(activityType: string): string {
+  const translated = tMaybe(`activity_type.${activityType.toLowerCase()}`);
+  if (translated) return translated;
   return activityType
     .split('_')
     .filter(Boolean)
@@ -165,11 +168,11 @@ export function formatIngestSource(source: string): string {
     case 'healthkit':
       return 'HealthKit';
     case 'upload':
-      return 'an uploaded file';
+      return t('source.upload_phrase');
     case 'takeout':
-      return 'a Google Takeout import';
+      return t('source.takeout_phrase');
     case 'recorded':
-      return 'a GPS recording';
+      return t('source.recorded_phrase');
     default:
       return source;
   }
@@ -187,11 +190,11 @@ export function formatSourceLabel(source: string): string {
     case 'healthkit':
       return 'HealthKit';
     case 'upload':
-      return 'Uploaded file';
+      return t('source.upload');
     case 'takeout':
       return 'Google Takeout';
     case 'recorded':
-      return 'GPS Logger';
+      return t('source.recorded');
     default:
       return source;
   }

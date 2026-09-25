@@ -1,17 +1,17 @@
 {{define "content"}}{{with .Page}}
 <main class="auth-page">
   <div class="auth-card">
-    <h1 class="auth-card__title">Set a new password</h1>
+    <h1 class="auth-card__title">{{t "reset.title"}}</h1>
     {{if .Token}}
     <form class="auth-card__form" method="post" action="/reset">
       <input type="hidden" name="token" value="{{.Token}}" />
-      <label class="auth-card__field"><span>New password</span><input type="password" name="password" required minlength="8" autocomplete="new-password" /></label>
+      <label class="auth-card__field"><span>{{t "reset.password"}}</span><input type="password" name="password" required minlength="8" autocomplete="new-password" /></label>
       {{with .Error}}<p class="auth-card__error" role="alert">{{.}}</p>{{end}}
-      <button type="submit" class="auth-card__submit">Set new password</button>
+      <button type="submit" class="auth-card__submit">{{t "reset.submit"}}</button>
     </form>
     {{else}}
     {{with .Error}}<p class="auth-card__error" role="alert">{{.}}</p>{{end}}
-    <a class="auth-card__link" href="/forgot">Request a new link</a>
+    <a class="auth-card__link" href="/forgot">{{t "reset.new_link"}}</a>
     {{end}}
   </div>
 </main>

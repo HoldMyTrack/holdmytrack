@@ -14,6 +14,20 @@ A category-filterable map of outdoor points of interest — playgrounds, dog par
 * The "are you at this place?" visited-confirmation prompt would be checked only while the app is open in the foreground — on launch or while viewing the map — not via background geofencing, matching the mobile apps' deliberate no-background-location design.
 * Visited POIs would render as a separate, discrete-point layer over the map, not a change to Fog of War's continuous, GPS-track-derived coverage computation (`IMPLEMENTATION.md` §4.2).
 
+### Place names on the map in the reader's language
+
+The map's labels (cities, countries, streets) are whatever `@protomaps/basemaps` picks, which is mostly each place's local name, while the interface around it is in English or Russian (FR-13). Protomaps' layers take a `lang` option and fall back to the local name where OSM has no translation.
+
+* The style is built once, ahead of time (`npm run build:style`, checked by `verify:style`), and served as a static document, so this would mean one style per language (served by `mapstyle`, keyed by the page's language), not a runtime switch.
+* The export image (FR-4.10) would carry the labels too, which is either a feature or a surprise, depending on who the image is for.
+
+### More languages, and language-specific URLs
+
+English and Russian ship (ADR-0014). Every further language is a translation pass over three catalogs and two prose pages, which is cheap once someone can review it. If search traffic in other languages ever matters, `/ru/help`-style URLs with `hreflang` would let search engines index each language, which the current one-URL-per-page approach can't.
+
+* Spanish and German are the obvious next candidates, for reach and for their long words respectively (the second is a good layout stress test).
+* The Android app could read the account's Language (it's in `GET /v1/auth/me`) and apply it as its per-app language, so the two apps agree without the user setting it twice.
+
 ### Prefill Country at first run from a coarse IP lookup
 
 Every new account now picks a Country before it reaches the map (`SPEC.md` FR-1.7 behavior 5, the first-run setup screen), from a list of about 250 with no preselection — one more decision standing between signup and a first look at the map. Prefilling it from the signup request's IP would turn that into a confirmation for most people. Until Country is saved the app displays metric (FR-1.7.3), and the map's zero-history fallback (`IMPLEMENTATION.md` §4.13) reads whatever `users.country` holds.

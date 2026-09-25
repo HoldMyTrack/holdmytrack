@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import type { TypeFacet } from './activityFacets';
 import { formatActivityType } from './format';
 import { fold, SearchPicker, type PickerOption } from './SearchPicker';
+import { t } from '../i18n';
 
 export interface ActivityTypePickerProps {
   /** The raw `activity_type` value, e.g. "dog_walk" or "Solowheel". */
@@ -41,7 +42,7 @@ export function ActivityTypePicker({ value, onChange, known, labelledBy, maxLeng
 
   const createOption = useCallback(
     (text: string): PickerOption | null =>
-      text.length > maxLength ? null : { value: text, label: `Add “${text}”`, detail: 'new', keywords: [] },
+      text.length > maxLength ? null : { value: text, label: t('picker.add_type', { type: text }), detail: t('picker.new'), keywords: [] },
     [maxLength],
   );
 
@@ -51,9 +52,9 @@ export function ActivityTypePicker({ value, onChange, known, labelledBy, maxLeng
       value={value}
       onChange={onChange}
       labelledBy={labelledBy}
-      searchLabel="Search or add a type"
-      noun="type"
-      placeholder="Search or add a type"
+      searchLabel={t('picker.search_type')}
+      noMatches={(query) => t('picker.no_type_matches', { query })}
+      placeholder={t('picker.search_type')}
       createOption={createOption}
     />
   );

@@ -1,6 +1,7 @@
 import { distanceValue, unitLabel } from './format';
 import { useUnitSystem } from './units';
 import type { DistanceRange } from './activityFacets';
+import { t } from '../i18n';
 
 /**
  * The Activities panel's DISTANCE dual slider — standalone and always visible now (§4.7.6),
@@ -26,10 +27,10 @@ export function DistanceFilter({ bounds, value, onChangeDistance, onReset, hasAc
     <div className="activity-filters" data-testid="distance-filter">
       <div className="activity-filters__section">
         <div className="activity-filters__head">
-          <span className="activity-filters__label">Distance</span>
+          <span className="activity-filters__label">{t('filters.distance')}</span>
           <span className="activity-filters__readout" data-testid="distance-readout">
             {value === null
-              ? 'any distance'
+              ? t('filters.any_distance')
               : `${distanceValue(current.min, system)} – ${distanceValue(current.max, system)} ${unitLabel(system)}`}
           </span>
         </div>
@@ -45,7 +46,7 @@ export function DistanceFilter({ bounds, value, onChangeDistance, onReset, hasAc
           <input
             type="range"
             className="activity-filters__range activity-filters__range--min"
-            aria-label="Minimum distance"
+            aria-label={t('filters.min_distance')}
             min={bounds.min}
             max={bounds.max}
             value={current.min}
@@ -54,7 +55,7 @@ export function DistanceFilter({ bounds, value, onChangeDistance, onReset, hasAc
           <input
             type="range"
             className="activity-filters__range activity-filters__range--max"
-            aria-label="Maximum distance"
+            aria-label={t('filters.max_distance')}
             min={bounds.min}
             max={bounds.max}
             value={current.max}
@@ -73,7 +74,7 @@ export function DistanceFilter({ bounds, value, onChangeDistance, onReset, hasAc
 
       {hasActiveFilters && (
         <button type="button" className="activity-filters__reset" onClick={onReset}>
-          Reset filters
+          {t('filters.reset')}
         </button>
       )}
     </div>

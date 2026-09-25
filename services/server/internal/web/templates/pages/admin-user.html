@@ -1,21 +1,21 @@
 {{define "content"}}{{with .Page}}
 <main class="page-main admin">
-  <a class="settings__back" href="/admin">← All accounts</a>
+  <a class="settings__back" href="/admin">{{t "admin.all_accounts"}}</a>
   {{with .User}}
   <h1 class="settings__title">{{if .DisplayName}}{{.DisplayName}}{{else}}{{.Email}}{{end}}</h1>
   <p class="profile__subtext">
-    {{.Email}} · <code class="admin__id">{{.ID}}</code> · signed up {{.SignedUp}}{{with .Country}} · {{.}}{{end}} · {{.Timezone}}
-    {{if .IsAdmin}}<span class="admin__badge">admin</span>{{end}}
-    {{if .IsDemo}}<span class="admin__badge">demo</span>{{else if not .Verified}}<span class="admin__badge admin__badge--warn">unverified</span>{{end}}
+    {{.Email}} · <code class="admin__id">{{.ID}}</code> · {{t "admin.signed_up" "date" .SignedUp}}{{with .Country}} · {{.}}{{end}} · {{.Timezone}}
+    {{if .IsAdmin}}<span class="admin__badge">{{t "admin.badge_admin"}}</span>{{end}}
+    {{if .IsDemo}}<span class="admin__badge">{{t "admin.badge_demo"}}</span>{{else if not .Verified}}<span class="admin__badge admin__badge--warn">{{t "admin.badge_unverified"}}</span>{{end}}
   </p>
-  <p class="profile__subtext">{{.Activities}} live activities · {{.Distance}}{{if .First}} · {{.First}} – {{.Last}}{{end}}. Times below are in this account's timezone.</p>
+  <p class="profile__subtext">{{tn "admin.live_activities" .ActivityCount}} · {{.Distance}}{{if .First}} · {{.First}} – {{.Last}}{{end}}. {{t "admin.times_note"}}</p>
   {{end}}
 
   {{if .Range}}
-  <nav class="admin__pager" aria-label="Pages">
+  <nav class="admin__pager" aria-label="{{t "admin.pages"}}">
     <span>{{.Range}}</span>
-    {{with .PrevHref}}<a href="{{.}}">← Newer</a>{{end}}
-    {{with .NextHref}}<a href="{{.}}">Older →</a>{{end}}
+    {{with .PrevHref}}<a href="{{.}}">{{t "admin.newer"}}</a>{{end}}
+    {{with .NextHref}}<a href="{{.}}">{{t "admin.older"}}</a>{{end}}
   </nav>
   {{end}}
 
@@ -23,7 +23,7 @@
   <div class="admin__scroll">
     <table class="admin__table">
       <thead>
-        <tr><th>Activity ID</th><th>Started</th><th>Type</th><th>Name</th><th class="admin__num">Distance</th><th class="admin__num">Duration</th><th>Source</th><th>Countries</th><th>Regions</th><th>State</th></tr>
+        <tr><th>{{t "admin.col_activity_id"}}</th><th>{{t "admin.col_started"}}</th><th>{{t "admin.col_type"}}</th><th>{{t "admin.col_name"}}</th><th class="admin__num">{{t "admin.col_distance"}}</th><th class="admin__num">{{t "admin.col_duration"}}</th><th>{{t "admin.col_source"}}</th><th>{{t "admin.col_countries"}}</th><th>{{t "admin.col_regions"}}</th><th>{{t "admin.col_state"}}</th></tr>
       </thead>
       <tbody>
         {{range .Activities}}
@@ -38,9 +38,9 @@
           <td>{{.Countries}}</td>
           <td>{{.Regions}}</td>
           <td>
-            {{with .SupersededBy}}<span class="admin__badge">duplicate of <a href="#{{.}}"><code class="admin__id">{{.}}</code></a></span>{{end}}
-            {{if .Hidden}}<span class="admin__badge">hidden</span>{{end}}
-            {{if .Edited}}<span class="admin__badge">edited</span>{{end}}
+            {{with .SupersededBy}}<span class="admin__badge">{{th "admin.duplicate_of" "id" .}}</span>{{end}}
+            {{if .Hidden}}<span class="admin__badge">{{t "admin.badge_hidden"}}</span>{{end}}
+            {{if .Edited}}<span class="admin__badge">{{t "admin.badge_edited"}}</span>{{end}}
           </td>
         </tr>
         {{end}}
@@ -48,7 +48,7 @@
     </table>
   </div>
   {{else if not .Range}}
-  <p class="profile__subtext">No activities.</p>
+  <p class="profile__subtext">{{t "admin.no_activities"}}</p>
   {{end}}
 </main>
 {{end}}{{end}}

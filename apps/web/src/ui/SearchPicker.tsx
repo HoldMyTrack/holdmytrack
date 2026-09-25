@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { ChevronDown, Search } from 'lucide-react';
+import { t } from '../i18n';
 
 /** One row of a SearchPicker: `leading` · `label` · `detail` (muted, right-aligned). */
 export interface PickerOption {
@@ -43,8 +44,10 @@ export interface SearchPickerProps {
   labelledBy: string;
   /** The search input's accessible name, e.g. "Search countries". */
   searchLabel: string;
-  /** What "No … matches" says, e.g. "country". */
-  noun: string;
+  /** What the list says when nothing matches the search, given the search text — e.g.
+   *  "No type matches “x”". A function, not a noun to build it from, since that sentence
+   *  doesn't translate word by word. */
+  noMatches: (query: string) => string;
   /** The search input's placeholder; "Search" unless the list is open-ended. */
   placeholder?: string;
   /** An extra first row whose value is `''`, for a field that can be left unset. Shown while
@@ -78,8 +81,8 @@ export function SearchPicker({
   onChange,
   labelledBy,
   searchLabel,
-  noun,
-  placeholder = 'Search',
+  noMatches,
+  placeholder = t('picker.search'),
   unsetOption,
   emptyLabel,
   createOption,
@@ -266,7 +269,7 @@ export function SearchPicker({
             ))}
             {shown.length === 0 && (
               <li className="search-picker__empty" role="presentation">
-                No {noun} matches “{query.trim()}”
+                {noMatches(query.trim())}
               </li>
             )}
           </ul>

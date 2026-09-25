@@ -15,7 +15,7 @@ This document specifies HoldMyTrack's functional behavior as currently implement
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google on the web, FR-1.9), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), and the read-only admin panel (FR-12).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google on the web, FR-1.9), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), and the interface language — English or Russian (FR-13).
 
 **Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), explorer-tile gamification, the rest of "Export" (story cards, animated reveals — high-resolution map export itself is built, FR-4.10 below). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace/heart-rate stay as per-activity route context (FR-4.9) rather than an analysed, all-time performance record. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
@@ -167,27 +167,27 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 
 ### FR-1.7 Account settings
 
-**Description**: A signed-in user (real or demo — FR-2) edits their own profile: Avatar, Name, Country, and Timezone. A page at `/settings`, reached from the header's account menu, separate from the activity graph (FR-7) — and, for a real account that has never saved it, shown automatically in place of the map (behavior 5). The page also links to the map's Private locations window (FR-8.1), which isn't edited here.
+**Description**: A signed-in user (real or demo — FR-2) edits their own profile: Avatar, Name, Country, Timezone, and Language. A page at `/settings`, reached from the header's account menu, separate from the activity graph (FR-7) — and, for a real account that has never saved it, shown automatically in place of the map (behavior 5). The page also links to the map's Private locations window (FR-8.1), which isn't edited here.
 
 **Name** is an optional display label, not an identifier: it isn't unique, two accounts may share one, and nothing signs in with it — the email address identifies an account. Nothing outside this page displays it yet.
 
 **Preconditions**: An active session.
 
-**Inputs**: An image file (PNG, JPEG, or WebP, up to 5 MB) for Avatar; free text for Name (optional); a country chosen from a list of ISO 3166-1 countries by name for Country (required — there is no "not set" choice); an IANA timezone for Timezone, chosen from the zones browsers know under IANA's current names (Kolkata, not Calcutta; Kyiv, not Kiev), grouped by region, sorted by place and labelled with its GMT offset today ("New York · GMT−04:00"), with UTC and the account's own saved zone always included. A zone given under a former name — which browsers still report at signup — is stored under its current one.
+**Inputs**: An image file (PNG, JPEG, or WebP, up to 5 MB) for Avatar; free text for Name (optional); a country chosen from a list of ISO 3166-1 countries by name for Country (required — there is no "not set" choice); an IANA timezone for Timezone, chosen from the zones browsers know under IANA's current names (Kolkata, not Calcutta; Kyiv, not Kiev), grouped by region, sorted by place and labelled with its GMT offset today ("New York · GMT−04:00"), with UTC and the account's own saved zone always included. A zone given under a former name — which browsers still report at signup — is stored under its current one. For Language, one of "Automatic (browser)" (the default), English, or Русский — each language named in itself, whatever language the page is in (FR-13).
 
 **Behavior**:
 1. Avatar uploads and removals take effect immediately — each is its own action (`POST /settings/avatar`, `POST /settings/avatar/remove`; for an API client, `POST`/`DELETE /v1/account/avatar`), not gated behind a separate save step; choosing a file uploads it. The page, header included, shows the new avatar when it reloads after the upload.
-2. Name, Country, and Timezone save together as one action (`POST /settings`; for an API client, `PATCH /v1/account/settings`) — editing one and leaving without saving discards all three, not just the one touched. A successful save reloads the page with "Saved."; a failed one shows the error with the submitted values kept.
+2. Name, Country, Timezone, and Language save together as one action (`POST /settings`; for an API client, `PATCH /v1/account/settings`, where `locale` is optional and left unchanged when absent) — editing one and leaving without saving discards all of them, not just the one touched. A successful save reloads the page with "Saved.", in the language just saved; a failed one shows the error with the submitted values kept.
 3. **Country decides which unit system the entire app displays distance, pace, and elevation in** — metric (km, min/km, meters) for every country except the United States, Liberia, and Myanmar, which see imperial (mi, min/mi, feet). An account that has never saved a Country (only possible before its first save — behavior 6) displays metric. It applies everywhere one of these values is shown (the Activities panel, the date-range picker, the activity graph, Trends, the per-activity pace/elevation profile, and the map's own distance scale) from the next time that page is opened after saving — Settings is a page of its own, so leaving it is a page load. Save can't be submitted until a Country is chosen.
 4. **Timezone decides which calendar day an activity is grouped under everywhere the app buckets by day** — the date-range picker's histogram, the activity graph's daily grid and stat cards, `GET /v1/activities/trends`, and date-range filtering. Auto-resolved from the browser at signup (FR-1.1) and editable here afterward; unlike Country, it has no "unset" state — every account always has one, defaulting to UTC until changed.
 5. **First run.** A real, verified account with no Country — one that has never saved this page, which is every new account right after FR-1.8's verification link — is sent here from the map and Profile (and from sign-in), titled "Welcome — set up your account", with a short explanation of why Country and Timezone matter. There is no way past it: no back link, and the header's links to the map and Profile lead back here. Timezone is prefilled with the one auto-detected at signup, to confirm or change; Country starts on "Choose a country". "Save and continue" can't be submitted until a Country is chosen; saving goes on to the map, and every later visit goes directly to the map. Reloading before saving shows this page again. A demo account never sees it.
 6. **A demo account** sees the page with every field and button disabled and a note that the shared demo account can't be changed, linking to "Create your own account" (FR-2.3); a save or avatar change submitted anyway is refused (`403`).
 
-**Outputs**: The account's current Avatar, Name, Country, and Timezone, always reflecting the last successful save (or the account's defaults, if never changed) — reloading the app never reverts to something stale.
+**Outputs**: The account's current Avatar, Name, Country, Timezone, and Language (`locale` in `GET /v1/auth/me`, `""` for automatic), always reflecting the last successful save (or the account's defaults, if never changed) — reloading the app never reverts to something stale.
 
 **Error cases**:
 - An unsupported image type or a file over 5 MB → `415`/`413`, and the image is not saved.
-- Country missing or outside the supported list, or Timezone not a valid IANA zone name → `400 Bad Request`, and none of the three fields in that save are applied (a full-replace save either succeeds as a whole or not at all).
+- Country missing or outside the supported list, Timezone not a valid IANA zone name, or Language not one FR-13 supports → `400 Bad Request`, and none of the fields in that save are applied (a full-replace save either succeeds as a whole or not at all).
 
 ### FR-1.8 Email verification
 
@@ -817,7 +817,7 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 
 **Behavior**:
 1. The header shows the logo, wordmark and tagline (the brand links to `/`), then Donate (FR-11.1), an "Info" menu listing About, Help and Contacts with the current page marked, and the account area.
-2. Signed out, the account area is a "Sign in" link to `/signin`. With a session (real or demo), it is an account menu showing the account's avatar (or a generic icon) that opens to the account's email (a demo session shows its display name instead, followed by "Create your own account", FR-2.3), then "Map" (`/`), "Profile" (`/profile`), "Settings" (`/settings`), "Private locations" (`/?private-locations`, FR-8.1), "Admin" (`/admin`, an admin only — FR-12.1) and "Sign out".
+2. Signed out, the account area is a "Sign in" link to `/signin`. With a session (real or demo), it is an account menu showing the account's avatar (or a generic icon) that opens to the account's email (a demo session shows its display name instead, followed by "Create your own account", FR-2.3), then "Profile" (`/profile`), "Settings" (`/settings`), "Private locations" (`/?private-locations`, FR-8.1), "Admin" (`/admin`, an admin only — FR-12.1) and "Sign out".
 3. Both menus open and close without JavaScript.
 4. "Sign out" submits `POST /logout`, which ends the session the same way `POST /v1/auth/logout` does and redirects to `/`. The request is refused (`403`) unless its `Origin` header — or, without one, its `Referer` — is the app's own origin.
 5. On a phone-width screen (≤768px) the tagline is hidden and Donate shows its heart alone; the Info and account menus stay.
@@ -877,7 +877,25 @@ A read-only view of every account and every account's activities, for the people
 5. An id that isn't a UUID, or no account's, is `404`. A page past the last shows no rows and a link back to the first.
 6. The pages only read. Nothing on them changes an account or an activity.
 
-## 15. Non-Functional Requirements (summary)
+## 15. FR-13 — Language
+
+### FR-13.1 Which language a person gets
+
+**Description**: HoldMyTrack's interface is in English or Russian. Every page, the map, the emails, and the error messages the web and Android apps show come in one language per request.
+
+**Behavior**:
+1. The language is, in order: the account's Language setting (FR-1.7) when it is English or Русский; otherwise the language the browser or app asks for (`Accept-Language`, its most preferred supported language, matching `ru-RU` as Russian); otherwise English. A signed-out visitor gets their browser's language, or English — there is no switcher, cookie, or URL parameter for it.
+2. The whole page is in that language: the shared header and footer (FR-10.4), every page including About and Help, the map app, `<html lang>`, the page title and description. The map app always shows the language the page around it is in.
+3. Numbers and dates follow the language: `1,234.5 km` and `Sep 8` in English, `1 234,5 км` and `8 сент.` in Russian. Units are unchanged by language — they follow Country (FR-1.7).
+4. Counts take the language's plural forms (`1 занятие`, `2 занятия`, `5 занятий`).
+5. The verification and password-reset emails (FR-1.8, FR-1.5) are in the account's language, or when it has none set, the language of the request that sent them.
+6. Error messages a person can see (a wrong password, a taken email, a rejected upload or track edit) are full sentences in the request's language, in page forms and in the JSON API's plain-text and `message` bodies alike. Machine-readable codes (`email_not_verified`, `demo_read_only`) never change with language.
+7. Saving a different Language in Settings takes effect from that save's own reload onward, everywhere; other open pages change on their next load.
+8. The Android app follows the phone's language, or its own per-app language (Android's Settings → Apps → HoldMyTrack → Language). It doesn't read the account's setting, and sends its language as `Accept-Language`, so the server's messages match it.
+
+**Not translated**: activity names and descriptions people type, place names on the map, activity types outside the common set (shown as recorded), and the reasons an ingest or a `.zip` entry failed.
+
+## 16. Non-Functional Requirements (summary)
 
 This section summarizes cross-cutting behavior specified elsewhere in this document, for convenience — it does not introduce new requirements.
 
@@ -890,7 +908,7 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 | **No reload required** | Every list/summary this document describes updates itself automatically as background processing completes (FR-3.1, FR-3.4) — a manual page reload is never required to see current data. |
 | **Idempotency** | Re-submitting the same activity content (FR-3.5) or the same password-reset token (FR-1.6) never has an effect beyond the first time. |
 
-## 16. Mobile Browser Support
+## 17. Mobile Browser Support
 
 **Known issue**: The behavior below is what was designed and implemented, but the actual mobile experience has been reported directly as unusable, not just rough — this section describes intent, not a verified, working feature. Treat it as broken until re-verified on a real device and re-confirmed; see `docs/ROADMAP.md`'s "Mobile browser support" item (Phase 3).
 
@@ -904,7 +922,7 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 
 **Explicitly not built** (hover-only, no touch equivalent, unlike Trends above — a continuous position read with no discrete point to tap, not a per-bar value): the colored zone segments' and pace/heart-rate + elevation profile's exact hover values (FR-4.8, FR-4.9), and the two-way map-track-hover ↔ Activities-row-underline highlight (FR-4.1, FR-5.4). Both remain mouse-only; a touchscreen user can still see the colored bands and elevation curve themselves, and can still focus/select a track by tapping it, just not read an exact value by touch alone the way a mouse hover shows one.
 
-## 17. Out-of-scope items, tracked for future revisions of this document
+## 18. Out-of-scope items, tracked for future revisions of this document
 
 The following are named in `VISION.md`'s roadmap but have no functional requirements in this document because they are not yet built:
 

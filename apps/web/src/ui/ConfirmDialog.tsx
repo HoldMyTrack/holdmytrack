@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { t } from '../i18n';
 
 /**
  * A generic "are you sure" confirm/cancel dialog — first used by the Activities panel's
@@ -28,9 +29,9 @@ export interface ConfirmDialogProps {
 export function ConfirmDialog({
   title,
   message,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
-  busyLabel = 'Working…',
+  confirmLabel = t('common.confirm'),
+  cancelLabel = t('common.cancel'),
+  busyLabel = t('common.working'),
   onConfirm,
   onClose,
 }: ConfirmDialogProps) {
@@ -50,7 +51,7 @@ export function ConfirmDialog({
       await onConfirm();
       ref.current?.close();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'something went wrong');
+      setError(err instanceof Error ? err.message : t('common.something_wrong'));
     } finally {
       setBusy(false);
     }

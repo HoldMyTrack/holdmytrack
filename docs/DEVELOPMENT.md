@@ -26,6 +26,20 @@ Every page is rendered by the Go server (`IMPLEMENTATION.md` §4.19) — the map
 
 An `apps/web/.env.local` that points `VITE_BASEMAP_ORIGIN` at production's tile host leaves the map grey on `localhost` (that host doesn't answer cross-origin requests from it), and the map's `load` never fires — so the Export control, which appears once the map has loaded, never shows either. Run with `VITE_BASEMAP_ORIGIN=` (empty, meaning same-origin) to use the local Ohio archive; the `test` compose service already does.
 
+### Text and translations
+
+Every piece of text a person reads is a catalog key, in English and Russian (`IMPLEMENTATION.md` §4.21). Adding text means adding it to both languages in the same change, on the surface it belongs to:
+
+- **A server page, email or error message:** a key in `services/server/internal/i18n/locales/en.json` and `ru.json`. Call it `{{t "key"}}` in a template (`tn` for a count, `th` for a message with its own markup), or `l.T("key")` / `accountFailure(status, "key")` / `httpErrorT(w, r, status, "key")` in Go. About and Help are the exception: edit `about.html`/`help.html` and their `.ru.html` twins together.
+- **The map app:** a key in `apps/web/src/i18n/en.ts` and `ru.ts`, called as `t('key')` or `tn('key', n)`. `tsc` fails until `ru.ts` has it.
+- **Android:** `res/values/strings.xml` and `res/values-ru/strings.xml`. Lint's `MissingTranslation` catches a gap.
+
+A count needs every plural form its language uses: `.one`/`.other` in English, `.one`/`.few`/`.many`/`.other` in Russian (the tests list what's missing). Keep placeholders identical across languages. `go test ./internal/i18n` and `npm run test:unit` check both.
+
+To see a page in Russian, set the browser's language, or send the header: `curl -H 'Accept-Language: ru' localhost:5173/help`. A signed-in account's Language setting beats the header. The dev server never caches pages, so there's no stale language to clear; production caches each signed-out page per language.
+
+Adding a *language* is a catalog on each surface, `about`/`help` translations, its plural rule (`i18n.PluralForm`) and separators (`Localizer.separators`), and its code in `i18n.Supported`/`Names`, `locales_config.xml` and `build.gradle.kts`'s `localeFilters`. ADR-0014 lists the rest.
+
 ### Seeding a fresh database
 
 `migrate` creates the schema and the Demo Customer's `users` row, but no data — two one-off subcommands fill that in, and `docker compose up` runs neither. Without them, "Try it now" signs into a demo account with zero activities, and Fog/Heatmap's Country/Region zoom tiers have no boundaries to draw. Run both once against any new or recreated database — and run `seed-admin-boundaries` once against an existing database that predates the Country/Region tiers, since `migrate` creating their tables doesn't fill them and the tiers then just render blank rather than erroring:

@@ -3,6 +3,7 @@ import { updateActivity, type Activity } from '../api';
 import type { TypeFacet } from './activityFacets';
 import { ActivityTypePicker } from './ActivityTypePicker';
 import { formatStartedAt } from './format';
+import { t, tn } from '../i18n';
 
 /** Mirrors the backend's own bounds (activities.go's maxActivityTypeLen/maxActivityNameLen/
  *  maxActivityDescriptionLen) — enforced here too so a caller sees the limit before
@@ -71,20 +72,20 @@ export function EditActivityDialog({ activities, knownTypes, onClose, onSaved }:
   async function handleSave() {
     const trimmedType = activityType.trim();
     if (!trimmedType) {
-      setError('Type is required.');
+      setError(t('edit.type_required'));
       return;
     }
     if (trimmedType.length > MAX_ACTIVITY_TYPE_LEN) {
-      setError(`Type must be ${MAX_ACTIVITY_TYPE_LEN} characters or fewer.`);
+      setError(t('edit.type_too_long', { max: MAX_ACTIVITY_TYPE_LEN }));
       return;
     }
     const trimmedName = name.trim();
     if (trimmedName.length > MAX_NAME_LEN) {
-      setError(`Name must be ${MAX_NAME_LEN} characters or fewer.`);
+      setError(t('edit.name_too_long', { max: MAX_NAME_LEN }));
       return;
     }
     if (description.length > MAX_DESCRIPTION_LEN) {
-      setError(`Description must be ${MAX_DESCRIPTION_LEN} characters or fewer.`);
+      setError(t('edit.description_too_long', { max: MAX_DESCRIPTION_LEN }));
       return;
     }
     setSaving(true);
@@ -109,7 +110,7 @@ export function EditActivityDialog({ activities, knownTypes, onClose, onSaved }:
       onSaved();
       ref.current?.close();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'could not save activity');
+      setError(err instanceof Error ? err.message : t('edit.save_failed'));
     } finally {
       setSaving(false);
     }
@@ -117,7 +118,7 @@ export function EditActivityDialog({ activities, knownTypes, onClose, onSaved }:
 
   const namedFieldsDisabledReason = single
     ? undefined
-    : 'Editing multiple activities only changes their type — name and description are per-activity.';
+    : t('edit.multi_reason');
 
   return (
     <dialog
@@ -130,16 +131,16 @@ export function EditActivityDialog({ activities, knownTypes, onClose, onSaved }:
         if (event.target === ref.current) ref.current?.close();
       }}
     >
-      <h2 className="edit-activity-dialog__title">{single ? 'Edit activity' : `Edit ${activities.length} activities`}</h2>
+      <h2 className="edit-activity-dialog__title">{single ? t('edit.title_one') : tn('edit.title_many', activities.length)}</h2>
       <p className="edit-activity-dialog__subtitle">
-        {single ? formatStartedAt(single.startedAt) : 'Only Type applies to every checked activity — see below.'}
+        {single ? formatStartedAt(single.startedAt) : t('edit.multi_subtitle')}
       </p>
 
       {/* A <div>, not a <label> like the fields below: a label wrapping the picker would
           forward every click inside its popover (search box included) to the trigger. */}
       <div className="settings-page__section">
         <span className="settings-page__label" id="edit-activity-type-label">
-          Type
+          {t('activities.type')}
         </span>
         <ActivityTypePicker
           value={activityType}
@@ -151,26 +152,26 @@ export function EditActivityDialog({ activities, knownTypes, onClose, onSaved }:
       </div>
 
       <label className="settings-page__section" title={namedFieldsDisabledReason}>
-        <span className="settings-page__label">Name</span>
+        <span className="settings-page__label">{t('edit.name')}</span>
         <input
           className="settings-page__input"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           maxLength={MAX_NAME_LEN}
-          placeholder="Optional — shown instead of the date in the Activities list"
+          placeholder={t('edit.name_placeholder')}
           disabled={!single}
         />
       </label>
 
       <label className="settings-page__section" title={namedFieldsDisabledReason}>
-        <span className="settings-page__label">Description</span>
+        <span className="settings-page__label">{t('edit.description')}</span>
         <textarea
           className="settings-page__input edit-activity-dialog__description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           maxLength={MAX_DESCRIPTION_LEN}
-          placeholder='Add a note — e.g. "Roadtrip to California with kids"'
+          placeholder={t('edit.description_placeholder')}
           rows={4}
           disabled={!single}
         />
@@ -179,10 +180,10 @@ export function EditActivityDialog({ activities, knownTypes, onClose, onSaved }:
       {error && <p className="settings-page__error">{error}</p>}
       <div className="settings-page__save-row">
         <button type="button" className="settings-page__submit" disabled={saving} onClick={() => void handleSave()}>
-          {saving ? 'Saving…' : 'Save'}
+          {saving ? t('common.saving') : t('common.save')}
         </button>
         <button type="button" className="settings-page__button" disabled={saving} onClick={() => ref.current?.close()}>
-          Cancel
+          {t('common.cancel')}
         </button>
       </div>
     </dialog>

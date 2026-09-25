@@ -1,19 +1,19 @@
 {{define "content"}}{{with .Page}}
 <main class="auth-page">
   <div class="auth-card">
-    <h1 class="auth-card__title">Sign in</h1>
+    <h1 class="auth-card__title">{{t "signin.title"}}</h1>
     {{if .Google}}{{template "google" .}}{{end}}
     <form class="auth-card__form" method="post" action="/signin">
-      <label class="auth-card__field"><span>Email</span><input type="email" name="email" value="{{.Email}}" required autocomplete="email" /></label>
-      <label class="auth-card__field"><span>Password</span><input type="password" name="password" required minlength="8" autocomplete="current-password" /></label>
-      <a class="auth-card__forgot" href="/forgot">Forgot password?</a>
+      <label class="auth-card__field"><span>{{t "auth.email"}}</span><input type="email" name="email" value="{{.Email}}" required autocomplete="email" /></label>
+      <label class="auth-card__field"><span>{{t "auth.password"}}</span><input type="password" name="password" required minlength="8" autocomplete="current-password" /></label>
+      <a class="auth-card__forgot" href="/forgot">{{t "signin.forgot"}}</a>
       {{with .Error}}<p class="auth-card__error" role="alert">{{.}}</p>{{end}}
-      <button type="submit" class="auth-card__submit">Sign in</button>
+      <button type="submit" class="auth-card__submit">{{t "signin.submit"}}</button>
     </form>
-    <a class="auth-card__link" href="/signup">Don't have an account? Create one</a>
-    <div class="auth-card__divider" role="separator">or</div>
+    <a class="auth-card__link" href="/signup">{{t "signin.to_signup"}}</a>
+    <div class="auth-card__divider" role="separator">{{t "auth.or"}}</div>
     <form method="post" action="/demo">
-      <button type="submit" class="auth-card__secondary">Try it now — no signup</button>
+      <button type="submit" class="auth-card__secondary">{{t "signin.demo"}}</button>
     </form>
   </div>
 </main>

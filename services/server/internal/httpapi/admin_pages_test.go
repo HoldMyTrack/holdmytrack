@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 )
 
@@ -75,8 +76,11 @@ func TestAdminFormatting(t *testing.T) {
 			t.Errorf("adminDuration(%d) = %q, want %q", secs, got, want)
 		}
 	}
-	if got := adminRange(100, 100, 1250); got != "101–200 of 1,250" {
+	if got := adminRange(i18n.Get("en"), 100, 100, 1250); got != "101–200 of 1,250" {
 		t.Errorf("adminRange = %q", got)
+	}
+	if got := adminRange(i18n.Get("ru"), 100, 100, 1250); got != "101–200 из 1\u00a0250" {
+		t.Errorf("adminRange ru = %q", got)
 	}
 	if got := adminUserHref("u", 1); got != "/admin/users/u" {
 		t.Errorf("page 1 href = %q", got)

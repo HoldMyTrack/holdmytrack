@@ -93,7 +93,7 @@ class RecordingActivity : AppCompatActivity() {
             setType(record.activityType)
             descriptionField.setText(record.description)
             timeValue.text = RecordingFormat.duration(record.durationSeconds * 1000)
-            distanceValue.text = RecordingFormat.distance(record.distanceMeters)
+            distanceValue.text = RecordingFormat.distance(resources, record.distanceMeters)
         }
     }
 

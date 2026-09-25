@@ -6,8 +6,10 @@ import (
 	"math"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 )
 
@@ -35,7 +37,7 @@ type profileView struct {
 	Trends    []trendBar
 	TrendFrom string
 	TrendTo   string
-	// Legend is the grid legend's own words: "activity count" or "distance".
+	// Legend is the grid legend's own words: "Shaded by activity count: less".
 	Legend string
 }
 
@@ -67,8 +69,6 @@ type trendBar struct {
 	Title         string
 }
 
-var monthLabels = [...]string{"JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"}
-
 // GET /profile.
 func (s *Server) handleProfilePage(w http.ResponseWriter, r *http.Request) {
 	acct := s.pageAccount(r)
@@ -90,16 +90,18 @@ func (s *Server) handleProfilePage(w http.ResponseWriter, r *http.Request) {
 		bucket = "month"
 	}
 
-	view, err := s.buildProfile(r.Context(), acct, shade, bucket, time.Now())
+	lang := pageLang(acct, r)
+	l := i18n.Get(lang)
+	view, err := s.buildProfile(r.Context(), l, acct, shade, bucket, time.Now())
 	if err != nil {
 		s.log.Error("profile page failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	s.pages.Render(w, http.StatusOK, "profile", web.PageData{Title: "Profile — HoldMyTrack", Path: "/profile", NoIndex: true, User: acct.user, Page: view})
+	s.pages.Render(w, http.StatusOK, "profile", web.PageData{Title: l.T("meta.profile_title"), Path: "/profile", NoIndex: true, User: acct.user, Page: view, Lang: lang})
 }
 
-func (s *Server) buildProfile(ctx context.Context, acct *pageAccount, shade, bucket string, now time.Time) (profileView, error) {
+func (s *Server) buildProfile(ctx context.Context, l *i18n.Localizer, acct *pageAccount, shade, bucket string, now time.Time) (profileView, error) {
 	userID, tz := acct.info.userID, acct.info.timezone
 	loc, err := time.LoadLocation(tz)
 	if err != nil {
@@ -133,23 +135,23 @@ func (s *Server) buildProfile(ctx context.Context, acct *pageAccount, shade, buc
 	all := statsOf(days)
 	view := profileView{
 		Cards: []statCard{
-			{"Activities", web.FormatInt(all.Count)},
-			{"Distance", web.FormatTotalDistance(all.DistanceMeters, imperial)},
-			{"Active days", web.FormatInt(all.ActiveDays)},
-			{"Longest streak", web.Plural(all.LongestStreakDays, "day", "days")},
+			{l.T("profile.card_activities"), l.Int(all.Count)},
+			{l.T("profile.card_distance"), web.FormatTotalDistance(l, all.DistanceMeters, imperial)},
+			{l.T("profile.card_active_days"), l.Int(all.ActiveDays)},
+			{l.T("profile.card_longest_streak"), l.N("count.days", all.LongestStreakDays)},
 		},
 		ShadeBy:   shade,
 		Bucket:    bucket,
 		ShadeHref: map[string]string{"count": profileHref("count", bucket), "distance": profileHref("distance", bucket)},
 		BucketURL: map[string]string{"week": profileHref(shade, "week"), "month": profileHref(shade, "month")},
-		Legend:    map[string]string{"count": "activity count", "distance": "distance"}[shade],
+		Legend:    l.T("profile.legend_" + shade),
 	}
 	for year := currentYear; year >= firstYear; year-- {
-		view.Years = append(view.Years, buildYearGrid(year, daysInYear(days, year), shade, imperial))
+		view.Years = append(view.Years, buildYearGrid(l, year, daysInYear(days, year), shade, imperial))
 	}
-	view.Trends = buildTrendBars(periods, imperial)
+	view.Trends = buildTrendBars(l, periods, imperial)
 	if len(periods) > 0 {
-		view.TrendFrom, view.TrendTo = web.ShortDate(periods[0].PeriodStart), web.ShortDate(periods[len(periods)-1].PeriodStart)
+		view.TrendFrom, view.TrendTo = web.ShortDate(l, periods[0].PeriodStart), web.ShortDate(l, periods[len(periods)-1].PeriodStart)
 	}
 	return view, nil
 }
@@ -204,7 +206,7 @@ func daysInYear(days []histogramBucket, year int) []histogramBucket {
 // columns carry padding days outside the year — with each day's shading level and tooltip.
 // Dates are calendar days, laid out in UTC arithmetic: the buckets are already the account's
 // own local days.
-func buildYearGrid(year int, days []histogramBucket, shade string, imperial bool) yearGrid {
+func buildYearGrid(l *i18n.Localizer, year int, days []histogramBucket, shade string, imperial bool) yearGrid {
 	byDate := make(map[string]histogramBucket, len(days))
 	for _, d := range days {
 		byDate[d.Date] = d
@@ -215,7 +217,7 @@ func buildYearGrid(year int, days []histogramBucket, shade string, imperial bool
 	weeks := (int(dec31.Sub(gridStart).Hours()/24) + 1 + 6) / 7
 	t1, t2 := distanceThresholds(days)
 
-	g := yearGrid{Year: year, Weeks: weeks, Stats: yearStatsLine(statsOf(days), imperial)}
+	g := yearGrid{Year: year, Weeks: weeks, Stats: yearStatsLine(l, statsOf(days), imperial)}
 	lastCol := -1
 	for col := 0; col < weeks; col++ {
 		for row := 0; row < 7; row++ {
@@ -225,14 +227,14 @@ func buildYearGrid(year int, days []histogramBucket, shade string, imperial bool
 				continue
 			}
 			if day.Day() == 1 && col != lastCol {
-				g.Months = append(g.Months, monthTick{Label: monthLabels[day.Month()-1], Col: col + 1})
+				g.Months = append(g.Months, monthTick{Label: strings.ToUpper(l.T(fmt.Sprintf("month.standalone.%d", day.Month()))), Col: col + 1})
 				lastCol = col
 			}
 			date := day.Format(dateLayout)
 			b := byDate[date]
-			cell := gridCell{Level: shadeLevel(b, shade, t1, t2), Title: date + ": no activity"}
+			cell := gridCell{Level: shadeLevel(b, shade, t1, t2), Title: l.T("profile.cell_empty", "date", date)}
 			if b.Count > 0 {
-				cell.Title = fmt.Sprintf("%s: %s, %s", date, web.Plural(b.Count, "activity", "activities"), web.FormatDistance(b.DistanceMeters, imperial))
+				cell.Title = l.T("profile.cell", "date", date, "activities", l.N("count.activities", b.Count), "distance", web.FormatDistance(l, b.DistanceMeters, imperial))
 			}
 			g.Cells = append(g.Cells, cell)
 		}
@@ -273,17 +275,17 @@ func shadeLevel(b histogramBucket, shade string, t1, t2 float64) int {
 	return 3
 }
 
-func yearStatsLine(st activityStatsBlock, imperial bool) string {
-	return fmt.Sprintf("%s · %s · %s · longest streak %s",
-		web.Plural(st.Count, "activity", "activities"),
-		web.FormatTotalDistance(st.DistanceMeters, imperial),
-		web.Plural(st.ActiveDays, "active day", "active days"),
-		web.Plural(st.LongestStreakDays, "day", "days"))
+func yearStatsLine(l *i18n.Localizer, st activityStatsBlock, imperial bool) string {
+	return l.T("profile.year_stats",
+		"activities", l.N("count.activities", st.Count),
+		"distance", web.FormatTotalDistance(l, st.DistanceMeters, imperial),
+		"active_days", l.N("count.active_days", st.ActiveDays),
+		"streak", l.N("count.days", st.LongestStreakDays))
 }
 
 // buildTrendBars scales each period's bar on a log curve against the busiest period
 // (Trends.tsx's rule): one huge week would otherwise flatten every other bar to nothing.
-func buildTrendBars(periods []trendPeriod, imperial bool) []trendBar {
+func buildTrendBars(l *i18n.Localizer, periods []trendPeriod, imperial bool) []trendBar {
 	var peak float64
 	for _, p := range periods {
 		peak = math.Max(peak, p.DistanceMeters)
@@ -296,10 +298,10 @@ func buildTrendBars(periods []trendPeriod, imperial bool) []trendBar {
 		}
 		bars = append(bars, trendBar{
 			HeightPercent: math.Round(h*10) / 10,
-			Title: fmt.Sprintf("%s: %s · %s · %s h moving · %s gain",
-				web.ShortDate(p.PeriodStart), web.FormatTotalDistance(p.DistanceMeters, imperial),
-				web.Plural(p.Count, "activity", "activities"), web.FormatHours(p.MovingSeconds),
-				web.FormatElevation(p.ElevationGainM, imperial)),
+			Title: l.T("profile.trend_bar",
+				"date", web.ShortDate(l, p.PeriodStart), "distance", web.FormatTotalDistance(l, p.DistanceMeters, imperial),
+				"activities", l.N("count.activities", p.Count), "hours", web.FormatHours(l, p.MovingSeconds),
+				"gain", web.FormatElevation(l, p.ElevationGainM, imperial)),
 		})
 	}
 	return bars

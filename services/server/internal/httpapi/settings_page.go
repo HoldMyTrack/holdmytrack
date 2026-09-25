@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 )
 
@@ -25,13 +26,17 @@ type settingsForm struct {
 	DisplayName string
 	Country     string
 	Timezone    string
-	Countries   []web.Country
-	Timezones   []web.TimezoneGroup
-	// Error belongs to the Name/Country/Timezone form, AvatarError to the avatar's;
+	// Locale is the account's language, "" for automatic; Languages what it can be.
+	Locale    string
+	Countries []web.Country
+	Timezones []web.TimezoneGroup
+	Languages []web.Country
+	// Error belongs to the Name/Country/Timezone/Language form, AvatarError to the avatar's;
 	// Notice is a PRG confirmation (?saved, ?avatar, ?avatar-removed).
 	Error       string
 	AvatarError string
 	Notice      string
+	NoticeKey   string
 }
 
 // settingsAccount is the check every Settings request starts with: a live, verified (or demo)
@@ -53,18 +58,26 @@ func (s *Server) renderSettings(w http.ResponseWriter, r *http.Request, status i
 	form.Onboarding = !acct.info.isDemo && acct.profile.Country == ""
 	form.IsDemo = acct.info.isDemo
 	form.AvatarURL = acct.profile.AvatarURL
-	form.Countries = web.Countries
+	lang := pageLang(acct, r)
+	l := i18n.Get(lang)
+	form.Countries = web.CountriesIn(lang)
 	form.Timezones = web.TimezoneGroups(time.Now(), form.Timezone)
-	title := "Settings — HoldMyTrack"
-	if form.Onboarding {
-		title = "Welcome — HoldMyTrack"
+	for _, code := range i18n.Supported {
+		form.Languages = append(form.Languages, web.Country{Code: code, Name: i18n.Names[code]})
 	}
-	s.pages.Render(w, status, "settings", web.PageData{Title: title, Path: "/settings", NoIndex: true, User: acct.user, Page: form})
+	if form.NoticeKey != "" {
+		form.Notice = l.T(form.NoticeKey)
+	}
+	title := l.T("meta.settings_title")
+	if form.Onboarding {
+		title = l.T("meta.welcome_title")
+	}
+	s.pages.Render(w, status, "settings", web.PageData{Title: title, Path: "/settings", NoIndex: true, User: acct.user, Page: form, Lang: lang})
 }
 
 // formWithSaved is the form showing the account's saved values.
 func formWithSaved(acct *pageAccount) settingsForm {
-	return settingsForm{DisplayName: acct.profile.DisplayName, Country: acct.profile.Country, Timezone: acct.profile.Timezone}
+	return settingsForm{DisplayName: acct.profile.DisplayName, Country: acct.profile.Country, Timezone: acct.profile.Timezone, Locale: acct.info.locale}
 }
 
 // GET /settings.
@@ -77,32 +90,33 @@ func (s *Server) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	switch {
 	case q.Has("saved"):
-		form.Notice = "Saved."
+		form.NoticeKey = "settings.saved"
 	case q.Has("avatar"):
-		form.Notice = "Avatar updated."
+		form.NoticeKey = "settings.avatar_updated"
 	case q.Has("avatar-removed"):
-		form.Notice = "Avatar removed."
+		form.NoticeKey = "settings.avatar_removed"
 	}
 	s.renderSettings(w, r, http.StatusOK, acct, form)
 }
 
 // errDemoSettings is what a demo session gets from any Settings form — the page shows the
 // fields disabled, so this is only reached by a hand-made request.
-var errDemoSettings = accountFailure(http.StatusForbidden, "demo accounts can't change settings — create an account to save your own")
+var errDemoSettings = accountFailure(http.StatusForbidden, "error.demo_settings")
 
-// POST /settings — Name, Country and Timezone together, as one save.
+// POST /settings — Name, Country, Timezone and Language together, as one save. The page
+// renders in the language just saved, so its own "Saved." is already in it.
 func (s *Server) handleSettingsForm(w http.ResponseWriter, r *http.Request) {
 	acct := s.settingsAccount(w, r)
 	if acct == nil {
 		return
 	}
-	form := settingsForm{DisplayName: r.PostFormValue("display_name"), Country: r.PostFormValue("country"), Timezone: r.PostFormValue("timezone")}
+	form := settingsForm{DisplayName: r.PostFormValue("display_name"), Country: r.PostFormValue("country"), Timezone: r.PostFormValue("timezone"), Locale: r.PostFormValue("locale")}
 	err := errDemoSettings
 	if !acct.info.isDemo {
-		err = s.saveSettings(r.Context(), acct.info.userID, form.DisplayName, form.Country, form.Timezone)
+		err = s.saveSettings(r.Context(), acct.info.userID, form.DisplayName, form.Country, form.Timezone, &form.Locale)
 	}
 	if err != nil {
-		status, msg := s.settingsError("save settings", err)
+		status, msg := s.settingsError("save settings", err, pageLang(acct, r))
 		form.Error = msg
 		s.renderSettings(w, r, status, acct, form)
 		return
@@ -135,7 +149,7 @@ func (s *Server) avatarForm(w http.ResponseWriter, r *http.Request, notice strin
 		err = do(acct)
 	}
 	if err != nil {
-		status, msg := s.settingsError("avatar", err)
+		status, msg := s.settingsError("avatar", err, pageLang(acct, r))
 		form := formWithSaved(acct)
 		form.AvatarError = msg
 		s.renderSettings(w, r, status, acct, form)
@@ -145,12 +159,12 @@ func (s *Server) avatarForm(w http.ResponseWriter, r *http.Request, notice strin
 }
 
 // settingsError is renderAuthError's counterpart for Settings: an accountError's own status
-// and message as a sentence, or a logged 500 with a generic one.
-func (s *Server) settingsError(op string, err error) (int, string) {
+// and message in lang, or a logged 500 with a generic one.
+func (s *Server) settingsError(op string, err error, lang string) (int, string) {
 	var ae *accountError
 	if errors.As(err, &ae) {
-		return ae.status, sentence(ae.msg)
+		return ae.status, ae.message(lang)
 	}
 	s.log.Error(op+" failed", "err", err)
-	return http.StatusInternalServerError, "Something went wrong on our side. Please try again."
+	return http.StatusInternalServerError, i18n.Get(lang).T("error.internal")
 }

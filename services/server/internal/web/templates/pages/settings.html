@@ -1,21 +1,21 @@
 {{define "content"}}{{with .Page}}
 <main class="page-main settings">
-  {{if not .Onboarding}}<a class="settings__back" href="/">← Back to map</a>{{end}}
-  <h1 class="settings__title">{{if .Onboarding}}Welcome — set up your account{{else}}Settings{{end}}</h1>
-  {{if .Onboarding}}<p class="settings__intro">Two things before your map: your country sets whether distances show in km or miles, and your timezone sets which day each activity falls on. You can change both here later.</p>{{end}}
-  {{if .IsDemo}}<p class="settings__notice" role="status">This is the shared demo account, so its settings can't be changed. <a href="/signup">Create your own account</a> to save yours.</p>{{end}}
+  {{if not .Onboarding}}<a class="settings__back" href="/">{{t "common.back_to_map"}}</a>{{end}}
+  <h1 class="settings__title">{{if .Onboarding}}{{t "settings.onboarding_title"}}{{else}}{{t "settings.title"}}{{end}}</h1>
+  {{if .Onboarding}}<p class="settings__intro">{{t "settings.onboarding_intro"}}</p>{{end}}
+  {{if .IsDemo}}<p class="settings__notice" role="status">{{th "settings.demo_notice"}}</p>{{end}}
   {{with .Notice}}<p class="settings__notice" role="status">{{.}}</p>{{end}}
 
   <section class="settings__section" aria-labelledby="settings-avatar">
-    <h2 class="settings__label" id="settings-avatar">Avatar</h2>
+    <h2 class="settings__label" id="settings-avatar">{{t "settings.avatar"}}</h2>
     <div class="settings__avatar-row">
-      <div class="settings__avatar">{{if .AvatarURL}}<img src="{{.AvatarURL}}" alt="Your avatar" />{{else}}<span aria-hidden="true">⬚</span>{{end}}</div>
+      <div class="settings__avatar">{{if .AvatarURL}}<img src="{{.AvatarURL}}" alt="{{t "settings.avatar_alt"}}" />{{else}}<span aria-hidden="true">⬚</span>{{end}}</div>
       <div class="settings__avatar-actions">
         {{/* Picking a file submits the form straight away (the one line of script); without
              script, the Upload button does. */}}
         <form method="post" action="/settings/avatar" enctype="multipart/form-data" class="settings__inline-form" id="avatar-form">
-          <input type="file" name="file" accept="image/png,image/jpeg,image/webp" required {{if .IsDemo}}disabled{{end}} aria-label="Choose an image" />
-          <button type="submit" class="settings__button" id="avatar-upload" {{if .IsDemo}}disabled{{end}}>Upload</button>
+          <input type="file" name="file" accept="image/png,image/jpeg,image/webp" required {{if .IsDemo}}disabled{{end}} aria-label="{{t "settings.avatar_choose"}}" />
+          <button type="submit" class="settings__button" id="avatar-upload" {{if .IsDemo}}disabled{{end}}>{{t "settings.avatar_upload"}}</button>
         </form>
         <script>
           (function () {
@@ -26,10 +26,10 @@
         </script>
         {{if .AvatarURL}}
         <form method="post" action="/settings/avatar/remove" class="settings__inline-form">
-          <button type="submit" class="settings__button" {{if .IsDemo}}disabled{{end}}>Remove</button>
+          <button type="submit" class="settings__button" {{if .IsDemo}}disabled{{end}}>{{t "settings.avatar_remove"}}</button>
         </form>
         {{end}}
-        <p class="settings__hint">PNG, JPEG or WebP, up to 5 MB.</p>
+        <p class="settings__hint">{{t "settings.avatar_hint"}}</p>
         {{with .AvatarError}}<p class="settings__error" role="alert">{{.}}</p>{{end}}
       </div>
     </div>
@@ -38,37 +38,46 @@
   <form method="post" action="/settings" class="settings__form">
     <fieldset {{if .IsDemo}}disabled{{end}}>
       <label class="settings__section">
-        <span class="settings__label">Name</span>
-        <input class="settings__input" type="text" name="display_name" value="{{.DisplayName}}" placeholder="Not set" autocomplete="name" />
+        <span class="settings__label">{{t "settings.name"}}</span>
+        <input class="settings__input" type="text" name="display_name" value="{{.DisplayName}}" placeholder="{{t "settings.name_placeholder"}}" autocomplete="name" />
       </label>
 
       <label class="settings__section">
-        <span class="settings__label">Country</span>
+        <span class="settings__label">{{t "settings.country"}}</span>
         <select class="settings__input" name="country" required>
-          <option value="" {{if eq .Country ""}}selected{{end}} disabled>Choose a country</option>
+          <option value="" {{if eq .Country ""}}selected{{end}} disabled>{{t "settings.country_choose"}}</option>
           {{$country := .Country}}{{range .Countries}}<option value="{{.Code}}" {{if eq .Code $country}}selected{{end}}>{{.Name}}</option>{{end}}
         </select>
-        <span class="settings__hint">{{if eq .Country ""}}Required. {{end}}Decides whether distance, pace and elevation show in km/m or mi/ft, everywhere in the app.</span>
+        <span class="settings__hint">{{if eq .Country ""}}{{t "settings.required"}} {{end}}{{t "settings.country_hint"}}</span>
       </label>
 
       <label class="settings__section">
-        <span class="settings__label">Timezone</span>
+        <span class="settings__label">{{t "settings.timezone"}}</span>
         <select class="settings__input" name="timezone" required>
-          {{$tz := .Timezone}}{{range .Timezones}}<optgroup label="{{.Region}}">{{range .Options}}<option value="{{.ID}}" {{if eq .ID $tz}}selected{{end}}>{{.Label}}</option>{{end}}</optgroup>{{end}}
+          {{$tz := .Timezone}}{{range .Timezones}}<optgroup label="{{t (printf "tz.region.%s" .Region)}}">{{range .Options}}<option value="{{.ID}}" {{if eq .ID $tz}}selected{{end}}>{{.Label}}</option>{{end}}</optgroup>{{end}}
         </select>
-        <span class="settings__hint">Decides which calendar day an activity falls on everywhere in the app (the histogram, the activity graph, date filtering). Auto-detected from your browser when you signed up; change it here if you're somewhere else now.</span>
+        <span class="settings__hint">{{t "settings.timezone_hint"}}</span>
+      </label>
+
+      <label class="settings__section">
+        <span class="settings__label">{{t "settings.language"}}</span>
+        <select class="settings__input" name="locale">
+          <option value="" {{if eq .Locale ""}}selected{{end}}>{{t "settings.language_auto"}}</option>
+          {{$locale := .Locale}}{{range .Languages}}<option value="{{.Code}}" lang="{{.Code}}" {{if eq .Code $locale}}selected{{end}}>{{.Name}}</option>{{end}}
+        </select>
+        <span class="settings__hint">{{t "settings.language_hint"}}</span>
       </label>
 
       {{with .Error}}<p class="settings__error" role="alert">{{.}}</p>{{end}}
-      <button type="submit" class="settings__submit">{{if .Onboarding}}Save and continue{{else}}Save{{end}}</button>
+      <button type="submit" class="settings__submit">{{if .Onboarding}}{{t "settings.save_continue"}}{{else}}{{t "settings.save"}}{{end}}</button>
     </fieldset>
   </form>
 
   {{if not .Onboarding}}
   <section class="settings__section" aria-labelledby="settings-private">
-    <h2 class="settings__label" id="settings-private">Private locations</h2>
-    <p class="settings__hint">Circles on the map — home, work — that your tracks never show inside. Any part of an activity that starts or ends in one is hidden everywhere, including your own map.</p>
-    <div><a class="settings__button" href="/?private-locations">Manage on the map</a></div>
+    <h2 class="settings__label" id="settings-private">{{t "header.private_locations"}}</h2>
+    <p class="settings__hint">{{t "settings.private_hint"}}</p>
+    <div><a class="settings__button" href="/?private-locations">{{t "settings.private_manage"}}</a></div>
   </section>
   {{end}}
 </main>

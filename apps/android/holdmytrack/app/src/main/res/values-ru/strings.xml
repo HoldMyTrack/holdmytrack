@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Russian. Every translatable string in values/strings.xml, in the same order; Android lint's
+     MissingTranslation keeps the two in step. The web app's own Russian (apps/web/src/i18n/ru.ts)
+     names the same things the same way — Обычный/Туман, «Синхронизировать» — except the Heatmap mode:
+     «Тепловая» here, since «Тепловая карта» doesn't fit the map's toolbar beside the locate button. -->
+<resources>
+    <string name="map_load_failed">Не удалось загрузить карту с %1$s\n%2$s</string>
+
+    <string name="sign_in">Войти</string>
+    <string name="sign_out">Выйти</string>
+    <string name="create_account">Создать аккаунт</string>
+    <string name="try_demo">Попробовать демо</string>
+    <string name="sign_in_title">Вход в HoldMyTrack</string>
+    <string name="sign_in_intro">Войдите, чтобы увидеть свои треки, «туман войны» и тепловую карту. Демо-аккаунт не требует регистрации и удаляется через день.</string>
+    <string name="email_hint">Эл. почта</string>
+    <string name="password_hint">Пароль</string>
+    <string name="credentials_required">Введите адрес почты и пароль.</string>
+    <string name="sign_in_failed">Не удалось войти.</string>
+
+    <string name="signed_in_as">Вы вошли как %1$s</string>
+    <string name="signed_in_demo">Вы вошли в демо-аккаунт</string>
+    <string name="checking_session">Проверяем вход…</string>
+
+    <string name="mode_normal">Обычный</string>
+    <string name="mode_fog">Туман</string>
+    <string name="mode_heatmap">Тепловая</string>
+
+    <string name="locate_button">Моё местоположение</string>
+    <string name="locate_needs_location">HoldMyTrack нужен доступ к местоположению, чтобы показать, где вы.</string>
+    <string name="menu_profile">Профиль</string>
+    <string name="menu_sync">Синхронизация</string>
+    <string name="menu_recorded_activities">Записанные занятия</string>
+
+    <string name="recording_name_hint">Название</string>
+    <string name="recording_type_hint">Тип занятия</string>
+    <string name="recording_description_hint">Описание (необязательно)</string>
+    <string name="recording_pause">Пауза</string>
+    <string name="recording_resume">Продолжить</string>
+    <string name="recording_stop">Стоп</string>
+    <string name="recording_save">Сохранить</string>
+    <string name="recording_edit">Изменить</string>
+    <string name="recording_type_search_hint">Найдите или добавьте тип</string>
+    <string name="recording_type_add">Добавить «%1$s»</string>
+    <string name="recording_type_new">новый</string>
+    <string name="recording_type_no_match">Нет типа, подходящего под «%1$s»</string>
+    <string name="recording_download">Скачать GPX</string>
+    <string name="recording_downloaded">Трек сохранён.</string>
+    <string name="recording_download_failed">Не удалось сохранить трек.</string>
+    <string name="recording_stat_time">Время</string>
+    <string name="recording_stat_distance">Расстояние</string>
+    <string name="recording_too_short">Слишком коротко — не сохранено.</string>
+    <string name="recording_needs_location">HoldMyTrack нужен доступ к местоположению, чтобы записать GPS-трек.</string>
+    <string name="recording_edit_title">Изменить запись</string>
+    <string name="recording_save_title">Сохранить запись</string>
+    <string name="recording_discard">Удалить</string>
+    <string name="recording_discard_confirm_title">Удалить эту запись?</string>
+    <string name="recording_discard_confirm_message">Трек будет удалён с этого устройства. Это нельзя отменить.</string>
+    <string name="record_button_start">Начать запись</string>
+    <string name="record_button_pause">Приостановить запись. Удерживайте, чтобы остановить.</string>
+    <string name="record_button_resume">Продолжить запись. Удерживайте, чтобы остановить.</string>
+    <string name="recording_notification_channel">Запись GPS</string>
+    <string name="recording_notification_title">Идёт запись</string>
+    <string name="recording_notification_title_paused">Пауза · %1$s</string>
+    <string name="unit_km">%1$.2f км</string>
+    <string name="unit_m">%1$.0f м</string>
+    <string name="unit_kmh">%1$.1f км/ч</string>
+
+    <string name="recorded_empty">Записанных занятий пока нет.</string>
+    <string name="recorded_filter_all">Все</string>
+    <string name="recorded_status_not_synced">Не синхронизировано</string>
+    <string name="recorded_status_queued">В очереди</string>
+    <string name="recorded_row_subtitle">%1$s · %2$.2f км · %3$s</string>
+    <string name="recorded_demo_notice">Демо-аккаунт только для просмотра: записи можно сохранять и редактировать здесь, но не синхронизировать. Создайте аккаунт, чтобы синхронизировать свои данные.</string>
+    <string name="recording_delete">Удалить</string>
+    <string name="recorded_row_preview">Предпросмотр маршрута</string>
+    <string name="recorded_delete_confirm_title">Удалить эту запись?</string>
+    <string name="recorded_delete_confirm_message">Она не синхронизирована, так что это единственная копия. Это нельзя отменить.</string>
+
+    <string name="sync_title">Синхронизация с Health Connect</string>
+    <string name="sync_rationale">HoldMyTrack читает из Health Connect ваши записанные тренировки и их GPS-маршруты и добавляет тренировки на улице на вашу карту. Больше он ничего не читает — ни пульс, ни вес, ни сон — и никогда ничего не записывает обратно. У тренировок в помещении нет маршрута, поэтому они пропускаются.</string>
+    <string name="sync_needs_account">Сначала войдите в HoldMyTrack — до этого синхронизировать некуда.</string>
+    <string name="sync_demo_read_only">Демо-аккаунт только для просмотра — в нём нельзя добавлять, изменять и удалять занятия. Создайте аккаунт, чтобы синхронизировать свои данные.</string>
+    <string name="sync_unavailable">На этом устройстве нет Health Connect, так что синхронизировать не из чего.</string>
+    <string name="sync_update_required">Health Connect нужно обновить, прежде чем он сможет чем-то поделиться.</string>
+    <string name="sync_needs_exercise_permission">HoldMyTrack пока не может читать ваши тренировки.</string>
+    <string name="sync_needs_routes_permission">HoldMyTrack может читать ваши тренировки, но не их маршруты, — а тренировку без маршрута нечем нарисовать на карте. Это разрешение выдаётся внутри Health Connect; запросить его отсюда нельзя.</string>
+    <string name="sync_routes_steps">Кнопка ниже открывает Health Connect. Android позволяет приложению открыть только его главный экран, поэтому дальше:\n\n1. Нажмите «Разрешения приложений»\n2. Выберите HoldMyTrack\n3. Прокрутите до «Дополнительный доступ»\n4. Нажмите «Доступ к маршрутам тренировок»\n5. Выберите «Разрешать всегда»\n\nЗатем вернитесь сюда.</string>
+    <string name="sync_allow_access">Разрешить доступ к Health Connect</string>
+    <string name="sync_open_health_connect">Открыть Health Connect</string>
+    <string name="sync_now">Синхронизировать</string>
+    <string name="sync_never">никогда</string>
+    <string name="sync_ready">Можно синхронизировать. Синхронизировано по: %1$s</string>
+    <string name="sync_running">Читаем Health Connect…</string>
+    <string name="sync_progress">Прочитано тренировок: %1$d, синхронизировано: %2$d…</string>
+    <string name="sync_done">Синхронизация завершена.</string>
+    <string name="sync_failed">Ошибка синхронизации: %1$s</string>
+    <string name="sync_summary">Новых синхронизировано: %1$d, уже было в HoldMyTrack: %2$d, всего прочитано тренировок: %3$d.</string>
+    <string name="sync_skipped_no_route">Пропущено тренировок в помещении: %1$d — у них нет маршрута.</string>
+    <string name="sync_rejected_row">Отклонено: %1$s %2$s — %3$s</string>
+    <string name="sync_stopped">Остановлено досрочно. %1$s</string>
+    <string name="sync_consent_required">Health Connect не отдал маршрут. Не уходите из HoldMyTrack во время синхронизации, проверьте, что доступ к маршрутам тренировок всё ещё разрешён, и синхронизируйте снова — всё после этого занятия ещё не синхронизировано, так что ничего не потеряно.</string>
+    <string name="sync_refusal_too_few_points">в маршруте меньше двух точек</string>
+    <string name="sync_refusal_too_many_points">в маршруте %1$d точек — больше, чем принимает один запрос синхронизации</string>
+    <string name="sync_request_failed">запрос синхронизации не удался</string>
+    <string name="sync_no_report">сервер ничего не сообщил об этом занятии (статус %1$s)</string>
+    <string name="sync_recorded_summary">Записанные занятия: синхронизировано %1$d.</string>
+    <string name="sync_recorded_summary_with_failed">Записанные занятия: синхронизировано %1$d, не удалось %2$d — попробуем снова в следующий раз.</string>
+    <string name="sync_needs_history_permission">Можно синхронизировать, но только последние 30 дней. Синхронизировано по: %1$s</string>
+    <string name="sync_history_hint">Health Connect отдаёт только последние 30 дней, если не разрешить доступ к прошлым данным. HoldMyTrack показывает всё, где вы побывали, так что 30 дней — это совсем маленькая карта.</string>
+    <string name="sync_allow_history">Разрешить доступ к прошлым данным</string>
+    <string name="sync_now_anyway">Всё равно синхронизировать последние 30 дней</string>
+    <string name="status_title">История синхронизации</string>
+    <string name="status_history">История</string>
+    <string name="status_summary_empty">Пока ничего не синхронизировано и не загружено.</string>
+    <string name="status_summary_processing">Обработано %1$d из %2$d…</string>
+    <string name="status_summary_settled">Синхронизировано или загружено занятий: %1$d.</string>
+    <string name="status_failed">Не удалось прочитать историю синхронизации: %1$s</string>
+    <string name="status_row_done">%1$s · %2$.1f км</string>
+    <string name="status_row_done_no_distance">%1$s · расстояние не записано</string>
+    <string name="status_row_processing">%1$s · обработка…</string>
+    <string name="status_row_failed">%1$s · ошибка — %2$s</string>
+    <string name="status_no_reason">причина не указана</string>
+    <string name="status_duplicates_heading">Уже записано из другого источника</string>
+    <string name="status_duplicate_row">%1$s · %2$s из %3$s — уже есть из %4$s, поэтому не рисуется дважды</string>
+    <string name="source_upload">загруженного файла</string>
+    <string name="source_takeout">импорта Google Takeout</string>
+    <string name="source_recorded">GPS-записи</string>
+</resources>

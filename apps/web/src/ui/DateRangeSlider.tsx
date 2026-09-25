@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { addDays, dayDiff } from './dateMath';
 import { formatDayLabel } from './format';
 import type { DateRange } from './RangePicker';
+import { t, tn } from '../i18n';
 
 export interface DateRangeSliderProps {
   /** The whole scale, as YYYY-MM-DD: the first activity day and today. */
@@ -149,8 +150,8 @@ export function DateRangeSlider({ first, last, value, onChange }: DateRangeSlide
       type="button"
       className="range-picker__page date-range-slider__page"
       data-testid={dir < 0 ? 'date-range-slider-earlier' : 'date-range-slider-later'}
-      aria-label={dir < 0 ? `${STEP_DAYS} days earlier` : `${STEP_DAYS} days later`}
-      title={dir < 0 ? 'Earlier' : 'Later'}
+      aria-label={dir < 0 ? tn('slider.days_earlier', STEP_DAYS) : tn('slider.days_later', STEP_DAYS)}
+      title={dir < 0 ? t('histogram.earlier') : t('histogram.later')}
       disabled={dir < 0 ? windowStart === 0 : windowEnd === limit}
       onPointerDown={(event) => startRepeat(dir, event)}
       onPointerUp={stopRepeat}
@@ -224,7 +225,7 @@ export function DateRangeSlider({ first, last, value, onChange }: DateRangeSlide
         className="date-range-slider__knob"
         role="slider"
         tabIndex={0}
-        aria-label={which === 'start' ? 'Start date' : 'End date'}
+        aria-label={which === 'start' ? t('slider.start') : t('slider.end')}
         aria-valuemin={windowStart}
         aria-valuemax={windowEnd}
         aria-valuenow={current[which]}

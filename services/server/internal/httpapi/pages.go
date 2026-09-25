@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 )
 
@@ -13,36 +14,27 @@ import (
 // signed-out visitor gets the page with a "Sign in" link where the account menu would be.
 // The auth pages themselves — sign in, sign up, reset, verify — are in auth_pages.go.
 
-// pageUser is the optional-auth lookup every page does: the signed-in account as the header
-// shows it, or nil for no session (or an expired one). Unlike requireAuth it never rejects,
-// and an unverified account still counts as signed in — the header only needs a name.
-// (auth_pages.go's pageAccount is the same lookup with the session's flags kept.)
-func (s *Server) pageUser(r *http.Request) *web.User {
-	if acct := s.pageAccount(r); acct != nil {
-		return acct.user
-	}
-	return nil
-}
-
 // staticPage serves a page whose content is the same for everyone — only the header differs.
 // Signed out, that makes the whole page the same for everyone, so it's served from
 // RenderPublic's cache, cacheable; signed in, it's rendered fresh with the account's header.
 // canonicalPath is for a page that shares its content with another URL (About with `/`).
-func (s *Server) staticPage(page, title, description, canonicalPath string) http.HandlerFunc {
+// titleKey and descriptionKey are catalog keys.
+func (s *Server) staticPage(page, titleKey, descriptionKey, canonicalPath string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		data := web.PageData{Title: title, Description: description, Path: r.URL.Path, CanonicalPath: canonicalPath}
-		if data.User = s.pageUser(r); data.User == nil {
+		acct := s.pageAccount(r)
+		lang := pageLang(acct, r)
+		l := i18n.Get(lang)
+		data := web.PageData{Title: l.T(titleKey), Description: l.T(descriptionKey), Path: r.URL.Path, CanonicalPath: canonicalPath, Lang: lang}
+		if acct != nil {
+			data.User = acct.user
+		}
+		if data.User == nil {
 			s.pages.RenderPublic(w, page, data)
 			return
 		}
 		s.pages.Render(w, http.StatusOK, page, data)
 	}
 }
-
-// homeTitle and homeDescription are the site's own — the signed-out home page's, and About's,
-// which is the same page (appShell).
-const homeTitle = "HoldMyTrack — Every journey, mapped."
-const homeDescription = "HoldMyTrack is a free, community-funded place to see every outdoor activity you have ever recorded on one map — Fog of War, heatmaps and routes from your watch, phone or old exports. No subscription, no ads, no data sales."
 
 // handleLogoutPage serves `POST /logout` — the header's Sign out form. The same revocation as
 // `POST /v1/auth/logout` (endSession), then a redirect to the map rather than a 204.
@@ -86,17 +78,19 @@ func (s *Server) isSameOrigin(r *http.Request) bool {
 // /verify-pending, one that has never saved Settings to /settings (pageAccount.home). The
 // React app's own copies of the first two checks (App.tsx) stay as a fallback for a session
 // that ends while the page is open.
-func (s *Server) appShell(title string) http.HandlerFunc {
+func (s *Server) appShell(titleKey string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if dest := legacyLanding(r); dest != "" {
 			http.Redirect(w, r, dest, http.StatusSeeOther)
 			return
 		}
 		acct := s.pageAccount(r)
+		lang := pageLang(acct, r)
+		l := i18n.Get(lang)
 		// Signed out, `/` is the site's front page — About's content, not a redirect to a
 		// sign-in form, since `/` is the URL people type, share and search engines rank.
 		if acct == nil {
-			s.pages.RenderPublic(w, "about", web.PageData{Title: homeTitle, Description: homeDescription, Path: "/"})
+			s.pages.RenderPublic(w, "about", web.PageData{Title: l.T("meta.home_title"), Description: l.T("meta.home_description"), Path: "/", Lang: lang})
 			return
 		}
 		if home := acct.home(); home != "/" {
@@ -104,7 +98,7 @@ func (s *Server) appShell(title string) http.HandlerFunc {
 			return
 		}
 		s.pages.RenderApp(w, web.AppPage{
-			PageData: web.PageData{Title: title, Path: r.URL.Path, NoIndex: true, User: acct.user},
+			PageData: web.PageData{Title: l.T(titleKey), Path: r.URL.Path, NoIndex: true, User: acct.user, Lang: lang},
 			// Only a dev server honours this, and only for a request Vite's dev proxy marked
 			// (apps/web/vite.config.ts); `vite preview` and production get the built bundle.
 			ViteDev: s.pages.Dev() && r.Header.Get(viteDevHeader) == "dev",
@@ -143,5 +137,11 @@ func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	s.pages.Render(w, http.StatusNotFound, "notfound", web.PageData{Title: "Page not found — HoldMyTrack", Path: r.URL.Path, NoIndex: true, User: s.pageUser(r)})
+	acct := s.pageAccount(r)
+	lang := pageLang(acct, r)
+	data := web.PageData{Title: i18n.Get(lang).T("meta.notfound_title"), Path: r.URL.Path, NoIndex: true, Lang: lang}
+	if acct != nil {
+		data.User = acct.user
+	}
+	s.pages.Render(w, http.StatusNotFound, "notfound", data)
 }

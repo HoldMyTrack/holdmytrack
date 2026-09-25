@@ -3,10 +3,8 @@ package httpapi
 import (
 	"errors"
 	"net/http"
-	"strings"
-	"unicode"
-	"unicode/utf8"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 )
 
@@ -17,12 +15,15 @@ import (
 // failed form is rendered again with the message and the email kept, at the failure's own
 // status. Every form POST is behind sameOrigin.
 
-// authForm is what the auth page templates read from PageData.Page.
+// authForm is what the auth page templates read from PageData.Page. The handlers set
+// ErrorKey/NoticeKey (catalog keys), renderAuth fills Error/Notice in the page's language.
 type authForm struct {
-	Error  string
-	Notice string
-	Email  string
-	Token  string
+	Error     string
+	Notice    string
+	ErrorKey  string
+	NoticeKey string
+	Email     string
+	Token     string
 	// Google shows "Continue with Google" — only when the server can complete that flow.
 	Google bool
 	// Upgrading is a demo session creating a real account (the account menu's "Create your
@@ -32,8 +33,10 @@ type authForm struct {
 	Sent bool
 }
 
-// pageAccount is pageUser plus what the auth pages decide on: who is signed in, whether it's
-// the demo, whether the email is verified. nil for no live session.
+// pageAccount is the optional-auth lookup every page does: who is signed in (the header's
+// account), whether it's the demo, whether the email is verified, its language. nil for no
+// live session (or an expired one). Unlike requireAuth it never rejects, and an unverified
+// account still counts as signed in — the header only needs a name.
 type pageAccount struct {
 	info    authInfo
 	profile authResponse
@@ -47,10 +50,10 @@ func (s *Server) pageAccount(r *http.Request) *pageAccount {
 	}
 	var info authInfo
 	err := s.pool.QueryRow(r.Context(), `
-		SELECT u.id, u.demo_expires_at IS NOT NULL, u.email_verified, u.timezone, u.is_admin
+		SELECT u.id, u.demo_expires_at IS NOT NULL, u.email_verified, u.timezone, COALESCE(u.locale, ''), u.is_admin
 		FROM sessions se JOIN users u ON u.id = se.user_id
 		WHERE se.id = $1 AND se.expires_at > NOW()
-	`, sessionID).Scan(&info.userID, &info.isDemo, &info.emailVerified, &info.timezone, &info.isAdmin)
+	`, sessionID).Scan(&info.userID, &info.isDemo, &info.emailVerified, &info.timezone, &info.locale, &info.isAdmin)
 	if err != nil {
 		return nil
 	}
@@ -60,6 +63,15 @@ func (s *Server) pageAccount(r *http.Request) *pageAccount {
 		return nil
 	}
 	return &pageAccount{info: info, profile: resp, user: &web.User{Email: resp.Email, DisplayName: resp.DisplayName, AvatarURL: resp.AvatarURL, IsDemo: resp.IsDemo, IsAdmin: info.isAdmin && !info.isDemo}}
+}
+
+// pageLang is the language a page renders in for acct (nil when signed out): the account's own
+// setting, else the browser's (i18n.Resolve).
+func pageLang(acct *pageAccount, r *http.Request) string {
+	if acct == nil {
+		return i18n.Resolve("", r)
+	}
+	return i18n.Resolve(acct.info.locale, r)
 }
 
 // home is where a signed-in account belongs: the map; or, for a real account whose email
@@ -79,45 +91,46 @@ func (a *pageAccount) home() string {
 	return "/"
 }
 
-// siteDescription is the sign-in page's description, for a search result or a shared link
-// that lands on it. (The site's own front page is `/`, About's content — homeDescription.)
-const siteDescription = "HoldMyTrack is a free, community-funded place to see every outdoor activity you have ever recorded on one map — Fog of War, heatmaps and routes from your watch, phone or old exports."
+// renderAuth renders one of the auth pages; titleKey is its title's catalog key. The sign-in
+// page carries the site's description, for a search result or a shared link that lands on it.
+// (The site's own front page is `/`, About's content.)
+func (s *Server) renderAuth(w http.ResponseWriter, r *http.Request, status int, page, titleKey string, noIndex bool, form authForm) {
+	s.renderAuthFailure(w, r, status, page, titleKey, noIndex, form, nil)
+}
 
-func (s *Server) renderAuth(w http.ResponseWriter, r *http.Request, status int, page, title string, noIndex bool, form authForm) {
+func (s *Server) renderAuthFailure(w http.ResponseWriter, r *http.Request, status int, page, titleKey string, noIndex bool, form authForm, ae *accountError) {
 	var user *web.User
-	if acct := s.pageAccount(r); acct != nil {
+	acct := s.pageAccount(r)
+	if acct != nil {
 		user = acct.user
 	}
-	data := web.PageData{Title: title + " — HoldMyTrack", Path: r.URL.Path, NoIndex: noIndex, User: user, Page: form}
+	lang := pageLang(acct, r)
+	l := i18n.Get(lang)
+	switch {
+	case ae != nil:
+		form.Error = ae.message(lang)
+	case form.ErrorKey != "":
+		form.Error = l.T(form.ErrorKey)
+	}
+	if form.NoticeKey != "" {
+		form.Notice = l.T(form.NoticeKey)
+	}
+	data := web.PageData{Title: l.T("meta.title", "page", l.T(titleKey)), Path: r.URL.Path, NoIndex: noIndex, User: user, Page: form, Lang: lang}
 	if page == "signin" {
-		data.Description = siteDescription
+		data.Description = l.T("meta.site_description")
 	}
 	s.pages.Render(w, status, page, data)
 }
 
 // renderAuthError re-renders a form after one of the account cores failed: an accountError's
 // own status and message, or a logged 500 with a generic one.
-func (s *Server) renderAuthError(w http.ResponseWriter, r *http.Request, op, page, title string, noIndex bool, form authForm, err error) {
-	status := http.StatusInternalServerError
-	form.Error = "Something went wrong on our side. Please try again."
+func (s *Server) renderAuthError(w http.ResponseWriter, r *http.Request, op, page, titleKey string, noIndex bool, form authForm, err error) {
 	var ae *accountError
-	if errors.As(err, &ae) {
-		status, form.Error = ae.status, sentence(ae.msg)
-	} else {
+	if !errors.As(err, &ae) {
 		s.log.Error(op+" failed", "err", err)
+		ae = &accountError{status: http.StatusInternalServerError, key: "error.internal"}
 	}
-	s.renderAuth(w, r, status, page, title, noIndex, form)
-}
-
-// sentence turns an account core's message ("invalid email or password", written for the
-// JSON API's plain-text bodies) into one fit for a page: a capital letter and a full stop.
-func sentence(msg string) string {
-	first, size := utf8.DecodeRuneInString(msg)
-	msg = string(unicode.ToUpper(first)) + msg[size:]
-	if !strings.HasSuffix(msg, ".") {
-		msg += "."
-	}
-	return msg
+	s.renderAuthFailure(w, r, ae.status, page, titleKey, noIndex, form, ae)
 }
 
 // signIn starts a session for userID and sends the browser on to where the account belongs.
@@ -144,9 +157,9 @@ func (s *Server) handleSignInPage(w http.ResponseWriter, r *http.Request) {
 	form := authForm{Google: s.google.enabled()}
 	// google_auth.go's callback lands here on any failure, with no detail on purpose.
 	if r.URL.Query().Get("error") == "google" {
-		form.Error = "Couldn't sign in with Google. Please try again."
+		form.ErrorKey = "signin.google_failed"
 	}
-	s.renderAuth(w, r, http.StatusOK, "signin", "Sign in", false, form)
+	s.renderAuth(w, r, http.StatusOK, "signin", "signin.title", false, form)
 }
 
 // POST /signin.
@@ -154,7 +167,7 @@ func (s *Server) handleSignInForm(w http.ResponseWriter, r *http.Request) {
 	email := r.PostFormValue("email")
 	userID, err := s.checkPassword(r.Context(), email, r.PostFormValue("password"))
 	if err != nil {
-		s.renderAuthError(w, r, "sign in", "signin", "Sign in", false, authForm{Email: email, Google: s.google.enabled()}, err)
+		s.renderAuthError(w, r, "sign in", "signin", "signin.title", false, authForm{Email: email, Google: s.google.enabled()}, err)
 		return
 	}
 	s.signIn(w, r, userID)
@@ -168,17 +181,17 @@ func (s *Server) handleSignUpPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// noindex: /signin is the one sign-in-or-up page search results should show (it links here).
-	s.renderAuth(w, r, http.StatusOK, "signup", "Create your account", true, authForm{Google: s.google.enabled(), Upgrading: acct != nil})
+	s.renderAuth(w, r, http.StatusOK, "signup", "signup.title", true, authForm{Google: s.google.enabled(), Upgrading: acct != nil})
 }
 
 // POST /signup. timezone comes from a hidden field the page's one-line script fills from the
 // browser; without it the account starts on UTC, as the JSON endpoint's would.
 func (s *Server) handleSignUpForm(w http.ResponseWriter, r *http.Request) {
 	email := r.PostFormValue("email")
-	userID, err := s.createAccount(r.Context(), email, r.PostFormValue("password"), r.PostFormValue("timezone"))
+	userID, err := s.createAccount(r.Context(), email, r.PostFormValue("password"), r.PostFormValue("timezone"), pageLang(s.pageAccount(r), r))
 	if err != nil {
 		acct := s.pageAccount(r)
-		s.renderAuthError(w, r, "sign up", "signup", "Create your account", true, authForm{Email: email, Google: s.google.enabled(), Upgrading: acct != nil && acct.info.isDemo}, err)
+		s.renderAuthError(w, r, "sign up", "signup", "signup.title", true, authForm{Email: email, Google: s.google.enabled(), Upgrading: acct != nil && acct.info.isDemo}, err)
 		return
 	}
 	s.signIn(w, r, userID)
@@ -187,7 +200,7 @@ func (s *Server) handleSignUpForm(w http.ResponseWriter, r *http.Request) {
 // POST /demo — the sign-in page's "Try it now — no signup".
 func (s *Server) handleDemoForm(w http.ResponseWriter, r *http.Request) {
 	if err := allowDemo(r); err != nil {
-		s.renderAuthError(w, r, "demo start", "signin", "Sign in", false, authForm{Google: s.google.enabled()}, err)
+		s.renderAuthError(w, r, "demo start", "signin", "signin.title", false, authForm{Google: s.google.enabled()}, err)
 		return
 	}
 	if _, err := s.startSession(w, r.Context(), DemoCustomerUserID, demoSessionTTL); err != nil {
@@ -200,17 +213,17 @@ func (s *Server) handleDemoForm(w http.ResponseWriter, r *http.Request) {
 
 // GET /forgot.
 func (s *Server) handleForgotPage(w http.ResponseWriter, r *http.Request) {
-	s.renderAuth(w, r, http.StatusOK, "forgot", "Reset your password", true, authForm{})
+	s.renderAuth(w, r, http.StatusOK, "forgot", "forgot.title", true, authForm{})
 }
 
 // POST /forgot. Answers "check your email" whether or not the address has an account.
 func (s *Server) handleForgotForm(w http.ResponseWriter, r *http.Request) {
 	email := r.PostFormValue("email")
 	if err := s.requestPasswordReset(r, email); err != nil {
-		s.renderAuthError(w, r, "forgot password", "forgot", "Reset your password", true, authForm{Email: email}, err)
+		s.renderAuthError(w, r, "forgot password", "forgot", "forgot.title", true, authForm{Email: email}, err)
 		return
 	}
-	s.renderAuth(w, r, http.StatusOK, "forgot", "Reset your password", true, authForm{Sent: true})
+	s.renderAuth(w, r, http.StatusOK, "forgot", "forgot.title", true, authForm{Sent: true})
 }
 
 // GET /reset?token= — the link in the password-reset email. The token is only checked on
@@ -218,9 +231,9 @@ func (s *Server) handleForgotForm(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleResetPage(w http.ResponseWriter, r *http.Request) {
 	form := authForm{Token: r.URL.Query().Get("token")}
 	if form.Token == "" {
-		form.Error = "This reset link is invalid or has expired."
+		form.ErrorKey = "error.reset_link_invalid"
 	}
-	s.renderAuth(w, r, http.StatusOK, "reset", "Set a new password", true, form)
+	s.renderAuth(w, r, http.StatusOK, "reset", "reset.title", true, form)
 }
 
 // POST /reset.
@@ -228,7 +241,7 @@ func (s *Server) handleResetForm(w http.ResponseWriter, r *http.Request) {
 	token := r.PostFormValue("token")
 	userID, err := s.resetPassword(r.Context(), token, r.PostFormValue("password"))
 	if err != nil {
-		s.renderAuthError(w, r, "reset password", "reset", "Set a new password", true, authForm{Token: token}, err)
+		s.renderAuthError(w, r, "reset password", "reset", "reset.title", true, authForm{Token: token}, err)
 		return
 	}
 	s.signIn(w, r, userID)
@@ -240,7 +253,7 @@ func (s *Server) handleResetForm(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleVerifyPage(w http.ResponseWriter, r *http.Request) {
 	userID, err := s.verifyEmail(r.Context(), r.URL.Query().Get("token"))
 	if err != nil {
-		s.renderAuthError(w, r, "verify email", "verify", "Verify your email", true, authForm{}, err)
+		s.renderAuthError(w, r, "verify email", "verify", "verify.title", true, authForm{}, err)
 		return
 	}
 	s.signIn(w, r, userID)
@@ -261,11 +274,11 @@ func (s *Server) handleVerifyPendingPage(w http.ResponseWriter, r *http.Request)
 	form := authForm{Email: acct.user.Email}
 	switch {
 	case r.URL.Query().Has("sent"):
-		form.Notice = "Verification email sent."
+		form.NoticeKey = "verify_pending.sent"
 	case r.URL.Query().Has("changed"):
-		form.Notice = "Verification email sent to the new address."
+		form.NoticeKey = "verify_pending.changed"
 	}
-	s.renderAuth(w, r, http.StatusOK, "verify-pending", "Verify your email", true, form)
+	s.renderAuth(w, r, http.StatusOK, "verify-pending", "verify.title", true, form)
 }
 
 // POST /verify-pending/resend.
@@ -275,8 +288,8 @@ func (s *Server) handleVerifyResendForm(w http.ResponseWriter, r *http.Request) 
 		http.Redirect(w, r, "/signin", http.StatusSeeOther)
 		return
 	}
-	if err := s.resendVerification(r.Context(), acct.info); err != nil {
-		s.renderAuthError(w, r, "resend verification", "verify-pending", "Verify your email", true, authForm{Email: acct.user.Email}, err)
+	if err := s.resendVerification(r.Context(), acct.info, pageLang(acct, r)); err != nil {
+		s.renderAuthError(w, r, "resend verification", "verify-pending", "verify.title", true, authForm{Email: acct.user.Email}, err)
 		return
 	}
 	http.Redirect(w, r, "/verify-pending?sent", http.StatusSeeOther)
@@ -289,8 +302,8 @@ func (s *Server) handleVerifyChangeEmailForm(w http.ResponseWriter, r *http.Requ
 		http.Redirect(w, r, "/signin", http.StatusSeeOther)
 		return
 	}
-	if err := s.changeEmail(r.Context(), acct.info, r.PostFormValue("email")); err != nil {
-		s.renderAuthError(w, r, "change email", "verify-pending", "Verify your email", true, authForm{Email: acct.user.Email}, err)
+	if err := s.changeEmail(r.Context(), acct.info, r.PostFormValue("email"), pageLang(acct, r)); err != nil {
+		s.renderAuthError(w, r, "change email", "verify-pending", "verify.title", true, authForm{Email: acct.user.Email}, err)
 		return
 	}
 	http.Redirect(w, r, "/verify-pending?changed", http.StatusSeeOther)

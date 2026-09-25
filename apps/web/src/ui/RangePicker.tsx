@@ -2,6 +2,7 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { HistogramBucket } from '../api';
 import { formatDistance } from './format';
 import { useUnitSystem, type UnitSystem } from './units';
+import { lang, t, tn } from '../i18n';
 
 /**
  * The bottom timeline's interactive range picker.
@@ -157,7 +158,7 @@ function monthTicks(
     if (left - lastLeft < MIN_TICK_GAP_PERCENT) return;
     const year = day.date.slice(0, 4);
     const month = new Date(`${day.date}T00:00:00Z`)
-      .toLocaleDateString(undefined, { month: 'short', timeZone: 'UTC' })
+      .toLocaleDateString(lang, { month: 'short', timeZone: 'UTC' })
       .toUpperCase();
     const align = left <= EDGE_ALIGN_THRESHOLD_PERCENT ? 'start' : left >= 100 - EDGE_ALIGN_THRESHOLD_PERCENT ? 'end' : 'center';
     ticks.push({ key: day.date, label: year === lastYear ? month : `${month} ${year}`, left, align });
@@ -168,8 +169,7 @@ function monthTicks(
 }
 
 function barTitle(day: HistogramBucket, system: UnitSystem): string {
-  const activities = `${day.count} ${day.count === 1 ? 'activity' : 'activities'}`;
-  return `${day.date}: ${activities}, ${formatDistance(day.distanceMeters, system)}`;
+  return t('histogram.bar', { date: day.date, activities: tn('activities.count', day.count), distance: formatDistance(day.distanceMeters, system) });
 }
 
 type DragMode = 'handle-start' | 'handle-end' | 'slide' | 'pan';
@@ -408,7 +408,7 @@ export function RangePicker({ days, onPan, selectedRange, onChangeSelection, onC
       ref={chartRef}
       data-testid="range-picker"
       role="group"
-      aria-label="Activity days — drag to pan, drag the highlighted band to change the selected range"
+      aria-label={t('histogram.chart_label')}
       onPointerDown={onChartPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}

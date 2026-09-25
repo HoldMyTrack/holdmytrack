@@ -46,7 +46,7 @@ func (s *Server) handleTakeoutUpload(w http.ResponseWriter, r *http.Request, zr 
 	archive, err := takeout.Open(zr)
 	if err != nil {
 		s.log.Error("takeout open failed", "err", err)
-		http.Error(w, "could not read this Takeout export — see server logs", http.StatusInternalServerError)
+		httpErrorT(w, r, http.StatusInternalServerError, "error.takeout_unreadable")
 		return
 	}
 

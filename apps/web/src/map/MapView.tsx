@@ -42,6 +42,7 @@ import { useActivityList } from '../ui/useActivityList';
 import { useActivityTotals } from '../ui/useActivityTotals';
 import { useDuplicates } from '../ui/useDuplicates';
 import { useImports } from '../ui/useImports';
+import { t } from '../i18n';
 
 /** How long a checkbox-selection spree pauses before the map auto-flies to fit it (replacing
  *  the old explicit "Fit map" button — see IMPLEMENTATION.md §4.7) — long enough that ticking
@@ -404,7 +405,9 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       URL.revokeObjectURL(url);
       setExportFlow({ stage: 'idle' });
     } catch (err) {
-      setExportError(err instanceof Error ? err.message : String(err));
+      // The cause is a developer's detail (a canvas or render timeout), not something to act on.
+      console.error('export failed', err);
+      setExportError(t('export.failed'));
       // Stays in 'framing', not 'idle' — a failed capture (e.g. a network timeout) shouldn't
       // discard the frame the user just positioned, forcing them to redo it from scratch.
       setExportFlow((flow) => (flow.stage === 'capturing' ? { stage: 'framing', preset: flow.preset, geometry: flow.geometry } : flow));
@@ -1059,14 +1062,14 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
             />
           )}
           {!editingTrack && (
-            <div className="map-mode-toggle" role="group" aria-label="Map mode" data-testid="map-mode-toggle">
+            <div className="map-mode-toggle" role="group" aria-label={t('map.mode')} data-testid="map-mode-toggle">
               <button
                 type="button"
                 className={mapMode === 'normal' ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
                 aria-pressed={mapMode === 'normal'}
                 onClick={() => changeMapMode('normal')}
               >
-                Normal
+                {t('map.mode_normal')}
               </button>
               {/* Normal on one side, the two coverage views on the other: two levels of choice. */}
               <span className="map-mode-toggle__divider" aria-hidden="true" />
@@ -1076,7 +1079,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
                 aria-pressed={mapMode === 'fog'}
                 onClick={() => changeMapMode('fog')}
               >
-                Fog
+                {t('map.mode_fog')}
               </button>
               <button
                 type="button"
@@ -1084,7 +1087,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
                 aria-pressed={mapMode === 'heatmap'}
                 onClick={() => changeMapMode('heatmap')}
               >
-                Heatmap
+                {t('map.mode_heatmap')}
               </button>
             </div>
           )}
@@ -1094,14 +1097,14 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
                   no heart-rate coverage just shows pace, with no single-option control for
                   it. */}
               {trackMetrics.heartrateAvailable && (
-                <div className="trends__bucket" role="group" aria-label="Colored by">
+                <div className="trends__bucket" role="group" aria-label={t('map.colored_by')}>
                   <button
                     type="button"
                     className="trends__bucket-btn"
                     aria-pressed={bandMetric === 'speed'}
                     onClick={() => setBandMetric('speed')}
                   >
-                    Pace
+                    {t('map.metric_pace')}
                   </button>
                   <button
                     type="button"
@@ -1109,7 +1112,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
                     aria-pressed={bandMetric === 'heartrate'}
                     onClick={() => setBandMetric('heartrate')}
                   >
-                    Heart rate
+                    {t('map.metric_hr')}
                   </button>
                 </div>
               )}
