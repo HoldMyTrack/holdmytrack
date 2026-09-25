@@ -16,7 +16,7 @@ docker compose up            # http://localhost:5173
 
 `db` (`postgis/postgis:16-3.4`), `rustfs` (RustFS, an S3-compatible server standing in for Cloudflare R2 locally; it replaced MinIO once MinIO stopped publishing free images), `migrate` (applies the schema, then exits), `api` (`cmd/holdmytrack serve`) and `worker` (`cmd/holdmytrack work`) all start by default with `docker compose up` — `api` and `worker` build from the *same* `services/server` image with different `command:` arguments, not two separate images, per `docs/ARCHITECTURE.md` §1.2's "one binary, two modes." `api`/`worker`/`migrate` depend on `db` being healthy; `api`/`worker` also depend on `migrate` completing successfully, so a fresh `docker compose up` can't race the schema. There's no healthcheck on `minio` specifically — `cmd/holdmytrack` retries its own Postgres and MinIO connections with backoff at startup instead of requiring one, since not every `minio` image build can be assumed to ship a specific health-check client binary.
 
-Env vars (`POSTGRES_*`, `S3_*`) are Compose interpolation, set in `/.env` (see `.env.example`) — never in `apps/web/.env`, and never seen by Vite. No custom `networks:` block: Compose's default network already resolves `db`/`minio` by service name.
+Env vars (`POSTGRES_*`, `S3_*`) are Compose interpolation, set in `/.env` (see `.env.example`) — never in `apps/web/.env`, and never seen by Vite. No custom `networks:` block: Compose's default network already resolves `db`/`rustfs` by service name.
 
 ### Seeding a fresh database
 
@@ -122,4 +122,4 @@ Run `npm run build` before `npm run verify:build`.
 - **Playwright renders on SwiftShader, not Metal.** The verification suites assert against a rasteriser no user will ever have — a genuine fidelity loss in exactly the tests written to catch rendering bugs.
 - **HMR gains a failure mode that doesn't exist on the host.** When it goes deaf the question is about VirtioFS, not the code.
 
-One open follow-up, cheap now and irritating later: `scripts/build-basemap.sh` pins a dated basemap build key that Protomaps' rolling seven-day retention window ages out silently. Teaching the script to resolve the newest key from `https://build-metadata.protomaps.dev/builds.json` when `BUILD` is unset (keeping the pinned value as an explicit override) would turn a future 404-with-no-obvious-cause into a normal fresh-clone experience.
+One open follow-up, cheap now and irritating later: `scripts/build-basemap.sh` pins a dated basemap build key that Protomaps' rolling seven-day retention window ages out silently. Teaching the script to resolve the newest key from `https://build-metadata.protomaps.dev/builds.json` when `BUILD` is unset (keeping the pinned value as an explicit override) would turn a future 404-with-no-obvious-cause into a normal fresh-clone experience — and into a self-healing cache miss in CI, whose map job cuts the extract with this same script whenever its cache is empty ("CI" above).

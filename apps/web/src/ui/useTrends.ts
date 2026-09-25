@@ -9,7 +9,7 @@ export interface TrendsState {
 }
 
 /**
- * Owns the Week/Month toggle and fetches VISION.md §5.3's trends for it — same shape
+ * Owns the Week/Month toggle and fetches docs/SPEC.md FR-9's trends for it — same shape
  * as useYearGraph.ts: refetch on bucket change, abort the in-flight request if the bucket
  * changes again before it resolves.
  */

@@ -6,7 +6,7 @@ Last updated: 2026-09-24.
 
 This is the master checklist from "what exists today" to "the full product `VISION.md` describes" — every remaining piece of work, broken into steps small enough to pick up and finish independently. It does not restate design detail already written down elsewhere:
 
-- **`VISION.md`** is the authority on *why* and *in what order* (§5's phases, the funding model, the ingest-path strategy) — note that this file's delivery order (Mobile, then a design-finalization pass, before Analysis+Cloud sources) currently diverges from `VISION.md` §5's stated sequence; not yet reconciled.
+- **`VISION.md`** is the authority on *why* and *in what order* (§5's phases, the funding model, the ingest-path strategy); its phase numbers match this file's.
 - **`SPEC.md`** is the authority on *what's actually shipped*, feature by feature, with preconditions/inputs/outputs/error cases (§1.2 states scope precisely).
 - **`IMPLEMENTATION.md`** is the authority on *how* each shipped piece works, and carries most of the unbuilt pieces' own design already worked out (schema, API shape, algorithm) — this document points at that design rather than re-deriving it.
 - **`AGENTS.md`** is repository orientation — which document to read for what, not a status narrative of its own; `SPEC.md`/`IMPLEMENTATION.md` are where "what's built, mapped to actual files" actually lives.
@@ -18,7 +18,7 @@ Checkboxes are the source of truth for progress; re-check them against the three
 
 ## Phase 1 — MVP
 
-**Shipped and deployable.** Every feature in `SPEC.md`'s FR-1 through FR-10 — auth and account management, the no-signup demo, activity upload/ingestion (file, `.zip`, Google Takeout), Normal/Fog of War/Heatmap map modes with colored zone segments and high-res export, the Activities panel and its filters, the date-range picker, the per-account activity graph, per-activity pace/heart-rate, distance trends, and the public About page — is built and documented there; not re-enumerated here.
+**Shipped and deployable.** Every feature in `SPEC.md`'s FR-1 through FR-11 — auth and account management, the no-signup demo, activity upload/ingestion (file, `.zip`, Google Takeout), Normal/Fog of War/Heatmap map modes with colored zone segments and high-res export, the Activities panel and its filters, track editing, Private locations, the date-range picker, the per-account activity graph, per-activity pace/heart-rate, distance trends, the public About page, and the Donate link — is built and documented there; not re-enumerated here.
 
 ### Production deployment — a sandbox is live at `holdmytrack.com`, not yet Production
 
@@ -99,7 +99,7 @@ Connecting the app to third-party services, and the explorer-tile scoring work t
 
 ### Explorer-tile gamification
 
-- [ ] `user_tiles` table exists, nothing reads it yet — scoring queries (total tiles, max square, max connected cluster, per-region coverage %, `IMPLEMENTATION.md` §4.4) and a UI surface for them (a natural fit on the Profile page, alongside the activity grid).
+- [ ] `user_tiles` table exists but nothing writes or reads it yet — populating it at ingest (`IMPLEMENTATION.md` §4.1 step 4), scoring queries (total tiles, max square, max connected cluster, per-region coverage %, `IMPLEMENTATION.md` §4.4) and a UI surface for them (a natural fit on the Profile page, alongside the activity grid).
 
 ---
 
@@ -129,7 +129,7 @@ Non-negotiable, GDPR Art. 9 special-category data (`VISION.md` §7).
 
 ## Phase 7 — Social (deliberately not committed)
 
-`VISION.md` §5.5/§5.6 is explicit that this should not be scheduled, let alone built, until the funding base can absorb the moderation and trust-and-safety staffing it requires — a fog map is a precise record of where someone lives, and a social graph on top of that is a threat-model change, not a feature. No steps are listed here on purpose; the first real step is revisiting §6's funding numbers, not writing code.
+`VISION.md` §5.7/§5.8 is explicit that this should not be scheduled, let alone built, until the funding base can absorb the moderation and trust-and-safety staffing it requires — a fog map is a precise record of where someone lives, and a social graph on top of that is a threat-model change, not a feature. No steps are listed here on purpose; the first real step is revisiting §6's funding numbers, not writing code.
 
 ---
 

@@ -4,7 +4,7 @@
 | :-- | :-- |
 | **Version** | 1.0 |
 | **Status** | Current — describes Phase 0/1 functionality as built |
-| **Last updated** | 2026-09-23 |
+| **Last updated** | 2026-09-24 |
 | **Related documents** | `VISION.md` (product scope, market rationale, phase roadmap — the authority on *what ships and why*); `ARCHITECTURE.md` (system-level shape, key decisions, the stack); `IMPLEMENTATION.md` (schema, each feature's own implementation — the authority on *how it's built*); `AGENTS.md` (repository orientation) |
 
 ## 1. Introduction
@@ -803,8 +803,7 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 The following are named in `VISION.md`'s roadmap but have no functional requirements in this document because they are not yet built:
 
 - Path 1 cloud-provider connectors (Garmin, Wahoo, COROS)
-- Path 2 on-device sync (Apple HealthKit, Android Health Connect)
-- Cross-source deduplication
+- Path 2 on-device sync's iOS half (Apple HealthKit — Android's Health Connect half is FR-3.6)
 - Explorer-tile gamification
 - The rest of "Export" — story cards, animated reveals (high-resolution map export itself is built, FR-4.10)
 - Dark-theme variant of the Fog of War veil (the theme parameter is accepted but currently has no visual effect on the veil itself)
