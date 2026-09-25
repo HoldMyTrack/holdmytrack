@@ -9,7 +9,7 @@ import { PlaceholderNotice, type NoticeContent } from './PlaceholderNotice';
  * on Open Collective. Until then it stays a placeholder that explains donations aren't open.
  *
  * It is in the nav bar either way because donations are not a feature HoldMyTrack adds on
- * later, they are how it is funded at all (docs/VISION.md §5 — recurring community
+ * later, they are how it is funded at all (docs/VISION.md §6 — recurring community
  * donations with public accounting, no subscription tier, no paywalled feature).
  */
 const DONATE_NOTICE: NoticeContent = {

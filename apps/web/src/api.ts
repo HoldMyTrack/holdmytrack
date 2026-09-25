@@ -969,7 +969,7 @@ interface ActivityTrendsBody {
 }
 
 /**
- * `GET /v1/activities/trends?bucket=week|month` — VISION.md §5.3's "trends": count/
+ * `GET /v1/activities/trends?bucket=week|month` — docs/SPEC.md FR-9's "trends": count/
  * distance/moving-time/elevation-gain per calendar bucket, over the trailing 12 months by
  * default (same default window as the year-graph's histogram calls).
  */

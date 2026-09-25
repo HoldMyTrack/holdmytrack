@@ -23,7 +23,7 @@ import logoUrl from '../assets/logo.png';
  * The order is deliberate: Import sits nearest Export because both are the two things this
  * bar actually lets you do with your data (in, then out), Export sits nearest the account
  * menu as the newer of the two, and Donate leads into both rather than trailing off the end,
- * since donations are how HoldMyTrack is funded rather than a footnote (docs/VISION.md §5).
+ * since donations are how HoldMyTrack is funded rather than a footnote (docs/VISION.md §6).
  */
 export interface HeaderProps {
   /** Rendered between Donate and the account menu. */

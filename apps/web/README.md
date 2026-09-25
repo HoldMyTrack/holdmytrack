@@ -31,6 +31,9 @@ npm run dev
 | `npm run verify:build` | The same question asked of the production bundle, which is not the same question |
 | `npm run basemap` | Re-cut the `.pmtiles` extract |
 | `npm run typecheck` | `tsc --noEmit` |
+| `npm run test:unit` | Plain `node --test` unit tests (the track editor's edit ops) |
+| `npm run build:style` | Regenerate the style documents the API serves (`services/server/internal/mapstyle/styles`) from `src/map/style.ts` |
+| `npm run verify:style` | Fail if those committed style documents have drifted from `style.ts` |
 
 Run `npm run build` before `npm run verify:build`.
 
@@ -47,14 +50,16 @@ src/map/
   layers.ts                # layer-ordering helpers (fog/track insertion points)
   useMapInstance.ts        # map lifecycle, StrictMode-safe
   viewState.ts             # <-> URL hash
+  fog.ts heatmap.ts tracks.ts mapMode.ts  # the overlays and the mode switch
+  exportMap.ts             # high-resolution export, rendered client-side
   MapView.tsx
-src/ui/                    # UploadPanel and the rest of the UI
+src/ui/                    # ImportPanel, ActivitiesPanel and the rest of the UI
 ```
 
 ## Three things that are easy to break
 
 **`style.ts` must stay pure and DOM-free.** No React, no `window`. It is the seam the print pipeline needs to render an identical map headlessly at print DPI. This is why `buildStyle` takes an `origin` argument instead of reading `window.location` — MapLibre 6 rejects relative sprite URLs, and the fix had to not cost the purity.
 
-**Fog and track layers go *beneath* the first symbol layer.** Fog painted over labels buries every place name and reads as a rendering bug. `layers.ts` computes that insertion point; nothing uses it yet, and that is deliberate.
+**Fog and track layers go *beneath* the first symbol layer.** Fog painted over labels buries every place name and reads as a rendering bug. `layers.ts` computes that insertion point, and every overlay inserts there.
 
 **Dev passing tells you nothing about the bundle.** MapLibre derives its worker URL from its own `import.meta.url`, which bundling invalidates — the result is a blank grey map with no console error and no failed request. `src/map/worker.ts` pins the URL explicitly and `npm run verify:build` guards it.

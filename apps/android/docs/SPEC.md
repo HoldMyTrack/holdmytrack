@@ -230,7 +230,7 @@ A third way an activity can originate on this app, alongside FR-3's Health Conne
 
 **Description**: Recordings are keyed to whichever account is signed in when they're made (`Session.email`, empty string for a demo account) — the same per-account key `SyncCursor` (FR-3.3) already established.
 
-**Behavior**: Switching accounts on one device never shows one account's recordings under another's. Confirmed live, incidentally: a recording made while signed out did not appear in Recorded Activities after signing into a real account, and so could not be queued or synced from that account either — consistent with `docs/IMPLEMENTATION.md` §7.2's own account-scoping note, not a defect.
+**Behavior**: Switching accounts on one device never shows one account's recordings under another's. Confirmed live, incidentally: a recording made while signed out did not appear in Recorded Activities after signing into a real account, and so could not be queued or synced from that account either — consistent with `apps/android/docs/IMPLEMENTATION.md` §7.2's own account-scoping note, not a defect.
 
 ## 8. Non-Functional Requirements (summary)
 

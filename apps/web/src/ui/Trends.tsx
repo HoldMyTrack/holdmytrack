@@ -13,7 +13,7 @@ function barHeightPercent(period: TrendPeriod, peak: number): number {
 }
 
 /**
- * VISION.md §5.3's "trends" — distance per week or month over the trailing year, the
+ * docs/SPEC.md FR-9's "trends" — distance per week or month over the trailing year, the
  * first Performance Analysis feature built. Plain divs, same bar-chart approach
  * RangePicker.tsx/ActivityHistogram.tsx already use — no charting library in this project to
  * reach for instead. Mounted on ProfilePage below the activity grid: both are "look back at

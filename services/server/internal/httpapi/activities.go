@@ -88,7 +88,7 @@ ORDER BY started_at DESC, id DESC`
 
 // activityRow is one row of the list. The field set is exactly what the Activities panel
 // renders, no more. Duration is `duration_seconds`, not `moving_seconds`. ingest.Process
-// populates moving_seconds now (VISION.md §5.3's ingest-gap fixes), but only for activities
+// populates moving_seconds now (added for Trends, docs/SPEC.md FR-9), but only for activities
 // ingested since — anything older still has it NULL, and serving a field that's populated
 // for some rows and not others in the one list every activity shares would read as broken
 // data rather than as what it is. duration_seconds has no such gap.
@@ -866,7 +866,7 @@ func (s *Server) handleActivityGraphStats(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, activityGraphStatsResponse{Year: year, YearStats: yearStats, AllTime: allTime})
 }
 
-// activityTrendsQuery is VISION.md §5.3's "trends": count/distance/moving-time/
+// activityTrendsQuery is docs/SPEC.md FR-9's "trends": count/distance/moving-time/
 // elevation-gain per calendar bucket (week or month), over an optional [from, to) window.
 // $1 (the bucket) is a bound parameter, not string-interpolated — date_trunc accepts its
 // first argument as a plain value, so this is not an injection vector — but the handler

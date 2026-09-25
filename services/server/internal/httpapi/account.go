@@ -185,7 +185,7 @@ func (s *Server) handleDeleteAvatar(w http.ResponseWriter, r *http.Request) {
 // handleGetAvatar serves `GET /v1/account/avatar` — always the signed-in caller's own
 // avatar, never anyone else's: there is no userID in the path at all, since this app has no
 // social/public-profile surface for one account's avatar to be visible from another's
-// session (VISION.md §5.5 — social is explicitly unscheduled).
+// session (VISION.md §5.7 — social is explicitly unscheduled).
 func (s *Server) handleGetAvatar(w http.ResponseWriter, r *http.Request) {
 	userID := userIDFromContext(r.Context())
 	ctx := r.Context()

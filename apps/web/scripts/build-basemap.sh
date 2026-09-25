@@ -23,7 +23,7 @@ BBOX=-84.85,38.35,-80.50,42.35          # minLon,minLat,maxLon,maxLat
 #
 # TODO: resolve the newest key automatically from that URL when BUILD is unset, keeping
 # this pin as an explicit override — otherwise the next re-cut past the retention window
-# fails with a 404 and no obvious cause (root README, "Known costs").
+# fails with a 404 and no obvious cause (docs/DEVELOPMENT.md, "Known costs").
 BUILD=https://build.protomaps.com/20260922.pmtiles
 
 # z14, not z15. The planet build is z0-15 and the top level carries roughly three

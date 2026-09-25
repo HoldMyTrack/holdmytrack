@@ -17,7 +17,7 @@ HoldMyTrack's wedge is:
 Worth stating early, because the shorthand for this product is "a free Strava" and that overstates it in three specific ways:
 
 * **HoldMyTrack is not a fitness tracker.** The mobile app can record a plain GPS track as a convenience — a road trip, a dog walk, a forest walk, anything you'd otherwise need a separate tool running for (§4.1) — but it captures GPS only: no heart rate, cadence, power or other sensor data, no training metrics, no ambition to match a dedicated watch's battery life or accuracy. If you already track workouts on a watch, that stays the better tool for the job; HoldMyTrack keeps ingesting its output exactly as it always has.
-* **HoldMyTrack has no social network yet.** No feed, no follows, no kudos, no segments, no leaderboards. Athlete social networking is a stated direction (§5.5) and is deliberately out of scope until the core works — see §5.6 for why that ordering is not just caution.
+* **HoldMyTrack has no social network yet.** No feed, no follows, no kudos, no segments, no leaderboards. Athlete social networking is a stated direction (§5.7) and is deliberately out of scope until the core works — see §5.8 for why that ordering is not just caution.
 * **HoldMyTrack is not a health or fitness advisor.** No HR zones, no training load, no recovery or readiness scores, no sleep tracking. Pace and heart rate are shown per activity as context for the route, not analysed as a coaching product — an outdoor GPS tracker is what this is, not a health platform wearing a map as a skin.
 
 What is left is an aggregator and a map for exploring where you've been — not an analytics platform and not a coach. That is a smaller product than Strava and a more defensible one: it competes on the axis Strava is weakest on rather than the axis where Strava has a decade of network effects.
@@ -117,7 +117,7 @@ So Android on-device sync is foreground-only, and Samsung Galaxy Watch is unsupp
 
 `.GPX`, `.FIT`, `.TCX`, plus bulk-export archives from Strava and others. Unglamorous, and the most robust thing in this document: no API terms, no licence, no permission model, no vendor who can revoke it, and it works for every service that offers an export — which is all of them, because GDPR requires it.
 
-**It also brings back the best marketing asset the product ever had.** A visitor can drag a file onto the website and see their fog map in ten seconds, with no signup. See §8.2.
+**It is also what the no-signup demo is built from** — the demo account's history went in through this same pipeline. See §8.2.
 
 #### The validation gate
 
@@ -134,7 +134,7 @@ Before engineering begins:
 
 Distinct from the three paths above, which each bring in a user's *existing* history from somewhere else: the mobile app can also originate an activity itself, for someone who has no watch running and does not want to install a separate tracker for a one-off walk or drive. Start, optionally pause, and stop a GPS-only recording directly in HoldMyTrack; on stop, the recorded track submits through the same ingest pipeline every other source already uses (`ARCHITECTURE.md` §1.1, `IMPLEMENTATION.md` §4.1) — no new server-side path, no separate privacy story, no dedupe case beyond what already exists for two overlapping recordings of the same activity.
 
-This isn't a resilience decision the way Paths 1–3 are — §4.1's provider-independence argument doesn't apply, since it depends on no external provider at all. It's a convenience feature: one fewer tool to install for someone who just wants a casual walk or drive on the map, with no export and no import in the way. **Scope stays deliberately narrow — GPS only.** No heart rate, cadence, power, or any other sensor; no training-load or coaching output; not a replacement for a dedicated fitness tracker (§1.1). Phased in on Android first, then iOS (§5.4); see `apps/android/docs/ROADMAP.md` for the plan.
+This isn't a resilience decision the way Paths 1–3 are — §4.1's provider-independence argument doesn't apply, since it depends on no external provider at all. It's a convenience feature: one fewer tool to install for someone who just wants a casual walk or drive on the map, with no export and no import in the way. **Scope stays deliberately narrow — GPS only.** No heart rate, cadence, power, or any other sensor; no training-load or coaching output; not a replacement for a dedicated fitness tracker (§1.1). Phased in on Android first, then iOS (§5.3); see `apps/android/docs/ROADMAP.md` for the plan.
 
 ### 4.2 Core Features
 
@@ -153,7 +153,7 @@ This isn't a resilience decision the way Paths 1–3 are — §4.1's provider-in
 
 **Pace and heart rate are shown per activity, not analysed as a training product.** They're a supporting detail on the route, not a pillar — the pillars are the map and the exploration stats. The schema carries per-point streams (`IMPLEMENTATION.md` §3.3) for exactly this, and no more.
 
-**The activity graph is deliberately private, not a profile page.** It's the same genre of thing as Fog of War and the explorer-tile game above — motivation through your own history, no comparison required — not a step toward the social features §1.1 and §5.5 explicitly hold off on. It has no follows, no feed, and nothing another user can view; it's a personal dashboard, available once accounts exist (§5.2), not a public artifact. If a shareable version is ever worth building, that's a §5.5 social-phase decision to make deliberately, not a side effect of how this one ships.
+**The activity graph is deliberately private, not a profile page.** It's the same genre of thing as Fog of War and the explorer-tile game above — motivation through your own history, no comparison required — not a step toward the social features §1.1 and §5.7 explicitly hold off on. It has no follows, no feed, and nothing another user can view; it's a personal dashboard, available once accounts exist (§5.2), not a public artifact. If a shareable version is ever worth building, that's a §5.7 social-phase decision to make deliberately, not a side effect of how this one ships.
 
 ### 4.3 Cost Model — running a free service
 
@@ -194,7 +194,7 @@ That is a genuinely small number, and it is the whole argument for this model wo
 
 ## 5. Product Roadmap
 
-Sequenced so the unconditional ingest path ships first and the ones that depend on other companies' permission come later.
+Sequenced so the unconditional ingest path ships first and the ones that depend on other companies' permission come later. The phase numbers are the ones `docs/ROADMAP.md` uses, which carries each phase's step-by-step detail.
 
 ### 5.1 Phase 0: Validation (Weeks 1–2) — *no application code*
 * Start the §4.1 gate: Garmin licence position in writing; Wahoo and COROS applications filed (lead time starts now); HealthKit and Samsung route checks.
@@ -205,25 +205,32 @@ Sequenced so the unconditional ingest path ships first and the ones that depend 
 * **Path 3 first**: `.GPX`/`.FIT`/`.TCX` parsing and bulk-archive import.
 * Backend: ingest, storage, fog raster pipeline, tile serving.
 * Web app: Fog of War and track modes on the self-hosted planet basemap.
-* **The no-signup demo** — drag a file in, see the map, before any account exists (§8.2).
+* **The no-signup demo** — a fully populated example account anyone can open and explore before signing up (§8.2).
 * Accounts and persistence for anyone who wants to keep it.
-* A private activity graph once an account exists — a GitHub-style daily contribution grid shadeable by count or distance, plus active-days and longest-streak stat cards (`IMPLEMENTATION.md` §4.8). The grid itself reuses §4.7's histogram query; the streak and active-day stats are small new aggregate queries of their own.
+* A private activity graph once an account exists — a GitHub-style daily contribution grid shadeable by count or distance, plus active-days and longest-streak stat cards (`IMPLEMENTATION.md` §4.8). The grid itself reuses `IMPLEMENTATION.md` §4.7's histogram query; the streak and active-day stats are small new aggregate queries of their own.
+* Free high-resolution export — a framed image of the current map, unwatermarked, rendered in the browser.
 
-### 5.3 Phase 2: Cloud Sources (Months 4–6)
-* Path 1 connectors, in whatever order §4.1's approvals actually land.
-* Cross-source deduplication — unavoidable the moment a second source exists.
-* Free high-resolution export.
-
-### 5.4 Phase 3: Mobile (Months 7–9)
+### 5.3 Phase 2: Mobile
 * Android app — Health Connect. Samsung Galaxy Watch sync is unsupported (Samsung never exposes route geometry, and HoldMyTrack only ingests activities that have one). Built first of the pair regardless, so the Path 2 sync contract is designed against the more constrained platform.
 * iOS app — HealthKit and Apple Watch, the stronger of the two on-device paths.
 * In-app GPS recording (Android, then iOS) — a plain start/pause/stop track capture for casual, watch-free activities, submitted through the existing ingest pipeline; no new server-side work beyond the mobile clients themselves (§4.1).
-* Explorer-tile gamification and coverage stats.
+* Cross-source deduplication — unavoidable the moment a second source exists, so it arrived with Health Connect sync rather than waiting for Phase 4's connectors.
 
-### 5.5 Phase 4: Social (not committed)
-Athlete social networking is the stated long-term direction and is deliberately unscheduled. It should not start until §6 shows the funding base can absorb it, because social features add moderation, abuse handling and safety obligations that are **staff costs, not server costs** — the one category donations scale to worst. See §5.6.
+### 5.4 Phase 3: Finalized design + mobile browser support
+* The first shipped UI is functional scaffolding. This pass finishes it — one icon set, deliberate typography, design tokens, motion — across desktop and phone browsers, and ends in a declared design freeze.
+* The mobile apps inherit that freeze rather than inventing a second visual language: two clients that each chose their own would not read as one product.
 
-### 5.6 Why social is last, not just later
+### 5.5 Phase 4: Cloud Sources + Exploration
+* Path 1 connectors, in whatever order §4.1's approvals actually land.
+* Explorer-tile gamification and coverage stats, which get more interesting with the broader history cloud sources bring in.
+
+### 5.6 Phases 5–6: Cost control and compliance
+Gates rather than features. Cost control — retention, per-user quotas, rate limits, and measuring cost per active user — can land alongside any phase, and is what keeps §6's funding model honest (§4.3). Compliance (§7) — a DPIA, EU-region hosting, working data export and account deletion — gates any public launch, however small.
+
+### 5.7 Phase 7: Social (not committed)
+Athlete social networking is the stated long-term direction and is deliberately unscheduled. It should not start until §6 shows the funding base can absorb it, because social features add moderation, abuse handling and safety obligations that are **staff costs, not server costs** — the one category donations scale to worst. See §5.8.
+
+### 5.8 Why social is last, not just later
 
 Deferred for a reason worth writing down. A fog map is a precise record of where someone lives and when they are away from home. Adding a social graph to that is not an incremental feature; it is a change in threat model. Strava's own 2018 heatmap incident and its subsequent stalking-related redesigns are the reference case, and Strava had a large trust-and-safety team when they hit it.
 
@@ -281,7 +288,7 @@ Non-negotiable. A Fog of War map is a precise map of where a person lives — th
 
 ### 8.2 The demo is the ad
 
-Restored by Path 3, and it is the single best asset in this plan: **a no-signup, drag-a-file-in, see-your-fog-map page.** Shareability at zero friction is worth more than a signup funnel, and it is the reason §5 builds file upload before anything that requires another company's approval.
+The single best asset in this plan: **a no-signup demo** — one click opens a fully populated example account, months of real walks, rides and road trips, in every map mode and the activity graph. Shareability at zero friction is worth more than a signup funnel. It was first pitched as a drag-your-own-file page; what shipped is read-only (`SPEC.md` FR-2.1), so seeing your *own* fog still takes a free account.
 
 Everything else follows from it — the screenshot people post is the marketing, and the fog reveal is inherently screenshot-friendly.
 
