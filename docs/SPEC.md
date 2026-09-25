@@ -15,7 +15,7 @@ This document specifies HoldMyTrack's functional behavior as currently implement
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google on the web, FR-1.9), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About page (FR-10), and the Donate link out to Open Collective (FR-11).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google on the web, FR-1.9), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), and the Donate link out to Open Collective (FR-11).
 
 **Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), explorer-tile gamification, the rest of "Export" (story cards, animated reveals — high-resolution map export itself is built, FR-4.10 below). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace/heart-rate stay as per-activity route context (FR-4.9) rather than an analysed, all-time performance record. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
@@ -48,6 +48,19 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 
 ## 3. FR-1 — Authentication & Account Management
 
+**On the web, every screen in this section is a server-rendered page** (`IMPLEMENTATION.md` §4.19) with the shared page header (FR-10.4), and every form on them is refused (`403`) unless its `Origin` — or, without one, its `Referer` — is the app's own origin:
+
+| Page | Purpose |
+| :-- | :-- |
+| `GET`/`POST /signin` | Sign in (FR-1.2); links to sign-up and "Forgot password?", "Continue with Google" when configured (FR-1.9), and "Try it now — no signup" (`POST /demo`, FR-2.1). `?error=google` shows FR-1.9's failure message. |
+| `GET`/`POST /signup` | Sign up (FR-1.1, FR-2.3) |
+| `GET`/`POST /forgot` | Request a reset link (FR-1.5); answers "Check your email" whatever the address |
+| `GET`/`POST /reset?token=` | Set a new password from the emailed link (FR-1.6) |
+| `GET /verify?token=` | The emailed verification link itself (FR-1.8) |
+| `GET /verify-pending` | A signed-in, unverified account's holding page: resend (`POST /verify-pending/resend`), change the address (`POST /verify-pending/email`), or sign out (FR-1.8) |
+
+A failed form comes back as the same page, at the failure's status (`400`, `401`, `409`, `429`), with the server's message and the typed email kept. A successful one redirects: to `/verify-pending` for a real account that hasn't verified its email, otherwise to the map (`/`). A visit to `/signin` or `/signup` with a real account already signed in redirects the same way; a demo session can still sign in, or sign up (FR-2.3). The JSON endpoints named below are what the Android app calls and what these pages share their behavior with. Links in emails sent before the pages existed pointed at `/?reset_token=` and `/?verify_token=`, and a failed Google sign-in at `/?auth_error=google`; `/` forwards those to `/reset`, `/verify` and `/signin?error=google`, before any session check.
+
 ### FR-1.1 Sign up
 
 **Description**: An anonymous visitor creates a new registered account.
@@ -57,7 +70,7 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 **Inputs**: Email address, password (minimum 8 characters); the browser's own IANA timezone, sent automatically (not user-entered) and optional — see step 3.
 
 **Behavior**:
-1. Client submits email + password + its own detected timezone to `POST /v1/auth/signup`.
+1. Client submits email + password + its own detected timezone to `POST /v1/auth/signup` (the web's `/signup` form fills the timezone from the browser with a one-line script; without it the account starts on UTC).
 2. Server validates the email is a syntactically valid address and the password meets the minimum length.
 3. Server hashes the password (bcrypt) and creates a new `users` row — always a fresh row, whether or not the caller's browser holds a live demo session (see FR-2.3, revised). The submitted timezone is validated against the IANA tz database and stored if valid; missing or invalid falls back to UTC rather than rejecting the signup (FR-1.7 covers editing it afterward).
 4. Server creates a session (30-day expiry) and sets it as an `HttpOnly` cookie, and sends a verification email (FR-1.8).
@@ -107,7 +120,7 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 **Behavior**:
 1. Client calls `GET /v1/auth/me` with whatever session cookie it currently holds.
 2. If the cookie names a live, unexpired session, the server returns the account's identity (`200 OK`).
-3. Otherwise the server returns `401 Unauthorized`, and the client shows the sign-in screen.
+3. Otherwise the server returns `401 Unauthorized`, and the client shows the sign-in screen. On the web the pages check the session themselves: the map (`/`), `/profile` and `/settings` redirect a visitor with no session to `/signin`, and a signed-in real account whose email isn't verified to `/verify-pending`.
 
 **Notes**: A session's validity is checked in the database on every request (not trusted from the cookie's own stated expiry), so a session ended server-side (FR-1.3, or invalidated by a password reset, FR-1.6) stops working immediately even if the browser still holds the cookie. Sessions last 30 days from creation. The response also reports whether the account's email is verified (always `true` for a demo account) — the client uses this to decide whether to show the map or FR-1.8's verify screen.
 
@@ -153,20 +166,21 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 
 ### FR-1.7 Account settings
 
-**Description**: A signed-in user (real or demo — FR-2) edits their own profile: Avatar, Name, Country, and Timezone. Reached from the account menu's "Settings" item, a separate screen from the activity graph (FR-7) — and, for a real account that has never saved it, shown automatically in place of the map (behavior 5). The page also links to the map's Private locations window (FR-8.1), which isn't edited here.
+**Description**: A signed-in user (real or demo — FR-2) edits their own profile: Avatar, Name, Country, and Timezone. A page at `/settings`, reached from the header's account menu, separate from the activity graph (FR-7) — and, for a real account that has never saved it, shown automatically in place of the map (behavior 5). The page also links to the map's Private locations window (FR-8.1), which isn't edited here.
 
 **Name** is an optional display label, not an identifier: it isn't unique, two accounts may share one, and nothing signs in with it — the email address identifies an account. Nothing outside this page displays it yet.
 
 **Preconditions**: An active session.
 
-**Inputs**: An image file (PNG, JPEG, or WebP, up to 5 MB) for Avatar; free text for Name (optional); a country selected from a standard list for Country (required — there is no "not set" choice), searchable by name or ISO code; an IANA timezone name selected from the browser's own supported list for Timezone, listed by current GMT offset and searchable by place, region, or offset.
+**Inputs**: An image file (PNG, JPEG, or WebP, up to 5 MB) for Avatar; free text for Name (optional); a country chosen from a list of ISO 3166-1 countries by name for Country (required — there is no "not set" choice); an IANA timezone for Timezone, chosen from the zones browsers know under IANA's current names (Kolkata, not Calcutta; Kyiv, not Kiev), grouped by region, sorted by place and labelled with its GMT offset today ("New York · GMT−04:00"), with UTC and the account's own saved zone always included. A zone given under a former name — which browsers still report at signup — is stored under its current one.
 
 **Behavior**:
-1. Avatar uploads and removals take effect immediately (`POST`/`DELETE /v1/account/avatar`) — each is its own action, not gated behind a separate save step. The account menu's own avatar button reflects whichever image is current everywhere in the app the moment it changes, with no reload.
-2. Name, Country, and Timezone save together as one action (`PATCH /v1/account/settings`) — editing one and leaving without saving discards all three, not just the one touched.
-3. **Country decides which unit system the entire app displays distance, pace, and elevation in** — metric (km, min/km, meters) for every country except the United States, Liberia, and Myanmar, which see imperial (mi, min/mi, feet). An account that has never saved a Country (only possible before its first save — behavior 6) displays metric. This takes effect the moment it's saved, across every screen that shows one of these values (the Activities panel, the date-range picker, the activity graph, Trends, the per-activity pace/elevation profile, and the map's own distance scale) — none of it requires a reload. Save is disabled until a Country is chosen.
+1. Avatar uploads and removals take effect immediately — each is its own action (`POST /settings/avatar`, `POST /settings/avatar/remove`; for an API client, `POST`/`DELETE /v1/account/avatar`), not gated behind a separate save step; choosing a file uploads it. The page, header included, shows the new avatar when it reloads after the upload.
+2. Name, Country, and Timezone save together as one action (`POST /settings`; for an API client, `PATCH /v1/account/settings`) — editing one and leaving without saving discards all three, not just the one touched. A successful save reloads the page with "Saved."; a failed one shows the error with the submitted values kept.
+3. **Country decides which unit system the entire app displays distance, pace, and elevation in** — metric (km, min/km, meters) for every country except the United States, Liberia, and Myanmar, which see imperial (mi, min/mi, feet). An account that has never saved a Country (only possible before its first save — behavior 6) displays metric. It applies everywhere one of these values is shown (the Activities panel, the date-range picker, the activity graph, Trends, the per-activity pace/elevation profile, and the map's own distance scale) from the next time that page is opened after saving — Settings is a page of its own, so leaving it is a page load. Save can't be submitted until a Country is chosen.
 4. **Timezone decides which calendar day an activity is grouped under everywhere the app buckets by day** — the date-range picker's histogram, the activity graph's daily grid and stat cards, `GET /v1/activities/trends`, and date-range filtering. Auto-resolved from the browser at signup (FR-1.1) and editable here afterward; unlike Country, it has no "unset" state — every account always has one, defaulting to UTC until changed.
-5. **First run.** A real, verified account with no Country — one that has never saved this page, which is every new account right after FR-1.8's verification link — sees this page instead of the map, titled "Welcome — set up your account", with a short explanation of why Country and Timezone matter. There is no way back to the map from it (no back link; the account menu offers only sign-out). Timezone is prefilled with the one auto-detected at signup, to confirm or change; Country starts empty. "Save and continue" is disabled until a Country is chosen; saving shows the map straight away, and every later visit goes directly to the map. Reloading before saving shows this page again. A demo account never sees it.
+5. **First run.** A real, verified account with no Country — one that has never saved this page, which is every new account right after FR-1.8's verification link — is sent here from the map and Profile (and from sign-in), titled "Welcome — set up your account", with a short explanation of why Country and Timezone matter. There is no way past it: no back link, and the header's links to the map and Profile lead back here. Timezone is prefilled with the one auto-detected at signup, to confirm or change; Country starts on "Choose a country". "Save and continue" can't be submitted until a Country is chosen; saving goes on to the map, and every later visit goes directly to the map. Reloading before saving shows this page again. A demo account never sees it.
+6. **A demo account** sees the page with every field and button disabled and a note that the shared demo account can't be changed, linking to "Create your own account" (FR-2.3); a save or avatar change submitted anyway is refused (`403`).
 
 **Outputs**: The account's current Avatar, Name, Country, and Timezone, always reflecting the last successful save (or the account's defaults, if never changed) — reloading the app never reverts to something stale.
 
@@ -182,7 +196,7 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 
 **Behavior**:
 1. On signup (FR-1.1) and whenever the email address changes (step 4 below), the server emails a link containing a verification token (valid 24 hours, single-use) to the address on file.
-2. Clicking the link submits the token to `POST /v1/auth/verify-email`. On success, the server marks the account verified, invalidates every other outstanding verification token for it, and creates a fresh session for whichever browser opened the link — regardless of whether that browser already held a session of its own, so the link works from any device.
+2. The link opens `/verify?token=…`, which verifies the token the same way `POST /v1/auth/verify-email` does (the endpoint the Android app would call). A missing, expired, used or malformed token shows "This verification link is invalid or has expired." On success, the server marks the account verified, invalidates every other outstanding verification token for it, and creates a fresh session for whichever browser opened the link — regardless of whether that browser already held a session of its own, so the link works from any device.
 3. While waiting, the account holder can request another copy of the link (`POST /v1/auth/resend-verification`, rate-limited to 5 per hour per account) without needing to already know it was lost or expired.
 4. The account holder can also change the address on file (`PATCH /v1/auth/email`) before ever verifying — correcting a typo the original signup made, since a resend alone cannot fix a wrong address. Any change resets the account back to unverified and sends a new link to the new address, whether or not the account was already verified.
 5. Once verified, the account continues to FR-1.7's first-run Settings page, not straight to the map, until Country and Timezone have been saved once.
@@ -206,8 +220,8 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 **Inputs**: The Google account the visitor picks on Google's own account chooser; the browser's IANA timezone, sent automatically as with FR-1.1.
 
 **Behavior**:
-1. Client calls `GET /v1/auth/providers`; when `google` is `true`, the sign-in screen shows "Continue with Google" above the email/password form.
-2. Clicking it navigates the whole page to `GET /v1/auth/google/start?tz=<timezone>`. The server sets a short-lived (10-minute) cookie holding a random `state` value and a PKCE verifier, and redirects to Google's consent screen, always showing the account chooser.
+1. When the server has Google credentials configured (what `GET /v1/auth/providers` reports as `google: true`), the sign-in and sign-up pages show "Continue with Google" above the email/password form.
+2. Clicking it navigates the whole page to `GET /v1/auth/google/start?tz=<timezone>` (a one-line script adds the browser's timezone; without it a new account starts on UTC). The server sets a short-lived (10-minute) cookie holding a random `state` value and a PKCE verifier, and redirects to Google's consent screen, always showing the account chooser.
 3. Google redirects back to `GET /v1/auth/google/callback`. The server checks `state` against the cookie (and clears the cookie either way), exchanges the authorization code with Google, and reads the Google account's stable id, email and name. A Google account whose email Google itself reports as unverified is refused.
 4. The server picks the account:
    - An account already linked to this Google account is signed in, even if its HoldMyTrack email has since changed.
@@ -217,7 +231,7 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 
 **Outputs**: A valid session cookie and a redirect to the app.
 
-**Error cases**: Every failure — the visitor cancelled on Google's screen, a missing or mismatched `state`, the code exchange failed, the Google email is unverified, or the matching account is already linked to a *different* Google account — redirects to the app with `?auth_error=google`, and the sign-in screen shows a generic "Couldn't sign in with Google" message. The cause is logged server-side, not revealed in the URL.
+**Error cases**: Every failure — the visitor cancelled on Google's screen, a missing or mismatched `state`, the code exchange failed, the Google email is unverified, or the matching account is already linked to a *different* Google account — redirects to `/signin?error=google`, which shows a generic "Couldn't sign in with Google. Please try again." message. The cause is logged server-side, not revealed in the URL.
 
 **Notes**: A Google-only account has no password, so FR-1.2 rejects it with the same generic error as any other mismatch; it can set a password at any time through FR-1.5/FR-1.6, after which both ways in work. Changing the account's email (FR-1.8 step 4) leaves the Google link in place.
 
@@ -230,10 +244,10 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 **Preconditions**: No active session.
 
 **Behavior**:
-1. Client calls `POST /v1/auth/demo`.
+1. Client calls `POST /v1/auth/demo` — on the web, the sign-in page's "Try it now — no signup" button submits `POST /demo`, which does the same and redirects to the map. Starts are rate-limited to 5 per hour per address; over the limit the sign-in page shows the error.
 2. Server opens a session against one persistent, shared **Demo Customer** account — not a fresh account created per visitor. That account is pre-seeded, once, out of band (not per request — see FR-2.2), with a real, richly-populated history: roughly 611 activities spanning about 7 months, a mix of walks, dog walks, bike rides, local errands, and a few multi-day road trips, based around Cleveland, OH — which its Settings profile (Name "Demo User," Country United States, Timezone America/New_York) matches, rather than being left at generic column defaults — plus one Private location, "Home," a 250 m circle over the area nearly every trip starts from (FR-8.1).
 3. Server creates a session for this visitor (24-hour expiry) and sets it as a cookie. Any number of visitors can hold their own session against the same shared account at once — they all see identical data.
-4. Client is signed in and shown the map, with the account's full history already visible in every mode (Normal, Fog of War, Heatmap) and every read-only feature (filtering, the activity graph, export) exactly as a registered user has it. **A demo account cannot upload, sync, edit, or delete an activity, or change its avatar/settings** — every such request is rejected regardless of what a client attempts, whether or not its own UI still offers the control. Creating a real account (FR-1.1) is the only way to save one's own data. Both clients also gate this proactively rather than relying on the rejection alone: the web app disables the Import control with an explanation (`ImportPanel.tsx`'s `readOnly` prop) and the Android app disables Sync Now and hides the Health Connect permission flow with the same explanation (FR-3.8) — a demo session can still record and manage GPS Logger recordings locally on Android, since nothing about that reaches the server until sync is attempted.
+4. Client is signed in and shown the map, with the account's full history already visible in every mode (Normal, Fog of War, Heatmap) and every read-only feature (filtering, the activity graph, export) exactly as a registered user has it. **A demo account cannot upload, sync, edit, or delete an activity, or change its avatar/settings** — every such request is rejected regardless of what a client attempts, whether or not its own UI still offers the control. Creating a real account (FR-1.1) is the only way to save one's own data. Both clients also gate this proactively rather than relying on the rejection alone: the web app replaces the Sync tab's drop zone with an explanation (`SyncTab.tsx`'s `readOnly` prop) and the Android app disables Sync Now and hides the Health Connect permission flow with the same explanation (FR-3.8) — a demo session can still record and manage GPS Logger recordings locally on Android, since nothing about that reaches the server until sync is attempted.
 
 **Outputs**: A valid session cookie for the shared Demo Customer account, already showing its full activity history.
 
@@ -256,10 +270,10 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 **Inputs**: Email address, password (minimum 8 characters) — the same inputs as FR-1.1.
 
 **Behavior**:
-1. From the account menu, which shows the demo account's name ("Demo User") where a real account shows its email, the user selects "Create your own account," which presents the same sign-up screen a new visitor sees (FR-1.1), with a "← Back" option instead of the "try demo" option (starting a second demo while already in one would abandon the first).
+1. From the account menu, which shows the demo account's name ("Demo User") where a real account shows its email, the user selects "Create your own account," which opens the same sign-up page a new visitor sees (`/signup`, FR-1.1), with "← Back to the map" in place of the sign-in page's "try demo" option (starting a second demo while already in one would abandon the first).
 2. The user submits an email and password.
 3. The server creates a plain new account (FR-1.1's normal behavior) — the shared Demo Customer account itself is untouched, exactly as every other concurrent demo visitor's session leaves it.
-4. The user is signed in to the new account, held on FR-1.8's verify-email screen exactly like any other fresh signup.
+4. The user is signed in to the new account and sent to FR-1.8's verify-email page (`/verify-pending`), exactly like any other fresh signup.
 
 **Outputs**: A new, unverified registered account — not the demo account, and not carrying any of its activity history.
 
@@ -278,10 +292,10 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Inputs**: One or more files, each a `.gpx`, `.fit`, or `.tcx` file no larger than 64 MiB. Up to 20 individually-selected files per batch (a larger selection is rejected client-side in full, before any upload begins, with a message directing the user to a `.zip` archive instead — FR-3.2).
 
 **Behavior**:
-1. User drags files onto the Import panel's Files tab, or selects them via a file picker.
+1. User drags files onto the drop zone in the Activities panel's Sync tab (FR-3.4), or selects them via a file picker.
 2. Each file uploads independently, as its own `POST /v1/activities/upload` request (multipart), and is tracked independently — one file failing does not affect the others.
 3. For each file: server validates its extension and size, computes a content hash to check for a duplicate (FR-3.5), persists the raw file, and enqueues a background parsing job.
-4. The Files tab shows each file's live status (uploading, with a progress percentage; then "Processing…") until the background job finishes.
+4. The Sync tab's history shows each file's live status (uploading, with a progress percentage; then "Processing…") until the background job finishes.
 5. Once ingestion completes, the activity appears automatically in the Activities panel, the map, and every summary that reflects the current date range — no page reload is required. Its Fog-of-War/Heatmap coverage follows a few seconds later, once the background re-render finishes, also without a reload.
 
 **Outputs**: One new `Activity` per successfully ingested file, each with a parsed trajectory, distance, duration, and (where the source file provides it) heart rate/elevation data.
@@ -321,7 +335,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Inputs**: A Google Takeout export `.zip` archive (detected automatically by its internal folder structure — no separate upload flow to choose).
 
 **Behavior**:
-1. User uploads the Takeout export `.zip` through the same Files tab as FR-3.1/FR-3.2.
+1. User uploads the Takeout export `.zip` through the same Sync-tab drop zone as FR-3.1/FR-3.2.
 2. Server recognizes the archive's shape as a Takeout export (rather than a plain `.zip`) and extracts one activity file per recorded activity that has GPS data (activity types with no GPS in the export — e.g. a logged swim with no route — are skipped, not treated as errors).
 3. Each extracted activity is ingested exactly as FR-3.1 describes, attributed to the Takeout source.
 
@@ -329,17 +343,18 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 ### FR-3.4 Import status and history
 
-**Description**: A user can see the status of in-progress and past uploads and syncs, and jump from a finished one straight to it on the map. The header's "Import" control (renamed from "Upload activity" once a second ingest source existed — FR-3.6) opens a dropdown with two tabs: **Files** (drag/drop, `.zip`, and Google Takeout — FR-3.1–FR-3.3, unchanged) and **Sync** (Health Connect and in-app GPS recording activity synced from the Android app — FR-3.6, FR-3.8). Sync is a read-only status view, not a "sync now" button: that sync is phone-triggered, and nothing in the web app can request it (`apps/android/docs/SPEC.md` §7.4's own "Ask every time"/"Always allow" split is the closest analogue, and it lives entirely on the phone).
+**Description**: A user can see the status of in-progress and past uploads and syncs, and jump from a finished one straight to it on the map. The Activities panel has two tabs, **Activities** (the list, FR-5) and **Sync**. The Sync tab holds the file drop zone and picker (`.gpx`/`.fit`/`.tcx`, `.zip`, and Google Takeout — FR-3.1–FR-3.3) above one history list of everything imported into the account, whatever the source: uploaded files alongside activity synced from the Android app (Health Connect and in-app GPS recording — FR-3.6, FR-3.8). The web can't start a phone sync; the history is a read-only status view, not a "sync now" button: that sync is phone-triggered, and nothing in the web app can request it (`apps/android/docs/SPEC.md` §7.4's own "Ask every time"/"Always allow" split is the closest analogue, and it lives entirely on the phone).
 
 **Preconditions**: Active session.
 
 **Behavior**:
-1. The Import control's badge shows a live count of jobs still processing, combined across both tabs, regardless of which tab is currently open.
-2. Each tab shows its own paginated list (5 per page) of every matching job ever recorded for this account, each showing: a title (the filename, for a Files row; the source name — "Health Connect," "GPS Logger" — for a Sync row, since a synced job's own filename is a platform-assigned id with nothing human-readable in it), status ("Processing…" / "Ready" / "Failed"), and — once ready — the activity's date and distance.
-3. While anything in a tab is still processing, that tab's list refreshes automatically (polled every 1.5 seconds) until every row settles to "Ready" or "Failed" — no manual refresh needed. Both tabs poll independently and simultaneously, regardless of which one is currently showing, since a job finishing in the tab that isn't open still has to reach the map.
-4. A "View on map" action appears on every finished (`"Ready"`) row, on either tab. Clicking it closes the Import dropdown, focuses that activity exactly as clicking its row in the Activities panel would (FR-5.5) — track bolded, camera flown to fit it — and, if the activity's own date falls outside the currently selected date range (FR-6), first narrows the selected range to just that one day (the same mechanism a manual single-day pick already uses — FR-6.5) before focusing, rather than focusing something the Activities panel isn't currently showing at all.
+1. The Sync tab's badge shows a live count of this session's uploads in flight plus every job still processing for the account, visible whichever tab is open.
+2. The history is one paginated list (5 per page) of every job ever recorded for this account, newest first, each showing: a title (the filename for an uploaded file; the source name — "Health Connect," "GPS Logger" — for a synced one, since a synced job's own filename is a platform-assigned id with nothing human-readable in it), status ("Processing…" / "Ready" / "Failed"), and — once ready — the activity's date and distance. Files still uploading are listed above it with a progress percentage.
+3. While anything is still processing, the history refreshes automatically (polled every 1.5 seconds) until every row settles to "Ready" or "Failed" — no manual refresh needed. Polling and uploads carry on while the Activities tab is showing, or the panel is hidden in Fog of War/Heatmap mode, since a job finishing still has to reach the map.
+4. For a demo session, the drop zone is replaced by a note that importing isn't available for demo accounts.
+5. A "View on map" action appears on every finished (`"Ready"`) row. Clicking it switches the panel back to the Activities tab, focuses that activity exactly as clicking its row in the Activities panel would (FR-5.5) — track bolded, camera flown to fit it — and, if the activity's own date falls outside the currently selected date range (FR-6), first narrows the selected range to just that one day (the same mechanism a manual single-day pick already uses — FR-6.5) before focusing, rather than focusing something the Activities panel isn't currently showing at all.
 
-**Outputs**: `GET /v1/uploads?limit=&offset=&source=` returns the current page, the total count (scoped to `source` when given), and how many are still processing (always the global count, unscoped, for the badge). `source` is a comma-separated filter — `upload,takeout` for the Files tab, `healthconnect,healthkit,recorded` for Sync — omitted for the unfiltered combined view neither tab actually uses today. Each row also carries `source` and, once the job has produced one, the resulting activity's own `id` — what the "View on map" action targets.
+**Outputs**: `GET /v1/uploads?limit=&offset=&source=` returns the current page, the total count (scoped to `source` when given), and how many are still processing (always the global count, unscoped, for the badge). `source` is an optional comma-separated filter (e.g. `upload,takeout`); the Sync tab omits it, for the combined view. Each row also carries `source` and, once the job has produced one, the resulting activity's own `id` — what the "View on map" action targets.
 
 ### FR-3.5 Duplicate detection
 
@@ -524,7 +539,7 @@ Only one track is hovered and only one is focused at a time; any number can be c
 **Preconditions**: Active session; the map has finished its initial load. No activity selection is required — the user frames whatever region of the map they want manually, independent of any checked/focused activity.
 
 **Behavior**:
-1. Clicking the header's camera button ("Export map image") shows a Custom frame — no fixed aspect ratio — centred on the current view at about 70% of the map's size, marked only by a dashed border. Clicking it again while the frame is shown puts it away. The map is not dimmed or obscured anywhere.
+1. Clicking the camera button ("Export map image") in the map's top-right control stack, under zoom and locate, shows a Custom frame — no fixed aspect ratio — centred on the current view at about 70% of the map's size, marked only by a dashed border. Clicking it again while the frame is shown puts it away. The map is not dimmed or obscured anywhere.
 2. The frame is anchored to the map: panning the map carries the frame with it, and zooming keeps the frame the same size on screen (so it holds more or less of the map). The frame may be panned partly or fully out of view and still be captured.
 3. The frame blocks nothing: pan, zoom and click all work inside the frame exactly as outside it. Dragging the frame's border moves the frame; dragging one of its four corner handles resizes it, with the opposite corner staying put. A Custom frame resizes freely; a platform preset keeps its aspect ratio while resizing.
 4. A toolbar sits centred just above the frame's top edge (moving inside the frame when there's no room above it) with a shape dropdown, Close and Capture. The dropdown offers Custom plus every platform image-size preset, grouped by platform (Instagram, Facebook, X) and listing each resolution/shape that platform has (Square, Portrait, Landscape, Story) with its pixel size; not every platform has every shape (e.g. X has no Story or Portrait). The Custom option shows its pixel size too — the frame's own on-screen size, which is exactly what a Custom capture produces — updating live as the frame is resized. Choosing a shape keeps the frame's center and fits the new aspect ratio within its current size. Close cancels with nothing captured. Capture captures exactly the region inside the frame at that moment — the current zoom, rotation, theme, and map mode, at the picked preset's exact declared pixel dimensions, or for Custom at the frame's own on-screen size in pixels. In Normal mode the captured region reflects the current date-range/hidden-track filters; Fog captures its all-time coverage and Heatmap its current rolling window (FR-4.2/FR-4.3), regardless of what Normal mode's filters were set to before switching.
@@ -697,11 +712,13 @@ Only one track is hovered and only one is focused at a time; any number can be c
 
 ### FR-7.1 Contribution grid
 
-**Description**: A private, per-account page (reached via the account menu's "Profile" item) showing a GitHub-style daily contribution grid — one cell per calendar day, one block per calendar year (most recent first, back to the account's first-ever activity).
+**Description**: A private, per-account page at `/profile` (reached from the header's account menu) showing a GitHub-style daily contribution grid — one cell per calendar day, one block per calendar year (most recent first, back to the account's first-ever activity).
 
-**Behavior**: Each day's cell is shaded by intensity, toggle-able between two measures:
+**Behavior**: Each day's cell is shaded by intensity, toggle-able between two measures (the "Shade by" switch — `/profile?shade=distance` for Distance, the plain `/profile` for Count):
 - **Count**: number of activities that day (empty / one / two / three-or-more).
 - **Distance**: quantile-based thresholds computed over that account's own active days for that year (so "a busy day" is relative to this account's own typical distances, not a fixed absolute number).
+
+Hovering a day shows its date, activity count and distance. The page needs a session like the map does: no session goes to `/signin`, an unverified account to `/verify-pending`, and an account that has never saved Settings to `/settings` (FR-1.7).
 
 ### FR-7.2 All-time and per-year stat cards
 
@@ -715,7 +732,7 @@ Only one track is hovered and only one is focused at a time; any number can be c
 
 **Preconditions**: An active session. Creating, moving, resizing, renaming, and deleting need a real account (FR-2's demo can see its own, read-only).
 
-**Inputs**: The map's Private locations window, opened from the account menu (or from Settings, FR-1.7), placed below the map-mode toggle so Normal/Fog/Heatmap stay usable: clicking empty map places a new circle (zoomed out past street level, the click flies in to that spot instead — a circle there would be under a pixel), clicking a saved circle or its center dot selects it (every saved location shows a fixed-size center dot at any zoom), the selected circle's center drags, and a slider sets its radius. Saved through `GET`/`POST /v1/private-locations` and `PATCH`/`DELETE /v1/private-locations/{id}`; at most 20 per account.
+**Inputs**: The map's Private locations window, opened from the header's account menu or from Settings (FR-1.7) — both link to `/?private-locations`, which opens the map with the window open (the parameter is then removed from the URL, so a refresh doesn't reopen it) — placed below the map-mode toggle so Normal/Fog/Heatmap stay usable: clicking empty map places a new circle (zoomed out past street level, the click flies in to that spot instead — a circle there would be under a pixel), clicking a saved circle or its center dot selects it (every saved location shows a fixed-size center dot at any zoom), the selected circle's center drags, and a slider sets its radius. Saved through `GET`/`POST /v1/private-locations` and `PATCH`/`DELETE /v1/private-locations/{id}`; at most 20 per account.
 
 **Behavior**:
 1. Applied at ingest, server-side, before anything is stored: the leading points inside any Private location are dropped, and the track starts on that circle's edge instead (a point interpolated onto the boundary, whatever the recording's point density); the trailing points likewise. A track that only passes *through* a Private location mid-way is shown whole, by design: what a Private location protects is where a track starts and ends, and passing through one reveals neither.
@@ -750,38 +767,73 @@ Only one track is hovered and only one is focused at a time; any number can be c
 **Behavior**:
 1. Every activity in the window is grouped into the requested bucket by its `started_at` date, in the account's own timezone (FR-1.7), one bucket per calendar week or month that has at least one activity — buckets with nothing recorded are omitted rather than returned as zeroes, the same convention FR-6's histogram uses.
 2. Each bucket reports: activity count, total distance, total moving time, and total elevation gain.
-3. The UI (`Trends`, on the Profile page) renders one bar per bucket, height scaled to the window's busiest bucket by distance, with a Week/Month toggle. Hovering a bar shows that bucket's full breakdown (distance, activity count, moving time, elevation gain).
+3. The Profile page renders the trailing 12 months as one bar per bucket, height scaled (logarithmically) to the window's busiest bucket by distance, with a Week/Month switch (`?bucket=month`; the Distance/Count grid setting is kept). Hovering a bar shows that bucket's full breakdown (distance, activity count, moving time, elevation gain); tapping or clicking one shows it in a line under the chart, and tapping it again hides it.
 
 **Outputs**: `{bucket, from, to, periods: [{period_start, count, distance_meters, moving_seconds, elevation_gain_m}, ...]}`.
 
 **Notes**: "Moving time" falls back to elapsed time for any activity ingested before moving- time detection existed — those activities have no moving-time figure of their own, so this bucket-level total uses whichever one each activity actually has, rather than a bucket going silently short. Best-effort curves and personal bests (formerly FR-9.2/FR-9.3) were built and then cut — deliberately out of scope, see §1.2 and §14.
 
-## 12. FR-10 — Public About page
+## 12. FR-10 — Public pages: About, Help, Contacts
+
+These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HTML page that needs no JavaScript and makes no API calls from the browser, with the page header every page shares (FR-10.4).
 
 ### FR-10.1 About page
 
-**Description**: A public page at `/about` that explains what HoldMyTrack is, who it is for, what it deliberately is not, how it is funded, and how to reach the project. It is the one page a visitor or a search engine can read without an account.
+**Description**: A public page at `/about` that explains what HoldMyTrack is, who it is for, what it deliberately is not, and how it is funded. A visitor or a search engine can read it without an account.
 
-**Preconditions**: None — no session is needed, and having one changes nothing on the page.
+**Preconditions**: None — no session is needed; having one changes only the header (FR-10.4).
 
 **Behavior**:
-1. `GET /about` returns a static HTML page; it needs no JavaScript and makes no API calls.
-2. The page shows the HoldMyTrack header (logo, wordmark, tagline) and sections for: what HoldMyTrack is, why someone might want it, what it isn't, how it is funded, and Contact — the email address `hello@holdmytrack.com` and the GitHub repository `https://github.com/HoldMyTrack/holdmytrack`.
-3. "Try the demo — no signup" and "Open the app" link to `/`, the sign-in screen, where the demo starts from its own button (FR-2.1). The page never starts a demo session itself.
-4. The page is reachable from the sign-in screen ("What is HoldMyTrack?", below the form) and, for a signed-in or demo session, from the header's "About" menu, just before the account menu — About HoldMyTrack, How it's funded (`/about#funding`) and Contact (`/about#contact`). On a phone-width screen, where the header has no room for that menu, "About HoldMyTrack" is in the account menu instead.
-5. `/robots.txt` allows crawling except for `/v1/` and `/tiles/`, and points to `/sitemap.xml`, which lists `/` and `/about`.
+1. `GET /about` returns the page.
+2. It has sections for: what HoldMyTrack is, why someone might want it, what it isn't, how it is funded (section id `funding`), and a pointer to Contacts (FR-10.3).
+3. "Try the demo — no signup" links to `/signin`, where the demo starts from its own button (FR-2.1). The page never starts a demo session itself.
+4. About, Help and Contacts are reachable from every page's header and footer (FR-10.4) — the map and the sign-in pages included.
+5. `/robots.txt` allows crawling except for `/v1/` and `/tiles/`, and points to `/sitemap.xml`, which lists `/`, `/about` and `/contacts`.
+
+### FR-10.2 Help page
+
+**Description**: A public page at `/help` that describes how the web app works. It is a placeholder for now: a heading and a line saying the guide is on its way, pointing to Contacts.
+
+**Preconditions**: None.
+
+**Behavior**:
+1. `GET /help` returns the page.
+2. Until it has real content, the page carries `<meta name="robots" content="noindex">` and is not listed in `/sitemap.xml`.
+
+### FR-10.3 Contacts page
+
+**Description**: A public page at `/contacts` with how to reach the project.
+
+**Preconditions**: None.
+
+**Behavior**:
+1. `GET /contacts` returns the page, listing the email address `hello@holdmytrack.com` and the GitHub repository `https://github.com/HoldMyTrack/holdmytrack` for code and issues.
+
+### FR-10.4 Page header and footer
+
+**Description**: Every page shares one header — the map and Profile included — and every page other than those two shares one footer.
+
+**Behavior**:
+1. The header shows the logo, wordmark and tagline (the brand links to `/`), then Donate (FR-11.1), an "Info" menu listing About, Help and Contacts with the current page marked, and the account area.
+2. Signed out, the account area is a "Sign in" link to `/signin`. With a session (real or demo), it is an account menu showing the account's avatar (or a generic icon) that opens to the account's email (a demo session shows its display name instead, followed by "Create your own account", FR-2.3), then "Map" (`/`), "Profile" (`/profile`), "Settings" (`/settings`), "Private locations" (`/?private-locations`, FR-8.1) and "Sign out".
+3. Both menus open and close without JavaScript.
+4. "Sign out" submits `POST /logout`, which ends the session the same way `POST /v1/auth/logout` does and redirects to `/`. The request is refused (`403`) unless its `Origin` header — or, without one, its `Referer` — is the app's own origin.
+5. On a phone-width screen (≤768px) the tagline is hidden and Donate shows its heart alone; the Info and account menus stay.
+6. The footer links to the map (`/`), About, Help, Contacts and the GitHub repository.
+7. Pages are sent with `Cache-Control: no-store`, since the header names the signed-in account.
+8. An address no page answers gets a "Page not found" page (`404`) with the same header; under `/v1/` and `/tiles/` it's a plain `404`, not a page.
 
 ## 13. FR-11 — Donations
 
 ### FR-11.1 Donate
 
-**Description**: The header's Donate button is how a visitor reaches HoldMyTrack's funding — recurring community donations with a public ledger on Open Collective (`VISION.md` §6.1). HoldMyTrack itself takes no payment and stores nothing about a donation.
+**Description**: The header's Donate button (FR-10.4) is how a visitor reaches HoldMyTrack's funding — recurring community donations with a public ledger on Open Collective (`VISION.md` §6.1). HoldMyTrack itself takes no payment and stores nothing about a donation.
 
-**Preconditions**: A signed-in or demo session (the button lives in the app header).
+**Preconditions**: None.
 
 **Behavior**:
 1. The button shows a heart icon followed by "Donate"; on a phone-width screen (≤768px) it shows the heart alone.
-2. While no Open Collective is configured (`OPEN_COLLECTIVE_SLUG` empty), clicking Donate opens a notice explaining that donations aren't open yet, and nothing else happens.
+2. While no Open Collective is configured (the slug is empty), Donate links to About's funding section (`/about#funding`), which says donations aren't open yet.
 3. Once one is configured, Donate is a link to `https://opencollective.com/<slug>/donate`, opened in a new tab so the map is kept; choosing an amount, one-off or monthly, and paying all happen on Open Collective.
 
 ## 14. Non-Functional Requirements (summary)

@@ -4,6 +4,7 @@ import { deleteActivity, type Activity, type ActivityTotals, type DuplicateActiv
 import { ConfirmDialog } from './ConfirmDialog';
 import { DistanceFilter } from './DistanceFilter';
 import { EditActivityDialog } from './EditActivityDialog';
+import { SyncTab } from './SyncTab';
 import type { DistanceRange, TypeFacet } from './activityFacets';
 import {
   formatActivityType,
@@ -14,8 +15,14 @@ import {
   formatTotalDistance,
 } from './format';
 import { useUnitSystem } from './units';
+import type { ImportsState } from './useImports';
 
 /**
+ * The left sidebar, with two tabs: **Activities** (the list, below) and **Sync** (SyncTab.tsx —
+ * file upload and the import history, formerly the header's Import dropdown). The tab is local
+ * UI state; the upload queue behind Sync is MapView's (useImports), so it keeps running while
+ * the Activities tab is showing.
+ *
  * The activity list — a permanent left sidebar (not a collapsible
  * dropdown, nor a paginated one: §4.7's list
  * endpoint no longer pages, so this renders every row the current date range matched, filtered
@@ -128,7 +135,13 @@ export interface ActivitiesPanelProps {
    *  a question scoped to whatever's currently selected. */
   duplicates: DuplicateActivity[];
   duplicatesError: string | null;
+  /** The Sync tab's upload queue and history — MapView's useImports. */
+  imports: ImportsState;
+  /** A Sync-tab row's "View on map" — MapView's viewActivityOnMap. */
+  onViewOnMap: (activityId: string, startedAt: string) => void;
 }
+
+type PanelTab = 'activities' | 'sync';
 
 export function ActivitiesPanel({
   readOnly = false,
@@ -160,13 +173,16 @@ export function ActivitiesPanel({
   onEditTrack,
   duplicates,
   duplicatesError,
+  imports,
+  onViewOnMap,
 }: ActivitiesPanelProps) {
+  const [tab, setTab] = useState<PanelTab>('activities');
   const hasActiveFilters = excludedTypes.size > 0 || distanceFilter !== null;
 
   // The Type dropdown (Type + Distance, per the header toolbar redesign) — closed by
   // default, same "most sessions don't start by narrowing filters" reasoning the old "Filter"
   // toggle button had. Dismiss on outside click or Escape, the same hand-wired pattern
-  // ImportPanel.tsx/UserMenu.tsx already use (not shared into a hook for a third call site).
+  // the Duplicates disclosure below uses too (not shared into a hook for two call sites).
   const [typeFilterOpen, setTypeFilterOpen] = useState(false);
   const typeFilterRef = useRef<HTMLDivElement>(null);
 
@@ -335,11 +351,31 @@ export function ActivitiesPanel({
         onPointerUp={onResizePointerUp}
         onPointerCancel={onResizePointerUp}
       />
-      <div className="activities-panel__head">
-        <div className="activities-panel__heading">
+      <div className="activities-panel__head" role="tablist" aria-label="Activities panel">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'activities'}
+          className="activities-panel__tab"
+          data-testid="activities-panel-tab-activities"
+          onClick={() => setTab('activities')}
+        >
           <span className="activities-panel__heading-text">Activities</span>
           <span className="activities-panel__badge">{activities.length.toLocaleString()}</span>
-        </div>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'sync'}
+          className="activities-panel__tab"
+          data-testid="activities-panel-tab-sync"
+          onClick={() => setTab('sync')}
+        >
+          <span className="activities-panel__heading-text">Sync</span>
+          {/* Visible from the Activities tab too, so an upload's progress doesn't disappear
+              the moment you switch away from it. */}
+          {imports.badgeCount > 0 && <span className="activities-panel__sync-badge">{imports.badgeCount}</span>}
+        </button>
       </div>
       {/* A <button>, not a <p> — on mobile this is the bottom sheet's own peek-strip tap
           target (expand/collapse), styled identically to the old plain text on desktop
@@ -352,303 +388,320 @@ export function ActivitiesPanel({
         aria-expanded={sheetExpanded}
         onClick={() => setSheetExpanded((expanded) => !expanded)}
       >
-        {totals !== null ? `${formatTotalDistance(totals.distanceMeters, system)} loaded` : 'Loading…'}
+        {tab === 'sync'
+          ? 'Upload files or sync from your phone'
+          : totals !== null
+            ? `${formatTotalDistance(totals.distanceMeters, system)} loaded`
+            : 'Loading…'}
         <span className="activities-panel__sheet-chevron" aria-hidden="true">
           {sheetExpanded ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
         </span>
       </button>
 
-      <DistanceFilter
-        bounds={distanceBounds}
-        value={distanceFilter}
-        onChangeDistance={onChangeDistance}
-        onReset={onResetFilters}
-        hasActiveFilters={hasActiveFilters}
-      />
-
-      {/* The header toolbar — right above the row list. There are no more per-row action
-          icons to stay column-aligned with (Visible/Edit/Delete all moved here, operating on
-          the checked group), so this is a plain compact strip: select-all checkbox, the invert-selection icon, the Type
-          dropdown, a spacer, the three group-action chips, a divider, then the one
-          accent-tinted "focus the map on this group" action. */}
-      <div className="activities-panel__toolbar">
-        <input
-          ref={selectAllRef}
-          type="checkbox"
-          className="activities-panel__checkbox"
-          checked={allChecked}
-          disabled={activities.length === 0}
-          aria-label={allChecked ? 'Uncheck all activities' : 'Check all activities'}
-          title={allChecked ? 'Uncheck all' : 'Check all'}
-          onChange={() => (allChecked || someChecked ? onClear() : onSelectAll())}
+      {tab === 'sync' ? (
+        <SyncTab
+          imports={imports}
+          readOnly={readOnly}
+          onViewOnMap={(activityId, startedAt) => {
+            setTab('activities');
+            onViewOnMap(activityId, startedAt);
+          }}
         />
-        <button
-          type="button"
-          className="activities-panel__invert"
-          disabled={activities.length === 0}
-          onClick={onInvertSelection}
-          aria-label="Invert selection"
-          title="Invert selection — check the unchecked activities and uncheck the checked ones"
-        >
-          {/* A checkbox-sized square split on the diagonal, one half filled — reads as a
-              sibling of the select-all checkbox beside it rather than a separate text chip.
-              Lucide has no such glyph, so it's drawn to Lucide's own geometry (its `square`:
-              24-unit grid, 2-unit stroke, rx 2) to stay one family with the rest. */}
-          <svg
-            viewBox="0 0 24 24"
-            width="16"
-            height="16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinejoin="round"
-            aria-hidden="true"
-            focusable="false"
-          >
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <path d="M21 3v16a2 2 0 0 1-2 2H3Z" fill="currentColor" />
-          </svg>
-        </button>
+      ) : (
+        <>
+          <DistanceFilter
+            bounds={distanceBounds}
+            value={distanceFilter}
+            onChangeDistance={onChangeDistance}
+            onReset={onResetFilters}
+            hasActiveFilters={hasActiveFilters}
+          />
 
-        <div className="activities-panel__type-dropdown" ref={typeFilterRef}>
-          <button
-            type="button"
-            className="activities-panel__type-trigger"
-            aria-haspopup="true"
-            aria-expanded={typeFilterOpen}
-            onClick={() => setTypeFilterOpen((open) => !open)}
-          >
-            Type
-            {excludedTypes.size > 0 && <span className="activities-panel__type-trigger-dot" aria-hidden="true" />}
-            <span className="activities-panel__type-trigger-caret" aria-hidden="true">
-              <ChevronDown size={14} />
+          {/* The header toolbar — right above the row list. There are no more per-row action
+              icons to stay column-aligned with (Visible/Edit/Delete all moved here, operating on
+              the checked group), so this is a plain compact strip: select-all checkbox, the invert-selection icon, the Type
+              dropdown, a spacer, the three group-action chips, a divider, then the one
+              accent-tinted "focus the map on this group" action. */}
+          <div className="activities-panel__toolbar">
+            <input
+              ref={selectAllRef}
+              type="checkbox"
+              className="activities-panel__checkbox"
+              checked={allChecked}
+              disabled={activities.length === 0}
+              aria-label={allChecked ? 'Uncheck all activities' : 'Check all activities'}
+              title={allChecked ? 'Uncheck all' : 'Check all'}
+              onChange={() => (allChecked || someChecked ? onClear() : onSelectAll())}
+            />
+            <button
+              type="button"
+              className="activities-panel__invert"
+              disabled={activities.length === 0}
+              onClick={onInvertSelection}
+              aria-label="Invert selection"
+              title="Invert selection — check the unchecked activities and uncheck the checked ones"
+            >
+              {/* A checkbox-sized square split on the diagonal, one half filled — reads as a
+                  sibling of the select-all checkbox beside it rather than a separate text chip.
+                  Lucide has no such glyph, so it's drawn to Lucide's own geometry (its `square`:
+                  24-unit grid, 2-unit stroke, rx 2) to stay one family with the rest. */}
+              <svg
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M21 3v16a2 2 0 0 1-2 2H3Z" fill="currentColor" />
+              </svg>
+            </button>
+
+            <div className="activities-panel__type-dropdown" ref={typeFilterRef}>
+              <button
+                type="button"
+                className="activities-panel__type-trigger"
+                aria-haspopup="true"
+                aria-expanded={typeFilterOpen}
+                onClick={() => setTypeFilterOpen((open) => !open)}
+              >
+                Type
+                {excludedTypes.size > 0 && <span className="activities-panel__type-trigger-dot" aria-hidden="true" />}
+                <span className="activities-panel__type-trigger-caret" aria-hidden="true">
+                  <ChevronDown size={14} />
+                </span>
+              </button>
+              {typeFilterOpen && (
+                <div className="activities-panel__type-panel" role="dialog" aria-label="Filter by type">
+                  {facets.length === 0 ? (
+                    <p className="activities-panel__type-panel-empty">No activities to filter yet.</p>
+                  ) : (
+                    <>
+                      {/* A select-all convenience, not a real toggle — it only ever clears every
+                          exclusion (looping onToggleType over the current excluded set re-includes
+                          each one; there's no separate prop for "clear all"), matching how "Reset
+                          filters" elsewhere in this panel also only ever clears forward. Clicking
+                          it while every type is already shown is a no-op. */}
+                      <label htmlFor="activities-toolbar-type-all" className="activity-filters__type-item activity-filters__type-item--all">
+                        <input
+                          id="activities-toolbar-type-all"
+                          type="checkbox"
+                          checked={excludedTypes.size === 0}
+                          onChange={() => {
+                            for (const type of excludedTypes) onToggleType(type);
+                          }}
+                        />
+                        <span className="activity-filters__type-label">All types</span>
+                      </label>
+                      <div className="activities-panel__type-panel-divider" aria-hidden="true" />
+                      <div className="activity-filters__type-list">
+                        {facets.map((facet) => {
+                          const included = !excludedTypes.has(facet.type);
+                          const inputId = `activities-toolbar-type-${facet.type}`;
+                          return (
+                            <label key={facet.type} htmlFor={inputId} className="activity-filters__type-item">
+                              <input id={inputId} type="checkbox" checked={included} onChange={() => onToggleType(facet.type)} />
+                              <span className="activity-filters__type-label">{formatActivityType(facet.type)}</span>
+                              <span className="activity-filters__type-count">{facet.count}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <span className="activities-panel__toolbar-spacer" aria-hidden="true" />
+
+            <button
+              type="button"
+              className="activities-panel__visibility"
+              disabled={checked.size === 0}
+              onClick={onToggleGroupVisibility}
+              aria-label={groupHasHidden ? 'Show every checked activity on the map' : 'Hide every checked activity from the map'}
+              title={groupHasHidden ? 'Show checked group' : 'Hide checked group'}
+            >
+              {groupHasHidden ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+            <button
+              type="button"
+              className="activities-panel__edit"
+              disabled={readOnly || checked.size === 0}
+              onClick={() => setEditingActivities(checkedActivities)}
+              aria-label="Edit the checked group"
+              title={
+                readOnly
+                  ? 'Not available for demo accounts — create an account to edit activities'
+                  : checkedActivities.length === 1
+                    ? 'Edit type, name, and description'
+                    : 'Edit type for every checked activity'
+              }
+            >
+              <Pencil size={16} />
+            </button>
+            <button
+              type="button"
+              className="activities-panel__edit-track"
+              disabled={editTrackReason !== null}
+              onClick={() => editTrackTarget && onEditTrack(editTrackTarget)}
+              aria-label="Edit the checked activity's track"
+              title={editTrackReason ?? 'Edit track — chop, cut, or delete points'}
+            >
+              <Waypoints size={16} />
+            </button>
+            <button
+              type="button"
+              className="activities-panel__delete"
+              disabled={readOnly || checked.size === 0 || groupHasPending}
+              onClick={() => setDeletingGroup(true)}
+              aria-label="Delete every checked activity"
+              title={readOnly ? 'Not available for demo accounts — create an account to delete activities' : 'Delete checked group'}
+            >
+              <Trash2 size={16} />
+            </button>
+            <span className="activities-panel__toolbar-divider" aria-hidden="true" />
+            <button
+              type="button"
+              className="activities-panel__focus"
+              disabled={checked.size === 0}
+              onClick={onShowSelected}
+              aria-label="Focus the map on the checked group"
+              title="Focus checked group on the map"
+            >
+              <Focus size={16} />
+            </button>
+          </div>
+
+          <ul className="activities-panel__list" data-testid="activities-list" ref={listRef}>
+            {activities.map((activity) => {
+              const isChecked = checked.has(activity.id);
+              const isFocused = focusedId === activity.id;
+              const isHovered = hoveredId === activity.id;
+              const isHidden = hiddenIds.has(activity.id);
+              const isPending = activity.pending;
+              // A user-entered name (§4.7's revised decision) leads; started_at is the fallback
+              // for a row that has none — never the reverse, so an activity's date doesn't
+              // disappear from the list just because it also has a name (shown in the meta line
+              // below instead). Sorting itself is untouched either way: the list's order comes
+              // entirely from the server's own `ORDER BY started_at DESC`, never from this label.
+              const displayName = activity.name?.trim() || null;
+              const label = displayName ?? formatStartedAt(activity.startedAt);
+              const classes = ['activities-panel__row'];
+              // Bold on the map is the union of checked and focused — the row highlight matches.
+              if (isChecked || isFocused) classes.push('activities-panel__row--selected');
+              if (isHidden) classes.push('activities-panel__row--hidden');
+              if (isPending) classes.push('activities-panel__row--pending');
+              return (
+                <li
+                  key={activity.id}
+                  data-activity-id={activity.id}
+                  className={classes.join(' ')}
+                  // The description (§4.7.4) shows as a hover tooltip only — no second visible
+                  // line, and undefined (not an empty string) when there is none, so a row with
+                  // nothing written there gets no title attribute at all rather than an empty
+                  // one a browser might still render as an inert tooltip.
+                  title={activity.description ?? undefined}
+                  onMouseEnter={() => onHoverActivity(activity.id)}
+                  onMouseLeave={() => onHoverActivity(null)}
+                >
+                  <input
+                    type="checkbox"
+                    className="activities-panel__checkbox"
+                    checked={isChecked}
+                    // A pending row (§4.7.7) is disabled until its reprocess lands, except that an
+                    // already-checked one can still be unchecked.
+                    disabled={isPending && !isChecked}
+                    aria-label={isChecked ? `Remove ${label} from selection` : `Add ${label} to selection`}
+                    onChange={() => onToggle(activity.id)}
+                  />
+                  <button
+                    type="button"
+                    className="activities-panel__text"
+                    disabled={isPending}
+                    aria-pressed={isFocused}
+                    aria-label={`Fly to ${label}`}
+                    title={activity.bbox === null ? 'No track recorded for this activity' : label}
+                    onClick={() => onFocus(activity.id)}
+                  >
+                    <span className={`activities-panel__title${isHovered ? ' activities-panel__title--hovered' : ''}`}>{label}</span>
+                    <span className="activities-panel__meta">
+                      {/* The date moves down here, ahead of distance/duration, once a name has
+                          taken its place as the title above — otherwise it's already the title
+                          and repeating it here would be redundant. Type trails the line now
+                          (there's no separate trailing column any more — single-item actions,
+                          including visibility, all moved to the toolbar via check-then-toolbar,
+                          so a bare row has nothing left to show but this text). */}
+                      {displayName && `${formatStartedAt(activity.startedAt)} · `}
+                      {formatDistance(activity.distanceMeters, system)} · {formatDuration(activity.durationSeconds)} ·{' '}
+                      {formatActivityType(activity.activityType)}
+                    </span>
+                  </button>
+                  {isPending && (
+                    <span className="activities-panel__hidden-badge" title="Applying your track edit">
+                      Pending
+                    </span>
+                  )}
+                  {isHidden && <span className="activities-panel__hidden-badge">Hidden</span>}
+                </li>
+              );
+            })}
+            {loading && <li className="activities-panel__note">Loading…</li>}
+            {error && !loading && (
+              <li className="activities-panel__note activities-panel__note--error">{error}</li>
+            )}
+            {!loading && !error && activities.length === 0 && (
+              <li className="activities-panel__note">No activities match the current filters.</li>
+            )}
+          </ul>
+
+          {/* Just the summary now — the fly-to-fit action it used to hold moved to the toolbar's
+              own accent-tinted "Focus checked group on the map" icon above. */}
+          <div className="activities-panel__footer">
+            <span className="activities-panel__footer-summary">
+              {checkedActivities.length} selected · {formatTotalDistance(checkedMeters, system)}
             </span>
-          </button>
-          {typeFilterOpen && (
-            <div className="activities-panel__type-panel" role="dialog" aria-label="Filter by type">
-              {facets.length === 0 ? (
-                <p className="activities-panel__type-panel-empty">No activities to filter yet.</p>
-              ) : (
-                <>
-                  {/* A select-all convenience, not a real toggle — it only ever clears every
-                      exclusion (looping onToggleType over the current excluded set re-includes
-                      each one; there's no separate prop for "clear all"), matching how "Reset
-                      filters" elsewhere in this panel also only ever clears forward. Clicking
-                      it while every type is already shown is a no-op. */}
-                  <label htmlFor="activities-toolbar-type-all" className="activity-filters__type-item activity-filters__type-item--all">
-                    <input
-                      id="activities-toolbar-type-all"
-                      type="checkbox"
-                      checked={excludedTypes.size === 0}
-                      onChange={() => {
-                        for (const type of excludedTypes) onToggleType(type);
-                      }}
-                    />
-                    <span className="activity-filters__type-label">All types</span>
-                  </label>
-                  <div className="activities-panel__type-panel-divider" aria-hidden="true" />
-                  <div className="activity-filters__type-list">
-                    {facets.map((facet) => {
-                      const included = !excludedTypes.has(facet.type);
-                      const inputId = `activities-toolbar-type-${facet.type}`;
-                      return (
-                        <label key={facet.type} htmlFor={inputId} className="activity-filters__type-item">
-                          <input id={inputId} type="checkbox" checked={included} onChange={() => onToggleType(facet.type)} />
-                          <span className="activity-filters__type-label">{formatActivityType(facet.type)}</span>
-                          <span className="activity-filters__type-count">{facet.count}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </>
+          </div>
+
+          {/* FR-3.7's "not yet built" gap: something synced can be absent from the list above for
+              two different reasons — it failed, or cross-source dedup already had it from
+              somewhere else — and only the second is not a fault. Hidden entirely when there's
+              nothing to say, the same as Android's own duplicatesHeading. */}
+          {(duplicates.length > 0 || duplicatesError) && (
+            <div className="activities-panel__duplicates" ref={duplicatesRef}>
+              <button
+                type="button"
+                className="activities-panel__duplicates-toggle"
+                aria-expanded={duplicatesOpen}
+                onClick={() => setDuplicatesOpen((open) => !open)}
+              >
+                {duplicatesError
+                  ? 'Duplicates — failed to load'
+                  : `${duplicates.length} ${duplicates.length === 1 ? 'duplicate' : 'duplicates'} found`}
+                <span className="activities-panel__duplicates-chevron" aria-hidden="true">
+                  {duplicatesOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                </span>
+              </button>
+              {duplicatesOpen && !duplicatesError && (
+                <ul className="activities-panel__duplicates-list" data-testid="activities-duplicates-list">
+                  {duplicates.map((d) => (
+                    <li key={d.id} className="activities-panel__duplicates-row">
+                      {formatStartedAt(d.startedAt)} · {formatActivityType(d.activityType)}
+                      {d.distanceMeters !== null && ` · ${formatDistance(d.distanceMeters, system)}`}
+                      <br />
+                      From {formatIngestSource(d.source)} — replaced by the copy from {formatIngestSource(d.supersededBy.source)}.
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
           )}
-        </div>
-
-        <span className="activities-panel__toolbar-spacer" aria-hidden="true" />
-
-        <button
-          type="button"
-          className="activities-panel__visibility"
-          disabled={checked.size === 0}
-          onClick={onToggleGroupVisibility}
-          aria-label={groupHasHidden ? 'Show every checked activity on the map' : 'Hide every checked activity from the map'}
-          title={groupHasHidden ? 'Show checked group' : 'Hide checked group'}
-        >
-          {groupHasHidden ? <EyeOff size={16} /> : <Eye size={16} />}
-        </button>
-        <button
-          type="button"
-          className="activities-panel__edit"
-          disabled={readOnly || checked.size === 0}
-          onClick={() => setEditingActivities(checkedActivities)}
-          aria-label="Edit the checked group"
-          title={
-            readOnly
-              ? 'Not available for demo accounts — create an account to edit activities'
-              : checkedActivities.length === 1
-                ? 'Edit type, name, and description'
-                : 'Edit type for every checked activity'
-          }
-        >
-          <Pencil size={16} />
-        </button>
-        <button
-          type="button"
-          className="activities-panel__edit-track"
-          disabled={editTrackReason !== null}
-          onClick={() => editTrackTarget && onEditTrack(editTrackTarget)}
-          aria-label="Edit the checked activity's track"
-          title={editTrackReason ?? 'Edit track — chop, cut, or delete points'}
-        >
-          <Waypoints size={16} />
-        </button>
-        <button
-          type="button"
-          className="activities-panel__delete"
-          disabled={readOnly || checked.size === 0 || groupHasPending}
-          onClick={() => setDeletingGroup(true)}
-          aria-label="Delete every checked activity"
-          title={readOnly ? 'Not available for demo accounts — create an account to delete activities' : 'Delete checked group'}
-        >
-          <Trash2 size={16} />
-        </button>
-        <span className="activities-panel__toolbar-divider" aria-hidden="true" />
-        <button
-          type="button"
-          className="activities-panel__focus"
-          disabled={checked.size === 0}
-          onClick={onShowSelected}
-          aria-label="Focus the map on the checked group"
-          title="Focus checked group on the map"
-        >
-          <Focus size={16} />
-        </button>
-      </div>
-
-      <ul className="activities-panel__list" data-testid="activities-list" ref={listRef}>
-        {activities.map((activity) => {
-          const isChecked = checked.has(activity.id);
-          const isFocused = focusedId === activity.id;
-          const isHovered = hoveredId === activity.id;
-          const isHidden = hiddenIds.has(activity.id);
-          const isPending = activity.pending;
-          // A user-entered name (§4.7's revised decision) leads; started_at is the fallback
-          // for a row that has none — never the reverse, so an activity's date doesn't
-          // disappear from the list just because it also has a name (shown in the meta line
-          // below instead). Sorting itself is untouched either way: the list's order comes
-          // entirely from the server's own `ORDER BY started_at DESC`, never from this label.
-          const displayName = activity.name?.trim() || null;
-          const label = displayName ?? formatStartedAt(activity.startedAt);
-          const classes = ['activities-panel__row'];
-          // Bold on the map is the union of checked and focused — the row highlight matches.
-          if (isChecked || isFocused) classes.push('activities-panel__row--selected');
-          if (isHidden) classes.push('activities-panel__row--hidden');
-          if (isPending) classes.push('activities-panel__row--pending');
-          return (
-            <li
-              key={activity.id}
-              data-activity-id={activity.id}
-              className={classes.join(' ')}
-              // The description (§4.7.4) shows as a hover tooltip only — no second visible
-              // line, and undefined (not an empty string) when there is none, so a row with
-              // nothing written there gets no title attribute at all rather than an empty
-              // one a browser might still render as an inert tooltip.
-              title={activity.description ?? undefined}
-              onMouseEnter={() => onHoverActivity(activity.id)}
-              onMouseLeave={() => onHoverActivity(null)}
-            >
-              <input
-                type="checkbox"
-                className="activities-panel__checkbox"
-                checked={isChecked}
-                // A pending row (§4.7.7) is disabled until its reprocess lands, except that an
-                // already-checked one can still be unchecked.
-                disabled={isPending && !isChecked}
-                aria-label={isChecked ? `Remove ${label} from selection` : `Add ${label} to selection`}
-                onChange={() => onToggle(activity.id)}
-              />
-              <button
-                type="button"
-                className="activities-panel__text"
-                disabled={isPending}
-                aria-pressed={isFocused}
-                aria-label={`Fly to ${label}`}
-                title={activity.bbox === null ? 'No track recorded for this activity' : label}
-                onClick={() => onFocus(activity.id)}
-              >
-                <span className={`activities-panel__title${isHovered ? ' activities-panel__title--hovered' : ''}`}>{label}</span>
-                <span className="activities-panel__meta">
-                  {/* The date moves down here, ahead of distance/duration, once a name has
-                      taken its place as the title above — otherwise it's already the title
-                      and repeating it here would be redundant. Type trails the line now
-                      (there's no separate trailing column any more — single-item actions,
-                      including visibility, all moved to the toolbar via check-then-toolbar,
-                      so a bare row has nothing left to show but this text). */}
-                  {displayName && `${formatStartedAt(activity.startedAt)} · `}
-                  {formatDistance(activity.distanceMeters, system)} · {formatDuration(activity.durationSeconds)} ·{' '}
-                  {formatActivityType(activity.activityType)}
-                </span>
-              </button>
-              {isPending && (
-                <span className="activities-panel__hidden-badge" title="Applying your track edit">
-                  Pending
-                </span>
-              )}
-              {isHidden && <span className="activities-panel__hidden-badge">Hidden</span>}
-            </li>
-          );
-        })}
-        {loading && <li className="activities-panel__note">Loading…</li>}
-        {error && !loading && (
-          <li className="activities-panel__note activities-panel__note--error">{error}</li>
-        )}
-        {!loading && !error && activities.length === 0 && (
-          <li className="activities-panel__note">No activities match the current filters.</li>
-        )}
-      </ul>
-
-      {/* Just the summary now — the fly-to-fit action it used to hold moved to the toolbar's
-          own accent-tinted "Focus checked group on the map" icon above. */}
-      <div className="activities-panel__footer">
-        <span className="activities-panel__footer-summary">
-          {checkedActivities.length} selected · {formatTotalDistance(checkedMeters, system)}
-        </span>
-      </div>
-
-      {/* FR-3.7's "not yet built" gap: something synced can be absent from the list above for
-          two different reasons — it failed, or cross-source dedup already had it from
-          somewhere else — and only the second is not a fault. Hidden entirely when there's
-          nothing to say, the same as Android's own duplicatesHeading. */}
-      {(duplicates.length > 0 || duplicatesError) && (
-        <div className="activities-panel__duplicates" ref={duplicatesRef}>
-          <button
-            type="button"
-            className="activities-panel__duplicates-toggle"
-            aria-expanded={duplicatesOpen}
-            onClick={() => setDuplicatesOpen((open) => !open)}
-          >
-            {duplicatesError
-              ? 'Duplicates — failed to load'
-              : `${duplicates.length} ${duplicates.length === 1 ? 'duplicate' : 'duplicates'} found`}
-            <span className="activities-panel__duplicates-chevron" aria-hidden="true">
-              {duplicatesOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-            </span>
-          </button>
-          {duplicatesOpen && !duplicatesError && (
-            <ul className="activities-panel__duplicates-list" data-testid="activities-duplicates-list">
-              {duplicates.map((d) => (
-                <li key={d.id} className="activities-panel__duplicates-row">
-                  {formatStartedAt(d.startedAt)} · {formatActivityType(d.activityType)}
-                  {d.distanceMeters !== null && ` · ${formatDistance(d.distanceMeters, system)}`}
-                  <br />
-                  From {formatIngestSource(d.source)} — replaced by the copy from {formatIngestSource(d.supersededBy.source)}.
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        </>
       )}
 
       {editingActivities && (

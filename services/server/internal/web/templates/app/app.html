@@ -1,0 +1,43 @@
+{{/* The React app's shell (ADR-0012): the map page, and for now Profile and Settings too —
+     the shared header, then the element the app mounts into. Rendered by httpapi's
+     appShell; the bundle is apps/web's, loaded from its stable-named build output, or from
+     Vite's dev server when the request came through it (AppPage.ViteDev). */}}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>{{.Title}}</title>
+    <meta name="robots" content="noindex" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,800;1,9..144,400&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{asset "header.css"}}" />
+    {{if .ViteDev}}
+    {{/* @vitejs/plugin-react's preamble, which its dev server otherwise injects into an
+         index.html it serves itself — required for Fast Refresh when the HTML comes from a
+         backend (https://vite.dev/guide/backend-integration). */}}
+    <script type="module">
+      import RefreshRuntime from '/@react-refresh';
+      RefreshRuntime.injectIntoGlobalHook(window);
+      window.$RefreshReg$ = () => {};
+      window.$RefreshSig$ = () => (type) => type;
+      window.__vite_plugin_react_preamble_installed__ = true;
+    </script>
+    <script type="module" src="/@vite/client"></script>
+    <script type="module" src="/src/main.tsx"></script>
+    {{else}}
+    <link rel="stylesheet" href="{{appAsset "app.css"}}" />
+    <script type="module" src="{{appAsset "app.js"}}"></script>
+    {{end}}
+  </head>
+  <body class="app-page">
+    {{template "header" .}}
+    <div id="root"></div>
+  </body>
+</html>

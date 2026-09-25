@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
  * Delete button (§4.7.5), but deliberately not delete-specific: any future destructive action
  * that needs a confirm step before committing can reuse this rather than growing its own.
  *
- * Same real `<dialog>`/`showModal()` shape as `PlaceholderNotice.tsx`/`EditActivityDialog.tsx`
+ * Same real `<dialog>`/`showModal()` shape as `EditActivityDialog.tsx`
  * — free Escape/backdrop/focus-trap behavior, and exactly one path out (the dialog's own
  * `close()`) regardless of whether that came from Confirm, Cancel, Escape, or a backdrop
  * click. `onConfirm` is async and owned entirely here, the same self-contained shape

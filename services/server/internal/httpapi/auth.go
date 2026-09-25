@@ -15,6 +15,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 )
 
 // Email+password auth, server-side sessions (migrations/0006_sessions.sql) — resolved toward
@@ -60,9 +62,11 @@ type authRequest struct {
 	Timezone string `json:"timezone"`
 }
 
-// normalizeTimezone validates raw against the IANA tz database via time.LoadLocation. Returns
-// ok=false for empty or unloadable input; the caller decides what that means for its own
-// endpoint (handleSignup falls back to "UTC", handleUpdateSettings rejects with a 400).
+// normalizeTimezone validates raw against the IANA tz database via time.LoadLocation, and
+// returns it under its current name (web.CurrentTimezoneName: a browser reports Asia/Calcutta,
+// the account stores Asia/Kolkata). Returns ok=false for empty or unloadable input; the caller
+// decides what that means for its own endpoint (createAccount falls back to "UTC",
+// saveSettings rejects with a 400).
 func normalizeTimezone(raw string) (tz string, ok bool) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -71,7 +75,7 @@ func normalizeTimezone(raw string) (tz string, ok bool) {
 	if _, err := time.LoadLocation(raw); err != nil {
 		return "", false
 	}
-	return raw, true
+	return web.CurrentTimezoneName(raw), true
 }
 
 // authResponse is the one shape every auth endpoint and handleMe returns — see
@@ -159,15 +163,63 @@ func decodeAuthRequest(r *http.Request) (authRequest, error) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return authRequest{}, errors.New("invalid request body")
 	}
-	email, err := normalizeEmail(req.Email)
-	if err != nil {
-		return authRequest{}, err
-	}
-	req.Email = email
-	if len(req.Password) < minPasswordLength {
-		return authRequest{}, fmt.Errorf("password must be at least %d characters", minPasswordLength)
-	}
 	return req, nil
+}
+
+// validateCredentials is the email+password check signup and sign-in share, JSON or form:
+// the normalized email, or a 400 accountFailure saying what's wrong.
+func validateCredentials(rawEmail, password string) (string, error) {
+	email, err := normalizeEmail(rawEmail)
+	if err != nil {
+		return "", accountFailure(http.StatusBadRequest, err.Error())
+	}
+	if len(password) < minPasswordLength {
+		return "", accountFailure(http.StatusBadRequest, fmt.Sprintf("password must be at least %d characters", minPasswordLength))
+	}
+	return email, nil
+}
+
+// accountError is a failure the person should see — wrong password, a taken email, an expired
+// link — as opposed to an infrastructure error, which is logged and shown only as "internal
+// error". The account cores above return one; the JSON handlers turn it into a status and
+// plain-text body (writeAccountError), the pages into a message on the form (auth_pages.go).
+type accountError struct {
+	status int
+	msg    string
+}
+
+func (e *accountError) Error() string { return e.msg }
+
+func accountFailure(status int, msg string) error { return &accountError{status: status, msg: msg} }
+
+// writeAccountError is the JSON side of an account core's error: its own status and message
+// for an accountError, a logged 500 for anything else.
+func (s *Server) writeAccountError(w http.ResponseWriter, op string, err error) {
+	var ae *accountError
+	if errors.As(err, &ae) {
+		http.Error(w, ae.msg, ae.status)
+		return
+	}
+	s.log.Error(op+" failed", "err", err)
+	http.Error(w, "internal error", http.StatusInternalServerError)
+}
+
+// writeSession starts a session for userID and answers with the account plus its token —
+// what every JSON endpoint that signs someone in (signup, login, demo, reset, verify) returns.
+func (s *Server) writeSession(w http.ResponseWriter, r *http.Request, userID string, ttl time.Duration, status int) {
+	sessionID, err := s.startSession(w, r.Context(), userID, ttl)
+	if err != nil {
+		s.log.Error("session start failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	resp, err := s.loadAuthResponse(r.Context(), userID)
+	if err != nil {
+		s.log.Error("session response lookup failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, status, authResponseWithSession{authResponse: resp, SessionToken: sessionID})
 }
 
 // normalizeEmail is decodeAuthRequest's own validation, pulled out so handleForgotPassword
@@ -196,56 +248,50 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	userID, err := s.createAccount(r.Context(), req.Email, req.Password, req.Timezone)
 	if err != nil {
-		s.log.Error("password hash failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.writeAccountError(w, "signup", err)
 		return
 	}
+	s.writeSession(w, r, userID, sessionTTL, http.StatusCreated)
+}
 
-	tz, ok := normalizeTimezone(req.Timezone)
+// createAccount is signup's shared core — handleSignup (JSON) and the /signup page
+// (auth_pages.go) both call it. email and password are validated here, not by the caller.
+// timezone is the browser's own guess and falls back to "UTC" when absent or unknown, rather
+// than failing the signup over a convenience default (migrations/0021_user_timezone.sql).
+func (s *Server) createAccount(ctx context.Context, rawEmail, password, timezone string) (string, error) {
+	email, err := validateCredentials(rawEmail, password)
+	if err != nil {
+		return "", err
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	tz, ok := normalizeTimezone(timezone)
 	if !ok {
 		tz = "UTC"
 	}
-
-	ctx := r.Context()
 	var userID string
 	err = s.pool.QueryRow(ctx,
 		`INSERT INTO users (email, password_hash, email_verified, timezone) VALUES ($1, $2, $3, $4) RETURNING id`,
-		req.Email, hash, s.skipEmailVerification, tz,
+		email, hash, s.skipEmailVerification, tz,
 	).Scan(&userID)
-	if err != nil {
-		if isUniqueViolation(err) {
-			http.Error(w, "an account with this email already exists", http.StatusConflict)
-			return
-		}
-		s.log.Error("signup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+	if isUniqueViolation(err) {
+		return "", accountFailure(http.StatusConflict, "an account with this email already exists")
 	}
-
+	if err != nil {
+		return "", err
+	}
 	if !s.skipEmailVerification {
-		if err := s.sendVerificationEmail(ctx, userID, req.Email); err != nil {
+		if err := s.sendVerificationEmail(ctx, userID, email); err != nil {
 			// Not fatal to the signup itself — the account exists and can request a resend
-			// (handleResendVerification) — but worth knowing about if Mailgun/SMTP is down.
+			// (resendVerification) — but worth knowing about if Mailgun/SMTP is down.
 			s.log.Error("verification email failed", "err", err)
 		}
 	}
-
-	sessionID, err := s.startSession(w, ctx, userID, sessionTTL)
-	if err != nil {
-		s.log.Error("session start failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	resp, err := s.loadAuthResponse(ctx, userID)
-	if err != nil {
-		s.log.Error("signup response lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, http.StatusCreated, authResponseWithSession{authResponse: resp, SessionToken: sessionID})
+	return userID, nil
 }
 
 // sendVerificationEmail creates a fresh token and emails the verification link — called from
@@ -261,7 +307,7 @@ func (s *Server) sendVerificationEmail(ctx context.Context, userID, email string
 		return err
 	}
 
-	link := fmt.Sprintf("%s/?verify_token=%s", s.appBaseURL, tokenID)
+	link := fmt.Sprintf("%s/verify?token=%s", s.appBaseURL, tokenID)
 	body := fmt.Sprintf(
 		"Welcome to HoldMyTrack! Confirm this email address to unlock your account:\n\n%s\n\n"+
 			"This link works once and expires in 24 hours. If you didn't create a HoldMyTrack "+
@@ -278,37 +324,33 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	ctx := r.Context()
+	userID, err := s.checkPassword(r.Context(), req.Email, req.Password)
+	if err != nil {
+		s.writeAccountError(w, "login", err)
+		return
+	}
+	s.writeSession(w, r, userID, sessionTTL, http.StatusOK)
+}
 
+// checkPassword is sign-in's shared core (handleLogin and the /signin page): the account id
+// for a matching email and password. One generic failure whether the email doesn't exist,
+// belongs to an unclaimed seed row (password_hash still NULL), or the password just doesn't
+// match — distinguishing any of those would tell a caller which emails are registered.
+func (s *Server) checkPassword(ctx context.Context, rawEmail, password string) (string, error) {
+	email, err := validateCredentials(rawEmail, password)
+	if err != nil {
+		return "", err
+	}
 	var userID string
 	var hash []byte
-	err = s.pool.QueryRow(ctx, `SELECT id, password_hash FROM users WHERE email = $1`, req.Email).Scan(&userID, &hash)
+	err = s.pool.QueryRow(ctx, `SELECT id, password_hash FROM users WHERE email = $1`, email).Scan(&userID, &hash)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		s.log.Error("login lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+		return "", err
 	}
-	// One generic response whether the email doesn't exist, belongs to an unclaimed seed
-	// row (password_hash still NULL), or the password just doesn't match — distinguishing
-	// any of those would tell a caller which emails are registered.
-	if errors.Is(err, pgx.ErrNoRows) || hash == nil || bcrypt.CompareHashAndPassword(hash, []byte(req.Password)) != nil {
-		http.Error(w, "invalid email or password", http.StatusUnauthorized)
-		return
+	if errors.Is(err, pgx.ErrNoRows) || hash == nil || bcrypt.CompareHashAndPassword(hash, []byte(password)) != nil {
+		return "", accountFailure(http.StatusUnauthorized, "invalid email or password")
 	}
-
-	sessionID, err := s.startSession(w, ctx, userID, sessionTTL)
-	if err != nil {
-		s.log.Error("session start failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	resp, err := s.loadAuthResponse(ctx, userID)
-	if err != nil {
-		s.log.Error("login response lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, http.StatusOK, authResponseWithSession{authResponse: resp, SessionToken: sessionID})
+	return userID, nil
 }
 
 // handleLogout serves `POST /v1/auth/logout` — deletes the session server-side (not just
@@ -317,6 +359,13 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 // directly, so a mobile caller presenting only Authorization: Bearer actually revokes its
 // session here instead of this silently no-op'ing and clearing a cookie that was never set.
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	s.endSession(w, r)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// endSession deletes the caller's session row and clears its cookie — shared by the JSON
+// logout above and the pages' Sign out form (pages.go's handleLogoutPage).
+func (s *Server) endSession(w http.ResponseWriter, r *http.Request) {
 	if sessionID, ok := sessionIDFromRequest(r); ok {
 		if _, err := s.pool.Exec(r.Context(), `DELETE FROM sessions WHERE id = $1`, sessionID); err != nil {
 			s.log.Error("session delete failed", "err", err)
@@ -330,7 +379,6 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 	})
-	w.WriteHeader(http.StatusNoContent)
 }
 
 // handleMe serves `GET /v1/auth/me` — how the frontend learns whether a session cookie it's
@@ -363,27 +411,19 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 // limiting" gap couldn't be left alone — cheap now that it only creates a session row, but
 // still worth capping.
 func (s *Server) handleDemoStart(w http.ResponseWriter, r *http.Request) {
+	if err := allowDemo(r); err != nil {
+		s.writeAccountError(w, "demo start", err)
+		return
+	}
+	s.writeSession(w, r, DemoCustomerUserID, demoSessionTTL, http.StatusCreated)
+}
+
+// allowDemo is the demo start's one check, shared with the page's `POST /demo`.
+func allowDemo(r *http.Request) error {
 	if !demoLimiter.allow(clientIP(r)) {
-		http.Error(w, "too many demo sessions from this address; try again later", http.StatusTooManyRequests)
-		return
+		return accountFailure(http.StatusTooManyRequests, "too many demo sessions from this address; try again later")
 	}
-
-	ctx := r.Context()
-	userID := DemoCustomerUserID
-
-	sessionID, err := s.startSession(w, ctx, userID, demoSessionTTL)
-	if err != nil {
-		s.log.Error("session start failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	resp, err := s.loadAuthResponse(ctx, userID)
-	if err != nil {
-		s.log.Error("demo start response lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, http.StatusCreated, authResponseWithSession{authResponse: resp, SessionToken: sessionID})
+	return nil
 }
 
 // demoLimiter caps how many demo accounts one address can create — 5 per hour is generous
@@ -403,28 +443,35 @@ type forgotPasswordRequest struct {
 // limited per IP like handleDemoStart: the other endpoint reachable with no credentials at
 // all that has a real-world side effect (sending mail) a script could otherwise abuse.
 func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
-	if !forgotPasswordLimiter.allow(clientIP(r)) {
-		http.Error(w, "too many requests; try again later", http.StatusTooManyRequests)
-		return
-	}
-
 	var req forgotPasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	email, err := normalizeEmail(req.Email)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if err := s.requestPasswordReset(r, req.Email); err != nil {
+		s.writeAccountError(w, "forgot-password", err)
 		return
-	}
-
-	if err := s.sendPasswordReset(r.Context(), email); err != nil {
-		s.log.Error("forgot-password failed", "err", err)
 	}
 	writeJSON(w, http.StatusOK, map[string]string{
 		"message": "If an account exists for that email, a reset link is on its way.",
 	})
+}
+
+// requestPasswordReset is the forgot-password core (the JSON endpoint and the /forgot page).
+// It only ever fails on the rate limit or a malformed address: an unknown email, and a failure
+// actually sending the mail, both look like success to the caller.
+func (s *Server) requestPasswordReset(r *http.Request, rawEmail string) error {
+	if !forgotPasswordLimiter.allow(clientIP(r)) {
+		return accountFailure(http.StatusTooManyRequests, "too many requests; try again later")
+	}
+	email, err := normalizeEmail(rawEmail)
+	if err != nil {
+		return accountFailure(http.StatusBadRequest, err.Error())
+	}
+	if err := s.sendPasswordReset(r.Context(), email); err != nil {
+		s.log.Error("forgot-password failed", "err", err)
+	}
+	return nil
 }
 
 // sendPasswordReset looks up a real, claimed account — one with a password or a linked Google
@@ -455,7 +502,7 @@ func (s *Server) sendPasswordReset(ctx context.Context, email string) error {
 		return err
 	}
 
-	link := fmt.Sprintf("%s/?reset_token=%s", s.appBaseURL, tokenID)
+	link := fmt.Sprintf("%s/reset?token=%s", s.appBaseURL, tokenID)
 	body := fmt.Sprintf(
 		"Someone requested a password reset for this HoldMyTrack account.\n\n"+
 			"Reset it here (expires in 1 hour, and only works once):\n%s\n\n"+
@@ -483,37 +530,36 @@ func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	if len(req.Password) < minPasswordLength {
-		http.Error(w, fmt.Sprintf("password must be at least %d characters", minPasswordLength), http.StatusBadRequest)
+	userID, err := s.resetPassword(r.Context(), req.Token, req.Password)
+	if err != nil {
+		s.writeAccountError(w, "reset-password", err)
 		return
 	}
+	s.writeSession(w, r, userID, sessionTTL, http.StatusOK)
+}
 
-	ctx := r.Context()
+// resetPassword is the reset core (the JSON endpoint and the /reset page): sets the new
+// password and returns the account id, for the caller to start the fresh session.
+func (s *Server) resetPassword(ctx context.Context, token, password string) (string, error) {
+	if len(password) < minPasswordLength {
+		return "", accountFailure(http.StatusBadRequest, fmt.Sprintf("password must be at least %d characters", minPasswordLength))
+	}
 	var userID string
 	err := s.pool.QueryRow(ctx,
-		`SELECT user_id FROM password_resets WHERE id = $1 AND expires_at > NOW()`, req.Token,
+		`SELECT user_id FROM password_resets WHERE id = $1 AND expires_at > NOW()`, token,
 	).Scan(&userID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		http.Error(w, "this reset link is invalid or has expired", http.StatusBadRequest)
-		return
+	if errors.Is(err, pgx.ErrNoRows) || isInvalidTextRepresentation(err) {
+		return "", accountFailure(http.StatusBadRequest, "this reset link is invalid or has expired")
 	}
 	if err != nil {
-		s.log.Error("reset-password lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+		return "", err
 	}
-
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		s.log.Error("password hash failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+		return "", err
 	}
-
 	if _, err := s.pool.Exec(ctx, `UPDATE users SET password_hash = $2 WHERE id = $1`, userID, hash); err != nil {
-		s.log.Error("password update failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+		return "", err
 	}
 	if _, err := s.pool.Exec(ctx, `DELETE FROM password_resets WHERE user_id = $1`, userID); err != nil {
 		s.log.Error("reset token cleanup failed", "err", err)
@@ -521,20 +567,7 @@ func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.pool.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1`, userID); err != nil {
 		s.log.Error("session cleanup failed", "err", err)
 	}
-
-	sessionID, err := s.startSession(w, ctx, userID, sessionTTL)
-	if err != nil {
-		s.log.Error("session start failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	resp, err := s.loadAuthResponse(ctx, userID)
-	if err != nil {
-		s.log.Error("reset-password response lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, http.StatusOK, authResponseWithSession{authResponse: resp, SessionToken: sessionID})
+	return userID, nil
 }
 
 // forgotPasswordLimiter mirrors demoLimiter — 5 requests per hour per address is generous for
@@ -560,47 +593,37 @@ func (s *Server) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
+	userID, err := s.verifyEmail(r.Context(), req.Token)
+	if err != nil {
+		s.writeAccountError(w, "verify-email", err)
+		return
+	}
+	s.writeSession(w, r, userID, sessionTTL, http.StatusOK)
+}
 
-	ctx := r.Context()
+// verifyEmail is the verification core (the JSON endpoint and the /verify page): marks the
+// token's account verified and returns its id, for the caller to start a session.
+func (s *Server) verifyEmail(ctx context.Context, token string) (string, error) {
 	var userID string
 	err := s.pool.QueryRow(ctx,
-		`SELECT user_id FROM email_verifications WHERE id = $1 AND expires_at > NOW()`, req.Token,
+		`SELECT user_id FROM email_verifications WHERE id = $1 AND expires_at > NOW()`, token,
 	).Scan(&userID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		http.Error(w, "this verification link is invalid or has expired", http.StatusBadRequest)
-		return
+	if errors.Is(err, pgx.ErrNoRows) || isInvalidTextRepresentation(err) {
+		return "", accountFailure(http.StatusBadRequest, "this verification link is invalid or has expired")
 	}
 	if err != nil {
-		s.log.Error("verify-email lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+		return "", err
 	}
-
 	if _, err := s.pool.Exec(ctx, `UPDATE users SET email_verified = true WHERE id = $1`, userID); err != nil {
-		s.log.Error("email verify update failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+		return "", err
 	}
 	// Every outstanding token for this account, not just the one used — mirrors
-	// handleResetPassword's own "close every other still-live link too" reasoning, applied to
-	// a resend that arrived after this one was already clicked.
+	// resetPassword's own "close every other still-live link too" reasoning, applied to a
+	// resend that arrived after this one was already clicked.
 	if _, err := s.pool.Exec(ctx, `DELETE FROM email_verifications WHERE user_id = $1`, userID); err != nil {
 		s.log.Error("verification token cleanup failed", "err", err)
 	}
-
-	sessionID, err := s.startSession(w, ctx, userID, sessionTTL)
-	if err != nil {
-		s.log.Error("session start failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	resp, err := s.loadAuthResponse(ctx, userID)
-	if err != nil {
-		s.log.Error("verify-email response lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, http.StatusOK, authResponseWithSession{authResponse: resp, SessionToken: sessionID})
+	return userID, nil
 }
 
 // handleResendVerification serves `POST /v1/auth/resend-verification` — plain requireAuth,
@@ -611,32 +634,30 @@ func (s *Server) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
 // arbitrary addresses.
 func (s *Server) handleResendVerification(w http.ResponseWriter, r *http.Request) {
 	info := authInfoFromContext(r.Context())
-	if info.isDemo {
-		http.Error(w, "demo accounts have no email to verify", http.StatusBadRequest)
-		return
-	}
-	if info.emailVerified {
+	if info.emailVerified && !info.isDemo {
 		writeJSON(w, http.StatusOK, map[string]string{"message": "This account is already verified."})
 		return
 	}
-	if !resendVerificationLimiter.allow(info.userID) {
-		http.Error(w, "too many requests; try again later", http.StatusTooManyRequests)
-		return
-	}
-
-	ctx := r.Context()
-	var email string
-	if err := s.pool.QueryRow(ctx, `SELECT email FROM users WHERE id = $1`, info.userID).Scan(&email); err != nil {
-		s.log.Error("resend-verification lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	if err := s.sendVerificationEmail(ctx, info.userID, email); err != nil {
-		s.log.Error("resend verification email failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+	if err := s.resendVerification(r.Context(), info); err != nil {
+		s.writeAccountError(w, "resend verification", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Verification email sent."})
+}
+
+// resendVerification is the resend core (the JSON endpoint and the /verify-pending page).
+func (s *Server) resendVerification(ctx context.Context, info authInfo) error {
+	if info.isDemo {
+		return accountFailure(http.StatusBadRequest, "demo accounts have no email to verify")
+	}
+	if !resendVerificationLimiter.allow(info.userID) {
+		return accountFailure(http.StatusTooManyRequests, "too many requests; try again later")
+	}
+	var email string
+	if err := s.pool.QueryRow(ctx, `SELECT email FROM users WHERE id = $1`, info.userID).Scan(&email); err != nil {
+		return err
+	}
+	return s.sendVerificationEmail(ctx, info.userID, email)
 }
 
 // resendVerificationLimiter mirrors forgotPasswordLimiter's shape but keys on the account's
@@ -655,33 +676,40 @@ type changeEmailRequest struct {
 // verified — an unconfirmed address is unconfirmed regardless of how it got there.
 func (s *Server) handleChangeEmail(w http.ResponseWriter, r *http.Request) {
 	info := authInfoFromContext(r.Context())
-	if info.isDemo {
-		http.Error(w, "demo accounts have no email to change", http.StatusBadRequest)
-		return
-	}
-
 	var req changeEmailRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	email, err := normalizeEmail(req.Email)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if err := s.changeEmail(r.Context(), info, req.Email); err != nil {
+		s.writeAccountError(w, "change-email", err)
 		return
 	}
+	resp, err := s.loadAuthResponse(r.Context(), info.userID)
+	if err != nil {
+		s.log.Error("change-email response lookup failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
 
-	ctx := r.Context()
+// changeEmail is the change-email core (the JSON endpoint and the /verify-pending page).
+func (s *Server) changeEmail(ctx context.Context, info authInfo, rawEmail string) error {
+	if info.isDemo {
+		return accountFailure(http.StatusBadRequest, "demo accounts have no email to change")
+	}
+	email, err := normalizeEmail(rawEmail)
+	if err != nil {
+		return accountFailure(http.StatusBadRequest, err.Error())
+	}
 	if _, err := s.pool.Exec(ctx,
 		`UPDATE users SET email = $2, email_verified = false WHERE id = $1`, info.userID, email,
 	); err != nil {
 		if isUniqueViolation(err) {
-			http.Error(w, "an account with this email already exists", http.StatusConflict)
-			return
+			return accountFailure(http.StatusConflict, "an account with this email already exists")
 		}
-		s.log.Error("change-email update failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+		return err
 	}
 	// Old tokens pointed at a verification link that would still verify an address this
 	// account no longer holds, if the new address ever unluckily collided with a stale one.
@@ -691,14 +719,7 @@ func (s *Server) handleChangeEmail(w http.ResponseWriter, r *http.Request) {
 	if err := s.sendVerificationEmail(ctx, info.userID, email); err != nil {
 		s.log.Error("change-email verification send failed", "err", err)
 	}
-
-	resp, err := s.loadAuthResponse(ctx, info.userID)
-	if err != nil {
-		s.log.Error("change-email response lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, http.StatusOK, resp)
+	return nil
 }
 
 type fixedWindowLimiter struct {
@@ -944,4 +965,11 @@ func (s *Server) requireNotDemo(next http.HandlerFunc) http.HandlerFunc {
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+// isInvalidTextRepresentation catches a token that isn't even a UUID — a mangled link — which
+// Postgres rejects outright rather than matching no row; it's still just an invalid link.
+func isInvalidTextRepresentation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "22P02"
 }

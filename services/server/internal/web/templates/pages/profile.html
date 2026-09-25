@@ -1,0 +1,93 @@
+{{define "content"}}{{with .Page}}
+<main class="page-main profile">
+  <a class="settings__back" href="/">← Back to map</a>
+
+  <section class="activity-graph" aria-label="Activity graph">
+    <div class="activity-graph__cards">
+      {{range .Cards}}<div class="activity-graph__card"><span class="activity-graph__card-label">{{.Label}}</span><span class="activity-graph__card-value">{{.Value}}</span></div>{{end}}
+    </div>
+
+    <div class="profile__head">
+      <div>
+        <h2 class="profile__title">Activity grid</h2>
+        <p class="profile__subtext">Every day you moved, year by year. Only you can see this.</p>
+      </div>
+      <div class="profile__toggle" role="group" aria-label="Shade grid by">
+        <span class="profile__toggle-label">Shade by</span>
+        <a class="profile__toggle-btn" href="{{index .ShadeHref "count"}}" {{if eq .ShadeBy "count"}}aria-current="true"{{end}}>Activities</a>
+        <a class="profile__toggle-btn" href="{{index .ShadeHref "distance"}}" {{if eq .ShadeBy "distance"}}aria-current="true"{{end}}>Distance</a>
+      </div>
+    </div>
+
+    {{range .Years}}
+    <section class="year-grid" aria-label="{{.Year}} activity grid">
+      <div class="year-grid__header">
+        <h3 class="year-grid__year">{{.Year}}</h3>
+        <span class="year-grid__stats">{{.Stats}}</span>
+      </div>
+      <div class="year-grid__body">
+        <div class="year-grid__row-labels" aria-hidden="true">
+          <span class="year-grid__row-label"></span><span class="year-grid__row-label">Mon</span><span class="year-grid__row-label"></span><span class="year-grid__row-label">Wed</span><span class="year-grid__row-label"></span><span class="year-grid__row-label">Fri</span><span class="year-grid__row-label"></span>
+        </div>
+        <div class="year-grid__chart">
+          <div class="year-grid__months" style="grid-template-columns: repeat({{.Weeks}}, 12px)" aria-hidden="true">
+            {{range .Months}}<span class="year-grid__month" style="grid-column-start: {{.Col}}">{{.Label}}</span>{{end}}
+          </div>
+          <div class="year-grid__cells" style="grid-template-columns: repeat({{.Weeks}}, 12px)">
+            {{- range .Cells}}{{if .Pad}}<span class="year-grid__cell year-grid__cell--pad"></span>{{else}}<span class="year-grid__cell year-grid__cell--level-{{.Level}}" title="{{.Title}}"></span>{{end}}{{end -}}
+          </div>
+        </div>
+      </div>
+    </section>
+    {{end}}
+
+    <p class="profile__legend">
+      <span>Shaded by {{.Legend}}: less</span>
+      <span class="year-grid__cell year-grid__cell--level-0" aria-hidden="true"></span>
+      <span class="year-grid__cell year-grid__cell--level-1" aria-hidden="true"></span>
+      <span class="year-grid__cell year-grid__cell--level-2" aria-hidden="true"></span>
+      <span class="year-grid__cell year-grid__cell--level-3" aria-hidden="true"></span>
+      <span>more</span>
+    </p>
+  </section>
+
+  <section class="trends" aria-label="Trends">
+    <div class="profile__head">
+      <div>
+        <h2 class="profile__title">Trends</h2>
+        <p class="profile__subtext">Distance over time — hover a bar for the full breakdown.</p>
+      </div>
+      <div class="profile__toggle" role="group" aria-label="Group by">
+        <a class="profile__toggle-btn" href="{{index .BucketURL "week"}}" {{if eq .Bucket "week"}}aria-current="true"{{end}}>Week</a>
+        <a class="profile__toggle-btn" href="{{index .BucketURL "month"}}" {{if eq .Bucket "month"}}aria-current="true"{{end}}>Month</a>
+      </div>
+    </div>
+    {{if .Trends}}
+    <div class="trends__chart">
+      <div class="trends__bars">
+        {{range .Trends}}<div class="trends__bar" style="height: {{.HeightPercent}}%" title="{{.Title}}"></div>{{end}}
+      </div>
+      <div class="trends__axis"><span>{{.TrendFrom}}</span><span>{{.TrendTo}}</span></div>
+    </div>
+    {{/* A bar's breakdown is its tooltip on hover — which a touch screen never shows. This
+         line is the tap (or click) fallback: the bar's own title, shown under the chart;
+         tapping the same bar again hides it. */}}
+    <p class="trends__detail" id="trends-detail" role="status" hidden></p>
+    <script>
+      (function () {
+        var detail = document.getElementById('trends-detail'), current = null;
+        document.querySelectorAll('.trends__bar').forEach(function (bar) {
+          bar.addEventListener('click', function () {
+            current = current === bar ? null : bar;
+            detail.textContent = current ? bar.title : '';
+            detail.hidden = !current;
+          });
+        });
+      })();
+    </script>
+    {{else}}
+    <p class="profile__subtext">Nothing recorded in this window yet.</p>
+    {{end}}
+  </section>
+</main>
+{{end}}{{end}}

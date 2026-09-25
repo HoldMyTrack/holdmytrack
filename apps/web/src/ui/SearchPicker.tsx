@@ -61,15 +61,16 @@ export interface SearchPickerProps {
 }
 
 /**
- * SettingsPage.tsx's Country and Timezone fields — a searchable combobox (trigger button +
- * popover with a search input over a listbox), in place of a native `<select>`, which can't
- * show a flag or a right-aligned detail and offers no type-to-filter beyond first-letter
- * jumping through hundreds of entries. Follows the WAI-ARIA combobox pattern: focus stays in
+ * A searchable combobox (trigger button + popover with a search input over a listbox), in
+ * place of a native `<select>`, which can't show a right-aligned detail and offers no
+ * type-to-filter beyond first-letter jumping. Built for the React Settings page's Country and
+ * Timezone fields (now a server-rendered page with native selects, ADR-0012); the Edit
+ * activity dialog's Type field is what uses it today. Follows the WAI-ARIA combobox pattern: focus stays in
  * the search input while ↑/↓ move the active option (`aria-activedescendant`), Enter picks
  * it, Escape closes and returns focus to the trigger. Dismisses on an outside `pointerdown`,
- * like UserMenu.tsx. CountryPicker.tsx, TimezonePicker.tsx and ActivityTypePicker.tsx only
- * build the option list; the last is open-ended (`createOption`), since activity types are
- * free-form text rather than a fixed vocabulary.
+ * like the Activities panel's Type dropdown. ActivityTypePicker.tsx builds the option list,
+ * open-ended (`createOption`), since activity types are free-form text rather than a fixed
+ * vocabulary.
  */
 export function SearchPicker({
   options,

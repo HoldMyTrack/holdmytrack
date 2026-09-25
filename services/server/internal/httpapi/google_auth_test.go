@@ -127,7 +127,7 @@ func TestGoogleCallbackRejectsStateMismatch(t *testing.T) {
 	req.AddCookie(&http.Cookie{Name: oauthCookieName, Value: "real.verifier.UTC"})
 	rec := httptest.NewRecorder()
 	s.handleGoogleCallback(rec, req)
-	if loc := rec.Header().Get("Location"); rec.Code != http.StatusFound || loc != "https://app.example/?auth_error=google" {
+	if loc := rec.Header().Get("Location"); rec.Code != http.StatusFound || loc != "https://app.example/signin?error=google" {
 		t.Fatalf("got %d %q", rec.Code, loc)
 	}
 }

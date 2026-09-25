@@ -1,0 +1,75 @@
+{{define "content"}}{{with .Page}}
+<main class="page-main settings">
+  {{if not .Onboarding}}<a class="settings__back" href="/">← Back to map</a>{{end}}
+  <h1 class="settings__title">{{if .Onboarding}}Welcome — set up your account{{else}}Settings{{end}}</h1>
+  {{if .Onboarding}}<p class="settings__intro">Two things before your map: your country sets whether distances show in km or miles, and your timezone sets which day each activity falls on. You can change both here later.</p>{{end}}
+  {{if .IsDemo}}<p class="settings__notice" role="status">This is the shared demo account, so its settings can't be changed. <a href="/signup">Create your own account</a> to save yours.</p>{{end}}
+  {{with .Notice}}<p class="settings__notice" role="status">{{.}}</p>{{end}}
+
+  <section class="settings__section" aria-labelledby="settings-avatar">
+    <h2 class="settings__label" id="settings-avatar">Avatar</h2>
+    <div class="settings__avatar-row">
+      <div class="settings__avatar">{{if .AvatarURL}}<img src="{{.AvatarURL}}" alt="Your avatar" />{{else}}<span aria-hidden="true">⬚</span>{{end}}</div>
+      <div class="settings__avatar-actions">
+        {{/* Picking a file submits the form straight away (the one line of script); without
+             script, the Upload button does. */}}
+        <form method="post" action="/settings/avatar" enctype="multipart/form-data" class="settings__inline-form" id="avatar-form">
+          <input type="file" name="file" accept="image/png,image/jpeg,image/webp" required {{if .IsDemo}}disabled{{end}} aria-label="Choose an image" />
+          <button type="submit" class="settings__button" id="avatar-upload" {{if .IsDemo}}disabled{{end}}>Upload</button>
+        </form>
+        <script>
+          (function () {
+            var form = document.getElementById('avatar-form');
+            form.querySelector('input[type=file]').addEventListener('change', function () { if (this.files.length) form.submit(); });
+            document.getElementById('avatar-upload').hidden = true;
+          })();
+        </script>
+        {{if .AvatarURL}}
+        <form method="post" action="/settings/avatar/remove" class="settings__inline-form">
+          <button type="submit" class="settings__button" {{if .IsDemo}}disabled{{end}}>Remove</button>
+        </form>
+        {{end}}
+        <p class="settings__hint">PNG, JPEG or WebP, up to 5 MB.</p>
+        {{with .AvatarError}}<p class="settings__error" role="alert">{{.}}</p>{{end}}
+      </div>
+    </div>
+  </section>
+
+  <form method="post" action="/settings" class="settings__form">
+    <fieldset {{if .IsDemo}}disabled{{end}}>
+      <label class="settings__section">
+        <span class="settings__label">Name</span>
+        <input class="settings__input" type="text" name="display_name" value="{{.DisplayName}}" placeholder="Not set" autocomplete="name" />
+      </label>
+
+      <label class="settings__section">
+        <span class="settings__label">Country</span>
+        <select class="settings__input" name="country" required>
+          <option value="" {{if eq .Country ""}}selected{{end}} disabled>Choose a country</option>
+          {{$country := .Country}}{{range .Countries}}<option value="{{.Code}}" {{if eq .Code $country}}selected{{end}}>{{.Name}}</option>{{end}}
+        </select>
+        <span class="settings__hint">{{if eq .Country ""}}Required. {{end}}Decides whether distance, pace and elevation show in km/m or mi/ft, everywhere in the app.</span>
+      </label>
+
+      <label class="settings__section">
+        <span class="settings__label">Timezone</span>
+        <select class="settings__input" name="timezone" required>
+          {{$tz := .Timezone}}{{range .Timezones}}<optgroup label="{{.Region}}">{{range .Options}}<option value="{{.ID}}" {{if eq .ID $tz}}selected{{end}}>{{.Label}}</option>{{end}}</optgroup>{{end}}
+        </select>
+        <span class="settings__hint">Decides which calendar day an activity falls on everywhere in the app (the histogram, the activity graph, date filtering). Auto-detected from your browser when you signed up; change it here if you're somewhere else now.</span>
+      </label>
+
+      {{with .Error}}<p class="settings__error" role="alert">{{.}}</p>{{end}}
+      <button type="submit" class="settings__submit">{{if .Onboarding}}Save and continue{{else}}Save{{end}}</button>
+    </fieldset>
+  </form>
+
+  {{if not .Onboarding}}
+  <section class="settings__section" aria-labelledby="settings-private">
+    <h2 class="settings__label" id="settings-private">Private locations</h2>
+    <p class="settings__hint">Circles on the map — home, work — that your tracks never show inside. Any part of an activity that starts or ends in one is hidden everywhere, including your own map.</p>
+    <div><a class="settings__button" href="/?private-locations">Manage on the map</a></div>
+  </section>
+  {{end}}
+</main>
+{{end}}{{end}}

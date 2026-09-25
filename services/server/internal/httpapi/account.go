@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -29,51 +30,57 @@ type updateSettingsRequest struct {
 // field individually. Returns the same authResponse shape handleMe does, so the frontend can
 // update its local state directly from this response instead of a follow-up GET.
 func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
-	userID := userIDFromContext(r.Context())
-
 	var req updateSettingsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	req.DisplayName = strings.TrimSpace(req.DisplayName)
-	req.Country = strings.ToUpper(strings.TrimSpace(req.Country))
-	// Required: Country decides metric vs imperial everywhere, and the web app's first-run
-	// gate (FR-1.7) treats an empty one as "Settings never saved" — letting a save clear it
-	// would send the account back through onboarding.
-	if req.Country == "" {
-		http.Error(w, "country is required", http.StatusBadRequest)
-		return
+	s.writeProfile(w, r, "update settings", s.saveSettings(r.Context(), userIDFromContext(r.Context()), req.DisplayName, req.Country, req.Timezone))
+}
+
+// saveSettings is the Settings save's shared core — handleUpdateSettings (JSON) and the
+// /settings page (settings_page.go) both call it, and it does all the validating. The caller
+// has already refused a demo session.
+func (s *Server) saveSettings(ctx context.Context, userID, displayName, country, timezone string) error {
+	displayName = strings.TrimSpace(displayName)
+	country = strings.ToUpper(strings.TrimSpace(country))
+	// Required: Country decides metric vs imperial everywhere, and the first-run gate (FR-1.7)
+	// treats an empty one as "Settings never saved" — letting a save clear it would send the
+	// account back through onboarding.
+	if country == "" {
+		return accountFailure(http.StatusBadRequest, "country is required")
 	}
-	if !countryCodePattern.MatchString(req.Country) {
-		http.Error(w, "country must be a two-letter code", http.StatusBadRequest)
-		return
+	if !countryCodePattern.MatchString(country) {
+		return accountFailure(http.StatusBadRequest, "country must be a two-letter code")
 	}
 	// Unlike Country, timezone has no "unset" state (the column is NOT NULL DEFAULT 'UTC' —
 	// migrations/0021_user_timezone.sql) — Settings always sends the field's current
 	// selection, so an empty/unloadable value here means a malformed request, not a deliberate
 	// clear, and is rejected rather than silently defaulted.
-	tz, ok := normalizeTimezone(req.Timezone)
+	tz, ok := normalizeTimezone(timezone)
 	if !ok {
-		http.Error(w, "timezone must be a valid IANA zone name (e.g. America/New_York)", http.StatusBadRequest)
-		return
+		return accountFailure(http.StatusBadRequest, "timezone must be a valid IANA zone name (e.g. America/New_York)")
 	}
-
-	ctx := r.Context()
 	// NULLIF, not a Go-side branch on "" — an empty display name means "unset", same as every
 	// other nullable text column this API already treats that way.
-	if _, err := s.pool.Exec(ctx, `
+	_, err := s.pool.Exec(ctx, `
 		UPDATE users SET display_name = NULLIF($2, ''), country = $3, timezone = $4
 		WHERE id = $1
-	`, userID, req.DisplayName, req.Country, tz); err != nil {
-		s.log.Error("update settings failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+	`, userID, displayName, country, tz)
+	return err
+}
+
+// writeProfile answers one of the account endpoints: err as writeAccountError does, or the
+// account's current profile — the same authResponse shape handleMe returns, so the web app
+// can update its local state from it instead of a follow-up GET.
+func (s *Server) writeProfile(w http.ResponseWriter, r *http.Request, op string, err error) {
+	if err != nil {
+		s.writeAccountError(w, op, err)
 		return
 	}
-
-	resp, err := s.loadAuthResponse(ctx, userID)
+	resp, err := s.loadAuthResponse(r.Context(), userIDFromContext(r.Context()))
 	if err != nil {
-		s.log.Error("settings response lookup failed", "err", err)
+		s.log.Error(op+" response lookup failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -103,54 +110,41 @@ func avatarKey(userID string) string {
 // and this sniffed value is exactly what handleGetAvatar serves the file back as, so trusting
 // the client here would let an upload masquerade as an image type it isn't.
 func (s *Server) handleUploadAvatar(w http.ResponseWriter, r *http.Request) {
-	userID := userIDFromContext(r.Context())
+	s.writeProfile(w, r, "avatar upload", s.setAvatar(w, r, userIDFromContext(r.Context())))
+}
 
+// setAvatar is the avatar upload's shared core (the JSON endpoint and the /settings page's
+// avatar form, both multipart with the image in field "file").
+func (s *Server) setAvatar(w http.ResponseWriter, r *http.Request, userID string) error {
 	r.Body = http.MaxBytesReader(w, r.Body, maxAvatarBytes+1<<20) // +1MiB of multipart overhead
 	if err := r.ParseMultipartForm(maxAvatarBytes); err != nil {
-		http.Error(w, "file too large or malformed multipart body", http.StatusRequestEntityTooLarge)
-		return
+		return accountFailure(http.StatusRequestEntityTooLarge, "file too large or malformed multipart body")
 	}
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		http.Error(w, `expected a multipart field named "file"`, http.StatusBadRequest)
-		return
+		return accountFailure(http.StatusBadRequest, `expected a multipart field named "file"`)
 	}
 	defer file.Close()
 
 	data, err := io.ReadAll(io.LimitReader(file, maxAvatarBytes))
 	if err != nil {
-		http.Error(w, "failed reading upload", http.StatusBadRequest)
-		return
+		return accountFailure(http.StatusBadRequest, "failed reading upload")
 	}
 	contentType := http.DetectContentType(data)
 	if !allowedAvatarContentType[contentType] {
-		http.Error(w, fmt.Sprintf("unsupported image type %q (want PNG, JPEG or WebP)", contentType), http.StatusUnsupportedMediaType)
-		return
+		return accountFailure(http.StatusUnsupportedMediaType, fmt.Sprintf("unsupported image type %q (want PNG, JPEG or WebP)", contentType))
 	}
 
 	ctx := r.Context()
 	key := avatarKey(userID)
 	if err := s.store.Put(ctx, key, bytes.NewReader(data), int64(len(data))); err != nil {
-		s.log.Error("avatar upload failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+		return err
 	}
-	if _, err := s.pool.Exec(ctx, `
+	_, err = s.pool.Exec(ctx, `
 		UPDATE users SET avatar_key = $2, avatar_content_type = $3, avatar_updated_at = NOW()
 		WHERE id = $1
-	`, userID, key, contentType); err != nil {
-		s.log.Error("avatar metadata update failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	resp, err := s.loadAuthResponse(ctx, userID)
-	if err != nil {
-		s.log.Error("avatar response lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, http.StatusOK, resp)
+	`, userID, key, contentType)
+	return err
 }
 
 // handleDeleteAvatar serves `DELETE /v1/account/avatar`. Object removal is best-effort and
@@ -158,28 +152,19 @@ func (s *Server) handleUploadAvatar(w http.ResponseWriter, r *http.Request) {
 // callers already use — since a stray orphaned blob is a cleanup nuisance, not a reason to
 // leave the DB still pointing at an avatar the user just asked to remove.
 func (s *Server) handleDeleteAvatar(w http.ResponseWriter, r *http.Request) {
-	userID := userIDFromContext(r.Context())
-	ctx := r.Context()
+	s.writeProfile(w, r, "avatar removal", s.removeAvatar(r.Context(), userIDFromContext(r.Context())))
+}
 
+// removeAvatar is the avatar removal's shared core (the JSON endpoint and the /settings page).
+func (s *Server) removeAvatar(ctx context.Context, userID string) error {
 	if err := s.store.Remove(ctx, avatarKey(userID)); err != nil {
 		s.log.Error("avatar removal failed", "err", err)
 	}
-	if _, err := s.pool.Exec(ctx, `
+	_, err := s.pool.Exec(ctx, `
 		UPDATE users SET avatar_key = NULL, avatar_content_type = NULL, avatar_updated_at = NULL
 		WHERE id = $1
-	`, userID); err != nil {
-		s.log.Error("avatar metadata clear failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	resp, err := s.loadAuthResponse(ctx, userID)
-	if err != nil {
-		s.log.Error("avatar response lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, http.StatusOK, resp)
+	`, userID)
+	return err
 }
 
 // handleGetAvatar serves `GET /v1/account/avatar` — always the signed-in caller's own

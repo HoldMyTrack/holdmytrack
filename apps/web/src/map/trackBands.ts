@@ -73,8 +73,8 @@ function metricValue(p: TrackMetricPoint, metric: BandMetric): number | null {
 
 /** Equal-width bins between *this activity's own* min/max for the active metric — "where in
  *  this run was I fastest" is a question about that run, not a fixed scale across every run
- *  ever recorded (the same reasoning Trends.tsx's log-scaled bar heights already apply
- *  locally, per window, rather than globally). */
+ *  ever recorded (the same reasoning the Profile page's log-scaled Trends bars apply locally,
+ *  per window, rather than globally). */
 export interface BandScale {
   min: number;
   max: number;

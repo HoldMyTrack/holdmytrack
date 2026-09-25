@@ -21,8 +21,8 @@ const BASE = `http://localhost:${PORT}`;
 const OHIO_BOUNDS = { minLon: -84.85, minLat: 38.35, maxLon: -80.5, maxLat: 42.35 };
 const SHOTS = new URL('./screenshots/', import.meta.url);
 
-// App.tsx now gates everything behind AuthGate (services/server/internal/httpapi/auth.go) —
-// a fresh browser context has no session cookie, so MapView (and window.__holdmytrack) would
+// App.tsx sends a signed-out visit to the sign-in page (services/server/internal/httpapi/
+// auth_pages.go) — a fresh browser context has no session cookie, so MapView (and window.__holdmytrack) would
 // never mount without signing in first. A dedicated test account, not the real one: `signup`
 // only *claims* the seeded placeholder user on the very first signup ever, so reusing this
 // fixed email is safe to call every run — after the first, the email is taken and this just

@@ -25,6 +25,7 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mail"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 )
 
 // maxUploadBytes bounds the single read into memory this handler does. The parse step
@@ -88,15 +89,18 @@ type Server struct {
 	version               string
 	skipEmailVerification bool
 	google                googleOAuth
+	pages                 *web.Renderer
 }
 
-func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail.Sender, appBaseURL, basemapOrigin, version string, skipEmailVerification bool, google GoogleOAuthConfig) *Server {
+func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail.Sender, appBaseURL, basemapOrigin, version string, skipEmailVerification bool, google GoogleOAuthConfig, pages *web.Renderer) *Server {
 	s := &Server{
 		pool: pool, store: store, log: log, mux: http.NewServeMux(), mailer: mailer,
 		appBaseURL: appBaseURL, basemapOrigin: basemapOrigin, version: version,
 		skipEmailVerification: skipEmailVerification,
 		google:                newGoogleOAuth(google),
+		pages:                 pages,
 	}
+	s.registerPages()
 	s.mux.HandleFunc(route("POST", "/auth/signup"), s.handleSignup)
 	s.mux.HandleFunc(route("POST", "/auth/login"), s.handleLogin)
 	s.mux.HandleFunc(route("POST", "/auth/logout"), s.handleLogout)
@@ -160,6 +164,44 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(route("GET", "/map/style/{flavor}"), s.handleMapStyle)
 	s.mux.HandleFunc("GET /healthz", s.handleHealthz)
 	return s
+}
+
+// registerPages adds the server-rendered HTML pages (pages.go, auth_pages.go, ADR-0012) —
+// outside /v1, since they're pages a browser navigates to, not API. In production Caddy sends
+// this server everything that isn't a static asset (apps/web/docker/Caddyfile); in dev, Vite's
+// proxy (apps/web/vite.config.ts) lists these paths one by one, so a new page goes there too.
+func (s *Server) registerPages() {
+	s.mux.HandleFunc("GET /about", s.staticPage("about", "About HoldMyTrack — Every journey, mapped.",
+		"HoldMyTrack is a free, community-funded place to see every outdoor activity you have ever recorded on one map — Fog of War, heatmaps and routes from your watch, phone or old exports. No subscription, no ads, no data sales.", false))
+	// noindex until it has real content (docs/SPEC.md FR-10.2).
+	s.mux.HandleFunc("GET /help", s.staticPage("help", "Help — HoldMyTrack", "How the HoldMyTrack web app works.", true))
+	s.mux.HandleFunc("GET /contacts", s.staticPage("contacts", "Contacts — HoldMyTrack", "How to reach the HoldMyTrack project: email, code and issues.", false))
+	s.mux.Handle("GET /static/", s.pages.StaticHandler())
+	s.mux.HandleFunc("POST /logout", s.sameOrigin(s.handleLogoutPage))
+	// auth_pages.go — every POST is a form, so every POST is behind sameOrigin.
+	s.mux.HandleFunc("GET /signin", s.handleSignInPage)
+	s.mux.HandleFunc("POST /signin", s.sameOrigin(s.handleSignInForm))
+	s.mux.HandleFunc("GET /signup", s.handleSignUpPage)
+	s.mux.HandleFunc("POST /signup", s.sameOrigin(s.handleSignUpForm))
+	s.mux.HandleFunc("POST /demo", s.sameOrigin(s.handleDemoForm))
+	s.mux.HandleFunc("GET /forgot", s.handleForgotPage)
+	s.mux.HandleFunc("POST /forgot", s.sameOrigin(s.handleForgotForm))
+	s.mux.HandleFunc("GET /reset", s.handleResetPage)
+	s.mux.HandleFunc("POST /reset", s.sameOrigin(s.handleResetForm))
+	s.mux.HandleFunc("GET /verify", s.handleVerifyPage)
+	s.mux.HandleFunc("GET /verify-pending", s.handleVerifyPendingPage)
+	s.mux.HandleFunc("POST /verify-pending/resend", s.sameOrigin(s.handleVerifyResendForm))
+	s.mux.HandleFunc("POST /verify-pending/email", s.sameOrigin(s.handleVerifyChangeEmailForm))
+	// settings_page.go.
+	s.mux.HandleFunc("GET /settings", s.handleSettingsPage)
+	s.mux.HandleFunc("POST /settings", s.sameOrigin(s.handleSettingsForm))
+	s.mux.HandleFunc("POST /settings/avatar", s.sameOrigin(s.handleSettingsAvatarForm))
+	s.mux.HandleFunc("POST /settings/avatar/remove", s.sameOrigin(s.handleSettingsAvatarRemoveForm))
+	s.mux.HandleFunc("GET /profile", s.handleProfilePage) // profile_page.go
+	// The React app — the map (pages.go's appShell). `/{$}` is the root alone; "/" below is
+	// everything else nothing more specific claims.
+	s.mux.HandleFunc("GET /{$}", s.appShell("HoldMyTrack — Every journey, mapped."))
+	s.mux.HandleFunc("/", s.notFound)
 }
 
 // ServeHTTP sets CORS headers before delegating to the mux. This has to happen here, not

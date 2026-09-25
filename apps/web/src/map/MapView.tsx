@@ -30,19 +30,18 @@ import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '.
 import { ActivitiesPanel } from '../ui/ActivitiesPanel';
 import { ActivityHistogram } from '../ui/ActivityHistogram';
 import { EditTrackPanel } from '../ui/EditTrackPanel';
-import { ExportButton } from '../ui/ExportButton';
+import { ExportControl } from '../ui/ExportControl';
 import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
 import { PrivateLocationsPanel } from '../ui/PrivateLocationsPanel';
 import { dayDiff, todayLocal } from '../ui/dateMath';
-import { Header } from '../ui/Header';
 import type { DateRange } from '../ui/RangePicker';
 import { TrackProfile } from '../ui/TrackProfile';
 import { useUnitSystem } from '../ui/units';
-import { ImportPanel } from '../ui/ImportPanel';
 import { useActivityDays } from '../ui/useActivityDays';
 import { useActivityList } from '../ui/useActivityList';
 import { useActivityTotals } from '../ui/useActivityTotals';
 import { useDuplicates } from '../ui/useDuplicates';
+import { useImports } from '../ui/useImports';
 
 /** How long a checkbox-selection spree pauses before the map auto-flies to fit it (replacing
  *  the old explicit "Fit map" button — see IMPLEMENTATION.md §4.7) — long enough that ticking
@@ -54,20 +53,14 @@ const SELECTION_FLY_DEBOUNCE_MS = 300;
 const EDIT_PENDING_POLL_MS = 2000;
 
 export interface MapViewProps {
-  /** Wires the account menu's "Profile" item — App.tsx owns which screen is showing, MapView
-   *  just needs somewhere to send that one click. */
-  onOpenProfile: () => void;
-  /** Same shape as onOpenProfile, for the account menu's "Settings" item. */
-  onOpenSettings: () => void;
-  /** Mount with the Private locations window already open — Settings' link to it. */
+  /** Mount with the Private locations window already open — `/?private-locations`, the
+   *  header's account menu and Settings' link to it (App.tsx). */
   initialPrivateLocationsOpen?: boolean;
 }
 
 /** The frame-and-capture export flow's own state — lives here, not inside `ExportFrame.tsx`,
- *  since it spans that component, the header's `ExportButton.tsx` that opens it, and the live
- *  map instance capture needs directly — the same "callback wiring belongs where the map
- *  instance is" reasoning `ExportButton.tsx`'s own doc comment gives for why `map` is a prop
- *  there. */
+ *  since it spans that component, the map control that opens it (`ExportControl.tsx`), and the
+ *  live map instance capture needs directly. */
 type ExportFlow =
   | { stage: 'idle' }
   | { stage: 'framing' | 'capturing'; preset: ExportPreset | 'custom'; geometry: FrameGeometry };
@@ -90,7 +83,7 @@ function frameSize(
   return maxW / maxH >= ratio ? { widthPx: maxH * ratio, heightPx: maxH } : { widthPx: maxW, heightPx: maxW / ratio };
 }
 
-export function MapView({ onOpenProfile, onOpenSettings, initialPrivateLocationsOpen = false }: MapViewProps) {
+export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // docs/SPEC.md FR-2.1–FR-2.3: a demo account is
   // read-only (no upload/sync, no edit/delete) — see ActivitiesPanel's own readOnly prop and
   // the importControl below. `'email' in user` is the same narrowing api.ts's SessionUser
@@ -98,14 +91,10 @@ export function MapView({ onOpenProfile, onOpenSettings, initialPrivateLocations
   const { user } = useAuth();
   const isDemo = !('email' in user);
 
-  // Read once per mount, not once per page load: App.tsx clears window.location.hash on every
-  // app-initiated identity change (sign-out, demo start, sign-in — see clearSavedView in
-  // viewState.ts), but that only helps if MapView re-reads the hash when it remounts for the
-  // new session. A module-level constant here previously meant a stale hash from a *previous*
-  // session's last camera position silently won over the new session's own fly-to-most-recent
-  // (reported live: the Demo Customer account not flying to its own data after a same-tab
-  // sign-out/demo-start, fixed by a full reload — which is exactly what re-evaluated a
-  // module-level read, and exactly what a remount now does instead).
+  // Read once per mount. A previous session's camera position can't leak into a new one: every
+  // sign-in, sign-up, demo start and sign-out is a server-rendered page that ends in a
+  // redirect to a bare `/`, with no hash to inherit (IMPLEMENTATION.md §4.13). (While those
+  // were React screens swapped in place, App.tsx had to clear the hash itself.)
   const [initial] = useState<{ hash: HashState; view: ViewState; flavor: Flavor }>(() => {
     const hash = parseHash(window.location.hash);
     return {
@@ -515,7 +504,7 @@ export function MapView({ onOpenProfile, onOpenSettings, initialPrivateLocations
     [activities, mapHiddenIds, fitToSelection],
   );
 
-  // ROADMAP.md's "View on map" item — ImportPanel.tsx's per-row action, reusing focusActivity
+  // ROADMAP.md's "View on map" item — SyncTab.tsx's per-row action, reusing focusActivity
   // above rather than inventing a second fly-to mechanism. The one thing a row click doesn't
   // already handle: the target activity may not be in the currently selected date range (an
   // old Takeout import, a Health Connect backfill), in which case focusActivity would silently
@@ -771,7 +760,7 @@ export function MapView({ onOpenProfile, onOpenSettings, initialPrivateLocations
   const watchCoverage = useCoverageRefresh(map);
 
   // A finished upload is a new track on the map and a new row in every §4.7 response, so
-  // refresh all four together rather than let the header badge fall behind the geometry.
+  // refresh all four together rather than let the Sync tab's badge fall behind the geometry.
   const handleUploaded = useCallback(() => {
     if (map) refreshTrackLayer(map, activityQuery);
     reloadActivities();
@@ -782,6 +771,10 @@ export function MapView({ onOpenProfile, onOpenSettings, initialPrivateLocations
     // Deletes come through here too (handleActivitiesDeleted), so this covers both.
     watchCoverage();
   }, [map, activityQuery, reloadActivities, reloadTotals, reloadHistogram, duplicates.refresh, watchCoverage]);
+
+  // The Sync tab's upload queue and history — held here rather than in the tab, so an upload
+  // and its polling survive the panel unmounting (Fog/Heatmap) or showing the other tab.
+  const imports = useImports(handleUploaded);
 
   // §4.7.5/§4.7.6: one or more deleted activities need the exact same four-part refresh a
   // finished upload does (unlike editing type/description, deleting changes distance/duration
@@ -852,10 +845,6 @@ export function MapView({ onOpenProfile, onOpenSettings, initialPrivateLocations
       setTrackMetricsVersion((v) => v + 1);
     });
   }, [map, activityQuery, reloadActivities, reloadTotals, reloadHistogram, watchCoverage]);
-  // Not while a track is being edited — that session owns the map until it closes.
-  const openPrivateLocations = useCallback(() => {
-    if (!editingTrack) setPrivateLocationsOpen(true);
-  }, [editingTrack]);
   const editingActivity = useMemo(
     () => (editingActivityId === null ? null : (activities.find((a) => a.id === editingActivityId) ?? null)),
     [activities, editingActivityId],
@@ -999,14 +988,6 @@ export function MapView({ onOpenProfile, onOpenSettings, initialPrivateLocations
 
   return (
     <div className="app-shell">
-      <Header
-        importControl={<ImportPanel readOnly={isDemo} onUploaded={handleUploaded} onViewOnMap={viewActivityOnMap} />}
-        exportControl={<ExportButton map={map} active={exportFlow.stage !== 'idle'} onOpen={handleExportOpen} />}
-        onOpenProfile={onOpenProfile}
-        onOpenSettings={onOpenSettings}
-        onOpenPrivateLocations={openPrivateLocations}
-      />
-
       <div className="app-body">
         {mapMode === 'normal' && (
           // Inert for the whole Edit track session: changing the range, the selection or a
@@ -1043,12 +1024,15 @@ export function MapView({ onOpenProfile, onOpenSettings, initialPrivateLocations
               onEditTrack={startEditTrack}
               duplicates={duplicates.duplicates}
               duplicatesError={duplicates.error}
+              imports={imports}
+              onViewOnMap={viewActivityOnMap}
             />
           </div>
         )}
 
         <div className="map-root">
           <div ref={container} className="map-canvas" data-testid="map-canvas" />
+          {map && <ExportControl map={map} active={exportFlow.stage !== 'idle'} onOpen={handleExportOpen} />}
           {map && (exportFlow.stage === 'framing' || exportFlow.stage === 'capturing') && (
             <ExportFrame
               map={map}

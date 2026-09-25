@@ -54,6 +54,11 @@ type Config struct {
 	GoogleClientID     string
 	GoogleClientSecret string
 	GoogleRedirectURL  string
+	// WebDevDir, when set, is a checkout's services/server/internal/web directory that `serve`
+	// reads page templates and their stylesheet from, re-parsing on every request, instead
+	// of the copies embedded in the binary — so editing a page in dev needs no image rebuild
+	// (compose.yaml bind-mounts it). Empty everywhere else.
+	WebDevDir string
 }
 
 func Load() (Config, error) {
@@ -78,6 +83,7 @@ func Load() (Config, error) {
 		// vars that must agree are two env vars that can disagree.
 		c.BasemapOrigin = c.AppBaseURL
 	}
+	c.WebDevDir = env("WEB_DEV_DIR", "")
 	c.GoogleClientID = env("GOOGLE_CLIENT_ID", "")
 	c.GoogleClientSecret = env("GOOGLE_CLIENT_SECRET", "")
 	if c.GoogleRedirectURL = env("GOOGLE_REDIRECT_URL", ""); c.GoogleRedirectURL == "" {

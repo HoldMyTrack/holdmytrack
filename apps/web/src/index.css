@@ -84,10 +84,21 @@
 }
 
 html,
-body,
-#root {
+body {
   margin: 0;
   height: 100%;
+}
+
+/* The page is the Go server's shell (templates/app/app.html): the shared header, then #root.
+   The header keeps its own height; the app takes the rest. */
+body.app-page {
+  display: flex;
+  flex-direction: column;
+}
+
+#root {
+  flex: 1;
+  min-height: 0;
 }
 
 body {
@@ -103,310 +114,15 @@ body {
   width: 100%;
 }
 
-/* Header, then a row (sidebar + map), then the histogram footer. */
+/* A row (sidebar + map), then the histogram footer — under the page's own header. */
 .app-body {
   display: flex;
   flex: 1;
   min-height: 0;
 }
 
-.app-header {
-  display: flex;
-  align-items: center;
-  gap: var(--fm-space-16);
-  height: 56px;
-  padding: 0 var(--fm-space-20);
-  background: var(--fm-surface);
-  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 10%);
-  /* Its own stacking context, above the map. Both things that hang out of this bar — the
-     account dropdown and the upload widget's status popover — overlap the map canvas, and
-     MapLibre's own controls sit at a z-index of their own that would otherwise win. */
-  position: relative;
-  z-index: 5;
-}
-
-.app-header__brand {
-  display: flex;
-  align-items: center;
-  gap: var(--fm-space-16);
-  font-family: var(--fm-font-serif);
-  font-size: 21px;
-  letter-spacing: 0.2px;
-  line-height: 1;
-  color: var(--fm-ink);
-}
-
-.app-header__logo {
-  display: block;
-  height: 42px;
-  width: auto;
-}
-
-.app-header__wordmark-light {
-  font-weight: var(--fm-weight-regular);
-  color: #4a5750;
-}
-
-.app-header__wordmark-bold {
-  font-weight: var(--fm-weight-heavy);
-  color: #9a6b1e;
-}
-
-.app-header__divider {
-  width: 1px;
-  height: 22px;
-  background: var(--fm-border-strong);
-}
-
-.app-header__tagline {
-  font-family: var(--fm-font-serif);
-  font-size: var(--fm-text-lg);
-  font-style: italic;
-  font-weight: var(--fm-weight-regular);
-  color: var(--fm-ink-secondary);
-  white-space: nowrap;
-}
-
-/* AboutMenu.tsx — a text menu just before the account menu, not a bordered button like the
-   actions: it's navigation, not something to do with your data. Its dropdown reuses the
-   account menu's panel and items, anchored under the trigger's trailing edge the same way. */
-.about-menu {
-  position: relative;
-  display: flex;
-}
-
-.about-menu__trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fm-space-6);
-  border: 0;
-  border-radius: var(--fm-radius-sm);
-  padding: var(--fm-space-6) var(--fm-space-8);
-  background: transparent;
-  font: inherit;
-  font-size: var(--fm-text-md);
-  font-weight: var(--fm-weight-semibold);
-  color: var(--fm-ink);
-  cursor: pointer;
-}
-
-.about-menu__trigger:hover,
-.about-menu__trigger[aria-expanded='true'] {
-  background: rgb(var(--fm-ink-rgb) / 6%);
-}
-
-.about-menu__caret {
-  width: 14px;
-  height: 14px;
-}
-
-/* Only ProfilePage renders the brand as a button (Header's onBrandClick) — reset every
-   button default so "go back to the map" looks identical to the map screen's plain, inert
-   brand mark rather than looking like a new control. */
-.app-header__brand--button {
-  border: 0;
-  background: none;
-  padding: 0;
-  font: inherit;
-  cursor: pointer;
-}
-
-/* Donate, the import control and the account menu, pushed to the trailing end together. */
-.app-header__actions {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: var(--fm-space-10);
-}
-
-/* Colors match docs/UI/exports/holdmytrack-map-screen-standalone.html's live prototype exactly
-   (read via getComputedStyle, not eyeballed) — orange rather than the app's usual blue
-   specifically so Donate doesn't read as just another neutral nav action; it's how HoldMyTrack
-   is funded (business_plan.md §6), not a footnote. */
-.donate-button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fm-space-6);
-  border: 1px solid var(--fm-donate);
-  border-radius: var(--fm-radius-md);
-  padding: var(--fm-space-6) var(--fm-space-12);
-  background: var(--fm-donate);
-  font: inherit;
-  font-weight: var(--fm-weight-semibold);
-  font-size: var(--fm-text-md);
-  color: var(--fm-donate-text);
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.donate-button__icon {
-  flex: none;
-  width: 14px;
-  height: 14px;
-}
-
-.donate-button:hover {
-  background: var(--fm-donate-hover);
-  border-color: var(--fm-donate-hover);
-}
-
-/* `position: relative` is what the dropdown anchors to, so it hangs under the avatar rather
-   than under the whole bar — same arrangement as the upload widget's status popover. */
-.user-menu {
-  position: relative;
-  display: flex;
-}
-
-.user-menu__avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 1px solid rgb(var(--fm-ink-rgb) / 15%);
-  border-radius: 50%;
-  background: var(--fm-surface);
-  color: var(--fm-ink);
-  cursor: pointer;
-}
-
-.user-menu__avatar:hover {
-  background: rgb(var(--fm-ink-rgb) / 4%);
-}
-
-/* Stroked, not filled: the glyph is two shapes (head and shoulders) that only read as a
-   person with a gap between them. */
-.user-menu__avatar svg {
-  width: 18px;
-  height: 18px;
-}
-
-/* A real avatar (SettingsPage.tsx) fills the whole circle, not just the glyph's own smaller
-   box — this is the one place the button shows a photo instead of an icon. */
-.user-menu__avatar img {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.user-menu__dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 12rem;
-  padding: var(--fm-space-4);
-  background: var(--fm-surface);
-  border: 1px solid rgb(var(--fm-ink-rgb) / 10%);
-  border-radius: var(--fm-radius-md);
-  box-shadow: var(--fm-shadow-lg);
-}
-
-.user-menu__email {
-  padding: var(--fm-space-8) var(--fm-space-10) var(--fm-space-8);
-  margin-bottom: var(--fm-space-4);
-  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 8%);
-  font-size: var(--fm-text-sm);
-  color: rgb(var(--fm-ink-rgb) / 55%);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.user-menu__item {
-  border: 0;
-  border-radius: var(--fm-radius-sm);
-  padding: var(--fm-space-8) var(--fm-space-10);
-  background: transparent;
-  font: inherit;
-  font-size: var(--fm-text-md);
-  color: var(--fm-ink);
-  text-align: left;
-  cursor: pointer;
-}
-
-.user-menu__item:hover {
-  background: rgb(var(--fm-ink-rgb) / 6%);
-}
-
-/* AboutMenu.tsx's entries, and the account menu's phone-only About, are <a>s, not <button>s —
-   drop the link styling so they match. */
-a.user-menu__item {
-  text-decoration: none;
-}
-
-/* Shown only at phone widths (see the header's media query), where AboutMenu is hidden. */
-.user-menu__item--phone-only {
-  display: none;
-}
-
-.user-menu__item:disabled {
-  color: rgb(var(--fm-ink-rgb) / 45%);
-  cursor: default;
-}
-
-/* The demo-session entry point into requestUpgrade() (App.tsx swaps to AuthGate) — same
-   shape as any other item, just tinted so it reads as the one worth noticing over
-   Profile/Sign out. */
-.user-menu__item--accent {
-  color: var(--fm-accent-strong);
-  font-weight: var(--fm-weight-semibold);
-}
-
-/* PlaceholderNotice.tsx — the shared "not built yet" dialog behind Donate and every account
-   menu item. A real <dialog>, so the centring and the dimmed backdrop are the only things
-   left to style. */
-.placeholder-notice {
-  width: min(26rem, calc(100vw - 40px));
-  margin: auto;
-  padding: var(--fm-space-20);
-  border: 1px solid rgb(var(--fm-ink-rgb) / 10%);
-  border-radius: var(--fm-radius-lg);
-  background: var(--fm-surface);
-  color: var(--fm-ink);
-  box-shadow: var(--fm-shadow-xl);
-}
-
-.placeholder-notice::backdrop {
-  background: rgb(var(--fm-ink-rgb) / 35%);
-}
-
-.placeholder-notice__title {
-  margin: 0 0 var(--fm-space-10);
-  font-size: var(--fm-text-xl);
-  font-weight: var(--fm-weight-heavy);
-  letter-spacing: 0.02em;
-}
-
-.placeholder-notice__message {
-  margin: 0 0 var(--fm-space-16);
-  font-size: var(--fm-text-md);
-  line-height: 1.5;
-  color: rgb(var(--fm-ink-rgb) / 70%);
-}
-
-.placeholder-notice__dismiss {
-  border: 1px solid rgb(var(--fm-ink-rgb) / 15%);
-  border-radius: var(--fm-radius-md);
-  padding: var(--fm-space-6) var(--fm-space-16);
-  background: var(--fm-surface);
-  font: inherit;
-  font-weight: var(--fm-weight-semibold);
-  font-size: var(--fm-text-md);
-  color: var(--fm-ink);
-  cursor: pointer;
-}
-
-.placeholder-notice__dismiss:hover {
-  background: rgb(var(--fm-ink-rgb) / 4%);
-}
-
-/* EditActivityDialog.tsx (§4.7.4) — same real-<dialog>/showModal() shape as
-   .placeholder-notice above, just wider (the description field needs the room) and its own
+/* EditActivityDialog.tsx (§4.7.4) — a real <dialog>/showModal(), wide enough for the
+   description field, and its own
    form-field layout reuses .settings-page__* classes rather than duplicating them. */
 /* `overflow: visible` overrides the UA's `overflow: auto` on a modal dialog, so the Type
    picker's dropdown (ActivityTypePicker.tsx) can hang past the dialog's bottom edge instead
@@ -449,7 +165,7 @@ a.user-menu__item {
   font: inherit;
 }
 
-/* ConfirmDialog.tsx — same real-<dialog>/showModal() shape as .placeholder-notice, sized for
+/* ConfirmDialog.tsx — same real-<dialog>/showModal() shape as .edit-activity-dialog, sized for
    a short title+message rather than a form. Generic, not delete-specific, but the one caller
    today (§4.7.5's Delete button) is what the red confirm button is tuned for — a future
    non-destructive use of this component can still override confirmLabel/styling as needed. */
@@ -546,17 +262,39 @@ a.user-menu__item {
   background: rgb(var(--fm-accent-rgb) / 35%);
 }
 
+/* The panel's tab strip (ActivitiesPanel.tsx: Activities | Sync). Each tab keeps the serif
+   heading look the panel title had before there were two; the inactive one is just dimmed,
+   and the active one carries an accent underline like the other tab strips here. */
 .activities-panel__head {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  padding: var(--fm-space-16) var(--fm-space-16) var(--fm-space-4);
+  gap: var(--fm-space-20);
+  padding: var(--fm-space-12) var(--fm-space-16) 0;
+  margin-bottom: var(--fm-space-8);
+  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 8%);
 }
 
-.activities-panel__heading {
+.activities-panel__tab {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--fm-space-8);
+  margin-bottom: -1px;
+  padding: 0 0 var(--fm-space-6);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  opacity: 0.45;
+}
+
+.activities-panel__tab:hover {
+  opacity: 0.75;
+}
+
+.activities-panel__tab[aria-selected='true'] {
+  border-bottom-color: var(--fm-accent);
+  opacity: 1;
 }
 
 .activities-panel__heading-text {
@@ -998,8 +736,7 @@ a.user-menu__item {
   background: var(--fm-border);
 }
 
-/* Anchors the dropdown panel under its trigger — same arrangement .import-panel/.user-menu
-   already use for their own dropdowns. No fixed width any more (nothing below it to stay
+/* Anchors the dropdown panel under its trigger's trailing edge. No fixed width any more (nothing below it to stay
    column-aligned with) — sized to its own label/caret like the mockup's chip. */
 .activities-panel__type-dropdown {
   position: relative;
@@ -1951,6 +1688,40 @@ a.user-menu__item {
   }
 }
 
+/* The two-way switch in the map's track-metric toggle ("Colored by" pace / heart rate,
+   MapView.tsx). Named for the Profile page's Trends chart it was first built for; that page
+   is server-rendered now, with its own copy (pages.css's .profile__toggle). */
+.trends__bucket {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.trends__bucket-btn {
+  border: 1px solid rgb(var(--fm-ink-rgb) / 20%);
+  background: var(--fm-surface);
+  padding: var(--fm-space-6) var(--fm-space-12);
+  font: inherit;
+  font-size: var(--fm-text-md);
+  color: var(--fm-ink);
+  cursor: pointer;
+}
+
+.trends__bucket-btn:first-of-type {
+  border-radius: var(--fm-radius-sm) 0 0 var(--fm-radius-sm);
+  border-right: 0;
+}
+
+.trends__bucket-btn:last-of-type {
+  border-radius: 0 var(--fm-radius-sm) var(--fm-radius-sm) 0;
+}
+
+.trends__bucket-btn[aria-pressed='true'] {
+  background: var(--fm-accent);
+  border-color: var(--fm-accent);
+  color: #fff;
+}
+
 /* The straight-line pace/HR + elevation profile (TrackProfile.tsx) — deliberately small and
    unlabeled (no axis ticks), a general overlook alongside the toggle already in this same
    floating card, not a separate detailed instrument. */
@@ -2015,84 +1786,11 @@ a.user-menu__item {
   white-space: nowrap;
 }
 
-/* §4.0.1's import control — a dropdown panel with Files/Sync tabs, not a hover popover
-   (docs/UI/exports/holdmytrack-map-screen-standalone.html's live prototype). `position: relative`
-   anchors the dropdown under the trigger button, the same arrangement as .user-menu's own
-   dropdown. */
-.import-panel {
-  position: relative;
-}
-
-.import-panel__trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fm-space-6);
-  border: 1px solid var(--fm-border-strong);
-  border-radius: var(--fm-radius-md);
-  padding: var(--fm-space-6) var(--fm-space-12);
-  background: var(--fm-surface);
-  font: inherit;
-  font-weight: var(--fm-weight-semibold);
-  font-size: var(--fm-text-md);
-  color: var(--fm-ink);
-  cursor: pointer;
-}
-
-.import-panel__trigger:hover:not(:disabled) {
-  background: rgb(var(--fm-ink-rgb) / 4%);
-}
-
-/* A demo account (ImportPanel's own readOnly prop) — visibly inert, not just a click no-op
-   that silently never opens the dropdown. */
-.import-panel__trigger:disabled {
-  color: rgb(var(--fm-ink-rgb) / 35%);
-  border-color: rgb(var(--fm-ink-rgb) / 8%);
-  cursor: not-allowed;
-}
-
-.export-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--fm-border-strong);
-  border-radius: var(--fm-radius-md);
-  padding: var(--fm-space-6) var(--fm-space-10);
-  background: var(--fm-surface);
-  font: inherit;
-  font-weight: var(--fm-weight-semibold);
-  font-size: var(--fm-text-md);
-  color: var(--fm-ink);
-  cursor: pointer;
-}
-
-/* Stroked like the account menu's glyph, sized to the text buttons' line height so the header's
-   actions stay one height. */
-.export-button__icon {
-  width: 16px;
-  height: 16px;
-}
-
-.export-button:hover:not(:disabled) {
-  background: rgb(var(--fm-ink-rgb) / 4%);
-}
-
-.export-button:disabled {
-  color: rgb(var(--fm-ink-rgb) / 40%);
-  cursor: default;
-}
-
-/* While the export frame is shown — the button is also how it's put away again. */
-.export-button[aria-pressed='true'] {
-  border-color: var(--fm-accent);
-  background: rgb(var(--fm-accent-rgb) / 10%);
-  color: var(--fm-accent-strong);
-}
-
-/* This session's in-flight count plus every pending job for this user globally (see
-   useUploadHistory's own comment on why the latter isn't scoped to whichever page happens
-   to be open) — visible even with the dropdown closed, so progress doesn't disappear the
-   moment it's collapsed. */
-.import-panel__badge {
+/* The Sync tab's badge (ActivitiesPanel.tsx): this session's in-flight uploads plus every
+   pending job for this user globally (see useUploadHistory's own comment on why the latter
+   isn't scoped to whichever page happens to be open) — shown on the tab itself, so progress
+   stays visible while the Activities tab is. */
+.activities-panel__sync-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2106,70 +1804,28 @@ a.user-menu__item {
   font-weight: var(--fm-weight-bold);
 }
 
-.import-panel__caret {
-  display: inline-flex;
-  color: rgb(var(--fm-ink-rgb) / 45%);
-}
-
-.import-panel__dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  width: min(24rem, calc(100vw - 40px));
-  max-height: min(32rem, calc(100vh - 100px));
-  padding: var(--fm-space-16);
-  background: var(--fm-surface);
-  border: 1px solid rgb(var(--fm-ink-rgb) / 10%);
-  border-radius: var(--fm-radius-lg);
-  box-shadow: var(--fm-shadow-lg);
+/* SyncTab.tsx — the Activities panel's second tab, taking the place of the list, filters and
+   footer below the panel head; scrolls on its own like the list does. */
+.sync-tab {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  padding: var(--fm-space-4) var(--fm-space-16) var(--fm-space-16);
 }
 
-/* The Files/Sync tab strip — ImportPanel.tsx's own doc comment has the reasoning for why
-   these are two tabs rather than one combined list. A plain underline-on-active treatment,
-   matching how little visual weight the rest of this dropdown spends on chrome. */
-.import-panel__tabs {
-  display: flex;
-  gap: var(--fm-space-4);
-  margin: 0 0 var(--fm-space-10);
-  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 10%);
-}
-
-.import-panel__tab {
-  padding: 0 var(--fm-space-2) var(--fm-space-8);
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: none;
-  font: inherit;
-  font-weight: var(--fm-weight-semibold);
-  font-size: var(--fm-text-md);
-  color: rgb(var(--fm-ink-rgb) / 55%);
-  cursor: pointer;
-}
-
-.import-panel__tab:hover {
-  color: var(--fm-ink);
-}
-
-.import-panel__tab--active {
-  border-bottom-color: var(--fm-accent);
-  color: var(--fm-ink);
-}
-
-.import-panel__hint {
-  margin: 0 0 var(--fm-space-10);
+.sync-tab__hint {
+  margin: var(--fm-space-10) 0;
   font-size: var(--fm-text-sm);
   color: rgb(var(--fm-ink-rgb) / 55%);
 }
 
-.import-panel__dropzone {
+.sync-tab__dropzone {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 64px;
+  gap: var(--fm-space-4);
+  height: 88px;
   border: 1px dashed rgb(var(--fm-ink-rgb) / 25%);
   border-radius: var(--fm-radius-md);
   font-size: var(--fm-text-md);
@@ -2178,17 +1834,22 @@ a.user-menu__item {
   text-align: center;
 }
 
-.import-panel__dropzone--drag {
+.sync-tab__dropzone--drag {
   border-color: var(--fm-accent);
   background: rgb(var(--fm-accent-rgb) / 6%);
   color: var(--fm-accent);
 }
 
-.import-panel__input {
+.sync-tab__dropzone-hint {
+  font-size: var(--fm-text-xs);
+  color: rgb(var(--fm-ink-rgb) / 45%);
+}
+
+.sync-tab__input {
   display: none;
 }
 
-.import-panel__notices {
+.sync-tab__notices {
   list-style: none;
   margin: var(--fm-space-10) 0 0;
   padding: 0;
@@ -2197,7 +1858,7 @@ a.user-menu__item {
   gap: var(--fm-space-6);
 }
 
-.import-panel__notice {
+.sync-tab__notice {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -2210,12 +1871,12 @@ a.user-menu__item {
   color: var(--fm-ink);
 }
 
-.import-panel__notice--error {
+.sync-tab__notice--error {
   background: rgb(var(--fm-danger-rgb) / 8%);
   color: var(--fm-danger);
 }
 
-.import-panel__notice-dismiss {
+.sync-tab__notice-dismiss {
   display: inline-flex;
   flex: none;
   border: 0;
@@ -2227,7 +1888,7 @@ a.user-menu__item {
   cursor: pointer;
 }
 
-.import-panel__list-head {
+.sync-tab__list-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -2235,7 +1896,7 @@ a.user-menu__item {
   margin: var(--fm-space-16) 0 var(--fm-space-6);
 }
 
-.import-panel__list-title {
+.sync-tab__list-title {
   font-size: var(--fm-text-xs);
   font-weight: var(--fm-weight-bold);
   letter-spacing: 0.06em;
@@ -2243,19 +1904,19 @@ a.user-menu__item {
   color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
-.import-panel__list-summary {
+.sync-tab__list-summary {
   font-size: var(--fm-text-xs);
   color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
-.import-panel__rows {
+.sync-tab__rows {
   list-style: none;
   margin: 0;
   padding: 0;
   border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
 }
 
-.import-panel__row {
+.sync-tab__row {
   display: flex;
   align-items: center;
   gap: var(--fm-space-8);
@@ -2263,7 +1924,7 @@ a.user-menu__item {
   border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 6%);
 }
 
-.import-panel__row-name {
+.sync-tab__row-name {
   flex: 1;
   min-width: 0;
   font-size: var(--fm-text-md);
@@ -2274,7 +1935,7 @@ a.user-menu__item {
   white-space: nowrap;
 }
 
-.import-panel__row-size {
+.sync-tab__row-size {
   flex: none;
   font-size: var(--fm-text-xs);
   color: rgb(var(--fm-ink-rgb) / 45%);
@@ -2282,7 +1943,7 @@ a.user-menu__item {
   text-align: right;
 }
 
-.import-panel__row-detail {
+.sync-tab__row-detail {
   flex: none;
   display: flex;
   flex-direction: column;
@@ -2291,20 +1952,20 @@ a.user-menu__item {
   min-width: 6.5rem;
 }
 
-.import-panel__row-status {
+.sync-tab__row-status {
   font-size: var(--fm-text-xs);
   color: rgb(var(--fm-ink-rgb) / 55%);
 }
 
-.import-panel__row-status--error {
+.sync-tab__row-status--error {
   color: var(--fm-danger);
 }
 
-.import-panel__row-status--ready {
+.sync-tab__row-status--ready {
   color: var(--fm-success);
 }
 
-.import-panel__row-meta {
+.sync-tab__row-meta {
   font-size: var(--fm-text-2xs);
   color: rgb(var(--fm-ink-rgb) / 45%);
 }
@@ -2312,7 +1973,7 @@ a.user-menu__item {
 /* ROADMAP.md's "View on map" action — plain text, not a button-styled control, to stay
    visually subordinate to the row's own status/date/distance rather than competing with them
    for attention in an already-tight detail column. */
-.import-panel__row-view {
+.sync-tab__row-view {
   border: 0;
   background: none;
   padding: 0;
@@ -2324,7 +1985,7 @@ a.user-menu__item {
   cursor: pointer;
 }
 
-.import-panel__progress {
+.sync-tab__progress {
   display: block;
   width: 6.5rem;
   height: 4px;
@@ -2333,24 +1994,24 @@ a.user-menu__item {
   overflow: hidden;
 }
 
-.import-panel__progress-fill {
+.sync-tab__progress-fill {
   display: block;
   height: 100%;
   background: var(--fm-accent);
   transition: width 120ms linear;
 }
 
-.import-panel__note {
+.sync-tab__note {
   padding: var(--fm-space-10) 0;
   font-size: var(--fm-text-sm);
   color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
-.import-panel__note--error {
+.sync-tab__note--error {
   color: var(--fm-danger);
 }
 
-.import-panel__pager {
+.sync-tab__pager {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2360,12 +2021,12 @@ a.user-menu__item {
   color: rgb(var(--fm-ink-rgb) / 50%);
 }
 
-.import-panel__pager-buttons {
+.sync-tab__pager-buttons {
   display: flex;
   gap: var(--fm-space-4);
 }
 
-.import-panel__pager-buttons button {
+.sync-tab__pager-buttons button {
   border: 1px solid rgb(var(--fm-ink-rgb) / 15%);
   border-radius: var(--fm-radius-sm);
   width: 24px;
@@ -2374,7 +2035,7 @@ a.user-menu__item {
   cursor: pointer;
 }
 
-.import-panel__pager-buttons button:disabled {
+.sync-tab__pager-buttons button:disabled {
   opacity: 0.35;
   cursor: default;
 }
@@ -2406,61 +2067,9 @@ a.user-menu__item {
   font-size: var(--fm-text-md);
 }
 
-/* §4.8's Profile screen — a normal scrolling page, unlike the map screen's fixed-height
-   .app-body (sidebar + map splitting one viewport). */
-.profile-page__body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  /* Without this, a scrollbar toggling on/off shrinks this element's own content width by
-     the scrollbar's own width — found live on the Trends chart specifically: hovering a bar
-     renders `.trends__tooltip` below it, adding just enough height to cross the threshold
-     where this container needs to scroll, which visibly shifted the whole page left by a few
-     pixels for as long as the tooltip was showing. Reserving the gutter unconditionally means
-     the content width never changes whether or not a scrollbar is actually needed right now. */
-  scrollbar-gutter: stable;
-  padding: var(--fm-space-24) clamp(var(--fm-space-16), 4vw, 48px) 60px;
-}
-
-.profile-page__back {
-  display: inline-block;
-  margin-bottom: var(--fm-space-20);
-  border: 0;
-  background: none;
-  padding: 0;
-  font: inherit;
-  font-size: var(--fm-text-md);
-  color: var(--fm-accent-strong);
-  cursor: pointer;
-}
-
-/* SettingsPage.tsx — Avatar, Name, Country, Timezone. Shares .profile-page__body/
-   __back above for the page shell (same "private, full-screen detour from the map" shape),
-   its own classes below only for what's actually different: a form, not a grid. */
-.settings-page {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fm-space-20);
-  max-width: 480px;
-  margin: 0 auto;
-}
-
-.settings-page__title {
-  margin: 0;
-  font-family: var(--fm-font-serif);
-  font-size: var(--fm-text-2xl);
-  font-weight: var(--fm-weight-semibold);
-  color: var(--fm-ink);
-}
-
-/* Onboarding's one-paragraph explanation under the title (SettingsPage's `onboarding` prop). */
-.settings-page__intro {
-  margin: 0;
-  font-size: var(--fm-text-lg);
-  line-height: 1.55;
-  color: rgb(var(--fm-ink-rgb) / 70%);
-}
-
+/* Form fields in the Edit activity dialog (EditActivityDialog.tsx). Named for the React
+   Settings page they came from, which is now a server-rendered page with its own styles
+   (services/server/internal/web/static/pages.css). */
 .settings-page__section {
   display: flex;
   flex-direction: column;
@@ -2497,59 +2106,6 @@ a.user-menu__item {
   cursor: not-allowed;
 }
 
-.settings-page__input--narrow {
-  max-width: 140px;
-}
-
-.settings-page__hint {
-  margin: var(--fm-space-2) 0 0;
-  font-size: var(--fm-text-sm);
-  color: rgb(var(--fm-ink-rgb) / 55%);
-  line-height: 1.5;
-}
-
-.settings-page__avatar-row {
-  display: flex;
-  align-items: center;
-  gap: var(--fm-space-16);
-}
-
-.settings-page__avatar-drop {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 72px;
-  height: 72px;
-  flex-shrink: 0;
-  border: 1px dashed rgb(var(--fm-ink-rgb) / 25%);
-  border-radius: var(--fm-radius-lg);
-  overflow: hidden;
-  background: rgb(var(--fm-ink-rgb) / 3%);
-}
-
-.settings-page__avatar-drop--over {
-  border-color: var(--fm-accent);
-  background: rgb(var(--fm-accent-rgb) / 8%);
-}
-
-.settings-page__avatar-preview {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.settings-page__avatar-placeholder {
-  font-size: 28px;
-  color: rgb(var(--fm-ink-rgb) / 25%);
-}
-
-.settings-page__avatar-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--fm-space-6);
-}
-
 .settings-page__button {
   border: 1px solid rgb(var(--fm-ink-rgb) / 18%);
   border-radius: var(--fm-radius-sm);
@@ -2560,6 +2116,12 @@ a.user-menu__item {
   font-size: var(--fm-text-md);
   font-weight: var(--fm-weight-semibold);
   cursor: pointer;
+}
+
+/* "Manage on the map" is a link to /?private-locations, dressed as the other buttons. */
+a.settings-page__button {
+  display: inline-block;
+  text-decoration: none;
 }
 
 .settings-page__button:disabled {
@@ -2604,15 +2166,9 @@ a.user-menu__item {
   cursor: default;
 }
 
-.settings-page__saved {
-  font-size: var(--fm-text-md);
-  font-weight: var(--fm-weight-semibold);
-  color: var(--fm-success-strong);
-}
-
 /* SearchPicker.tsx — Settings' Country and Timezone fields. The trigger matches
    .settings-page__input's box so it sits in the form like any other field; the panel hangs
-   under it, same anchoring as .user-menu's dropdown. Rows are leading (a flag, a GMT offset)
+   under it, anchored like .activities-panel__type-dropdown. Rows are leading (a flag, a GMT offset)
    · label · muted detail, right-aligned. */
 .search-picker {
   position: relative;
@@ -2709,7 +2265,7 @@ a.user-menu__item {
   color: rgb(var(--fm-ink-rgb) / 45%);
 }
 
-/* `position: relative` makes the list the rows' offsetParent — CountryPicker scrolls the
+/* `position: relative` makes the list the rows' offsetParent — SearchPicker scrolls the
    active row into view off its offsetTop. */
 .search-picker__list {
   position: relative;
@@ -2756,16 +2312,6 @@ a.user-menu__item {
   white-space: nowrap;
 }
 
-/* TimezonePicker.tsx's "(GMT+05:30)" — fixed width and tabular digits, so every place name
-   starts in the same column however the offsets differ. */
-.search-picker__offset {
-  flex-shrink: 0;
-  min-width: 92px;
-  font-size: var(--fm-text-md);
-  font-variant-numeric: tabular-nums;
-  color: rgb(var(--fm-ink-rgb) / 60%);
-}
-
 .search-picker__label--unset {
   color: rgb(var(--fm-ink-rgb) / 55%);
 }
@@ -2783,596 +2329,11 @@ a.user-menu__item {
   font-variant-numeric: tabular-nums;
 }
 
-/* A round flag: the rectangular emoji, scaled up and clipped to a circle so its middle band
-   fills the disc (what circle-flag icon sets draw, without shipping ~250 SVGs). */
-.search-picker__flag {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  overflow: hidden;
-  box-shadow: inset 0 0 0 1px rgb(var(--fm-ink-rgb) / 10%);
-}
-
-.search-picker__flag-emoji {
-  font-size: 30px;
-  line-height: 1;
-}
-
-/* No flag emoji on this platform (Windows) — show the code on a tinted disc instead. */
-.search-picker__flag--text {
-  background: var(--fm-surface-tint-strong);
-  font-size: 8.5px;
-  font-weight: var(--fm-weight-bold);
-  color: rgb(var(--fm-ink-rgb) / 60%);
-}
-
 .search-picker__empty {
   padding: var(--fm-space-16) var(--fm-space-8);
   font-size: var(--fm-text-md);
   color: rgb(var(--fm-ink-rgb) / 55%);
   text-align: center;
-}
-
-.activity-graph {
-  max-width: 960px;
-  margin: 0 auto;
-}
-
-.activity-graph__cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 1px;
-  margin-bottom: var(--fm-space-24);
-  background: rgb(var(--fm-ink-rgb) / 8%);
-  border: 1px solid rgb(var(--fm-ink-rgb) / 8%);
-}
-
-.activity-graph__card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fm-space-6);
-  padding: var(--fm-space-16) var(--fm-space-16);
-  background: var(--fm-surface);
-}
-
-.activity-graph__card-label {
-  font-size: var(--fm-text-xs);
-  font-weight: var(--fm-weight-semibold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgb(var(--fm-ink-rgb) / 50%);
-}
-
-.activity-graph__card-value {
-  font-size: var(--fm-text-2xl);
-  font-weight: var(--fm-weight-bold);
-  color: var(--fm-ink);
-}
-
-.activity-graph__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--fm-space-12);
-  margin-bottom: var(--fm-space-16);
-}
-
-.activity-graph__title {
-  margin: 0 0 var(--fm-space-4);
-  font-size: var(--fm-text-md);
-  font-weight: var(--fm-weight-bold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgb(var(--fm-ink-rgb) / 60%);
-}
-
-.activity-graph__subtext {
-  margin: 0;
-  font-size: var(--fm-text-md);
-  color: rgb(var(--fm-ink-rgb) / 55%);
-}
-
-.activity-graph__shade {
-  display: flex;
-  align-items: center;
-  gap: var(--fm-space-8);
-}
-
-.activity-graph__shade-label {
-  font-size: var(--fm-text-xs);
-  font-weight: var(--fm-weight-semibold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgb(var(--fm-ink-rgb) / 50%);
-}
-
-.activity-graph__shade-btn {
-  border: 1px solid rgb(var(--fm-ink-rgb) / 20%);
-  background: var(--fm-surface);
-  padding: var(--fm-space-6) var(--fm-space-12);
-  font: inherit;
-  font-size: var(--fm-text-md);
-  color: var(--fm-ink);
-  cursor: pointer;
-}
-
-.activity-graph__shade-btn:first-of-type {
-  border-radius: var(--fm-radius-sm) 0 0 var(--fm-radius-sm);
-  border-right: 0;
-}
-
-.activity-graph__shade-btn:last-of-type {
-  border-radius: 0 var(--fm-radius-sm) var(--fm-radius-sm) 0;
-}
-
-.activity-graph__shade-btn[aria-pressed='true'] {
-  background: var(--fm-accent);
-  border-color: var(--fm-accent);
-  color: #fff;
-}
-
-.activity-graph__error {
-  color: var(--fm-danger);
-  font-size: var(--fm-text-md);
-}
-
-.activity-graph__legend {
-  display: flex;
-  align-items: center;
-  gap: var(--fm-space-6);
-  margin: var(--fm-space-16) 0 0;
-  font-size: var(--fm-text-xs);
-  color: rgb(var(--fm-ink-rgb) / 50%);
-}
-
-.trends {
-  max-width: 960px;
-  margin: var(--fm-space-32) auto 0;
-  padding-top: var(--fm-space-24);
-  border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
-}
-
-.trends__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--fm-space-12);
-  margin-bottom: var(--fm-space-16);
-}
-
-.trends__title {
-  margin: 0 0 var(--fm-space-4);
-  font-size: var(--fm-text-md);
-  font-weight: var(--fm-weight-bold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgb(var(--fm-ink-rgb) / 60%);
-}
-
-.trends__subtext {
-  margin: 0;
-  font-size: var(--fm-text-md);
-  color: rgb(var(--fm-ink-rgb) / 55%);
-}
-
-.trends__bucket {
-  display: flex;
-  align-items: center;
-  gap: 0;
-}
-
-.trends__bucket-btn {
-  border: 1px solid rgb(var(--fm-ink-rgb) / 20%);
-  background: var(--fm-surface);
-  padding: var(--fm-space-6) var(--fm-space-12);
-  font: inherit;
-  font-size: var(--fm-text-md);
-  color: var(--fm-ink);
-  cursor: pointer;
-}
-
-.trends__bucket-btn:first-of-type {
-  border-radius: var(--fm-radius-sm) 0 0 var(--fm-radius-sm);
-  border-right: 0;
-}
-
-.trends__bucket-btn:last-of-type {
-  border-radius: 0 var(--fm-radius-sm) var(--fm-radius-sm) 0;
-}
-
-.trends__bucket-btn[aria-pressed='true'] {
-  background: var(--fm-accent);
-  border-color: var(--fm-accent);
-  color: #fff;
-}
-
-.trends__error {
-  color: var(--fm-danger);
-  font-size: var(--fm-text-md);
-}
-
-.trends__empty {
-  color: rgb(var(--fm-ink-rgb) / 50%);
-  font-size: var(--fm-text-md);
-}
-
-.trends__chart {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fm-space-6);
-}
-
-.trends__bars {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--fm-space-2);
-  height: 140px;
-  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 12%);
-}
-
-.trends__bar {
-  flex: 1 1 0;
-  min-height: 2px;
-  background: var(--fm-accent);
-  border-radius: var(--fm-radius-xs) var(--fm-radius-xs) 0 0;
-}
-
-.trends__bar:hover {
-  background: var(--fm-accent-hover);
-}
-
-.trends__axis {
-  display: flex;
-  justify-content: space-between;
-  font-size: var(--fm-text-xs);
-  color: rgb(var(--fm-ink-rgb) / 50%);
-}
-
-.trends__tooltip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fm-space-4) var(--fm-space-16);
-  margin-top: var(--fm-space-12);
-  padding: var(--fm-space-8) var(--fm-space-12);
-  background: rgb(var(--fm-ink-rgb) / 4%);
-  border-radius: var(--fm-radius-sm);
-  font-size: var(--fm-text-md);
-  color: var(--fm-ink);
-}
-
-.trends__tooltip-date {
-  font-weight: var(--fm-weight-bold);
-}
-
-.year-grid {
-  margin-bottom: var(--fm-space-32);
-  padding-top: var(--fm-space-16);
-  border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
-}
-
-.year-grid__header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--fm-space-10);
-  margin-bottom: var(--fm-space-10);
-}
-
-.year-grid__year {
-  margin: 0;
-  font-family: var(--fm-font-serif);
-  font-size: var(--fm-text-2xl);
-  font-weight: var(--fm-weight-semibold);
-  color: var(--fm-ink);
-}
-
-.year-grid__stats {
-  font-size: var(--fm-text-md);
-  color: rgb(var(--fm-ink-rgb) / 55%);
-}
-
-.year-grid__body {
-  display: flex;
-  gap: var(--fm-space-6);
-  overflow-x: auto;
-}
-
-.year-grid__row-labels {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  gap: var(--fm-space-4);
-  padding-top: var(--fm-space-16);
-}
-
-.year-grid__row-label {
-  height: 12px;
-  font-size: var(--fm-text-3xs);
-  line-height: 12px;
-  color: rgb(var(--fm-ink-rgb) / 45%);
-}
-
-.year-grid__chart {
-  flex: none;
-}
-
-.year-grid__months {
-  display: grid;
-  grid-auto-flow: column;
-  height: 14px;
-  margin-bottom: var(--fm-space-2);
-}
-
-.year-grid__month {
-  font-size: var(--fm-text-3xs);
-  color: rgb(var(--fm-ink-rgb) / 45%);
-  white-space: nowrap;
-}
-
-.year-grid__cells {
-  display: grid;
-  grid-auto-flow: column;
-  grid-template-rows: repeat(7, 12px);
-  gap: var(--fm-space-4);
-}
-
-.year-grid__cell {
-  width: 12px;
-  height: 12px;
-  border-radius: var(--fm-radius-xs);
-  background: rgb(var(--fm-ink-rgb) / 6%);
-}
-
-.year-grid__cell--pad {
-  background: transparent;
-}
-
-.year-grid__cell--level-0 {
-  background: rgb(var(--fm-ink-rgb) / 6%);
-}
-
-.year-grid__cell--level-1 {
-  background: rgb(var(--fm-accent-rgb) / 30%);
-}
-
-.year-grid__cell--level-2 {
-  background: rgb(var(--fm-accent-rgb) / 60%);
-}
-
-.year-grid__cell--level-3 {
-  background: var(--fm-accent);
-}
-
-/* AuthGate.tsx — the whole screen App.tsx renders in place of the app until getCurrentUser()
-   confirms a session. Its own root, not nested in .app-shell: there is no header/map chrome
-   to sit inside of, since signing in is a precondition for either existing. */
-.auth-gate {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--fm-space-16);
-  min-height: 100vh;
-  padding: var(--fm-space-24);
-  background: var(--fm-bg);
-}
-
-.auth-gate__about {
-  font-size: var(--fm-text-md);
-  color: var(--fm-ink-secondary);
-}
-
-.auth-gate__about:hover {
-  color: var(--fm-accent-strong);
-}
-
-.auth-gate__card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fm-space-16);
-  width: 100%;
-  max-width: 22rem;
-  padding: var(--fm-space-24);
-  background: var(--fm-surface);
-  border: 1px solid rgb(var(--fm-ink-rgb) / 10%);
-  border-radius: var(--fm-radius-lg);
-  box-shadow: var(--fm-shadow-lg);
-}
-
-.auth-gate__brand {
-  display: flex;
-  align-items: center;
-  gap: var(--fm-space-12);
-  font-family: var(--fm-font-serif);
-  font-size: 19px;
-  letter-spacing: 0.2px;
-  line-height: 1;
-  color: var(--fm-ink);
-}
-
-.auth-gate__logo {
-  display: block;
-  height: 36px;
-  width: auto;
-}
-
-.auth-gate__title {
-  margin: var(--fm-space-4) 0 var(--fm-space-6);
-  font-family: var(--fm-font-serif);
-  font-size: var(--fm-text-2xl);
-  font-weight: var(--fm-weight-semibold);
-  color: var(--fm-ink);
-}
-
-.auth-gate__field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fm-space-6);
-  font-size: var(--fm-text-md);
-  color: rgb(var(--fm-ink-rgb) / 60%);
-}
-
-.auth-gate__field input {
-  padding: var(--fm-space-10) var(--fm-space-10);
-  border: 1px solid rgb(var(--fm-ink-rgb) / 18%);
-  border-radius: var(--fm-radius-sm);
-  font: inherit;
-  font-size: var(--fm-text-lg);
-  color: var(--fm-ink);
-}
-
-.auth-gate__field input:focus {
-  outline: 2px solid var(--fm-accent);
-  outline-offset: 1px;
-}
-
-.auth-gate__error {
-  margin: 0;
-  padding: var(--fm-space-8) var(--fm-space-10);
-  border-radius: var(--fm-radius-sm);
-  background: rgb(var(--fm-danger-rgb) / 8%);
-  color: var(--fm-danger);
-  font-size: var(--fm-text-md);
-}
-
-.auth-gate__submit {
-  margin-top: var(--fm-space-6);
-  border: 0;
-  border-radius: var(--fm-radius-md);
-  padding: var(--fm-space-10);
-  background: var(--fm-accent);
-  color: #fff;
-  font: inherit;
-  font-weight: var(--fm-weight-semibold);
-  font-size: var(--fm-text-lg);
-  cursor: pointer;
-}
-
-.auth-gate__submit:hover {
-  background: var(--fm-accent-hover);
-}
-
-.auth-gate__submit:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.auth-gate__toggle {
-  align-self: center;
-  border: 0;
-  background: none;
-  padding: 0;
-  font: inherit;
-  font-size: var(--fm-text-md);
-  color: var(--fm-accent-strong);
-  cursor: pointer;
-}
-
-.auth-gate__toggle:disabled {
-  color: rgb(var(--fm-ink-rgb) / 40%);
-  cursor: default;
-}
-
-/* Sits right under the password field, so it reads as "trouble with that?" rather than a
-   general nav link — same treatment as .auth-gate__toggle, just right-aligned to stay out of
-   the vertical flow of field -> field -> submit. */
-.auth-gate__forgot {
-  align-self: flex-end;
-  margin-top: calc(-1 * var(--fm-space-6));
-  border: 0;
-  background: none;
-  padding: 0;
-  font: inherit;
-  font-size: var(--fm-text-sm);
-  color: var(--fm-accent-strong);
-  cursor: pointer;
-}
-
-.auth-gate__forgot:disabled {
-  color: rgb(var(--fm-ink-rgb) / 40%);
-  cursor: default;
-}
-
-/* The "check your email" confirmation — plain body copy, same width/rhythm as the form it
-   replaces so the card doesn't visibly resize between screens. */
-.auth-gate__hint {
-  margin: 0;
-  font-size: var(--fm-text-md);
-  line-height: 1.5;
-  color: rgb(var(--fm-ink-rgb) / 65%);
-}
-
-.auth-gate__divider {
-  display: flex;
-  align-items: center;
-  gap: var(--fm-space-10);
-  margin: var(--fm-space-2) 0;
-  font-size: var(--fm-text-xs);
-  color: rgb(var(--fm-ink-rgb) / 40%);
-}
-
-.auth-gate__divider::before,
-.auth-gate__divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: rgb(var(--fm-ink-rgb) / 10%);
-}
-
-.auth-gate__google {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--fm-space-10);
-  border: 1px solid rgb(var(--fm-ink-rgb) / 15%);
-  border-radius: var(--fm-radius-md);
-  padding: var(--fm-space-10);
-  background: var(--fm-surface);
-  color: var(--fm-ink);
-  font-weight: var(--fm-weight-semibold);
-  font-size: var(--fm-text-lg);
-  text-decoration: none;
-}
-
-.auth-gate__google:hover {
-  background: rgb(var(--fm-ink-rgb) / 4%);
-}
-
-.auth-gate__google[aria-disabled='true'] {
-  opacity: 0.6;
-  pointer-events: none;
-}
-
-.auth-gate__google-mark {
-  width: 18px;
-  height: 18px;
-}
-
-.auth-gate__demo {
-  border: 1px solid rgb(var(--fm-ink-rgb) / 15%);
-  border-radius: var(--fm-radius-md);
-  padding: var(--fm-space-10);
-  background: var(--fm-surface);
-  color: var(--fm-ink);
-  font: inherit;
-  font-weight: var(--fm-weight-semibold);
-  font-size: var(--fm-text-lg);
-  cursor: pointer;
-}
-
-.auth-gate__demo:hover {
-  background: rgb(var(--fm-ink-rgb) / 4%);
-}
-
-.auth-gate__demo:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
 
 /* ============================================================================
@@ -3384,10 +2345,8 @@ a.user-menu__item {
    every desktop interaction: two hover-only features stay mouse-only on purpose —
    TrackProfile.tsx's colored-band/elevation exact values (FR-4.9) and the map-track-hover
    ↔ Activities-row-underline two-way highlight (FR-4.1/FR-5.4) — both are continuous-
-   position hover reads with no discrete point to tap, unlike Trends.tsx's bar/point
-   tooltips below, which do get a tap fallback (in that file directly, not
-   here). See functional_specification.md's mobile-support note and
-   technical_implementation_plan.md §5.9 for the full account. */
+   position hover reads with no discrete point to tap. See functional_specification.md's
+   mobile-support note and technical_implementation_plan.md §5.9 for the full account. */
 @media (max-width: 768px) {
   /* Defensive backstop, not a fix for a specific known overflow (those are fixed at their
      own source below, e.g. the histogram header) — a few elements deliberately extend
@@ -3481,79 +2440,6 @@ a.user-menu__item {
     padding: var(--fm-space-8) var(--fm-space-6);
   }
 
-  /* The header: Donate/Upload/Export/the account menu at their desktop padding don't
-     reliably fit a ~360px-wide phone alongside the brand mark. Tighter padding/gaps first;
-     Donate (still a placeholder today — the least "core" of the four) is what's allowed to
-     wrap or shrink further if a specific device still runs tight, rather than crowding
-     Upload/Export/the account menu, which are the real functional core. */
-  .app-header {
-    padding: 0 var(--fm-space-10);
-    gap: var(--fm-space-8);
-  }
-
-  .app-header__actions {
-    gap: var(--fm-space-6);
-  }
-
-  .app-header__brand {
-    font-size: 15px;
-    gap: var(--fm-space-6);
-  }
-
-  .app-header__logo {
-    height: 30px;
-  }
-
-  /* No room for the tagline beside four actions on a phone — the wordmark alone carries it. */
-  .app-header__divider,
-  .app-header__tagline {
-    display: none;
-  }
-
-  /* Nor for the About menu: the header is already at a 390px phone's full width without it.
-     About moves into the account menu instead (UserMenu.tsx's phone-only item). */
-  .about-menu {
-    display: none;
-  }
-
-  .user-menu__item--phone-only {
-    display: block;
-  }
-
-  .donate-button,
-  .export-button {
-    padding: var(--fm-space-6) var(--fm-space-10);
-    font-size: var(--fm-text-md);
-  }
-
-  /* Heart only on a phone — the header was already ~30px wider than a 390px viewport with
-     the word alone, and a heart is recognizable without it. The button's aria-label keeps its
-     accessible name. */
-  .donate-button {
-    padding: var(--fm-space-6) var(--fm-space-8);
-  }
-
-  .donate-button__label {
-    display: none;
-  }
-
-  /* Desktop anchors this dropdown to its own trigger's right edge (`right: 0` on the rule
-     above), which only stays on screen because Import happens to be the header's rightmost
-     action there. On a phone it sits between Export and the account menu (Header.tsx's fixed
-     order), so a dropdown nearly as wide as the viewport anchored to that trigger runs off the
-     left edge instead — reported live as the import window landing partly out of the
-     viewport. Fixed to the screen's own edges instead, the same "stop anchoring to a button
-     that isn't at either edge" fix the Activities panel's bottom sheet already needed; `top:
-     64px` clears the header's fixed 56px height plus the same 8px gap the desktop rule uses. */
-  .import-panel__dropdown {
-    position: fixed;
-    top: 64px;
-    left: 10px;
-    right: 10px;
-    width: auto;
-    max-height: calc(100vh - 84px);
-  }
-
   /* The phone footer is just DateRangeSlider.tsx — ActivityHistogram.tsx swaps out the bar
      chart and legend below this breakpoint, so none of their desktop rules need a phone
      variant. Its bottom padding reserves the collapsed Activities sheet's ~68px (plus a
@@ -3634,4 +2520,19 @@ a.user-menu__item {
   font-weight: var(--fm-weight-semibold);
   letter-spacing: 0.02em;
   color: rgb(var(--fm-ink-rgb) / 65%);
+}
+
+/* ExportControl.tsx — a button in MapLibre's own top-right control stack, under zoom and
+   locate. MapLibre sizes the button (29px square); this centers the Lucide camera in it the
+   way MapLibre's own controls center their icons, and marks it while the frame is shown. */
+.maplibregl-ctrl-group .export-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fm-ink);
+}
+
+.maplibregl-ctrl-group .export-control[aria-pressed='true'] {
+  background: rgb(var(--fm-accent-rgb) / 14%);
+  color: var(--fm-accent-strong);
 }

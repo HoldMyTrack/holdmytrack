@@ -88,6 +88,55 @@ GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-f
 - If Google sign-in is configured, click "Continue with Google" and confirm you land on the map signed in. A `redirect_uri_mismatch` page from Google means the authorized redirect URI in step 4 doesn't match `APP_BASE_URL` + `/v1/auth/google/callback` exactly; landing back on the sign-in screen with "Couldn't sign in with Google" means the callback failed, and `docker compose -f compose.prod.yml logs api | grep "google sign-in"` says why.
 - If sign-in silently fails (redirected straight back to the sign-in screen after submitting), the most likely cause is `APP_BASE_URL` not actually being `https://` while the browser is on a plain `http://` connection, or vice versa — see step 4's note on the `Secure` cookie flag.
 
+## 9. Before upgrading the Postgres image
+
+The server passes each account's stored time zone straight to Postgres (`AT TIME ZONE users.timezone`, every per-day query), and the `postgis/postgis` image reads time zones from the operating system's own files (it's built `--with-system-tzdata`). Today's `16-3.4` image is Debian 11, whose files still carry the old names IANA has since replaced, like `Asia/Calcutta` for `Asia/Kolkata` and `Europe/Kiev` for `Europe/Kyiv`. Debian 13 moved those old names into a separate `tzdata-legacy` package that isn't installed by default. On an image built on it, any account still storing an old name would make those queries fail with an error.
+
+New accounts can't get one: the server stores every time zone under its current name (`IMPLEMENTATION.md` §4.12). But an account that signed up before that change (2026-09-25) keeps the old spelling its browser reported until it next saves Settings. So before moving `db` to an image on Debian 13 or later, rewrite those, while the old image is still running:
+
+```bash
+docker compose -f compose.prod.yml --env-file .env.prod exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
+```sql
+UPDATE users u SET timezone = r.current
+FROM (VALUES
+  ('Africa/Asmera', 'Africa/Asmara'),
+  ('America/Buenos_Aires', 'America/Argentina/Buenos_Aires'),
+  ('America/Catamarca', 'America/Argentina/Catamarca'),
+  ('America/Cordoba', 'America/Argentina/Cordoba'),
+  ('America/Godthab', 'America/Nuuk'),
+  ('America/Indianapolis', 'America/Indiana/Indianapolis'),
+  ('America/Jujuy', 'America/Argentina/Jujuy'),
+  ('America/Knox_IN', 'America/Indiana/Knox'),
+  ('America/Louisville', 'America/Kentucky/Louisville'),
+  ('America/Mendoza', 'America/Argentina/Mendoza'),
+  ('America/Virgin', 'America/St_Thomas'),
+  ('Asia/Ashkhabad', 'Asia/Ashgabat'),
+  ('Asia/Calcutta', 'Asia/Kolkata'),
+  ('Asia/Chungking', 'Asia/Chongqing'),
+  ('Asia/Dacca', 'Asia/Dhaka'),
+  ('Asia/Istanbul', 'Europe/Istanbul'),
+  ('Asia/Katmandu', 'Asia/Kathmandu'),
+  ('Asia/Macao', 'Asia/Macau'),
+  ('Asia/Rangoon', 'Asia/Yangon'),
+  ('Asia/Saigon', 'Asia/Ho_Chi_Minh'),
+  ('Asia/Thimbu', 'Asia/Thimphu'),
+  ('Asia/Ujung_Pandang', 'Asia/Makassar'),
+  ('Asia/Ulan_Bator', 'Asia/Ulaanbaatar'),
+  ('Atlantic/Faeroe', 'Atlantic/Faroe'),
+  ('Europe/Kiev', 'Europe/Kyiv'),
+  ('Europe/Nicosia', 'Asia/Nicosia'),
+  ('HST', 'Pacific/Honolulu'),
+  ('Pacific/Ponape', 'Pacific/Pohnpei'),
+  ('Pacific/Samoa', 'Pacific/Pago_Pago'),
+  ('Pacific/Truk', 'Pacific/Chuuk')
+) AS r(old, current)
+WHERE u.timezone = r.old;
+```
+
+That's the rename table in `services/server/internal/web/timezones_data.go` (`timezoneRenames`, tzdata 2026d) at the time of writing. If the table has been regenerated since, rebuild the list from it. Then check that nothing is left that the new image won't know: run `SELECT DISTINCT timezone FROM users` and look each result up in the new image's `pg_timezone_names`.
+
 ## What this doesn't cover
 
 Per `docs/ROADMAP.md`, still open beyond this minimal setup: backups and a restore drill, host hardening, log rotation and monitoring (its "Production deployment" section), per-user quotas and rate limits with a spend cap (Phase 5), and the compliance work (DPIA, EU-region hosting — Phase 6) a genuine public launch needs regardless of how small the deployment is. This document gets you to "it's live," not to "it's ready for the public."

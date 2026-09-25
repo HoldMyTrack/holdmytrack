@@ -23,7 +23,8 @@ export const TILES_V1 = '/tiles/v1';
  * Whichever it is, this pulls out the part actually worth putting in front of a person: the
  * JSON body's own `message` field when there is one, the plain text otherwise — never the raw
  * `{"error":...,"message":...}` blob itself, which is what every caller below used to throw
- * verbatim (reported live: SettingsPage.tsx showing the whole JSON string as its save error).
+ * verbatim (reported live: the Settings page, when it was React, showing the whole JSON string as its
+ * save error).
  */
 function messageFromErrorBody(text: string, fallback: string): string {
   if (!text) return fallback;
@@ -51,14 +52,14 @@ async function errorMessageFromResponse(res: Response, fallback: string): Promis
  * Simple email+password auth (services/server/internal/httpapi/auth.go) — every request in
  * this file sends `credentials: 'include'` now (and `uploadFile`'s XHR sets
  * `withCredentials`) so the browser attaches the session cookie these endpoints set/read.
- * `signup`/`login` throw on failure rather than returning a result union, matching every
- * other function here's "throw with the server's own message" convention — the caller
- * (AuthGate.tsx) catches and displays it.
+ * Signing in, signing up, password reset and email verification are server-rendered pages
+ * (ADR-0012), not calls from here, and so is signing out (the page header's form); this app
+ * only reads the session (`getCurrentUser`).
  */
-/** The Settings page's own fields (SettingsPage.tsx) — carried by both `AuthUser` and
+/** The Settings page's own fields (`/settings`) — carried by both `AuthUser` and
  *  `DemoUser` uniformly, since a demo account is a real `users` row with real column
  *  defaults, not a special case that skips having them. `displayName`/`country`/`avatarUrl`
- *  are `''` when unset, not `undefined` — every caller (units.ts, SettingsPage.tsx) checks
+ *  are `''` when unset, not `undefined` — every caller (units.ts) checks
  *  for an empty string, never an absent field. `country` is an ISO 3166-1 alpha-2 code or
  *  `''` (defaults the whole app to metric — see `ui/units.ts`). `avatarUrl` is already a
  *  full API path (`/v1/account/avatar?v=...`) — callers prefix `API_BASE_URL`. */
@@ -79,7 +80,7 @@ export interface AuthUser extends UserProfile {
   /** docs/SPEC.md FR-1.8 — always `true` for a
    *  `DemoUser` (the gate never applies to one, so that type doesn't carry this field at all),
    *  reflects the account's real `users.email_verified` column for a real one. App.tsx checks
-   *  this to decide whether to render the map or AuthGate's verify-email screen. */
+   *  this to decide whether to render the map or leave for the verify-email page. */
   emailVerified: boolean;
 }
 
@@ -124,156 +125,6 @@ function toSessionUser(body: AuthResponseBody): SessionUser {
   return body.isDemo ? toProfile(body) : toAuthUser(body);
 }
 
-async function postAuth(path: string, email: string, password: string, extra?: Record<string, unknown>): Promise<AuthUser> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ email, password, ...extra }),
-  });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
-  }
-  const body = (await res.json()) as AuthResponseBody;
-  return toAuthUser(body);
-}
-
-/** Sends the browser's own IANA zone (`Intl.DateTimeFormat().resolvedOptions().timeZone`) as
- *  a one-time signup-only default — auth.go's `handleSignup` falls back to `'UTC'` if this is
- *  missing or the server can't load it, so there's nothing to validate client-side here; the
- *  account can always change it later in Settings (SettingsPage.tsx). `login` sends no such
- *  field — the account's stored value, not the browser's, is authoritative from then on. */
-export function signup(email: string, password: string): Promise<AuthUser> {
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  return postAuth(`${API_V1}/auth/signup`, email, password, { timezone });
-}
-
-export function login(email: string, password: string): Promise<AuthUser> {
-  return postAuth(`${API_V1}/auth/login`, email, password);
-}
-
-/** Which optional sign-in methods this deployment has configured (google_auth.go's
- *  handleAuthProviders) — read at runtime rather than baked in at build time, so the button
- *  never appears on a deployment whose server can't complete the flow. A failed request reads
- *  as "none": email+password never depends on this. */
-export async function getAuthProviders(): Promise<{ google: boolean }> {
-  try {
-    const res = await fetch(`${API_BASE_URL}${API_V1}/auth/providers`, { credentials: 'include' });
-    if (!res.ok) return { google: false };
-    return (await res.json()) as { google: boolean };
-  } catch {
-    return { google: false };
-  }
-}
-
-/** Where "Continue with Google" navigates — a full-page navigation, not a fetch(): the server
- *  redirects on to Google and back (docs/SPEC.md FR-1.9), ending with the ordinary session
- *  cookie set and a redirect to the app's root, where App.tsx's usual getCurrentUser check
- *  picks the session up. `tz` plays `signup`'s `timezone` role for a brand-new account. */
-export function googleSignInUrl(): string {
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  return `${API_BASE_URL}${API_V1}/auth/google/start?tz=${encodeURIComponent(tz)}`;
-}
-
-/** VISION.md §8.2's "no-signup, drag-a-file-in, see-your-fog-map page" — a real
- *  session behind the scenes (auth.go's handleDemoStart), so nothing else in this file needs
- *  a demo-specific branch: uploads, tiles, everything just works once this resolves. */
-export async function startDemo(): Promise<DemoUser> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/auth/demo`, { method: 'POST', credentials: 'include' });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `couldn't start the demo (${res.status})`));
-  }
-  const body = (await res.json()) as AuthResponseBody;
-  return toProfile(body);
-}
-
-/** IMPLEMENTATION.md §4.11's password recovery. Always resolves — never rejects on "no such
- *  account," matching the backend's own deliberate non-leaking response — there is nothing
- *  more specific for a caller to do differently either way. */
-export async function forgotPassword(email: string): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/auth/forgot-password`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ email }),
-  });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
-  }
-}
-
-/** Never a `DemoUser` — a reset always targets a real, already-claimed account (the backend
- *  only ever creates a reset token for one — see auth.go's sendPasswordReset). */
-export async function resetPassword(token: string, password: string): Promise<AuthUser> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/auth/reset-password`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ token, password }),
-  });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
-  }
-  const body = (await res.json()) as AuthResponseBody;
-  return toAuthUser(body);
-}
-
-/** docs/ROADMAP.md's verification link (`?verify_token=...`) — App.tsx reads it the same way
- *  it already reads `reset_token`. Never a `DemoUser`, same reasoning as `resetPassword`: the
- *  backend only ever mints one of these tokens for a real account. */
-export async function verifyEmail(token: string): Promise<AuthUser> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/auth/verify-email`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ token }),
-  });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
-  }
-  const body = (await res.json()) as AuthResponseBody;
-  return toAuthUser(body);
-}
-
-/** The verify-email screen's "resend" action (AuthGate.tsx) — the caller is already signed in
- *  but unverified, so this needs no email/token of its own, just the session cookie already
- *  attached. */
-export async function resendVerification(): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/auth/resend-verification`, {
-    method: 'POST',
-    credentials: 'include',
-  });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
-  }
-}
-
-/** The verify-email screen's "change email" action — corrects a mistyped signup address
- *  before it's ever been confirmed (docs/ROADMAP.md: "resend alone doesn't help someone who
- *  typed the address wrong in the first place"). Resets emailVerified to false on the caller's
- *  side too, matching what the backend just did, so AuthGate keeps showing the verify screen
- *  for the new address rather than briefly reading as verified. */
-export async function changeEmail(email: string): Promise<AuthUser> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/auth/email`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ email }),
-  });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
-  }
-  const body = (await res.json()) as AuthResponseBody;
-  return toAuthUser(body);
-}
-
-export async function logout(): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/auth/logout`, { method: 'POST', credentials: 'include' });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `logout failed (${res.status})`));
-  }
-}
-
 /** Resolves to the signed-in user (real or demo), or `null` if there is no valid session —
  *  not an error: this is the normal "nobody's signed in yet" state on first load, checked
  *  deliberately rather than treated as a failure. */
@@ -285,54 +136,6 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   }
   const body = (await res.json()) as AuthResponseBody;
   return toSessionUser(body);
-}
-
-/** SettingsPage.tsx's Save button — a full replace of all three fields at once (`PATCH
- *  /v1/account/settings`), not per-field auto-save. Returns the updated profile so the
- *  caller can merge it into AuthContext directly (`useAuth().updateUser`) with no extra
- *  round trip. */
-export async function updateSettings(patch: {
-  displayName: string;
-  country: string;
-  timezone: string;
-}): Promise<UserProfile> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/account/settings`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({
-      display_name: patch.displayName,
-      country: patch.country,
-      timezone: patch.timezone,
-    }),
-  });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
-  }
-  const body = (await res.json()) as AuthResponseBody;
-  return toProfile(body);
-}
-
-/** `POST /v1/account/avatar` — a small image, not large enough to need `uploadFile`'s
- *  XMLHttpRequest-for-progress treatment (5 MiB server-side cap). */
-export async function uploadAvatar(file: File): Promise<UserProfile> {
-  const form = new FormData();
-  form.append('file', file);
-  const res = await fetch(`${API_BASE_URL}${API_V1}/account/avatar`, { method: 'POST', credentials: 'include', body: form });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `upload failed (${res.status})`));
-  }
-  const body = (await res.json()) as AuthResponseBody;
-  return toProfile(body);
-}
-
-export async function removeAvatar(): Promise<UserProfile> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/account/avatar`, { method: 'DELETE', credentials: 'include' });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
-  }
-  const body = (await res.json()) as AuthResponseBody;
-  return toProfile(body);
 }
 
 /** A single plain file's own upload outcome — §4.0's original one-file response shape. */
@@ -447,9 +250,9 @@ export interface UploadHistoryRow {
   filename: string;
   externalId: string;
   /** `"upload"` | `"takeout"` | `"healthconnect"` | `"healthkit"` | `"recorded"` — what
-   *  ImportPanel.tsx's Files/Sync tabs filter by, and (for a Files row) what makes `filename`
-   *  worth showing at all; a synced row's own filename is a raw external id, never meant to
-   *  be read directly (`formatSourceLabel` is what a Sync row's title actually shows). */
+   *  `sources` filters by, and (for an uploaded file) what makes `filename` worth showing at
+   *  all; a synced row's own filename is a raw external id, never meant to be read directly
+   *  (`formatSourceLabel` is what SyncTab.tsx shows as a synced row's title instead). */
   source: string;
   status: 'processing' | 'done' | 'failed';
   error?: string;
@@ -497,8 +300,7 @@ export interface UploadHistoryQuery {
   limit?: number;
   offset?: number;
   /** Comma-joined server-side, matching §4.3's own `types` filter convention — absent means
-   *  every source, which is what an unfiltered combined view (rather than ImportPanel.tsx's
-   *  own Files/Sync tabs) would ask for. */
+   *  every source — what SyncTab.tsx's one combined history asks for. */
   sources?: readonly string[];
 }
 
@@ -637,12 +439,11 @@ export async function listActivities(query: ActivityQuery = {}, signal?: AbortSi
 
 /**
  * §4.7.4's `PATCH /v1/activities/{id}` — the edit-type-name-and-description dialog's Save
- * button. Full-replace-on-save like `updateSettings`, not per-field: all three fields commit
- * together.
+ * button. Full-replace-on-save, not per-field: all three fields commit together.
  * Returns the updated row so the caller can `reload()` the list (EditActivityDialog.tsx does,
  * matching the "just refetch" convention an upload completion already uses) rather than
- * needing this return value directly — returned anyway for the same reason `updateSettings`
- * returns the updated profile: one fewer thing for a caller to assume about the request.
+ * needing this return value directly — returned anyway: one fewer thing for a caller to
+ * assume about the request.
  */
 export async function updateActivity(
   id: string,
@@ -843,156 +644,6 @@ export async function getActivityDayPage(query: DayPageQuery, signal?: AbortSign
     to: body.to,
     days: body.buckets.map((b) => ({ date: b.date, count: b.count, distanceMeters: b.distance_meters })),
     earliest: body.earliest ?? null,
-  };
-}
-
-/**
- * §4.8's activity graph cells: one calendar year of §4.7's histogram, via the same endpoint's
- * `from`/`to` calendar-window mode rather than a new one — see
- * IMPLEMENTATION.md §4.8, "reuses GET /v1/activities/histogram's day-bucket
- * shape for the grid cells." Empty days are absent, same as the day-page mode above; the
- * caller lays out the full Jan 1–Dec 31 grid itself and places these `days` into it.
- */
-export interface ActivityYearGraph {
-  from: string;
-  to: string;
-  days: HistogramBucket[];
-  earliest: string | null;
-}
-
-export async function getActivityYearGraph(year: number, signal?: AbortSignal): Promise<ActivityYearGraph> {
-  const params = new URLSearchParams({ from: `${year}-01-01`, to: `${year}-12-31` });
-  const res = await fetch(`${API_BASE_URL}${API_V1}/activities/histogram?${params.toString()}`, {
-    ...(signal ? { signal } : {}),
-    credentials: 'include',
-  });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `activity year graph failed (${res.status})`));
-  }
-  const body = (await res.json()) as HistogramBody;
-  return {
-    from: body.from,
-    to: body.to,
-    days: body.buckets.map((b) => ({ date: b.date, count: b.count, distanceMeters: b.distance_meters })),
-    earliest: body.earliest ?? null,
-  };
-}
-
-/** One of §4.8's two stat-card rows (a selected year, or all-time). */
-export interface ActivityStatsBlock {
-  count: number;
-  distanceMeters: number;
-  activeDays: number;
-  longestStreakDays: number;
-}
-
-export interface ActivityGraphStats {
-  year: number;
-  /** The requested year's own numbers — the subtotal line under that year's grid. */
-  yearStats: ActivityStatsBlock;
-  /** Every activity ever recorded, regardless of year — the page's header cards. */
-  allTime: ActivityStatsBlock;
-}
-
-interface ActivityStatsBlockBody {
-  count: number;
-  distance_meters: number;
-  active_days: number;
-  longest_streak_days: number;
-}
-
-interface ActivityGraphStatsBody {
-  year: number;
-  year_stats: ActivityStatsBlockBody;
-  all_time: ActivityStatsBlockBody;
-}
-
-function toStatsBlock(b: ActivityStatsBlockBody): ActivityStatsBlock {
-  return {
-    count: b.count,
-    distanceMeters: b.distance_meters,
-    activeDays: b.active_days,
-    longestStreakDays: b.longest_streak_days,
-  };
-}
-
-/**
- * `GET /v1/activities/graph-stats?year=` — §4.8's four stat-card numbers (count, distance,
- * active days, longest streak), for one calendar year and for all time in the same response.
- * Deliberately not derived from `getActivityYearGraph`'s day buckets client-side, even though
- * three of the four technically could be: longest streak is real server-side work regardless,
- * and computing the other three two different ways (client-side per year, server-side for
- * all-time) would be more code than just reading all four from here every time.
- */
-export async function getActivityGraphStats(year: number, signal?: AbortSignal): Promise<ActivityGraphStats> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/activities/graph-stats?year=${year}`, {
-    ...(signal ? { signal } : {}),
-    credentials: 'include',
-  });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `activity graph stats failed (${res.status})`));
-  }
-  const body = (await res.json()) as ActivityGraphStatsBody;
-  return { year: body.year, yearStats: toStatsBlock(body.year_stats), allTime: toStatsBlock(body.all_time) };
-}
-
-export type TrendBucket = 'week' | 'month';
-
-export interface TrendPeriod {
-  periodStart: string;
-  count: number;
-  distanceMeters: number;
-  movingSeconds: number;
-  elevationGainM: number;
-}
-
-export interface ActivityTrends {
-  bucket: TrendBucket;
-  from: string;
-  to: string;
-  periods: TrendPeriod[];
-}
-
-interface TrendPeriodBody {
-  period_start: string;
-  count: number;
-  distance_meters: number;
-  moving_seconds: number;
-  elevation_gain_m: number;
-}
-
-interface ActivityTrendsBody {
-  bucket: TrendBucket;
-  from: string;
-  to: string;
-  periods: TrendPeriodBody[];
-}
-
-/**
- * `GET /v1/activities/trends?bucket=week|month` — docs/SPEC.md FR-9's "trends": count/
- * distance/moving-time/elevation-gain per calendar bucket, over the trailing 12 months by
- * default (same default window as the year-graph's histogram calls).
- */
-export async function getActivityTrends(bucket: TrendBucket, signal?: AbortSignal): Promise<ActivityTrends> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/activities/trends?bucket=${bucket}`, {
-    ...(signal ? { signal } : {}),
-    credentials: 'include',
-  });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `activity trends failed (${res.status})`));
-  }
-  const body = (await res.json()) as ActivityTrendsBody;
-  return {
-    bucket: body.bucket,
-    from: body.from,
-    to: body.to,
-    periods: body.periods.map((p) => ({
-      periodStart: p.period_start,
-      count: p.count,
-      distanceMeters: p.distance_meters,
-      movingSeconds: p.moving_seconds,
-      elevationGainM: p.elevation_gain_m,
-    })),
   };
 }
 
