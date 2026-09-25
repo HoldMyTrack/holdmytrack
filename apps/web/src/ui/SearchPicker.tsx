@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { ChevronDown, Search } from 'lucide-react';
 
 /** One row of a SearchPicker: `leading` · `label` · `detail` (muted, right-aligned). */
 export interface PickerOption {
@@ -213,18 +214,13 @@ export function SearchPicker({
             <span className="search-picker__label">{value}</span>
           )}
         </span>
-        <svg className="search-picker__chevron" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-          <path d="M4 6l4 4 4-4" />
-        </svg>
+        <ChevronDown className="search-picker__chevron" size={14} />
       </button>
 
       {open && (
         <div className="search-picker__panel">
           <div className="search-picker__search">
-            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-              <circle cx="7" cy="7" r="4.75" />
-              <path d="M10.5 10.5L14 14" />
-            </svg>
+            <Search size={16} />
             <input
               autoFocus
               type="text"

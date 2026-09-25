@@ -155,13 +155,8 @@ body {
 }
 
 .about-menu__caret {
-  width: 9px;
-  height: 6px;
-  fill: none;
-  stroke: currentcolor;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  width: 14px;
+  height: 14px;
 }
 
 /* Only ProfilePage renders the brand as a button (Header's onBrandClick) — reset every
@@ -242,12 +237,8 @@ body {
 /* Stroked, not filled: the glyph is two shapes (head and shoulders) that only read as a
    person with a gap between them. */
 .user-menu__avatar svg {
-  width: 19px;
-  height: 19px;
-  fill: none;
-  stroke: currentcolor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
+  width: 18px;
+  height: 18px;
 }
 
 /* A real avatar (SettingsPage.tsx) fills the whole circle, not just the glyph's own smaller
@@ -1013,8 +1004,8 @@ a.user-menu__item {
 }
 
 .activities-panel__invert svg {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
 }
 
 .activities-panel__invert:hover:not(:disabled) {
@@ -1038,8 +1029,8 @@ a.user-menu__item {
 }
 
 .activities-panel__type-trigger-caret {
+  display: inline-flex;
   flex: none;
-  font-size: 10px;
   color: rgb(var(--fm-ink-rgb) / 45%);
 }
 
@@ -1128,7 +1119,7 @@ a.user-menu__item {
 }
 
 .activities-panel__duplicates-chevron {
-  font-size: 10px;
+  display: inline-flex;
 }
 
 .activities-panel__duplicates-list {
@@ -2038,10 +2029,6 @@ a.user-menu__item {
 .export-button__icon {
   width: 16px;
   height: 16px;
-  fill: none;
-  stroke: currentcolor;
-  stroke-width: 1.6;
-  stroke-linejoin: round;
 }
 
 .export-button:hover:not(:disabled) {
@@ -2079,7 +2066,7 @@ a.user-menu__item {
 }
 
 .import-panel__caret {
-  font-size: 10px;
+  display: inline-flex;
   color: rgb(var(--fm-ink-rgb) / 45%);
 }
 
@@ -2188,11 +2175,11 @@ a.user-menu__item {
 }
 
 .import-panel__notice-dismiss {
+  display: inline-flex;
   flex: none;
   border: 0;
   background: none;
   padding: 0;
-  font-size: 14px;
   line-height: 1;
   color: inherit;
   opacity: 0.6;
@@ -2625,11 +2612,7 @@ a.user-menu__item {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
-  fill: none;
-  stroke: rgb(var(--fm-ink-rgb) / 50%);
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  color: rgb(var(--fm-ink-rgb) / 50%);
   transition: transform 120ms ease;
 }
 
@@ -2663,13 +2646,10 @@ a.user-menu__item {
 }
 
 .search-picker__search svg {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
-  fill: none;
-  stroke: rgb(var(--fm-ink-rgb) / 55%);
-  stroke-width: 1.6;
-  stroke-linecap: round;
+  color: rgb(var(--fm-ink-rgb) / 55%);
 }
 
 .search-picker__search input {
@@ -3424,13 +3404,10 @@ a.user-menu__item {
   }
 
   .activities-panel__sheet-chevron {
-    display: inline;
+    /* Larger than the 14px carets elsewhere (the icon's own size={20}): this is the sheet's
+       whole expand/collapse affordance on a touchscreen, not a decorative aside to its text. */
+    display: inline-flex;
     flex: none;
-    /* Inherits .activities-panel__subtext's 12px otherwise — a fine size for a text line, but
-       this glyph is the sheet's whole expand/collapse affordance on a touchscreen, not just a
-       decorative aside to that text, so it gets its own larger size rather than riding along. */
-    font-size: 20px;
-    line-height: 1;
     color: rgb(var(--fm-ink-rgb) / 40%);
   }
 
@@ -3509,8 +3486,8 @@ a.user-menu__item {
   }
 
   /* Heart only on a phone — the header was already ~30px wider than a 390px viewport with
-     the word alone, and the heart is recognizable without it (GitHub's own Sponsor
-     heart). The button's aria-label keeps its accessible name. */
+     the word alone, and a heart is recognizable without it. The button's aria-label keeps its
+     accessible name. */
   .donate-button {
     padding: 6px 8px;
   }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronDown, X } from 'lucide-react';
 import { uploadFile, type UploadHistoryRow, type UploadOutcome, type ZipEntryResult } from '../api';
 import { formatDistance, formatFileSize, formatShortDate, formatSourceLabel } from './format';
 import { useUnitSystem } from './units';
@@ -240,7 +241,7 @@ export function ImportPanel({ onUploaded, readOnly = false, onViewOnMap }: Impor
         Import
         {badgeCount > 0 && <span className="import-panel__badge">{badgeCount}</span>}
         <span className="import-panel__caret" aria-hidden="true">
-          ▾
+          <ChevronDown size={14} />
         </span>
       </button>
 
@@ -318,7 +319,7 @@ export function ImportPanel({ onUploaded, readOnly = false, onViewOnMap }: Impor
                         aria-label="Dismiss"
                         onClick={() => dismissNotice(notice.id)}
                       >
-                        ×
+                        <X size={14} />
                       </button>
                     </li>
                   ))}

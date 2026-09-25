@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
+import { Camera, X } from 'lucide-react';
 import { EXPORT_PLATFORMS, EXPORT_PRESET_ROWS, EXPORT_PRESETS, type ExportPreset } from '../map/exportPresets';
 
 /** Where the frame is: its center as a map position (so it travels with the map when it
@@ -228,7 +229,7 @@ export function ExportFrame({
           ))}
         </select>
         <button type="button" className="export-frame__button" data-testid="export-frame-close" aria-label="Cancel export" onClick={onCancel}>
-          <CloseIcon />
+          <X size={14} />
         </button>
         <button
           type="button"
@@ -238,7 +239,7 @@ export function ExportFrame({
           onClick={onCapture}
           disabled={busy}
         >
-          {busy ? <span className="export-frame__spinner" aria-hidden="true" /> : <CameraIcon />}
+          {busy ? <span className="export-frame__spinner" aria-hidden="true" /> : <Camera size={16} />}
         </button>
       </div>
 
@@ -248,29 +249,5 @@ export function ExportFrame({
         </p>
       )}
     </div>
-  );
-}
-
-function CameraIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="15" height="15">
-      <path
-        d="M2 5.5 A1 1 0 0 1 3 4.5 H5.2 L6 3 H10 L10.8 4.5 H13 A1 1 0 0 1 14 5.5 V12 A1 1 0 0 1 13 13 H3 A1 1 0 0 1 2 12 Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinejoin="round"
-      />
-      <circle cx="8" cy="8.5" r="2.6" fill="none" stroke="currentColor" strokeWidth="1.3" />
-    </svg>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="13" height="13">
-      <line x1="3" y1="3" x2="13" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <line x1="13" y1="3" x2="3" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
   );
 }

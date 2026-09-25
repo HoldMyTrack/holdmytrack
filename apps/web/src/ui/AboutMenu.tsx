@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 
 /**
  * The header's "About" menu — a text trigger and a dropdown of links into the static
@@ -44,9 +45,7 @@ export function AboutMenu() {
         onClick={() => setOpen((was) => !was)}
       >
         About
-        <svg className="about-menu__caret" viewBox="0 0 10 6" aria-hidden="true" focusable="false">
-          <path d="M1 1l4 4 4-4" />
-        </svg>
+        <ChevronDown className="about-menu__caret" size={14} />
       </button>
 
       {open && (
