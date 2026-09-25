@@ -10,10 +10,17 @@ import { CITY_MIN_ZOOM } from './zoomTiers';
  */
 export const TRACKS_SOURCE_ID = 'tracks';
 export const TRACKS_LAYER_ID = 'tracks-line';
+// The halo drawn under a selected track (checked or focused) — see ensureTrackLayer.
+export const TRACKS_CASING_LAYER_ID = 'tracks-casing';
 const TRACKS_SOURCE_LAYER = 'tracks'; // must match ST_AsMVT(t, 'tracks', ...) in the backend query
 
 const NORMAL_WIDTH = 2.5;
-const EMPHASIS_WIDTH = 4.5; // hover and selected share one treatment — see MapView's onClick
+const EMPHASIS_WIDTH = 4.5; // selected: checked or focused, plus the halo below
+const HOVER_WIDTH = 5; // hovered: the widest, in HOVER_COLOR, with no halo of its own
+// 1.5px of halo showing on each side of an EMPHASIS_WIDTH line.
+const CASING_WIDTH = EMPHASIS_WIDTH + 3;
+const TRACK_COLOR = '#b07e2e'; // --fm-accent
+const HOVER_COLOR = '#93691f'; // --fm-accent-strong
 
 // Half-width, in screen pixels, of the box a click's hit-test is queried against — see the
 // click handler below for why this can't just be the bare click pixel.
@@ -80,6 +87,34 @@ export function ensureTrackLayer(map: MapLibreMap, beforeId: string | undefined,
       promoteId: 'id',
     });
   }
+  // Hovered and selected (checked or focused, MapView's boldedActivityIds) tracks are both
+  // widened, but differently: a hovered one is the widest and a darker gold, a selected one
+  // keeps the track color and gets this dark halo underneath, so a checked group still reads
+  // as checked while the pointer moves over other tracks (SPEC.md FR-4.1's state table).
+  // Hovering a selected track shows both: the hover line over its halo. Feature-state can't drive line-sort-key (a
+  // layout property), so a selected track isn't raised above its neighbours; the halo is what
+  // separates it where tracks overlap. Added before the line layer so it always sits beneath
+  // it, including when only the line layer already exists.
+  if (!map.getLayer(TRACKS_CASING_LAYER_ID)) {
+    map.addLayer(
+      {
+        id: TRACKS_CASING_LAYER_ID,
+        type: 'line',
+        source: TRACKS_SOURCE_ID,
+        'source-layer': TRACKS_SOURCE_LAYER,
+        minzoom: CITY_MIN_ZOOM,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          // Ink, not white: tracks mostly run along the basemap's white streets, where a white
+          // halo disappears into the road it sits on.
+          'line-color': '#202b25',
+          'line-width': CASING_WIDTH,
+          'line-opacity': ['case', ['boolean', ['feature-state', 'selected'], false], 0.95, 0],
+        },
+      },
+      map.getLayer(TRACKS_LAYER_ID) ? TRACKS_LAYER_ID : beforeId,
+    );
+  }
   if (!map.getLayer(TRACKS_LAYER_ID)) {
     map.addLayer(
       {
@@ -94,20 +129,16 @@ export function ensureTrackLayer(map: MapLibreMap, beforeId: string | undefined,
         minzoom: CITY_MIN_ZOOM,
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
-          'line-color': '#b07e2e',
-          // Hover and selected get the same treatment on purpose — hovering previews
-          // exactly the emphasis a click would commit to, not a different one.
+          'line-color': ['case', ['boolean', ['feature-state', 'hover'], false], HOVER_COLOR, TRACK_COLOR],
           'line-width': [
             'case',
-            [
-              'any',
-              ['boolean', ['feature-state', 'hover'], false],
-              ['boolean', ['feature-state', 'selected'], false],
-            ],
+            ['boolean', ['feature-state', 'hover'], false],
+            HOVER_WIDTH,
+            ['boolean', ['feature-state', 'selected'], false],
             EMPHASIS_WIDTH,
             NORMAL_WIDTH,
           ],
-          'line-opacity': 0.9,
+          'line-opacity': ['case', ['boolean', ['feature-state', 'selected'], false], 1, 0.9],
         },
       },
       beforeId,
@@ -184,7 +215,7 @@ function attachTrackInteractivity(map: MapLibreMap): void {
   // destructive instead. Found live: clicking within 3px of a second activity's track, while
   // a first one was already focused, cleared the first activity's focus and never applied a
   // new one — the exact-pixel query saw neither track under the cursor. CLICK_TOLERANCE_PX
-  // is deliberately larger than half of EMPHASIS_WIDTH so a hover-widened line is still
+  // is deliberately larger than half of HOVER_WIDTH so a hover-widened line is still
   // comfortably inside its own tolerance box, not just barely.
   map.on('click', (e) => {
     // Same "layer might not exist yet" guard setSelectedTracks/setHiddenTracks already have —
@@ -306,7 +337,12 @@ export function setHiddenTracks(map: MapLibreMap, hiddenIds: string[]): void {
   // re-render re-fires 'styledata', which calls this again, which dirties again, which
   // never lets isStyleLoaded() settle (confirmed: this is what hung verify:map's second
   // isStyleLoaded() check). Comparing against the layer's current filter first breaks it.
-  const current = map.getFilter(TRACKS_LAYER_ID) ?? null;
-  if (JSON.stringify(current) === JSON.stringify(next)) return;
-  map.setFilter(TRACKS_LAYER_ID, next);
+  // The halo layer takes the same filter, or a hidden-but-checked track would leave its halo
+  // drawn with no line on it.
+  for (const layerId of [TRACKS_LAYER_ID, TRACKS_CASING_LAYER_ID]) {
+    if (!map.getLayer(layerId)) continue;
+    const current = map.getFilter(layerId) ?? null;
+    if (JSON.stringify(current) === JSON.stringify(next)) continue;
+    map.setFilter(layerId, next);
+  }
 }
