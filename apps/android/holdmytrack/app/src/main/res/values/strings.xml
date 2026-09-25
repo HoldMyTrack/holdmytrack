@@ -66,7 +66,6 @@
     <string name="recorded_status_not_synced">Not synced</string>
     <string name="recorded_status_queued">Queued</string>
     <string name="recorded_row_subtitle">%1$s · %2$.2f km · %3$s</string>
-    <string name="recorded_row_needs_type">Set a type to sync</string>
     <string name="recorded_demo_notice">The demo account is read-only — recordings can be saved and edited here, but never synced. Create an account to sync your own data.</string>
     <string name="recording_delete">Delete</string>
     <string name="recorded_row_preview">Route preview</string>

@@ -158,7 +158,7 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	// collision can change which activities a tile the *new* one never touched is composited
 	// from, and rebuilding only the new one's tiles would leave the rest showing coverage
 	// from a copy that no longer counts.
-	dedupeTiles, err := ResolveDuplicates(ctx, pool, job.UserID, act.ActivityType, points[0].Time, m.distanceM)
+	dedupeTiles, err := ResolveDuplicates(ctx, pool, job.UserID, points[0].Time, m.durationS)
 	if err != nil {
 		return Result{}, err
 	}

@@ -130,14 +130,6 @@ class RecordedActivitiesActivity : AppCompatActivity() {
             setPadding(0, 20, 0, 20)
         }
 
-        // A recording still on RecordingTypes.DEFAULT ("unknown") is blocked from queuing —
-        // cross-source deduplication (docs/IMPLEMENTATION.md §4.6) requires an exact
-        // activity-type match, and "unknown" never equals whatever a same-walk Health Connect
-        // sync reports (typically a real type like "walking"), so a recording left untyped
-        // silently defeats dedup rather than failing loudly. Gating it here, at the one place a
-        // row can be queued, is cheaper than loosening the server's matcher and keeps "same
-        // type" an exact, reliable signal for every source.
-        val needsType = record.activityType == RecordingTypes.DEFAULT
         row.addView(
             CheckBox(this).apply {
                 isChecked = record.syncStatus != SyncStatus.NOT_SYNCED
@@ -146,7 +138,7 @@ class RecordedActivitiesActivity : AppCompatActivity() {
                 // httpapi/auth.go) — so queuing is blocked here too, matching the Sync
                 // screen's own demo gate: no point letting a demo account queue something
                 // "Sync Now" can never actually take.
-                isEnabled = !Session.isDemo && !needsType
+                isEnabled = !Session.isDemo
                 setOnCheckedChangeListener { _, checked ->
                     val newStatus = if (checked) SyncStatus.QUEUED else SyncStatus.NOT_SYNCED
                     lifecycleScope.launch {
@@ -179,17 +171,12 @@ class RecordedActivitiesActivity : AppCompatActivity() {
         )
         textColumn.addView(
             TextView(this).apply {
-                val subtitle = getString(
+                text = getString(
                     R.string.recorded_row_subtitle,
                     record.activityType,
                     record.distanceMeters / 1000.0,
                     statusLabel(record.syncStatus),
                 )
-                text = if (needsType) {
-                    "$subtitle · ${getString(R.string.recorded_row_needs_type)}"
-                } else {
-                    subtitle
-                }
                 setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
                 setTextColor(getColor(R.color.hmt_ink_secondary))
             },
