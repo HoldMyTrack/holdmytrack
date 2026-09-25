@@ -59,7 +59,7 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 | `GET /verify?token=` | The emailed verification link itself (FR-1.8) |
 | `GET /verify-pending` | A signed-in, unverified account's holding page: resend (`POST /verify-pending/resend`), change the address (`POST /verify-pending/email`), or sign out (FR-1.8) |
 
-A failed form comes back as the same page, at the failure's status (`400`, `401`, `409`, `429`), with the server's message and the typed email kept. A successful one redirects: to `/verify-pending` for a real account that hasn't verified its email, otherwise to the map (`/`). A visit to `/signin` or `/signup` with a real account already signed in redirects the same way; a demo session can still sign in, or sign up (FR-2.3). The JSON endpoints named below are what the Android app calls and what these pages share their behavior with. Links in emails sent before the pages existed pointed at `/?reset_token=` and `/?verify_token=`; the map page forwards those to `/reset` and `/verify`.
+A failed form comes back as the same page, at the failure's status (`400`, `401`, `409`, `429`), with the server's message and the typed email kept. A successful one redirects: to `/verify-pending` for a real account that hasn't verified its email, otherwise to the map (`/`). A visit to `/signin` or `/signup` with a real account already signed in redirects the same way; a demo session can still sign in, or sign up (FR-2.3). The JSON endpoints named below are what the Android app calls and what these pages share their behavior with. Links in emails sent before the pages existed pointed at `/?reset_token=` and `/?verify_token=`, and a failed Google sign-in at `/?auth_error=google`; `/` forwards those to `/reset`, `/verify` and `/signin?error=google`, before any session check.
 
 ### FR-1.1 Sign up
 
@@ -120,7 +120,7 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 **Behavior**:
 1. Client calls `GET /v1/auth/me` with whatever session cookie it currently holds.
 2. If the cookie names a live, unexpired session, the server returns the account's identity (`200 OK`).
-3. Otherwise the server returns `401 Unauthorized`, and the client shows the sign-in screen (on the web, the map page redirects to `/signin`; a signed-in real account whose email isn't verified is redirected to `/verify-pending` instead).
+3. Otherwise the server returns `401 Unauthorized`, and the client shows the sign-in screen. On the web the pages check the session themselves: the map (`/`), `/profile` and `/settings` redirect a visitor with no session to `/signin`, and a signed-in real account whose email isn't verified to `/verify-pending`.
 
 **Notes**: A session's validity is checked in the database on every request (not trusted from the cookie's own stated expiry), so a session ended server-side (FR-1.3, or invalidated by a password reset, FR-1.6) stops working immediately even if the browser still holds the cookie. Sessions last 30 days from creation. The response also reports whether the account's email is verified (always `true` for a demo account) — the client uses this to decide whether to show the map or FR-1.8's verify screen.
 
@@ -166,7 +166,7 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 
 ### FR-1.7 Account settings
 
-**Description**: A signed-in user (real or demo — FR-2) edits their own profile: Avatar, Name, Country, and Timezone. Reached from the account menu's "Settings" item, a separate screen from the activity graph (FR-7) — and, for a real account that has never saved it, shown automatically in place of the map (behavior 5). The page also links to the map's Private locations window (FR-8.1), which isn't edited here.
+**Description**: A signed-in user (real or demo — FR-2) edits their own profile: Avatar, Name, Country, and Timezone. A page at `/settings`, reached from the header's account menu, separate from the activity graph (FR-7) — and, for a real account that has never saved it, shown automatically in place of the map (behavior 5). The page also links to the map's Private locations window (FR-8.1), which isn't edited here.
 
 **Name** is an optional display label, not an identifier: it isn't unique, two accounts may share one, and nothing signs in with it — the email address identifies an account. Nothing outside this page displays it yet.
 
@@ -175,7 +175,7 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 **Inputs**: An image file (PNG, JPEG, or WebP, up to 5 MB) for Avatar; free text for Name (optional); a country selected from a standard list for Country (required — there is no "not set" choice), searchable by name or ISO code; an IANA timezone name selected from the browser's own supported list for Timezone, listed by current GMT offset and searchable by place, region, or offset.
 
 **Behavior**:
-1. Avatar uploads and removals take effect immediately (`POST`/`DELETE /v1/account/avatar`) — each is its own action, not gated behind a separate save step. The account menu's own avatar button reflects whichever image is current everywhere in the app the moment it changes, with no reload.
+1. Avatar uploads and removals take effect immediately (`POST`/`DELETE /v1/account/avatar`) — each is its own action, not gated behind a separate save step. The header's account-menu button shows the current avatar from the next page load on (the header is rendered by the server with each page).
 2. Name, Country, and Timezone save together as one action (`PATCH /v1/account/settings`) — editing one and leaving without saving discards all three, not just the one touched.
 3. **Country decides which unit system the entire app displays distance, pace, and elevation in** — metric (km, min/km, meters) for every country except the United States, Liberia, and Myanmar, which see imperial (mi, min/mi, feet). An account that has never saved a Country (only possible before its first save — behavior 6) displays metric. This takes effect the moment it's saved, across every screen that shows one of these values (the Activities panel, the date-range picker, the activity graph, Trends, the per-activity pace/elevation profile, and the map's own distance scale) — none of it requires a reload. Save is disabled until a Country is chosen.
 4. **Timezone decides which calendar day an activity is grouped under everywhere the app buckets by day** — the date-range picker's histogram, the activity graph's daily grid and stat cards, `GET /v1/activities/trends`, and date-range filtering. Auto-resolved from the browser at signup (FR-1.1) and editable here afterward; unlike Country, it has no "unset" state — every account always has one, defaulting to UTC until changed.
@@ -538,7 +538,7 @@ Only one track is hovered and only one is focused at a time; any number can be c
 **Preconditions**: Active session; the map has finished its initial load. No activity selection is required — the user frames whatever region of the map they want manually, independent of any checked/focused activity.
 
 **Behavior**:
-1. Clicking the header's camera button ("Export map image") shows a Custom frame — no fixed aspect ratio — centred on the current view at about 70% of the map's size, marked only by a dashed border. Clicking it again while the frame is shown puts it away. The map is not dimmed or obscured anywhere.
+1. Clicking the camera button ("Export map image") in the map's top-right control stack, under zoom and locate, shows a Custom frame — no fixed aspect ratio — centred on the current view at about 70% of the map's size, marked only by a dashed border. Clicking it again while the frame is shown puts it away. The map is not dimmed or obscured anywhere.
 2. The frame is anchored to the map: panning the map carries the frame with it, and zooming keeps the frame the same size on screen (so it holds more or less of the map). The frame may be panned partly or fully out of view and still be captured.
 3. The frame blocks nothing: pan, zoom and click all work inside the frame exactly as outside it. Dragging the frame's border moves the frame; dragging one of its four corner handles resizes it, with the opposite corner staying put. A Custom frame resizes freely; a platform preset keeps its aspect ratio while resizing.
 4. A toolbar sits centred just above the frame's top edge (moving inside the frame when there's no room above it) with a shape dropdown, Close and Capture. The dropdown offers Custom plus every platform image-size preset, grouped by platform (Instagram, Facebook, X) and listing each resolution/shape that platform has (Square, Portrait, Landscape, Story) with its pixel size; not every platform has every shape (e.g. X has no Story or Portrait). The Custom option shows its pixel size too — the frame's own on-screen size, which is exactly what a Custom capture produces — updating live as the frame is resized. Choosing a shape keeps the frame's center and fits the new aspect ratio within its current size. Close cancels with nothing captured. Capture captures exactly the region inside the frame at that moment — the current zoom, rotation, theme, and map mode, at the picked preset's exact declared pixel dimensions, or for Custom at the frame's own on-screen size in pixels. In Normal mode the captured region reflects the current date-range/hidden-track filters; Fog captures its all-time coverage and Heatmap its current rolling window (FR-4.2/FR-4.3), regardless of what Normal mode's filters were set to before switching.
@@ -711,7 +711,7 @@ Only one track is hovered and only one is focused at a time; any number can be c
 
 ### FR-7.1 Contribution grid
 
-**Description**: A private, per-account page (reached via the account menu's "Profile" item) showing a GitHub-style daily contribution grid — one cell per calendar day, one block per calendar year (most recent first, back to the account's first-ever activity).
+**Description**: A private, per-account page at `/profile` (reached from the header's account menu) showing a GitHub-style daily contribution grid — one cell per calendar day, one block per calendar year (most recent first, back to the account's first-ever activity).
 
 **Behavior**: Each day's cell is shaded by intensity, toggle-able between two measures:
 - **Count**: number of activities that day (empty / one / two / three-or-more).
@@ -729,7 +729,7 @@ Only one track is hovered and only one is focused at a time; any number can be c
 
 **Preconditions**: An active session. Creating, moving, resizing, renaming, and deleting need a real account (FR-2's demo can see its own, read-only).
 
-**Inputs**: The map's Private locations window, opened from the account menu (or from Settings, FR-1.7), placed below the map-mode toggle so Normal/Fog/Heatmap stay usable: clicking empty map places a new circle (zoomed out past street level, the click flies in to that spot instead — a circle there would be under a pixel), clicking a saved circle or its center dot selects it (every saved location shows a fixed-size center dot at any zoom), the selected circle's center drags, and a slider sets its radius. Saved through `GET`/`POST /v1/private-locations` and `PATCH`/`DELETE /v1/private-locations/{id}`; at most 20 per account.
+**Inputs**: The map's Private locations window, opened from the header's account menu or from Settings (FR-1.7) — both link to `/?private-locations`, which opens the map with the window open (the parameter is then removed from the URL, so a refresh doesn't reopen it) — placed below the map-mode toggle so Normal/Fog/Heatmap stay usable: clicking empty map places a new circle (zoomed out past street level, the click flies in to that spot instead — a circle there would be under a pixel), clicking a saved circle or its center dot selects it (every saved location shows a fixed-size center dot at any zoom), the selected circle's center drags, and a slider sets its radius. Saved through `GET`/`POST /v1/private-locations` and `PATCH`/`DELETE /v1/private-locations/{id}`; at most 20 per account.
 
 **Behavior**:
 1. Applied at ingest, server-side, before anything is stored: the leading points inside any Private location are dropped, and the track starts on that circle's edge instead (a point interpolated onto the boundary, whatever the recording's point density); the trailing points likewise. A track that only passes *through* a Private location mid-way is shown whole, by design: what a Private location protects is where a track starts and ends, and passing through one reveals neither.
@@ -772,7 +772,7 @@ Only one track is hovered and only one is focused at a time; any number can be c
 
 ## 12. FR-10 — Public pages: About, Help, Contacts
 
-These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HTML page that needs no JavaScript and makes no API calls from the browser, with the shared page header of FR-10.4.
+These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HTML page that needs no JavaScript and makes no API calls from the browser, with the page header every page shares (FR-10.4).
 
 ### FR-10.1 About page
 
@@ -784,7 +784,7 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 1. `GET /about` returns the page.
 2. It has sections for: what HoldMyTrack is, why someone might want it, what it isn't, how it is funded (section id `funding`), and a pointer to Contacts (FR-10.3).
 3. "Try the demo — no signup" links to `/signin`, where the demo starts from its own button (FR-2.1). The page never starts a demo session itself.
-4. About, Help and Contacts are reachable from every page's header and footer (FR-10.4) — the sign-in pages included — and from the map page's header "Info" menu, just before the account menu. On a phone-width screen, where the map page's header has no room for that menu, its three entries are in the account menu instead.
+4. About, Help and Contacts are reachable from every page's header and footer (FR-10.4) — the map and the sign-in pages included.
 5. `/robots.txt` allows crawling except for `/v1/` and `/tiles/`, and points to `/sitemap.xml`, which lists `/`, `/about` and `/contacts`.
 
 ### FR-10.2 Help page
@@ -808,28 +808,29 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 
 ### FR-10.4 Page header and footer
 
-**Description**: Every server-rendered page shares one header and one footer.
+**Description**: Every page shares one header — the map, Profile and Settings included — and every page other than those three shares one footer.
 
 **Behavior**:
 1. The header shows the logo, wordmark and tagline (the brand links to `/`), then Donate (FR-11.1), an "Info" menu listing About, Help and Contacts with the current page marked, and the account area.
-2. Signed out, the account area is a "Sign in" link to `/signin`. With a session (real or demo), it is an account menu showing the account's avatar (or a generic icon) that opens to the account's email (a demo session shows its display name instead), "Map" (`/`), and "Sign out".
+2. Signed out, the account area is a "Sign in" link to `/signin`. With a session (real or demo), it is an account menu showing the account's avatar (or a generic icon) that opens to the account's email (a demo session shows its display name instead, followed by "Create your own account", FR-2.3), then "Map" (`/`), "Profile" (`/profile`), "Settings" (`/settings`), "Private locations" (`/?private-locations`, FR-8.1) and "Sign out".
 3. Both menus open and close without JavaScript.
 4. "Sign out" submits `POST /logout`, which ends the session the same way `POST /v1/auth/logout` does and redirects to `/`. The request is refused (`403`) unless its `Origin` header — or, without one, its `Referer` — is the app's own origin.
 5. On a phone-width screen (≤768px) the tagline is hidden and Donate shows its heart alone; the Info and account menus stay.
 6. The footer links to the map (`/`), About, Help, Contacts and the GitHub repository.
 7. Pages are sent with `Cache-Control: no-store`, since the header names the signed-in account.
+8. An address no page answers gets a "Page not found" page (`404`) with the same header; under `/v1/` and `/tiles/` it's a plain `404`, not a page.
 
 ## 13. FR-11 — Donations
 
 ### FR-11.1 Donate
 
-**Description**: The header's Donate button is how a visitor reaches HoldMyTrack's funding — recurring community donations with a public ledger on Open Collective (`VISION.md` §6.1). HoldMyTrack itself takes no payment and stores nothing about a donation.
+**Description**: The header's Donate button (FR-10.4) is how a visitor reaches HoldMyTrack's funding — recurring community donations with a public ledger on Open Collective (`VISION.md` §6.1). HoldMyTrack itself takes no payment and stores nothing about a donation.
 
-**Preconditions**: None for the server-rendered pages' header (FR-10.4); a signed-in or demo session for the map page's.
+**Preconditions**: None.
 
 **Behavior**:
 1. The button shows a heart icon followed by "Donate"; on a phone-width screen (≤768px) it shows the heart alone.
-2. While no Open Collective is configured (`OPEN_COLLECTIVE_SLUG` empty), clicking Donate on the map page opens a notice explaining that donations aren't open yet, and nothing else happens; on the other pages it links to About's funding section (`/about#funding`).
+2. While no Open Collective is configured (the slug is empty), Donate links to About's funding section (`/about#funding`), which says donations aren't open yet.
 3. Once one is configured, Donate is a link to `https://opencollective.com/<slug>/donate`, opened in a new tab so the map is kept; choosing an amount, one-off or monthly, and paying all happen on Open Collective.
 
 ## 14. Non-Functional Requirements (summary)

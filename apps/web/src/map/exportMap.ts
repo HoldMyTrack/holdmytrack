@@ -196,7 +196,8 @@ function stripMetrics(canvas: HTMLCanvasElement): { fontPx: number; margin: numb
  * margin and its bottom edge on `bottomY` (the attribution plate's own bottom edge), so the
  * two never overlap and the map's middle stays clear. Always drawn, like attribution — every
  * export carries it.
- * The wordmark copies `Header.tsx`'s own brand: "HoldMy" regular, "Track" bold, in the header's
+ * The wordmark copies the page header's brand (services/server/internal/web/templates/
+ * header.html): "HoldMy" regular, "Track" bold, in the header's
  * serif font. Unlike attribution it has no backing plate, just `WATERMARK_ALPHA` overall, so
  * its colors follow the basemap flavor instead: the header's own dark ink/amber on light
  * flavors, light counterparts on `dark`/`black`.

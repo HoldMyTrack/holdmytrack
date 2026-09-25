@@ -74,17 +74,3 @@ export function replaceHash(view: ViewState, flavor: Flavor): void {
 }
 
 export const DEFAULT_FLAVOR: Flavor = FLAVORS[0];
-
-/**
- * Drops any saved camera position from the URL — called at every app-initiated identity
- * change (sign-out, demo start, sign-in success), never on an ordinary reload, where a saved
- * hash is a legitimate "return to where I was." Without this, a fresh session's MapView can
- * inherit a previous session's leftover camera position and skip its own fly-to-most-recent
- * entirely (FR-4.5's "saved URL position wins" working exactly as designed, against stale
- * data — reported live for the Demo Customer account, root-caused to this).
- */
-export function clearSavedView(): void {
-  if (window.location.hash) {
-    window.history.replaceState(null, '', window.location.pathname + window.location.search);
-  }
-}

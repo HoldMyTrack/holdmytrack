@@ -52,8 +52,8 @@ async function errorMessageFromResponse(res: Response, fallback: string): Promis
  * this file sends `credentials: 'include'` now (and `uploadFile`'s XHR sets
  * `withCredentials`) so the browser attaches the session cookie these endpoints set/read.
  * Signing in, signing up, password reset and email verification are server-rendered pages
- * (ADR-0012), not calls from here; this app only reads the session (`getCurrentUser`) and
- * ends it (`logout`).
+ * (ADR-0012), not calls from here, and so is signing out (the page header's form); this app
+ * only reads the session (`getCurrentUser`).
  */
 /** The Settings page's own fields (SettingsPage.tsx) — carried by both `AuthUser` and
  *  `DemoUser` uniformly, since a demo account is a real `users` row with real column
@@ -122,13 +122,6 @@ function toAuthUser(body: AuthResponseBody): AuthUser {
 
 function toSessionUser(body: AuthResponseBody): SessionUser {
   return body.isDemo ? toProfile(body) : toAuthUser(body);
-}
-
-export async function logout(): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/auth/logout`, { method: 'POST', credentials: 'include' });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `logout failed (${res.status})`));
-  }
 }
 
 /** Resolves to the signed-in user (real or demo), or `null` if there is no valid session —

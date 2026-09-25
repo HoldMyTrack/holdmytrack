@@ -240,3 +240,47 @@ func TestSignInOffersGoogleOnlyWhenConfigured(t *testing.T) {
 		}
 	}
 }
+
+func TestAppShellRoutes(t *testing.T) {
+	s := newPagesTestServer(t)
+	for _, tc := range []struct {
+		path, want string
+	}{
+		// No session: the app's pages send you to sign in.
+		{"/", "/signin"},
+		{"/profile", "/signin"},
+		{"/settings", "/signin"},
+		// Links from emails sent before the auth pages existed, forwarded before any session
+		// check — they work signed out.
+		{"/?reset_token=abc", "/reset?token=abc"},
+		{"/?verify_token=a%20b", "/verify?token=a+b"},
+		{"/?auth_error=google", "/signin?error=google"},
+	} {
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tc.path, nil))
+		if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != tc.want {
+			t.Errorf("%s: status %d, location %q; want 303 to %q", tc.path, rec.Code, rec.Header().Get("Location"), tc.want)
+		}
+	}
+}
+
+func TestNotFound(t *testing.T) {
+	s := newPagesTestServer(t)
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/no-such-page", nil))
+	if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "Page not found") || !strings.Contains(rec.Body.String(), `class="page-header"`) {
+		t.Errorf("/no-such-page: status %d, want the 404 page with the shared header", rec.Code)
+	}
+	for _, path := range []string{"/v1/no-such-endpoint", "/tiles/v1/nope/1/2/3"} {
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusNotFound || strings.Contains(rec.Body.String(), "<html") {
+			t.Errorf("%s: status %d; want a plain 404, not a page", path, rec.Code)
+		}
+	}
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/static/header.css", nil))
+	if rec.Code != http.StatusOK {
+		t.Errorf("/static/header.css: status %d", rec.Code)
+	}
+}

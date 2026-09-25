@@ -2,15 +2,14 @@ import { useRef, useState } from 'react';
 import { API_BASE_URL, removeAvatar, updateSettings, uploadAvatar } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { CountryPicker } from './CountryPicker';
-import { Header } from './Header';
 import { TimezonePicker } from './TimezonePicker';
 
 /**
- * The Settings page (Avatar, Name, Country, Timezone) — reached from the account menu's
- * "Settings" item (UserMenu.tsx), a separate screen from ProfilePage.tsx rather than wired
- * into `profile-v1.png`'s own still-unbuilt "Edit profile" button (a direct user choice, not
- * a default). Same page shell as ProfilePage (`Header` + a back button), since both are
- * private, full-screen detours from the map.
+ * The Settings page (Avatar, Name, Country, Timezone) at `/settings` — reached from the
+ * header's account menu, a separate page from ProfilePage.tsx rather than wired into
+ * `profile-v1.png`'s own still-unbuilt "Edit profile" button (a direct user choice, not a
+ * default). Same shape as ProfilePage (a back link above the content), since both are private
+ * detours from the map.
  *
  * Country is the field with a side effect reaching the rest of the app: it's what
  * `units.ts`'s `useUnitSystem()` derives metric-vs-imperial from, so every distance/pace/
@@ -26,20 +25,14 @@ import { TimezonePicker } from './TimezonePicker';
  * one — so this page just links to the map's own window for them.
  */
 export interface SettingsPageProps {
-  /** Absent in onboarding — there's no map to go back to yet. */
-  onBack?: () => void;
-  /** Lets the account menu jump straight to Profile without detouring back through the map
-   *  first — the same cross-link ProfilePage offers back to Settings. Absent in onboarding. */
-  onOpenProfile?: () => void;
   /** First run (FR-1.7): a verified real account with no Country lands here instead of the map
-   *  (App.tsx), with no way back to a map it hasn't unlocked yet. Saving with a Country is what
-   *  lets App.tsx move on — `updateUser` below changes the very field its gate reads. */
+   *  (App.tsx), with no way back to a map it hasn't unlocked yet — so no back link and no
+   *  private-locations link. Saving with a Country is what lets App.tsx move on — `updateUser`
+   *  below changes the very field its gate reads. */
   onboarding?: boolean;
-  /** Opens the map with its Private locations window. Absent in onboarding, like onBack. */
-  onOpenPrivateLocations?: () => void;
 }
 
-export function SettingsPage({ onBack, onOpenProfile, onOpenPrivateLocations, onboarding = false }: SettingsPageProps) {
+export function SettingsPage({ onboarding = false }: SettingsPageProps) {
   const { user, updateUser } = useAuth();
   const [displayName, setDisplayName] = useState(user.displayName);
   const [country, setCountry] = useState(user.country);
@@ -111,12 +104,11 @@ export function SettingsPage({ onBack, onOpenProfile, onOpenPrivateLocations, on
 
   return (
     <div className="app-shell">
-      <Header {...(onBack ? { onBrandClick: onBack } : {})} {...(onOpenProfile ? { onOpenProfile } : {})} />
       <main className="profile-page__body">
-        {onBack && (
-          <button type="button" className="profile-page__back" onClick={onBack}>
+        {!onboarding && (
+          <a className="profile-page__back" href="/">
             ← Back to map
-          </button>
+          </a>
         )}
 
         <section className="settings-page" aria-label="Settings">
@@ -223,7 +215,7 @@ export function SettingsPage({ onBack, onOpenProfile, onOpenPrivateLocations, on
             </p>
           </div>
 
-          {onOpenPrivateLocations && (
+          {!onboarding && (
             <div className="settings-page__section">
               <span className="settings-page__label">Private locations</span>
               <p className="settings-page__hint">
@@ -231,9 +223,9 @@ export function SettingsPage({ onBack, onOpenProfile, onOpenPrivateLocations, on
                 in one is hidden everywhere, including your own map.
               </p>
               <div>
-                <button type="button" className="settings-page__button" onClick={onOpenPrivateLocations}>
+                <a className="settings-page__button" href="/?private-locations">
                   Manage on the map
-                </button>
+                </a>
               </div>
             </div>
           )}

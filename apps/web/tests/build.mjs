@@ -109,13 +109,9 @@ after(async () => {
 
 describe('production build', () => {
   it('emits the maplibre worker as a real asset', async () => {
-    const res = await fetch(`${BASE}/`);
-    const html = await res.text();
-    // Whatever module script index.html loads, not a fixed name: the chunk is named after
-    // its rollup input, and hashed.
-    const entry = html.match(/<script type="module"[^>]*src="(\/assets\/[\w-]+\.js)"/)?.[1];
-    assert.ok(entry, 'entry chunk in index.html');
-    const js = await (await fetch(`${BASE}${entry}`)).text();
+    // The entry has a fixed name — the Go server's app shell loads it as /assets/app.js
+    // (vite.config.ts) — so there's no page to read it from first.
+    const js = await (await fetch(`${BASE}/assets/app.js`)).text();
     const worker = js.match(/\/assets\/maplibre-gl-worker-[\w-]+\.js/)?.[0];
     assert.ok(worker, 'bundle references an emitted worker asset');
     assert.equal((await fetch(`${BASE}${worker}`)).status, 200, 'worker asset is served');

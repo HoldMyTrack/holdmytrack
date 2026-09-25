@@ -84,10 +84,21 @@
 }
 
 html,
-body,
-#root {
+body {
   margin: 0;
   height: 100%;
+}
+
+/* The page is the Go server's shell (templates/app/app.html): the shared header, then #root.
+   The header keeps its own height; the app takes the rest. */
+body.app-page {
+  display: flex;
+  flex-direction: column;
+}
+
+#root {
+  flex: 1;
+  min-height: 0;
 }
 
 body {
@@ -103,310 +114,15 @@ body {
   width: 100%;
 }
 
-/* Header, then a row (sidebar + map), then the histogram footer. */
+/* A row (sidebar + map), then the histogram footer — under the page's own header. */
 .app-body {
   display: flex;
   flex: 1;
   min-height: 0;
 }
 
-.app-header {
-  display: flex;
-  align-items: center;
-  gap: var(--fm-space-16);
-  height: 56px;
-  padding: 0 var(--fm-space-20);
-  background: var(--fm-surface);
-  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 10%);
-  /* Its own stacking context, above the map. Both things that hang out of this bar — the
-     account dropdown and the upload widget's status popover — overlap the map canvas, and
-     MapLibre's own controls sit at a z-index of their own that would otherwise win. */
-  position: relative;
-  z-index: 5;
-}
-
-.app-header__brand {
-  display: flex;
-  align-items: center;
-  gap: var(--fm-space-16);
-  font-family: var(--fm-font-serif);
-  font-size: 21px;
-  letter-spacing: 0.2px;
-  line-height: 1;
-  color: var(--fm-ink);
-}
-
-.app-header__logo {
-  display: block;
-  height: 42px;
-  width: auto;
-}
-
-.app-header__wordmark-light {
-  font-weight: var(--fm-weight-regular);
-  color: #4a5750;
-}
-
-.app-header__wordmark-bold {
-  font-weight: var(--fm-weight-heavy);
-  color: #9a6b1e;
-}
-
-.app-header__divider {
-  width: 1px;
-  height: 22px;
-  background: var(--fm-border-strong);
-}
-
-.app-header__tagline {
-  font-family: var(--fm-font-serif);
-  font-size: var(--fm-text-lg);
-  font-style: italic;
-  font-weight: var(--fm-weight-regular);
-  color: var(--fm-ink-secondary);
-  white-space: nowrap;
-}
-
-/* InfoMenu.tsx — a text menu just before the account menu, not a bordered button like the
-   actions: it's navigation, not something to do with your data. Its dropdown reuses the
-   account menu's panel and items, anchored under the trigger's trailing edge the same way. */
-.info-menu {
-  position: relative;
-  display: flex;
-}
-
-.info-menu__trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fm-space-6);
-  border: 0;
-  border-radius: var(--fm-radius-sm);
-  padding: var(--fm-space-6) var(--fm-space-8);
-  background: transparent;
-  font: inherit;
-  font-size: var(--fm-text-md);
-  font-weight: var(--fm-weight-semibold);
-  color: var(--fm-ink);
-  cursor: pointer;
-}
-
-.info-menu__trigger:hover,
-.info-menu__trigger[aria-expanded='true'] {
-  background: rgb(var(--fm-ink-rgb) / 6%);
-}
-
-.info-menu__caret {
-  width: 14px;
-  height: 14px;
-}
-
-/* Only ProfilePage renders the brand as a button (Header's onBrandClick) — reset every
-   button default so "go back to the map" looks identical to the map screen's plain, inert
-   brand mark rather than looking like a new control. */
-.app-header__brand--button {
-  border: 0;
-  background: none;
-  padding: 0;
-  font: inherit;
-  cursor: pointer;
-}
-
-/* Donate, the import control and the account menu, pushed to the trailing end together. */
-.app-header__actions {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: var(--fm-space-10);
-}
-
-/* Colors match docs/UI/exports/holdmytrack-map-screen-standalone.html's live prototype exactly
-   (read via getComputedStyle, not eyeballed) — orange rather than the app's usual blue
-   specifically so Donate doesn't read as just another neutral nav action; it's how HoldMyTrack
-   is funded (business_plan.md §6), not a footnote. */
-.donate-button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fm-space-6);
-  border: 1px solid var(--fm-donate);
-  border-radius: var(--fm-radius-md);
-  padding: var(--fm-space-6) var(--fm-space-12);
-  background: var(--fm-donate);
-  font: inherit;
-  font-weight: var(--fm-weight-semibold);
-  font-size: var(--fm-text-md);
-  color: var(--fm-donate-text);
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.donate-button__icon {
-  flex: none;
-  width: 14px;
-  height: 14px;
-}
-
-.donate-button:hover {
-  background: var(--fm-donate-hover);
-  border-color: var(--fm-donate-hover);
-}
-
-/* `position: relative` is what the dropdown anchors to, so it hangs under the avatar rather
-   than under the whole bar — same arrangement as the upload widget's status popover. */
-.user-menu {
-  position: relative;
-  display: flex;
-}
-
-.user-menu__avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 1px solid rgb(var(--fm-ink-rgb) / 15%);
-  border-radius: 50%;
-  background: var(--fm-surface);
-  color: var(--fm-ink);
-  cursor: pointer;
-}
-
-.user-menu__avatar:hover {
-  background: rgb(var(--fm-ink-rgb) / 4%);
-}
-
-/* Stroked, not filled: the glyph is two shapes (head and shoulders) that only read as a
-   person with a gap between them. */
-.user-menu__avatar svg {
-  width: 18px;
-  height: 18px;
-}
-
-/* A real avatar (SettingsPage.tsx) fills the whole circle, not just the glyph's own smaller
-   box — this is the one place the button shows a photo instead of an icon. */
-.user-menu__avatar img {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.user-menu__dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 12rem;
-  padding: var(--fm-space-4);
-  background: var(--fm-surface);
-  border: 1px solid rgb(var(--fm-ink-rgb) / 10%);
-  border-radius: var(--fm-radius-md);
-  box-shadow: var(--fm-shadow-lg);
-}
-
-.user-menu__email {
-  padding: var(--fm-space-8) var(--fm-space-10) var(--fm-space-8);
-  margin-bottom: var(--fm-space-4);
-  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 8%);
-  font-size: var(--fm-text-sm);
-  color: rgb(var(--fm-ink-rgb) / 55%);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.user-menu__item {
-  border: 0;
-  border-radius: var(--fm-radius-sm);
-  padding: var(--fm-space-8) var(--fm-space-10);
-  background: transparent;
-  font: inherit;
-  font-size: var(--fm-text-md);
-  color: var(--fm-ink);
-  text-align: left;
-  cursor: pointer;
-}
-
-.user-menu__item:hover {
-  background: rgb(var(--fm-ink-rgb) / 6%);
-}
-
-/* InfoMenu.tsx's entries, and the account menu's phone-only copies of them, are <a>s, not <button>s —
-   drop the link styling so they match. */
-a.user-menu__item {
-  text-decoration: none;
-}
-
-/* Shown only at phone widths (see the header's media query), where InfoMenu is hidden. */
-.user-menu__item--phone-only {
-  display: none;
-}
-
-.user-menu__item:disabled {
-  color: rgb(var(--fm-ink-rgb) / 45%);
-  cursor: default;
-}
-
-/* The demo-session entry point into requestUpgrade() (App.tsx, the sign-up page) — same
-   shape as any other item, just tinted so it reads as the one worth noticing over
-   Profile/Sign out. */
-.user-menu__item--accent {
-  color: var(--fm-accent-strong);
-  font-weight: var(--fm-weight-semibold);
-}
-
-/* PlaceholderNotice.tsx — the shared "not built yet" dialog behind Donate and every account
-   menu item. A real <dialog>, so the centring and the dimmed backdrop are the only things
-   left to style. */
-.placeholder-notice {
-  width: min(26rem, calc(100vw - 40px));
-  margin: auto;
-  padding: var(--fm-space-20);
-  border: 1px solid rgb(var(--fm-ink-rgb) / 10%);
-  border-radius: var(--fm-radius-lg);
-  background: var(--fm-surface);
-  color: var(--fm-ink);
-  box-shadow: var(--fm-shadow-xl);
-}
-
-.placeholder-notice::backdrop {
-  background: rgb(var(--fm-ink-rgb) / 35%);
-}
-
-.placeholder-notice__title {
-  margin: 0 0 var(--fm-space-10);
-  font-size: var(--fm-text-xl);
-  font-weight: var(--fm-weight-heavy);
-  letter-spacing: 0.02em;
-}
-
-.placeholder-notice__message {
-  margin: 0 0 var(--fm-space-16);
-  font-size: var(--fm-text-md);
-  line-height: 1.5;
-  color: rgb(var(--fm-ink-rgb) / 70%);
-}
-
-.placeholder-notice__dismiss {
-  border: 1px solid rgb(var(--fm-ink-rgb) / 15%);
-  border-radius: var(--fm-radius-md);
-  padding: var(--fm-space-6) var(--fm-space-16);
-  background: var(--fm-surface);
-  font: inherit;
-  font-weight: var(--fm-weight-semibold);
-  font-size: var(--fm-text-md);
-  color: var(--fm-ink);
-  cursor: pointer;
-}
-
-.placeholder-notice__dismiss:hover {
-  background: rgb(var(--fm-ink-rgb) / 4%);
-}
-
-/* EditActivityDialog.tsx (§4.7.4) — same real-<dialog>/showModal() shape as
-   .placeholder-notice above, just wider (the description field needs the room) and its own
+/* EditActivityDialog.tsx (§4.7.4) — a real <dialog>/showModal(), wide enough for the
+   description field, and its own
    form-field layout reuses .settings-page__* classes rather than duplicating them. */
 /* `overflow: visible` overrides the UA's `overflow: auto` on a modal dialog, so the Type
    picker's dropdown (ActivityTypePicker.tsx) can hang past the dialog's bottom edge instead
@@ -449,7 +165,7 @@ a.user-menu__item {
   font: inherit;
 }
 
-/* ConfirmDialog.tsx — same real-<dialog>/showModal() shape as .placeholder-notice, sized for
+/* ConfirmDialog.tsx — same real-<dialog>/showModal() shape as .edit-activity-dialog, sized for
    a short title+message rather than a form. Generic, not delete-specific, but the one caller
    today (§4.7.5's Delete button) is what the red confirm button is tuned for — a future
    non-destructive use of this component can still override confirmLabel/styling as needed. */
@@ -1020,8 +736,7 @@ a.user-menu__item {
   background: var(--fm-border);
 }
 
-/* Anchors the dropdown panel under its trigger — same arrangement .user-menu
-   already uses for its own dropdown. No fixed width any more (nothing below it to stay
+/* Anchors the dropdown panel under its trigger's trailing edge. No fixed width any more (nothing below it to stay
    column-aligned with) — sized to its own label/caret like the mockup's chip. */
 .activities-panel__type-dropdown {
   position: relative;
@@ -2037,44 +1752,6 @@ a.user-menu__item {
   white-space: nowrap;
 }
 
-.export-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--fm-border-strong);
-  border-radius: var(--fm-radius-md);
-  padding: var(--fm-space-6) var(--fm-space-10);
-  background: var(--fm-surface);
-  font: inherit;
-  font-weight: var(--fm-weight-semibold);
-  font-size: var(--fm-text-md);
-  color: var(--fm-ink);
-  cursor: pointer;
-}
-
-/* Stroked like the account menu's glyph, sized to the text buttons' line height so the header's
-   actions stay one height. */
-.export-button__icon {
-  width: 16px;
-  height: 16px;
-}
-
-.export-button:hover:not(:disabled) {
-  background: rgb(var(--fm-ink-rgb) / 4%);
-}
-
-.export-button:disabled {
-  color: rgb(var(--fm-ink-rgb) / 40%);
-  cursor: default;
-}
-
-/* While the export frame is shown — the button is also how it's put away again. */
-.export-button[aria-pressed='true'] {
-  border-color: var(--fm-accent);
-  background: rgb(var(--fm-accent-rgb) / 10%);
-  color: var(--fm-accent-strong);
-}
-
 /* The Sync tab's badge (ActivitiesPanel.tsx): this session's in-flight uploads plus every
    pending job for this user globally (see useUploadHistory's own comment on why the latter
    isn't scoped to whichever page happens to be open) — shown on the tab itself, so progress
@@ -2375,13 +2052,9 @@ a.user-menu__item {
 .profile-page__back {
   display: inline-block;
   margin-bottom: var(--fm-space-20);
-  border: 0;
-  background: none;
-  padding: 0;
-  font: inherit;
   font-size: var(--fm-text-md);
   color: var(--fm-accent-strong);
-  cursor: pointer;
+  text-decoration: none;
 }
 
 /* SettingsPage.tsx — Avatar, Name, Country, Timezone. Shares .profile-page__body/
@@ -2512,6 +2185,12 @@ a.user-menu__item {
   cursor: pointer;
 }
 
+/* "Manage on the map" is a link to /?private-locations, dressed as the other buttons. */
+a.settings-page__button {
+  display: inline-block;
+  text-decoration: none;
+}
+
 .settings-page__button:disabled {
   color: rgb(var(--fm-ink-rgb) / 30%);
   border-color: rgb(var(--fm-ink-rgb) / 10%);
@@ -2562,7 +2241,7 @@ a.user-menu__item {
 
 /* SearchPicker.tsx — Settings' Country and Timezone fields. The trigger matches
    .settings-page__input's box so it sits in the form like any other field; the panel hangs
-   under it, same anchoring as .user-menu's dropdown. Rows are leading (a flag, a GMT offset)
+   under it, anchored like .activities-panel__type-dropdown. Rows are leading (a flag, a GMT offset)
    · label · muted detail, right-aligned. */
 .search-picker {
   position: relative;
@@ -3205,62 +2884,6 @@ a.user-menu__item {
     padding: var(--fm-space-8) var(--fm-space-6);
   }
 
-  /* The header: Donate/Upload/Export/the account menu at their desktop padding don't
-     reliably fit a ~360px-wide phone alongside the brand mark. Tighter padding/gaps first;
-     Donate (still a placeholder today — the least "core" of the four) is what's allowed to
-     wrap or shrink further if a specific device still runs tight, rather than crowding
-     Upload/Export/the account menu, which are the real functional core. */
-  .app-header {
-    padding: 0 var(--fm-space-10);
-    gap: var(--fm-space-8);
-  }
-
-  .app-header__actions {
-    gap: var(--fm-space-6);
-  }
-
-  .app-header__brand {
-    font-size: 15px;
-    gap: var(--fm-space-6);
-  }
-
-  .app-header__logo {
-    height: 30px;
-  }
-
-  /* No room for the tagline beside four actions on a phone — the wordmark alone carries it. */
-  .app-header__divider,
-  .app-header__tagline {
-    display: none;
-  }
-
-  /* Nor for the Info menu: the header is already at a 390px phone's full width without it.
-     Its entries move into the account menu instead (UserMenu.tsx's phone-only items). */
-  .info-menu {
-    display: none;
-  }
-
-  .user-menu__item--phone-only {
-    display: block;
-  }
-
-  .donate-button,
-  .export-button {
-    padding: var(--fm-space-6) var(--fm-space-10);
-    font-size: var(--fm-text-md);
-  }
-
-  /* Heart only on a phone — the header was already ~30px wider than a 390px viewport with
-     the word alone, and a heart is recognizable without it. The button's aria-label keeps its
-     accessible name. */
-  .donate-button {
-    padding: var(--fm-space-6) var(--fm-space-8);
-  }
-
-  .donate-button__label {
-    display: none;
-  }
-
   /* The phone footer is just DateRangeSlider.tsx — ActivityHistogram.tsx swaps out the bar
      chart and legend below this breakpoint, so none of their desktop rules need a phone
      variant. Its bottom padding reserves the collapsed Activities sheet's ~68px (plus a
@@ -3341,4 +2964,19 @@ a.user-menu__item {
   font-weight: var(--fm-weight-semibold);
   letter-spacing: 0.02em;
   color: rgb(var(--fm-ink-rgb) / 65%);
+}
+
+/* ExportControl.tsx — a button in MapLibre's own top-right control stack, under zoom and
+   locate. MapLibre sizes the button (29px square); this centers the Lucide camera in it the
+   way MapLibre's own controls center their icons, and marks it while the frame is shown. */
+.maplibregl-ctrl-group .export-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fm-ink);
+}
+
+.maplibregl-ctrl-group .export-control[aria-pressed='true'] {
+  background: rgb(var(--fm-accent-rgb) / 14%);
+  color: var(--fm-accent-strong);
 }

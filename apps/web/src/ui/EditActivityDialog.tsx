@@ -14,8 +14,8 @@ const MAX_DESCRIPTION_LEN = 2000;
 /**
  * The "rename an activity, name it, add a note" form (§4.7.4) — reached from the header
  * toolbar's Edit-selected button (ActivitiesPanel.tsx) over whatever's currently checked. A
- * real `<dialog>`/`showModal()`, the same choice PlaceholderNotice.tsx already made for "a
- * small focused piece of UI over the map": free Escape/backdrop/focus-trap behavior, and
+ * real `<dialog>`/`showModal()`, the right primitive for "a small focused piece of UI over
+ * the map": free Escape/backdrop/focus-trap behavior, and
  * exactly one path out (the dialog's own `close()`) regardless of whether that came from Save,
  * Cancel, Escape, or a backdrop click.
  *
@@ -125,7 +125,7 @@ export function EditActivityDialog({ activities, knownTypes, onClose, onSaved }:
       className="edit-activity-dialog"
       data-testid="edit-activity-dialog"
       onClose={onClose}
-      // Same "backdrop click has the dialog itself as its target" trick PlaceholderNotice uses.
+      // A backdrop click has the dialog itself as its target; a click inside it doesn't.
       onClick={(event) => {
         if (event.target === ref.current) ref.current?.close();
       }}

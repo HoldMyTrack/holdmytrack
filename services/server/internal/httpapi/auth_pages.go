@@ -70,12 +70,21 @@ func (a *pageAccount) home() string {
 	return "/"
 }
 
+// siteDescription is what a link to the site shows in a preview, and what a search engine
+// shows under it. The sign-in page carries it: `/` itself redirects a signed-out visitor
+// there, so that's the page a shared link to holdmytrack.com actually lands on.
+const siteDescription = "HoldMyTrack is a free, community-funded place to see every outdoor activity you have ever recorded on one map — Fog of War, heatmaps and routes from your watch, phone or old exports."
+
 func (s *Server) renderAuth(w http.ResponseWriter, r *http.Request, status int, page, title string, noIndex bool, form authForm) {
 	var user *web.User
 	if acct := s.pageAccount(r); acct != nil {
 		user = acct.user
 	}
-	s.pages.Render(w, status, page, web.PageData{Title: title + " — HoldMyTrack", Path: r.URL.Path, NoIndex: noIndex, User: user, Page: form})
+	data := web.PageData{Title: title + " — HoldMyTrack", Path: r.URL.Path, NoIndex: noIndex, User: user, Page: form}
+	if page == "signin" || page == "signup" {
+		data.Description = siteDescription
+	}
+	s.pages.Render(w, status, page, data)
 }
 
 // renderAuthError re-renders a form after one of the account cores failed: an accountError's

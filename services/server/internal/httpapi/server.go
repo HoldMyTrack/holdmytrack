@@ -166,11 +166,10 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	return s
 }
 
-// registerPages adds the server-rendered HTML pages (pages.go, ADR-0012) — outside /v1, since
-// they're pages a browser navigates to, not API. Caddy (apps/web/docker/Caddyfile) and Vite's
-// dev proxy (apps/web/vite.config.ts) each list these same paths; a new page needs adding to
-// both until the map page moves here too and they can send everything that isn't a static
-// asset.
+// registerPages adds the server-rendered HTML pages (pages.go, auth_pages.go, ADR-0012) —
+// outside /v1, since they're pages a browser navigates to, not API. In production Caddy sends
+// this server everything that isn't a static asset (apps/web/docker/Caddyfile); in dev, Vite's
+// proxy (apps/web/vite.config.ts) lists these paths one by one, so a new page goes there too.
 func (s *Server) registerPages() {
 	s.mux.HandleFunc("GET /about", s.staticPage("about", "About HoldMyTrack — Every journey, mapped.",
 		"HoldMyTrack is a free, community-funded place to see every outdoor activity you have ever recorded on one map — Fog of War, heatmaps and routes from your watch, phone or old exports. No subscription, no ads, no data sales.", false))
@@ -193,6 +192,12 @@ func (s *Server) registerPages() {
 	s.mux.HandleFunc("GET /verify-pending", s.handleVerifyPendingPage)
 	s.mux.HandleFunc("POST /verify-pending/resend", s.sameOrigin(s.handleVerifyResendForm))
 	s.mux.HandleFunc("POST /verify-pending/email", s.sameOrigin(s.handleVerifyChangeEmailForm))
+	// The React app (pages.go's appShell). `/{$}` is the root alone; "/" below is everything
+	// else nothing more specific claims.
+	s.mux.HandleFunc("GET /{$}", s.appShell("HoldMyTrack — Every journey, mapped."))
+	s.mux.HandleFunc("GET /profile", s.appShell("Profile — HoldMyTrack"))
+	s.mux.HandleFunc("GET /settings", s.appShell("Settings — HoldMyTrack"))
+	s.mux.HandleFunc("/", s.notFound)
 }
 
 // ServeHTTP sets CORS headers before delegating to the mux. This has to happen here, not

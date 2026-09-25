@@ -67,7 +67,7 @@ export interface SearchPickerProps {
  * jumping through hundreds of entries. Follows the WAI-ARIA combobox pattern: focus stays in
  * the search input while ↑/↓ move the active option (`aria-activedescendant`), Enter picks
  * it, Escape closes and returns focus to the trigger. Dismisses on an outside `pointerdown`,
- * like UserMenu.tsx. CountryPicker.tsx, TimezonePicker.tsx and ActivityTypePicker.tsx only
+ * like the Activities panel's Type dropdown. CountryPicker.tsx, TimezonePicker.tsx and ActivityTypePicker.tsx only
  * build the option list; the last is open-ended (`createOption`), since activity types are
  * free-form text rather than a fixed vocabulary.
  */

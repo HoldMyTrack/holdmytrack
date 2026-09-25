@@ -9,13 +9,22 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>{{.Title}}</title>
     {{with .Description}}<meta name="description" content="{{.}}" />{{end}}
-    {{if .NoIndex}}<meta name="robots" content="noindex" />{{else}}<link rel="canonical" href="{{.Canonical}}" />{{end}}
+    {{if .NoIndex}}<meta name="robots" content="noindex" />{{else}}<link rel="canonical" href="{{.Canonical}}" />
+    {{/* Link previews, for the pages meant to be shared — what the old single-page app's
+         index.html carried for the site root. */}}
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="HoldMyTrack" />
+    <meta property="og:title" content="{{.Title}}" />
+    {{with .Description}}<meta property="og:description" content="{{.}}" />{{end}}
+    <meta property="og:url" content="{{.Canonical}}" />
+    <meta name="twitter:card" content="summary" />{{end}}
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,800;1,9..144,400&family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <link rel="stylesheet" href="{{asset "header.css"}}" />
     <link rel="stylesheet" href="{{asset "pages.css"}}" />
     {{block "head" .}}{{end}}
   </head>

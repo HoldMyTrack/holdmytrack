@@ -97,6 +97,16 @@ type Renderer struct {
 
 	mu    sync.Mutex
 	pages map[string]*template.Template
+	app   *template.Template
+}
+
+// AppPage is what the React app's shell (templates/app/app.html) reads: the shared header's
+// fields, plus how to load the bundle.
+type AppPage struct {
+	PageData
+	// ViteDev loads the app from Vite's dev server (/@vite/client, /src/main.tsx) instead of
+	// the built /assets/app.js and app.css — see Dev.
+	ViteDev bool
 }
 
 // New builds a Renderer over fsys (Embedded(), or os.DirFS of a checkout's internal/web in dev).
@@ -104,24 +114,33 @@ type Renderer struct {
 // built from. A template that fails to parse is a startup error here, not a 500 later.
 func New(fsys fs.FS, reload bool, version, baseURL string) (*Renderer, error) {
 	r := &Renderer{fsys: fsys, reload: reload, version: version, baseURL: baseURL}
-	pages, err := r.parse()
+	pages, app, err := r.parse()
 	if err != nil {
 		return nil, err
 	}
-	r.pages = pages
+	r.pages, r.app = pages, app
 	return r, nil
 }
 
-func (r *Renderer) parse() (map[string]*template.Template, error) {
+// Dev reports whether this Renderer is a dev one (WEB_DEV_DIR). Only then may a request ask
+// for the app's Vite-dev-server assets (AppPage.ViteDev); in production the flag is ignored.
+func (r *Renderer) Dev() bool { return r.reload }
+
+func (r *Renderer) parse() (map[string]*template.Template, *template.Template, error) {
 	files, err := fs.Glob(r.fsys, "templates/pages/*.html")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	funcs := template.FuncMap{
 		// asset is a static file's URL with the build version as a cache-buster, so /static/
 		// can be served with a long max-age and still change the moment a deploy does.
 		"asset": func(name string) string {
 			return "/static/" + name + "?v=" + url.QueryEscape(r.version)
+		},
+		// appAsset is one of the React build's two stable-named entry files (apps/web's
+		// vite.config.ts names them app.js and app.css), with the same cache-buster.
+		"appAsset": func(name string) string {
+			return "/assets/" + name + "?v=" + url.QueryEscape(r.version)
 		},
 	}
 	pages := make(map[string]*template.Template, len(files))
@@ -131,40 +150,71 @@ func (r *Renderer) parse() (map[string]*template.Template, error) {
 		// Every templates/*.html (the layout, the header, shared partials) goes with each page.
 		t, err := template.New("layout.html").Funcs(funcs).ParseFS(r.fsys, "templates/*.html", file)
 		if err != nil {
-			return nil, fmt.Errorf("web: parse %s: %w", file, err)
+			return nil, nil, fmt.Errorf("web: parse %s: %w", file, err)
 		}
 		pages[name] = t
 	}
-	return pages, nil
+	// The React app's shell is its own root, not a page inside layout.html: no footer, no
+	// page styles, just the shared header above the app's mount point.
+	app, err := template.New("app.html").Funcs(funcs).ParseFS(r.fsys, "templates/*.html", "templates/app/app.html")
+	if err != nil {
+		return nil, nil, fmt.Errorf("web: parse templates/app/app.html: %w", err)
+	}
+	return pages, app, nil
 }
 
 // Render writes page (a templates/pages/ file name, without .html) with data. It renders into a
 // buffer first, so a template error becomes a clean 500 rather than half a page.
 func (r *Renderer) Render(w http.ResponseWriter, status int, page string, data PageData) {
-	pages := r.pages
-	if r.reload {
-		fresh, err := r.parse()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		r.mu.Lock()
-		r.pages = fresh
-		r.mu.Unlock()
-		pages = fresh
+	pages, _, ok := r.current(w)
+	if !ok {
+		return
 	}
 	t, ok := pages[page]
 	if !ok {
 		http.Error(w, "unknown page "+page, http.StatusInternalServerError)
 		return
 	}
+	r.fill(&data)
+	r.execute(w, status, t, data)
+}
+
+// RenderApp writes the React app's shell (the map page, and for now Profile and Settings).
+func (r *Renderer) RenderApp(w http.ResponseWriter, data AppPage) {
+	_, app, ok := r.current(w)
+	if !ok {
+		return
+	}
+	r.fill(&data.PageData)
+	r.execute(w, http.StatusOK, app, data)
+}
+
+// current is the parsed templates — re-parsed first when reloading (dev).
+func (r *Renderer) current(w http.ResponseWriter) (map[string]*template.Template, *template.Template, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.reload {
+		pages, app, err := r.parse()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return nil, nil, false
+		}
+		r.pages, r.app = pages, app
+	}
+	return r.pages, r.app, true
+}
+
+// fill sets the fields every page's header and head share.
+func (r *Renderer) fill(data *PageData) {
 	data.InfoLinks = InfoLinks
 	data.DonateURL = "/about#funding"
 	if OpenCollectiveSlug != "" {
 		data.DonateURL = "https://opencollective.com/" + url.PathEscape(OpenCollectiveSlug) + "/donate"
 	}
 	data.Canonical = r.baseURL + data.Path
+}
 
+func (r *Renderer) execute(w http.ResponseWriter, status int, t *template.Template, data any) {
 	var buf bytes.Buffer
 	if err := t.Execute(&buf, data); err != nil {
 		http.Error(w, "template error", http.StatusInternalServerError)

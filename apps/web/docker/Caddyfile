@@ -17,7 +17,7 @@
 	# .env.prod and recreates just this container. /healthz is deliberately exempt so it
 	# keeps reflecting api/db's real status — that's what the script polls to know when
 	# it's safe to turn this back off. `handle` blocks are mutually exclusive (first match
-	# wins), so this short-circuits @backend and the SPA fallback below whenever active.
+	# wins), so this short-circuits the static files and the Go server below whenever active.
 	@maintenance {
 		not path /healthz
 		expression {env.MAINTENANCE_MODE} == "true"
@@ -31,26 +31,23 @@
 <p>HoldMyTrack is down for scheduled maintenance. Try again in a few minutes.</p>` 503
 	}
 
-	# The API, and the server-rendered pages (services/server/internal/web, ADR-0012) — the
-	# same page paths httpapi's registerPages serves and apps/web/vite.config.ts proxies in
-	# dev. Listed one by one until the map page is served by Go too; then this flips to
-	# "everything that isn't a static asset".
-	@backend {
-		path /v1/* /tiles/* /healthz /static/*
-		path /about /help /contacts /logout
-		path /signin /signup /demo /forgot /reset /verify /verify-pending /verify-pending/*
-	}
-	handle @backend {
-		reverse_proxy api:8080
+	# What the build and public/ put in /srv/web — the React app's bundle, the basemap archive
+	# (when it's served from here rather than VITE_BASEMAP_ORIGIN), icons, robots.txt and the
+	# sitemap — is served as files. Everything else is the Go server's: the API, the tiles, and
+	# every page, the app's own shell included (ADR-0012), with its own 404 page for anything
+	# it doesn't know. A new file in apps/web/public/ needs adding to this list.
+	@static path /assets/* /basemap/* /favicon.png /apple-touch-icon.png /robots.txt /sitemap.xml
+	handle @static {
+		root * /srv/web
+		# The app's two entry files keep fixed names so the Go server can reference them
+		# without this build's manifest (vite.config.ts); revalidate them every time, so a
+		# deploy is never masked by a cached copy. Everything they load is content-hashed.
+		header /assets/app.* Cache-Control "no-cache"
+		file_server
 	}
 
-	# The SPA fallback: any path that isn't the API or a page and doesn't match a real file
-	# (e.g. a deep link straight to a client-side route) still serves index.html, letting the
-	# client-side app take over routing from there.
 	handle {
-		root * /srv/web
-		try_files {path} /index.html
-		file_server
+		reverse_proxy api:8080
 	}
 
 	encode gzip

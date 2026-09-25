@@ -68,3 +68,66 @@ func (s *Server) isSameOrigin(r *http.Request) bool {
 	referer := r.Header.Get("Referer")
 	return referer == wantOrigin || strings.HasPrefix(referer, wantOrigin+"/")
 }
+
+// appShell serves the React app's pages — the map at `/`, and for now `/profile` and
+// `/settings` too, which are views inside the same app until they become pages of their own
+// (ADR-0012). Only for a session that has something to show: no session goes to /signin, an
+// unverified real account to /verify-pending. The React app's own copies of those two checks
+// (App.tsx) stay as a fallback for a session that ends while the page is open.
+func (s *Server) appShell(title string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if dest := legacyLanding(r); dest != "" {
+			http.Redirect(w, r, dest, http.StatusSeeOther)
+			return
+		}
+		acct := s.pageAccount(r)
+		if acct == nil {
+			http.Redirect(w, r, "/signin", http.StatusSeeOther)
+			return
+		}
+		if home := acct.home(); home != "/" {
+			http.Redirect(w, r, home, http.StatusSeeOther)
+			return
+		}
+		s.pages.RenderApp(w, web.AppPage{
+			PageData: web.PageData{Title: title, Path: r.URL.Path, NoIndex: true, User: acct.user},
+			// Only a dev server honours this, and only for a request Vite's dev proxy marked
+			// (apps/web/vite.config.ts); `vite preview` and production get the built bundle.
+			ViteDev: s.pages.Dev() && r.Header.Get(viteDevHeader) == "dev",
+		})
+	}
+}
+
+// viteDevHeader is how Vite's dev proxy tells the app shell to load the bundle from Vite's
+// dev server rather than from /assets/ — the same name as apps/web/vite.config.ts's.
+const viteDevHeader = "X-HoldMyTrack-Vite"
+
+// legacyLanding forwards the links emails carried before the auth screens became pages
+// (`/?reset_token=`, `/?verify_token=`) and the old Google-failure redirect
+// (`/?auth_error=`) to the page that handles each now. Keep while such emails may still be
+// sitting in inboxes; a reset link lives an hour, a verification link a day.
+func legacyLanding(r *http.Request) string {
+	if r.URL.Path != "/" {
+		return ""
+	}
+	q := r.URL.Query()
+	switch {
+	case q.Get("reset_token") != "":
+		return "/reset?token=" + url.QueryEscape(q.Get("reset_token"))
+	case q.Get("verify_token") != "":
+		return "/verify?token=" + url.QueryEscape(q.Get("verify_token"))
+	case q.Get("auth_error") != "":
+		return "/signin?error=google"
+	}
+	return ""
+}
+
+// notFound answers every path nothing else claims: an HTML page for a browser, a plain 404
+// under the API's own prefixes, where a client expects no page.
+func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
+	if strings.HasPrefix(r.URL.Path, apiPrefix+"/") || strings.HasPrefix(r.URL.Path, "/tiles/") {
+		http.NotFound(w, r)
+		return
+	}
+	s.pages.Render(w, http.StatusNotFound, "notfound", web.PageData{Title: "Page not found — HoldMyTrack", Path: r.URL.Path, NoIndex: true, User: s.pageUser(r)})
+}

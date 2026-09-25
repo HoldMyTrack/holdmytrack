@@ -182,7 +182,7 @@ export function ActivitiesPanel({
   // The Type dropdown (Type + Distance, per the header toolbar redesign) — closed by
   // default, same "most sessions don't start by narrowing filters" reasoning the old "Filter"
   // toggle button had. Dismiss on outside click or Escape, the same hand-wired pattern
-  // UserMenu.tsx already uses (not shared into a hook for a third call site).
+  // the Duplicates disclosure below uses too (not shared into a hook for two call sites).
   const [typeFilterOpen, setTypeFilterOpen] = useState(false);
   const typeFilterRef = useRef<HTMLDivElement>(null);
 

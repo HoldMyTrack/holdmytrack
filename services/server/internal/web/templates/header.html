@@ -1,8 +1,10 @@
-{{/* The header every page shares (ADR-0012). It mirrors the map page's React Header.tsx —
-     brand, tagline, Donate, the Info menu, the account menu — until phase 5 makes that page
-     render this template too. The two menus are <details> dropdowns: they open and close with
-     no script. Sign out is a form POST to /logout (pages.go), not a link, so a GET from
-     another site can't end someone's session. Signed out, the account menu is a Sign in link. */}}
+{{/* The header every page shares (ADR-0012), the React app's shell included — brand,
+     tagline, Donate, the Info menu, the account menu. Its styles are static/header.css, which
+     the app's shell loads alone and every other page alongside pages.css. The two menus are
+     <details> dropdowns: they open and close with no script. Sign out is a form POST to
+     /logout (pages.go), not a link, so a GET from another site can't end someone's session.
+     Signed out, the account menu is a Sign in link. "Private locations" is a window on the
+     map, opened by the ?private-locations the React app reads on load. */}}
 {{define "header"}}
 <header class="page-header">
   <a class="page-header__brand" href="/">
@@ -29,7 +31,11 @@
       </summary>
       <div class="header-menu__dropdown" role="menu">
         <div class="header-menu__label">{{.Label}}</div>
+        {{if .IsDemo}}<a role="menuitem" class="header-menu__item header-menu__item--accent" href="/signup">Create your own account</a>{{end}}
         <a role="menuitem" class="header-menu__item" href="/">Map</a>
+        <a role="menuitem" class="header-menu__item" href="/profile">Profile</a>
+        <a role="menuitem" class="header-menu__item" href="/settings">Settings</a>
+        <a role="menuitem" class="header-menu__item" href="/?private-locations">Private locations</a>
         <form method="post" action="/logout">
           <button type="submit" role="menuitem" class="header-menu__item">Sign out</button>
         </form>
