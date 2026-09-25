@@ -714,9 +714,11 @@ Only one track is hovered and only one is focused at a time; any number can be c
 
 **Description**: A private, per-account page at `/profile` (reached from the header's account menu) showing a GitHub-style daily contribution grid — one cell per calendar day, one block per calendar year (most recent first, back to the account's first-ever activity).
 
-**Behavior**: Each day's cell is shaded by intensity, toggle-able between two measures:
+**Behavior**: Each day's cell is shaded by intensity, toggle-able between two measures (the "Shade by" switch — `/profile?shade=distance` for Distance, the plain `/profile` for Count):
 - **Count**: number of activities that day (empty / one / two / three-or-more).
 - **Distance**: quantile-based thresholds computed over that account's own active days for that year (so "a busy day" is relative to this account's own typical distances, not a fixed absolute number).
+
+Hovering a day shows its date, activity count and distance. The page needs a session like the map does: no session goes to `/signin`, an unverified account to `/verify-pending`, and an account that has never saved Settings to `/settings` (FR-1.7).
 
 ### FR-7.2 All-time and per-year stat cards
 
@@ -765,7 +767,7 @@ Only one track is hovered and only one is focused at a time; any number can be c
 **Behavior**:
 1. Every activity in the window is grouped into the requested bucket by its `started_at` date, in the account's own timezone (FR-1.7), one bucket per calendar week or month that has at least one activity — buckets with nothing recorded are omitted rather than returned as zeroes, the same convention FR-6's histogram uses.
 2. Each bucket reports: activity count, total distance, total moving time, and total elevation gain.
-3. The UI (`Trends`, on the Profile page) renders one bar per bucket, height scaled to the window's busiest bucket by distance, with a Week/Month toggle. Hovering a bar shows that bucket's full breakdown (distance, activity count, moving time, elevation gain).
+3. The Profile page renders the trailing 12 months as one bar per bucket, height scaled (logarithmically) to the window's busiest bucket by distance, with a Week/Month switch (`?bucket=month`; the Distance/Count grid setting is kept). Hovering a bar shows that bucket's full breakdown (distance, activity count, moving time, elevation gain); tapping or clicking one shows it in a line under the chart, and tapping it again hides it.
 
 **Outputs**: `{bucket, from, to, periods: [{period_start, count, distance_meters, moving_seconds, elevation_gain_m}, ...]}`.
 

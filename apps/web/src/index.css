@@ -1688,6 +1688,40 @@ body {
   }
 }
 
+/* The two-way switch in the map's track-metric toggle ("Colored by" pace / heart rate,
+   MapView.tsx). Named for the Profile page's Trends chart it was first built for; that page
+   is server-rendered now, with its own copy (pages.css's .profile__toggle). */
+.trends__bucket {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.trends__bucket-btn {
+  border: 1px solid rgb(var(--fm-ink-rgb) / 20%);
+  background: var(--fm-surface);
+  padding: var(--fm-space-6) var(--fm-space-12);
+  font: inherit;
+  font-size: var(--fm-text-md);
+  color: var(--fm-ink);
+  cursor: pointer;
+}
+
+.trends__bucket-btn:first-of-type {
+  border-radius: var(--fm-radius-sm) 0 0 var(--fm-radius-sm);
+  border-right: 0;
+}
+
+.trends__bucket-btn:last-of-type {
+  border-radius: 0 var(--fm-radius-sm) var(--fm-radius-sm) 0;
+}
+
+.trends__bucket-btn[aria-pressed='true'] {
+  background: var(--fm-accent);
+  border-color: var(--fm-accent);
+  color: #fff;
+}
+
 /* The straight-line pace/HR + elevation profile (TrackProfile.tsx) — deliberately small and
    unlabeled (no axis ticks), a general overlook alongside the toggle already in this same
    floating card, not a separate detailed instrument. */
@@ -2033,30 +2067,6 @@ body {
   font-size: var(--fm-text-md);
 }
 
-/* §4.8's Profile screen — a normal scrolling page, unlike the map screen's fixed-height
-   .app-body (sidebar + map splitting one viewport). */
-.profile-page__body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  /* Without this, a scrollbar toggling on/off shrinks this element's own content width by
-     the scrollbar's own width — found live on the Trends chart specifically: hovering a bar
-     renders `.trends__tooltip` below it, adding just enough height to cross the threshold
-     where this container needs to scroll, which visibly shifted the whole page left by a few
-     pixels for as long as the tooltip was showing. Reserving the gutter unconditionally means
-     the content width never changes whether or not a scrollbar is actually needed right now. */
-  scrollbar-gutter: stable;
-  padding: var(--fm-space-24) clamp(var(--fm-space-16), 4vw, 48px) 60px;
-}
-
-.profile-page__back {
-  display: inline-block;
-  margin-bottom: var(--fm-space-20);
-  font-size: var(--fm-text-md);
-  color: var(--fm-accent-strong);
-  text-decoration: none;
-}
-
 /* Form fields in the Edit activity dialog (EditActivityDialog.tsx). Named for the React
    Settings page they came from, which is now a server-rendered page with its own styles
    (services/server/internal/web/static/pages.css). */
@@ -2326,338 +2336,6 @@ a.settings-page__button {
   text-align: center;
 }
 
-.activity-graph {
-  max-width: 960px;
-  margin: 0 auto;
-}
-
-.activity-graph__cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 1px;
-  margin-bottom: var(--fm-space-24);
-  background: rgb(var(--fm-ink-rgb) / 8%);
-  border: 1px solid rgb(var(--fm-ink-rgb) / 8%);
-}
-
-.activity-graph__card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fm-space-6);
-  padding: var(--fm-space-16) var(--fm-space-16);
-  background: var(--fm-surface);
-}
-
-.activity-graph__card-label {
-  font-size: var(--fm-text-xs);
-  font-weight: var(--fm-weight-semibold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgb(var(--fm-ink-rgb) / 50%);
-}
-
-.activity-graph__card-value {
-  font-size: var(--fm-text-2xl);
-  font-weight: var(--fm-weight-bold);
-  color: var(--fm-ink);
-}
-
-.activity-graph__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--fm-space-12);
-  margin-bottom: var(--fm-space-16);
-}
-
-.activity-graph__title {
-  margin: 0 0 var(--fm-space-4);
-  font-size: var(--fm-text-md);
-  font-weight: var(--fm-weight-bold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgb(var(--fm-ink-rgb) / 60%);
-}
-
-.activity-graph__subtext {
-  margin: 0;
-  font-size: var(--fm-text-md);
-  color: rgb(var(--fm-ink-rgb) / 55%);
-}
-
-.activity-graph__shade {
-  display: flex;
-  align-items: center;
-  gap: var(--fm-space-8);
-}
-
-.activity-graph__shade-label {
-  font-size: var(--fm-text-xs);
-  font-weight: var(--fm-weight-semibold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgb(var(--fm-ink-rgb) / 50%);
-}
-
-.activity-graph__shade-btn {
-  border: 1px solid rgb(var(--fm-ink-rgb) / 20%);
-  background: var(--fm-surface);
-  padding: var(--fm-space-6) var(--fm-space-12);
-  font: inherit;
-  font-size: var(--fm-text-md);
-  color: var(--fm-ink);
-  cursor: pointer;
-}
-
-.activity-graph__shade-btn:first-of-type {
-  border-radius: var(--fm-radius-sm) 0 0 var(--fm-radius-sm);
-  border-right: 0;
-}
-
-.activity-graph__shade-btn:last-of-type {
-  border-radius: 0 var(--fm-radius-sm) var(--fm-radius-sm) 0;
-}
-
-.activity-graph__shade-btn[aria-pressed='true'] {
-  background: var(--fm-accent);
-  border-color: var(--fm-accent);
-  color: #fff;
-}
-
-.activity-graph__error {
-  color: var(--fm-danger);
-  font-size: var(--fm-text-md);
-}
-
-.activity-graph__legend {
-  display: flex;
-  align-items: center;
-  gap: var(--fm-space-6);
-  margin: var(--fm-space-16) 0 0;
-  font-size: var(--fm-text-xs);
-  color: rgb(var(--fm-ink-rgb) / 50%);
-}
-
-.trends {
-  max-width: 960px;
-  margin: var(--fm-space-32) auto 0;
-  padding-top: var(--fm-space-24);
-  border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
-}
-
-.trends__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--fm-space-12);
-  margin-bottom: var(--fm-space-16);
-}
-
-.trends__title {
-  margin: 0 0 var(--fm-space-4);
-  font-size: var(--fm-text-md);
-  font-weight: var(--fm-weight-bold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgb(var(--fm-ink-rgb) / 60%);
-}
-
-.trends__subtext {
-  margin: 0;
-  font-size: var(--fm-text-md);
-  color: rgb(var(--fm-ink-rgb) / 55%);
-}
-
-.trends__bucket {
-  display: flex;
-  align-items: center;
-  gap: 0;
-}
-
-.trends__bucket-btn {
-  border: 1px solid rgb(var(--fm-ink-rgb) / 20%);
-  background: var(--fm-surface);
-  padding: var(--fm-space-6) var(--fm-space-12);
-  font: inherit;
-  font-size: var(--fm-text-md);
-  color: var(--fm-ink);
-  cursor: pointer;
-}
-
-.trends__bucket-btn:first-of-type {
-  border-radius: var(--fm-radius-sm) 0 0 var(--fm-radius-sm);
-  border-right: 0;
-}
-
-.trends__bucket-btn:last-of-type {
-  border-radius: 0 var(--fm-radius-sm) var(--fm-radius-sm) 0;
-}
-
-.trends__bucket-btn[aria-pressed='true'] {
-  background: var(--fm-accent);
-  border-color: var(--fm-accent);
-  color: #fff;
-}
-
-.trends__error {
-  color: var(--fm-danger);
-  font-size: var(--fm-text-md);
-}
-
-.trends__empty {
-  color: rgb(var(--fm-ink-rgb) / 50%);
-  font-size: var(--fm-text-md);
-}
-
-.trends__chart {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fm-space-6);
-}
-
-.trends__bars {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--fm-space-2);
-  height: 140px;
-  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 12%);
-}
-
-.trends__bar {
-  flex: 1 1 0;
-  min-height: 2px;
-  background: var(--fm-accent);
-  border-radius: var(--fm-radius-xs) var(--fm-radius-xs) 0 0;
-}
-
-.trends__bar:hover {
-  background: var(--fm-accent-hover);
-}
-
-.trends__axis {
-  display: flex;
-  justify-content: space-between;
-  font-size: var(--fm-text-xs);
-  color: rgb(var(--fm-ink-rgb) / 50%);
-}
-
-.trends__tooltip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fm-space-4) var(--fm-space-16);
-  margin-top: var(--fm-space-12);
-  padding: var(--fm-space-8) var(--fm-space-12);
-  background: rgb(var(--fm-ink-rgb) / 4%);
-  border-radius: var(--fm-radius-sm);
-  font-size: var(--fm-text-md);
-  color: var(--fm-ink);
-}
-
-.trends__tooltip-date {
-  font-weight: var(--fm-weight-bold);
-}
-
-.year-grid {
-  margin-bottom: var(--fm-space-32);
-  padding-top: var(--fm-space-16);
-  border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
-}
-
-.year-grid__header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--fm-space-10);
-  margin-bottom: var(--fm-space-10);
-}
-
-.year-grid__year {
-  margin: 0;
-  font-family: var(--fm-font-serif);
-  font-size: var(--fm-text-2xl);
-  font-weight: var(--fm-weight-semibold);
-  color: var(--fm-ink);
-}
-
-.year-grid__stats {
-  font-size: var(--fm-text-md);
-  color: rgb(var(--fm-ink-rgb) / 55%);
-}
-
-.year-grid__body {
-  display: flex;
-  gap: var(--fm-space-6);
-  overflow-x: auto;
-}
-
-.year-grid__row-labels {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  gap: var(--fm-space-4);
-  padding-top: var(--fm-space-16);
-}
-
-.year-grid__row-label {
-  height: 12px;
-  font-size: var(--fm-text-3xs);
-  line-height: 12px;
-  color: rgb(var(--fm-ink-rgb) / 45%);
-}
-
-.year-grid__chart {
-  flex: none;
-}
-
-.year-grid__months {
-  display: grid;
-  grid-auto-flow: column;
-  height: 14px;
-  margin-bottom: var(--fm-space-2);
-}
-
-.year-grid__month {
-  font-size: var(--fm-text-3xs);
-  color: rgb(var(--fm-ink-rgb) / 45%);
-  white-space: nowrap;
-}
-
-.year-grid__cells {
-  display: grid;
-  grid-auto-flow: column;
-  grid-template-rows: repeat(7, 12px);
-  gap: var(--fm-space-4);
-}
-
-.year-grid__cell {
-  width: 12px;
-  height: 12px;
-  border-radius: var(--fm-radius-xs);
-  background: rgb(var(--fm-ink-rgb) / 6%);
-}
-
-.year-grid__cell--pad {
-  background: transparent;
-}
-
-.year-grid__cell--level-0 {
-  background: rgb(var(--fm-ink-rgb) / 6%);
-}
-
-.year-grid__cell--level-1 {
-  background: rgb(var(--fm-accent-rgb) / 30%);
-}
-
-.year-grid__cell--level-2 {
-  background: rgb(var(--fm-accent-rgb) / 60%);
-}
-
-.year-grid__cell--level-3 {
-  background: var(--fm-accent);
-}
-
 /* ============================================================================
    Mobile browsers (~768px and narrower — phones and small tablets).
    ============================================================================
@@ -2667,10 +2345,8 @@ a.settings-page__button {
    every desktop interaction: two hover-only features stay mouse-only on purpose —
    TrackProfile.tsx's colored-band/elevation exact values (FR-4.9) and the map-track-hover
    ↔ Activities-row-underline two-way highlight (FR-4.1/FR-5.4) — both are continuous-
-   position hover reads with no discrete point to tap, unlike Trends.tsx's bar/point
-   tooltips below, which do get a tap fallback (in that file directly, not
-   here). See functional_specification.md's mobile-support note and
-   technical_implementation_plan.md §5.9 for the full account. */
+   position hover reads with no discrete point to tap. See functional_specification.md's
+   mobile-support note and technical_implementation_plan.md §5.9 for the full account. */
 @media (max-width: 768px) {
   /* Defensive backstop, not a fix for a specific known overflow (those are fixed at their
      own source below, e.g. the histogram header) — a few elements deliberately extend

@@ -2,18 +2,15 @@ import { useEffect, useState } from 'react';
 import { getCurrentUser, type SessionUser } from './api';
 import { AuthProvider } from './auth/AuthContext';
 import { MapView } from './map/MapView';
-import { ProfilePage } from './ui/ProfilePage';
 import { VersionBanner } from './ui/VersionBanner';
 
 /**
- * Which of the app's views this page is — decided by the URL: the Go server renders `/` and
- * `/profile` as the same shell around this app (ADR-0012), and links between them are
- * ordinary links. Lives inside AuthProvider, not App itself, so it can assume a signed-in
- * user unconditionally rather than re-checking one.
+ * The map — the one page this app is (ADR-0012): the Go server renders `/` as a shell around
+ * it, with the shared header above, and every other page is the server's own. Lives inside
+ * AuthProvider, not App itself, so it can assume a signed-in user unconditionally rather
+ * than re-checking one.
  */
 function AuthenticatedApp() {
-  const path = window.location.pathname;
-  if (path === '/profile') return <ProfilePage />;
   return <MapView initialPrivateLocationsOpen={openPrivateLocations} />;
 }
 

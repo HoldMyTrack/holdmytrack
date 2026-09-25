@@ -624,10 +624,8 @@ func (s *Server) handleActivityHistogram(w http.ResponseWriter, r *http.Request)
 		from, to = buckets[0].Date, buckets[len(buckets)-1].Date
 	}
 
-	var earliest *time.Time
-	if err := s.pool.QueryRow(r.Context(),
-		`SELECT MIN(started_at) FROM activities WHERE user_id = $1 AND superseded_by IS NULL`, userIDFromContext(r.Context()),
-	).Scan(&earliest); err != nil {
+	earliest, err := s.earliestActivity(r.Context(), userIDFromContext(r.Context()))
+	if err != nil {
 		s.log.Error("activity earliest-date query failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -640,6 +638,23 @@ func (s *Server) handleActivityHistogram(w http.ResponseWriter, r *http.Request)
 
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// earliestActivity is when the account's first activity started, nil when it has none —
+// the histogram's `earliest`, and how far back the Profile page's year grids go.
+func (s *Server) earliestActivity(ctx context.Context, userID string) (*time.Time, error) {
+	var earliest *time.Time
+	err := s.pool.QueryRow(ctx,
+		`SELECT MIN(started_at) FROM activities WHERE user_id = $1 AND superseded_by IS NULL`, userID,
+	).Scan(&earliest)
+	return earliest, err
+}
+
+// dailyTotals is the histogram's calendar-window query for [first, end): one bucket per local
+// day with activity, ascending — the JSON endpoint's `?from=&to=` mode and the Profile page's
+// year grids both read it.
+func (s *Server) dailyTotals(ctx context.Context, userID string, first, end time.Time, tz string) ([]histogramBucket, error) {
+	return s.scanHistogramBuckets(ctx, activityHistogramQuery, userID, first, end, tz)
 }
 
 // badRequest marks an error as the client's fault, so the two mode helpers can return plain
@@ -679,7 +694,7 @@ func (s *Server) activityDayPage(r *http.Request, q url.Values, loc *time.Locati
 		before = &t
 	}
 
-	buckets, err := s.scanHistogramBuckets(r, activityDayPageQuery, userIDFromContext(r.Context()), before, limit, tz)
+	buckets, err := s.scanHistogramBuckets(r.Context(), activityDayPageQuery, userIDFromContext(r.Context()), before, limit, tz)
 	if err != nil {
 		return nil, err
 	}
@@ -717,7 +732,7 @@ func (s *Server) activityCalendarWindow(r *http.Request, q url.Values, loc *time
 	}
 	end := last.AddDate(0, 0, 1) // exclusive upper bound for the query
 
-	buckets, err := s.scanHistogramBuckets(r, activityHistogramQuery, userIDFromContext(r.Context()), first, end, tz)
+	buckets, err := s.dailyTotals(r.Context(), userIDFromContext(r.Context()), first, end, tz)
 	if err != nil {
 		return nil, "", "", err
 	}
@@ -726,8 +741,8 @@ func (s *Server) activityCalendarWindow(r *http.Request, q url.Values, loc *time
 
 // scanHistogramBuckets runs either histogram query — they return the same three columns in
 // the same order, and differ only in how they choose which days to return.
-func (s *Server) scanHistogramBuckets(r *http.Request, query string, args ...any) ([]histogramBucket, error) {
-	rows, err := s.pool.Query(r.Context(), query, args...)
+func (s *Server) scanHistogramBuckets(ctx context.Context, query string, args ...any) ([]histogramBucket, error) {
+	rows, err := s.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -906,6 +921,27 @@ type activityTrendsResponse struct {
 	Periods []trendPeriod `json:"periods"`
 }
 
+// activityTrends runs activityTrendsQuery for [first, end) — the JSON endpoint below and the
+// Profile page's Trends chart both read it. bucket must already be "week" or "month".
+func (s *Server) activityTrends(ctx context.Context, userID, bucket string, first, end time.Time, tz string) ([]trendPeriod, error) {
+	rows, err := s.pool.Query(ctx, activityTrendsQuery, bucket, userID, first, end, tz)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	periods := make([]trendPeriod, 0)
+	for rows.Next() {
+		var period time.Time
+		var p trendPeriod
+		if err := rows.Scan(&period, &p.Count, &p.DistanceMeters, &p.MovingSeconds, &p.ElevationGainM); err != nil {
+			return nil, err
+		}
+		p.PeriodStart = period.Format(dateLayout)
+		periods = append(periods, p)
+	}
+	return periods, rows.Err()
+}
+
 // handleActivityTrends serves `GET /v1/activities/trends?bucket=week|month&from=&to=`.
 // `from`/`to` default to the trailing histogramWindowMonths months, the same default the
 // calendar-window histogram mode already uses — there's no reason a trend line's default
@@ -951,28 +987,9 @@ func (s *Server) handleActivityTrends(w http.ResponseWriter, r *http.Request) {
 	}
 	end := last.AddDate(0, 0, 1) // exclusive upper bound, matching activityCalendarWindow
 
-	rows, err := s.pool.Query(r.Context(), activityTrendsQuery, bucket, userIDFromContext(r.Context()), first, end, tz)
+	periods, err := s.activityTrends(r.Context(), userIDFromContext(r.Context()), bucket, first, end, tz)
 	if err != nil {
 		s.log.Error("activity trends query failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-
-	periods := make([]trendPeriod, 0)
-	for rows.Next() {
-		var period time.Time
-		var p trendPeriod
-		if err := rows.Scan(&period, &p.Count, &p.DistanceMeters, &p.MovingSeconds, &p.ElevationGainM); err != nil {
-			s.log.Error("activity trends scan failed", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-		p.PeriodStart = period.Format(dateLayout)
-		periods = append(periods, p)
-	}
-	if err := rows.Err(); err != nil {
-		s.log.Error("activity trends rows failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}

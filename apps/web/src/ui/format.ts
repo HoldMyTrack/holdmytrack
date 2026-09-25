@@ -105,10 +105,6 @@ export function formatTotalDistance(meters: number, system: UnitSystem): string 
   return `${converted.toLocaleString(undefined, { maximumFractionDigits: converted < 10 ? 1 : 0 })} ${unitLabel(system)}`;
 }
 
-export function formatTotalHours(seconds: number): string {
-  return Math.round(seconds / 3600).toLocaleString();
-}
-
 export function formatElevation(meters: number, system: UnitSystem): string {
   const converted = system === 'imperial' ? metersToFeet(meters) : meters;
   return `${Math.round(converted).toLocaleString()} ${elevationUnitLabel(system)}`;

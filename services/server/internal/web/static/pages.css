@@ -506,6 +506,271 @@ code {
   color: var(--fm-ink);
 }
 
+/* The Profile page (templates/pages/profile.html) — the all-time cards, a grid per year and
+   Trends, ported from the React Profile view's rules in apps/web/src/index.css. Wider than
+   the other pages: a year is 53 week-columns. */
+.profile {
+  max-width: 1000px;
+}
+
+.activity-graph__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1px;
+  margin-bottom: 24px;
+  background: rgb(var(--fm-ink-rgb) / 8%);
+  border: 1px solid rgb(var(--fm-ink-rgb) / 8%);
+}
+
+.activity-graph__card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  background: var(--fm-surface);
+}
+
+.activity-graph__card-label,
+.profile__toggle-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(var(--fm-ink-rgb) / 50%);
+}
+
+.activity-graph__card-value {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.profile__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.profile__title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(var(--fm-ink-rgb) / 60%);
+}
+
+.profile__subtext {
+  margin: 0;
+  font-size: 13px;
+  color: rgb(var(--fm-ink-rgb) / 55%);
+}
+
+/* A two-way switch made of links — each one is the same page with the other setting. */
+.profile__toggle {
+  display: flex;
+  align-items: center;
+}
+
+.profile__toggle-label {
+  margin-right: 8px;
+}
+
+.profile__toggle-btn {
+  border: 1px solid rgb(var(--fm-ink-rgb) / 20%);
+  background: var(--fm-surface);
+  padding: 6px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--fm-ink);
+  text-decoration: none;
+}
+
+.profile__toggle-btn:hover {
+  color: var(--fm-ink);
+  background: var(--fm-surface-tint);
+}
+
+.profile__toggle-btn:first-of-type {
+  border-right: 0;
+  border-radius: 6px 0 0 6px;
+}
+
+.profile__toggle-btn:last-of-type {
+  border-radius: 0 6px 6px 0;
+}
+
+.profile__toggle-btn[aria-current='true'] {
+  background: var(--fm-accent);
+  border-color: var(--fm-accent);
+  color: #fff;
+}
+
+.year-grid {
+  margin-bottom: 32px;
+  padding-top: 16px;
+  border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
+}
+
+.year-grid__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.year-grid__year {
+  margin: 0;
+  font-family: var(--fm-font-serif);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.year-grid__stats {
+  font-size: 13px;
+  color: rgb(var(--fm-ink-rgb) / 55%);
+}
+
+/* A year is wider than a phone: the grid scrolls sideways inside its own box, the page
+   doesn't. */
+.year-grid__body {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.year-grid__row-labels {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 16px;
+}
+
+.year-grid__row-label {
+  height: 12px;
+  font-size: 9px;
+  line-height: 12px;
+  color: rgb(var(--fm-ink-rgb) / 45%);
+}
+
+.year-grid__chart {
+  flex: none;
+}
+
+.year-grid__months {
+  display: grid;
+  grid-auto-flow: column;
+  height: 14px;
+  margin-bottom: 2px;
+  column-gap: 4px;
+}
+
+.year-grid__month {
+  font-size: 9px;
+  line-height: 14px;
+  color: rgb(var(--fm-ink-rgb) / 45%);
+  white-space: nowrap;
+}
+
+.year-grid__cells {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 12px);
+  gap: 4px;
+}
+
+.year-grid__cell {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: rgb(var(--fm-ink-rgb) / 6%);
+}
+
+.year-grid__cell--pad {
+  background: transparent;
+}
+
+.year-grid__cell--level-0 {
+  background: rgb(var(--fm-ink-rgb) / 6%);
+}
+
+.year-grid__cell--level-1 {
+  background: rgb(176 126 46 / 30%);
+}
+
+.year-grid__cell--level-2 {
+  background: rgb(176 126 46 / 60%);
+}
+
+.year-grid__cell--level-3 {
+  background: var(--fm-accent);
+}
+
+.profile__legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 16px 0 0;
+  font-size: 11px;
+  color: rgb(var(--fm-ink-rgb) / 50%);
+}
+
+.trends {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
+}
+
+.trends__chart {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.trends__bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 140px;
+  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 12%);
+}
+
+.trends__bar {
+  flex: 1 1 0;
+  min-height: 2px;
+  background: var(--fm-accent);
+  border-radius: 2px 2px 0 0;
+}
+
+.trends__bar:hover {
+  background: var(--fm-accent-hover);
+}
+
+.trends__bar {
+  cursor: pointer;
+}
+
+.trends__detail {
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgb(var(--fm-ink-rgb) / 4%);
+  font-size: 13px;
+}
+
+.trends__axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: rgb(var(--fm-ink-rgb) / 50%);
+}
+
 @media (max-width: 768px) {
   .page-main {
     padding: 36px 16px 24px;
