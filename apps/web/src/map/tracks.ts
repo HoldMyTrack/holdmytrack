@@ -1,6 +1,5 @@
 import type { FilterSpecification, Map as MapLibreMap, VectorTileSource } from 'maplibre-gl';
 import { API_BASE_URL, TILES_V1, type ActivityQuery } from '../api';
-import { CITY_MIN_ZOOM } from './zoomTiers';
 
 /**
  * The live tracks MVT layer (IMPLEMENTATION.md §4.3). Unlike the basemap —
@@ -13,6 +12,15 @@ export const TRACKS_LAYER_ID = 'tracks-line';
 // The halo drawn under a selected track (checked or focused) — see ensureTrackLayer.
 export const TRACKS_CASING_LAYER_ID = 'tracks-casing';
 const TRACKS_SOURCE_LAYER = 'tracks'; // must match ST_AsMVT(t, 'tracks', ...) in the backend query
+
+// Tracks draw from z4 — a few states on screen — down to street level. Below that a track is a
+// few pixels long; above it the only cost is tile payload, and ST_AsMVTGeom's 4096-unit grid
+// already bounds that: measured with the demo's 611 activities and no date filter, the tile
+// over Cleveland is 40KB at z4 against 44KB at z8 (IMPLEMENTATION.md §5.3). Not Fog/Heatmap's
+// CITY_MIN_ZOOM (z8): those switch to Country/Region fills below it, but Normal mode has no
+// such fallback, so tracks hidden there left an empty map — and a focused road trip too long
+// to fit at z8 flew to a view with nothing drawn on it.
+const TRACKS_MIN_ZOOM = 4;
 
 const NORMAL_WIDTH = 2.5;
 const EMPHASIS_WIDTH = 4.5; // selected: checked or focused, plus the halo below
@@ -102,7 +110,7 @@ export function ensureTrackLayer(map: MapLibreMap, beforeId: string | undefined,
         type: 'line',
         source: TRACKS_SOURCE_ID,
         'source-layer': TRACKS_SOURCE_LAYER,
-        minzoom: CITY_MIN_ZOOM,
+        minzoom: TRACKS_MIN_ZOOM,
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           // Ink, not white: tracks mostly run along the basemap's white streets, where a white
@@ -122,11 +130,7 @@ export function ensureTrackLayer(map: MapLibreMap, beforeId: string | undefined,
         type: 'line',
         source: TRACKS_SOURCE_ID,
         'source-layer': TRACKS_SOURCE_LAYER,
-        // Finally implements IMPLEMENTATION.md §5.3's previously undocumented-as-built
-        // claim ("below roughly z8 tracks are hidden entirely — at that scale the fog mask
-        // *is* the picture"), at the same threshold zoomTiers.ts introduces for Fog/Heatmap's
-        // own Region/City boundary rather than a second, disconnected one.
-        minzoom: CITY_MIN_ZOOM,
+        minzoom: TRACKS_MIN_ZOOM,
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': ['case', ['boolean', ['feature-state', 'hover'], false], HOVER_COLOR, TRACK_COLOR],
