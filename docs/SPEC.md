@@ -788,17 +788,17 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 2. It has sections for: what HoldMyTrack is, why someone might want it, what it isn't, how it is funded (section id `funding`), and a pointer to Contacts (FR-10.3).
 3. "Try the demo — no signup" links to `/signin`, where the demo starts from its own button (FR-2.1). The page never starts a demo session itself.
 4. About, Help and Contacts are reachable from every page's header and footer (FR-10.4) — the map and the sign-in pages included.
-5. `/robots.txt` allows crawling except for `/v1/` and `/tiles/`, and points to `/sitemap.xml`, which lists `/`, `/about` and `/contacts`.
+5. `/robots.txt` allows crawling except for `/v1/` and `/tiles/`, and points to `/sitemap.xml`, which lists `/`, `/about`, `/help` and `/contacts`.
 
 ### FR-10.2 Help page
 
-**Description**: A public page at `/help` that describes how the web app works. It is a placeholder for now: a heading and a line saying the guide is on its way, pointing to Contacts.
+**Description**: A public page at `/help` that explains how HoldMyTrack works, in five sections reachable from jump links under its title: the map (the opening view, the Normal / Fog of War / Heatmap modes, and how Fog and Heatmap switch to whole states or regions, then whole countries, as the map zooms out — FR-4), the timeline (what a bar is, the selection band and how to extend, move or scroll it, and the phone slider — FR-6), getting activities in (files, `.zip` archives, Google Takeout with a link to Google's own download guide, the Android app, and what happens on a repeated or cross-source import — FR-3), exporting a map image (FR-4.10), and settings and privacy (Country, Timezone, Private locations — FR-1.7, FR-8.1).
 
 **Preconditions**: None.
 
 **Behavior**:
-1. `GET /help` returns the page.
-2. Until it has real content, the page carries `<meta name="robots" content="noindex">` and is not listed in `/sitemap.xml`.
+1. `GET /help` returns the page. It is indexable and listed in `/sitemap.xml`.
+2. Its facts are the behavior this document specifies; a change to one of those FRs that the page describes (a limit, a mode's window, a zoom tier) is a change to the page too.
 
 ### FR-10.3 Contacts page
 

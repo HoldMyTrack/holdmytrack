@@ -28,7 +28,7 @@ func TestPagesRenderSignedOut(t *testing.T) {
 		noIndex     bool
 	}{
 		{"/about", "About HoldMyTrack", false},
-		{"/help", "Help — HoldMyTrack", true},
+		{"/help", "Help — HoldMyTrack", false},
 		{"/contacts", "Contacts — HoldMyTrack", false},
 	} {
 		rec := httptest.NewRecorder()

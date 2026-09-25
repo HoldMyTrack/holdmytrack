@@ -173,8 +173,8 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 func (s *Server) registerPages() {
 	s.mux.HandleFunc("GET /about", s.staticPage("about", "About HoldMyTrack — Every journey, mapped.",
 		"HoldMyTrack is a free, community-funded place to see every outdoor activity you have ever recorded on one map — Fog of War, heatmaps and routes from your watch, phone or old exports. No subscription, no ads, no data sales.", false))
-	// noindex until it has real content (docs/SPEC.md FR-10.2).
-	s.mux.HandleFunc("GET /help", s.staticPage("help", "Help — HoldMyTrack", "How the HoldMyTrack web app works.", true))
+	s.mux.HandleFunc("GET /help", s.staticPage("help", "Help — HoldMyTrack",
+		"How HoldMyTrack works: the map and its Normal, Fog of War and Heatmap modes, importing files, Google Takeout and the Android app, exporting a map image, and privacy settings.", false))
 	s.mux.HandleFunc("GET /contacts", s.staticPage("contacts", "Contacts — HoldMyTrack", "How to reach the HoldMyTrack project: email, code and issues.", false))
 	s.mux.Handle("GET /static/", s.pages.StaticHandler())
 	s.mux.HandleFunc("POST /logout", s.sameOrigin(s.handleLogoutPage))
