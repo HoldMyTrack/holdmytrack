@@ -858,12 +858,15 @@ const authContextKey contextKey = "authInfo"
 // request context — userID for every handler that used to read the old PlaceholderUserID
 // constant, isDemo/emailVerified for the two gates layered on top (requireVerified,
 // requireNotDemo), and timezone for handlers that need the account's own setting
-// (day-bucketing) without a second round trip each.
+// (day-bucketing) without a second round trip each. isAdmin is read only by pageAccount, for
+// the admin panel's pages (admin_pages.go); requireAuth leaves it false, since no JSON endpoint
+// is admin-only.
 type authInfo struct {
 	userID        string
 	isDemo        bool
 	emailVerified bool
 	timezone      string
+	isAdmin       bool
 }
 
 func authInfoFromContext(ctx context.Context) authInfo {

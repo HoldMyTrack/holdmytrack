@@ -198,6 +198,8 @@ func (s *Server) registerPages() {
 	s.mux.HandleFunc("POST /settings/avatar", s.sameOrigin(s.handleSettingsAvatarForm))
 	s.mux.HandleFunc("POST /settings/avatar/remove", s.sameOrigin(s.handleSettingsAvatarRemoveForm))
 	s.mux.HandleFunc("GET /profile", s.handleProfilePage) // profile_page.go
+	s.mux.HandleFunc("GET /admin", s.handleAdminPage)     // admin_pages.go
+	s.mux.HandleFunc("GET /admin/users/{id}", s.handleAdminUserPage)
 	// The React app — the map (pages.go's appShell). `/{$}` is the root alone; "/" below is
 	// everything else nothing more specific claims.
 	s.mux.HandleFunc("GET /{$}", s.appShell("HoldMyTrack — Every journey, mapped."))

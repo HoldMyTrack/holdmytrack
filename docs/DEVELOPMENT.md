@@ -37,6 +37,8 @@ docker compose run --rm api seed-demo-customer      # the Demo Customer's 611 GP
 
 Boundaries first, so the demo's activities get their country/region matches at ingest — the other order also works, since `seed-admin-boundaries` backfills matches for activities already present, just with one more pass. Both are idempotent: re-running skips whatever is already loaded. `seed-demo-customer` pushes every file through the real ingest pipeline, so it takes a few minutes.
 
+To see the admin panel (`/admin`, `IMPLEMENTATION.md` §4.20), sign up a local account and make it an admin: `docker compose run --rm api set-admin you@example.com true`.
+
 ### The local basemap covers Ohio only — or point dev at production's planet tiles
 
 `apps/web/public/basemap/basemap.pmtiles` is a regional extract (roughly Ohio, z0–14, cut by `npm run basemap`), so anything outside it renders as bare background. To see the whole planet locally, add `VITE_BASEMAP_ORIGIN=https://tiles.holdmytrack.com/<YYYYMMDD>` (the dated prefix production uses, `docs/DEPLOY.md` §5) to `apps/web/.env.local` and restart `web`. That only works because the basemap bucket's CORS policy lists `http://localhost:5173` alongside the production origin — without it every tile, font and sprite request fails CORS. Each tile loaded counts as a production R2 request. `.env.local` is in `apps/web/.dockerignore`, so no image bakes it in, but the `test` service bind-mounts `apps/web` and Vite would read it from there; `compose.yaml` pins `VITE_BASEMAP_ORIGIN` (empty, same-origin) and `VITE_API_BASE_URL` on that service, and real env vars outrank every `.env` file, so `verify:map` keeps using the local extract and the local API.

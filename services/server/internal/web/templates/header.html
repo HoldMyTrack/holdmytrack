@@ -36,6 +36,7 @@
         <a role="menuitem" class="header-menu__item" href="/profile">Profile</a>
         <a role="menuitem" class="header-menu__item" href="/settings">Settings</a>
         <a role="menuitem" class="header-menu__item" href="/?private-locations">Private locations</a>
+        {{if .IsAdmin}}<a role="menuitem" class="header-menu__item" href="/admin">Admin</a>{{end}}
         <form method="post" action="/logout">
           <button type="submit" role="menuitem" class="header-menu__item">Sign out</button>
         </form>

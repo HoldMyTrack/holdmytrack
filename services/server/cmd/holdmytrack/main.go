@@ -38,7 +38,7 @@ func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: holdmytrack <serve|work|migrate|seed-demo-customer|seed-admin-boundaries>")
+		fmt.Fprintln(os.Stderr, "usage: holdmytrack <serve|work|migrate|seed-demo-customer|seed-admin-boundaries|set-admin>")
 		os.Exit(2)
 	}
 
@@ -160,8 +160,22 @@ func main() {
 		}
 		log.Info("seed-admin-boundaries: done")
 
+	case "set-admin":
+		// Grants or revokes the admin panel (/admin, FR-12) — deliberately a shell-only
+		// operation: nothing on the web can make an account an admin.
+		if len(os.Args) != 4 || (os.Args[3] != "true" && os.Args[3] != "false") {
+			fmt.Fprintln(os.Stderr, "usage: holdmytrack set-admin <email> true|false")
+			os.Exit(2)
+		}
+		admin := os.Args[3] == "true"
+		if err := httpapi.SetAdmin(ctx, pool, os.Args[2], admin); err != nil {
+			log.Error("set-admin", "err", err)
+			os.Exit(1)
+		}
+		log.Info("set-admin: done", "email", os.Args[2], "admin", admin)
+
 	default:
-		fmt.Fprintf(os.Stderr, "unknown subcommand %q; want serve, work, migrate, seed-demo-customer, or seed-admin-boundaries\n", os.Args[1])
+		fmt.Fprintf(os.Stderr, "unknown subcommand %q; want serve, work, migrate, seed-demo-customer, seed-admin-boundaries, or set-admin\n", os.Args[1])
 		os.Exit(2)
 	}
 }

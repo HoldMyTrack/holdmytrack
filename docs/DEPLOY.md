@@ -68,6 +68,14 @@ docker compose -f compose.prod.yml --env-file .env.prod run --rm api seed-demo-c
 
 Skip them and "Try it now" opens an empty demo account (`SPEC.md` FR-2.2), and Fog/Heatmap's Country/Region zoom tiers have no boundaries to draw. Both are idempotent — safe to re-run on a later deploy, they skip whatever is already loaded — so running them after every deploy is harmless, just unnecessary. Boundaries first, so the demo's activities are matched to countries/regions as they're ingested (`docs/DEVELOPMENT.md`'s "Seeding a fresh database" has the detail).
 
+To open the admin panel (`/admin`, `SPEC.md` FR-12), make your own account an admin. It has to exist first, so sign up on the site, then:
+
+```
+docker compose -f compose.prod.yml --env-file .env.prod run --rm api set-admin you@example.com true
+```
+
+`false` in place of `true` revokes it. This is the only way to grant or revoke admin; nothing on the web can.
+
 ## 7. Maintenance mode
 
 DigitalOcean (and most VPS providers) have no Droplet-level maintenance toggle, so this lives in the app stack instead. Before a deploy that touches migrations or involves manual DB work — i.e. before step 6's `up -d --build` — put the site into maintenance mode so visitors see a friendly page instead of Caddy's raw `502`s while `api` is mid-restart:

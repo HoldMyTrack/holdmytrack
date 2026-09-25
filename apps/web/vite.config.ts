@@ -25,6 +25,7 @@ const pagesTarget = process.env.API_PROXY_TARGET ?? 'http://localhost:8080';
 const pageRoutes = [
   '^/(\\?|$)',
   '^/profile(\\?|$)',
+  '^/admin(/|\\?|$)',
   '^/settings(/|\\?|$)',
   '^/(about|help|contacts|logout|signin|signup|demo|forgot|reset|verify)(\\?|$)',
   '^/verify-pending(/|\\?|$)',

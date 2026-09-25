@@ -822,3 +822,84 @@ code {
     padding: 20px 16px 32px;
   }
 }
+
+/* The admin panel (templates/pages/admin.html, admin-user.html) — plain tables, one line per
+   row; a table wider than the screen scrolls inside its own box rather than the page. */
+.admin {
+  max-width: 1280px;
+}
+
+.admin__scroll {
+  margin-top: var(--fm-space-16);
+  overflow-x: auto;
+  background: var(--fm-surface);
+  border: 1px solid var(--fm-border);
+  border-radius: var(--fm-radius-md);
+}
+
+.admin__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fm-text-md);
+}
+
+.admin__table th,
+.admin__table td {
+  padding: var(--fm-space-8) var(--fm-space-12);
+  border-bottom: 1px solid var(--fm-divider-tint);
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.admin__table th {
+  font-size: var(--fm-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fm-ink-secondary);
+}
+
+.admin__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.admin__table tbody tr:target {
+  background: rgb(var(--fm-accent-rgb) / 10%);
+}
+
+.admin__table .admin__num {
+  text-align: right;
+}
+
+.admin__id {
+  font-size: var(--fm-text-sm);
+  user-select: all;
+}
+
+.admin__muted {
+  display: block;
+  color: var(--fm-ink-muted);
+}
+
+.admin__badge {
+  display: inline-block;
+  margin: var(--fm-space-2) var(--fm-space-4) 0 0;
+  padding: 0 var(--fm-space-6);
+  font-size: var(--fm-text-xs);
+  border-radius: var(--fm-radius-pill);
+  background: var(--fm-surface-tint-strong);
+  color: var(--fm-ink-secondary);
+}
+
+.admin__badge--warn {
+  background: rgb(var(--fm-danger-rgb) / 10%);
+  color: var(--fm-danger);
+}
+
+.admin__pager {
+  display: flex;
+  gap: var(--fm-space-16);
+  margin-top: var(--fm-space-16);
+  font-size: var(--fm-text-md);
+}

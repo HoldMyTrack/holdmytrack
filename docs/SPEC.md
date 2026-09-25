@@ -4,7 +4,7 @@
 | :-- | :-- |
 | **Version** | 1.0 |
 | **Status** | Current — describes Phase 0/1 functionality as built |
-| **Last updated** | 2026-09-24 |
+| **Last updated** | 2026-09-25 |
 | **Related documents** | `VISION.md` (product scope, market rationale, phase roadmap — the authority on *what ships and why*); `ARCHITECTURE.md` (system-level shape, key decisions, the stack); `IMPLEMENTATION.md` (schema, each feature's own implementation — the authority on *how it's built*); `AGENTS.md` (repository orientation) |
 
 ## 1. Introduction
@@ -15,7 +15,7 @@ This document specifies HoldMyTrack's functional behavior as currently implement
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google on the web, FR-1.9), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), and the Donate link out to Open Collective (FR-11).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google on the web, FR-1.9), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), and the read-only admin panel (FR-12).
 
 **Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), explorer-tile gamification, the rest of "Export" (story cards, animated reveals — high-resolution map export itself is built, FR-4.10 below). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace/heart-rate stay as per-activity route context (FR-4.9) rather than an analysed, all-time performance record. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
@@ -43,8 +43,9 @@ Engineers implementing against or modifying this system, QA deriving test cases,
 | **Anonymous visitor** | Has not signed in and holds no session. Can reach the sign-in/sign-up screen and start a demo. Cannot see any activity data or use the map. |
 | **Demo user** | Holds a session tied to an ephemeral account (FR-2). Full functional access to every feature a registered user has, except the account itself expires after 24 hours unless upgraded (FR-2.3). |
 | **Registered user** | Holds a session tied to a permanent account (email + password, or Google — FR-1.9). Full functional access to every feature in this document. |
+| **Admin** | A registered user whose account has been made an admin from the server's command line (FR-12.1). Everything a registered user has, plus the read-only admin panel (FR-12): every account, and any account's activities. |
 
-There is no administrator role, no multi-tenancy beyond per-account data isolation, and no concept of one account viewing another's data (FR-8.2).
+There is no multi-tenancy beyond per-account data isolation. The admin panel is the one place an account sees another's data (FR-8.2, FR-12).
 
 ## 3. FR-1 — Authentication & Account Management
 
@@ -752,7 +753,7 @@ Hovering a day shows its date, activity count and distance. The page needs a ses
 
 ### FR-8.2 Data isolation
 
-**Description**: An account can only ever see its own activities, uploads, and profile data. Every data-returning endpoint derives the account from the caller's session; no endpoint accepts a user or account identifier as a request parameter that could be substituted for another account's.
+**Description**: An account can only ever see its own activities, uploads, and profile data. Every data-returning endpoint derives the account from the caller's session; no endpoint accepts a user or account identifier as a request parameter that could be substituted for another account's. The one exception is the admin panel (FR-12), whose pages take an account id in the path and are shown only to an admin.
 
 ## 11. FR-9 — Trends
 
@@ -816,7 +817,7 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 
 **Behavior**:
 1. The header shows the logo, wordmark and tagline (the brand links to `/`), then Donate (FR-11.1), an "Info" menu listing About, Help and Contacts with the current page marked, and the account area.
-2. Signed out, the account area is a "Sign in" link to `/signin`. With a session (real or demo), it is an account menu showing the account's avatar (or a generic icon) that opens to the account's email (a demo session shows its display name instead, followed by "Create your own account", FR-2.3), then "Map" (`/`), "Profile" (`/profile`), "Settings" (`/settings`), "Private locations" (`/?private-locations`, FR-8.1) and "Sign out".
+2. Signed out, the account area is a "Sign in" link to `/signin`. With a session (real or demo), it is an account menu showing the account's avatar (or a generic icon) that opens to the account's email (a demo session shows its display name instead, followed by "Create your own account", FR-2.3), then "Map" (`/`), "Profile" (`/profile`), "Settings" (`/settings`), "Private locations" (`/?private-locations`, FR-8.1), "Admin" (`/admin`, an admin only — FR-12.1) and "Sign out".
 3. Both menus open and close without JavaScript.
 4. "Sign out" submits `POST /logout`, which ends the session the same way `POST /v1/auth/logout` does and redirects to `/`. The request is refused (`403`) unless its `Origin` header — or, without one, its `Referer` — is the app's own origin.
 5. On a phone-width screen (≤768px) the tagline is hidden and Donate shows its heart alone; the Info and account menus stay.
@@ -838,7 +839,45 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 2. While no Open Collective is configured (the slug is empty), Donate links to About's funding section (`/about#funding`), which says donations aren't open yet.
 3. Once one is configured, Donate is a link to `https://opencollective.com/<slug>/donate`, opened in a new tab so the map is kept; choosing an amount, one-off or monthly, and paying all happen on Open Collective.
 
-## 14. Non-Functional Requirements (summary)
+## 14. FR-12 — Admin panel
+
+A read-only view of every account and every account's activities, for the people operating HoldMyTrack. Server-rendered pages (`IMPLEMENTATION.md` §4.20) with the shared page header (FR-10.4), `noindex`:
+
+| Page | Purpose |
+| :-- | :-- |
+| `GET /admin` | Every account (FR-12.2) |
+| `GET /admin/users/{id}` | One account and its activities (FR-12.3) |
+
+### FR-12.1 Access
+
+**Description**: Only an admin can open the admin panel; to anyone else it doesn't exist.
+
+**Behavior**:
+1. An account is made an admin, or stops being one, only from the server's command line: `holdmytrack set-admin <email> true|false`. It fails for an email no account has, and for the demo account. Nothing on the web can make an account an admin.
+2. An admin's account menu (FR-10.4) has an "Admin" item, after "Private locations", linking to `/admin`. No one else's does.
+3. Signed out, signed in as a non-admin, or in a demo session, both admin pages answer with the ordinary "Page not found" page (`404`), exactly like a URL that doesn't exist.
+4. An admin whose own account isn't past email verification or first-run Settings is sent there first (FR-1.8, FR-1.7), as on every other signed-in page.
+5. Revoking takes effect on the admin's next page load; their session is not ended.
+
+### FR-12.2 Accounts
+
+**Description**: `/admin` lists every account, demo accounts included, newest signup first.
+
+**Behavior**: Each row shows the email (a link to FR-12.3's page), the display name when set, badges for admin, demo and unverified email, the signup date, country, timezone, the number of live activities, the first and last activity's dates, and their total distance. Counts, dates and distance cover live activities only — a duplicate superseded by another copy (FR-3.7) isn't counted. Dates are in that account's timezone, distance in the admin's own units (FR-1.7).
+
+### FR-12.3 An account's activities
+
+**Description**: `/admin/users/{id}` shows one account and every activity it has stored, with each activity's id.
+
+**Behavior**:
+1. The header repeats FR-12.2's row, plus the account id.
+2. Activities are listed newest first, 100 per page, with "← Newer" and "Older →" links (`?page=`) and a "1–100 of 250" count.
+3. Each row shows the full activity id (selected whole with one click), the start date and time in the account's timezone, type, name, distance, duration (hours:minutes), source (`upload`, `takeout`, `healthconnect`, `recorded`, …), and the countries and regions it passes through (FR-4.2's boundary tiers).
+4. Unlike every other list in the product, superseded duplicates and activities entirely inside a Private location are included, badged "duplicate of <id>" (linking to that row when it's on the same page) and "hidden"; an activity with a track edit (FR-5.14) is badged "edited".
+5. An id that isn't a UUID, or no account's, is `404`. A page past the last shows no rows and a link back to the first.
+6. The pages only read. Nothing on them changes an account or an activity.
+
+## 15. Non-Functional Requirements (summary)
 
 This section summarizes cross-cutting behavior specified elsewhere in this document, for convenience — it does not introduce new requirements.
 
@@ -851,7 +890,7 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 | **No reload required** | Every list/summary this document describes updates itself automatically as background processing completes (FR-3.1, FR-3.4) — a manual page reload is never required to see current data. |
 | **Idempotency** | Re-submitting the same activity content (FR-3.5) or the same password-reset token (FR-1.6) never has an effect beyond the first time. |
 
-## 15. Mobile Browser Support
+## 16. Mobile Browser Support
 
 **Known issue**: The behavior below is what was designed and implemented, but the actual mobile experience has been reported directly as unusable, not just rough — this section describes intent, not a verified, working feature. Treat it as broken until re-verified on a real device and re-confirmed; see `docs/ROADMAP.md`'s "Mobile browser support" item (Phase 3).
 
@@ -865,7 +904,7 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 
 **Explicitly not built** (hover-only, no touch equivalent, unlike Trends above — a continuous position read with no discrete point to tap, not a per-bar value): the colored zone segments' and pace/heart-rate + elevation profile's exact hover values (FR-4.8, FR-4.9), and the two-way map-track-hover ↔ Activities-row-underline highlight (FR-4.1, FR-5.4). Both remain mouse-only; a touchscreen user can still see the colored bands and elevation curve themselves, and can still focus/select a track by tapping it, just not read an exact value by touch alone the way a mouse hover shows one.
 
-## 16. Out-of-scope items, tracked for future revisions of this document
+## 17. Out-of-scope items, tracked for future revisions of this document
 
 The following are named in `VISION.md`'s roadmap but have no functional requirements in this document because they are not yet built:
 

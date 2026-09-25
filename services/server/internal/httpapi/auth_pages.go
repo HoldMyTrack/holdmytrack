@@ -47,10 +47,10 @@ func (s *Server) pageAccount(r *http.Request) *pageAccount {
 	}
 	var info authInfo
 	err := s.pool.QueryRow(r.Context(), `
-		SELECT u.id, u.demo_expires_at IS NOT NULL, u.email_verified, u.timezone
+		SELECT u.id, u.demo_expires_at IS NOT NULL, u.email_verified, u.timezone, u.is_admin
 		FROM sessions se JOIN users u ON u.id = se.user_id
 		WHERE se.id = $1 AND se.expires_at > NOW()
-	`, sessionID).Scan(&info.userID, &info.isDemo, &info.emailVerified, &info.timezone)
+	`, sessionID).Scan(&info.userID, &info.isDemo, &info.emailVerified, &info.timezone, &info.isAdmin)
 	if err != nil {
 		return nil
 	}
@@ -59,7 +59,7 @@ func (s *Server) pageAccount(r *http.Request) *pageAccount {
 		s.log.Error("page account lookup failed", "err", err)
 		return nil
 	}
-	return &pageAccount{info: info, profile: resp, user: &web.User{Email: resp.Email, DisplayName: resp.DisplayName, AvatarURL: resp.AvatarURL, IsDemo: resp.IsDemo}}
+	return &pageAccount{info: info, profile: resp, user: &web.User{Email: resp.Email, DisplayName: resp.DisplayName, AvatarURL: resp.AvatarURL, IsDemo: resp.IsDemo, IsAdmin: info.isAdmin && !info.isDemo}}
 }
 
 // home is where a signed-in account belongs: the map; or, for a real account whose email

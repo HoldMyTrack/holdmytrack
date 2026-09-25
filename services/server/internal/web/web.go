@@ -55,6 +55,8 @@ type User struct {
 	DisplayName string
 	AvatarURL   string // "" when no avatar is set
 	IsDemo      bool
+	// IsAdmin shows the account menu's Admin item (the admin panel, FR-12).
+	IsAdmin bool
 }
 
 // Label is what the account menu shows as its first line: the email for a real account, the

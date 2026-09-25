@@ -21,6 +21,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0010](0010-private-locations-replace-endpoint-trim.md) | Private locations replace the fixed endpoint trim |
 | [0011](0011-takeout-reader-in-go.md) | The Takeout reader is Go code in the server, not a pathify subprocess |
 | [0012](0012-server-rendered-pages-react-for-the-map.md) | Every page is server-rendered HTML sharing one header; React is kept for the map page |
+| [0013](0013-admin-panel.md) | An in-app, read-only admin panel, gated by a CLI-granted flag |
 
 ## Writing a new one
 

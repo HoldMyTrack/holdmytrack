@@ -1,0 +1,54 @@
+{{define "content"}}{{with .Page}}
+<main class="page-main admin">
+  <a class="settings__back" href="/admin">← All accounts</a>
+  {{with .User}}
+  <h1 class="settings__title">{{if .DisplayName}}{{.DisplayName}}{{else}}{{.Email}}{{end}}</h1>
+  <p class="profile__subtext">
+    {{.Email}} · <code class="admin__id">{{.ID}}</code> · signed up {{.SignedUp}}{{with .Country}} · {{.}}{{end}} · {{.Timezone}}
+    {{if .IsAdmin}}<span class="admin__badge">admin</span>{{end}}
+    {{if .IsDemo}}<span class="admin__badge">demo</span>{{else if not .Verified}}<span class="admin__badge admin__badge--warn">unverified</span>{{end}}
+  </p>
+  <p class="profile__subtext">{{.Activities}} live activities · {{.Distance}}{{if .First}} · {{.First}} – {{.Last}}{{end}}. Times below are in this account's timezone.</p>
+  {{end}}
+
+  {{if .Range}}
+  <nav class="admin__pager" aria-label="Pages">
+    <span>{{.Range}}</span>
+    {{with .PrevHref}}<a href="{{.}}">← Newer</a>{{end}}
+    {{with .NextHref}}<a href="{{.}}">Older →</a>{{end}}
+  </nav>
+  {{end}}
+
+  {{if .Activities}}
+  <div class="admin__scroll">
+    <table class="admin__table">
+      <thead>
+        <tr><th>Activity ID</th><th>Started</th><th>Type</th><th>Name</th><th class="admin__num">Distance</th><th class="admin__num">Duration</th><th>Source</th><th>Countries</th><th>Regions</th><th>State</th></tr>
+      </thead>
+      <tbody>
+        {{range .Activities}}
+        <tr id="{{.ID}}">
+          <td><code class="admin__id">{{.ID}}</code></td>
+          <td>{{.Started}}</td>
+          <td>{{.Type}}</td>
+          <td>{{.Name}}</td>
+          <td class="admin__num">{{.Distance}}</td>
+          <td class="admin__num">{{.Duration}}</td>
+          <td>{{.Source}}</td>
+          <td>{{.Countries}}</td>
+          <td>{{.Regions}}</td>
+          <td>
+            {{with .SupersededBy}}<span class="admin__badge">duplicate of <a href="#{{.}}"><code class="admin__id">{{.}}</code></a></span>{{end}}
+            {{if .Hidden}}<span class="admin__badge">hidden</span>{{end}}
+            {{if .Edited}}<span class="admin__badge">edited</span>{{end}}
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else if not .Range}}
+  <p class="profile__subtext">No activities.</p>
+  {{end}}
+</main>
+{{end}}{{end}}
