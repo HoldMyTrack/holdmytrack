@@ -4,6 +4,7 @@ import { DateRangeSlider } from './DateRangeSlider';
 import { formatDayLabel } from './format';
 import { RangePicker, type DateRange } from './RangePicker';
 import { MOBILE_QUERY, useMediaQuery } from './useMediaQuery';
+import { t, tn } from '../i18n';
 
 /**
  * The docked bottom timeline. The interactive strip is
@@ -98,22 +99,22 @@ export function ActivityHistogram({
             show a completely different stretch of history while a selection elsewhere stays
             exactly where it was. */}
         <div className="activity-histogram__legend-block">
-          <div className="activity-histogram__legend-label">Shown days</div>
+          <div className="activity-histogram__legend-label">{t('histogram.shown_days')}</div>
           <div className="activity-histogram__range-label" data-testid="visible-window-label">
             {first && last ? `${formatDayLabel(first.date)} – ${formatDayLabel(last.date)}` : '—'}
           </div>
           <div className="activity-histogram__stats">
-            {first && last ? `${days.length} active ${days.length === 1 ? 'day' : 'days'}` : 'No activity days to show'}
+            {first && last ? tn('histogram.active_days', days.length) : t('histogram.no_days')}
           </div>
         </div>
 
         <div className="activity-histogram__legend-block">
-          <div className="activity-histogram__legend-label">Selected range</div>
+          <div className="activity-histogram__legend-label">{t('histogram.selected_range')}</div>
           <div className="activity-histogram__range-label" data-testid="selected-range-label">
             {formatDayLabel(selectedRange.from)} – {formatDayLabel(selectedRange.to)}
           </div>
           <div className="activity-histogram__stats" data-testid="selected-range-stats">
-            {selectedRangeDays}-day range · {selectedActiveDays} active {selectedActiveDays === 1 ? 'day' : 'days'}
+            {tn('histogram.range_days', selectedRangeDays)} · {tn('histogram.active_days', selectedActiveDays)}
           </div>
         </div>
       </div>
@@ -124,8 +125,8 @@ export function ActivityHistogram({
           className="range-picker__page"
           data-testid="range-picker-earlier"
           disabled={!canPanEarlier}
-          aria-label="Earlier"
-          title="Earlier"
+          aria-label={t('histogram.earlier')}
+          title={t('histogram.earlier')}
           onClick={() => onPan(-pageStep)}
         >
           <ChevronLeft size={16} />
@@ -144,8 +145,8 @@ export function ActivityHistogram({
           className="range-picker__page"
           data-testid="range-picker-later"
           disabled={!canPanLater}
-          aria-label="Later"
-          title="Later"
+          aria-label={t('histogram.later')}
+          title={t('histogram.later')}
           onClick={() => onPan(pageStep)}
         >
           <ChevronRight size={16} />

@@ -2,6 +2,7 @@ package web
 
 import (
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -78,8 +79,14 @@ func TestRenderPublicCaches(t *testing.T) {
 	if first.Body.String() != second.Body.String() || !strings.Contains(second.Body.String(), "<title>Help</title>") {
 		t.Errorf("second render wasn't served from the cache")
 	}
-	if cc := second.Header().Get("Cache-Control"); cc != "public, max-age=300" || second.Header().Get("Vary") != "Cookie" {
+	if cc := second.Header().Get("Cache-Control"); cc != "public, max-age=300" || second.Header().Get("Vary") != "Cookie, Accept-Language" {
 		t.Errorf("cache headers %q / Vary %q", cc, second.Header().Get("Vary"))
+	}
+	// Each language is its own cached copy: Russian after English isn't served the English one.
+	ru := httptest.NewRecorder()
+	r.RenderPublic(ru, "help", PageData{Title: "Справка", Path: "/help", Lang: "ru"})
+	if !strings.Contains(ru.Body.String(), "<title>Справка</title>") || !strings.Contains(ru.Body.String(), `<html lang="ru">`) {
+		t.Errorf("a Russian render was served the English cached copy")
 	}
 	// A dev renderer (templates reloading) never caches.
 	dev, _ := New(Embedded(), true, "v", "https://app.example")
@@ -89,5 +96,40 @@ func TestRenderPublicCaches(t *testing.T) {
 	dev.RenderPublic(b, "help", PageData{Title: "Two", Path: "/help"})
 	if !strings.Contains(b.Body.String(), "<title>Two</title>") {
 		t.Errorf("a dev renderer served a cached page")
+	}
+}
+
+// Every page renders in every language without a catalog key left showing as itself — the
+// sign of a key a template names but no catalog has.
+func TestPagesRenderInEveryLanguage(t *testing.T) {
+	r, err := New(Embedded(), false, "v", "https://app.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	leftover := regexp.MustCompile(`>\s*[a-z_]+\.[a-z_.]+\s*<|"[a-z_]+\.[a-z_]+\.?[a-z_]*"`)
+	pages := map[string]any{
+		"about": nil, "help": nil, "contacts": nil, "notfound": nil,
+		"signin": struct {
+			Email, Error string
+			Google       bool
+		}{Google: true},
+	}
+	for _, lang := range []string{"en", "ru"} {
+		for page, data := range pages {
+			rec := httptest.NewRecorder()
+			r.Render(rec, 200, page, PageData{Title: "T", Path: "/" + page, Lang: lang, Page: data, User: &User{Email: "a@b.c", IsAdmin: true}})
+			body := rec.Body.String()
+			if rec.Code != 200 {
+				t.Fatalf("%s/%s: status %d: %s", lang, page, rec.Code, body)
+			}
+			for _, m := range leftover.FindAllString(body, -1) {
+				if !strings.Contains(m, "application/") && !strings.Contains(m, "schema.org") && !strings.Contains(m, "holdmytrack.com") && !strings.Contains(m, "github.com") && !strings.Contains(m, ".png") && !strings.Contains(m, ".css") && !strings.Contains(m, ".js") {
+					t.Errorf("%s/%s: %q looks like an untranslated key", lang, page, m)
+				}
+			}
+			if !strings.Contains(body, `<html lang="`+lang+`">`) {
+				t.Errorf("%s/%s: no <html lang=%q>", lang, page, lang)
+			}
+		}
 	}
 }

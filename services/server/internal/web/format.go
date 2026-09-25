@@ -1,11 +1,11 @@
 package web
 
 import (
-	"fmt"
 	"math"
 	"strconv"
-	"strings"
 	"time"
+
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 )
 
 // Units: the distance/elevation formatting the server-rendered pages need, ported from
@@ -22,72 +22,54 @@ func Imperial(country string) bool {
 const metersPerMile = 1609.344
 const metersPerFoot = 0.3048
 
+// Unit labels and number separators come from the page's language (l): "12.3 km" in English,
+// "12,3 км" in Russian.
+
 // FormatDistance is one day's or one activity's distance, one decimal: "12.3 km" / "7.6 mi".
-func FormatDistance(meters float64, imperial bool) string {
+func FormatDistance(l *i18n.Localizer, meters float64, imperial bool) string {
 	if imperial {
-		return strconv.FormatFloat(meters/metersPerMile, 'f', 1, 64) + " mi"
+		return l.T("unit.distance.mi", "v", l.Float(meters/metersPerMile, 1))
 	}
-	return strconv.FormatFloat(meters/1000, 'f', 1, 64) + " km"
+	return l.T("unit.distance.km", "v", l.Float(meters/1000, 1))
 }
 
 // FormatTotalDistance is a sum over many activities: one decimal below 10, whole numbers
 // with thousands separators above — "8.4 km", "1,234 km".
-func FormatTotalDistance(meters float64, imperial bool) string {
-	v, unit := meters/1000, " km"
+func FormatTotalDistance(l *i18n.Localizer, meters float64, imperial bool) string {
+	v, key := meters/1000, "unit.distance.km"
 	if imperial {
-		v, unit = meters/metersPerMile, " mi"
+		v, key = meters/metersPerMile, "unit.distance.mi"
 	}
+	var s string
 	if v < 10 {
 		// toLocaleString's maximumFractionDigits: 1 drops a trailing ".0".
-		return strings.TrimSuffix(strconv.FormatFloat(v, 'f', 1, 64), ".0") + unit
+		if s = l.Float(v, 1); math.Round(v*10) == math.Round(v)*10 {
+			s = l.Float(v, 0)
+		}
+	} else {
+		s = l.Int(int64(math.Round(v)))
 	}
-	return FormatInt(int64(math.Round(v))) + unit
+	return l.T(key, "v", s)
 }
 
 // FormatElevation is a whole number of meters or feet: "1,203 m" / "3,947 ft".
-func FormatElevation(meters float64, imperial bool) string {
+func FormatElevation(l *i18n.Localizer, meters float64, imperial bool) string {
 	if imperial {
-		return FormatInt(int64(math.Round(meters/metersPerFoot))) + " ft"
+		return l.T("unit.elevation.ft", "v", l.Int(int64(math.Round(meters/metersPerFoot))))
 	}
-	return FormatInt(int64(math.Round(meters))) + " m"
+	return l.T("unit.elevation.m", "v", l.Int(int64(math.Round(meters))))
 }
 
 // FormatHours is a whole number of hours: "12".
-func FormatHours(seconds int64) string {
-	return FormatInt(int64(math.Round(float64(seconds) / 3600)))
+func FormatHours(l *i18n.Localizer, seconds int64) string {
+	return l.Int(int64(math.Round(float64(seconds) / 3600)))
 }
 
-// FormatInt adds thousands separators: 1234567 → "1,234,567".
-func FormatInt(n int64) string {
-	s := strconv.FormatInt(n, 10)
-	neg := strings.HasPrefix(s, "-")
-	s = strings.TrimPrefix(s, "-")
-	var b strings.Builder
-	for i, c := range s {
-		if i > 0 && (len(s)-i)%3 == 0 {
-			b.WriteByte(',')
-		}
-		b.WriteRune(c)
-	}
-	if neg {
-		return "-" + b.String()
-	}
-	return b.String()
-}
-
-// Plural is "1 activity" / "3 activities": n with thousands separators and the right noun.
-func Plural(n int64, one, many string) string {
-	if n == 1 {
-		return fmt.Sprintf("1 %s", one)
-	}
-	return FormatInt(n) + " " + many
-}
-
-// ShortDate is "Sep 8" for a YYYY-MM-DD day.
-func ShortDate(day string) string {
+// ShortDate is "Sep 8" / "8 сент." for a YYYY-MM-DD day.
+func ShortDate(l *i18n.Localizer, day string) string {
 	t, err := time.Parse("2006-01-02", day)
 	if err != nil {
 		return day
 	}
-	return t.Format("Jan 2")
+	return l.T("date.short", "day", strconv.Itoa(t.Day()), "month", l.T("month.short."+strconv.Itoa(int(t.Month()))))
 }

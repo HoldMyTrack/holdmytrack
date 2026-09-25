@@ -48,18 +48,18 @@ func (s *Server) handleActivityTrackPoints(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if rawKey == nil {
-		http.Error(w, "this activity has no recorded points to edit", http.StatusConflict)
+		httpErrorT(w, r, http.StatusConflict, "error.track_no_points")
 		return
 	}
 
 	points, err := ingest.LoadClippedPoints(ctx, s.pool, s.store, userID, sourceDetail, *rawKey)
 	if err != nil {
 		s.log.Error("track points load failed", "activity_id", activityID, "err", err)
-		http.Error(w, "couldn't read this activity's recorded points", http.StatusConflict)
+		httpErrorT(w, r, http.StatusConflict, "error.track_unreadable")
 		return
 	}
 	if points == nil {
-		http.Error(w, "this activity is entirely inside your private locations", http.StatusConflict)
+		httpErrorT(w, r, http.StatusConflict, "error.track_all_private")
 		return
 	}
 	if err := ingest.EditableTimestamps(points); err != nil {
@@ -115,7 +115,7 @@ func (s *Server) handleActivityTrackEdit(w http.ResponseWriter, r *http.Request)
 			return
 		}
 		if len(req.Edit.Remove)+len(req.Edit.Drop) > maxTrackEditEntries {
-			http.Error(w, "edit is too large", http.StatusBadRequest)
+			httpErrorT(w, r, http.StatusBadRequest, "error.track_edit_too_large")
 			return
 		}
 		if req.Edit.IsEmpty() {
@@ -132,7 +132,7 @@ func (s *Server) handleActivityTrackEdit(w http.ResponseWriter, r *http.Request)
 	if !ok {
 		// Not this user's, a superseded duplicate, or already mid-edit — one 409 covers all
 		// three without saying which, same as a 404 elsewhere never says whose activity it was.
-		http.Error(w, "this activity can't be edited right now", http.StatusConflict)
+		httpErrorT(w, r, http.StatusConflict, "error.track_busy")
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)

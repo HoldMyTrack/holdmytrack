@@ -2,17 +2,17 @@
 <main class="auth-page">
   <div class="auth-card">
     {{if .Sent}}
-    <h1 class="auth-card__title">Check your email</h1>
-    <p class="auth-card__hint">If an account exists for that email, a reset link is on its way — it works once and expires in an hour.</p>
+    <h1 class="auth-card__title">{{t "forgot.sent_title"}}</h1>
+    <p class="auth-card__hint">{{t "forgot.sent_hint"}}</p>
     {{else}}
-    <h1 class="auth-card__title">Reset your password</h1>
+    <h1 class="auth-card__title">{{t "forgot.title"}}</h1>
     <form class="auth-card__form" method="post" action="/forgot">
-      <label class="auth-card__field"><span>Email</span><input type="email" name="email" value="{{.Email}}" required autocomplete="email" /></label>
+      <label class="auth-card__field"><span>{{t "auth.email"}}</span><input type="email" name="email" value="{{.Email}}" required autocomplete="email" /></label>
       {{with .Error}}<p class="auth-card__error" role="alert">{{.}}</p>{{end}}
-      <button type="submit" class="auth-card__submit">Send reset link</button>
+      <button type="submit" class="auth-card__submit">{{t "forgot.submit"}}</button>
     </form>
     {{end}}
-    <a class="auth-card__link" href="/signin">← Back to sign in</a>
+    <a class="auth-card__link" href="/signin">{{t "forgot.back"}}</a>
   </div>
 </main>
 {{end}}{{end}}

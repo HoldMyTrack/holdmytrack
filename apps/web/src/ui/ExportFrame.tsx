@@ -3,6 +3,15 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent, RefObject } from
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { Camera, X } from 'lucide-react';
 import { customOutputSize, EXPORT_PLATFORMS, EXPORT_PRESET_ROWS, EXPORT_PRESETS, type ExportPreset } from '../map/exportPresets';
+import { t } from '../i18n';
+
+/** EXPORT_PRESET_ROWS' names as the toolbar shows them — the ids stay English. */
+const ROW_LABELS = {
+  Square: 'export.row_square',
+  Portrait: 'export.row_portrait',
+  Landscape: 'export.row_landscape',
+  Story: 'export.row_story',
+} as const;
 
 /** Where the frame is: its center as a map position (so it travels with the map when it
  *  pans), and its size in CSS pixels (so it keeps its on-screen size when the map zooms —
@@ -206,7 +215,7 @@ export function ExportFrame({
         <select
           className="export-frame__shape"
           data-testid="export-frame-shape"
-          aria-label="Export shape"
+          aria-label={t('export.shape')}
           value={preset === 'custom' ? 'custom' : preset.id}
           onChange={(event) => {
             const next = EXPORT_PRESETS.find((p) => p.id === event.target.value);
@@ -214,7 +223,7 @@ export function ExportFrame({
           }}
         >
           <option value="custom">
-            Custom · {customSize.widthPx}×{customSize.heightPx}
+            {t('export.custom')} · {customSize.widthPx}×{customSize.heightPx}
           </option>
           {EXPORT_PLATFORMS.map((platform) => (
             <optgroup key={platform} label={platform}>
@@ -223,7 +232,7 @@ export function ExportFrame({
                 return (
                   p && (
                     <option key={p.id} value={p.id}>
-                      {row} · {p.widthPx}×{p.heightPx}
+                      {t(ROW_LABELS[row])} · {p.widthPx}×{p.heightPx}
                     </option>
                   )
                 );
@@ -231,14 +240,14 @@ export function ExportFrame({
             </optgroup>
           ))}
         </select>
-        <button type="button" className="export-frame__button" data-testid="export-frame-close" aria-label="Cancel export" onClick={onCancel}>
+        <button type="button" className="export-frame__button" data-testid="export-frame-close" aria-label={t('export.cancel')} onClick={onCancel}>
           <X size={14} />
         </button>
         <button
           type="button"
           className="export-frame__button export-frame__button--capture"
           data-testid="export-frame-capture"
-          aria-label="Capture export"
+          aria-label={t('export.capture')}
           onClick={onCapture}
           disabled={busy}
         >

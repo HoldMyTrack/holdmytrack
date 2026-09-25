@@ -225,7 +225,7 @@ class SyncActivity : AppCompatActivity() {
         status.setText(R.string.sync_running)
 
         syncJob = lifecycleScope.launch {
-            val runner = SyncRunner(client, cursor())
+            val runner = SyncRunner(client, cursor(), resources)
             try {
                 val report = runner.run { progress -> showProgress(progress) }
                 show(report, flushRecordedQueue())

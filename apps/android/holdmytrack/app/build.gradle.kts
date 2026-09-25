@@ -32,6 +32,13 @@ android {
         )
     }
 
+    // The languages the app ships (res/values-ru/, res/xml/locales_config.xml): without this
+    // the APK also carries every library's own translations into languages the app itself
+    // doesn't have, and a phone set to one of those would get a half-translated screen.
+    androidResources {
+        localeFilters += listOf("en", "ru")
+    }
+
     buildFeatures {
         buildConfig = true
     }

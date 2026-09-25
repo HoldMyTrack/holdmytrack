@@ -3,6 +3,7 @@ import type { TrackMetricPoint } from '../api';
 import { bandColor, computeBandRuns, computeBandScale, type BandMetric } from '../map/trackBands';
 import { formatDistance, formatElevation, formatPace } from './format';
 import { useUnitSystem, type UnitSystem } from './units';
+import { t } from '../i18n';
 
 // An arbitrary internal coordinate space for the elevation SVG's viewBox, not a rendered
 // pixel width — the actual card stretches to the panel's own 100% width (index.css), and
@@ -22,7 +23,7 @@ function metricValue(p: TrackMetricPoint, metric: BandMetric): number | null {
 }
 
 function formatMetricValue(metric: BandMetric, value: number, system: UnitSystem): string {
-  return metric === 'speed' ? formatPace(value, system) : `${Math.round(value)} bpm`;
+  return metric === 'speed' ? formatPace(value, system) : t('profile.bpm', { v: Math.round(value) });
 }
 
 /**

@@ -274,9 +274,9 @@ class RecordingService : Service() {
         val stats = currentStats()
         val recording = state == RecordingState.RECORDING
         val details = listOfNotNull(
-            RecordingFormat.distance(stats.distanceM),
-            RecordingFormat.speed(stats.speedMps),
-            stats.altitudeM?.let(RecordingFormat::altitude),
+            RecordingFormat.distance(resources, stats.distanceM),
+            RecordingFormat.speed(resources, stats.speedMps),
+            stats.altitudeM?.let { RecordingFormat.altitude(resources, it) },
         ).joinToString(" · ")
 
         val builder = Notification.Builder(this, CHANNEL_ID)

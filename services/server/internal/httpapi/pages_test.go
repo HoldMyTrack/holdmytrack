@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -43,7 +44,7 @@ func TestPagesRenderSignedOut(t *testing.T) {
 		}
 		// Signed out, these pages are the same for everyone, so they're cacheable — but only
 		// for a request without a session cookie.
-		if rec.Header().Get("Cache-Control") != "public, max-age=300" || rec.Header().Get("Vary") != "Cookie" {
+		if rec.Header().Get("Cache-Control") != "public, max-age=300" || rec.Header().Get("Vary") != "Cookie, Accept-Language" {
 			t.Errorf("%s: signed-out cache headers %q, Vary %q", tc.path, rec.Header().Get("Cache-Control"), rec.Header().Get("Vary"))
 		}
 		if !strings.Contains(body, "<title>"+tc.title) {
@@ -209,6 +210,30 @@ func TestAuthFormsRequireSameOrigin(t *testing.T) {
 	}
 }
 
+// A signed-out visitor gets the language their browser asks for — and the next visitor, asking
+// for another, isn't served the first one's cached copy.
+func TestPagesFollowAcceptLanguage(t *testing.T) {
+	s := newPagesTestServer(t)
+	get := func(path, acceptLanguage string) string {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("Accept-Language", acceptLanguage)
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, req)
+		return rec.Body.String()
+	}
+	for _, path := range []string{"/help", "/signin", "/nowhere"} {
+		if ru := get(path, "ru-RU,ru;q=0.9,en;q=0.8"); !strings.Contains(ru, `<html lang="ru">`) || !strings.Contains(ru, ">Войти</a>") {
+			t.Errorf("%s: Russian browser didn't get a Russian page", path)
+		}
+		if en := get(path, "en-US"); !strings.Contains(en, `<html lang="en">`) || !strings.Contains(en, ">Sign in</a>") {
+			t.Errorf("%s: English browser didn't get an English page", path)
+		}
+		if other := get(path, "de-DE"); !strings.Contains(other, `<html lang="en">`) {
+			t.Errorf("%s: an unsupported language didn't fall back to English", path)
+		}
+	}
+}
+
 func TestVerifyPendingSignedOutGoesToSignIn(t *testing.T) {
 	s := newPagesTestServer(t)
 	rec := httptest.NewRecorder()
@@ -218,15 +243,20 @@ func TestVerifyPendingSignedOutGoesToSignIn(t *testing.T) {
 	}
 }
 
-func TestSentence(t *testing.T) {
-	for in, want := range map[string]string{
-		"invalid email or password": "Invalid email or password.",
-		"already a sentence.":       "Already a sentence.",
-		"éclair":                    "Éclair.",
-	} {
-		if got := sentence(in); got != want {
-			t.Errorf("sentence(%q) = %q, want %q", in, got, want)
-		}
+func TestAccountErrorLanguages(t *testing.T) {
+	err := accountFailure(http.StatusBadRequest, "error.password_too_short", "min", 8)
+	var ae *accountError
+	if !errors.As(err, &ae) {
+		t.Fatal("not an accountError")
+	}
+	if got := ae.message("en"); got != "Password must be at least 8 characters." {
+		t.Errorf("en: %q", got)
+	}
+	if got := ae.message("ru"); got != "Пароль должен быть не короче 8 символов." {
+		t.Errorf("ru: %q", got)
+	}
+	if err.Error() != ae.message("en") {
+		t.Errorf("Error() = %q, want the English message", err.Error())
 	}
 }
 

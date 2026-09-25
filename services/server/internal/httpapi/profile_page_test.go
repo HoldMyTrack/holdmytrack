@@ -3,6 +3,8 @@ package httpapi
 import (
 	"strings"
 	"testing"
+
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 )
 
 func day(date string, count int64, meters float64) histogramBucket {
@@ -35,7 +37,7 @@ func TestStatsOf(t *testing.T) {
 
 func TestBuildYearGrid(t *testing.T) {
 	// 2026 starts on a Thursday: four padding days before Jan 1 in the first column.
-	g := buildYearGrid(2026, []histogramBucket{day("2026-01-01", 2, 5000), day("2026-12-31", 1, 100)}, "count", false)
+	g := buildYearGrid(i18n.Get("en"), 2026, []histogramBucket{day("2026-01-01", 2, 5000), day("2026-12-31", 1, 100)}, "count", false)
 	if g.Weeks != 53 || len(g.Cells) != 53*7 {
 		t.Fatalf("weeks %d, cells %d", g.Weeks, len(g.Cells))
 	}
@@ -89,7 +91,7 @@ func TestProfileHref(t *testing.T) {
 }
 
 func TestTrendBars(t *testing.T) {
-	bars := buildTrendBars([]trendPeriod{
+	bars := buildTrendBars(i18n.Get("en"), []trendPeriod{
 		{PeriodStart: "2026-09-07", Count: 3, DistanceMeters: 10000, MovingSeconds: 7200, ElevationGainM: 120},
 		{PeriodStart: "2026-09-14", Count: 0, DistanceMeters: 0},
 	}, true)
@@ -97,6 +99,24 @@ func TestTrendBars(t *testing.T) {
 		t.Errorf("heights %v, %v", bars[0].HeightPercent, bars[1].HeightPercent)
 	}
 	if bars[0].Title != "Sep 7: 6.2 mi · 3 activities · 2 h moving · 394 ft gain" {
+		t.Errorf("title %q", bars[0].Title)
+	}
+}
+
+func TestProfileInRussian(t *testing.T) {
+	ru := i18n.Get("ru")
+	g := buildYearGrid(ru, 2026, []histogramBucket{day("2026-01-01", 2, 5000), day("2026-01-02", 5, 1234567)}, "count", false)
+	if c := g.Cells[4]; c.Title != "2026-01-01: 2 занятия, 5,0 км" {
+		t.Errorf("Jan 1: %q", c.Title)
+	}
+	if c := g.Cells[5]; c.Title != "2026-01-02: 5 занятий, 1\u00a0234,6 км" {
+		t.Errorf("Jan 2: %q", c.Title)
+	}
+	if g.Months[0].Label != "ЯНВ." {
+		t.Errorf("month label %q", g.Months[0].Label)
+	}
+	bars := buildTrendBars(ru, []trendPeriod{{PeriodStart: "2026-09-07", Count: 1, DistanceMeters: 10000, MovingSeconds: 7200, ElevationGainM: 120}}, false)
+	if bars[0].Title != "7 сент.: 10 км · 1 занятие · 2 ч в движении · набор 120 м" {
 		t.Errorf("title %q", bars[0].Title)
 	}
 }

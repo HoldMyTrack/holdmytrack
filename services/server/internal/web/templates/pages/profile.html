@@ -1,33 +1,33 @@
 {{define "content"}}{{with .Page}}
 <main class="page-main profile">
-  <a class="settings__back" href="/">← Back to map</a>
+  <a class="settings__back" href="/">{{t "common.back_to_map"}}</a>
 
-  <section class="activity-graph" aria-label="Activity graph">
+  <section class="activity-graph" aria-label="{{t "profile.graph_label"}}">
     <div class="activity-graph__cards">
       {{range .Cards}}<div class="activity-graph__card"><span class="activity-graph__card-label">{{.Label}}</span><span class="activity-graph__card-value">{{.Value}}</span></div>{{end}}
     </div>
 
     <div class="profile__head">
       <div>
-        <h2 class="profile__title">Activity grid</h2>
-        <p class="profile__subtext">Every day you moved, year by year. Only you can see this.</p>
+        <h2 class="profile__title">{{t "profile.grid_title"}}</h2>
+        <p class="profile__subtext">{{t "profile.grid_subtext"}}</p>
       </div>
-      <div class="profile__toggle" role="group" aria-label="Shade grid by">
-        <span class="profile__toggle-label">Shade by</span>
-        <a class="profile__toggle-btn" href="{{index .ShadeHref "count"}}" {{if eq .ShadeBy "count"}}aria-current="true"{{end}}>Activities</a>
-        <a class="profile__toggle-btn" href="{{index .ShadeHref "distance"}}" {{if eq .ShadeBy "distance"}}aria-current="true"{{end}}>Distance</a>
+      <div class="profile__toggle" role="group" aria-label="{{t "profile.shade_label"}}">
+        <span class="profile__toggle-label">{{t "profile.shade_by"}}</span>
+        <a class="profile__toggle-btn" href="{{index .ShadeHref "count"}}" {{if eq .ShadeBy "count"}}aria-current="true"{{end}}>{{t "profile.shade_count"}}</a>
+        <a class="profile__toggle-btn" href="{{index .ShadeHref "distance"}}" {{if eq .ShadeBy "distance"}}aria-current="true"{{end}}>{{t "profile.shade_distance"}}</a>
       </div>
     </div>
 
     {{range .Years}}
-    <section class="year-grid" aria-label="{{.Year}} activity grid">
+    <section class="year-grid" aria-label="{{t "profile.year_grid_label" "year" .Year}}">
       <div class="year-grid__header">
         <h3 class="year-grid__year">{{.Year}}</h3>
         <span class="year-grid__stats">{{.Stats}}</span>
       </div>
       <div class="year-grid__body">
         <div class="year-grid__row-labels" aria-hidden="true">
-          <span class="year-grid__row-label"></span><span class="year-grid__row-label">Mon</span><span class="year-grid__row-label"></span><span class="year-grid__row-label">Wed</span><span class="year-grid__row-label"></span><span class="year-grid__row-label">Fri</span><span class="year-grid__row-label"></span>
+          <span class="year-grid__row-label"></span><span class="year-grid__row-label">{{t "weekday.short.1"}}</span><span class="year-grid__row-label"></span><span class="year-grid__row-label">{{t "weekday.short.3"}}</span><span class="year-grid__row-label"></span><span class="year-grid__row-label">{{t "weekday.short.5"}}</span><span class="year-grid__row-label"></span>
         </div>
         <div class="year-grid__chart">
           <div class="year-grid__months" style="grid-template-columns: repeat({{.Weeks}}, 12px)" aria-hidden="true">
@@ -42,24 +42,24 @@
     {{end}}
 
     <p class="profile__legend">
-      <span>Shaded by {{.Legend}}: less</span>
+      <span>{{.Legend}}</span>
       <span class="year-grid__cell year-grid__cell--level-0" aria-hidden="true"></span>
       <span class="year-grid__cell year-grid__cell--level-1" aria-hidden="true"></span>
       <span class="year-grid__cell year-grid__cell--level-2" aria-hidden="true"></span>
       <span class="year-grid__cell year-grid__cell--level-3" aria-hidden="true"></span>
-      <span>more</span>
+      <span>{{t "profile.legend_more"}}</span>
     </p>
   </section>
 
-  <section class="trends" aria-label="Trends">
+  <section class="trends" aria-label="{{t "profile.trends"}}">
     <div class="profile__head">
       <div>
-        <h2 class="profile__title">Trends</h2>
-        <p class="profile__subtext">Distance over time — hover a bar for the full breakdown.</p>
+        <h2 class="profile__title">{{t "profile.trends"}}</h2>
+        <p class="profile__subtext">{{t "profile.trends_subtext"}}</p>
       </div>
-      <div class="profile__toggle" role="group" aria-label="Group by">
-        <a class="profile__toggle-btn" href="{{index .BucketURL "week"}}" {{if eq .Bucket "week"}}aria-current="true"{{end}}>Week</a>
-        <a class="profile__toggle-btn" href="{{index .BucketURL "month"}}" {{if eq .Bucket "month"}}aria-current="true"{{end}}>Month</a>
+      <div class="profile__toggle" role="group" aria-label="{{t "profile.group_by"}}">
+        <a class="profile__toggle-btn" href="{{index .BucketURL "week"}}" {{if eq .Bucket "week"}}aria-current="true"{{end}}>{{t "profile.week"}}</a>
+        <a class="profile__toggle-btn" href="{{index .BucketURL "month"}}" {{if eq .Bucket "month"}}aria-current="true"{{end}}>{{t "profile.month"}}</a>
       </div>
     </div>
     {{if .Trends}}
@@ -86,7 +86,7 @@
       })();
     </script>
     {{else}}
-    <p class="profile__subtext">Nothing recorded in this window yet.</p>
+    <p class="profile__subtext">{{t "profile.trends_empty"}}</p>
     {{end}}
   </section>
 </main>

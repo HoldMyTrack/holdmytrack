@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { API_BASE_URL } from '../api';
 import { APP_VERSION } from '../version';
+import { t } from '../i18n';
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -44,9 +45,9 @@ export function VersionBanner() {
   if (!stale) return null;
   return (
     <div className="version-banner" role="status" data-testid="version-banner">
-      A new version of HoldMyTrack is available.
+      {t('version.available')}
       <button type="button" className="version-banner__refresh" onClick={() => window.location.reload()}>
-        Refresh
+        {t('version.refresh')}
       </button>
     </div>
   );

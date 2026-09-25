@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">HoldMyTrack</string>
+    <string name="app_name" translatable="false">HoldMyTrack</string>
     <string name="map_load_failed">Map failed to load from %1$s\n%2$s</string>
 
     <string name="sign_in">Sign in</string>
@@ -22,7 +22,7 @@
     <string name="mode_fog">Fog</string>
     <string name="mode_heatmap">Heatmap</string>
 
-    <string name="menu_button">☰</string>
+    <string name="menu_button" translatable="false">☰</string>
     <string name="locate_button">Find my location</string>
     <string name="locate_needs_location">HoldMyTrack needs location access to show where you are.</string>
     <string name="menu_profile">Profile</string>
@@ -46,7 +46,7 @@
     <string name="recording_download_failed">Could not save the track.</string>
     <string name="recording_stat_time">Time</string>
     <string name="recording_stat_distance">Distance</string>
-    <string name="recording_stat_placeholder">—</string>
+    <string name="recording_stat_placeholder" translatable="false">—</string>
     <string name="recording_too_short">Too short — not saved.</string>
     <string name="recording_needs_location">HoldMyTrack needs location access to record a GPS track.</string>
     <string name="recording_edit_title">Edit recording</string>
@@ -60,6 +60,9 @@
     <string name="recording_notification_channel">GPS recording</string>
     <string name="recording_notification_title">Recording</string>
     <string name="recording_notification_title_paused">Paused · %1$s</string>
+    <string name="unit_km">%1$.2f km</string>
+    <string name="unit_m">%1$.0f m</string>
+    <string name="unit_kmh">%1$.1f km/h</string>
 
     <string name="recorded_empty">No recorded activities yet.</string>
     <string name="recorded_filter_all">All</string>
@@ -94,6 +97,11 @@
     <string name="sync_skipped_no_route">Skipped %1$d recorded indoors — no route to map.</string>
     <string name="sync_rejected_row">Rejected: %1$s %2$s — %3$s</string>
     <string name="sync_stopped">Stopped early. %1$s</string>
+    <string name="sync_consent_required">Health Connect would not hand over a route. Keep HoldMyTrack on screen while syncing, check that exercise routes are still allowed, then sync again — nothing after that activity has been synced, so none of it is lost.</string>
+    <string name="sync_refusal_too_few_points">the route has fewer than two points</string>
+    <string name="sync_refusal_too_many_points">the route has %1$d points, more than one sync request accepts</string>
+    <string name="sync_request_failed">the sync request failed</string>
+    <string name="sync_no_report">the server did not report on this activity (status %1$s)</string>
     <string name="sync_recorded_summary">Recorded activities: %1$d synced.</string>
     <string name="sync_recorded_summary_with_failed">Recorded activities: %1$d synced, %2$d failed — will retry next time.</string>
     <string name="sync_needs_history_permission">Ready to sync, but only the last 30 days. Last synced through: %1$s</string>
@@ -113,8 +121,8 @@
     <string name="status_no_reason">no reason given</string>
     <string name="status_duplicates_heading">Already recorded from another source</string>
     <string name="status_duplicate_row">%1$s · %2$s from %3$s — already here from %4$s, so it is not drawn twice</string>
-    <string name="source_health_connect">Health Connect</string>
-    <string name="source_health_kit">HealthKit</string>
+    <string name="source_health_connect" translatable="false">Health Connect</string>
+    <string name="source_health_kit" translatable="false">HealthKit</string>
     <string name="source_upload">an uploaded file</string>
     <string name="source_takeout">a Google Takeout import</string>
     <string name="source_recorded">a GPS recording</string>

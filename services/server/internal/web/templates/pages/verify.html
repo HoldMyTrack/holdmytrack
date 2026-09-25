@@ -1,10 +1,10 @@
 {{define "content"}}{{with .Page}}
 <main class="auth-page">
   <div class="auth-card">
-    <h1 class="auth-card__title">Verify your email</h1>
+    <h1 class="auth-card__title">{{t "verify.title"}}</h1>
     {{with .Error}}<p class="auth-card__error" role="alert">{{.}}</p>{{end}}
-    <p class="auth-card__hint">Sign in to have a new link sent to you.</p>
-    <a class="auth-card__link" href="/signin">Sign in</a>
+    <p class="auth-card__hint">{{t "verify.hint"}}</p>
+    <a class="auth-card__link" href="/signin">{{t "header.sign_in"}}</a>
   </div>
 </main>
 {{end}}{{end}}

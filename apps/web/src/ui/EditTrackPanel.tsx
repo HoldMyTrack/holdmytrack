@@ -6,6 +6,7 @@ import { clearTrackEdit, ensureTrackEditLayer, onTrackEditPointClick, setTrackEd
 import { applyEdit, chopOp, cumulativeDistances, cutOp, foldEdit, isEmptyEdit, type EditOp } from './editTrackOps';
 import { distanceValue, formatActivityType, formatStartedAt, unitLabel } from './format';
 import { useUnitSystem } from './units';
+import { lang, t, tn } from '../i18n';
 
 /**
  * The Edit track window (IMPLEMENTATION.md §4.7.7) — floats over the map while one activity's
@@ -141,22 +142,22 @@ export function EditTrackPanel({ map, activity, onClose }: EditTrackPanelProps) 
   const unit = unitLabel(system);
 
   return (
-    <section className="edit-track" aria-label="Edit track" data-testid="edit-track">
+    <section className="edit-track" aria-label={t('edit_track.title')} data-testid="edit-track">
       <header className="edit-track__head">
-        <span className="edit-track__title">Edit track</span>
+        <span className="edit-track__title">{t('edit_track.title')}</span>
         <span className="edit-track__subtitle">
           {label} · {formatActivityType(activity.activityType)}
         </span>
       </header>
 
       {loadError && <p className="edit-track__error">{loadError}</p>}
-      {!session && !loadError && <p className="edit-track__note">Loading points…</p>}
+      {!session && !loadError && <p className="edit-track__note">{t('edit_track.loading')}</p>}
 
       {session && visible.length >= 2 && (
         <>
           <div className="activity-filters__section">
             <div className="activity-filters__head">
-              <span className="activity-filters__label">Range</span>
+              <span className="activity-filters__label">{t('edit_track.range')}</span>
               <span className="activity-filters__readout" data-testid="edit-track-readout">
                 {distanceValue(distances[lo]!, system)} – {distanceValue(distances[hi]!, system)} {unit} ·{' '}
                 {clockTime(visible[lo]![2])}–{clockTime(visible[hi]![2])}
@@ -174,7 +175,7 @@ export function EditTrackPanel({ map, activity, onClose }: EditTrackPanelProps) 
               <input
                 type="range"
                 className="activity-filters__range activity-filters__range--min"
-                aria-label="Start of range"
+                aria-label={t('edit_track.range_start')}
                 min={0}
                 max={last}
                 value={lo}
@@ -183,7 +184,7 @@ export function EditTrackPanel({ map, activity, onClose }: EditTrackPanelProps) 
               <input
                 type="range"
                 className="activity-filters__range activity-filters__range--max"
-                aria-label="End of range"
+                aria-label={t('edit_track.range_end')}
                 min={0}
                 max={last}
                 value={hi}
@@ -191,8 +192,8 @@ export function EditTrackPanel({ map, activity, onClose }: EditTrackPanelProps) 
               />
             </div>
             <div className="activity-filters__bounds">
-              <span>0.0 {unit}</span>
-              <span>{visible.length.toLocaleString()} points</span>
+              <span>{distanceValue(0, system)} {unit}</span>
+              <span>{tn('edit_track.points', visible.length)}</span>
               <span>
                 {distanceValue(distances[last]!, system)} {unit}
               </span>
@@ -210,9 +211,9 @@ export function EditTrackPanel({ map, activity, onClose }: EditTrackPanelProps) 
               }}
               onMouseEnter={() => setPreview('chop')}
               onFocus={() => setPreview('chop')}
-              title="Keep only the part between the knobs"
+              title={t('edit_track.chop_title')}
             >
-              Chop
+              {t('edit_track.chop')}
             </button>
             <button
               type="button"
@@ -229,25 +230,25 @@ export function EditTrackPanel({ map, activity, onClose }: EditTrackPanelProps) 
               onMouseLeave={() => setPreview('chop')}
               onFocus={() => setPreview('cut')}
               onBlur={() => setPreview('chop')}
-              title="Remove the part between the knobs and join its two ends"
+              title={t('edit_track.cut_title')}
             >
-              Cut
+              {t('edit_track.cut')}
             </button>
             <button
               type="button"
               className="edit-track__btn"
               aria-pressed={deleteMode}
               onClick={() => setDeleteMode((on) => !on)}
-              title="Click points on the map to delete them"
+              title={t('edit_track.delete_point_title')}
             >
-              Delete point
+              {t('edit_track.delete_point')}
             </button>
           </div>
-          {deleteMode && <p className="edit-track__note">Click a point on the map to delete it.</p>}
+          {deleteMode && <p className="edit-track__note">{t('edit_track.delete_point_note')}</p>}
 
           <div className="edit-track__row edit-track__row--footer">
-            <button type="button" className="edit-track__btn" disabled={ops.length === 0 || applying} onClick={undo} title="Undo the last change (⌘Z)">
-              Undo
+            <button type="button" className="edit-track__btn" disabled={ops.length === 0 || applying} onClick={undo} title={t('edit_track.undo_title')}>
+              {t('edit_track.undo')}
             </button>
             {canReset && (
               <button
@@ -258,14 +259,14 @@ export function EditTrackPanel({ map, activity, onClose }: EditTrackPanelProps) 
                   push({ kind: 'reset' });
                   setKnobs(ENDS);
                 }}
-                title="Go back to the track as it was recorded (Undo brings the edits back)"
+                title={t('edit_track.reset_title')}
               >
-                Reset
+                {t('edit_track.reset')}
               </button>
             )}
             <span className="edit-track__spacer" aria-hidden="true" />
             <button type="button" className="edit-track__btn" disabled={applying} onClick={() => onClose(false)}>
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               type="button"
@@ -273,7 +274,7 @@ export function EditTrackPanel({ map, activity, onClose }: EditTrackPanelProps) 
               disabled={ops.length === 0 || applying}
               onClick={() => void apply()}
             >
-              {applying ? 'Applying…' : 'Apply'}
+              {applying ? t('edit_track.applying') : t('edit_track.apply')}
             </button>
           </div>
           {applyError && <p className="edit-track__error">{applyError}</p>}
@@ -284,7 +285,7 @@ export function EditTrackPanel({ map, activity, onClose }: EditTrackPanelProps) 
         <div className="edit-track__row edit-track__row--footer">
           <span className="edit-track__spacer" aria-hidden="true" />
           <button type="button" className="edit-track__btn" onClick={() => onClose(false)}>
-            Cancel
+            {t('common.cancel')}
           </button>
         </div>
       )}
@@ -298,5 +299,5 @@ function findLastIndex<T>(items: readonly T[], pred: (item: T) => boolean): numb
 }
 
 function clockTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  return new Date(ms).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' });
 }

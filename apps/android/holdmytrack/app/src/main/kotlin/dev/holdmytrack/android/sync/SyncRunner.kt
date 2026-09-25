@@ -1,5 +1,6 @@
 package dev.holdmytrack.android.sync
 
+import android.content.res.Resources
 import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.records.ExerciseRoute
@@ -7,6 +8,7 @@ import androidx.health.connect.client.records.ExerciseRouteResult
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
+import dev.holdmytrack.android.R
 import dev.holdmytrack.android.health.ExerciseTypes
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import java.io.IOException
@@ -61,6 +63,8 @@ data class SyncProgress(val scanned: Int, val synced: Int)
 class SyncRunner(
     private val client: HealthConnectClient,
     private val cursor: SyncCursor,
+    /** For the reasons a run reports — the refusals and why it stopped — in the app's language. */
+    private val res: Resources,
 ) {
 
     /** Records read since the watermark last moved, in order. Cleared each time it moves. */
@@ -111,7 +115,7 @@ class SyncRunner(
                     else -> {
                         // ConsentRequired. Blocking, always: the route is there and we were
                         // refused it, so passing over this record would lose it for good.
-                        stoppedBecause = CONSENT_REQUIRED
+                        stoppedBecause = res.getString(R.string.sync_consent_required)
                         break@paging
                     }
                 }
@@ -144,9 +148,8 @@ class SyncRunner(
         val points = route.route
         val activityType = ExerciseTypes.name(record.exerciseType)
         val refusal = when {
-            points.size < MIN_POINTS -> "the route has fewer than two points"
-            points.size > MAX_POINTS_PER_ACTIVITY ->
-                "the route has ${points.size} points, more than one sync request accepts"
+            points.size < MIN_POINTS -> res.getString(R.string.sync_refusal_too_few_points)
+            points.size > MAX_POINTS_PER_ACTIVITY -> res.getString(R.string.sync_refusal_too_many_points, points.size)
             else -> null
         }
         if (refusal != null) {
@@ -182,7 +185,7 @@ class SyncRunner(
             batchRecords.clear()
             batchPoints = 0
             segment.clear()
-            return e.message ?: "the sync request failed"
+            return e.message ?: res.getString(R.string.sync_request_failed)
         }
 
         val byId = results.associateBy { it.externalId }
@@ -194,7 +197,7 @@ class SyncRunner(
                     record.startTime,
                     ExerciseTypes.name(record.exerciseType),
                     byId[record.metadata.id]?.error?.ifBlank { null }
-                        ?: "the server did not report on this activity (status ${result ?: "missing"})",
+                        ?: res.getString(R.string.sync_no_report, result ?: "missing"),
                 )
             }
         }
@@ -271,10 +274,5 @@ class SyncRunner(
          *  accepted is reported as such instead of being sent to be refused. */
         const val MIN_POINTS = 2
         const val MAX_POINTS_PER_ACTIVITY = 50_000
-
-        const val CONSENT_REQUIRED =
-            "Health Connect would not hand over a route. Keep HoldMyTrack on screen while syncing, " +
-                "check that exercise routes are still allowed, then sync again — nothing after " +
-                "that activity has been synced, so none of it is lost."
     }
 }

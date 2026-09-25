@@ -19,6 +19,8 @@ import (
 	"path"
 	"strings"
 	"sync"
+
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 )
 
 //go:embed templates static
@@ -35,18 +37,19 @@ func Embedded() fs.FS { return embedded }
 // header is this one too (ADR-0012's phase 5); keep the two in step.
 const OpenCollectiveSlug = ""
 
-// Link is one entry of a header menu.
+// Link is one entry of a header menu. LabelKey is its label's catalog key (i18n), translated
+// when the page renders.
 type Link struct {
-	Href  string
-	Label string
+	Href     string
+	LabelKey string
 }
 
 // InfoLinks is the header's Info menu. apps/web/src/ui/InfoMenu.tsx repeats it for the map
 // page's React header until that header is this one (ADR-0012); keep the two in step.
 var InfoLinks = []Link{
-	{Href: "/about", Label: "About"},
-	{Href: "/help", Label: "Help"},
-	{Href: "/contacts", Label: "Contacts"},
+	{Href: "/about", LabelKey: "nav.about"},
+	{Href: "/help", LabelKey: "nav.help"},
+	{Href: "/contacts", LabelKey: "nav.contacts"},
 }
 
 // User is the signed-in account as the header shows it; nil when nobody is signed in.
@@ -55,18 +58,18 @@ type User struct {
 	DisplayName string
 	AvatarURL   string // "" when no avatar is set
 	IsDemo      bool
+	// IsAdmin shows the account menu's Admin item (the admin panel, FR-12).
+	IsAdmin bool
 }
 
 // Label is what the account menu shows as its first line: the email for a real account, the
 // display name for a demo one (its email is an internal placeholder never shown anywhere).
+// "" for a demo account without a name — the header shows its own "Demo account" then.
 func (u *User) Label() string {
 	if u.Email != "" {
 		return u.Email
 	}
-	if u.DisplayName != "" {
-		return u.DisplayName
-	}
-	return "Demo account"
+	return u.DisplayName
 }
 
 // PageData is everything a page template can read. Title/Description/Path/User/NoIndex come
@@ -82,6 +85,8 @@ type PageData struct {
 	CanonicalPath string
 	NoIndex       bool
 	User          *User
+	// Lang is the language the page renders in (i18n.Resolve) — "" is English.
+	Lang string
 	// Page holds whatever a single page needs beyond the shared fields.
 	Page any
 
@@ -102,11 +107,18 @@ type Renderer struct {
 	version string
 	baseURL string
 
-	mu    sync.Mutex
+	mu   sync.Mutex
+	sets map[string]*templateSet
+	// public caches RenderPublic's output — a signed-out page's bytes, by page, path and
+	// language.
+	public sync.Map
+}
+
+// templateSet is every template parsed for one language: its catalog is bound into the
+// t/tn/th funcs at parse time, so a template calls {{t "key"}} wherever it is, `.` or not.
+type templateSet struct {
 	pages map[string]*template.Template
 	app   *template.Template
-	// public caches RenderPublic's output — a signed-out page's bytes, by page and path.
-	public sync.Map
 }
 
 // AppPage is what the React app's shell (templates/app/app.html) reads: the shared header's
@@ -123,11 +135,11 @@ type AppPage struct {
 // built from. A template that fails to parse is a startup error here, not a 500 later.
 func New(fsys fs.FS, reload bool, version, baseURL string) (*Renderer, error) {
 	r := &Renderer{fsys: fsys, reload: reload, version: version, baseURL: baseURL}
-	pages, app, err := r.parse()
+	sets, err := r.parseAll()
 	if err != nil {
 		return nil, err
 	}
-	r.pages, r.app = pages, app
+	r.sets = sets
 	return r, nil
 }
 
@@ -135,10 +147,25 @@ func New(fsys fs.FS, reload bool, version, baseURL string) (*Renderer, error) {
 // for the app's Vite-dev-server assets (AppPage.ViteDev); in production the flag is ignored.
 func (r *Renderer) Dev() bool { return r.reload }
 
-func (r *Renderer) parse() (map[string]*template.Template, *template.Template, error) {
+func (r *Renderer) parseAll() (map[string]*templateSet, error) {
+	sets := make(map[string]*templateSet, len(i18n.Supported))
+	for _, lang := range i18n.Supported {
+		set, err := r.parse(i18n.Get(lang))
+		if err != nil {
+			return nil, err
+		}
+		sets[lang] = set
+	}
+	return sets, nil
+}
+
+// parse builds one language's templates. A page may have a whole-page translation beside it,
+// pages/about.ru.html — for the long prose pages, where a key per paragraph would only make
+// them harder to write — which that language uses instead of pages/about.html.
+func (r *Renderer) parse(l *i18n.Localizer) (*templateSet, error) {
 	files, err := fs.Glob(r.fsys, "templates/pages/*.html")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	funcs := template.FuncMap{
 		// asset is a static file's URL with the build version as a cache-buster, so /static/
@@ -151,35 +178,72 @@ func (r *Renderer) parse() (map[string]*template.Template, *template.Template, e
 		"appAsset": func(name string) string {
 			return "/assets/" + name + "?v=" + url.QueryEscape(r.version)
 		},
+		// t is a catalog message, {name}s filled from name/value pairs: {{t "key" "email" .Email}}.
+		"t": l.T,
+		// tn is a count's message in the plural form n takes: {{tn "key" .Count}}.
+		"tn": func(key string, n any, args ...any) string { return l.N(key, toInt64(n), args...) },
+		// th is t for a message that carries its own markup (<strong>, <a>): the catalog is
+		// trusted, the arguments are escaped.
+		"th": func(key string, args ...any) template.HTML {
+			escaped := make([]any, len(args))
+			for i, a := range args {
+				escaped[i] = a
+				if i%2 == 1 {
+					escaped[i] = template.HTMLEscapeString(fmt.Sprint(a))
+				}
+			}
+			return template.HTML(l.T(key, escaped...))
+		},
+		"lang": l.Lang,
 	}
-	pages := make(map[string]*template.Template, len(files))
+	set := &templateSet{pages: make(map[string]*template.Template, len(files))}
 	for _, file := range files {
-		name := path.Base(file)
-		name = name[:len(name)-len(".html")]
+		name := strings.TrimSuffix(path.Base(file), ".html")
+		if strings.Contains(name, ".") {
+			continue // a translation of another page, parsed in its place below
+		}
+		if translated := "templates/pages/" + name + "." + l.Lang() + ".html"; fileExists(r.fsys, translated) {
+			file = translated
+		}
 		// Every templates/*.html (the layout, the header, shared partials) goes with each page.
 		t, err := template.New("layout.html").Funcs(funcs).ParseFS(r.fsys, "templates/*.html", file)
 		if err != nil {
-			return nil, nil, fmt.Errorf("web: parse %s: %w", file, err)
+			return nil, fmt.Errorf("web: parse %s: %w", file, err)
 		}
-		pages[name] = t
+		set.pages[name] = t
 	}
 	// The React app's shell is its own root, not a page inside layout.html: no footer, no
 	// page styles, just the shared header above the app's mount point.
-	app, err := template.New("app.html").Funcs(funcs).ParseFS(r.fsys, "templates/*.html", "templates/app/app.html")
+	set.app, err = template.New("app.html").Funcs(funcs).ParseFS(r.fsys, "templates/*.html", "templates/app/app.html")
 	if err != nil {
-		return nil, nil, fmt.Errorf("web: parse templates/app/app.html: %w", err)
+		return nil, fmt.Errorf("web: parse templates/app/app.html: %w", err)
 	}
-	return pages, app, nil
+	return set, nil
+}
+
+func fileExists(fsys fs.FS, name string) bool {
+	_, err := fs.Stat(fsys, name)
+	return err == nil
+}
+
+func toInt64(n any) int64 {
+	switch v := n.(type) {
+	case int:
+		return int64(v)
+	case int64:
+		return v
+	}
+	return 0
 }
 
 // Render writes page (a templates/pages/ file name, without .html) with data. It renders into a
 // buffer first, so a template error becomes a clean 500 rather than half a page.
 func (r *Renderer) Render(w http.ResponseWriter, status int, page string, data PageData) {
-	pages, _, ok := r.current(w)
+	set, ok := r.current(w, data.Lang)
 	if !ok {
 		return
 	}
-	t, ok := pages[page]
+	t, ok := set.pages[page]
 	if !ok {
 		http.Error(w, "unknown page "+page, http.StatusInternalServerError)
 		return
@@ -190,31 +254,39 @@ func (r *Renderer) Render(w http.ResponseWriter, status int, page string, data P
 
 // RenderApp writes the React app's shell (the map page, and for now Profile and Settings).
 func (r *Renderer) RenderApp(w http.ResponseWriter, data AppPage) {
-	_, app, ok := r.current(w)
+	set, ok := r.current(w, data.Lang)
 	if !ok {
 		return
 	}
 	r.fill(&data.PageData)
-	r.execute(w, http.StatusOK, app, data)
+	r.execute(w, http.StatusOK, set.app, data)
 }
 
-// current is the parsed templates — re-parsed first when reloading (dev).
-func (r *Renderer) current(w http.ResponseWriter) (map[string]*template.Template, *template.Template, bool) {
+// current is lang's parsed templates (English's for an unknown lang) — every language
+// re-parsed first when reloading (dev).
+func (r *Renderer) current(w http.ResponseWriter, lang string) (*templateSet, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.reload {
-		pages, app, err := r.parse()
+		sets, err := r.parseAll()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return nil, nil, false
+			return nil, false
 		}
-		r.pages, r.app = pages, app
+		r.sets = sets
 	}
-	return r.pages, r.app, true
+	set, ok := r.sets[lang]
+	if !ok {
+		set = r.sets[i18n.Default]
+	}
+	return set, true
 }
 
 // fill sets the fields every page's header and head share.
 func (r *Renderer) fill(data *PageData) {
+	if !i18n.IsSupported(data.Lang) {
+		data.Lang = i18n.Default
+	}
 	data.InfoLinks = InfoLinks
 	data.DonateURL = "/about#funding"
 	if OpenCollectiveSlug != "" {
@@ -243,26 +315,27 @@ func (r *Renderer) execute(w http.ResponseWriter, status int, t *template.Templa
 
 // RenderPublic is Render for a page with no session behind it and nothing request-specific
 // in it (About, Help, Contacts, the signed-out home page): the same bytes for every visitor
-// and every crawler. So they're rendered once and kept (per page and path; not in dev, where
-// templates reload), and sent cacheable for five minutes. `Vary: Cookie` keeps a browser from
-// reusing the signed-out copy once it holds a session cookie, whose pages have a different
-// header.
+// and every crawler in one language. So they're rendered once and kept (per page, path and
+// language; not in dev, where templates reload), and sent cacheable for five minutes.
+// `Vary: Cookie` keeps a browser from reusing the signed-out copy once it holds a session
+// cookie, whose pages have a different header; `Vary: Accept-Language` keeps a shared cache
+// from handing one language's copy to a browser that asked for another.
 func (r *Renderer) RenderPublic(w http.ResponseWriter, page string, data PageData) {
-	key := page + "|" + data.Path
+	r.fill(&data)
+	key := page + "|" + data.Path + "|" + data.Lang
 	if cached, ok := r.public.Load(key); ok && !r.reload {
 		writePublic(w, cached.([]byte))
 		return
 	}
-	pages, _, ok := r.current(w)
+	set, ok := r.current(w, data.Lang)
 	if !ok {
 		return
 	}
-	t, ok := pages[page]
+	t, ok := set.pages[page]
 	if !ok {
 		http.Error(w, "unknown page "+page, http.StatusInternalServerError)
 		return
 	}
-	r.fill(&data)
 	var buf bytes.Buffer
 	if err := t.Execute(&buf, data); err != nil {
 		http.Error(w, "template error", http.StatusInternalServerError)
@@ -275,7 +348,7 @@ func (r *Renderer) RenderPublic(w http.ResponseWriter, page string, data PageDat
 }
 
 func writePublic(w http.ResponseWriter, body []byte) {
-	w.Header().Set("Vary", "Cookie")
+	w.Header().Set("Vary", "Cookie, Accept-Language")
 	writeHTML(w, http.StatusOK, "public, max-age=300", body)
 }
 

@@ -18,6 +18,7 @@ import (
 	"log/slog"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -172,10 +173,9 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 // proxy (apps/web/vite.config.ts) lists these paths one by one, so a new page goes there too.
 func (s *Server) registerPages() {
 	// About is the signed-out home page too (appShell), so its canonical link is `/`.
-	s.mux.HandleFunc("GET /about", s.staticPage("about", "About HoldMyTrack — Every journey, mapped.", homeDescription, "/"))
-	s.mux.HandleFunc("GET /help", s.staticPage("help", "Help — HoldMyTrack",
-		"How HoldMyTrack works: the map and its Normal, Fog of War and Heatmap modes, importing files, Google Takeout and the Android app, exporting a map image, and privacy settings.", ""))
-	s.mux.HandleFunc("GET /contacts", s.staticPage("contacts", "Contacts — HoldMyTrack", "How to reach the HoldMyTrack project: email, code and issues.", ""))
+	s.mux.HandleFunc("GET /about", s.staticPage("about", "meta.about_title", "meta.home_description", "/"))
+	s.mux.HandleFunc("GET /help", s.staticPage("help", "meta.help_title", "meta.help_description", ""))
+	s.mux.HandleFunc("GET /contacts", s.staticPage("contacts", "meta.contacts_title", "meta.contacts_description", ""))
 	s.mux.Handle("GET /static/", s.pages.StaticHandler())
 	s.mux.HandleFunc("POST /logout", s.sameOrigin(s.handleLogoutPage))
 	// auth_pages.go — every POST is a form, so every POST is behind sameOrigin.
@@ -198,9 +198,11 @@ func (s *Server) registerPages() {
 	s.mux.HandleFunc("POST /settings/avatar", s.sameOrigin(s.handleSettingsAvatarForm))
 	s.mux.HandleFunc("POST /settings/avatar/remove", s.sameOrigin(s.handleSettingsAvatarRemoveForm))
 	s.mux.HandleFunc("GET /profile", s.handleProfilePage) // profile_page.go
+	s.mux.HandleFunc("GET /admin", s.handleAdminPage)     // admin_pages.go
+	s.mux.HandleFunc("GET /admin/users/{id}", s.handleAdminUserPage)
 	// The React app — the map (pages.go's appShell). `/{$}` is the root alone; "/" below is
 	// everything else nothing more specific claims.
-	s.mux.HandleFunc("GET /{$}", s.appShell("HoldMyTrack — Every journey, mapped."))
+	s.mux.HandleFunc("GET /{$}", s.appShell("meta.home_title"))
 	s.mux.HandleFunc("/", s.notFound)
 }
 
@@ -269,12 +271,12 @@ type uploadResponse struct {
 func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxZipUploadBytes+1<<20) // +1MiB of multipart overhead
 	if err := r.ParseMultipartForm(maxZipUploadBytes); err != nil {
-		http.Error(w, "file too large or malformed multipart body", http.StatusRequestEntityTooLarge)
+		httpErrorT(w, r, http.StatusRequestEntityTooLarge, "error.upload_too_large")
 		return
 	}
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		http.Error(w, `expected a multipart field named "file"`, http.StatusBadRequest)
+		httpErrorT(w, r, http.StatusBadRequest, "error.avatar_missing")
 		return
 	}
 	defer file.Close()
@@ -287,16 +289,16 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		// which zip-shaped branch below ends up handling it.
 		data, err := io.ReadAll(io.LimitReader(file, maxZipUploadBytes))
 		if err != nil {
-			http.Error(w, "failed reading upload", http.StatusBadRequest)
+			httpErrorT(w, r, http.StatusBadRequest, "error.avatar_read")
 			return
 		}
 		if len(data) == 0 {
-			http.Error(w, "empty file", http.StatusBadRequest)
+			httpErrorT(w, r, http.StatusBadRequest, "error.upload_empty")
 			return
 		}
 		zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 		if err != nil {
-			http.Error(w, "not a valid zip archive", http.StatusBadRequest)
+			httpErrorT(w, r, http.StatusBadRequest, "error.upload_bad_zip")
 			return
 		}
 		if isTakeoutArchive(zr) {
@@ -307,7 +309,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !allowedExt[ext] {
-		http.Error(w, fmt.Sprintf("unsupported file type %q (want .gpx, .fit, .tcx, or .zip)", ext), http.StatusUnsupportedMediaType)
+		httpErrorT(w, r, http.StatusUnsupportedMediaType, "error.upload_type", "type", strconv.Quote(ext))
 		return
 	}
 
@@ -316,11 +318,11 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	// comment for why this is a deliberate, bounded exception to "never buffer a file."
 	data, err := io.ReadAll(io.LimitReader(file, maxUploadBytes))
 	if err != nil {
-		http.Error(w, "failed reading upload", http.StatusBadRequest)
+		httpErrorT(w, r, http.StatusBadRequest, "error.avatar_read")
 		return
 	}
 	if len(data) == 0 {
-		http.Error(w, "empty file", http.StatusBadRequest)
+		httpErrorT(w, r, http.StatusBadRequest, "error.upload_empty")
 		return
 	}
 

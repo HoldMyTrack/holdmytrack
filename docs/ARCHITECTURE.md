@@ -27,6 +27,8 @@ A second constraint now shapes every decision: **the service is free and communi
 | **Planet-wide basemap**, not a regional extract | Users are everywhere; a regional extract makes "blank map" the default outside one metro |
 | **Country/Region zoom tiers are live vector tiles**, not a second precomputed raster pyramid | Their cost scales with a fixed ~250-country/~4,600-region boundary dataset, not with a user's own activity history — the scaling problem the fog raster pyramid exists to avoid never applies here — [ADR-0008](adr/0008-vector-tiles-for-country-region-boundary-tiers.md) |
 | **Web pages are server-rendered HTML**; React only for the map page | Each page is one layout with a few per-user values — a template, which only the server can fill without client JS; every page gets a real URL, one shared header, and no map bundle to load first — [ADR-0012](adr/0012-server-rendered-pages-react-for-the-map.md) |
+| **Admin panel in the app**, granted only from the server's CLI | Operators need to see accounts and activity ids without raw SQL on production; a flag only the server's shell can set keeps the web from ever being an escalation path, and non-admins get a 404 — [ADR-0013](adr/0013-admin-panel.md) |
+| **Localization**: in-house catalogs, the language decided by the server | Two languages and a few hundred strings don't need three i18n libraries; the server picks one language per request (account setting → `Accept-Language` → English) and the map app reads it from `<html lang>`, so the page and the app never disagree — [ADR-0014](adr/0014-localization.md) |
 
 ### 1.2 Target architecture
 

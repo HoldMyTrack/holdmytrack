@@ -16,6 +16,7 @@ import {
 } from './format';
 import { useUnitSystem } from './units';
 import type { ImportsState } from './useImports';
+import { lang, t, tn } from '../i18n';
 
 /**
  * The left sidebar, with two tabs: **Activities** (the list, below) and **Sync** (SyncTab.tsx —
@@ -305,7 +306,10 @@ export function ActivitiesPanel({
   // §4.7.5's ConfirmDialog message needs the group's own summary — reuses formatStartedAt's
   // shortest form isn't meaningful for N activities, so this names the count and total
   // distance instead, the same two numbers the footer summary already shows.
-  const groupSummary = `${checkedActivities.length} ${checkedActivities.length === 1 ? 'activity' : 'activities'} (${formatTotalDistance(checkedMeters, system)})`;
+  const groupSummary = t('activities.group_summary', {
+    activities: tn('activities.count', checkedActivities.length),
+    distance: formatTotalDistance(checkedMeters, system),
+  });
 
   // Group visible's own icon mirrors the row-level eye icon's open/closed convention: closed
   // (about to reveal) once any checked activity is currently hidden, open otherwise — matching
@@ -316,13 +320,13 @@ export function ActivitiesPanel({
   // with a track to edit that isn't already mid-reprocess.
   const editTrackTarget = checkedActivities.length === 1 ? checkedActivities[0]! : null;
   const editTrackReason = readOnly
-    ? 'Not available for demo accounts — create an account to edit tracks'
+    ? t('activities.demo_edit_tracks')
     : editTrackTarget === null
-      ? 'Check exactly one activity to edit its track'
+      ? t('activities.edit_track_check_one')
       : editTrackTarget.pending
-        ? 'This track is still being processed'
+        ? t('activities.edit_track_processing')
         : editTrackTarget.bbox === null
-          ? 'No track recorded for this activity'
+          ? t('activities.no_track')
           : null;
   // Pending rows can't be edited or deleted until their reprocess lands — the job would
   // otherwise race the edit or delete for the same row.
@@ -345,13 +349,13 @@ export function ActivitiesPanel({
         data-testid="activities-panel-resize"
         role="separator"
         aria-orientation="vertical"
-        aria-label="Resize the activities panel"
+        aria-label={t('activities.resize')}
         onPointerDown={onResizePointerDown}
         onPointerMove={onResizePointerMove}
         onPointerUp={onResizePointerUp}
         onPointerCancel={onResizePointerUp}
       />
-      <div className="activities-panel__head" role="tablist" aria-label="Activities panel">
+      <div className="activities-panel__head" role="tablist" aria-label={t('activities.panel')}>
         <button
           type="button"
           role="tab"
@@ -360,8 +364,8 @@ export function ActivitiesPanel({
           data-testid="activities-panel-tab-activities"
           onClick={() => setTab('activities')}
         >
-          <span className="activities-panel__heading-text">Activities</span>
-          <span className="activities-panel__badge">{activities.length.toLocaleString()}</span>
+          <span className="activities-panel__heading-text">{t('activities.tab')}</span>
+          <span className="activities-panel__badge">{activities.length.toLocaleString(lang)}</span>
         </button>
         <button
           type="button"
@@ -371,7 +375,7 @@ export function ActivitiesPanel({
           data-testid="activities-panel-tab-sync"
           onClick={() => setTab('sync')}
         >
-          <span className="activities-panel__heading-text">Sync</span>
+          <span className="activities-panel__heading-text">{t('sync.tab')}</span>
           {/* Visible from the Activities tab too, so an upload's progress doesn't disappear
               the moment you switch away from it. */}
           {imports.badgeCount > 0 && <span className="activities-panel__sync-badge">{imports.badgeCount}</span>}
@@ -389,10 +393,10 @@ export function ActivitiesPanel({
         onClick={() => setSheetExpanded((expanded) => !expanded)}
       >
         {tab === 'sync'
-          ? 'Upload files or sync from your phone'
+          ? t('sync.subtext')
           : totals !== null
-            ? `${formatTotalDistance(totals.distanceMeters, system)} loaded`
-            : 'Loading…'}
+            ? t('activities.loaded', { distance: formatTotalDistance(totals.distanceMeters, system) })
+            : t('common.loading')}
         <span className="activities-panel__sheet-chevron" aria-hidden="true">
           {sheetExpanded ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
         </span>
@@ -429,8 +433,8 @@ export function ActivitiesPanel({
               className="activities-panel__checkbox"
               checked={allChecked}
               disabled={activities.length === 0}
-              aria-label={allChecked ? 'Uncheck all activities' : 'Check all activities'}
-              title={allChecked ? 'Uncheck all' : 'Check all'}
+              aria-label={allChecked ? t('activities.uncheck_all_label') : t('activities.check_all_label')}
+              title={allChecked ? t('activities.uncheck_all') : t('activities.check_all')}
               onChange={() => (allChecked || someChecked ? onClear() : onSelectAll())}
             />
             <button
@@ -438,8 +442,8 @@ export function ActivitiesPanel({
               className="activities-panel__invert"
               disabled={activities.length === 0}
               onClick={onInvertSelection}
-              aria-label="Invert selection"
-              title="Invert selection — check the unchecked activities and uncheck the checked ones"
+              aria-label={t('activities.invert')}
+              title={t('activities.invert_title')}
             >
               {/* A checkbox-sized square split on the diagonal, one half filled — reads as a
                   sibling of the select-all checkbox beside it rather than a separate text chip.
@@ -469,16 +473,16 @@ export function ActivitiesPanel({
                 aria-expanded={typeFilterOpen}
                 onClick={() => setTypeFilterOpen((open) => !open)}
               >
-                Type
+                {t('activities.type')}
                 {excludedTypes.size > 0 && <span className="activities-panel__type-trigger-dot" aria-hidden="true" />}
                 <span className="activities-panel__type-trigger-caret" aria-hidden="true">
                   <ChevronDown size={14} />
                 </span>
               </button>
               {typeFilterOpen && (
-                <div className="activities-panel__type-panel" role="dialog" aria-label="Filter by type">
+                <div className="activities-panel__type-panel" role="dialog" aria-label={t('activities.filter_by_type')}>
                   {facets.length === 0 ? (
-                    <p className="activities-panel__type-panel-empty">No activities to filter yet.</p>
+                    <p className="activities-panel__type-panel-empty">{t('activities.type_empty')}</p>
                   ) : (
                     <>
                       {/* A select-all convenience, not a real toggle — it only ever clears every
@@ -495,7 +499,7 @@ export function ActivitiesPanel({
                             for (const type of excludedTypes) onToggleType(type);
                           }}
                         />
-                        <span className="activity-filters__type-label">All types</span>
+                        <span className="activity-filters__type-label">{t('activities.all_types')}</span>
                       </label>
                       <div className="activities-panel__type-panel-divider" aria-hidden="true" />
                       <div className="activity-filters__type-list">
@@ -524,8 +528,8 @@ export function ActivitiesPanel({
               className="activities-panel__visibility"
               disabled={checked.size === 0}
               onClick={onToggleGroupVisibility}
-              aria-label={groupHasHidden ? 'Show every checked activity on the map' : 'Hide every checked activity from the map'}
-              title={groupHasHidden ? 'Show checked group' : 'Hide checked group'}
+              aria-label={groupHasHidden ? t('activities.show_group_label') : t('activities.hide_group_label')}
+              title={groupHasHidden ? t('activities.show_group') : t('activities.hide_group')}
             >
               {groupHasHidden ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
@@ -534,13 +538,13 @@ export function ActivitiesPanel({
               className="activities-panel__edit"
               disabled={readOnly || checked.size === 0}
               onClick={() => setEditingActivities(checkedActivities)}
-              aria-label="Edit the checked group"
+              aria-label={t('activities.edit_group_label')}
               title={
                 readOnly
-                  ? 'Not available for demo accounts — create an account to edit activities'
+                  ? t('activities.demo_edit_activities')
                   : checkedActivities.length === 1
-                    ? 'Edit type, name, and description'
-                    : 'Edit type for every checked activity'
+                    ? t('activities.edit_one')
+                    : t('activities.edit_many')
               }
             >
               <Pencil size={16} />
@@ -550,8 +554,8 @@ export function ActivitiesPanel({
               className="activities-panel__edit-track"
               disabled={editTrackReason !== null}
               onClick={() => editTrackTarget && onEditTrack(editTrackTarget)}
-              aria-label="Edit the checked activity's track"
-              title={editTrackReason ?? 'Edit track — chop, cut, or delete points'}
+              aria-label={t('activities.edit_track_label')}
+              title={editTrackReason ?? t('activities.edit_track')}
             >
               <Waypoints size={16} />
             </button>
@@ -560,8 +564,8 @@ export function ActivitiesPanel({
               className="activities-panel__delete"
               disabled={readOnly || checked.size === 0 || groupHasPending}
               onClick={() => setDeletingGroup(true)}
-              aria-label="Delete every checked activity"
-              title={readOnly ? 'Not available for demo accounts — create an account to delete activities' : 'Delete checked group'}
+              aria-label={t('activities.delete_group_label')}
+              title={readOnly ? t('activities.demo_delete') : t('activities.delete_group')}
             >
               <Trash2 size={16} />
             </button>
@@ -571,8 +575,8 @@ export function ActivitiesPanel({
               className="activities-panel__focus"
               disabled={checked.size === 0}
               onClick={onShowSelected}
-              aria-label="Focus the map on the checked group"
-              title="Focus checked group on the map"
+              aria-label={t('activities.focus_group_label')}
+              title={t('activities.focus_group')}
             >
               <Focus size={16} />
             </button>
@@ -617,7 +621,7 @@ export function ActivitiesPanel({
                     // A pending row (§4.7.7) is disabled until its reprocess lands, except that an
                     // already-checked one can still be unchecked.
                     disabled={isPending && !isChecked}
-                    aria-label={isChecked ? `Remove ${label} from selection` : `Add ${label} to selection`}
+                    aria-label={isChecked ? t('activities.row_uncheck', { label }) : t('activities.row_check', { label })}
                     onChange={() => onToggle(activity.id)}
                   />
                   <button
@@ -625,8 +629,8 @@ export function ActivitiesPanel({
                     className="activities-panel__text"
                     disabled={isPending}
                     aria-pressed={isFocused}
-                    aria-label={`Fly to ${label}`}
-                    title={activity.bbox === null ? 'No track recorded for this activity' : label}
+                    aria-label={t('activities.fly_to', { label })}
+                    title={activity.bbox === null ? t('activities.no_track') : label}
                     onClick={() => onFocus(activity.id)}
                   >
                     <span className={`activities-panel__title${isHovered ? ' activities-panel__title--hovered' : ''}`}>{label}</span>
@@ -643,20 +647,20 @@ export function ActivitiesPanel({
                     </span>
                   </button>
                   {isPending && (
-                    <span className="activities-panel__hidden-badge" title="Applying your track edit">
-                      Pending
+                    <span className="activities-panel__hidden-badge" title={t('activities.pending_title')}>
+                      {t('activities.pending')}
                     </span>
                   )}
-                  {isHidden && <span className="activities-panel__hidden-badge">Hidden</span>}
+                  {isHidden && <span className="activities-panel__hidden-badge">{t('activities.hidden')}</span>}
                 </li>
               );
             })}
-            {loading && <li className="activities-panel__note">Loading…</li>}
+            {loading && <li className="activities-panel__note">{t('common.loading')}</li>}
             {error && !loading && (
               <li className="activities-panel__note activities-panel__note--error">{error}</li>
             )}
             {!loading && !error && activities.length === 0 && (
-              <li className="activities-panel__note">No activities match the current filters.</li>
+              <li className="activities-panel__note">{t('activities.none_match')}</li>
             )}
           </ul>
 
@@ -664,7 +668,7 @@ export function ActivitiesPanel({
               own accent-tinted "Focus checked group on the map" icon above. */}
           <div className="activities-panel__footer">
             <span className="activities-panel__footer-summary">
-              {checkedActivities.length} selected · {formatTotalDistance(checkedMeters, system)}
+              {t('activities.footer', { n: checkedActivities.length, distance: formatTotalDistance(checkedMeters, system) })}
             </span>
           </div>
 
@@ -681,8 +685,8 @@ export function ActivitiesPanel({
                 onClick={() => setDuplicatesOpen((open) => !open)}
               >
                 {duplicatesError
-                  ? 'Duplicates — failed to load'
-                  : `${duplicates.length} ${duplicates.length === 1 ? 'duplicate' : 'duplicates'} found`}
+                  ? t('activities.duplicates_failed')
+                  : tn('activities.duplicates_found', duplicates.length)}
                 <span className="activities-panel__duplicates-chevron" aria-hidden="true">
                   {duplicatesOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
                 </span>
@@ -694,7 +698,7 @@ export function ActivitiesPanel({
                       {formatStartedAt(d.startedAt)} · {formatActivityType(d.activityType)}
                       {d.distanceMeters !== null && ` · ${formatDistance(d.distanceMeters, system)}`}
                       <br />
-                      From {formatIngestSource(d.source)} — replaced by the copy from {formatIngestSource(d.supersededBy.source)}.
+                      {t('activities.duplicate_from', { source: formatIngestSource(d.source), kept: formatIngestSource(d.supersededBy.source) })}
                     </li>
                   ))}
                 </ul>
@@ -715,14 +719,14 @@ export function ActivitiesPanel({
 
       {deletingGroup && (
         <ConfirmDialog
-          title="Delete this group?"
+          title={t('activities.delete_title')}
           message={
             checkedActivities.length === 1
-              ? `${groupSummary} will be permanently deleted — its track, fog/heatmap coverage, and any performance records it contributed to. This can't be undone.`
-              : `${groupSummary} will be permanently deleted — their tracks, fog/heatmap coverage, and any performance records they contributed to. This can't be undone.`
+              ? t('activities.delete_one_body', { group: groupSummary })
+              : t('activities.delete_many_body', { group: groupSummary })
           }
-          confirmLabel="Delete group"
-          busyLabel="Deleting…"
+          confirmLabel={t('activities.delete_confirm')}
+          busyLabel={t('common.deleting')}
           onConfirm={async () => {
             // Sequential, not Promise.all: N concurrent DELETEs against the same account's
             // fog_tiles rows would race each other's dirty-mark-and-render trigger for no

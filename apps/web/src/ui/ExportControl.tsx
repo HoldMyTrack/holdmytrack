@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { IControl, Map as MapLibreMap } from 'maplibre-gl';
 import { Camera } from 'lucide-react';
+import { t } from '../i18n';
 
 export interface ExportControlProps {
   map: MapLibreMap;
@@ -52,8 +53,8 @@ export function ExportControl({ map, active, onOpen }: ExportControlProps) {
       className="export-control"
       data-testid="export-button"
       aria-pressed={active}
-      aria-label="Export map image"
-      title="Export map image"
+      aria-label={t('export.open')}
+      title={t('export.open')}
       onClick={onOpen}
     >
       <Camera size={17} aria-hidden="true" />

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"math"
 	"net/http"
 	"regexp"
@@ -49,13 +48,13 @@ type privateLocationRequest struct {
 func (req *privateLocationRequest) validate() error {
 	req.Name = strings.TrimSpace(req.Name)
 	if len([]rune(req.Name)) > maxPrivateLocationNameLen {
-		return fmt.Errorf("name must be at most %d characters", maxPrivateLocationNameLen)
+		return accountFailure(http.StatusBadRequest, "error.location_name_too_long", "max", maxPrivateLocationNameLen)
 	}
 	if math.IsNaN(req.Lat) || math.IsNaN(req.Lon) || req.Lat < -85 || req.Lat > 85 || req.Lon < -180 || req.Lon > 180 {
-		return errors.New("lat must be within ±85 and lon within ±180")
+		return accountFailure(http.StatusBadRequest, "error.location_position")
 	}
 	if req.RadiusM < minPrivateLocationRadiusM || req.RadiusM > maxPrivateLocationRadiusM {
-		return fmt.Errorf("radius_m must be between %d and %d", minPrivateLocationRadiusM, maxPrivateLocationRadiusM)
+		return accountFailure(http.StatusBadRequest, "error.location_radius", "min", minPrivateLocationRadiusM, "max", maxPrivateLocationRadiusM)
 	}
 	return nil
 }
@@ -67,7 +66,7 @@ func decodePrivateLocation(w http.ResponseWriter, r *http.Request) (privateLocat
 		return req, false
 	}
 	if err := req.validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, err.(*accountError).message(requestLang(r)), http.StatusBadRequest)
 		return req, false
 	}
 	return req, true
@@ -133,7 +132,7 @@ func (s *Server) handleCreatePrivateLocation(w http.ResponseWriter, r *http.Requ
 		`, userID, req.Name, req.Lon, req.Lat, req.RadiusM))
 		return []circle{{req.Lat, req.Lon, req.RadiusM}}, err
 	})
-	if s.writeLocationError(w, err) {
+	if s.writeLocationError(w, r, err) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, created)
@@ -175,7 +174,7 @@ func (s *Server) handleUpdatePrivateLocation(w http.ResponseWriter, r *http.Requ
 		}
 		return []circle{{old.Lat, old.Lon, old.RadiusM}, {updated.Lat, updated.Lon, updated.RadiusM}}, nil
 	})
-	if s.writeLocationError(w, err) {
+	if s.writeLocationError(w, r, err) {
 		return
 	}
 	writeJSON(w, http.StatusOK, updated)
@@ -197,7 +196,7 @@ func (s *Server) handleDeletePrivateLocation(w http.ResponseWriter, r *http.Requ
 		`, id, userID))
 		return []circle{{old.Lat, old.Lon, old.RadiusM}}, err
 	})
-	if s.writeLocationError(w, err) {
+	if s.writeLocationError(w, r, err) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -208,7 +207,7 @@ type circle struct {
 	radiusM  int
 }
 
-var errTooManyLocations = fmt.Errorf("at most %d private locations", maxPrivateLocations)
+var errTooManyLocations = accountFailure(http.StatusConflict, "error.location_too_many", "max", maxPrivateLocations)
 
 // changePrivateLocations runs one privacy_zones change and enqueues the reprocessing it
 // causes in a single transaction: change returns the circles (old and/or new) whose
@@ -256,14 +255,14 @@ func (s *Server) changePrivateLocations(ctx context.Context, userID string, chan
 
 // writeLocationError maps changePrivateLocations' error to a response, reporting whether
 // it wrote one.
-func (s *Server) writeLocationError(w http.ResponseWriter, err error) bool {
+func (s *Server) writeLocationError(w http.ResponseWriter, r *http.Request, err error) bool {
 	switch {
 	case err == nil:
 		return false
 	case errors.Is(err, pgx.ErrNoRows):
 		http.Error(w, "private location not found", http.StatusNotFound)
 	case errors.Is(err, errTooManyLocations):
-		http.Error(w, err.Error(), http.StatusConflict)
+		http.Error(w, errTooManyLocations.(*accountError).message(requestLang(r)), http.StatusConflict)
 	default:
 		s.log.Error("private location change failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)

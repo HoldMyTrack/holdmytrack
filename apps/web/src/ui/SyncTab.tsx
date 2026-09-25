@@ -4,6 +4,7 @@ import type { UploadHistoryRow } from '../api';
 import { formatDistance, formatFileSize, formatShortDate, formatSourceLabel } from './format';
 import { useUnitSystem } from './units';
 import type { ImportsState } from './useImports';
+import { t, tn } from '../i18n';
 
 const ACCEPT = '.gpx,.fit,.tcx,.zip';
 
@@ -49,7 +50,7 @@ export function SyncTab({ imports, readOnly, onViewOnMap }: SyncTabProps) {
   return (
     <div className="sync-tab" data-testid="sync-tab">
       {readOnly ? (
-        <p className="sync-tab__hint">Not available for demo accounts — create an account to import your own data.</p>
+        <p className="sync-tab__hint">{t('sync.demo')}</p>
       ) : (
         <>
           <div
@@ -67,8 +68,8 @@ export function SyncTab({ imports, readOnly, onViewOnMap }: SyncTabProps) {
               enqueueFiles(event.dataTransfer.files);
             }}
           >
-            Drop files here or choose from disk
-            <span className="sync-tab__dropzone-hint">.gpx, .fit, .tcx, or a .zip archive containing them</span>
+            {t('sync.dropzone')}
+            <span className="sync-tab__dropzone-hint">{t('sync.dropzone_hint')}</span>
           </div>
           <input
             ref={inputRef}
@@ -83,8 +84,7 @@ export function SyncTab({ imports, readOnly, onViewOnMap }: SyncTabProps) {
             }}
           />
           <p className="sync-tab__hint">
-            Activity from the HoldMyTrack Android app — Health Connect and GPS Logger recordings — lands here once you
-            tap "Sync Now" on your phone.
+            {t('sync.android_hint')}
           </p>
         </>
       )}
@@ -101,7 +101,7 @@ export function SyncTab({ imports, readOnly, onViewOnMap }: SyncTabProps) {
               <button
                 type="button"
                 className="sync-tab__notice-dismiss"
-                aria-label="Dismiss"
+                aria-label={t('common.dismiss')}
                 onClick={() => dismissNotice(notice.id)}
               >
                 <X size={14} />
@@ -112,12 +112,11 @@ export function SyncTab({ imports, readOnly, onViewOnMap }: SyncTabProps) {
       )}
 
       <div className="sync-tab__list-head">
-        <span className="sync-tab__list-title">History</span>
+        <span className="sync-tab__list-title">{t('sync.history')}</span>
         <span className="sync-tab__list-summary">
           {page
-            ? `${page.total.toLocaleString()} ${page.total === 1 ? 'activity' : 'activities'}${
-                page.processing > 0 ? ` · ${page.processing} in progress` : ''
-              }`
+            ? tn('activities.count', page.total) +
+              (page.processing > 0 ? ` · ${t('sync.in_progress', { n: page.processing })}` : '')
             : '…'}
         </span>
       </div>
@@ -135,7 +134,7 @@ export function SyncTab({ imports, readOnly, onViewOnMap }: SyncTabProps) {
               ) : (
                 <>
                   <span className="sync-tab__row-status">
-                    {f.status === 'queued' ? 'Queued' : `Uploading ${Math.round(f.progress * 100)}%`}
+                    {f.status === 'queued' ? t('sync.queued') : t('sync.uploading', { percent: Math.round(f.progress * 100) })}
                   </span>
                   <span className="sync-tab__progress">
                     <span
@@ -151,7 +150,7 @@ export function SyncTab({ imports, readOnly, onViewOnMap }: SyncTabProps) {
 
         {history.error && <li className="sync-tab__note sync-tab__note--error">{history.error}</li>}
         {!history.error && page && page.uploads.length === 0 && inFlight.length === 0 && (
-          <li className="sync-tab__note">Nothing imported yet.</li>
+          <li className="sync-tab__note">{t('sync.empty')}</li>
         )}
         {page?.uploads.map((u) => (
           <li key={u.externalId} className="sync-tab__row">
@@ -160,13 +159,13 @@ export function SyncTab({ imports, readOnly, onViewOnMap }: SyncTabProps) {
             </span>
             <span className="sync-tab__row-size" />
             <span className="sync-tab__row-detail">
-              {u.status === 'processing' && <span className="sync-tab__row-status">Processing…</span>}
+              {u.status === 'processing' && <span className="sync-tab__row-status">{t('sync.processing')}</span>}
               {u.status === 'failed' && (
-                <span className="sync-tab__row-status sync-tab__row-status--error">Failed{u.error ? `: ${u.error}` : ''}</span>
+                <span className="sync-tab__row-status sync-tab__row-status--error">{u.error ? t('sync.failed_with', { error: u.error }) : t('sync.failed')}</span>
               )}
               {u.status === 'done' && (
                 <>
-                  <span className="sync-tab__row-status sync-tab__row-status--ready">Ready</span>
+                  <span className="sync-tab__row-status sync-tab__row-status--ready">{t('sync.ready')}</span>
                   {u.startedAt && u.distanceMeters !== undefined && (
                     <span className="sync-tab__row-meta">
                       {formatShortDate(u.startedAt)} · {formatDistance(u.distanceMeters, system)}
@@ -178,7 +177,7 @@ export function SyncTab({ imports, readOnly, onViewOnMap }: SyncTabProps) {
                       className="sync-tab__row-view"
                       onClick={() => onViewOnMap(u.activityId!, u.startedAt!)}
                     >
-                      View on map
+                      {t('sync.view_on_map')}
                     </button>
                   )}
                 </>
@@ -190,13 +189,13 @@ export function SyncTab({ imports, readOnly, onViewOnMap }: SyncTabProps) {
 
       {page && page.total > page.limit && (
         <div className="sync-tab__pager">
-          <span>{page.total === 0 ? '0 of 0' : `${page.offset + 1}–${pageEnd} of ${page.total}`}</span>
+          <span>{t('common.range', { from: page.total === 0 ? 0 : page.offset + 1, to: pageEnd, total: page.total })}</span>
           <div className="sync-tab__pager-buttons">
             <button
               type="button"
               disabled={page.offset === 0}
               onClick={() => history.setOffset(Math.max(0, page.offset - page.limit))}
-              aria-label="Previous page"
+              aria-label={t('common.previous_page')}
             >
               ←
             </button>
@@ -204,7 +203,7 @@ export function SyncTab({ imports, readOnly, onViewOnMap }: SyncTabProps) {
               type="button"
               disabled={pageEnd >= page.total}
               onClick={() => history.setOffset(page.offset + page.limit)}
-              aria-label="Next page"
+              aria-label={t('common.next_page')}
             >
               →
             </button>

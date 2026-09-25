@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The languages the app has strings for (values/, values-ru/), for Android's per-app language
+     setting (Settings → Apps → HoldMyTrack → Language). Keep in step with build.gradle.kts's
+     localeFilters and with the server's internal/i18n catalogs. -->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="ru" />
+</locale-config>

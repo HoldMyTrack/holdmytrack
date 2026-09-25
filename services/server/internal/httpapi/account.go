@@ -4,16 +4,19 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
+
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 )
 
 // The Settings page (Avatar, Name, Country, Timezone) — see
 // migrations/0001_init.sql's users table (display_name/country/avatar_key/
-// avatar_content_type/avatar_updated_at) and migrations/0021_user_timezone.sql (timezone).
+// avatar_content_type/avatar_updated_at), migrations/0021_user_timezone.sql (timezone) and
+// migrations/0030_user_locale.sql (locale).
 // Name, Country and Timezone are covered by handleUpdateSettings; the avatar is a
 // separate content type entirely, so it gets its own three endpoints below.
 
@@ -23,6 +26,9 @@ type updateSettingsRequest struct {
 	DisplayName string `json:"display_name"`
 	Country     string `json:"country"`
 	Timezone    string `json:"timezone"`
+	// Locale is the account's language (i18n.Supported), "" for automatic — its browser's. A
+	// pointer so a client that predates it (the Android app) leaves it as it was.
+	Locale *string `json:"locale"`
 }
 
 // handleUpdateSettings serves `PATCH /v1/account/settings` — a full replace of all three
@@ -35,23 +41,23 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	s.writeProfile(w, r, "update settings", s.saveSettings(r.Context(), userIDFromContext(r.Context()), req.DisplayName, req.Country, req.Timezone))
+	s.writeProfile(w, r, "update settings", s.saveSettings(r.Context(), userIDFromContext(r.Context()), req.DisplayName, req.Country, req.Timezone, req.Locale))
 }
 
 // saveSettings is the Settings save's shared core — handleUpdateSettings (JSON) and the
 // /settings page (settings_page.go) both call it, and it does all the validating. The caller
-// has already refused a demo session.
-func (s *Server) saveSettings(ctx context.Context, userID, displayName, country, timezone string) error {
+// has already refused a demo session. A nil locale is left as it is.
+func (s *Server) saveSettings(ctx context.Context, userID, displayName, country, timezone string, locale *string) error {
 	displayName = strings.TrimSpace(displayName)
 	country = strings.ToUpper(strings.TrimSpace(country))
 	// Required: Country decides metric vs imperial everywhere, and the first-run gate (FR-1.7)
 	// treats an empty one as "Settings never saved" — letting a save clear it would send the
 	// account back through onboarding.
 	if country == "" {
-		return accountFailure(http.StatusBadRequest, "country is required")
+		return accountFailure(http.StatusBadRequest, "error.country_required")
 	}
 	if !countryCodePattern.MatchString(country) {
-		return accountFailure(http.StatusBadRequest, "country must be a two-letter code")
+		return accountFailure(http.StatusBadRequest, "error.country_invalid")
 	}
 	// Unlike Country, timezone has no "unset" state (the column is NOT NULL DEFAULT 'UTC' —
 	// migrations/0021_user_timezone.sql) — Settings always sends the field's current
@@ -59,14 +65,19 @@ func (s *Server) saveSettings(ctx context.Context, userID, displayName, country,
 	// clear, and is rejected rather than silently defaulted.
 	tz, ok := normalizeTimezone(timezone)
 	if !ok {
-		return accountFailure(http.StatusBadRequest, "timezone must be a valid IANA zone name (e.g. America/New_York)")
+		return accountFailure(http.StatusBadRequest, "error.timezone_invalid")
+	}
+	if locale != nil && *locale != "" && !i18n.IsSupported(*locale) {
+		return accountFailure(http.StatusBadRequest, "error.locale_invalid")
 	}
 	// NULLIF, not a Go-side branch on "" — an empty display name means "unset", same as every
-	// other nullable text column this API already treats that way.
+	// other nullable text column this API already treats that way; an empty locale likewise
+	// means "automatic". $5 IS NULL is a locale left out of the request, kept as it was.
 	_, err := s.pool.Exec(ctx, `
-		UPDATE users SET display_name = NULLIF($2, ''), country = $3, timezone = $4
+		UPDATE users SET display_name = NULLIF($2, ''), country = $3, timezone = $4,
+		                 locale = CASE WHEN $5::text IS NULL THEN locale ELSE NULLIF($5, '') END
 		WHERE id = $1
-	`, userID, displayName, country, tz)
+	`, userID, displayName, country, tz, locale)
 	return err
 }
 
@@ -75,7 +86,7 @@ func (s *Server) saveSettings(ctx context.Context, userID, displayName, country,
 // can update its local state from it instead of a follow-up GET.
 func (s *Server) writeProfile(w http.ResponseWriter, r *http.Request, op string, err error) {
 	if err != nil {
-		s.writeAccountError(w, op, err)
+		s.writeAccountError(w, r, op, err)
 		return
 	}
 	resp, err := s.loadAuthResponse(r.Context(), userIDFromContext(r.Context()))
@@ -118,21 +129,21 @@ func (s *Server) handleUploadAvatar(w http.ResponseWriter, r *http.Request) {
 func (s *Server) setAvatar(w http.ResponseWriter, r *http.Request, userID string) error {
 	r.Body = http.MaxBytesReader(w, r.Body, maxAvatarBytes+1<<20) // +1MiB of multipart overhead
 	if err := r.ParseMultipartForm(maxAvatarBytes); err != nil {
-		return accountFailure(http.StatusRequestEntityTooLarge, "file too large or malformed multipart body")
+		return accountFailure(http.StatusRequestEntityTooLarge, "error.avatar_too_large")
 	}
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		return accountFailure(http.StatusBadRequest, `expected a multipart field named "file"`)
+		return accountFailure(http.StatusBadRequest, "error.avatar_missing")
 	}
 	defer file.Close()
 
 	data, err := io.ReadAll(io.LimitReader(file, maxAvatarBytes))
 	if err != nil {
-		return accountFailure(http.StatusBadRequest, "failed reading upload")
+		return accountFailure(http.StatusBadRequest, "error.avatar_read")
 	}
 	contentType := http.DetectContentType(data)
 	if !allowedAvatarContentType[contentType] {
-		return accountFailure(http.StatusUnsupportedMediaType, fmt.Sprintf("unsupported image type %q (want PNG, JPEG or WebP)", contentType))
+		return accountFailure(http.StatusUnsupportedMediaType, "error.avatar_type", "type", strconv.Quote(contentType))
 	}
 
 	ctx := r.Context()

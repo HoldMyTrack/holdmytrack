@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 	"sort"
@@ -248,19 +247,19 @@ func (s *Server) handleUpdateActivity(w http.ResponseWriter, r *http.Request) {
 	req.Name = strings.TrimSpace(req.Name)
 	req.Description = strings.TrimSpace(req.Description)
 	if req.ActivityType == "" {
-		http.Error(w, "activity_type is required", http.StatusBadRequest)
+		httpErrorT(w, r, http.StatusBadRequest, "error.activity_type_required")
 		return
 	}
 	if len(req.ActivityType) > maxActivityTypeLen {
-		http.Error(w, fmt.Sprintf("activity_type must be %d characters or fewer", maxActivityTypeLen), http.StatusBadRequest)
+		httpErrorT(w, r, http.StatusBadRequest, "error.activity_type_too_long", "max", maxActivityTypeLen)
 		return
 	}
 	if len(req.Name) > maxActivityNameLen {
-		http.Error(w, fmt.Sprintf("name must be %d characters or fewer", maxActivityNameLen), http.StatusBadRequest)
+		httpErrorT(w, r, http.StatusBadRequest, "error.activity_name_too_long", "max", maxActivityNameLen)
 		return
 	}
 	if len(req.Description) > maxActivityDescriptionLen {
-		http.Error(w, fmt.Sprintf("description must be %d characters or fewer", maxActivityDescriptionLen), http.StatusBadRequest)
+		httpErrorT(w, r, http.StatusBadRequest, "error.activity_description_too_long", "max", maxActivityDescriptionLen)
 		return
 	}
 

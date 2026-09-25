@@ -1,6 +1,7 @@
 package dev.holdmytrack.android.net
 
 import android.os.Handler
+import android.os.LocaleList
 import android.os.Looper
 import dev.holdmytrack.android.BuildConfig
 import java.io.IOException
@@ -109,7 +110,25 @@ object HoldMyTrackApi {
     val client: OkHttpClient = OkHttpClient.Builder()
         .dispatcher(Dispatcher().apply { maxRequestsPerHost = 20 })
         .addInterceptor(BearerInterceptor)
+        .addInterceptor(LanguageInterceptor)
         .build()
+
+    /**
+     * Sends the app's language as Accept-Language on HoldMyTrack's own requests, so the
+     * server's messages (a failed sign-in, a rejected activity) come back in it — the same
+     * language the rest of the screen is in. Read per request: the per-app language can change
+     * while the app runs. OkHttp sends no Accept-Language of its own, so without this the
+     * server would always answer in English.
+     */
+    private object LanguageInterceptor : Interceptor {
+        override fun intercept(chain: Interceptor.Chain): Response {
+            val request = chain.request()
+            if (!request.url.toString().startsWith(BuildConfig.API_BASE_URL)) return chain.proceed(request)
+            val tags = LocaleList.getDefault().toLanguageTags()
+            if (tags.isEmpty()) return chain.proceed(request)
+            return chain.proceed(request.newBuilder().header("Accept-Language", tags).build())
+        }
+    }
 
     /**
      * Attaches the session token to every request bound for HoldMyTrack's own API, and to nothing

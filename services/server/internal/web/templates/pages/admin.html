@@ -1,0 +1,33 @@
+{{define "content"}}{{with .Page}}
+<main class="page-main admin">
+  <a class="settings__back" href="/">{{t "common.back_to_map"}}</a>
+  <h1 class="settings__title">{{t "header.admin"}}</h1>
+  <p class="profile__subtext">{{t "admin.intro"}}</p>
+
+  <div class="admin__scroll">
+    <table class="admin__table">
+      <thead>
+        <tr><th>{{t "admin.col_account"}}</th><th>{{t "admin.col_signed_up"}}</th><th>{{t "settings.country"}}</th><th>{{t "settings.timezone"}}</th><th class="admin__num">{{t "admin.col_activities"}}</th><th>{{t "admin.col_first_last"}}</th><th class="admin__num">{{t "admin.col_distance"}}</th></tr>
+      </thead>
+      <tbody>
+        {{range .Users}}
+        <tr>
+          <td>
+            <a href="/admin/users/{{.ID}}">{{.Email}}</a>
+            {{if .DisplayName}}<span class="admin__muted">{{.DisplayName}}</span>{{end}}
+            {{if .IsAdmin}}<span class="admin__badge">{{t "admin.badge_admin"}}</span>{{end}}
+            {{if .IsDemo}}<span class="admin__badge">{{t "admin.badge_demo"}}</span>{{else if not .Verified}}<span class="admin__badge admin__badge--warn">{{t "admin.badge_unverified"}}</span>{{end}}
+          </td>
+          <td>{{.SignedUp}}</td>
+          <td>{{.Country}}</td>
+          <td>{{.Timezone}}</td>
+          <td class="admin__num">{{.Activities}}</td>
+          <td>{{if .First}}{{.First}} – {{.Last}}{{end}}</td>
+          <td class="admin__num">{{.Distance}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</main>
+{{end}}{{end}}

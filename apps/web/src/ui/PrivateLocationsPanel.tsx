@@ -20,6 +20,7 @@ import {
 import { ConfirmDialog } from './ConfirmDialog';
 import { elevationUnitLabel, metersToFeet } from './format';
 import { useUnitSystem } from './units';
+import { lang, t } from '../i18n';
 
 /**
  * The Private locations window (FR-8.1) — floats over the map, like EditTrackPanel, while the
@@ -166,23 +167,23 @@ export function PrivateLocationsPanel({ map, readOnly, onChanged, onClose }: Pri
   }
 
   const unit = elevationUnitLabel(system);
-  const radiusDisplay = (m: number) => Math.round(system === 'imperial' ? metersToFeet(m) : m).toLocaleString();
+  const radiusDisplay = (m: number) => Math.round(system === 'imperial' ? metersToFeet(m) : m).toLocaleString(lang);
 
   return (
-    <section className="edit-track private-locations" aria-label="Private locations" data-testid="private-locations">
+    <section className="edit-track private-locations" aria-label={t('private.title')} data-testid="private-locations">
       <header className="edit-track__head">
-        <span className="edit-track__title">Private locations</span>
+        <span className="edit-track__title">{t('private.title')}</span>
         <span className="edit-track__subtitle">
-          {readOnly ? 'Tracks never show inside these circles.' : 'Tracks never show inside these circles. Zoom in and click the map to add one.'}
+          {readOnly ? t('private.subtitle') : t('private.subtitle_add')}
         </span>
       </header>
 
       {loadError && <p className="edit-track__error">{loadError}</p>}
-      {!locations && !loadError && <p className="edit-track__note">Loading…</p>}
+      {!locations && !loadError && <p className="edit-track__note">{t('common.loading')}</p>}
 
       {locations && (
         <ul className="private-locations__list">
-          {locations.length === 0 && draft === null && <li className="edit-track__note">None yet.</li>}
+          {locations.length === 0 && draft === null && <li className="edit-track__note">{t('private.none')}</li>}
           {locations.map((l) => (
             <li key={l.id}>
               <button
@@ -194,7 +195,7 @@ export function PrivateLocationsPanel({ map, readOnly, onChanged, onClose }: Pri
                   map.flyTo({ center: [l.lon, l.lat], zoom: Math.max(map.getZoom(), 14) });
                 }}
               >
-                <span className="private-locations__name">{l.name || 'Unnamed'}</span>
+                <span className="private-locations__name">{l.name || t('private.unnamed')}</span>
                 <span className="private-locations__radius">
                   {radiusDisplay(l.radiusM)} {unit}
                 </span>
@@ -207,19 +208,19 @@ export function PrivateLocationsPanel({ map, readOnly, onChanged, onClose }: Pri
       {draft && !readOnly && (
         <div className="private-locations__editor">
           <label className="private-locations__field">
-            <span className="activity-filters__label">Name</span>
+            <span className="activity-filters__label">{t('edit.name')}</span>
             <input
               className="settings-page__input"
               type="text"
               value={draft.name}
               maxLength={100}
-              placeholder="e.g. Home"
+              placeholder={t('private.name_placeholder')}
               onChange={(e) => setDraft({ ...draft, name: e.target.value })}
             />
           </label>
           <label className="private-locations__field">
             <span className="activity-filters__head">
-              <span className="activity-filters__label">Radius</span>
+              <span className="activity-filters__label">{t('private.radius')}</span>
               <span className="activity-filters__readout">
                 {radiusDisplay(draft.radiusM)} {unit}
               </span>
@@ -235,21 +236,21 @@ export function PrivateLocationsPanel({ map, readOnly, onChanged, onClose }: Pri
             />
           </label>
           <p className="edit-track__note">
-            Drag the center to move it. Don't center it exactly on your door — a circle's middle is the first place anyone looks.
+            {t('private.editor_note')}
           </p>
           {error && <p className="edit-track__error">{error}</p>}
           <div className="edit-track__row edit-track__row--footer">
             {draft.id !== undefined && (
               <button type="button" className="edit-track__btn edit-track__btn--quiet" disabled={busy} onClick={() => setConfirmDelete(true)}>
-                Delete
+                {t('common.delete')}
               </button>
             )}
             <span className="edit-track__spacer" />
             <button type="button" className="edit-track__btn" disabled={busy} onClick={() => setDraft(null)}>
-              Cancel
+              {t('common.cancel')}
             </button>
             <button type="button" className="edit-track__btn edit-track__btn--primary" disabled={busy || !dirty} onClick={() => void save()}>
-              {busy ? 'Saving…' : 'Save'}
+              {busy ? t('common.saving') : t('common.save')}
             </button>
           </div>
         </div>
@@ -257,20 +258,20 @@ export function PrivateLocationsPanel({ map, readOnly, onChanged, onClose }: Pri
 
       {!draft && (
         <div className="edit-track__row edit-track__row--footer">
-          <p className="edit-track__note">Saving a change reprocesses the activities it touches — they show Pending until done.</p>
+          <p className="edit-track__note">{t('private.reprocess_note')}</p>
           <span className="edit-track__spacer" />
           <button type="button" className="edit-track__btn" onClick={onClose}>
-            Done
+            {t('common.done')}
           </button>
         </div>
       )}
 
       {confirmDelete && draft?.id !== undefined && (
         <ConfirmDialog
-          title="Delete this private location?"
-          message="Activities that start or end inside it will show those parts again once they're reprocessed."
-          confirmLabel="Delete"
-          busyLabel="Deleting…"
+          title={t('private.delete_title')}
+          message={t('private.delete_body')}
+          confirmLabel={t('common.delete')}
+          busyLabel={t('common.deleting')}
           onConfirm={remove}
           onClose={() => setConfirmDelete(false)}
         />

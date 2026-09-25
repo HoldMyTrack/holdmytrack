@@ -12,37 +12,37 @@
     <span class="page-header__wordmark"><span class="page-header__wordmark-light">HoldMy</span><span class="page-header__wordmark-bold">Track</span></span>
   </a>
   <span class="page-header__divider" aria-hidden="true"></span>
-  <span class="page-header__tagline">Every journey, mapped.</span>
-  <nav class="page-header__actions" aria-label="Main">
-    <a class="donate-button" href="{{.DonateURL}}" aria-label="Donate"{{if ne .DonateURL "/about#funding"}} target="_blank" rel="noopener noreferrer"{{end}}>
+  <span class="page-header__tagline">{{t "header.tagline"}}</span>
+  <nav class="page-header__actions" aria-label="{{t "header.nav_label"}}">
+    <a class="donate-button" href="{{.DonateURL}}" aria-label="{{t "header.donate"}}"{{if ne .DonateURL "/about#funding"}} target="_blank" rel="noopener noreferrer"{{end}}>
       <svg class="donate-button__icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /></svg>
-      <span class="donate-button__label">Donate</span>
+      <span class="donate-button__label">{{t "header.donate"}}</span>
     </a>
     <details class="header-menu info-menu">
-      <summary class="info-menu__trigger">Info<svg class="info-menu__caret" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></summary>
+      <summary class="info-menu__trigger">{{t "header.info"}}<svg class="info-menu__caret" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></summary>
       <div class="header-menu__dropdown" role="menu">
-        {{range .InfoLinks}}<a role="menuitem" class="header-menu__item" href="{{.Href}}"{{if eq .Href $.Path}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}
+        {{range .InfoLinks}}<a role="menuitem" class="header-menu__item" href="{{.Href}}"{{if eq .Href $.Path}} aria-current="page"{{end}}>{{t .LabelKey}}</a>{{end}}
       </div>
     </details>
     {{with .User}}
     <details class="header-menu user-menu">
-      <summary class="user-menu__avatar" aria-label="Account menu">
+      <summary class="user-menu__avatar" aria-label="{{t "header.account_menu"}}">
         {{if .AvatarURL}}<img src="{{.AvatarURL}}" alt="" />{{else}}<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>{{end}}
       </summary>
       <div class="header-menu__dropdown" role="menu">
-        <div class="header-menu__label">{{.Label}}</div>
-        {{if .IsDemo}}<a role="menuitem" class="header-menu__item header-menu__item--accent" href="/signup">Create your own account</a>{{end}}
-        <a role="menuitem" class="header-menu__item" href="/">Map</a>
-        <a role="menuitem" class="header-menu__item" href="/profile">Profile</a>
-        <a role="menuitem" class="header-menu__item" href="/settings">Settings</a>
-        <a role="menuitem" class="header-menu__item" href="/?private-locations">Private locations</a>
+        <div class="header-menu__label">{{with .Label}}{{.}}{{else}}{{t "header.demo_account"}}{{end}}</div>
+        {{if .IsDemo}}<a role="menuitem" class="header-menu__item header-menu__item--accent" href="/signup">{{t "header.create_account"}}</a>{{end}}
+        <a role="menuitem" class="header-menu__item" href="/profile">{{t "header.profile"}}</a>
+        <a role="menuitem" class="header-menu__item" href="/settings">{{t "header.settings"}}</a>
+        <a role="menuitem" class="header-menu__item" href="/?private-locations">{{t "header.private_locations"}}</a>
+        {{if .IsAdmin}}<a role="menuitem" class="header-menu__item" href="/admin">{{t "header.admin"}}</a>{{end}}
         <form method="post" action="/logout">
-          <button type="submit" role="menuitem" class="header-menu__item">Sign out</button>
+          <button type="submit" role="menuitem" class="header-menu__item">{{t "header.sign_out"}}</button>
         </form>
       </div>
     </details>
     {{else}}
-    <a class="page-button page-button--quiet" href="/signin">Sign in</a>
+    <a class="page-button page-button--quiet" href="/signin">{{t "header.sign_in"}}</a>
     {{end}}
   </nav>
 </header>
