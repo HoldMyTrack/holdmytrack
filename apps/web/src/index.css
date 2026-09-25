@@ -167,15 +167,15 @@ body {
   white-space: nowrap;
 }
 
-/* AboutMenu.tsx — a text menu just before the account menu, not a bordered button like the
+/* InfoMenu.tsx — a text menu just before the account menu, not a bordered button like the
    actions: it's navigation, not something to do with your data. Its dropdown reuses the
    account menu's panel and items, anchored under the trigger's trailing edge the same way. */
-.about-menu {
+.info-menu {
   position: relative;
   display: flex;
 }
 
-.about-menu__trigger {
+.info-menu__trigger {
   display: inline-flex;
   align-items: center;
   gap: var(--fm-space-6);
@@ -190,12 +190,12 @@ body {
   cursor: pointer;
 }
 
-.about-menu__trigger:hover,
-.about-menu__trigger[aria-expanded='true'] {
+.info-menu__trigger:hover,
+.info-menu__trigger[aria-expanded='true'] {
   background: rgb(var(--fm-ink-rgb) / 6%);
 }
 
-.about-menu__caret {
+.info-menu__caret {
   width: 14px;
   height: 14px;
 }
@@ -333,13 +333,13 @@ body {
   background: rgb(var(--fm-ink-rgb) / 6%);
 }
 
-/* AboutMenu.tsx's entries, and the account menu's phone-only About, are <a>s, not <button>s —
+/* InfoMenu.tsx's entries, and the account menu's phone-only About and Help, are <a>s, not <button>s —
    drop the link styling so they match. */
 a.user-menu__item {
   text-decoration: none;
 }
 
-/* Shown only at phone widths (see the header's media query), where AboutMenu is hidden. */
+/* Shown only at phone widths (see the header's media query), where InfoMenu is hidden. */
 .user-menu__item--phone-only {
   display: none;
 }
@@ -3510,9 +3510,9 @@ a.user-menu__item {
     display: none;
   }
 
-  /* Nor for the About menu: the header is already at a 390px phone's full width without it.
-     About moves into the account menu instead (UserMenu.tsx's phone-only item). */
-  .about-menu {
+  /* Nor for the Info menu: the header is already at a 390px phone's full width without it.
+     Its entries move into the account menu instead (UserMenu.tsx's phone-only items). */
+  .info-menu {
     display: none;
   }
 

@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { staticHeader } from './src/about/staticHeader';
 
 // tsconfig.json's `types` is deliberately just `["vite/client"]` — no @types/node for one
 // config file. This config file alone needs `process.env`, so it gets its own ambient type.
@@ -14,7 +15,19 @@ const devHost = process.env.VITE_DEV_HOST;
 const watchPoll = process.env.VITE_WATCH_POLL;
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      // The static pages' shared header (src/about/staticHeader.ts). 'pre' so the injected
+      // markup goes through Vite's own HTML processing (the logo becomes a hashed asset).
+      name: 'static-header',
+      transformIndexHtml: {
+        order: 'pre',
+        handler: (html, ctx) =>
+          html.replace('<!-- static-header -->', () => staticHeader(ctx.path.replace(/\.html$/, ''))),
+      },
+    },
+  ],
   worker: {
     // maplibre-gl creates its worker with { type: 'module' }; see src/map/worker.ts
     // for why the URL is supplied explicitly rather than left to the library.
@@ -42,10 +55,11 @@ export default defineConfig({
     // At ~326 MB that is slow but correct for Phase 1; production moves it to
     // object storage (IMPLEMENTATION.md §5.4).
     chunkSizeWarningLimit: 1500,
-    // Two pages: the app itself, and the static public About page (about.html), which
-    // needs no JavaScript and stays readable without an account. Caddy serves it at /about.
+    // Three pages: the app itself, and the static public About and Help pages (about.html,
+    // help.html), which need no JavaScript and stay readable without an account. Caddy
+    // serves them at /about and /help.
     rollupOptions: {
-      input: { main: 'index.html', about: 'about.html' },
+      input: { main: 'index.html', about: 'about.html', help: 'help.html' },
     },
   },
 });

@@ -145,10 +145,13 @@ export function UserMenu({ onOpenProfile, onOpenSettings, onOpenPrivateLocations
               Private locations
             </button>
           )}
-          {/* Phone widths only (CSS): the header has no room for AboutMenu there, so About
-              falls back to this menu. A plain link — about.html is outside this app. */}
+          {/* Phone widths only (CSS): the header has no room for InfoMenu there, so its
+              entries fall back to this menu. Plain links — both pages are outside this app. */}
           <a role="menuitem" className="user-menu__item user-menu__item--phone-only" href="/about">
-            About HoldMyTrack
+            About
+          </a>
+          <a role="menuitem" className="user-menu__item user-menu__item--phone-only" href="/help">
+            Help
           </a>
           <button
             type="button"

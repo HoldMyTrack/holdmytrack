@@ -1018,7 +1018,7 @@ Timezone rows are (GMT offset) · place · region — "(GMT−04:00) New York ·
 
 ---
 
-### 4.14 Public About page (FR-10)
+### 4.14 Public About and Help pages (FR-10)
 
 **Built.** `apps/web/about.html` is a second Vite entry beside `index.html` (`vite.config.ts`'s `build.rollupOptions.input`), not a route inside the React app. It is plain HTML with its own stylesheet, `src/about/about.css`, and no script at all, so a crawler reads it as served and a visitor doesn't download the map bundle to read a page of text. Vite still processes it: the logo and stylesheet references come out as hashed `/assets/` URLs like the app's own.
 
@@ -1028,7 +1028,11 @@ Timezone rows are (GMT offset) · place · region — "(GMT−04:00) New York ·
 
 **"Try the demo" links to `/`, it doesn't start a demo.** A link that opened a demo session on page load would be followed by any crawler that runs JavaScript and would use up `demoLimiter`'s 5-per-hour-per-IP budget (§4.10) for nothing, so starting a demo stays behind the sign-in screen's own button.
 
-**Linked from two places**: the sign-in screen (`AuthGate.tsx`, "What is HoldMyTrack?" under the card — `.auth-gate` became a column to hold it) and the header's About menu (`AboutMenu.tsx`: About HoldMyTrack, How it's funded, Contact — real `<a>`s since they leave the app, the last two landing on the `#funding`/`#contact` section ids). AboutMenu sits last among the header's actions, just before the account menu, as a text trigger rather than a bordered button like the rest, and borrows the account menu's dropdown panel and item styles. At ≤768px it is hidden — a 390px phone header is already full width without it — and `UserMenu.tsx` shows a phone-only "About HoldMyTrack" item (`.user-menu__item--phone-only`) in its place. `public/robots.txt` keeps crawlers off `/v1/` and `/tiles/`; `public/sitemap.xml` lists `/` and `/about`.
+**Linked from two places**: the sign-in screen (`AuthGate.tsx`, "What is HoldMyTrack?" under the card — `.auth-gate` became a column to hold it) and the header's Info menu (`InfoMenu.tsx`: About and Help — real `<a>`s since they leave the app). The menu was "About" with three entries into the one page (About, How it's funded, Contact) until Help arrived; the funding and contact anchors (`#funding`, `#contact`) are still on the page, just no longer linked separately. InfoMenu sits last among the header's actions, just before the account menu, as a text trigger rather than a bordered button like the rest, and borrows the account menu's dropdown panel and item styles. At ≤768px it is hidden — a 390px phone header is already full width without it — and `UserMenu.tsx` shows phone-only "About" and "Help" items (`.user-menu__item--phone-only`) in its place. `public/robots.txt` keeps crawlers off `/v1/` and `/tiles/`; `public/sitemap.xml` lists `/` and `/about`.
+
+**The Help page (FR-10.2) is built the same way**: `apps/web/help.html` is a third Vite entry, shares `about.css`, and is served at `/help` by the same `{path}.html` lookup — no Caddy change. It is a placeholder for now, so it carries `noindex` and stays out of `sitemap.xml`; drop the one and add the other once it has content.
+
+**The two static pages share one header, written once.** `src/about/staticHeader.ts` returns the header markup (brand, tagline, an Info menu, "Open the app"), and a small plugin in `vite.config.ts` swaps it in for each page's `<!-- static-header -->` placeholder via `transformIndexHtml` with `order: 'pre'` — early enough that Vite's own HTML processing still turns the logo into a hashed asset, and in dev as well as the build. It's a TS module rather than an `.html` partial read with `fs` because the web app has no `@types/node`; a side benefit is that Vite restarts the dev server when a config dependency changes, so editing it needs no reload hook. It is not the React `Header.tsx`: that one needs a session and the map instance, and these pages have no script. The Info menu here is a `<details>` — it opens and closes without JavaScript, at the cost of not closing on an outside click — with the same entries as `InfoMenu.tsx`, the current page's marked `aria-current`, styled in `about.css` to match the app's dropdown. Unlike the app header, it stays visible at phone widths: without Donate/Import/Export there is room for it.
 
 ### 4.15 Sign in with Google (FR-1.9)
 

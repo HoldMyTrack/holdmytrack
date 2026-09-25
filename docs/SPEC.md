@@ -15,7 +15,7 @@ This document specifies HoldMyTrack's functional behavior as currently implement
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google on the web, FR-1.9), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About page (FR-10), and the Donate link out to Open Collective (FR-11).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google on the web, FR-1.9), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About and Help pages (FR-10), and the Donate link out to Open Collective (FR-11).
 
 **Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), explorer-tile gamification, the rest of "Export" (story cards, animated reveals — high-resolution map export itself is built, FR-4.10 below). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace/heart-rate stay as per-activity route context (FR-4.9) rather than an analysed, all-time performance record. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
@@ -756,7 +756,7 @@ Only one track is hovered and only one is focused at a time; any number can be c
 
 **Notes**: "Moving time" falls back to elapsed time for any activity ingested before moving- time detection existed — those activities have no moving-time figure of their own, so this bucket-level total uses whichever one each activity actually has, rather than a bucket going silently short. Best-effort curves and personal bests (formerly FR-9.2/FR-9.3) were built and then cut — deliberately out of scope, see §1.2 and §14.
 
-## 12. FR-10 — Public About page
+## 12. FR-10 — Public About and Help pages
 
 ### FR-10.1 About page
 
@@ -766,12 +766,23 @@ Only one track is hovered and only one is focused at a time; any number can be c
 
 **Behavior**:
 1. `GET /about` returns a static HTML page; it needs no JavaScript and makes no API calls.
-2. The page shows the HoldMyTrack header (logo, wordmark, tagline) and sections for: what HoldMyTrack is, why someone might want it, what it isn't, how it is funded, and Contact — the email address `hello@holdmytrack.com` and the GitHub repository `https://github.com/HoldMyTrack/holdmytrack`.
+2. The page shows the HoldMyTrack header (logo, wordmark, tagline, an "Info" menu with About and Help, and "Open the app") and sections for: what HoldMyTrack is, why someone might want it, what it isn't, how it is funded, and Contact — the email address `hello@holdmytrack.com` and the GitHub repository `https://github.com/HoldMyTrack/holdmytrack`.
 3. "Try the demo — no signup" and "Open the app" link to `/`, the sign-in screen, where the demo starts from its own button (FR-2.1). The page never starts a demo session itself.
-4. The page is reachable from the sign-in screen ("What is HoldMyTrack?", below the form) and, for a signed-in or demo session, from the header's "About" menu, just before the account menu — About HoldMyTrack, How it's funded (`/about#funding`) and Contact (`/about#contact`). On a phone-width screen, where the header has no room for that menu, "About HoldMyTrack" is in the account menu instead.
+4. The page is reachable from the sign-in screen ("What is HoldMyTrack?", below the form) and, for a signed-in or demo session, from the header's "Info" menu, just before the account menu — About (`/about`) and Help (`/help`, FR-10.2). On a phone-width screen, where the header has no room for that menu, both entries are in the account menu instead.
 5. `/robots.txt` allows crawling except for `/v1/` and `/tiles/`, and points to `/sitemap.xml`, which lists `/` and `/about`.
 
 ## 13. FR-11 — Donations
+### FR-10.2 Help page
+
+**Description**: A public page at `/help` that describes how the web app works. It is a placeholder for now: a heading and a line saying the guide is on its way, with the contact email.
+
+**Preconditions**: None — no session is needed.
+
+**Behavior**:
+1. `GET /help` returns a static HTML page with the same header and styling as `/about`; it needs no JavaScript and makes no API calls.
+2. The page is reachable from the app header's "Info" menu (FR-10.1 point 4) and from the same menu in the About page's header, and links back to `/` and `/about` from its footer.
+3. Until it has real content, the page carries `<meta name="robots" content="noindex">` and is not listed in `/sitemap.xml`.
+
 
 ### FR-11.1 Donate
 

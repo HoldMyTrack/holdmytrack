@@ -1,6 +1,6 @@
-/* The public About page (about.html) — a static page outside the React app, so it carries
-   its own small stylesheet instead of pulling in index.css. The tokens and the header
-   mirror index.css's :root palette and .app-header__* rules; keep them in step. */
+/* The public About and Help pages (about.html, help.html) — static pages outside the React
+   app, so they carry their own small stylesheet instead of pulling in index.css. The tokens
+   and the header mirror index.css's :root palette and .app-header__* rules; keep them in step. */
 :root {
   color-scheme: light;
   --fm-font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -102,8 +102,72 @@ code {
   white-space: nowrap;
 }
 
-.about-header__open {
+.about-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-left: auto;
+}
+
+/* The Info menu (staticHeader.ts) — a <details> made to look like the app's InfoMenu.tsx:
+   a text trigger, and a dropdown styled like index.css's .user-menu__dropdown/__item. */
+.info-menu {
+  position: relative;
+}
+
+.info-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fm-ink);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.info-menu__trigger::-webkit-details-marker {
+  display: none;
+}
+
+.info-menu__trigger:hover,
+.info-menu[open] .info-menu__trigger {
+  background: rgb(32 43 37 / 6%);
+}
+
+.info-menu__dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 12rem;
+  padding: 4px;
+  background: var(--fm-surface);
+  border: 1px solid rgb(32 43 37 / 10%);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgb(32 43 37 / 18%);
+}
+
+.info-menu__item {
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--fm-ink);
+  text-decoration: none;
+}
+
+.info-menu__item:hover {
+  color: var(--fm-ink);
+  background: rgb(32 43 37 / 6%);
+}
+
+.info-menu__item[aria-current='page'] {
+  font-weight: 600;
 }
 
 /* Buttons */
@@ -289,7 +353,11 @@ code {
     display: none;
   }
 
-  .about-header__open {
+  .about-header__actions {
+    gap: 4px;
+  }
+
+  .about-header__actions .about-button {
     padding: 7px 11px;
     font-size: 13px;
   }

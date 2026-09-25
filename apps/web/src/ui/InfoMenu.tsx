@@ -2,19 +2,19 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 /**
- * The header's "About" menu — a text trigger and a dropdown of links into the static
- * about.html page, rather than one "About HoldMyTrack" item buried in the account menu.
- * Everything here is a plain link, not a navigation callback: about.html lives outside this
- * app, so each entry is a real page load (and Back returns here). The dropdown behaves like
- * UserMenu's: dismissed by a click anywhere else or by Escape.
+ * The header's "Info" menu — a text trigger and a dropdown of links to the two static pages
+ * about the app itself: about.html (what HoldMyTrack is, funding, contact) and help.html (how
+ * the app works). Everything here is a plain link, not a navigation callback: both pages live
+ * outside this app, so each entry is a real page load (and Back returns here). The dropdown
+ * behaves like UserMenu's: dismissed by a click anywhere else or by Escape. The static pages'
+ * own header (src/about/staticHeader.ts) repeats these entries; keep them in step.
  */
 const LINKS = [
-  { href: '/about', label: 'About HoldMyTrack' },
-  { href: '/about#funding', label: 'How it’s funded' },
-  { href: '/about#contact', label: 'Contact' },
+  { href: '/about', label: 'About' },
+  { href: '/help', label: 'Help' },
 ];
 
-export function AboutMenu() {
+export function InfoMenu() {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -35,21 +35,21 @@ export function AboutMenu() {
   }, [open]);
 
   return (
-    <div className="about-menu" ref={rootRef} data-testid="about-menu">
+    <div className="info-menu" ref={rootRef} data-testid="info-menu">
       <button
         type="button"
-        className="about-menu__trigger"
-        data-testid="about-menu-button"
+        className="info-menu__trigger"
+        data-testid="info-menu-button"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((was) => !was)}
       >
-        About
-        <ChevronDown className="about-menu__caret" size={14} />
+        Info
+        <ChevronDown className="info-menu__caret" size={14} />
       </button>
 
       {open && (
-        <div className="user-menu__dropdown" role="menu" data-testid="about-menu-dropdown">
+        <div className="user-menu__dropdown" role="menu" data-testid="info-menu-dropdown">
           {LINKS.map((link) => (
             <a key={link.href} role="menuitem" className="user-menu__item" href={link.href}>
               {link.label}

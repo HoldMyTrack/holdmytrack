@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react';
-import { AboutMenu } from './AboutMenu';
+import { InfoMenu } from './InfoMenu';
 import { DonateButton } from './DonateButton';
 import { UserMenu } from './UserMenu';
 import logoUrl from '../assets/logo.png';
 
 /**
  * Docked top chrome: the brand mark and tagline, then Donate, the import and export controls,
- * the About menu and the account menu at the trailing end. About is a text menu rather than a
+ * the Info menu and the account menu at the trailing end. Info is a text menu rather than a
  * bordered button like the actions before it: it's navigation, not something to do with your
  * data.
  * The Activities toggle that used to live here is gone — the panel it opened is now a
@@ -72,7 +72,7 @@ export function Header({ importControl, exportControl, onBrandClick, onOpenProfi
         <DonateButton />
         {importControl}
         {exportControl}
-        <AboutMenu />
+        <InfoMenu />
         <UserMenu onOpenProfile={onOpenProfile} onOpenSettings={onOpenSettings} onOpenPrivateLocations={onOpenPrivateLocations} />
       </nav>
     </header>
