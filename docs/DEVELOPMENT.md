@@ -20,7 +20,7 @@ Env vars (`POSTGRES_*`, `S3_*`) are Compose interpolation, set in `/.env` (see `
 
 ### Seeding a fresh database
 
-`migrate` creates the schema and the Demo Customer's `users` row, but no data — two one-off subcommands fill that in, and `docker compose up` runs neither. Without them, "Try it now" signs into a demo account with zero activities, and Fog/Heatmap's Country/Region zoom tiers have no boundaries to draw. Run both once against any new or recreated database:
+`migrate` creates the schema and the Demo Customer's `users` row, but no data — two one-off subcommands fill that in, and `docker compose up` runs neither. Without them, "Try it now" signs into a demo account with zero activities, and Fog/Heatmap's Country/Region zoom tiers have no boundaries to draw. Run both once against any new or recreated database — and run `seed-admin-boundaries` once against an existing database that predates the Country/Region tiers, since `migrate` creating their tables doesn't fill them and the tiers then just render blank rather than erroring:
 
 ```bash
 docker compose run --rm api seed-admin-boundaries   # Natural Earth country/region polygons (IMPLEMENTATION.md §4.2.4)
