@@ -2,16 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 /**
- * The header's "Info" menu — a text trigger and a dropdown of links to the two static pages
- * about the app itself: about.html (what HoldMyTrack is, funding, contact) and help.html (how
- * the app works). Everything here is a plain link, not a navigation callback: both pages live
- * outside this app, so each entry is a real page load (and Back returns here). The dropdown
- * behaves like UserMenu's: dismissed by a click anywhere else or by Escape. The static pages'
- * own header (src/about/staticHeader.ts) repeats these entries; keep them in step.
+ * The header's "Info" menu — a text trigger and a dropdown of links to the pages about the app
+ * itself: About, Help and Contacts. Everything here is a plain link, not a navigation callback:
+ * those pages are server-rendered (services/server/internal/web), outside this app, so each
+ * entry is a real page load (and Back returns here). The dropdown behaves like UserMenu's:
+ * dismissed by a click anywhere else or by Escape. The pages' own header (web.go's InfoLinks)
+ * lists the same entries; keep them in step.
  */
 const LINKS = [
   { href: '/about', label: 'About' },
   { href: '/help', label: 'Help' },
+  { href: '/contacts', label: 'Contacts' },
 ];
 
 export function InfoMenu() {

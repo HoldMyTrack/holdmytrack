@@ -31,18 +31,21 @@
 <p>HoldMyTrack is down for scheduled maintenance. Try again in a few minutes.</p>` 503
 	}
 
-	@backend path /v1/* /tiles/* /healthz
+	# The API, and the server-rendered pages (services/server/internal/web, ADR-0012) — the
+	# same page paths httpapi's registerPages serves and apps/web/vite.config.ts proxies in
+	# dev. Listed one by one until the map page is served by Go too; then this flips to
+	# "everything that isn't a static asset".
+	@backend path /v1/* /tiles/* /healthz /about /help /contacts /logout /static/*
 	handle @backend {
 		reverse_proxy api:8080
 	}
 
-	# The SPA fallback: any path that isn't the API and doesn't match a real file (e.g. a
-	# deep link straight to a client-side route) still serves index.html, letting the
-	# client-side app take over routing from there. `{path}.html` comes first so a static
-	# page like about.html answers at its extensionless URL (/about).
+	# The SPA fallback: any path that isn't the API or a page and doesn't match a real file
+	# (e.g. a deep link straight to a client-side route) still serves index.html, letting the
+	# client-side app take over routing from there.
 	handle {
 		root * /srv/web
-		try_files {path} {path}.html /index.html
+		try_files {path} /index.html
 		file_server
 	}
 

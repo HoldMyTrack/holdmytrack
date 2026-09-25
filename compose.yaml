@@ -21,6 +21,9 @@ services:
       - web-node-modules:/app/node_modules   # MUST shadow the host's darwin binaries
     environment:
       VITE_DEV_HOST: "0.0.0.0"
+      # Where Vite's dev proxy sends the server-rendered pages (/about, /static/…) — the Go
+      # server, by service name (apps/web/vite.config.ts's pageRoutes).
+      API_PROXY_TARGET: "http://api:8080"
       # VITE_WATCH_POLL: "1"                 # only if HMR goes deaf; see §4 of the doc
     develop:
       watch:
@@ -141,7 +144,13 @@ services:
   api:                        # one binary, mode `serve`
     build: { context: ./services/server, target: dev }
     command: ["serve"]
-    environment: *server-env
+    environment:
+      <<: *server-env
+      # Page templates and their stylesheet read from the bind mount below, re-parsed on
+      # every request, so editing a page needs no image rebuild (internal/config's WebDevDir).
+      WEB_DEV_DIR: /web
+    volumes:
+      - ./services/server/internal/web:/web:ro
     # API_PORT overrides the host-published port only; other containers always reach
     # this one via service-name DNS at api:8080 regardless.
     ports: ["127.0.0.1:${API_PORT:-8080}:8080"]

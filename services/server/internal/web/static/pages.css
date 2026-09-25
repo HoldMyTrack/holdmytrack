@@ -1,6 +1,8 @@
-/* The public About and Help pages (about.html, help.html) — static pages outside the React
-   app, so they carry their own small stylesheet instead of pulling in index.css. The tokens
-   and the header mirror index.css's :root palette and .app-header__* rules; keep them in step. */
+/* The server-rendered pages' stylesheet (internal/web, ADR-0012) — the shared header and the
+   page content. The map page's React app has its own (apps/web/src/index.css); the header
+   rules below mirror its .app-header, .donate-button, .info-menu and .user-menu, and the
+   tokens its :root, so the header looks the same on every page. Keep them in step until the
+   map page renders this header too (ADR-0012's phase 5). */
 :root {
   color-scheme: light;
   --fm-font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -9,6 +11,7 @@
   --fm-surface: #fff;
   --fm-surface-tint: #f6f3e9;
   --fm-ink: #202b25;
+  --fm-ink-rgb: 32 43 37;
   --fm-ink-secondary: #6c7a70;
   --fm-ink-muted: #8b9186;
   --fm-border: #e6e1d2;
@@ -16,6 +19,9 @@
   --fm-accent: #b07e2e;
   --fm-accent-strong: #93691f;
   --fm-accent-hover: #8a611f;
+  --fm-donate: #b0532f;
+  --fm-donate-hover: #96431f;
+  --fm-donate-text: #fff7ee;
 }
 
 * {
@@ -47,54 +53,54 @@ code {
   border: 1px solid var(--fm-border);
 }
 
-/* Header — same shape as the app's .app-header. */
-.about-header {
+/* Header — index.css's .app-header. */
+.page-header {
+  position: relative;
+  z-index: 5;
   display: flex;
   align-items: center;
   gap: 16px;
-  height: 64px;
-  padding: 0 28px;
+  height: 56px;
+  padding: 0 20px;
   background: var(--fm-surface);
-  border-bottom: 1px solid var(--fm-border);
+  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 10%);
+  line-height: 1.2;
 }
 
-.about-header__brand {
+.page-header__brand {
   display: flex;
   align-items: center;
   gap: 16px;
+  font-family: var(--fm-font-serif);
+  font-size: 21px;
+  letter-spacing: 0.2px;
+  line-height: 1;
   text-decoration: none;
 }
 
-.about-header__logo {
+.page-header__logo {
   display: block;
   height: 42px;
   width: auto;
 }
 
-.about-wordmark {
-  font-family: var(--fm-font-serif);
-  font-size: 21px;
-  letter-spacing: 0.2px;
-  line-height: 1;
-}
-
-.about-wordmark__light {
+.page-header__wordmark-light {
   font-weight: 400;
   color: #4a5750;
 }
 
-.about-wordmark__bold {
+.page-header__wordmark-bold {
   font-weight: 800;
   color: #9a6b1e;
 }
 
-.about-header__divider {
+.page-header__divider {
   width: 1px;
   height: 22px;
   background: var(--fm-border-strong);
 }
 
-.about-header__tagline {
+.page-header__tagline {
   font-family: var(--fm-font-serif);
   font-size: 14px;
   font-style: italic;
@@ -102,17 +108,106 @@ code {
   white-space: nowrap;
 }
 
-.about-header__actions {
+.page-header__actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   margin-left: auto;
 }
 
-/* The Info menu (staticHeader.ts) — a <details> made to look like the app's InfoMenu.tsx:
-   a text trigger, and a dropdown styled like index.css's .user-menu__dropdown/__item. */
-.info-menu {
+.donate-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--fm-donate);
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: var(--fm-donate);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--fm-donate-text);
+  text-decoration: none;
+}
+
+.donate-button:hover {
+  color: var(--fm-donate-text);
+  background: var(--fm-donate-hover);
+  border-color: var(--fm-donate-hover);
+}
+
+.donate-button__icon {
+  flex: none;
+}
+
+/* Both header menus are <details>: the <summary> is the trigger, and the dropdown is styled
+   like index.css's .user-menu__dropdown/__item. */
+.header-menu {
   position: relative;
+  display: flex;
+}
+
+.header-menu > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.header-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.header-menu__dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 12rem;
+  padding: 4px;
+  background: var(--fm-surface);
+  border: 1px solid rgb(var(--fm-ink-rgb) / 10%);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgb(var(--fm-ink-rgb) / 18%);
+}
+
+.header-menu__label {
+  margin-bottom: 4px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 8%);
+  font-size: 12px;
+  color: rgb(var(--fm-ink-rgb) / 55%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-menu__item {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--fm-ink);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.header-menu__item:hover {
+  color: var(--fm-ink);
+  background: rgb(var(--fm-ink-rgb) / 6%);
+}
+
+.header-menu__item[aria-current='page'] {
+  font-weight: 600;
+}
+
+.header-menu form {
+  margin: 0;
 }
 
 .info-menu__trigger {
@@ -124,54 +219,38 @@ code {
   font-size: 13px;
   font-weight: 600;
   color: var(--fm-ink);
-  cursor: pointer;
-  list-style: none;
-  user-select: none;
-}
-
-.info-menu__trigger::-webkit-details-marker {
-  display: none;
 }
 
 .info-menu__trigger:hover,
 .info-menu[open] .info-menu__trigger {
-  background: rgb(32 43 37 / 6%);
+  background: rgb(var(--fm-ink-rgb) / 6%);
 }
 
-.info-menu__dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 12rem;
-  padding: 4px;
+.user-menu__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgb(var(--fm-ink-rgb) / 15%);
+  border-radius: 50%;
   background: var(--fm-surface);
-  border: 1px solid rgb(32 43 37 / 10%);
-  border-radius: 8px;
-  box-shadow: 0 12px 32px rgb(32 43 37 / 18%);
-}
-
-.info-menu__item {
-  padding: 8px 10px;
-  border-radius: 6px;
-  font-size: 13px;
   color: var(--fm-ink);
-  text-decoration: none;
+  overflow: hidden;
 }
 
-.info-menu__item:hover {
-  color: var(--fm-ink);
-  background: rgb(32 43 37 / 6%);
+.user-menu__avatar:hover {
+  background: rgb(var(--fm-ink-rgb) / 4%);
 }
 
-.info-menu__item[aria-current='page'] {
-  font-weight: 600;
+.user-menu__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 /* Buttons */
-.about-button {
+.page-button {
   display: inline-block;
   padding: 10px 18px;
   border-radius: 8px;
@@ -184,33 +263,38 @@ code {
   border: 1px solid var(--fm-accent);
 }
 
-.about-button:hover {
+.page-button:hover {
   color: #fff;
   background: var(--fm-accent-hover);
   border-color: var(--fm-accent-hover);
 }
 
-.about-button--quiet {
+.page-button--quiet {
   color: #3e4a43;
   background: var(--fm-surface);
   border-color: var(--fm-border-strong);
   font-weight: 500;
 }
 
-.about-button--quiet:hover {
+.page-button--quiet:hover {
   color: var(--fm-ink);
   background: var(--fm-surface-tint);
   border-color: var(--fm-border-strong);
 }
 
+.page-header .page-button {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
 /* Content */
-.about-main {
+.page-main {
   max-width: 880px;
   margin: 0 auto;
   padding: 56px 24px 32px;
 }
 
-.about-hero h1 {
+.page-hero h1 {
   margin: 0 0 16px;
   font-family: var(--fm-font-serif);
   font-size: 40px;
@@ -219,37 +303,37 @@ code {
   letter-spacing: -0.3px;
 }
 
-.about-lede {
+.page-lede {
   margin: 0;
   max-width: 44rem;
   font-size: 18px;
   color: var(--fm-ink-secondary);
 }
 
-.about-actions {
+.page-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 28px;
 }
 
-.about-section {
+.page-section {
   margin-top: 56px;
 }
 
-.about-section h2 {
+.page-section h2 {
   margin: 0 0 16px;
   font-family: var(--fm-font-serif);
   font-size: 26px;
   font-weight: 600;
 }
 
-.about-section p {
+.page-section p {
   margin: 0 0 12px;
   max-width: 44rem;
 }
 
-.about-cards {
+.page-cards {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
@@ -258,43 +342,43 @@ code {
   list-style: none;
 }
 
-.about-cards li {
+.page-cards li {
   padding: 20px 22px;
   background: var(--fm-surface);
   border: 1px solid var(--fm-border);
   border-radius: 10px;
 }
 
-.about-cards h3 {
+.page-cards h3 {
   margin: 0 0 6px;
   font-family: var(--fm-font-serif);
   font-size: 18px;
   font-weight: 600;
 }
 
-.about-cards p {
+.page-cards p {
   margin: 0;
   font-size: 15px;
   color: var(--fm-ink-secondary);
 }
 
-.about-list {
+.page-list {
   margin: 0;
   padding-left: 20px;
   max-width: 44rem;
 }
 
-.about-list li + li {
+.page-list li + li {
   margin-top: 8px;
 }
 
-.about-contact {
+.page-contact {
   margin: 0 0 12px;
   padding: 0;
   list-style: none;
 }
 
-.about-contact li {
+.page-contact li {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 12px;
@@ -302,7 +386,7 @@ code {
   border-bottom: 1px solid var(--fm-border);
 }
 
-.about-contact__label {
+.page-contact__label {
   min-width: 9rem;
   font-size: 13px;
   font-weight: 600;
@@ -312,12 +396,7 @@ code {
   line-height: 1.9;
 }
 
-.about-muted {
-  color: var(--fm-ink-secondary);
-  font-size: 15px;
-}
-
-.about-footer {
+.page-footer {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 20px;
@@ -329,60 +408,58 @@ code {
   color: var(--fm-ink-muted);
 }
 
+/* index.css's phone header: tighter, no tagline, Donate as a heart alone. Unlike the map
+   page's header, the Info menu stays — without Import/Export there is room for it. */
 @media (max-width: 768px) {
-  .about-header {
-    height: 56px;
-    padding: 0 16px;
+  .page-header {
+    padding: 0 10px;
     gap: 8px;
   }
 
-  .about-header__brand {
-    gap: 8px;
+  .page-header__actions {
+    gap: 6px;
   }
 
-  .about-header__logo {
+  .page-header__brand {
+    font-size: 15px;
+    gap: 6px;
+  }
+
+  .page-header__logo {
     height: 30px;
   }
 
-  .about-wordmark {
-    font-size: 16px;
-  }
-
-  .about-header__divider,
-  .about-header__tagline {
+  .page-header__divider,
+  .page-header__tagline,
+  .donate-button__label {
     display: none;
   }
 
-  .about-header__actions {
-    gap: 4px;
+  .donate-button {
+    padding: 6px 8px;
   }
 
-  .about-header__actions .about-button {
-    padding: 7px 11px;
-    font-size: 13px;
-  }
-
-  .about-main {
+  .page-main {
     padding: 36px 16px 24px;
   }
 
-  .about-hero h1 {
+  .page-hero h1 {
     font-size: 30px;
   }
 
-  .about-lede {
+  .page-lede {
     font-size: 16px;
   }
 
-  .about-section {
+  .page-section {
     margin-top: 44px;
   }
 
-  .about-cards {
+  .page-cards {
     grid-template-columns: 1fr;
   }
 
-  .about-footer {
+  .page-footer {
     padding: 20px 16px 32px;
   }
 }

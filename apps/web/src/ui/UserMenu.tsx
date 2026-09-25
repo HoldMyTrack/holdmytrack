@@ -146,12 +146,15 @@ export function UserMenu({ onOpenProfile, onOpenSettings, onOpenPrivateLocations
             </button>
           )}
           {/* Phone widths only (CSS): the header has no room for InfoMenu there, so its
-              entries fall back to this menu. Plain links — both pages are outside this app. */}
+              entries fall back to this menu. Plain links — these pages are outside this app. */}
           <a role="menuitem" className="user-menu__item user-menu__item--phone-only" href="/about">
             About
           </a>
           <a role="menuitem" className="user-menu__item user-menu__item--phone-only" href="/help">
             Help
+          </a>
+          <a role="menuitem" className="user-menu__item user-menu__item--phone-only" href="/contacts">
+            Contacts
           </a>
           <button
             type="button"

@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { staticHeader } from './src/about/staticHeader';
 
 // tsconfig.json's `types` is deliberately just `["vite/client"]` — no @types/node for one
 // config file. This config file alone needs `process.env`, so it gets its own ambient type.
@@ -13,21 +12,18 @@ const devHost = process.env.VITE_DEV_HOST;
 // Escape hatch if VirtioFS inotify forwarding goes deaf. Off by default: polling 773 font
 // files burns real CPU for no reason on a host where inotify already works.
 const watchPoll = process.env.VITE_WATCH_POLL;
+// Where the Go server is, for the page routes below — the `api` service inside compose
+// (compose.yaml sets it), localhost:8080 for a Go server run on the host.
+const pagesTarget = process.env.API_PROXY_TARGET ?? 'http://localhost:8080';
+// The server-rendered pages (services/server/internal/web, ADR-0012) and what they load. In
+// production Caddy sends these same paths to the Go server (apps/web/docker/Caddyfile);
+// proxying them here makes dev behave the same, with the pages on this origin like the app.
+// /v1 is for the header's avatar image — the React app itself calls the API directly at
+// VITE_API_BASE_URL and never goes through this.
+const pageRoutes = ['^/(about|help|contacts|logout)$', '^/static/', '^/v1/'];
 
 export default defineConfig({
-  plugins: [
-    react(),
-    {
-      // The static pages' shared header (src/about/staticHeader.ts). 'pre' so the injected
-      // markup goes through Vite's own HTML processing (the logo becomes a hashed asset).
-      name: 'static-header',
-      transformIndexHtml: {
-        order: 'pre',
-        handler: (html, ctx) =>
-          html.replace('<!-- static-header -->', () => staticHeader(ctx.path.replace(/\.html$/, ''))),
-      },
-    },
-  ],
+  plugins: [react()],
   worker: {
     // maplibre-gl creates its worker with { type: 'module' }; see src/map/worker.ts
     // for why the URL is supplied explicitly rather than left to the library.
@@ -38,6 +34,9 @@ export default defineConfig({
     // public/basemap/*.pmtiles is read by the client over HTTP range requests.
     // Vite's dev server honours Range on static files, so no tile server is needed.
     ...(devHost ? { host: devHost } : {}),
+    // changeOrigin stays false: the Go server checks a form POST's Origin against
+    // APP_BASE_URL (this dev server's own origin), and the header must reach it untouched.
+    proxy: Object.fromEntries(pageRoutes.map((route) => [route, { target: pagesTarget }])),
     watch: {
       // publicDir is watched by default — 773 glyph files and a 326 MB archive that
       // never change during dev. Worth ignoring on the host too, not just in the
@@ -55,11 +54,5 @@ export default defineConfig({
     // At ~326 MB that is slow but correct for Phase 1; production moves it to
     // object storage (IMPLEMENTATION.md §5.4).
     chunkSizeWarningLimit: 1500,
-    // Three pages: the app itself, and the static public About and Help pages (about.html,
-    // help.html), which need no JavaScript and stay readable without an account. Caddy
-    // serves them at /about and /help.
-    rollupOptions: {
-      input: { main: 'index.html', about: 'about.html', help: 'help.html' },
-    },
   },
 });

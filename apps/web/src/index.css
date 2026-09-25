@@ -333,7 +333,7 @@ body {
   background: rgb(var(--fm-ink-rgb) / 6%);
 }
 
-/* InfoMenu.tsx's entries, and the account menu's phone-only About and Help, are <a>s, not <button>s —
+/* InfoMenu.tsx's entries, and the account menu's phone-only copies of them, are <a>s, not <button>s —
    drop the link styling so they match. */
 a.user-menu__item {
   text-decoration: none;

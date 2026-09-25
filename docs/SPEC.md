@@ -15,7 +15,7 @@ This document specifies HoldMyTrack's functional behavior as currently implement
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google on the web, FR-1.9), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About and Help pages (FR-10), and the Donate link out to Open Collective (FR-11).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google on the web, FR-1.9), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), and the Donate link out to Open Collective (FR-11).
 
 **Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), explorer-tile gamification, the rest of "Export" (story cards, animated reveals — high-resolution map export itself is built, FR-4.10 below). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace/heart-rate stay as per-activity route context (FR-4.9) rather than an analysed, all-time performance record. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
@@ -757,31 +757,54 @@ Only one track is hovered and only one is focused at a time; any number can be c
 
 **Notes**: "Moving time" falls back to elapsed time for any activity ingested before moving- time detection existed — those activities have no moving-time figure of their own, so this bucket-level total uses whichever one each activity actually has, rather than a bucket going silently short. Best-effort curves and personal bests (formerly FR-9.2/FR-9.3) were built and then cut — deliberately out of scope, see §1.2 and §14.
 
-## 12. FR-10 — Public About and Help pages
+## 12. FR-10 — Public pages: About, Help, Contacts
+
+These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HTML page that needs no JavaScript and makes no API calls from the browser, with the shared page header of FR-10.4.
 
 ### FR-10.1 About page
 
-**Description**: A public page at `/about` that explains what HoldMyTrack is, who it is for, what it deliberately is not, how it is funded, and how to reach the project. It is the one page a visitor or a search engine can read without an account.
+**Description**: A public page at `/about` that explains what HoldMyTrack is, who it is for, what it deliberately is not, and how it is funded. A visitor or a search engine can read it without an account.
 
-**Preconditions**: None — no session is needed, and having one changes nothing on the page.
+**Preconditions**: None — no session is needed; having one changes only the header (FR-10.4).
 
 **Behavior**:
-1. `GET /about` returns a static HTML page; it needs no JavaScript and makes no API calls.
-2. The page shows the HoldMyTrack header (logo, wordmark, tagline, an "Info" menu with About and Help, and "Open the app") and sections for: what HoldMyTrack is, why someone might want it, what it isn't, how it is funded, and Contact — the email address `hello@holdmytrack.com` and the GitHub repository `https://github.com/HoldMyTrack/holdmytrack`.
-3. "Try the demo — no signup" and "Open the app" link to `/`, the sign-in screen, where the demo starts from its own button (FR-2.1). The page never starts a demo session itself.
-4. The page is reachable from the sign-in screen ("What is HoldMyTrack?", below the form) and, for a signed-in or demo session, from the header's "Info" menu, just before the account menu — About (`/about`) and Help (`/help`, FR-10.2). On a phone-width screen, where the header has no room for that menu, both entries are in the account menu instead.
-5. `/robots.txt` allows crawling except for `/v1/` and `/tiles/`, and points to `/sitemap.xml`, which lists `/` and `/about`.
+1. `GET /about` returns the page.
+2. It has sections for: what HoldMyTrack is, why someone might want it, what it isn't, how it is funded (section id `funding`), and a pointer to Contacts (FR-10.3).
+3. "Try the demo — no signup" links to `/`, the sign-in screen, where the demo starts from its own button (FR-2.1). The page never starts a demo session itself.
+4. About, Help and Contacts are reachable from the sign-in screen ("What is HoldMyTrack?", below the form, links to About), from every page's header and footer (FR-10.4), and from the map page's header "Info" menu, just before the account menu. On a phone-width screen, where the map page's header has no room for that menu, its three entries are in the account menu instead.
+5. `/robots.txt` allows crawling except for `/v1/` and `/tiles/`, and points to `/sitemap.xml`, which lists `/`, `/about` and `/contacts`.
 
 ### FR-10.2 Help page
 
-**Description**: A public page at `/help` that describes how the web app works. It is a placeholder for now: a heading and a line saying the guide is on its way, with the contact email.
+**Description**: A public page at `/help` that describes how the web app works. It is a placeholder for now: a heading and a line saying the guide is on its way, pointing to Contacts.
 
-**Preconditions**: None — no session is needed.
+**Preconditions**: None.
 
 **Behavior**:
-1. `GET /help` returns a static HTML page with the same header and styling as `/about`; it needs no JavaScript and makes no API calls.
-2. The page is reachable from the app header's "Info" menu (FR-10.1 point 4) and from the same menu in the About page's header, and links back to `/` and `/about` from its footer.
-3. Until it has real content, the page carries `<meta name="robots" content="noindex">` and is not listed in `/sitemap.xml`.
+1. `GET /help` returns the page.
+2. Until it has real content, the page carries `<meta name="robots" content="noindex">` and is not listed in `/sitemap.xml`.
+
+### FR-10.3 Contacts page
+
+**Description**: A public page at `/contacts` with how to reach the project.
+
+**Preconditions**: None.
+
+**Behavior**:
+1. `GET /contacts` returns the page, listing the email address `hello@holdmytrack.com` and the GitHub repository `https://github.com/HoldMyTrack/holdmytrack` for code and issues.
+
+### FR-10.4 Page header and footer
+
+**Description**: Every server-rendered page shares one header and one footer.
+
+**Behavior**:
+1. The header shows the logo, wordmark and tagline (the brand links to `/`), then Donate (FR-11.1), an "Info" menu listing About, Help and Contacts with the current page marked, and the account area.
+2. Signed out, the account area is a "Sign in" link to `/`. With a session (real or demo), it is an account menu showing the account's avatar (or a generic icon) that opens to the account's email (a demo session shows its display name instead), "Map" (`/`), and "Sign out".
+3. Both menus open and close without JavaScript.
+4. "Sign out" submits `POST /logout`, which ends the session the same way `POST /v1/auth/logout` does and redirects to `/`. The request is refused (`403`) unless its `Origin` header — or, without one, its `Referer` — is the app's own origin.
+5. On a phone-width screen (≤768px) the tagline is hidden and Donate shows its heart alone; the Info and account menus stay.
+6. The footer links to the map (`/`), About, Help, Contacts and the GitHub repository.
+7. Pages are sent with `Cache-Control: no-store`, since the header names the signed-in account.
 
 ## 13. FR-11 — Donations
 
@@ -789,11 +812,11 @@ Only one track is hovered and only one is focused at a time; any number can be c
 
 **Description**: The header's Donate button is how a visitor reaches HoldMyTrack's funding — recurring community donations with a public ledger on Open Collective (`VISION.md` §6.1). HoldMyTrack itself takes no payment and stores nothing about a donation.
 
-**Preconditions**: A signed-in or demo session (the button lives in the app header).
+**Preconditions**: None for the server-rendered pages' header (FR-10.4); a signed-in or demo session for the map page's.
 
 **Behavior**:
 1. The button shows a heart icon followed by "Donate"; on a phone-width screen (≤768px) it shows the heart alone.
-2. While no Open Collective is configured (`OPEN_COLLECTIVE_SLUG` empty), clicking Donate opens a notice explaining that donations aren't open yet, and nothing else happens.
+2. While no Open Collective is configured (`OPEN_COLLECTIVE_SLUG` empty), clicking Donate on the map page opens a notice explaining that donations aren't open yet, and nothing else happens; on the other pages it links to About's funding section (`/about#funding`).
 3. Once one is configured, Donate is a link to `https://opencollective.com/<slug>/donate`, opened in a new tab so the map is kept; choosing an amount, one-off or monthly, and paying all happen on Open Collective.
 
 ## 14. Non-Functional Requirements (summary)

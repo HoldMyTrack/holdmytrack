@@ -18,6 +18,10 @@ docker compose up            # http://localhost:5173
 
 Env vars (`POSTGRES_*`, `S3_*`) are Compose interpolation, set in `/.env` (see `.env.example`) — never in `apps/web/.env`, and never seen by Vite. No custom `networks:` block: Compose's default network already resolves `db`/`rustfs` by service name.
 
+### Server-rendered pages in dev
+
+Every page other than the map (About, Help, Contacts so far) is rendered by the Go server (`IMPLEMENTATION.md` §4.19), but you still open everything at `localhost:5173`: Vite's dev server proxies the page paths to `api` (`vite.config.ts`'s `pageRoutes`, target `API_PROXY_TARGET`, which compose sets to `http://api:8080`). That keeps pages and the map on one origin, as in production, which the pages' same-origin check on form POSTs relies on. `compose.yaml` bind-mounts `services/server/internal/web` into `api` with `WEB_DEV_DIR` set, so templates and `pages.css` are re-read on every request — edit one and reload, no rebuild. A change to the Go handlers themselves (`internal/httpapi/pages.go`) still needs `docker compose up -d --build api`. Running Vite on the host (`npm run dev`) proxies to `localhost:8080` unless `API_PROXY_TARGET` says otherwise. A new page path goes in three places: `registerPages` (`server.go`), `pageRoutes`, and the Caddyfile's `@backend` matcher.
+
 ### Seeding a fresh database
 
 `migrate` creates the schema and the Demo Customer's `users` row, but no data — two one-off subcommands fill that in, and `docker compose up` runs neither. Without them, "Try it now" signs into a demo account with zero activities, and Fog/Heatmap's Country/Region zoom tiers have no boundaries to draw. Run both once against any new or recreated database — and run `seed-admin-boundaries` once against an existing database that predates the Country/Region tiers, since `migrate` creating their tables doesn't fill them and the tiers then just render blank rather than erroring:

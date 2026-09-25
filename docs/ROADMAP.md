@@ -39,7 +39,7 @@ Checkboxes are the source of truth for progress; re-check them against the three
 
 ### Pre-launch validation — gates any public launch, regardless of which paths are live
 
-- [ ] Stand up the funding page (Open Collective, public ledger — `VISION.md` §6.1) before any public launch, not retrofitted after The app side is built (`IMPLEMENTATION.md` §4.16); what's left: create the `holdmytrack` collective on opencollective.com and apply to Open Source Collective as fiscal host, then once approved set `apps/web/src/funding.ts`'s `OPEN_COLLECTIVE_SLUG` and replace `about.html`'s "donations are not open yet" line with a link to it.
+- [ ] Stand up the funding page (Open Collective, public ledger — `VISION.md` §6.1) before any public launch, not retrofitted after The app side is built (`IMPLEMENTATION.md` §4.16); what's left: create the `holdmytrack` collective on opencollective.com and apply to Open Source Collective as fiscal host, then once approved set the slug — `apps/web/src/funding.ts`'s `OPEN_COLLECTIVE_SLUG` and `services/server/internal/web/web.go`'s `OpenCollectiveSlug` — and replace the About page template's "donations are not open yet" line with a link to it.
 - [ ] Post concept renders to r/running, r/cycling, r/Garmin, r/Strava, r/FogOfWorld (`VISION.md` §5.1, §8.1) — validate "free forever, funded by users" as credible before building further.
 
 ---
@@ -70,6 +70,14 @@ The shipped UI so far is functional scaffolding, not a finished product. Partly 
 - [x] A real icon set — Lucide (`lucide-react`) replaces every hand-drawn inline SVG icon and text-glyph caret on the web (`IMPLEMENTATION.md` §4.17); Android adopts the same set in its own Phase 5.
 - [x] Real typography — Inter for text, Fraunces for headings and the wordmark (`--fm-font-sans`/`--fm-font-serif`, loaded from Google Fonts in `index.html`).
 - [x] An actual design system — the `--fm-*` palette plus spacing, radius, type, weight and elevation scales in `index.css`'s `:root`, used by every declaration except a few deliberate literals (`IMPLEMENTATION.md` §4.18). The one literal color left in use is `#fff` (12 uses), plus two single-use colors.
+- [ ] Server-rendered pages sharing one header, React kept for the map page ([ADR-0012](adr/0012-server-rendered-pages-react-for-the-map.md), `IMPLEMENTATION.md` §4.19), in shippable steps:
+  - [x] Import moves out of the header into the Activities panel's Sync tab (`IMPLEMENTATION.md` §4.0.1).
+  - [x] The rendering foundation (`internal/web`, the shared header, Sign out as a same-origin-checked form) with About, Help and Contacts as its first pages (`IMPLEMENTATION.md` §4.14).
+  - [ ] Sign-in, sign-up, password reset, email verification and demo start as pages, replacing `AuthGate.tsx`; email links move to `/verify?token=`/`/reset?token=`, with the old `/?…_token=` forms still redirected.
+  - [ ] The map page served by Go with the shared header, replacing `Header.tsx`/`UserMenu.tsx`/`InfoMenu.tsx`/`DonateButton.tsx`; Export becomes a map control; Caddy and Vite's proxy flip to "everything but static assets goes to Go"; the onboarding gate moves server-side.
+  - [ ] Settings as a page (`/settings`), a plain form with native selects.
+  - [ ] Profile as a page (`/profile`), the year grids and trends rendered server-side.
+  - [ ] Cloud integrations page, on the same layout, once Path 1 has connectors to show.
 - [ ] An animation/transition pass — micro-interactions (hover, focus, panel open/close, loading states) that are currently almost entirely absent.
 - [ ] Mobile browser support, folded into this same pass rather than treated separately — CSS/layout work already exists (`index.css`'s `@media (max-width: 768px)` layer, `IMPLEMENTATION.md` §5.9, `SPEC.md` §15), but the actual experience has been reported directly as unusable, not just rough, and needs the same real-device testing and rework this phase's desktop work gets, not CSS review assumed to already be correct.
 - [ ] Design freeze: once this pass lands, declare the visual design final and communicate it as such — the explicit milestone this phase produces, not an open-ended polish effort.

@@ -317,6 +317,13 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 // directly, so a mobile caller presenting only Authorization: Bearer actually revokes its
 // session here instead of this silently no-op'ing and clearing a cookie that was never set.
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	s.endSession(w, r)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// endSession deletes the caller's session row and clears its cookie — shared by the JSON
+// logout above and the pages' Sign out form (pages.go's handleLogoutPage).
+func (s *Server) endSession(w http.ResponseWriter, r *http.Request) {
 	if sessionID, ok := sessionIDFromRequest(r); ok {
 		if _, err := s.pool.Exec(r.Context(), `DELETE FROM sessions WHERE id = $1`, sessionID); err != nil {
 			s.log.Error("session delete failed", "err", err)
@@ -330,7 +337,6 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 	})
-	w.WriteHeader(http.StatusNoContent)
 }
 
 // handleMe serves `GET /v1/auth/me` — how the frontend learns whether a session cookie it's

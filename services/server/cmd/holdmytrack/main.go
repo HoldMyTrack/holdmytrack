@@ -25,6 +25,7 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/httpapi"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mail"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/worker"
 )
 
@@ -90,9 +91,18 @@ func main() {
 			smtpFrom = cfg.SMTPUsername
 		}
 		mailer := mail.New(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUsername, cfg.SMTPPassword, smtpFrom, log)
+		webFS, webReload := web.Embedded(), false
+		if cfg.WebDevDir != "" {
+			webFS, webReload = os.DirFS(cfg.WebDevDir), true
+		}
+		pages, err := web.New(webFS, webReload, gitSHA, cfg.AppBaseURL)
+		if err != nil {
+			log.Error("page templates", "err", err)
+			os.Exit(1)
+		}
 		srv := httpapi.New(pool, store, log, mailer, cfg.AppBaseURL, cfg.BasemapOrigin, gitSHA, cfg.SkipEmailVerification, httpapi.GoogleOAuthConfig{
 			ClientID: cfg.GoogleClientID, ClientSecret: cfg.GoogleClientSecret, RedirectURL: cfg.GoogleRedirectURL,
-		})
+		}, pages)
 		httpSrv := &http.Server{Addr: cfg.ListenAddr, Handler: srv}
 		log.Info("serve: listening", "addr", cfg.ListenAddr)
 		go func() {
