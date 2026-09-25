@@ -1,21 +1,19 @@
 import { useEffect, useState } from 'react';
-import { getCurrentUser, type SessionUser, type UserProfile } from './api';
+import { getCurrentUser, type SessionUser } from './api';
 import { AuthProvider } from './auth/AuthContext';
 import { MapView } from './map/MapView';
 import { ProfilePage } from './ui/ProfilePage';
-import { SettingsPage } from './ui/SettingsPage';
 import { VersionBanner } from './ui/VersionBanner';
 
 /**
- * Which of the app's views this page is — decided by the URL, since each is its own page now:
- * the Go server renders `/`, `/profile` and `/settings` as the same shell around this app
- * (ADR-0012), and links between them are ordinary links. Lives inside AuthProvider, not App
- * itself, so it can assume a signed-in user unconditionally rather than re-checking one.
+ * Which of the app's views this page is — decided by the URL: the Go server renders `/` and
+ * `/profile` as the same shell around this app (ADR-0012), and links between them are
+ * ordinary links. Lives inside AuthProvider, not App itself, so it can assume a signed-in
+ * user unconditionally rather than re-checking one.
  */
 function AuthenticatedApp() {
   const path = window.location.pathname;
   if (path === '/profile') return <ProfilePage />;
-  if (path === '/settings') return <SettingsPage />;
   return <MapView initialPrivateLocationsOpen={openPrivateLocations} />;
 }
 
@@ -59,25 +57,7 @@ export function App() {
 
   if (auth === 'checking') return <VersionBanner />;
 
-  const updateUser = (patch: UserProfile) => setAuth({ ...auth, ...patch });
-  const authValue = { user: auth, updateUser };
-
-  // First run (FR-1.7): a verified real account with no Country confirms Country and Timezone
-  // before seeing anything — both decide how every number and day in the app reads. Derived
-  // from the data rather than a separate "onboarded" flag: Country can't be saved empty any
-  // more, so an empty one means Settings has never been saved. Saving goes through
-  // updateUser, which sets `country` and lets this fall through to the map on the next render.
-  // A demo account is never gated: it's read-only and can't save Settings at all.
-  if ('email' in auth && !auth.country) {
-    return (
-      <>
-        <VersionBanner />
-        <AuthProvider value={authValue}>
-          <SettingsPage onboarding />
-        </AuthProvider>
-      </>
-    );
-  }
+  const authValue = { user: auth };
 
   return (
     <>

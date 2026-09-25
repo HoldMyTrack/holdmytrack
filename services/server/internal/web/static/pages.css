@@ -314,6 +314,198 @@ code {
   background: rgb(var(--fm-ink-rgb) / 10%);
 }
 
+/* The Settings page (templates/pages/settings.html) — a narrow single-column form, the same
+   look the React Settings page it replaced had. */
+.settings {
+  max-width: 36rem;
+}
+
+.settings__back {
+  display: inline-block;
+  margin-bottom: 20px;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.settings__title {
+  margin: 0 0 12px;
+  font-family: var(--fm-font-serif);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.settings__intro {
+  margin: 0 0 20px;
+  color: var(--fm-ink-secondary);
+}
+
+.settings__form {
+  margin: 0 0 40px;
+}
+
+.settings__form fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.settings__section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 24px;
+}
+
+.settings__label {
+  margin: 0;
+  font-family: var(--fm-font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(var(--fm-ink-rgb) / 55%);
+}
+
+.settings__input {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid rgb(var(--fm-ink-rgb) / 18%);
+  border-radius: 6px;
+  background: var(--fm-surface);
+  font: inherit;
+  font-size: 14px;
+  color: var(--fm-ink);
+}
+
+.settings__input:disabled {
+  background: var(--fm-surface-tint);
+  color: rgb(var(--fm-ink-rgb) / 55%);
+}
+
+.settings__input:focus {
+  outline: 2px solid var(--fm-accent);
+  outline-offset: 1px;
+}
+
+.settings__hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgb(var(--fm-ink-rgb) / 60%);
+}
+
+.settings__avatar-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.settings__avatar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border: 1px dashed rgb(var(--fm-ink-rgb) / 25%);
+  border-radius: 50%;
+  overflow: hidden;
+  color: rgb(var(--fm-ink-rgb) / 35%);
+  background: var(--fm-surface);
+}
+
+.settings__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.settings__avatar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings__inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.settings__button {
+  display: inline-block;
+  border: 1px solid rgb(var(--fm-ink-rgb) / 18%);
+  border-radius: 6px;
+  padding: 6px 12px;
+  background: var(--fm-surface);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fm-ink);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* The avatar's Upload button, hidden once picking a file submits the form by itself. */
+.settings__button[hidden] {
+  display: none;
+}
+
+.settings__button:hover {
+  color: var(--fm-ink);
+  background: rgb(var(--fm-ink-rgb) / 4%);
+}
+
+.settings__button:disabled {
+  color: rgb(var(--fm-ink-rgb) / 30%);
+  cursor: not-allowed;
+}
+
+.settings__submit {
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 20px;
+  background: var(--fm-accent);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+}
+
+.settings__submit:hover {
+  background: var(--fm-accent-hover);
+}
+
+.settings__submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings__error,
+.settings__notice {
+  margin: 0 0 16px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.settings__error {
+  background: rgb(170 51 51 / 8%);
+  color: #a33;
+}
+
+.settings__notice {
+  background: rgb(176 126 46 / 10%);
+  color: var(--fm-ink);
+}
+
 @media (max-width: 768px) {
   .page-main {
     padding: 36px 16px 24px;

@@ -35,8 +35,9 @@ type authForm struct {
 // pageAccount is pageUser plus what the auth pages decide on: who is signed in, whether it's
 // the demo, whether the email is verified. nil for no live session.
 type pageAccount struct {
-	info authInfo
-	user *web.User
+	info    authInfo
+	profile authResponse
+	user    *web.User
 }
 
 func (s *Server) pageAccount(r *http.Request) *pageAccount {
@@ -58,14 +59,22 @@ func (s *Server) pageAccount(r *http.Request) *pageAccount {
 		s.log.Error("page account lookup failed", "err", err)
 		return nil
 	}
-	return &pageAccount{info: info, user: &web.User{Email: resp.Email, DisplayName: resp.DisplayName, AvatarURL: resp.AvatarURL, IsDemo: resp.IsDemo}}
+	return &pageAccount{info: info, profile: resp, user: &web.User{Email: resp.Email, DisplayName: resp.DisplayName, AvatarURL: resp.AvatarURL, IsDemo: resp.IsDemo}}
 }
 
-// home is where a signed-in account belongs: the map, or — for a real account whose email
-// isn't confirmed yet — the page that says so, since the map has nothing to show it.
+// home is where a signed-in account belongs: the map; or, for a real account whose email
+// isn't confirmed yet, the page that says so, since the map has nothing to show it; or, for
+// one that has never saved Settings (no Country — FR-1.7's first run), Settings, since Country
+// and Timezone decide how every number and day on the map reads. A demo account is never
+// gated on either.
 func (a *pageAccount) home() string {
-	if !a.info.isDemo && !a.info.emailVerified {
+	switch {
+	case a.info.isDemo:
+		return "/"
+	case !a.info.emailVerified:
 		return "/verify-pending"
+	case a.profile.Country == "":
+		return "/settings"
 	}
 	return "/"
 }

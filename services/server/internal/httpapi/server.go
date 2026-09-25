@@ -192,11 +192,15 @@ func (s *Server) registerPages() {
 	s.mux.HandleFunc("GET /verify-pending", s.handleVerifyPendingPage)
 	s.mux.HandleFunc("POST /verify-pending/resend", s.sameOrigin(s.handleVerifyResendForm))
 	s.mux.HandleFunc("POST /verify-pending/email", s.sameOrigin(s.handleVerifyChangeEmailForm))
+	// settings_page.go.
+	s.mux.HandleFunc("GET /settings", s.handleSettingsPage)
+	s.mux.HandleFunc("POST /settings", s.sameOrigin(s.handleSettingsForm))
+	s.mux.HandleFunc("POST /settings/avatar", s.sameOrigin(s.handleSettingsAvatarForm))
+	s.mux.HandleFunc("POST /settings/avatar/remove", s.sameOrigin(s.handleSettingsAvatarRemoveForm))
 	// The React app (pages.go's appShell). `/{$}` is the root alone; "/" below is everything
 	// else nothing more specific claims.
 	s.mux.HandleFunc("GET /{$}", s.appShell("HoldMyTrack — Every journey, mapped."))
 	s.mux.HandleFunc("GET /profile", s.appShell("Profile — HoldMyTrack"))
-	s.mux.HandleFunc("GET /settings", s.appShell("Settings — HoldMyTrack"))
 	s.mux.HandleFunc("/", s.notFound)
 }
 

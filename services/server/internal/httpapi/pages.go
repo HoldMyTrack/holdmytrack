@@ -69,11 +69,12 @@ func (s *Server) isSameOrigin(r *http.Request) bool {
 	return referer == wantOrigin || strings.HasPrefix(referer, wantOrigin+"/")
 }
 
-// appShell serves the React app's pages — the map at `/`, and for now `/profile` and
-// `/settings` too, which are views inside the same app until they become pages of their own
-// (ADR-0012). Only for a session that has something to show: no session goes to /signin, an
-// unverified real account to /verify-pending. The React app's own copies of those two checks
-// (App.tsx) stay as a fallback for a session that ends while the page is open.
+// appShell serves the React app's pages — the map at `/`, and for now `/profile` too, a view
+// inside the same app until it becomes a page of its own (ADR-0012). Only for a session that
+// has something to show: no session goes to /signin, an unverified real account to
+// /verify-pending, one that has never saved Settings to /settings (pageAccount.home). The
+// React app's own copies of the first two checks (App.tsx) stay as a fallback for a session
+// that ends while the page is open.
 func (s *Server) appShell(title string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if dest := legacyLanding(r); dest != "" {

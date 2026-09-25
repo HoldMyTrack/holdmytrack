@@ -23,7 +23,8 @@ export const TILES_V1 = '/tiles/v1';
  * Whichever it is, this pulls out the part actually worth putting in front of a person: the
  * JSON body's own `message` field when there is one, the plain text otherwise — never the raw
  * `{"error":...,"message":...}` blob itself, which is what every caller below used to throw
- * verbatim (reported live: SettingsPage.tsx showing the whole JSON string as its save error).
+ * verbatim (reported live: the Settings page, when it was React, showing the whole JSON string as its
+ * save error).
  */
 function messageFromErrorBody(text: string, fallback: string): string {
   if (!text) return fallback;
@@ -55,10 +56,10 @@ async function errorMessageFromResponse(res: Response, fallback: string): Promis
  * (ADR-0012), not calls from here, and so is signing out (the page header's form); this app
  * only reads the session (`getCurrentUser`).
  */
-/** The Settings page's own fields (SettingsPage.tsx) — carried by both `AuthUser` and
+/** The Settings page's own fields (`/settings`) — carried by both `AuthUser` and
  *  `DemoUser` uniformly, since a demo account is a real `users` row with real column
  *  defaults, not a special case that skips having them. `displayName`/`country`/`avatarUrl`
- *  are `''` when unset, not `undefined` — every caller (units.ts, SettingsPage.tsx) checks
+ *  are `''` when unset, not `undefined` — every caller (units.ts) checks
  *  for an empty string, never an absent field. `country` is an ISO 3166-1 alpha-2 code or
  *  `''` (defaults the whole app to metric — see `ui/units.ts`). `avatarUrl` is already a
  *  full API path (`/v1/account/avatar?v=...`) — callers prefix `API_BASE_URL`. */
@@ -135,54 +136,6 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   }
   const body = (await res.json()) as AuthResponseBody;
   return toSessionUser(body);
-}
-
-/** SettingsPage.tsx's Save button — a full replace of all three fields at once (`PATCH
- *  /v1/account/settings`), not per-field auto-save. Returns the updated profile so the
- *  caller can merge it into AuthContext directly (`useAuth().updateUser`) with no extra
- *  round trip. */
-export async function updateSettings(patch: {
-  displayName: string;
-  country: string;
-  timezone: string;
-}): Promise<UserProfile> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/account/settings`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({
-      display_name: patch.displayName,
-      country: patch.country,
-      timezone: patch.timezone,
-    }),
-  });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
-  }
-  const body = (await res.json()) as AuthResponseBody;
-  return toProfile(body);
-}
-
-/** `POST /v1/account/avatar` — a small image, not large enough to need `uploadFile`'s
- *  XMLHttpRequest-for-progress treatment (5 MiB server-side cap). */
-export async function uploadAvatar(file: File): Promise<UserProfile> {
-  const form = new FormData();
-  form.append('file', file);
-  const res = await fetch(`${API_BASE_URL}${API_V1}/account/avatar`, { method: 'POST', credentials: 'include', body: form });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `upload failed (${res.status})`));
-  }
-  const body = (await res.json()) as AuthResponseBody;
-  return toProfile(body);
-}
-
-export async function removeAvatar(): Promise<UserProfile> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/account/avatar`, { method: 'DELETE', credentials: 'include' });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `request failed (${res.status})`));
-  }
-  const body = (await res.json()) as AuthResponseBody;
-  return toProfile(body);
 }
 
 /** A single plain file's own upload outcome — §4.0's original one-file response shape. */
@@ -486,12 +439,11 @@ export async function listActivities(query: ActivityQuery = {}, signal?: AbortSi
 
 /**
  * §4.7.4's `PATCH /v1/activities/{id}` — the edit-type-name-and-description dialog's Save
- * button. Full-replace-on-save like `updateSettings`, not per-field: all three fields commit
- * together.
+ * button. Full-replace-on-save, not per-field: all three fields commit together.
  * Returns the updated row so the caller can `reload()` the list (EditActivityDialog.tsx does,
  * matching the "just refetch" convention an upload completion already uses) rather than
- * needing this return value directly — returned anyway for the same reason `updateSettings`
- * returns the updated profile: one fewer thing for a caller to assume about the request.
+ * needing this return value directly — returned anyway: one fewer thing for a caller to
+ * assume about the request.
  */
 export async function updateActivity(
   id: string,

@@ -15,8 +15,8 @@ const watchPoll = process.env.VITE_WATCH_POLL;
 // Where the Go server is, for the page routes below — the `api` service inside compose
 // (compose.yaml sets it), localhost:8080 for a Go server run on the host.
 const pagesTarget = process.env.API_PROXY_TARGET ?? 'http://localhost:8080';
-// Every page is the Go server's (ADR-0012), this app's own included: it renders `/`,
-// `/profile` and `/settings` as a shell around the element this app mounts into. So dev
+// Every page is the Go server's (ADR-0012), this app's own included: it renders `/` and
+// `/profile` as a shell around the element this app mounts into. So dev
 // proxies every page path to it — production's Caddy sends it everything that isn't a static
 // file (apps/web/docker/Caddyfile) — and this server is left serving the app's modules and
 // public/. /v1 is for the header's avatar image; the app itself calls the API directly at
@@ -24,7 +24,8 @@ const pagesTarget = process.env.API_PROXY_TARGET ?? 'http://localhost:8080';
 // `(\?|$)` endings.
 const pageRoutes = [
   '^/(\\?|$)',
-  '^/(profile|settings)(\\?|$)',
+  '^/profile(\\?|$)',
+  '^/settings(/|\\?|$)',
   '^/(about|help|contacts|logout|signin|signup|demo|forgot|reset|verify)(\\?|$)',
   '^/verify-pending(/|\\?|$)',
   '^/static/',

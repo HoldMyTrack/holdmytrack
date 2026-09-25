@@ -75,7 +75,7 @@ The shipped UI so far is functional scaffolding, not a finished product. Partly 
   - [x] The rendering foundation (`internal/web`, the shared header, Sign out as a same-origin-checked form) with About, Help and Contacts as its first pages (`IMPLEMENTATION.md` §4.14).
   - [x] Sign-in, sign-up, password reset, email verification and demo start as pages, replacing `AuthGate.tsx`; email links move to `/verify?token=`/`/reset?token=`, with the old `/?…_token=` forms still redirected (`IMPLEMENTATION.md` §4.19).
   - [x] The map page served by Go with the shared header, replacing `Header.tsx`/`UserMenu.tsx`/`InfoMenu.tsx`/`DonateButton.tsx`; Export becomes a map control; Caddy sends everything but static files to Go; Profile and Settings get URLs (`/profile`, `/settings`) as views in the same shell (`IMPLEMENTATION.md` §4.19). The first-run gate stays in React until Settings is a page.
-  - [ ] Settings as a page (`/settings`), a plain form with native selects; the first-run gate moves server-side with it.
+  - [x] Settings as a page (`/settings`), a plain form with native selects; the first-run gate moves server-side with it (`IMPLEMENTATION.md` §4.12).
   - [ ] Profile as a page (`/profile`), the year grids and trends rendered server-side.
   - [ ] Cloud integrations page, on the same layout, once Path 1 has connectors to show.
 - [ ] An animation/transition pass — micro-interactions (hover, focus, panel open/close, loading states) that are currently almost entirely absent.

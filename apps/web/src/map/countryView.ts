@@ -9,7 +9,7 @@ import type { ViewState } from './viewState';
  * `ST_PointOnSurface(geom)` per `iso_a2` (not `ST_Centroid`, which can land outside a concave
  * or archipelago shape), zoom derived from the polygon's own bounding-box extent so a small
  * country lands close and a large one lands wide. Scoped to exactly the codes
- * `apps/web/src/ui/countries.ts`'s COUNTRIES list can write into `users.country` — a handful of
+ * the Settings page's Country list (`services/server/internal/web/places_data.go`) can write into `users.country` — a handful of
  * small territories in that list have no polygon in `admin_countries` and simply have no entry
  * here, falling through to WORLD_VIEW (config.ts) like an unset country does.
  *
@@ -262,7 +262,7 @@ export const COUNTRY_VIEWS: Record<string, ViewState> = {
 
 /** `country` is `''` for an account that hasn't set one yet (UserProfile's own convention,
  *  api.ts, same as units.ts's unitSystemForCountry) — and a handful of territories in
- *  countries.ts's COUNTRIES list have no entry above. Both resolve to null; MapView falls
+ *  the Settings page's Country list have no entry above. Both resolve to null; MapView falls
  *  back to WORLD_VIEW. */
 export function countryView(country: string): ViewState | null {
   return COUNTRY_VIEWS[country] ?? null;

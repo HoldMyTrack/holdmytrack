@@ -2057,33 +2057,9 @@ body {
   text-decoration: none;
 }
 
-/* SettingsPage.tsx — Avatar, Name, Country, Timezone. Shares .profile-page__body/
-   __back above for the page shell (same "private, full-screen detour from the map" shape),
-   its own classes below only for what's actually different: a form, not a grid. */
-.settings-page {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fm-space-20);
-  max-width: 480px;
-  margin: 0 auto;
-}
-
-.settings-page__title {
-  margin: 0;
-  font-family: var(--fm-font-serif);
-  font-size: var(--fm-text-2xl);
-  font-weight: var(--fm-weight-semibold);
-  color: var(--fm-ink);
-}
-
-/* Onboarding's one-paragraph explanation under the title (SettingsPage's `onboarding` prop). */
-.settings-page__intro {
-  margin: 0;
-  font-size: var(--fm-text-lg);
-  line-height: 1.55;
-  color: rgb(var(--fm-ink-rgb) / 70%);
-}
-
+/* Form fields in the Edit activity dialog (EditActivityDialog.tsx). Named for the React
+   Settings page they came from, which is now a server-rendered page with its own styles
+   (services/server/internal/web/static/pages.css). */
 .settings-page__section {
   display: flex;
   flex-direction: column;
@@ -2118,59 +2094,6 @@ body {
   background: var(--fm-surface-tint);
   color: var(--fm-ink-faint);
   cursor: not-allowed;
-}
-
-.settings-page__input--narrow {
-  max-width: 140px;
-}
-
-.settings-page__hint {
-  margin: var(--fm-space-2) 0 0;
-  font-size: var(--fm-text-sm);
-  color: rgb(var(--fm-ink-rgb) / 55%);
-  line-height: 1.5;
-}
-
-.settings-page__avatar-row {
-  display: flex;
-  align-items: center;
-  gap: var(--fm-space-16);
-}
-
-.settings-page__avatar-drop {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 72px;
-  height: 72px;
-  flex-shrink: 0;
-  border: 1px dashed rgb(var(--fm-ink-rgb) / 25%);
-  border-radius: var(--fm-radius-lg);
-  overflow: hidden;
-  background: rgb(var(--fm-ink-rgb) / 3%);
-}
-
-.settings-page__avatar-drop--over {
-  border-color: var(--fm-accent);
-  background: rgb(var(--fm-accent-rgb) / 8%);
-}
-
-.settings-page__avatar-preview {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.settings-page__avatar-placeholder {
-  font-size: 28px;
-  color: rgb(var(--fm-ink-rgb) / 25%);
-}
-
-.settings-page__avatar-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--fm-space-6);
 }
 
 .settings-page__button {
@@ -2231,12 +2154,6 @@ a.settings-page__button {
 .settings-page__submit:disabled {
   opacity: 0.6;
   cursor: default;
-}
-
-.settings-page__saved {
-  font-size: var(--fm-text-md);
-  font-weight: var(--fm-weight-semibold);
-  color: var(--fm-success-strong);
 }
 
 /* SearchPicker.tsx — Settings' Country and Timezone fields. The trigger matches
@@ -2338,7 +2255,7 @@ a.settings-page__button {
   color: rgb(var(--fm-ink-rgb) / 45%);
 }
 
-/* `position: relative` makes the list the rows' offsetParent — CountryPicker scrolls the
+/* `position: relative` makes the list the rows' offsetParent — SearchPicker scrolls the
    active row into view off its offsetTop. */
 .search-picker__list {
   position: relative;
@@ -2385,16 +2302,6 @@ a.settings-page__button {
   white-space: nowrap;
 }
 
-/* TimezonePicker.tsx's "(GMT+05:30)" — fixed width and tabular digits, so every place name
-   starts in the same column however the offsets differ. */
-.search-picker__offset {
-  flex-shrink: 0;
-  min-width: 92px;
-  font-size: var(--fm-text-md);
-  font-variant-numeric: tabular-nums;
-  color: rgb(var(--fm-ink-rgb) / 60%);
-}
-
 .search-picker__label--unset {
   color: rgb(var(--fm-ink-rgb) / 55%);
 }
@@ -2410,33 +2317,6 @@ a.settings-page__button {
   letter-spacing: 0.02em;
   color: rgb(var(--fm-ink-rgb) / 45%);
   font-variant-numeric: tabular-nums;
-}
-
-/* A round flag: the rectangular emoji, scaled up and clipped to a circle so its middle band
-   fills the disc (what circle-flag icon sets draw, without shipping ~250 SVGs). */
-.search-picker__flag {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  overflow: hidden;
-  box-shadow: inset 0 0 0 1px rgb(var(--fm-ink-rgb) / 10%);
-}
-
-.search-picker__flag-emoji {
-  font-size: 30px;
-  line-height: 1;
-}
-
-/* No flag emoji on this platform (Windows) — show the code on a tinted disc instead. */
-.search-picker__flag--text {
-  background: var(--fm-surface-tint-strong);
-  font-size: 8.5px;
-  font-weight: var(--fm-weight-bold);
-  color: rgb(var(--fm-ink-rgb) / 60%);
 }
 
 .search-picker__empty {
