@@ -1,5 +1,5 @@
 import type { HistogramBucket } from '../api';
-import { ChevronIcon } from './ChevronIcon';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { DateRangeSlider } from './DateRangeSlider';
 import { formatDayLabel } from './format';
 import { RangePicker, type DateRange } from './RangePicker';
@@ -128,7 +128,7 @@ export function ActivityHistogram({
           title="Earlier"
           onClick={() => onPan(-pageStep)}
         >
-          <ChevronIcon direction="left" />
+          <ChevronLeft size={16} />
         </button>
 
         <RangePicker
@@ -148,7 +148,7 @@ export function ActivityHistogram({
           title="Later"
           onClick={() => onPan(pageStep)}
         >
-          <ChevronIcon direction="right" />
+          <ChevronRight size={16} />
         </button>
       </div>
     </footer>

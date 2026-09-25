@@ -1,4 +1,5 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
+import { Camera } from 'lucide-react';
 
 export interface ExportButtonProps {
   /** `null` before the live map has finished loading — the button stays disabled until
@@ -36,10 +37,7 @@ export function ExportButton({ map, active, onOpen }: ExportButtonProps) {
       onClick={onOpen}
       disabled={!map}
     >
-      <svg className="export-button__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path d="M3.5 8.5a2 2 0 0 1 2-2h2.3l1.4-2.2a1 1 0 0 1 .85-.46h3.9a1 1 0 0 1 .85.46l1.4 2.2h2.3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" />
-        <circle cx="12" cy="13" r="3.6" />
-      </svg>
+      <Camera className="export-button__icon" size={16} />
     </button>
   );
 }

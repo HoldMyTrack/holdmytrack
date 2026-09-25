@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronDown, ChevronUp, Eye, EyeOff, Focus, Pencil, Trash2, Waypoints } from 'lucide-react';
 import { deleteActivity, type Activity, type ActivityTotals, type DuplicateActivity } from '../api';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DistanceFilter } from './DistanceFilter';
@@ -353,7 +354,7 @@ export function ActivitiesPanel({
       >
         {totals !== null ? `${formatTotalDistance(totals.distanceMeters, system)} loaded` : 'Loading…'}
         <span className="activities-panel__sheet-chevron" aria-hidden="true">
-          {sheetExpanded ? '▾' : '▴'}
+          {sheetExpanded ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
         </span>
       </button>
 
@@ -390,10 +391,22 @@ export function ActivitiesPanel({
           title="Invert selection — check the unchecked activities and uncheck the checked ones"
         >
           {/* A checkbox-sized square split on the diagonal, one half filled — reads as a
-              sibling of the select-all checkbox beside it rather than a separate text chip. */}
-          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-            <rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="none" stroke="currentColor" strokeWidth="1.5" />
-            <path d="M14.5 1.5V11.5a3 3 0 0 1-3 3H1.5Z" fill="currentColor" />
+              sibling of the select-all checkbox beside it rather than a separate text chip.
+              Lucide has no such glyph, so it's drawn to Lucide's own geometry (its `square`:
+              24-unit grid, 2-unit stroke, rx 2) to stay one family with the rest. */}
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M21 3v16a2 2 0 0 1-2 2H3Z" fill="currentColor" />
           </svg>
         </button>
 
@@ -408,7 +421,7 @@ export function ActivitiesPanel({
             Type
             {excludedTypes.size > 0 && <span className="activities-panel__type-trigger-dot" aria-hidden="true" />}
             <span className="activities-panel__type-trigger-caret" aria-hidden="true">
-              ▾
+              <ChevronDown size={14} />
             </span>
           </button>
           {typeFilterOpen && (
@@ -463,7 +476,7 @@ export function ActivitiesPanel({
           aria-label={groupHasHidden ? 'Show every checked activity on the map' : 'Hide every checked activity from the map'}
           title={groupHasHidden ? 'Show checked group' : 'Hide checked group'}
         >
-          <EyeIcon open={!groupHasHidden} />
+          {groupHasHidden ? <EyeOff size={16} /> : <Eye size={16} />}
         </button>
         <button
           type="button"
@@ -479,7 +492,7 @@ export function ActivitiesPanel({
                 : 'Edit type for every checked activity'
           }
         >
-          <PencilIcon />
+          <Pencil size={16} />
         </button>
         <button
           type="button"
@@ -489,7 +502,7 @@ export function ActivitiesPanel({
           aria-label="Edit the checked activity's track"
           title={editTrackReason ?? 'Edit track — chop, cut, or delete points'}
         >
-          <ScissorsIcon />
+          <Waypoints size={16} />
         </button>
         <button
           type="button"
@@ -499,7 +512,7 @@ export function ActivitiesPanel({
           aria-label="Delete every checked activity"
           title={readOnly ? 'Not available for demo accounts — create an account to delete activities' : 'Delete checked group'}
         >
-          <TrashIcon />
+          <Trash2 size={16} />
         </button>
         <span className="activities-panel__toolbar-divider" aria-hidden="true" />
         <button
@@ -510,7 +523,7 @@ export function ActivitiesPanel({
           aria-label="Focus the map on the checked group"
           title="Focus checked group on the map"
         >
-          <FocusIcon />
+          <Focus size={16} />
         </button>
       </div>
 
@@ -620,7 +633,7 @@ export function ActivitiesPanel({
               ? 'Duplicates — failed to load'
               : `${duplicates.length} ${duplicates.length === 1 ? 'duplicate' : 'duplicates'} found`}
             <span className="activities-panel__duplicates-chevron" aria-hidden="true">
-              {duplicatesOpen ? '▾' : '▴'}
+              {duplicatesOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
             </span>
           </button>
           {duplicatesOpen && !duplicatesError && (
@@ -672,87 +685,5 @@ export function ActivitiesPanel({
         />
       )}
     </div>
-  );
-}
-
-/** A simple pencil glyph for the §4.7.4 edit affordance — same viewBox/stroke weight as
- *  EyeIcon/TrashIcon/FocusIcon so all four read as one family of toolbar icons. */
-function PencilIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="14" height="14">
-      <path
-        d="M2 14 L2.6 11.2 L10.5 3.3 A1.4 1.4 0 0 1 12.5 3.3 L12.7 3.5 A1.4 1.4 0 0 1 12.7 5.5 L4.8 13.4 Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-      <line x1="9.3" y1="4.5" x2="11.5" y2="6.7" stroke="currentColor" strokeWidth="1.3" />
-    </svg>
-  );
-}
-
-/** Open eye (visible) or the same eye with a slash through it (hidden). */
-function EyeIcon({ open }: { open: boolean }) {
-  return (
-    <svg viewBox="0 0 16 16" width="15" height="15">
-      <path
-        d="M1 8 C3 4, 6 2.5, 8 2.5 C10 2.5, 13 4, 15 8 C13 12, 10 13.5, 8 13.5 C6 13.5, 3 12, 1 8 Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinejoin="round"
-      />
-      <circle cx="8" cy="8" r="2.1" fill="none" stroke="currentColor" strokeWidth="1.3" />
-      {!open && <line x1="1.5" y1="13.5" x2="14.5" y2="2.5" stroke="currentColor" strokeWidth="1.3" />}
-    </svg>
-  );
-}
-
-/** A simple trash-can glyph for the §4.7.5 delete affordance — same viewBox/stroke weight as
- *  PencilIcon/EyeIcon/FocusIcon so all four read as one family of toolbar icons. */
-function TrashIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="14" height="14">
-      <path
-        d="M3 4.5 H13 M6 4.5 V2.8 A0.8 0.8 0 0 1 6.8 2 H9.2 A0.8 0.8 0 0 1 10 2.8 V4.5 M4.2 4.5 L4.8 13.2 A1 1 0 0 0 5.8 14.1 H10.2 A1 1 0 0 0 11.2 13.2 L11.8 4.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <line x1="6.5" y1="7" x2="6.5" y2="11.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
-      <line x1="9.5" y1="7" x2="9.5" y2="11.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-/** Scissors for §4.7.7's Edit track — same viewBox/stroke weight as the rest of the toolbar
- *  family. */
-function ScissorsIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="15" height="15">
-      <circle cx="4.2" cy="11.8" r="2" fill="none" stroke="currentColor" strokeWidth="1.3" />
-      <circle cx="11.8" cy="11.8" r="2" fill="none" stroke="currentColor" strokeWidth="1.3" />
-      <line x1="5.6" y1="10.4" x2="12" y2="1.8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-      <line x1="10.4" y1="10.4" x2="4" y2="1.8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-/** A crosshair glyph for the toolbar's "Focus checked group on the map" action — the one
- *  fly-to-fit affordance for the checked group, moved here from the footer's old text button. */
-function FocusIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="15" height="15">
-      <circle cx="8" cy="8" r="5" fill="none" stroke="currentColor" strokeWidth="1.3" />
-      <circle cx="8" cy="8" r="1.4" fill="currentColor" />
-      <line x1="8" y1="0.5" x2="8" y2="2.6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-      <line x1="8" y1="13.4" x2="8" y2="15.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-      <line x1="0.5" y1="8" x2="2.6" y2="8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-      <line x1="13.4" y1="8" x2="15.5" y2="8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-    </svg>
   );
 }

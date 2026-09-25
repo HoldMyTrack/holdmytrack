@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
-import { ChevronIcon } from './ChevronIcon';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { addDays, dayDiff } from './dateMath';
 import { formatDayLabel } from './format';
 import type { DateRange } from './RangePicker';
@@ -162,7 +162,7 @@ export function DateRangeSlider({ first, last, value, onChange }: DateRangeSlide
         commit(live.current.current);
       }}
     >
-      <ChevronIcon direction={dir < 0 ? 'left' : 'right'} />
+      {dir < 0 ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
     </button>
   );
 
