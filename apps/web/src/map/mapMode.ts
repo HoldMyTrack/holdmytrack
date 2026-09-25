@@ -2,7 +2,7 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { COUNTRY_FOG_LAYER_ID, FOG_LAYER_ID, REGION_FOG_LAYER_ID } from './fog';
 import { COUNTRY_HEATMAP_LAYER_ID, HEATMAP_LAYER_ID, REGION_HEATMAP_LAYER_ID } from './heatmap';
 import { BAND_LAYER_ID } from './trackBands';
-import { TRACKS_LAYER_ID } from './tracks';
+import { TRACKS_CASING_LAYER_ID, TRACKS_LAYER_ID } from './tracks';
 
 /**
  * The three mutually-exclusive views IMPLEMENTATION.md §4.2.2 names — not
@@ -33,6 +33,7 @@ export function setMapMode(map: MapLibreMap, mode: MapMode, editingTrack = false
   setVisible(map, REGION_HEATMAP_LAYER_ID, mode === 'heatmap');
   // Tracks stay visible only in Normal — both Fog and Heatmap hide them (§4.2.2).
   setVisible(map, TRACKS_LAYER_ID, mode === 'normal' && !editingTrack);
+  setVisible(map, TRACKS_CASING_LAYER_ID, mode === 'normal' && !editingTrack);
   // FR-4.8: a focused activity's colored zone segments are a second layer over the shared
   // tracks layer (trackBands.ts) — not covered by the tracks toggle above — so switching to
   // Fog/Heatmap has to hide it too, or it keeps rendering over the raster.

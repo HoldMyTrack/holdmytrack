@@ -81,6 +81,14 @@ object MapOverlays {
     private const val CITY_MIN_ZOOM = 8f
 
     /**
+     * Tracks draw from z4 inward — not [CITY_MIN_ZOOM]: Normal mode has no Country/Region
+     * fallback, so hiding tracks below z8 left an empty map, and a road trip too long to fit
+     * at z8 had nothing drawn once the camera fit it. Mirrors `apps/web/src/map/tracks.ts`'s
+     * `TRACKS_MIN_ZOOM` (`docs/IMPLEMENTATION.md` §5.3 has the tile-size measurement).
+     */
+    private const val TRACKS_MIN_ZOOM = 4f
+
+    /**
      * The basemap archive's own maximum zoom (`docs/IMPLEMENTATION.md` §5.4), and the same
      * ceiling the server renders fog and heatmap tiles to. MapLibre overzooms past a declared
      * maximum rather than stopping, so the layers stay drawn as the user keeps zooming in.
@@ -279,10 +287,6 @@ object MapOverlays {
             style.addSource(VectorSource(TRACKS_SOURCE_ID, tileSet(tileUrl("tracks", "mvt"))))
         }
         if (style.getLayer(TRACKS_LAYER_ID) == null) {
-            // Finally implements `docs/IMPLEMENTATION.md` §5.3's previously
-            // undocumented-as-built claim ("below roughly z8 tracks are hidden entirely — at
-            // that scale the fog mask *is* the picture"), at the same threshold introduced
-            // above rather than a second, disconnected one.
             val layer = LineLayer(TRACKS_LAYER_ID, TRACKS_SOURCE_ID)
                 .withSourceLayer(TRACKS_SOURCE_LAYER)
                 .withProperties(
@@ -292,7 +296,7 @@ object MapOverlays {
                     PropertyFactory.lineWidth(TRACK_WIDTH),
                     PropertyFactory.lineOpacity(TRACK_OPACITY),
                 )
-                .apply { setMinZoom(CITY_MIN_ZOOM) }
+                .apply { setMinZoom(TRACKS_MIN_ZOOM) }
             insert(style, layer, beforeId)
         }
     }

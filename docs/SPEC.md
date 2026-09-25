@@ -423,9 +423,22 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Behavior**:
 1. The map renders every activity within the currently selected date range (FR-6) that has not been individually hidden (FR-5.8) or filtered out by TYPE/DISTANCE (FR-5.2/FR-5.3), as a colored line following its recorded route.
-2. Hovering a track on the map bolds it; the corresponding row in the Activities panel is highlighted to match (FR-5.4's reverse direction).
-3. Clicking a track on the map sets it as the row-click focus (FR-5.5) — bolds it, flies the camera to fit it, and replaces whichever activity was previously focused. It does not add to or remove from the checkbox group (FR-5.6) in either direction.
-4. Clicking anywhere on the map that is not a track clears the row-click focus, if any — the focused activity's highlight is removed and it returns to the same flat-color rendering as every other unfocused activity. This does not affect the checkbox group.
+2. Hovering a track on the map draws it thicker; the corresponding row in the Activities panel is highlighted to match (FR-5.4's reverse direction).
+3. Clicking a track on the map sets it as the row-click focus (FR-5.5) — emphasizes it, flies the camera to fit it, and replaces whichever activity was previously focused. It does not add to or remove from the checkbox group (FR-5.6) in either direction.
+4. Clicking anywhere on the map that is not a track clears the row-click focus, if any — the focused activity loses its focus treatment and returns to how it looked before: checked if it is in the checkbox group, normal otherwise. This does not affect the checkbox group.
+5. Tracks are drawn from zoom 4 — a few states on screen — inward. Zoomed out further, Normal mode shows the base map alone; unlike Fog and Heatmap, it has no country/region fallback (FR-4.2, FR-4.3). Fitting the camera to an activity (FR-5.5, FR-5.6) lands at zoom 4 or closer for anything spanning up to about 60° of longitude at desktop width — a US coast-to-coast drive included — and about 25° on a phone; a wider activity is flown to but isn't drawn until the user zooms in.
+6. Every track is always in one of four states — Normal, Hovered, Checked, or Focused — each drawn distinctly (*Track states*, below).
+
+**Track states**:
+
+| State | Entered by | Track on the map | Also on the map | Its row in the Activities panel | Camera |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| Normal | default | thin gold line | — | plain | — |
+| Hovered | pointer over the track, or over its row (FR-5.4) | the thickest line, in a darker gold, no outline | — | title underlined | doesn't move |
+| Checked | the row's checkbox (FR-5.6), Select all or Invert selection (FR-5.7) | thicker gold line with a dark outline, fully opaque | — | tinted background with a gold bar on its left edge; checkbox ticked | flies to fit the whole checked group 300ms after the group last changed |
+| Focused | clicking the track (behavior 3) or its row's text (FR-5.5) | as Checked | colored zone segments over the line (FR-4.8) and the profile card (FR-4.9) | as Checked, checkbox unchanged | flies to fit that one track |
+
+Only one track is hovered and only one is focused at a time; any number can be checked. Hovering a checked or focused track draws the hover line inside its outline, and underlines its row title. A track both checked and focused looks focused. A hidden track (FR-5.8) draws nothing in any state, and none of these states exist outside Normal mode (FR-4.2, FR-4.3). An emphasized track is not raised above other tracks where they overlap; its outline is what sets it apart.
 
 ### FR-4.2 Fog of War mode
 
@@ -543,7 +556,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 ### FR-5.4 Row hover preview
 
-**Description**: Hovering a row (anywhere on it) previews that activity's track on the map — bolded — with no camera movement. The preview clears the instant the pointer leaves the row. This works in both directions: hovering an activity's track directly on the map previews it the same way, and additionally underlines that row's title in the Activities panel — so either surface can be used to identify which row an unlabeled track on the map belongs to, not only the reverse.
+**Description**: Hovering a row (anywhere on it) previews that activity's track on the map — drawn thicker, FR-4.1's Hovered state — with no camera movement. The preview clears the instant the pointer leaves the row. This works in both directions: hovering an activity's track directly on the map previews it the same way, and additionally underlines that row's title in the Activities panel — so either surface can be used to identify which row an unlabeled track on the map belongs to, not only the reverse.
 
 ### FR-5.5 Row click — focus and fly
 

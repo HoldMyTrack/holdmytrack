@@ -93,7 +93,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 **Description**: The same three mutually exclusive views `docs/SPEC.md` FR-4.1–FR-4.4 define, switched by a toggle at the map's top-left, in one row beside the menu button, with a divider between Normal and the two coverage views (Normal | Fog, Heatmap), as on the web. Only visible/available once signed in.
 
 **Behavior**:
-1. **Normal** draws the account's tracks as a single-color vector line layer (`GET /tiles/v1/tracks/{z}/{x}/{y}.mvt`).
+1. **Normal** draws the account's tracks as a single-color vector line layer (`GET /tiles/v1/tracks/{z}/{x}/{y}.mvt`), from zoom 4 inward, the same as the web (`docs/SPEC.md` FR-4.1).
 2. **Fog** replaces the tracks with the server-rendered dark-veil raster (`GET /tiles/v1/fog/{z}/{x}/{y}.png`); tracks are hidden.
 3. **Heatmap** replaces the tracks with the server-rendered intensity raster (`GET /tiles/v1/heatmap/{z}/{x}/{y}.png`); tracks are hidden.
 4. All three layers sit beneath the basemap's first label layer, so place names stay legible; within that, the active raster (fog or heatmap) is drawn beneath the tracks layer so a cleared route reads as visible through the fog rather than obscured by it — the same ordering the web client uses.
