@@ -35,7 +35,7 @@ Checkboxes are the source of truth for progress; re-check them against the three
 - [ ] Host hardening — a firewall allowing only 22/80/443, key-only SSH with password login disabled, unattended security updates, and `.env.prod` readable only by the deploying user.
 - [ ] Bound Docker's container logs — the default `json-file` driver never rotates, so `api`/`worker`/Caddy logs grow without limit on a 50 GB disk; set `max-size`/`max-file` in `/etc/docker/daemon.json` or per service in `compose.prod.yml`.
 - [ ] Basic monitoring/alerting — start with an external uptime check on `/healthz` (the cheapest signal, and what `scripts/maintenance.sh` already polls), then error rate and ingest queue depth. Cost-per-user is Phase 5's own measurement item, not an ops alert.
-- [ ] Size up from sandbox hardware once real traffic is expected — 1 vCPU / 2 GB RAM is good enough for real pre-release testing, not sized for this being called Production. RAM is the real constraint: it's below `docs/DEPLOY.md`'s recommended 4 GB, and Postgres, the Go server and a `pathify` Takeout import running at once can trigger the kernel OOM killer, which may kill Postgres. Until then, swap is the cheap stopgap.
+- [ ] Size up from sandbox hardware once real traffic is expected — 1 vCPU / 2 GB RAM is good enough for real pre-release testing, not sized for this being called Production. RAM is the real constraint: it's below `docs/DEPLOY.md`'s recommended 4 GB, and Postgres, the Go server and a Takeout import running at once can trigger the kernel OOM killer, which may kill Postgres. Until then, swap is the cheap stopgap.
 
 ### CI on push/PR — closes the gap where `tsc`/Go tests/`make test` already exist but nothing runs them automatically
 

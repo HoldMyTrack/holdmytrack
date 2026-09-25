@@ -19,6 +19,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0008](0008-vector-tiles-for-country-region-boundary-tiers.md) | The Country/Region zoom tiers are live vector tiles, not a second precomputed raster pyramid |
 | [0009](0009-google-sign-in-server-side-code-flow.md) | Sign in with Google is a server-side authorization-code flow with no OAuth library, auto-linking by verified email |
 | [0010](0010-private-locations-replace-endpoint-trim.md) | Private locations replace the fixed endpoint trim |
+| [0011](0011-takeout-reader-in-go.md) | The Takeout reader is Go code in the server, not a pathify subprocess |
 
 ## Writing a new one
 

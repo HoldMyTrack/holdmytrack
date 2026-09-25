@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1" creator="Pathify Phone">
+  <metadata>
+    <name>Outdoor Bike 2026-07-11</name>
+    <desc>Fitbit log 1003</desc>
+    <time>2026-07-11T23:56:00.000000000Z</time>
+  </metadata>
+  <trk>
+    <name>Outdoor Bike 2026-07-11</name>
+    <desc>Fitbit log 1003</desc>
+    <trkseg>
+      <trkpt lat="41.41" lon="-81.76">
+        <ele>240</ele>
+        <time>2026-07-11T23:56:00.000000000Z</time>
+      </trkpt>
+      <trkpt lat="41.4105" lon="-81.7606">
+        <ele>240.2</ele>
+        <time>2026-07-11T23:57:00.000000000Z</time>
+      </trkpt>
+      <trkpt lat="41.411" lon="-81.7612">
+        <ele>240.4</ele>
+        <time>2026-07-11T23:58:00.000000000Z</time>
+      </trkpt>
+      <trkpt lat="41.4115" lon="-81.7618">
+        <ele>240.6</ele>
+        <time>2026-07-11T23:59:00.000000000Z</time>
+      </trkpt>
+      <trkpt lat="41.412" lon="-81.7624">
+        <ele>240.8</ele>
+        <time>2026-07-12T00:00:00.000000000Z</time>
+      </trkpt>
+      <trkpt lat="41.4125" lon="-81.763">
+        <ele>241</ele>
+        <time>2026-07-12T00:01:00.000000000Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>
