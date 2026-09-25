@@ -11,29 +11,44 @@ import (
 // Cross-source deduplication — IMPLEMENTATION.md §4.6.
 //
 // The unique index on `(user_id, source, external_id)` cannot help here: three copies of one
-// ride arriving by three paths genuinely do have three different ids. What they share is
-// roughly when they started and roughly how far they went, so identity has to be fuzzy.
+// ride arriving by three paths genuinely do have three different ids. What they share is the
+// stretch of time they were recorded over — one person is not on two rides at once — so
+// identity is time overlap: two activities are the same when their time ranges overlap by at
+// least dedupeMinOverlap of the *longer* one's duration.
 //
-// §4.6's tolerance is **start time within a minute, distance within ~1%**, and it is applied
-// here as a window around the incoming activity rather than as equality on a pre-rounded
-// bucket. Rounding first is cheaper to index but turns matching into a lottery at the bucket
-// edges — two copies three seconds apart match or don't depending purely on whether they
-// straddle a boundary, which was measured happening on a real pair. A window applies the same
-// tolerance the spec names, to every pair, the same way.
+// Type and distance are deliberately not compared. Sources disagree on both for the same ride —
+// "walking" against "hiking", or a type-less "unknown"; distance measured by a watch, a phone,
+// a smoothed export or a wheel sensor, a few percent apart — and every such disagreement was a
+// missed duplicate. Start times drift too (a late GPS lock, trimmed auto-pause), which an
+// overlap fraction absorbs without a separate tolerance.
 //
-// The bias §4.6 asks for still holds: an activity with no distance is never deduplicated at
-// all, because type and start minute alone are too weak to merge on, and a duplicate that
-// survives is visible and fixable in a way a merge of two real activities is not.
-const (
-	// dedupeTimeWindow is §4.6's "nearest minute" as a symmetric range: two starts within
-	// half a minute either way are the same start.
-	dedupeTimeWindow = 30 * time.Second
+// Measuring against the longer duration, not the shorter, is what keeps the rule strict in the
+// cases where an overlap is not the same activity: a few seconds of clock skew between two
+// back-to-back recordings, an auto-detected ten-minute walk inside a two-hour hike, a day hike
+// inside a multi-day log. All of those stay separate. A duplicate that survives is visible and
+// fixable; a real activity merged away is not.
+const dedupeMinOverlap = 0.8
 
-	// dedupeDistanceTolerance is §4.6's ~1%, relative rather than absolute — 1% of a 5 km run
-	// and 1% of a 200 km ride are very different numbers of metres, and a fixed-metre
-	// tolerance would be far too strict for one and far too loose for the other.
-	dedupeDistanceTolerance = 0.01
-)
+// dedupeStartSlack bounds how far apart two matching starts can be, as a fraction of the
+// incoming activity's duration D, so the candidate lookup is a plain range scan on
+// `(user_id, started_at)`. A match needs overlap ≥ f·max, and overlap ≤ max − |Δstart|, so
+// |Δstart| ≤ (1−f)·max; and since min ≥ f·max, max ≤ D/f. Together: |Δstart| ≤ (1−f)/f · D.
+const dedupeStartSlack = (1 - dedupeMinOverlap) / dedupeMinOverlap
+
+// overlapMatches is the match rule on its own, for tests; ResolveDuplicates' SQL mirrors it.
+func overlapMatches(aStart time.Time, aDur time.Duration, bStart time.Time, bDur time.Duration) bool {
+	if aDur <= 0 || bDur <= 0 {
+		return false
+	}
+	lo, hi := aStart, aStart.Add(aDur)
+	if bStart.After(lo) {
+		lo = bStart
+	}
+	if bEnd := bStart.Add(bDur); bEnd.Before(hi) {
+		hi = bEnd
+	}
+	return hi.Sub(lo).Seconds() >= dedupeMinOverlap*max(aDur, bDur).Seconds()
+}
 
 // candidate is one row in a collision, with everything needed to rank it.
 type candidate struct {
@@ -87,13 +102,16 @@ func (c candidate) richerThan(other candidate) bool {
 func ResolveDuplicates(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	userID, activityType string,
+	userID string,
 	startedAt time.Time,
-	distanceM float64,
+	durationS int,
 ) ([][2]int, error) {
-	if distanceM <= 0 {
+	// No time span, nothing to overlap — never deduplicated.
+	if durationS <= 0 {
 		return nil, nil
 	}
+	duration := time.Duration(durationS) * time.Second
+	slack := time.Duration(float64(duration) * dedupeStartSlack)
 	rows, err := pool.Query(ctx, `
 		SELECT a.id::text,
 		       a.trajectory IS NOT NULL,
@@ -110,14 +128,18 @@ func ResolveDuplicates(
 		FROM activities a
 		LEFT JOIN activity_streams s ON s.activity_id = a.id
 		WHERE a.user_id = $1
-		  AND a.activity_type = $2
-		  AND a.started_at BETWEEN $3 AND $4
-		  AND a.distance_meters IS NOT NULL
-		  AND abs(a.distance_meters - $5::numeric) <= $6::numeric
+		  AND a.started_at BETWEEN $2 AND $3
+		  AND a.duration_seconds > 0
+		  -- overlapMatches: the overlap covers dedupeMinOverlap of the longer of the two.
+		  AND extract(epoch FROM
+		        least(a.started_at + make_interval(secs => a.duration_seconds), $5::timestamptz)
+		        - greatest(a.started_at, $4::timestamptz))::float8
+		      >= $6::float8 * greatest(a.duration_seconds, $7::int)
 	`,
-		userID, activityType,
-		startedAt.Add(-dedupeTimeWindow), startedAt.Add(dedupeTimeWindow),
-		distanceM, distanceM*dedupeDistanceTolerance,
+		userID,
+		startedAt.Add(-slack), startedAt.Add(slack),
+		startedAt, startedAt.Add(duration),
+		dedupeMinOverlap, durationS,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("ingest: dedupe candidates: %w", err)

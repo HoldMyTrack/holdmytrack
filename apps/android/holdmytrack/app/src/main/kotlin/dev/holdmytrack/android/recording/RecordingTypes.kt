@@ -28,8 +28,7 @@ object RecordingTypes {
     /**
      * What a fresh recording starts with: the type this account last gave a recording in Edit,
      * or [DEFAULT] if it never has. Recording asks nothing, so this is how most recordings
-     * arrive already typed — and so already queueable past `RecordedActivitiesActivity`'s
-     * "unknown" gate. Kept in its own preference rather than read off the newest row, because
+     * arrive already typed. Kept in its own preference rather than read off the newest row, because
      * a synced row is deleted from the device and the store can be empty. Scoped per account
      * by [Session.email], the same key `RecordedActivityStore` uses.
      */

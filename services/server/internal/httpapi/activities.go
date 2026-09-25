@@ -361,17 +361,16 @@ func (s *Server) handleDeleteActivity(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// A representative of the copies this delete is about to release (§4.6). They all share
-	// one dedupe window by construction, so re-ranking from any one of them re-ranks the lot —
-	// and without that they would every one become live at once, leaving the same ride counted
-	// two or three times in the totals and the fog.
-	var releasedType *string
+	// A representative of the copies this delete is about to release (§4.6). Each one overlapped
+	// the deleted winner, so re-ranking around any one of them re-ranks its copies too — and
+	// without that they would every one become live at once, leaving the same ride counted two
+	// or three times in the totals and the fog.
 	var releasedStart *time.Time
-	var releasedDistance *float64
+	var releasedDuration *int
 	if err := s.pool.QueryRow(ctx,
-		`SELECT activity_type, started_at, distance_meters FROM activities
+		`SELECT started_at, duration_seconds FROM activities
 		 WHERE superseded_by = $1 ORDER BY created_at LIMIT 1`, activityID,
-	).Scan(&releasedType, &releasedStart, &releasedDistance); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	).Scan(&releasedStart, &releasedDuration); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		s.log.Error("activity delete: superseded lookup failed", "activity_id", activityID, "err", err)
 	}
 
@@ -393,8 +392,8 @@ func (s *Server) handleDeleteActivity(w http.ResponseWriter, r *http.Request) {
 	// the now-smaller set (this activity's rows already gone via the cascade above) produces a
 	// correct result with no new compositing logic needed.
 	// Re-rank before re-rendering, so the render below composites the set that actually wins.
-	if releasedType != nil && releasedStart != nil && releasedDistance != nil {
-		extra, err := ingest.ResolveDuplicates(ctx, s.pool, userID, *releasedType, *releasedStart, *releasedDistance)
+	if releasedStart != nil && releasedDuration != nil {
+		extra, err := ingest.ResolveDuplicates(ctx, s.pool, userID, *releasedStart, *releasedDuration)
 		if err != nil {
 			s.log.Error("activity delete: re-resolving duplicates failed", "activity_id", activityID, "err", err)
 		} else {
