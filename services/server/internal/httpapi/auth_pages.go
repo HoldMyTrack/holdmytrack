@@ -79,9 +79,8 @@ func (a *pageAccount) home() string {
 	return "/"
 }
 
-// siteDescription is what a link to the site shows in a preview, and what a search engine
-// shows under it. The sign-in page carries it: `/` itself redirects a signed-out visitor
-// there, so that's the page a shared link to holdmytrack.com actually lands on.
+// siteDescription is the sign-in page's description, for a search result or a shared link
+// that lands on it. (The site's own front page is `/`, About's content — homeDescription.)
 const siteDescription = "HoldMyTrack is a free, community-funded place to see every outdoor activity you have ever recorded on one map — Fog of War, heatmaps and routes from your watch, phone or old exports."
 
 func (s *Server) renderAuth(w http.ResponseWriter, r *http.Request, status int, page, title string, noIndex bool, form authForm) {
@@ -90,7 +89,7 @@ func (s *Server) renderAuth(w http.ResponseWriter, r *http.Request, status int, 
 		user = acct.user
 	}
 	data := web.PageData{Title: title + " — HoldMyTrack", Path: r.URL.Path, NoIndex: noIndex, User: user, Page: form}
-	if page == "signin" || page == "signup" {
+	if page == "signin" {
 		data.Description = siteDescription
 	}
 	s.pages.Render(w, status, page, data)
@@ -168,7 +167,8 @@ func (s *Server) handleSignUpPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, acct.home(), http.StatusSeeOther)
 		return
 	}
-	s.renderAuth(w, r, http.StatusOK, "signup", "Create your account", false, authForm{Google: s.google.enabled(), Upgrading: acct != nil})
+	// noindex: /signin is the one sign-in-or-up page search results should show (it links here).
+	s.renderAuth(w, r, http.StatusOK, "signup", "Create your account", true, authForm{Google: s.google.enabled(), Upgrading: acct != nil})
 }
 
 // POST /signup. timezone comes from a hidden field the page's one-line script fills from the
@@ -178,7 +178,7 @@ func (s *Server) handleSignUpForm(w http.ResponseWriter, r *http.Request) {
 	userID, err := s.createAccount(r.Context(), email, r.PostFormValue("password"), r.PostFormValue("timezone"))
 	if err != nil {
 		acct := s.pageAccount(r)
-		s.renderAuthError(w, r, "sign up", "signup", "Create your account", false, authForm{Email: email, Google: s.google.enabled(), Upgrading: acct != nil && acct.info.isDemo}, err)
+		s.renderAuthError(w, r, "sign up", "signup", "Create your account", true, authForm{Email: email, Google: s.google.enabled(), Upgrading: acct != nil && acct.info.isDemo}, err)
 		return
 	}
 	s.signIn(w, r, userID)

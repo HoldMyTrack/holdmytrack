@@ -1,8 +1,99 @@
 {{define "content"}}
-<main class="page-main">
+<main class="page-main help">
   <section class="page-hero">
     <h1>How HoldMyTrack works</h1>
-    <p class="page-lede">A guide to the web app is on its way. Until then, questions are welcome — see <a href="/contacts">Contacts</a>.</p>
+    <p class="page-lede">A map of everywhere you have been, built from the activities you have already recorded. Here is how to get them in, what the map shows you, and how to make it yours.</p>
+    <nav class="help__toc" aria-label="On this page">
+      <a href="#map">The map</a>
+      <a href="#timeline">The timeline</a>
+      <a href="#sync">Getting your activities in</a>
+      <a href="#export">Exporting a map image</a>
+      <a href="#settings">Settings and privacy</a>
+    </nav>
+  </section>
+
+  <section class="page-section" id="map">
+    <h2>The map</h2>
+
+    <h3>What you see when you open it</h3>
+    <p>The map flies to your most recent activity (the <a href="#timeline">timeline</a> below it selects the days around it). The address bar keeps your current position, so a reload brings you back to the same view and a copied link opens it for someone else.</p>
+
+    <h3>Three ways to look at your history</h3>
+    <p>The switch in the top-left corner of the map changes what it shows.</p>
+    <ul class="page-list">
+      <li><strong>Normal</strong> draws each activity from the dates selected on the <a href="#timeline">timeline</a> as a line. Filter the list by type or distance, hide the ones you don't want to see, and click a track (or its row in the list) to focus it: it is colored by pace — or by heart rate, if that was recorded for the whole activity — with an elevation profile alongside.</li>
+      <li><strong>Fog of War</strong> covers the world in fog and clears it wherever you have ever been. It is your whole history, all the time: the date range and the filters don't apply here, and a place you once cleared stays clear.</li>
+      <li><strong>Heatmap</strong> glows brighter wherever you go more often, over the last 365 days only. Places you haven't visited for a year fade out, so it shows the shape of your life now rather than all time. How bright "a lot" is adapts to your own history, so your busiest route is always the hottest.</li>
+    </ul>
+
+    <h3>Zooming out</h3>
+    <p>Fog of War and Heatmap change what they show as you zoom, because street-level detail disappears when a whole continent is on screen.</p>
+    <ul class="page-list">
+      <li><strong>Close in</strong> (a city or closer), you see exactly the streets and paths you covered.</li>
+      <li><strong>Zoomed out to a country</strong>, whole states and regions clear or light up as soon as you have an activity anywhere inside them.</li>
+      <li><strong>Zoomed out to a continent or the world</strong>, the same happens for whole countries.</li>
+    </ul>
+    <p>Normal mode doesn't do this: it draws tracks until a few states fit on screen, and shows the plain map when you zoom out further.</p>
+  </section>
+
+  <section class="page-section" id="timeline">
+    <h2>The timeline</h2>
+    <p>The timeline along the bottom of the map chooses which dates you're looking at. When you open the map, it selects your five most recent days that have an activity.</p>
+    <ul class="page-list">
+      <li><strong>Each bar is one day</strong> with at least one activity. Days with nothing recorded are left out, so the bars sit side by side however far apart the days were. A taller bar means more distance that day.</li>
+      <li><strong>The highlighted band is your selection.</strong> The activities in it are the ones listed in the Activities panel and drawn on the map in Normal mode.</li>
+      <li><strong>Drag the band's edges</strong> to extend or shorten it, or drag the band itself to move it along. Click a bar outside it to select just that day.</li>
+      <li><strong>Scroll back through your history</strong> with the Earlier and Later buttons, or by dragging the timeline. Scrolling doesn't change what's selected. The dates of both are shown on the left: <em>Shown days</em> and <em>Selected range</em>.</li>
+    </ul>
+    <p>Choosing new dates clears your filters, hidden tracks and selected activities, since they described the old ones. Fog of War and Heatmap don't use dates, so the timeline is hidden in those modes.</p>
+    <p><strong>On a phone</strong>, the timeline is a slider with two knobs, showing fifteen days at a time. Earlier and Later move it five days, carrying along a knob parked on that edge, which is how a selection grows beyond fifteen days.</p>
+  </section>
+
+  <section class="page-section" id="sync">
+    <h2>Getting your activities in</h2>
+    <p>Everything comes in through the <strong>Sync</strong> tab, next to Activities in the panel on the left. It also lists everything you have imported, with its status (Processing, Ready or Failed); "View on map" jumps straight to a finished one.</p>
+
+    <h3>Files</h3>
+    <p>Drop files onto the Sync tab, or choose them from your computer. HoldMyTrack reads <strong>GPX</strong>, <strong>FIT</strong> and <strong>TCX</strong> files, the formats watches, bike computers and most fitness apps export. You can add up to 20 files at a time, each up to 64 MB. For more, put them in a <strong>.zip</strong> archive: one archive can hold up to 5,000 files.</p>
+
+    <h3>Google Takeout (Fitbit and Google Health)</h3>
+    <p>If your history lives with Fitbit or Google, download it with <a href="https://takeout.google.com">Google Takeout</a>: select your Fitbit data, create the export, and download the <strong>.zip</strong> it gives you (Google's own guide: <a href="https://support.google.com/accounts/answer/3024190">How to download your Google data</a>). Upload that .zip to the Sync tab as it is, without unpacking it. HoldMyTrack recognizes a Takeout export by itself and imports every activity that has a GPS route; activities without one, like a logged swim, are skipped.</p>
+
+    <h3>The Android app</h3>
+    <p>The HoldMyTrack Android app syncs your workouts from Health Connect, where most Android watches and fitness apps store them. Open it and tap <strong>Sync Now</strong>: the new activities appear in the Sync tab's history and on your map. Workouts without a route can't be placed on a map, so they're skipped: indoor ones, and Samsung Galaxy Watch workouts, whose routes Samsung doesn't share with Health Connect. The app can also record a walk, hike or drive by itself when you just want the route; recordings stay on your phone until you choose to sync them.</p>
+
+    <h3>Importing twice is safe</h3>
+    <ul class="page-list">
+      <li><strong>The same file again</strong> is recognized and skipped; you'll see a note that it was already uploaded, and nothing is added twice.</li>
+      <li><strong>The same activity from two places</strong>, say synced from your watch and later uploaded as a FIT file, is kept once. HoldMyTrack keeps the richer copy (the one with a route, or with heart rate) and sets the other aside. When that happens, a "duplicates found" link at the bottom of the Activities list shows what was set aside and why. Delete the copy that was kept, and the other one comes back.</li>
+    </ul>
+  </section>
+
+  <section class="page-section" id="export">
+    <h2>Exporting a map image</h2>
+    <p>The camera button in the map's top-right corner, under the zoom and location buttons, puts a frame on the map. Pan and zoom the map to line it up, drag the frame's edge to move it, or its corners to resize it. The menu above the frame picks its shape: Custom, or a ready-made size for Instagram, Facebook or X. <strong>Capture</strong> downloads exactly what's inside the frame as a high-resolution PNG image.</p>
+    <p>The image shows the map as you see it: your tracks in Normal mode, your coverage in Fog of War, your year in Heatmap (a focused track's pace coloring isn't included). It carries the map's required credit to OpenStreetMap and a small HoldMyTrack logo in its bottom corners.</p>
+  </section>
+
+  <section class="page-section" id="settings">
+    <h2>Settings and privacy</h2>
+
+    <h3>Country and timezone</h3>
+    <p>Open <a href="/settings">Settings</a> from the menu under your avatar.</p>
+    <ul class="page-list">
+      <li><strong>Country</strong> sets your units: miles and feet in the United States, Liberia and Myanmar, kilometers and meters everywhere else.</li>
+      <li><strong>Timezone</strong> decides which calendar day an activity counts on, everywhere the app groups by day: the timeline, the activity grid on your Profile, and trends. It is set from your browser when you sign up; change it if you have moved.</li>
+    </ul>
+    <p>When you first sign up, HoldMyTrack asks for both before showing your map.</p>
+
+    <h3>Private locations</h3>
+    <p>Mark the places you don't want your tracks to reveal, like home or work, as <strong>Private locations</strong>: circles you place on the map, each with a radius from 50 meters to 2 kilometers, up to 20 of them. Wherever a track starts or ends inside one, that part is hidden everywhere, your own map included, and its distance and stats count only the visible part. A track that only passes through a private location is shown in full, since passing by reveals neither where you started nor where you stopped.</p>
+    <p>Open them from the menu under your avatar, or from Settings. Changes apply to your whole history: the affected activities show as Pending in the list for a moment while they are updated.</p>
+  </section>
+
+  <section class="page-section">
+    <h2>Still stuck?</h2>
+    <p>Questions and bug reports are welcome — see <a href="/contacts">Contacts</a>.</p>
   </section>
 </main>
 {{end}}

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -28,7 +29,7 @@ func TestPagesRenderSignedOut(t *testing.T) {
 		noIndex     bool
 	}{
 		{"/about", "About HoldMyTrack", false},
-		{"/help", "Help — HoldMyTrack", true},
+		{"/help", "Help — HoldMyTrack", false},
 		{"/contacts", "Contacts — HoldMyTrack", false},
 	} {
 		rec := httptest.NewRecorder()
@@ -40,8 +41,10 @@ func TestPagesRenderSignedOut(t *testing.T) {
 		if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
 			t.Errorf("%s: content type %q", tc.path, ct)
 		}
-		if rec.Header().Get("Cache-Control") != "no-store" {
-			t.Errorf("%s: pages carry the account in their header and must not be cached", tc.path)
+		// Signed out, these pages are the same for everyone, so they're cacheable — but only
+		// for a request without a session cookie.
+		if rec.Header().Get("Cache-Control") != "public, max-age=300" || rec.Header().Get("Vary") != "Cookie" {
+			t.Errorf("%s: signed-out cache headers %q, Vary %q", tc.path, rec.Header().Get("Cache-Control"), rec.Header().Get("Vary"))
 		}
 		if !strings.Contains(body, "<title>"+tc.title) {
 			t.Errorf("%s: missing title %q", tc.path, tc.title)
@@ -56,8 +59,15 @@ func TestPagesRenderSignedOut(t *testing.T) {
 		if hasNoIndex := strings.Contains(body, `name="robots" content="noindex"`); hasNoIndex != tc.noIndex {
 			t.Errorf("%s: noindex = %v, want %v", tc.path, hasNoIndex, tc.noIndex)
 		}
-		if !tc.noIndex && !strings.Contains(body, `<link rel="canonical" href="https://app.example`+tc.path+`"`) {
-			t.Errorf("%s: missing canonical link", tc.path)
+		canonical := tc.path
+		if tc.path == "/about" {
+			canonical = "/" // About is the signed-out home page's content
+		}
+		if !tc.noIndex && !strings.Contains(body, `<link rel="canonical" href="https://app.example`+canonical+`"`) {
+			t.Errorf("%s: missing canonical link to %s", tc.path, canonical)
+		}
+		if !tc.noIndex && (!strings.Contains(body, `<meta property="og:image" content="https://app.example/static/og-image.jpg?v=test"`) || !strings.Contains(body, `content="summary_large_image"`)) {
+			t.Errorf("%s: no large link-preview image", tc.path)
 		}
 	}
 }
@@ -246,8 +256,8 @@ func TestAppShellRoutes(t *testing.T) {
 	for _, tc := range []struct {
 		path, want string
 	}{
-		// No session: the app's pages send you to sign in.
-		{"/", "/signin"},
+		// No session: the app's pages send you to sign in (`/` is the home page instead —
+		// TestSignedOutHome).
 		{"/profile", "/signin"},
 		{"/settings", "/signin"},
 		// Links from emails sent before the auth pages existed, forwarded before any session
@@ -298,5 +308,53 @@ func TestNormalizeTimezoneStoresCurrentNames(t *testing.T) {
 	}
 	if _, ok := normalizeTimezone("Mars/Olympus"); ok {
 		t.Errorf("an unknown zone was accepted")
+	}
+}
+
+func TestSignedOutHome(t *testing.T) {
+	s := newPagesTestServer(t)
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("/: status %d, want the home page", rec.Code)
+	}
+	for _, want := range []string{
+		"<title>HoldMyTrack — Every journey, mapped.</title>",
+		"Every place you have ever run, ridden or walked", // About's own content
+		`<link rel="canonical" href="https://app.example/"`,
+		">Sign in</a>",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("/: missing %q", want)
+		}
+	}
+	// The structured data is valid JSON, with absolute URLs.
+	_, ld, _ := strings.Cut(body, `<script type="application/ld+json">`)
+	ld, _, _ = strings.Cut(ld, "</script>")
+	var app struct {
+		Type  string `json:"@type"`
+		URL   string `json:"url"`
+		Image string `json:"image"`
+	}
+	if err := json.Unmarshal([]byte(ld), &app); err != nil {
+		t.Fatalf("/: structured data isn't JSON: %v\n%s", err, ld)
+	}
+	if app.Type != "WebApplication" || app.URL != "https://app.example/" || app.Image != "https://app.example/static/og-image.jpg?v=test" {
+		t.Errorf("/: structured data %+v", app)
+	}
+	if strings.Contains(body, `id="root"`) {
+		t.Errorf("/: signed out got the app shell")
+	}
+	// Sign-up is reachable but not indexed: /signin is the page results should show.
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/signup", nil))
+	if !strings.Contains(rec.Body.String(), `name="robots" content="noindex"`) {
+		t.Errorf("/signup is indexable")
+	}
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/signin", nil))
+	if strings.Contains(rec.Body.String(), `content="noindex"`) {
+		t.Errorf("/signin isn't indexable")
 	}
 }

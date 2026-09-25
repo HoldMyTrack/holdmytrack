@@ -92,6 +92,11 @@ code {
   border-radius: 10px;
 }
 
+/* An odd last card spans the row instead of sitting alone at half width. */
+.page-cards li:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
 .page-cards h3 {
   margin: 0 0 6px;
   font-family: var(--fm-font-serif);
@@ -769,6 +774,27 @@ code {
   justify-content: space-between;
   font-size: 11px;
   color: rgb(var(--fm-ink-rgb) / 50%);
+}
+
+/* The Help page (templates/pages/help.html): a row of jump links under the title, and
+   subheadings inside each section. */
+.help__toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 20px;
+  font-size: 15px;
+}
+
+.help h3 {
+  margin: 24px 0 8px;
+  font-family: var(--fm-font-serif);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.help .page-list {
+  margin-bottom: 12px;
 }
 
 @media (max-width: 768px) {

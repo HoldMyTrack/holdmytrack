@@ -53,7 +53,7 @@ There is no administrator role, no multi-tenancy beyond per-account data isolati
 | Page | Purpose |
 | :-- | :-- |
 | `GET`/`POST /signin` | Sign in (FR-1.2); links to sign-up and "Forgot password?", "Continue with Google" when configured (FR-1.9), and "Try it now — no signup" (`POST /demo`, FR-2.1). `?error=google` shows FR-1.9's failure message. |
-| `GET`/`POST /signup` | Sign up (FR-1.1, FR-2.3) |
+| `GET`/`POST /signup` | Sign up (FR-1.1, FR-2.3); `noindex`, since `/signin` links to it and is the one that should appear in search results |
 | `GET`/`POST /forgot` | Request a reset link (FR-1.5); answers "Check your email" whatever the address |
 | `GET`/`POST /reset?token=` | Set a new password from the emailed link (FR-1.6) |
 | `GET /verify?token=` | The emailed verification link itself (FR-1.8) |
@@ -120,7 +120,7 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 **Behavior**:
 1. Client calls `GET /v1/auth/me` with whatever session cookie it currently holds.
 2. If the cookie names a live, unexpired session, the server returns the account's identity (`200 OK`).
-3. Otherwise the server returns `401 Unauthorized`, and the client shows the sign-in screen. On the web the pages check the session themselves: the map (`/`), `/profile` and `/settings` redirect a visitor with no session to `/signin`, and a signed-in real account whose email isn't verified to `/verify-pending`.
+3. Otherwise the server returns `401 Unauthorized`, and the client shows the sign-in screen. On the web the pages check the session themselves: `/profile` and `/settings` redirect a visitor with no session to `/signin` (at `/` they get the front page, FR-10.1), and a signed-in real account whose email isn't verified to `/verify-pending`.
 
 **Notes**: A session's validity is checked in the database on every request (not trusted from the cookie's own stated expiry), so a session ended server-side (FR-1.3, or invalidated by a password reset, FR-1.6) stops working immediately even if the browser still holds the cookie. Sessions last 30 days from creation. The response also reports whether the account's email is verified (always `true` for a demo account) — the client uses this to decide whether to show the map or FR-1.8's verify screen.
 
@@ -784,21 +784,22 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 **Preconditions**: None — no session is needed; having one changes only the header (FR-10.4).
 
 **Behavior**:
-1. `GET /about` returns the page.
+1. `GET /about` returns the page. It is also the site's front page: a visit to `/` without a session gets the same page (titled "HoldMyTrack — Every journey, mapped."), and both carry a canonical link to `/`, so search engines index the one URL. With a session, `/` is the map (FR-4).
 2. It has sections for: what HoldMyTrack is, why someone might want it, what it isn't, how it is funded (section id `funding`), and a pointer to Contacts (FR-10.3).
 3. "Try the demo — no signup" links to `/signin`, where the demo starts from its own button (FR-2.1). The page never starts a demo session itself.
 4. About, Help and Contacts are reachable from every page's header and footer (FR-10.4) — the map and the sign-in pages included.
-5. `/robots.txt` allows crawling except for `/v1/` and `/tiles/`, and points to `/sitemap.xml`, which lists `/`, `/about` and `/contacts`.
+5. `/robots.txt` allows crawling except for `/v1/` and `/tiles/`, and points to `/sitemap.xml`, which lists `/`, `/help` and `/contacts` (`/about` is the same page as `/`).
+6. The front page carries structured data (a schema.org `WebApplication`, as JSON-LD) naming the site, its URL, description and share image, and that it's free.
 
 ### FR-10.2 Help page
 
-**Description**: A public page at `/help` that describes how the web app works. It is a placeholder for now: a heading and a line saying the guide is on its way, pointing to Contacts.
+**Description**: A public page at `/help` that explains how HoldMyTrack works, in five sections reachable from jump links under its title: the map (the opening view, the Normal / Fog of War / Heatmap modes, and how Fog and Heatmap switch to whole states or regions, then whole countries, as the map zooms out — FR-4), the timeline (what a bar is, the selection band and how to extend, move or scroll it, and the phone slider — FR-6), getting activities in (files, `.zip` archives, Google Takeout with a link to Google's own download guide, the Android app, and what happens on a repeated or cross-source import — FR-3), exporting a map image (FR-4.10), and settings and privacy (Country, Timezone, Private locations — FR-1.7, FR-8.1).
 
 **Preconditions**: None.
 
 **Behavior**:
-1. `GET /help` returns the page.
-2. Until it has real content, the page carries `<meta name="robots" content="noindex">` and is not listed in `/sitemap.xml`.
+1. `GET /help` returns the page. It is indexable and listed in `/sitemap.xml`.
+2. Its facts are the behavior this document specifies; a change to one of those FRs that the page describes (a limit, a mode's window, a zoom tier) is a change to the page too.
 
 ### FR-10.3 Contacts page
 
@@ -820,8 +821,9 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 4. "Sign out" submits `POST /logout`, which ends the session the same way `POST /v1/auth/logout` does and redirects to `/`. The request is refused (`403`) unless its `Origin` header — or, without one, its `Referer` — is the app's own origin.
 5. On a phone-width screen (≤768px) the tagline is hidden and Donate shows its heart alone; the Info and account menus stay.
 6. The footer links to the map (`/`), About, Help, Contacts and the GitHub repository.
-7. Pages are sent with `Cache-Control: no-store`, since the header names the signed-in account.
+7. With a session, pages are sent with `Cache-Control: no-store`, since the header names the signed-in account. Without one, the front page, About, Help and Contacts are the same for every visitor and are sent `Cache-Control: public, max-age=300` with `Vary: Cookie`, so a copy cached before signing in is never reused after.
 8. An address no page answers gets a "Page not found" page (`404`) with the same header; under `/v1/` and `/tiles/` it's a plain `404`, not a page.
+9. Every indexable page carries link-preview tags (Open Graph and a large-image Twitter card), with a 1200×630 share image: a Fog of War map with the HoldMyTrack logo, tagline and a one-line pitch.
 
 ## 13. FR-11 — Donations
 

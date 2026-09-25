@@ -171,11 +171,11 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 // this server everything that isn't a static asset (apps/web/docker/Caddyfile); in dev, Vite's
 // proxy (apps/web/vite.config.ts) lists these paths one by one, so a new page goes there too.
 func (s *Server) registerPages() {
-	s.mux.HandleFunc("GET /about", s.staticPage("about", "About HoldMyTrack — Every journey, mapped.",
-		"HoldMyTrack is a free, community-funded place to see every outdoor activity you have ever recorded on one map — Fog of War, heatmaps and routes from your watch, phone or old exports. No subscription, no ads, no data sales.", false))
-	// noindex until it has real content (docs/SPEC.md FR-10.2).
-	s.mux.HandleFunc("GET /help", s.staticPage("help", "Help — HoldMyTrack", "How the HoldMyTrack web app works.", true))
-	s.mux.HandleFunc("GET /contacts", s.staticPage("contacts", "Contacts — HoldMyTrack", "How to reach the HoldMyTrack project: email, code and issues.", false))
+	// About is the signed-out home page too (appShell), so its canonical link is `/`.
+	s.mux.HandleFunc("GET /about", s.staticPage("about", "About HoldMyTrack — Every journey, mapped.", homeDescription, "/"))
+	s.mux.HandleFunc("GET /help", s.staticPage("help", "Help — HoldMyTrack",
+		"How HoldMyTrack works: the map and its Normal, Fog of War and Heatmap modes, importing files, Google Takeout and the Android app, exporting a map image, and privacy settings.", ""))
+	s.mux.HandleFunc("GET /contacts", s.staticPage("contacts", "Contacts — HoldMyTrack", "How to reach the HoldMyTrack project: email, code and issues.", ""))
 	s.mux.Handle("GET /static/", s.pages.StaticHandler())
 	s.mux.HandleFunc("POST /logout", s.sameOrigin(s.handleLogoutPage))
 	// auth_pages.go — every POST is a form, so every POST is behind sameOrigin.
