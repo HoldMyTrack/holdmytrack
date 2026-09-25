@@ -48,6 +48,15 @@ async function ensureSignedIn(context) {
   } else if (!signup.ok()) {
     throw new Error(`build test signup failed: ${signup.status()} ${await signup.text()}`);
   }
+  // A fresh account opens on the first-run setup screen, not the map, until it has a Country
+  // (App.tsx, FR-1.7). Saving the same settings on every run is a no-op after the first, and
+  // makes a run against an empty database (CI's) reach the map like a long-used one does.
+  const settings = await context.request.patch(`${API_BASE}/v1/account/settings`, {
+    data: { display_name: '', country: 'US', timezone: 'America/New_York' },
+  });
+  if (!settings.ok()) {
+    throw new Error(`build test settings failed: ${settings.status()} ${await settings.text()}`);
+  }
 }
 
 before(async () => {
@@ -102,7 +111,9 @@ describe('production build', () => {
   it('emits the maplibre worker as a real asset', async () => {
     const res = await fetch(`${BASE}/`);
     const html = await res.text();
-    const entry = html.match(/\/assets\/index-[\w-]+\.js/)?.[0];
+    // Whatever module script index.html loads, not a fixed name: the chunk is named after
+    // its rollup input (vite.config.ts), which is `main` since about.html became a second one.
+    const entry = html.match(/<script type="module"[^>]*src="(\/assets\/[\w-]+\.js)"/)?.[1];
     assert.ok(entry, 'entry chunk in index.html');
     const js = await (await fetch(`${BASE}${entry}`)).text();
     const worker = js.match(/\/assets\/maplibre-gl-worker-[\w-]+\.js/)?.[0];

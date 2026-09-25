@@ -45,6 +45,15 @@ async function ensureSignedIn(context) {
   } else if (!signup.ok()) {
     throw new Error(`smoke test signup failed: ${signup.status()} ${await signup.text()}`);
   }
+  // A fresh account opens on the first-run setup screen, not the map, until it has a Country
+  // (App.tsx, FR-1.7). Saving the same settings on every run is a no-op after the first, and
+  // makes a run against an empty database (CI's) reach the map like a long-used one does.
+  const settings = await context.request.patch(`${API_BASE}/v1/account/settings`, {
+    data: { display_name: '', country: 'US', timezone: 'America/New_York' },
+  });
+  if (!settings.ok()) {
+    throw new Error(`smoke test settings failed: ${settings.status()} ${await settings.text()}`);
+  }
 }
 
 let server;

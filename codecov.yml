@@ -1,0 +1,20 @@
+# Codecov settings for .github/workflows/ci.yml's Go coverage upload. Coverage is reported,
+# not enforced: this project verifies most behavior live rather than through unit tests
+# (docs/DEVELOPMENT.md, "Verification"), so a percentage threshold would gate on the wrong
+# thing. Both status checks stay informational and never block a merge.
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+comment:
+  layout: "condensed_header, diff, flags"
+  require_changes: true
+
+# Paths are reported relative to the repo root; the Go module lives in services/server.
+fixes:
+  - "github.com/HoldMyTrack/holdmytrack/services/server/::services/server/"

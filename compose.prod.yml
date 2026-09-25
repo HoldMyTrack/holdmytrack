@@ -4,7 +4,7 @@
 #   docker compose -f compose.prod.yml --env-file .env.prod up -d
 #
 # Deliberately a separate, standalone file rather than a compose.yaml override: this stack
-# has one fewer service than the dev one (no `minio` — object storage is real Cloudflare
+# has one fewer service than the dev one (no `rustfs` — object storage is real Cloudflare
 # R2 here, reached over the public internet, not a container on this same network) and
 # different topology for the one it renames (`web` is Caddy + the built static frontend,
 # not the Vite dev server), so treating it as "compose.yaml plus a few tweaks" would be
