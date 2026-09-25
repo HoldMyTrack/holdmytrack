@@ -76,15 +76,22 @@ type PageData struct {
 	Description string
 	// Path is the page's own URL path — the Info menu marks the matching entry current, and
 	// the canonical link is built from it.
-	Path    string
-	NoIndex bool
-	User    *User
+	Path string
+	// CanonicalPath, when set, is the canonical link's path instead of Path — for a page that
+	// is the same content as another URL (/about is the signed-out home page, `/`).
+	CanonicalPath string
+	NoIndex       bool
+	User          *User
 	// Page holds whatever a single page needs beyond the shared fields.
 	Page any
 
 	InfoLinks []Link
 	DonateURL string
 	Canonical string
+	// SiteURL is APP_BASE_URL — for the absolute URLs link previews and structured data need.
+	SiteURL string
+	// ShareImage is the link-preview image's absolute URL (static/og-image.jpg).
+	ShareImage string
 }
 
 // Renderer parses each page template together with the shared layout, header and partials
@@ -98,6 +105,8 @@ type Renderer struct {
 	mu    sync.Mutex
 	pages map[string]*template.Template
 	app   *template.Template
+	// public caches RenderPublic's output — a signed-out page's bytes, by page and path.
+	public sync.Map
 }
 
 // AppPage is what the React app's shell (templates/app/app.html) reads: the shared header's
@@ -211,7 +220,13 @@ func (r *Renderer) fill(data *PageData) {
 	if OpenCollectiveSlug != "" {
 		data.DonateURL = "https://opencollective.com/" + url.PathEscape(OpenCollectiveSlug) + "/donate"
 	}
-	data.Canonical = r.baseURL + data.Path
+	canonical := data.Path
+	if data.CanonicalPath != "" {
+		canonical = data.CanonicalPath
+	}
+	data.Canonical = r.baseURL + canonical
+	data.SiteURL = r.baseURL
+	data.ShareImage = r.baseURL + "/static/og-image.jpg?v=" + url.QueryEscape(r.version)
 }
 
 func (r *Renderer) execute(w http.ResponseWriter, status int, t *template.Template, data any) {
@@ -220,12 +235,55 @@ func (r *Renderer) execute(w http.ResponseWriter, status int, t *template.Templa
 		http.Error(w, "template error", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	// Pages carry the signed-in account's name and avatar in their header, so no shared cache
+	// A page carries the signed-in account's name and avatar in its header, so no shared cache
 	// may keep one — and a browser shouldn't show a stale header after sign-out either.
-	w.Header().Set("Cache-Control", "no-store")
+	// Signed-out pages that are the same for everyone go through RenderPublic instead.
+	writeHTML(w, status, "no-store", buf.Bytes())
+}
+
+// RenderPublic is Render for a page with no session behind it and nothing request-specific
+// in it (About, Help, Contacts, the signed-out home page): the same bytes for every visitor
+// and every crawler. So they're rendered once and kept (per page and path; not in dev, where
+// templates reload), and sent cacheable for five minutes. `Vary: Cookie` keeps a browser from
+// reusing the signed-out copy once it holds a session cookie, whose pages have a different
+// header.
+func (r *Renderer) RenderPublic(w http.ResponseWriter, page string, data PageData) {
+	key := page + "|" + data.Path
+	if cached, ok := r.public.Load(key); ok && !r.reload {
+		writePublic(w, cached.([]byte))
+		return
+	}
+	pages, _, ok := r.current(w)
+	if !ok {
+		return
+	}
+	t, ok := pages[page]
+	if !ok {
+		http.Error(w, "unknown page "+page, http.StatusInternalServerError)
+		return
+	}
+	r.fill(&data)
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, data); err != nil {
+		http.Error(w, "template error", http.StatusInternalServerError)
+		return
+	}
+	if !r.reload {
+		r.public.Store(key, buf.Bytes())
+	}
+	writePublic(w, buf.Bytes())
+}
+
+func writePublic(w http.ResponseWriter, body []byte) {
+	w.Header().Set("Vary", "Cookie")
+	writeHTML(w, http.StatusOK, "public, max-age=300", body)
+}
+
+func writeHTML(w http.ResponseWriter, status int, cacheControl string, body []byte) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", cacheControl)
 	w.WriteHeader(status)
-	_, _ = buf.WriteTo(w)
+	_, _ = w.Write(body)
 }
 
 // StaticHandler serves static/ (the pages' stylesheet, the logo) at /static/. Every reference

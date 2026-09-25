@@ -63,3 +63,31 @@ func TestHeaderDemoMenu(t *testing.T) {
 		t.Errorf("demo menu missing its name or Create your own account")
 	}
 }
+
+// RenderPublic renders a page once and serves the same bytes after, cacheable.
+func TestRenderPublicCaches(t *testing.T) {
+	r, err := New(Embedded(), false, "v", "https://app.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := httptest.NewRecorder()
+	r.RenderPublic(first, "help", PageData{Title: "Help", Path: "/help"})
+	second := httptest.NewRecorder()
+	// A different title proves the second answer is the cached first one, not a new render.
+	r.RenderPublic(second, "help", PageData{Title: "Changed", Path: "/help"})
+	if first.Body.String() != second.Body.String() || !strings.Contains(second.Body.String(), "<title>Help</title>") {
+		t.Errorf("second render wasn't served from the cache")
+	}
+	if cc := second.Header().Get("Cache-Control"); cc != "public, max-age=300" || second.Header().Get("Vary") != "Cookie" {
+		t.Errorf("cache headers %q / Vary %q", cc, second.Header().Get("Vary"))
+	}
+	// A dev renderer (templates reloading) never caches.
+	dev, _ := New(Embedded(), true, "v", "https://app.example")
+	a := httptest.NewRecorder()
+	dev.RenderPublic(a, "help", PageData{Title: "One", Path: "/help"})
+	b := httptest.NewRecorder()
+	dev.RenderPublic(b, "help", PageData{Title: "Two", Path: "/help"})
+	if !strings.Contains(b.Body.String(), "<title>Two</title>") {
+		t.Errorf("a dev renderer served a cached page")
+	}
+}

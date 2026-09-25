@@ -25,13 +25,24 @@ func (s *Server) pageUser(r *http.Request) *web.User {
 }
 
 // staticPage serves a page whose content is the same for everyone — only the header differs.
-func (s *Server) staticPage(page, title, description string, noIndex bool) http.HandlerFunc {
+// Signed out, that makes the whole page the same for everyone, so it's served from
+// RenderPublic's cache, cacheable; signed in, it's rendered fresh with the account's header.
+// canonicalPath is for a page that shares its content with another URL (About with `/`).
+func (s *Server) staticPage(page, title, description, canonicalPath string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		s.pages.Render(w, http.StatusOK, page, web.PageData{
-			Title: title, Description: description, Path: r.URL.Path, NoIndex: noIndex, User: s.pageUser(r),
-		})
+		data := web.PageData{Title: title, Description: description, Path: r.URL.Path, CanonicalPath: canonicalPath}
+		if data.User = s.pageUser(r); data.User == nil {
+			s.pages.RenderPublic(w, page, data)
+			return
+		}
+		s.pages.Render(w, http.StatusOK, page, data)
 	}
 }
+
+// homeTitle and homeDescription are the site's own — the signed-out home page's, and About's,
+// which is the same page (appShell).
+const homeTitle = "HoldMyTrack — Every journey, mapped."
+const homeDescription = "HoldMyTrack is a free, community-funded place to see every outdoor activity you have ever recorded on one map — Fog of War, heatmaps and routes from your watch, phone or old exports. No subscription, no ads, no data sales."
 
 // handleLogoutPage serves `POST /logout` — the header's Sign out form. The same revocation as
 // `POST /v1/auth/logout` (endSession), then a redirect to the map rather than a 204.
@@ -70,7 +81,8 @@ func (s *Server) isSameOrigin(r *http.Request) bool {
 }
 
 // appShell serves the React app — the map, at `/`, the one page that isn't rendered here
-// (ADR-0012). Only for a session that has something to show: no session goes to /signin, an unverified real account to
+// (ADR-0012). Only for a session that has something to show: no session gets the signed-out
+// home page instead (About's content), an unverified real account to
 // /verify-pending, one that has never saved Settings to /settings (pageAccount.home). The
 // React app's own copies of the first two checks (App.tsx) stay as a fallback for a session
 // that ends while the page is open.
@@ -81,8 +93,10 @@ func (s *Server) appShell(title string) http.HandlerFunc {
 			return
 		}
 		acct := s.pageAccount(r)
+		// Signed out, `/` is the site's front page — About's content, not a redirect to a
+		// sign-in form, since `/` is the URL people type, share and search engines rank.
 		if acct == nil {
-			http.Redirect(w, r, "/signin", http.StatusSeeOther)
+			s.pages.RenderPublic(w, "about", web.PageData{Title: homeTitle, Description: homeDescription, Path: "/"})
 			return
 		}
 		if home := acct.home(); home != "/" {

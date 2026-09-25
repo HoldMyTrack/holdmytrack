@@ -1,3 +1,22 @@
+{{/* About is also the signed-out home page (`/`, pages.go's appShell), so it carries the
+     site's structured data: what HoldMyTrack is, for a search engine's result card. Its
+     canonical link is `/` on both URLs. */}}
+{{define "head"}}
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "HoldMyTrack",
+      "url": "{{.SiteURL}}/",
+      "description": "A free, community-funded place to see every outdoor activity you have ever recorded on one map: Fog of War, heatmaps and routes from your watch, phone or old exports.",
+      "applicationCategory": "SportsApplication",
+      "operatingSystem": "Web, Android",
+      "image": "{{.ShareImage}}",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "sameAs": ["https://github.com/HoldMyTrack/holdmytrack"]
+    }
+    </script>
+{{end}}
 {{define "content"}}
 <main class="page-main">
   <section class="page-hero">
