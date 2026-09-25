@@ -435,7 +435,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 | :-- | :-- | :-- | :-- | :-- | :-- |
 | Normal | default | thin gold line | — | plain | — |
 | Hovered | pointer over the track, or over its row (FR-5.4) | the thickest line, in a darker gold, no outline | — | title underlined | doesn't move |
-| Checked | the row's checkbox (FR-5.6), Select all or Invert selection (FR-5.7) | thicker gold line with a dark outline, fully opaque | — | tinted background with a gold bar on its left edge; checkbox ticked | flies to fit the whole checked group 300ms after the group last changed |
+| Checked | the row's checkbox (FR-5.6), Select all or Invert selection (FR-5.7) | thicker gold line with a dark outline, fully opaque | — | tinted background with a gold bar on its left edge; checkbox ticked | flies to fit the whole checked group 300ms after the last checkbox click |
 | Focused | clicking the track (behavior 3) or its row's text (FR-5.5) | as Checked | colored zone segments over the line (FR-4.8) and the profile card (FR-4.9) | as Checked, checkbox unchanged | flies to fit that one track |
 
 Only one track is hovered and only one is focused at a time; any number can be checked. Hovering a checked or focused track draws the hover line inside its outline, and underlines its row title. A track both checked and focused looks focused. A hidden track (FR-5.8) draws nothing in any state, and none of these states exist outside Normal mode (FR-4.2, FR-4.3). An emphasized track is not raised above other tracks where they overlap; its outline is what sets it apart.
@@ -449,7 +449,7 @@ Only one track is hovered and only one is focused at a time; any number can be c
 2. Fog ignores the date range and the Type/Distance/hidden-track filters entirely — it always shows every activity the account has ever recorded, not just what Normal mode currently has selected. Entering Fog hides the Activities panel and the date-range picker (there is nothing for either to filter) and clears any checked or focused activity. The camera is left exactly where it was — switching modes never moves it; an earlier auto-fly-to-coverage on entry was removed after being reported as disorienting.
 3. Individual track lines are not drawn in this mode (the veil itself is the information).
 4. Below a threshold zoom, the veil switches from per-pixel coverage to a coarser reveal: a country renders fully clear the moment the account has at least one activity anywhere inside it, however small; one zoom step in, the same applies one administrative level down, at state/region granularity. Zooming back in past the threshold returns to exact per-pixel coverage — the two never blend or overlap, only one is ever shown at a given zoom.
-5. Returning to Normal mode restores the previously checked/focused activities, the date range, and the panel/picker exactly as they were before switching to Fog.
+5. Returning to Normal mode restores the previously checked/focused activities, the date range, and the panel/picker exactly as they were before switching to Fog — without moving the camera, even if the restored activities are off screen.
 
 ### FR-4.3 Heatmap mode
 
@@ -461,7 +461,7 @@ Only one track is hovered and only one is focused at a time; any number can be c
 3. Individual track lines are not drawn in this mode.
 4. How much crossing traffic it takes to reach full brightness adapts to the account's own history, recomputed daily — a new account and a long-running one don't saturate at the same point, so each account's own most-used spot is what reads as hottest, not a fixed number of visits everyone shares.
 5. Below the same threshold zoom Fog switches at, the graded overlay is replaced by a flat "visited" highlight at country granularity, and one step in at state/region granularity — not graded by how much, only whether the account has a currently-in-window activity there. A country/region whose only activity has aged out of the rolling window shows no highlight at this zoom either, matching what the per-pixel overlay already shows at city zoom.
-6. Returning to Normal mode restores the previously checked/focused activities, the date range, and the panel/picker exactly as they were before switching to Heatmap.
+6. Returning to Normal mode restores the previously checked/focused activities, the date range, and the panel/picker exactly as they were before switching to Heatmap — without moving the camera (FR-4.2 behavior 5).
 
 ### FR-4.4 Mode is mutually exclusive
 
@@ -566,7 +566,7 @@ Only one track is hovered and only one is focused at a time; any number can be c
 
 ### FR-5.6 Checkbox — build a group
 
-**Description**: Each row also has a checkbox that adds or removes it from the current checked group without replacing the rest of it, for building a multi-activity selection. Checking a second row never unchecks the first. The map automatically flies to fit the combined bounds of every currently checked activity, 300ms after the group last changed (so a rapid multi-check settles once, not once per checkbox). This is independent of FR-5.5 in both directions: checking a box never sets or clears the row-click focus.
+**Description**: Each row also has a checkbox that adds or removes it from the current checked group without replacing the rest of it, for building a multi-activity selection. Checking a second row never unchecks the first. Each checkbox click flies the map to fit the combined bounds of every currently checked activity, 300ms after the last click (so a rapid multi-check settles once, not once per checkbox). Only a checkbox click does this: the group coming back after a Fog/Heatmap round trip (FR-4.2, FR-4.3), the list refreshing, or hiding a checked track (FR-5.8) never moves the camera. This is independent of FR-5.5 in both directions: checking a box never sets or clears the row-click focus.
 
 **Notes**: A hidden activity (FR-5.8) can still be focused (FR-5.5) or checked; the system excludes hidden activities from the fly-to bounds specifically so the camera never flies to an area with nothing drawn on it. A row that is both focused and checked renders with the same single highlight treatment as either alone — there is no visually distinct "both" state.
 

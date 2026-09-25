@@ -138,6 +138,9 @@ export function MapView({ onOpenProfile, onOpenSettings, initialPrivateLocations
   // group, never the focused row. Both start empty/null: there is no sensible default over a
   // real, unknown history.
   const [checkedActivityIds, setCheckedActivityIds] = useState<Set<string>>(() => new Set());
+  // Bumped only by a checkbox click (toggleActivityChecked) — what the debounced group fly below
+  // answers to, rather than every change to checkedActivityIds.
+  const [groupFlyRequest, setGroupFlyRequest] = useState(0);
   const [focusedActivityId, setFocusedActivityId] = useState<string | null>(null);
   // The row (or map track) currently under the pointer — reported both ways (Activities
   // Panel's onMouseEnter/Leave, tracks.ts's onHover) into this one piece of state so a single
@@ -194,6 +197,7 @@ export function MapView({ onOpenProfile, onOpenSettings, initialPrivateLocations
       }
       return next;
     });
+    setGroupFlyRequest((n) => n + 1);
   }, []);
   // focusActivity itself (the row-click handler) is defined further down, alongside
   // clearSelection — both need fitToSelection/activities/mapHiddenIds, which aren't in scope
@@ -465,29 +469,35 @@ export function MapView({ onOpenProfile, onOpenSettings, initialPrivateLocations
     [mapMode, checkedActivityIds, focusedActivityId],
   );
 
-  // Auto-fly on checked-group change ("FLYING TO 3 SELECTED"),
-  // replacing the old explicit "Fit map to selection" button — see IMPLEMENTATION.md §4.7.
-  // Debounced so a multi-checkbox spree flies once, after the user pauses, not once per
-  // checkbox. Guarded on
-  // a non-empty group because *this* effect has nothing sensible to fly to once it's empty —
-  // clearSelection below is the one place checkedActivityIds goes back to empty on purpose,
-  // and it flies to every activity instead, explicitly, rather than relying on this effect to
-  // fire on the way down to zero.
+  // Auto-fly after a checkbox click ("FLYING TO 3 SELECTED"), replacing the old explicit "Fit
+  // map to selection" button — see IMPLEMENTATION.md §4.7. Debounced so a multi-checkbox spree
+  // flies once, after the user pauses, not once per checkbox.
   //
-  // Excludes mapHiddenIds the same way the band-change effect below does: checking a row is
-  // independent of its own eye icon (hiding its track), so a hidden-but-checked activity is a
-  // real, reachable state — reported live as flying to that activity's bbox anyway, which
-  // looks like flying to empty water since nothing is drawn there. If every checked activity
-  // is currently hidden, unionBBox([]) is null and fitToSelection is a no-op, same as an
-  // empty group.
+  // Keyed on groupFlyRequest, which only a checkbox click bumps — not on checkedActivityIds
+  // itself. Keyed on the state, it also fired whenever the group changed for any other reason:
+  // coming back to Normal from Fog/Heatmap (which restores the saved group) flew the camera back
+  // to it after the user had panned away — reported live — and so did a list refresh or hiding a
+  // checked track. Select all, Invert selection and Clear fly on their own, immediately, and the
+  // "Focus checked group" button re-flies on demand. The group, list and hidden set are read
+  // from a ref when the timer fires, so the fly always uses the current ones without the effect
+  // re-running when they change.
+  //
+  // Excludes mapHiddenIds: checking a row is independent of its own eye icon (hiding its track),
+  // so a hidden-but-checked activity is a real, reachable state — reported live as flying to
+  // that activity's bbox anyway, which looks like flying to empty water since nothing is drawn
+  // there. If every checked activity is hidden, unionBBox([]) is null and fitToSelection is a
+  // no-op, same as an empty group.
+  const groupFlyInputs = useRef({ checkedActivityIds, activities, mapHiddenIds });
+  groupFlyInputs.current = { checkedActivityIds, activities, mapHiddenIds };
   useEffect(() => {
-    if (checkedActivityIds.size === 0) return;
+    if (groupFlyRequest === 0) return;
     const timer = window.setTimeout(() => {
-      const visible = activities.filter((a) => checkedActivityIds.has(a.id) && !mapHiddenIds.has(a.id));
-      fitToSelection(visible);
+      const { checkedActivityIds: ids, activities: all, mapHiddenIds: hidden } = groupFlyInputs.current;
+      if (ids.size === 0) return;
+      fitToSelection(all.filter((a) => ids.has(a.id) && !hidden.has(a.id)));
     }, SELECTION_FLY_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [checkedActivityIds, activities, mapHiddenIds, fitToSelection]);
+  }, [groupFlyRequest, fitToSelection]);
 
   // Clicking a row's own text/body — a single "look at just this one" focus, independent of
   // the checkbox group above (see the state comment near checkedActivityIds/focusedActivityId
