@@ -1,6 +1,6 @@
 /* The server-rendered pages' content styles (internal/web, ADR-0012) — everything below the
-   shared header, whose own styles and the --fm-* tokens are header.css, loaded first by
-   layout.html. */
+   shared header, whose own styles are header.css. Both draw on tokens.css, which layout.html
+   loads first. */
 * {
   box-sizing: border-box;
 }
@@ -226,12 +226,12 @@ code {
 }
 
 .auth-card__error {
-  background: rgb(170 51 51 / 8%);
-  color: #a33;
+  background: rgb(var(--fm-danger-rgb) / 8%);
+  color: var(--fm-danger);
 }
 
 .auth-card__notice {
-  background: rgb(176 126 46 / 10%);
+  background: rgb(var(--fm-accent-rgb) / 10%);
   color: var(--fm-ink);
 }
 
@@ -497,12 +497,12 @@ code {
 }
 
 .settings__error {
-  background: rgb(170 51 51 / 8%);
-  color: #a33;
+  background: rgb(var(--fm-danger-rgb) / 8%);
+  color: var(--fm-danger);
 }
 
 .settings__notice {
-  background: rgb(176 126 46 / 10%);
+  background: rgb(var(--fm-accent-rgb) / 10%);
   color: var(--fm-ink);
 }
 
@@ -701,11 +701,11 @@ code {
 }
 
 .year-grid__cell--level-1 {
-  background: rgb(176 126 46 / 30%);
+  background: rgb(var(--fm-accent-rgb) / 30%);
 }
 
 .year-grid__cell--level-2 {
-  background: rgb(176 126 46 / 60%);
+  background: rgb(var(--fm-accent-rgb) / 60%);
 }
 
 .year-grid__cell--level-3 {
