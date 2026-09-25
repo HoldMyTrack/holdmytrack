@@ -38,6 +38,30 @@ export function setMapMode(map: MapLibreMap, mode: MapMode, editingTrack = false
   // tracks layer (trackBands.ts) — not covered by the tracks toggle above — so switching to
   // Fog/Heatmap has to hide it too, or it keeps rendering over the raster.
   setVisible(map, BAND_LAYER_ID, mode === 'normal' && !editingTrack);
+  // Basemap labels (place names, street names, POIs) stay above the veil (layers.ts) so
+  // they're legible, but at full strength they read as brighter than the fog itself and
+  // pull the eye away from what's actually been cleared — so Fog mode mutes them. Every
+  // symbol layer on the map is the basemap's own (no overlay adds one), and
+  // @protomaps/basemaps never sets text-/icon-opacity itself, so resetting to undefined
+  // restores exactly the style's default rather than a remembered value.
+  const labelOpacity = mode === 'fog' ? FOG_LABEL_OPACITY : undefined;
+  for (const layer of map.getStyle().layers) {
+    if (layer.type !== 'symbol') continue;
+    setPaint(map, layer.id, 'text-opacity', labelOpacity);
+    setPaint(map, layer.id, 'icon-opacity', labelOpacity);
+  }
+}
+
+/** How far Fog mode mutes basemap labels — dim enough to recede behind the veil, still
+ *  readable enough to orient by. */
+const FOG_LABEL_OPACITY = 0.4;
+
+/** Same diff-before-set guard as setVisible below: map.setPaintProperty also calls
+ *  _update(true) unconditionally, so skipping a no-op call is what keeps the styledata
+ *  loop from self-sustaining. */
+function setPaint(map: MapLibreMap, layerId: string, property: 'text-opacity' | 'icon-opacity', value: number | undefined): void {
+  if (map.getPaintProperty(layerId, property) === value) return;
+  map.setPaintProperty(layerId, property, value);
 }
 
 function setVisible(map: MapLibreMap, layerId: string, visible: boolean): void {
