@@ -258,9 +258,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if isTakeoutArchive(zr) {
-			// Needs the raw bytes on disk, not the parsed *zip.Reader — pathify reads the
-			// archive itself as a subprocess, it doesn't share this process's parsed entries.
-			s.handleTakeoutUpload(w, r, data, header.Filename)
+			s.handleTakeoutUpload(w, r, zr, header.Filename)
 			return
 		}
 		s.handleZipUpload(w, r, zr, header.Filename)

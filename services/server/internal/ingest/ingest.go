@@ -43,11 +43,10 @@ type Job struct {
 	// ActivityType overrides whatever the parser itself reports, when set. Empty means "use
 	// the parsed value" (the zero value already does the right thing for every existing
 	// caller). This exists for the Google Takeout import path
-	// (services/server/internal/httpapi/takeout_upload.go): `pathify takeout` is invoked once
-	// per activity type into its own directory, so the caller already knows each extracted
-	// file's real type — a plain per-activity GPX carries no `<type>` element of its own to
-	// parse back out, and reconstructing one from pathify's per-file naming convention would
-	// just be re-deriving something the caller already has for free.
+	// (services/server/internal/httpapi/takeout_upload.go): activities are extracted one type
+	// at a time, so the caller already knows each one's real type — a per-activity Takeout GPX
+	// carries no `<type>` element of its own to parse back out, and reconstructing one from its
+	// display name would just be re-deriving something the caller already has for free.
 	ActivityType string `json:"activity_type,omitempty"`
 }
 

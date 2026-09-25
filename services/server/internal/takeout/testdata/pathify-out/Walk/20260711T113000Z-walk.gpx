@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1" creator="Pathify Phone">
+  <metadata>
+    <name>Walk 2026-07-11</name>
+    <desc>Fitbit log 1001</desc>
+    <time>2026-07-11T11:30:00.000000000Z</time>
+  </metadata>
+  <trk>
+    <name>Walk 2026-07-11</name>
+    <desc>Fitbit log 1001</desc>
+    <trkseg>
+      <trkpt lat="41.3931" lon="-81.7433">
+        <ele>236</ele>
+        <time>2026-07-11T11:30:00.000000000Z</time>
+      </trkpt>
+      <trkpt lat="41.3936" lon="-81.7439">
+        <ele>236.4</ele>
+        <time>2026-07-11T11:31:00.000000000Z</time>
+      </trkpt>
+      <trkpt lat="41.3941" lon="-81.7445">
+        <ele>236.8</ele>
+        <time>2026-07-11T11:32:00.000000000Z</time>
+      </trkpt>
+    </trkseg>
+    <trkseg>
+      <trkpt lat="41.3971" lon="-81.7481">
+        <ele>238</ele>
+        <time>2026-07-11T11:38:00.000000000Z</time>
+      </trkpt>
+      <trkpt lat="41.3976" lon="-81.7487">
+        <ele>238.4</ele>
+        <time>2026-07-11T11:39:00.000000000Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>
