@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { Camera, X } from 'lucide-react';
-import { EXPORT_PLATFORMS, EXPORT_PRESET_ROWS, EXPORT_PRESETS, type ExportPreset } from '../map/exportPresets';
+import { customOutputSize, EXPORT_PLATFORMS, EXPORT_PRESET_ROWS, EXPORT_PRESETS, type ExportPreset } from '../map/exportPresets';
 
 /** Where the frame is: its center as a map position (so it travels with the map when it
  *  pans), and its size in CSS pixels (so it keeps its on-screen size when the map zooms —
@@ -176,6 +176,7 @@ export function ExportFrame({
   };
 
   const dragHandlers = { onPointerMove: onDragMove, onPointerUp: endDrag, onPointerCancel: endDrag };
+  const customSize = customOutputSize(widthPx, heightPx);
   const style = { '--frame-w': `${widthPx}px`, '--frame-h': `${heightPx}px` } as CSSProperties;
 
   return (
@@ -212,7 +213,9 @@ export function ExportFrame({
             onPresetChange(next ?? 'custom');
           }}
         >
-          <option value="custom">Custom</option>
+          <option value="custom">
+            Custom · {customSize.widthPx}×{customSize.heightPx}
+          </option>
           {EXPORT_PLATFORMS.map((platform) => (
             <optgroup key={platform} label={platform}>
               {EXPORT_PRESET_ROWS.map((row) => {

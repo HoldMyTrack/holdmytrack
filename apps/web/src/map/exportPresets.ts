@@ -34,3 +34,10 @@ export const EXPORT_PRESETS: ExportPreset[] = [
   { id: 'x-square', group: 'X', row: 'Square', widthPx: 1080, heightPx: 1080 },
   { id: 'x-landscape', group: 'X', row: 'Landscape', widthPx: 1280, heightPx: 720 },
 ];
+
+/** A Custom frame's output pixel size: exactly the frame's own on-screen size, in CSS pixels.
+ *  Shared by the capture pipeline and the shape dropdown's Custom label, so the size shown is
+ *  the size produced. */
+export function customOutputSize(frameWidthPx: number, frameHeightPx: number): { widthPx: number; heightPx: number } {
+  return { widthPx: Math.max(1, Math.round(frameWidthPx)), heightPx: Math.max(1, Math.round(frameHeightPx)) };
+}

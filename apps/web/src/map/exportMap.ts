@@ -2,6 +2,7 @@ import { Map as MapLibreMap } from 'maplibre-gl';
 import { API_BASE_URL, type ActivityQuery } from '../api';
 import logoUrl from '../assets/logo.png';
 import { basemapOrigin } from './config';
+import { customOutputSize } from './exportPresets';
 import { ensureFogLayer } from './fog';
 import { ensureHeatmapLayer } from './heatmap';
 import { labelInsertionPoint } from './layers';
@@ -23,12 +24,6 @@ import { ensureTrackLayer, setHiddenTracks } from './tracks';
  * automatic fit of whatever happens to be on screen — `exportFramedImage` below is the one
  * entry point this module exports.
  */
-
-/** The output's longer side, for a Custom frame (no declared target dimensions to aim for
- *  instead) — "print-grade" is scoped here as "generously larger than a screenshot," not a
- *  calibrated DPI against an unspecified physical size. Not tied to "width" specifically:
- *  a portrait Custom frame's longer side is its height, just as validly. */
-const EXPORT_LONG_SIDE_PX = 2400;
 
 /** How long to wait for a render to actually settle before giving up — generous, since a
  *  fresh Map instance has to fetch every tile at this new size/position from nothing, unlike
@@ -71,9 +66,8 @@ export interface ExportFrameCapture {
   /** The frame's on-screen size in CSS pixels, at the live map's current zoom. */
   widthPx: number;
   heightPx: number;
-  /** Exact output pixel dimensions for a platform preset. Omitted for Custom, where the
-   *  frame's own aspect ratio is kept and only scaled so its longer side hits
-   *  `EXPORT_LONG_SIDE_PX`. */
+  /** Exact output pixel dimensions for a platform preset. Omitted for Custom, which
+   *  exports at the frame's own on-screen pixel size (`customOutputSize`). */
   target?: { widthPx: number; heightPx: number };
 }
 
@@ -94,8 +88,7 @@ export async function exportFramedImage(
   capture: ExportFrameCapture,
 ): Promise<Blob> {
   const { center, widthPx, heightPx, target } = capture;
-  const outWidth = target?.widthPx ?? Math.round((widthPx * EXPORT_LONG_SIDE_PX) / Math.max(widthPx, heightPx));
-  const outHeight = target?.heightPx ?? Math.round((heightPx * EXPORT_LONG_SIDE_PX) / Math.max(widthPx, heightPx));
+  const { widthPx: outWidth, heightPx: outHeight } = target ?? customOutputSize(widthPx, heightPx);
   const cssWidth = Math.max(1, Math.round(widthPx));
   const cssHeight = Math.max(1, Math.round(heightPx));
 
