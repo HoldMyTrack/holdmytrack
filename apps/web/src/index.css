@@ -2274,6 +2274,27 @@ body {
   html,
   body {
     overflow-x: hidden;
+    /* A drag that starts on the header, the sheet or the footer and runs off the edge of its
+       own scroll area would otherwise rubber-band the whole page, or pull-to-refresh it on
+       Android — the page is a fixed-height app screen, with nothing of its own to scroll. */
+    overscroll-behavior: none;
+  }
+
+  /* The page's height is the visible area, not `height: 100%`'s: a phone browser's toolbar
+     slides in and out, and the percentage and `vh` can both resolve to the taller,
+     toolbar-hidden height — which put the date footer, anchored to the bottom, under the
+     toolbar. `dvh` follows the toolbar as it moves. Not reproducible in desktop emulation,
+     which has no toolbar. */
+  body.app-page {
+    height: 100dvh;
+  }
+
+  /* iOS Safari zooms the page in on focusing any text field under 16px and doesn't zoom back
+     out, leaving the fixed sheet and footer off-screen — the interface's inputs are 14px
+     (--fm-text-lg). `:is()` takes its most specific argument's weight, (0,1,1), so this
+     outranks the single-class input rules above it without naming each one. */
+  :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='file']), select, textarea) {
+    font-size: 16px;
   }
 
   /* The phone footer (DateRangeSlider.tsx) sits at the very bottom of the screen and the
@@ -2319,7 +2340,7 @@ body {
 
   /* Its top edge stays where it was when the sheet sat on the viewport's bottom. */
   .activities-panel--sheet-expanded {
-    height: calc(78vh - var(--phone-footer-height));
+    height: calc(78dvh - var(--phone-footer-height));
   }
 
   /* Edit track is started from the sheet's toolbar, so the sheet is expanded at that moment —
