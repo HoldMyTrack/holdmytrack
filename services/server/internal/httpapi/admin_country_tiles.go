@@ -27,7 +27,7 @@ FROM (
       AND NOT EXISTS (
           SELECT 1 FROM activity_country ac
           JOIN activities a ON a.id = ac.activity_id
-          WHERE ac.country_id = c.id AND a.user_id = $4 AND a.superseded_by IS NULL
+          WHERE ac.country_id = c.id AND a.user_id = $4 AND a.superseded_by IS NULL AND NOT a.edit_pending
       )
 ) t;`
 
@@ -50,7 +50,7 @@ FROM (
       AND EXISTS (
           SELECT 1 FROM activity_country ac
           JOIN activities a ON a.id = ac.activity_id
-          WHERE ac.country_id = c.id AND a.user_id = $4 AND a.superseded_by IS NULL
+          WHERE ac.country_id = c.id AND a.user_id = $4 AND a.superseded_by IS NULL AND NOT a.edit_pending
             AND a.in_heatmap_window
       )
 ) t;`

@@ -438,7 +438,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Preconditions**: Active session.
 
 **Behavior**:
-1. The map renders every activity within the currently selected date range (FR-6) that has not been individually hidden (FR-5.8) or filtered out by TYPE/DISTANCE (FR-5.2/FR-5.3), as a colored line following its recorded route.
+1. The map renders every activity within the currently selected date range (FR-6) that has not been individually hidden (FR-5.8), filtered out by TYPE/DISTANCE (FR-5.2/FR-5.3), or left out while Pending (FR-5.15), as a colored line following its recorded route.
 2. Hovering a track on the map draws it thicker; the corresponding row in the Activities panel is highlighted to match (FR-5.4's reverse direction).
 3. Clicking a track on the map sets it as the row-click focus (FR-5.5) — emphasizes it, flies the camera to fit it, and replaces whichever activity was previously focused. It does not add to or remove from the checkbox group (FR-5.6) in either direction.
 4. Clicking anywhere on the map that is not a track clears the row-click focus, if any — the focused activity loses its focus treatment and returns to how it looked before: checked if it is in the checkbox group, normal otherwise. This does not affect the checkbox group.
@@ -596,7 +596,7 @@ Only one track is hovered and only one is focused at a time; any number can be c
 
 ### FR-5.8 Hide/show a track
 
-**Description**: The header toolbar's Show/hide icon (FR-5.12) hides or shows every currently checked activity's track on the map, independent of the row-click focus (FR-5.5). There is no per-row hide/show control — hiding or showing a single activity means checking just its own box first, the same as any other single-item action. A hidden activity's track is not drawn in any map mode (Normal, Fog, or Heatmap) until shown again; its row dims in place and carries a "Hidden" badge so its hidden state is still visible at a glance. Hiding/showing is purely client-side and does not refetch data. See FR-5.12 for the exact toggle rule.
+**Description**: The header toolbar's Show/hide icon (FR-5.12) hides or shows every currently checked activity's track on the map, independent of the row-click focus (FR-5.5). There is no per-row hide/show control — hiding or showing a single activity means checking just its own box first, the same as any other single-item action. A hidden activity's track is not drawn in Normal mode until shown again — Fog of War and Heatmap ignore the hidden set (FR-4.2, FR-4.3); its row dims in place and carries a "Hidden" badge so its hidden state is still visible at a glance. Hiding/showing is purely client-side and does not refetch data. See FR-5.12 for the exact toggle rule.
 
 ### FR-5.9 Resizable panel
 
@@ -649,7 +649,7 @@ Only one track is hovered and only one is focused at a time; any number can be c
 
 **Behavior**: If any checked activity is currently hidden, clicking shows the entire checked group (removes all of them from the hidden set). If every checked activity is already visible, clicking hides the entire group instead.
 
-**Outputs**: The hidden-activity set updates; the map's drawn tracks and Fog-of-War/Heatmap coverage reflect it immediately.
+**Outputs**: The hidden-activity set updates; the map's drawn tracks reflect it immediately (Fog-of-War/Heatmap coverage doesn't change — FR-5.8).
 
 ### FR-5.13 Delete group
 
@@ -670,7 +670,7 @@ Only one track is hovered and only one is focused at a time; any number can be c
 4. **Undo** reverts exactly one step, and can be repeated back through every step of the session to the track as it was when the editor opened (also Cmd/Ctrl+Z). **Reset** (shown whenever the track currently has any edit, including one saved in an earlier session) returns to the track as originally recorded, as one more undoable step. **Cancel** discards every step of the session, restores the map, and closes the editor; nothing is saved.
 5. **Apply** (enabled once there is at least one step) sends the session's net result as one edit and closes the editor. The server stores it and reprocesses the activity in the background from its original recording: distance, duration, moving time, elevation gain, start time (a Chop can move it), the display track, per-point stream data, its Fog-of-War/Heatmap coverage (FR-4.2/FR-4.3), and its country/region matches (FR-4.2's zoomed-out tiers) are all recomputed. A Cut's joining segment counts toward distance; the time gap it spans counts toward elapsed duration but not moving time.
 6. Reprocessing does not re-run cross-source duplicate detection (FR-3.7): the edited activity stays whichever copy it was.
-7. Until reprocessing finishes the activity is **Pending**: its row shows a Pending badge with its pre-edit numbers, its text and checkbox are disabled, and Edit track and Delete are unavailable for it. The Activities panel re-reads the list every few seconds while any row is Pending; Pending lasts until everything in behavior 5 is recomputed, Fog-of-War and Heatmap included; when it clears, the row, the totals, the date-range picker's bars, the drawn track, and the Fog-of-War/Heatmap layers (at every zoom tier) all update without a page reload. If reprocessing fails, the activity simply stops being Pending and keeps its previous track and numbers.
+7. Until reprocessing finishes the activity is **Pending** (FR-5.15): its row shows a Pending badge with its pre-edit numbers, its text and checkbox are disabled, and Edit track and Delete are unavailable for it; its track isn't drawn, and it drops out of Fog of War and Heatmap (Country/Region tiers included). The Activities panel re-reads the list every few seconds while any row is Pending. When it clears, the row, the totals, the date-range picker's bars and the drawn track update, and the Fog-of-War/Heatmap layers (at every zoom tier) follow once their re-render lands — all without a page reload, and without moving the camera. If reprocessing fails, the activity simply stops being Pending and keeps its previous track and numbers.
 8. An edit is stored as ranges and points identified by recording time, not by position in the point list, so it keeps meaning the same points if a Private location later changes. A track whose timestamps are missing or run backwards can't be edited.
 
 **Outputs**: The activity's stored edit (none, after a Reset) and every value derived from its points, as listed in behavior 5.
@@ -680,6 +680,23 @@ Only one track is hovered and only one is focused at a time; any number can be c
 - The activity has no stored original recording, or its timestamps are missing or run backwards → `409 Conflict` when opening the editor, shown in the editor window.
 - A range whose start is after its end → `400 Bad Request`.
 - An edit that would leave fewer than two points (possible only through the API directly) → accepted, then fails during reprocessing; the activity is left as it was.
+
+### FR-5.15 Activity states
+
+**Description**: Every activity listed in the Activities panel is in exactly one of three states. They describe whether and how it takes part in the map, separately from the per-track display states (Hovered, Checked, Focused — FR-4.1's *Track states*), which apply only to a Normal activity.
+
+| State | Entered by | Left by | Track on the map | Fog of War / Heatmap | Its row | Camera | Kept across reloads |
+| :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- |
+| Normal | default | — | drawn (FR-4.1) | counted | plain | flies to it on the user's own actions (FR-5.5–FR-5.7) | — |
+| Pending | Edit track's Apply (FR-5.14), or a Private location change that could clip it (FR-8.1) | its reprocess finishing, or failing | not drawn | not counted, at any zoom tier | Pending badge, pre-reprocess numbers, disabled | never flies to it, and doesn't move when it enters or leaves Pending | yes — it's the server's state |
+| Hidden | Visibility off (FR-5.8, FR-5.12) | Visibility on, or a new date range (FR-6.6) | not drawn | counted — Fog and Heatmap ignore the hidden set (FR-4.2, FR-4.3) | dimmed, "Hidden" badge | excluded from every fly-to fit | no — this tab only |
+
+**Behavior**:
+1. Pending takes precedence: an activity hidden before it went Pending is simply not drawn either way, and is still Hidden once Pending clears — reprocessing never changes the user's own Visibility choice.
+2. A Pending activity's row can't be focused onto the map or checked (a row already checked stays checked); its absence is what the map, Fog of War and Heatmap all show until its reprocess lands.
+3. Leaving Pending brings the activity back everywhere — its track at once, Fog of War and Heatmap once their re-render lands (FR-5.14 behavior 7) — without moving the camera.
+
+**Notes**: An activity entirely inside Private locations (FR-8.1 behavior 3) is Normal with no geometry — nothing to draw or count — rather than a fourth state; superseded duplicates (FR-3.7) are never listed at all.
 
 ## 8. FR-6 — Date Range Picker
 
@@ -707,7 +724,7 @@ Only one track is hovered and only one is focused at a time; any number can be c
 
 ### FR-6.6 Changing the selection resets dependent state
 
-**Description**: Committing a new date range (via FR-6.2, FR-6.3, or FR-6.5) clears both the row-click focus (FR-5.5) and the checked group (FR-5.6) independently, the hidden-activity set (FR-5.8), and both the TYPE and DISTANCE filters (FR-5.2/FR-5.3) together — all of these could otherwise silently describe activities the new range no longer lists.
+**Description**: Committing a new date range (via FR-6.2, FR-6.3, or FR-6.5) clears both the row-click focus (FR-5.5) and the checked group (FR-5.6) independently, the hidden-activity set (FR-5.8), and both the TYPE and DISTANCE filters (FR-5.2/FR-5.3) together — all of these could otherwise silently describe activities the new range no longer lists. The camera flies to fit the new range's drawn activities once, when its list arrives. Only a range the user picked moves it: an upload or sync landing never does — not when it refreshes the same range, and not when it shifts the automatic default range (FR-6.1) — and neither does a Pending activity (FR-5.15) finishing or a Private location change.
 
 ## 9. FR-7 — Activity Graph (Profile)
 
@@ -739,7 +756,7 @@ Hovering a day shows its date, activity count and distance. The page needs a ses
 1. Applied at ingest, server-side, before anything is stored: the leading points inside any Private location are dropped, and the track starts on that circle's edge instead (a point interpolated onto the boundary, whatever the recording's point density); the trailing points likewise. A track that only passes *through* a Private location mid-way is shown whole, by design: what a Private location protects is where a track starts and ends, and passing through one reveals neither.
 2. An activity's distance, duration, elevation gain, pace, streams, fog, heatmap, and Country/Region matches all come from the visible part only.
 3. An activity entirely inside Private locations is still kept, with no geometry: zero distance, nothing on the map, no fog. Deleting or shrinking the location brings it back.
-4. Every change to a Private location is retroactive. The activities the old or new circle could clip are marked Pending in the Activities panel (the same badge FR-5.14's reprocessing shows) and reprocessed in the background from their original recorded points; the badges clear once each activity's track, stats, fog, and heatmap are current, and the map refreshes itself.
+4. Every change to a Private location is retroactive. The activities the old or new circle could clip are marked Pending (FR-5.15, the same badge FR-5.14's reprocessing shows) and reprocessed in the background from their original recorded points; while Pending they are neither drawn nor counted in fog or heatmap. The badges clear once each activity's track and stats are current, and the map refreshes itself — fog and heatmap a moment later, once re-rendered — without moving the camera.
 5. The circles are drawn only while the Private locations window is open, never in the normal view and never in an Export (FR-4.10).
 6. Activities ingested before Private locations existed kept the fixed endpoint trim they were processed with (100 m by default). There's no backfill: one gets its full ends back only when something reprocesses it — an Edit track (FR-5.14), or a Private location change that includes it.
 

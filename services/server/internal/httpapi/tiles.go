@@ -6,10 +6,12 @@ import (
 	"strings"
 )
 
-// tracksQuery is IMPLEMENTATION.md §4.3 verbatim, with two changes: user_id
-// is the authenticated caller (userIDFromContext — requireAuth, server.go), and from/to/types
+// tracksQuery is IMPLEMENTATION.md §4.3 verbatim, with three changes: user_id
+// is the authenticated caller (userIDFromContext — requireAuth, server.go), from/to/types
 // each become "$n IS NULL OR ..." so an absent query param means "no filter" instead of
-// requiring the caller to pass an explicit wide-open range.
+// requiring the caller to pass an explicit wide-open range, and a Pending activity
+// (edit_pending, §4.7.7) is left out — its trajectory is the pre-reprocess one, and it comes
+// back once the reprocess lands.
 const tracksQuery = `
 SELECT ST_AsMVT(t, 'tracks', 4096, 'geom')
 FROM (
@@ -23,6 +25,7 @@ FROM (
     FROM activities
     WHERE user_id = $4
       AND superseded_by IS NULL
+      AND NOT edit_pending
       AND trajectory && ST_Transform(ST_TileEnvelope($1, $2, $3), 4326)
       AND ($5::timestamptz IS NULL OR started_at >= $5)
       AND ($6::timestamptz IS NULL OR started_at <= $6)

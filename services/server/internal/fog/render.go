@@ -114,12 +114,16 @@ func dirtyTiles(ctx context.Context, pool *pgxpool.Pool, userID string, zoom int
 // internal/worker's job (heatmap_aging.go's daily sweep), not this function's — by the time an
 // activity's flag actually flips, that sweep has already marked its tiles dirty too, so this
 // render is always just reflecting whatever the flag already says, never deciding it itself.
+//
+// Neither includes a Pending activity (edit_pending, §4.7.7): its masks are the pre-reprocess
+// ones, or mid-rewrite. The reprocess marks its tiles dirty when it goes Pending and renders
+// them again after clearing the flag, so it drops out of both rasters for the duration.
 func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID string, zoom, x, y int, heatmapCap float64) error {
 	rows, err := pool.Query(ctx, `
 		SELECT m.mask_object_key, a.in_heatmap_window
 		FROM activity_tile_masks m
 		JOIN activities a ON a.id = m.activity_id
-		WHERE a.user_id = $1 AND a.superseded_by IS NULL
+		WHERE a.user_id = $1 AND a.superseded_by IS NULL AND NOT a.edit_pending
 		  AND m.zoom = $2 AND m.tile_x = $3 AND m.tile_y = $4
 	`, userID, zoom, x, y)
 	if err != nil {
