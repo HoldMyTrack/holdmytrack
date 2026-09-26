@@ -34,10 +34,9 @@ import kotlinx.coroutines.launch
  * `services/server/internal/httpapi/auth.go` mints a session — or continue with Google or
  * Facebook, when the server has them configured (`docs/adr/0016-native-sign-in.md`).
  *
- * Deliberately plain: no icons, no type scale, no color tokens. The design freeze is Phase 3
- * of the root roadmap, after Mobile, and there is no design system to build against yet — so
- * this is built to work now and styled in that pass, rather than inventing a visual language
- * that would have to be thrown away.
+ * Designed as the web's sign-in page (`templates/pages/signin.html`): one card, the serif title
+ * inside it, the providers, then the email form, then the demo — the layout carries all of
+ * that, and this class only shows, hides and wires it.
  *
  * The app's first screen whenever no session is held, mirroring web's `AuthGate`: a bare
  * basemap with no tracks, fog or heatmap is a weak demonstration of what HoldMyTrack does, and the

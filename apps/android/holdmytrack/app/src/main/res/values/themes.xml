@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Material 3 on Views (apps/android/docs/ROADMAP.md Phase 5, "Decide the UI toolkit"): the
-     colors in colors.xml mapped onto Material's color roles once, so every widget picks them up
-     from the theme rather than from literals. Light only, like the web. Dynamic color is
-     deliberately not applied — it would replace this palette with one derived from the user's
-     wallpaper. -->
+     web's design tokens mapped onto Material's roles once, so every widget picks them up from
+     the theme rather than from literals — colors.xml onto the color roles, dimens.xml's type
+     and radius scales onto the type roles and corner sizes, and Inter/Fraunces (res/font) as
+     the two faces. Light only, like the web. Dynamic color is deliberately not applied — it
+     would replace this palette with one derived from the user's wallpaper. -->
 <resources>
     <style name="Base.Theme.HoldMyTrack" parent="Theme.Material3.Light">
         <item name="colorPrimary">@color/hmt_accent</item>
@@ -36,15 +37,46 @@
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
 
-        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.HoldMyTrack.Small</item>
-        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.HoldMyTrack.Medium</item>
+        <!-- The web's radius scale: inputs at sm, buttons and map toggles at md, menus, sheets
+             and dialogs at lg — rather than Material's 4dp fields, pill buttons and 28dp dialogs. -->
+        <item name="shapeAppearanceCornerExtraSmall">@style/ShapeAppearance.HoldMyTrack.ExtraSmall</item>
         <item name="shapeAppearanceCornerSmall">@style/ShapeAppearance.HoldMyTrack.Small</item>
         <item name="shapeAppearanceCornerMedium">@style/ShapeAppearance.HoldMyTrack.Medium</item>
+        <item name="shapeAppearanceCornerLarge">@style/ShapeAppearance.HoldMyTrack.Medium</item>
+        <item name="shapeAppearanceCornerExtraLarge">@style/ShapeAppearance.HoldMyTrack.Medium</item>
+        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.HoldMyTrack.Small</item>
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.HoldMyTrack.Medium</item>
+        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.HoldMyTrack.Medium</item>
+
+        <!-- The web's type scale. Only the roles the app uses, and the steps tokens.css has;
+             the display and larger headline roles have no step there and no screen here. -->
+        <item name="textAppearanceHeadlineSmall">@style/TextAppearance.HoldMyTrack.HeadlineSmall</item>
+        <item name="textAppearanceTitleLarge">@style/TextAppearance.HoldMyTrack.TitleLarge</item>
+        <item name="textAppearanceTitleMedium">@style/TextAppearance.HoldMyTrack.TitleMedium</item>
+        <item name="textAppearanceTitleSmall">@style/TextAppearance.HoldMyTrack.TitleSmall</item>
+        <item name="textAppearanceBodyLarge">@style/TextAppearance.HoldMyTrack.BodyLarge</item>
+        <item name="textAppearanceBodyMedium">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
+        <item name="textAppearanceBodySmall">@style/TextAppearance.HoldMyTrack.BodySmall</item>
+        <item name="textAppearanceLabelLarge">@style/TextAppearance.HoldMyTrack.LabelLarge</item>
+        <item name="textAppearanceLabelMedium">@style/TextAppearance.HoldMyTrack.LabelMedium</item>
+        <item name="textAppearanceLabelSmall">@style/TextAppearance.HoldMyTrack.LabelSmall</item>
+        <!-- The default face for text with no role of its own, through a default TextView style
+             rather than the theme's own fontFamily: a theme-level fontFamily reaches every
+             TextView as if set on it directly, which outranks its textAppearance — so a serif
+             TitleLarge came out in the sans. -->
+        <item name="android:textViewStyle">@style/Widget.HoldMyTrack.TextView</item>
+        <!-- Text the platform lays out from its own attributes rather than a TextView style:
+             PopupMenu's items (the burger menu) and list and spinner rows. -->
+        <item name="android:textAppearanceLargePopupMenu">@style/TextAppearance.HoldMyTrack.BodyLarge</item>
+        <item name="android:textAppearanceSmallPopupMenu">@style/TextAppearance.HoldMyTrack.BodyLarge</item>
+        <item name="android:textAppearanceListItem">@style/TextAppearance.HoldMyTrack.BodyLarge</item>
+        <item name="android:textAppearanceListItemSmall">@style/TextAppearance.HoldMyTrack.BodyLarge</item>
         <item name="materialButtonStyle">@style/Widget.HoldMyTrack.Button</item>
         <item name="materialButtonOutlinedStyle">@style/Widget.HoldMyTrack.Button.Outlined</item>
         <item name="borderlessButtonStyle">@style/Widget.HoldMyTrack.Button.Text</item>
         <item name="textInputStyle">@style/Widget.Material3.TextInputLayout.OutlinedBox</item>
         <item name="actionBarStyle">@style/Widget.HoldMyTrack.ActionBar</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.HoldMyTrack.Dialog</item>
     </style>
 
     <!-- Every screen with a title: the sign-in, sync, history, profile and recording forms. -->
@@ -56,15 +88,128 @@
         <item name="windowNoTitle">true</item>
     </style>
 
-    <!-- The web's 8px radius, rather than Material's fully rounded pill buttons. -->
+    <style name="ShapeAppearance.HoldMyTrack.ExtraSmall" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">@dimen/hmt_radius_sm</item>
+    </style>
+
     <style name="ShapeAppearance.HoldMyTrack.Small" parent="">
         <item name="cornerFamily">rounded</item>
-        <item name="cornerSize">8dp</item>
+        <item name="cornerSize">@dimen/hmt_radius_md</item>
     </style>
 
     <style name="ShapeAppearance.HoldMyTrack.Medium" parent="">
         <item name="cornerFamily">rounded</item>
-        <item name="cornerSize">10dp</item>
+        <item name="cornerSize">@dimen/hmt_radius_lg</item>
+    </style>
+
+    <!-- Type roles. Letter spacing is zero, as on the web, where Material's roles each track
+         slightly; line heights are about 1.4 of the size for text, 1.3 for headings. -->
+    <!-- Stat values (the recording's time and distance) and dialog titles: text-2xl, bold. -->
+    <style name="TextAppearance.HoldMyTrack.HeadlineSmall" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="fontFamily">@font/hmt_sans</item>
+        <item name="android:fontFamily">@font/hmt_sans</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textFontWeight">700</item>
+        <item name="android:textSize">@dimen/hmt_text_2xl</item>
+        <item name="android:lineHeight">26sp</item>
+        <item name="lineHeight">26sp</item>
+    </style>
+
+    <!-- Screen titles (the action bar's): the serif at text-2xl, the web's .auth-card__title. -->
+    <style name="TextAppearance.HoldMyTrack.TitleLarge" parent="TextAppearance.Material3.TitleLarge">
+        <item name="fontFamily">@font/hmt_serif</item>
+        <item name="android:fontFamily">@font/hmt_serif</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textFontWeight">600</item>
+        <item name="android:textSize">@dimen/hmt_text_2xl</item>
+        <item name="android:lineHeight">26sp</item>
+        <item name="lineHeight">26sp</item>
+    </style>
+
+    <!-- Section and panel titles: text-xl. -->
+    <style name="TextAppearance.HoldMyTrack.TitleMedium" parent="TextAppearance.Material3.TitleMedium">
+        <item name="fontFamily">@font/hmt_sans</item>
+        <item name="android:fontFamily">@font/hmt_sans</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textFontWeight">600</item>
+        <item name="android:textSize">@dimen/hmt_text_xl</item>
+        <item name="android:lineHeight">22sp</item>
+        <item name="lineHeight">22sp</item>
+    </style>
+
+    <style name="TextAppearance.HoldMyTrack.TitleSmall" parent="TextAppearance.Material3.TitleSmall">
+        <item name="fontFamily">@font/hmt_sans</item>
+        <item name="android:fontFamily">@font/hmt_sans</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textFontWeight">600</item>
+        <item name="android:textSize">@dimen/hmt_text_md</item>
+        <item name="android:lineHeight">18sp</item>
+        <item name="lineHeight">18sp</item>
+    </style>
+
+    <!-- Body text and form inputs: text-lg, the web's input size. -->
+    <style name="TextAppearance.HoldMyTrack.BodyLarge" parent="TextAppearance.Material3.BodyLarge">
+        <item name="fontFamily">@font/hmt_sans</item>
+        <item name="android:fontFamily">@font/hmt_sans</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textFontWeight">400</item>
+        <item name="android:textSize">@dimen/hmt_text_lg</item>
+        <item name="android:lineHeight">20sp</item>
+        <item name="lineHeight">20sp</item>
+    </style>
+
+    <!-- Notes, statuses, list rows: text-md, the interface's own text on the web. -->
+    <style name="TextAppearance.HoldMyTrack.BodyMedium" parent="TextAppearance.Material3.BodyMedium">
+        <item name="fontFamily">@font/hmt_sans</item>
+        <item name="android:fontFamily">@font/hmt_sans</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textFontWeight">400</item>
+        <item name="android:textSize">@dimen/hmt_text_md</item>
+        <item name="android:lineHeight">18sp</item>
+        <item name="lineHeight">18sp</item>
+    </style>
+
+    <style name="TextAppearance.HoldMyTrack.BodySmall" parent="TextAppearance.Material3.BodySmall">
+        <item name="fontFamily">@font/hmt_sans</item>
+        <item name="android:fontFamily">@font/hmt_sans</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textFontWeight">400</item>
+        <item name="android:textSize">@dimen/hmt_text_sm</item>
+        <item name="android:lineHeight">16sp</item>
+        <item name="lineHeight">16sp</item>
+    </style>
+
+    <!-- Buttons: text-lg semibold, the web's .auth-card__submit. -->
+    <style name="TextAppearance.HoldMyTrack.LabelLarge" parent="TextAppearance.Material3.LabelLarge">
+        <item name="fontFamily">@font/hmt_sans</item>
+        <item name="android:fontFamily">@font/hmt_sans</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textFontWeight">600</item>
+        <item name="android:textSize">@dimen/hmt_text_lg</item>
+        <item name="android:lineHeight">20sp</item>
+        <item name="lineHeight">20sp</item>
+    </style>
+
+    <!-- Field and stat labels: text-sm semibold. -->
+    <style name="TextAppearance.HoldMyTrack.LabelMedium" parent="TextAppearance.Material3.LabelMedium">
+        <item name="fontFamily">@font/hmt_sans</item>
+        <item name="android:fontFamily">@font/hmt_sans</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textFontWeight">600</item>
+        <item name="android:textSize">@dimen/hmt_text_sm</item>
+        <item name="android:lineHeight">16sp</item>
+        <item name="lineHeight">16sp</item>
+    </style>
+
+    <style name="TextAppearance.HoldMyTrack.LabelSmall" parent="TextAppearance.Material3.LabelSmall">
+        <item name="fontFamily">@font/hmt_sans</item>
+        <item name="android:fontFamily">@font/hmt_sans</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textFontWeight">600</item>
+        <item name="android:textSize">@dimen/hmt_text_xs</item>
+        <item name="android:lineHeight">16sp</item>
+        <item name="lineHeight">16sp</item>
     </style>
 
     <style name="Widget.HoldMyTrack.Button" parent="Widget.Material3.Button">
@@ -83,37 +228,193 @@
     </style>
 
     <!-- The map's Normal / Fog / Heatmap toggle, after the web's .map-mode-toggle__btn: ink
-         text on nothing, and ink fill with white text when active. -->
+         text on nothing, and ink fill with white text when active; the web's 12px regular
+         label, its 10px side padding, and its small radius nested inside the panel's medium
+         one. Height stays at Material's 48dp minimum, a full touch target. -->
     <style name="Widget.HoldMyTrack.Button.MapMode" parent="Widget.Material3.Button.TextButton">
-        <item name="shapeAppearance">@style/ShapeAppearance.HoldMyTrack.Small</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.HoldMyTrack.ExtraSmall</item>
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodySmall</item>
         <item name="android:textColor">@color/map_mode_text</item>
         <item name="backgroundTint">@color/map_mode_bg</item>
         <item name="android:minWidth">0dp</item>
-        <item name="android:paddingStart">14dp</item>
-        <item name="android:paddingEnd">14dp</item>
+        <item name="android:paddingStart">@dimen/hmt_space_10</item>
+        <item name="android:paddingEnd">@dimen/hmt_space_10</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
         <item name="android:checkable">true</item>
     </style>
 
-    <!-- A square icon-only button on the map's near-white chrome panel (Find my location). -->
+    <!-- A square icon-only button on the map's chrome (the menu, Find my location). It sits in
+         a MapPanel frame, the mode toggle's own panel, rather than carrying the panel color and
+         shadow itself: a translucent MaterialButton with elevation draws its shadow through its
+         own fill, as a lighter square around the icon. -->
     <style name="Widget.HoldMyTrack.Button.MapIcon" parent="Widget.Material3.Button.IconButton">
         <item name="shapeAppearance">@style/ShapeAppearance.HoldMyTrack.Small</item>
-        <item name="backgroundTint">@color/hmt_map_chrome</item>
+        <item name="backgroundTint">@android:color/transparent</item>
+        <!-- Square, at the mode buttons' own 48dp height, so each panel comes out the same
+             56dp tall — set here rather than borrowed from the row, which is empty of
+             anything else while recording. -->
+        <item name="android:minHeight">48dp</item>
+        <item name="android:minWidth">48dp</item>
         <item name="iconTint">@color/hmt_ink</item>
         <item name="iconGravity">textStart</item>
         <item name="iconPadding">0dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
-        <item name="android:padding">12dp</item>
+        <item name="android:padding">@dimen/hmt_space_12</item>
+    </style>
+
+    <!-- The title is named directly: the Material 3 action bar's own title style is a fixed
+         style rather than the theme's TitleLarge role, so it would otherwise stay in the
+         system face. -->
+    <!-- The floating panel every piece of map chrome sits on, after the web's .map-mode-toggle:
+         near-white, medium radius, a small shadow (fm-shadow-sm). -->
+    <style name="Widget.HoldMyTrack.MapPanel" parent="">
+        <item name="android:background">@drawable/bg_map_chrome</item>
+        <item name="android:elevation">2dp</item>
+        <item name="android:padding">@dimen/hmt_space_4</item>
     </style>
 
     <style name="Widget.HoldMyTrack.ActionBar" parent="Widget.Material3.ActionBar.Solid">
         <item name="background">@color/hmt_bg</item>
         <item name="elevation">0dp</item>
+        <item name="titleTextStyle">@style/TextAppearance.HoldMyTrack.TitleLarge</item>
     </style>
 
-    <style name="TextAppearance.HoldMyTrack.Error" parent="TextAppearance.Material3.BodyMedium">
-        <item name="android:textColor">?attr/colorError</item>
+    <style name="Widget.HoldMyTrack.TextView" parent="Widget.AppCompat.TextView">
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
+    </style>
+
+    <!-- Screens designed as the web's auth card (sign-in, "check your email"): no action bar,
+         the title inside the card as on the web. -->
+    <style name="Theme.HoldMyTrack.NoActionBar" parent="Base.Theme.HoldMyTrack">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+
+    <!-- The web's .auth-card: white on the cream page, a hairline border, the large radius.
+         No elevation — Material 3 tints an elevated surface toward the primary color. -->
+    <style name="Widget.HoldMyTrack.Card" parent="Widget.Material3.CardView.Outlined">
+        <item name="cardBackgroundColor">@color/hmt_surface</item>
+        <item name="strokeColor">@color/hmt_card_border</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="cardElevation">0dp</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.HoldMyTrack.Medium</item>
+        <item name="contentPadding">@dimen/hmt_space_24</item>
+    </style>
+
+    <!-- Explanatory text under a title: the web's .auth-card__hint, 13sp at 65% ink. -->
+    <style name="Widget.HoldMyTrack.Hint" parent="">
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
+        <item name="android:textColor">@color/hmt_ink_hint</item>
+        <item name="android:lineHeight">20sp</item>
+    </style>
+
+    <!-- A notice box (.auth-card__notice, .sync-tab__notice) and its error variant
+         (.auth-card__error): tinted fill, small radius, 8/10 padding, 13sp. -->
+    <style name="Widget.HoldMyTrack.Notice" parent="">
+        <item name="android:background">@drawable/bg_notice</item>
+        <item name="android:paddingStart">@dimen/hmt_space_10</item>
+        <item name="android:paddingEnd">@dimen/hmt_space_10</item>
+        <item name="android:paddingTop">@dimen/hmt_space_8</item>
+        <item name="android:paddingBottom">@dimen/hmt_space_8</item>
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
+        <item name="android:textColor">@color/hmt_ink</item>
+    </style>
+
+    <style name="Widget.HoldMyTrack.Notice.Error">
+        <item name="android:background">@drawable/bg_notice_error</item>
+        <item name="android:textColor">@color/hmt_danger</item>
+    </style>
+
+    <!-- Every dialog, after the web's .confirm-dialog: the large radius (the theme's corners
+         already give it), a 16sp heavy title, the message at 13sp and ink 70%. -->
+    <style name="ThemeOverlay.HoldMyTrack.Dialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <!-- White, as the web's dialog is, rather than Material's cream container tone. -->
+        <item name="colorSurfaceContainerHigh">@color/hmt_surface</item>
+        <item name="materialAlertDialogTitleTextStyle">@style/MaterialAlertDialog.HoldMyTrack.Title</item>
+        <item name="materialAlertDialogBodyTextStyle">@style/MaterialAlertDialog.HoldMyTrack.Body</item>
+    </style>
+
+    <!-- A dialog whose confirm action destroys something (Delete, Discard): the confirm button
+         filled in the danger color, the web's .confirm-dialog__confirm. Passed explicitly by the
+         builders that need it, so no other dialog's confirm turns red. -->
+    <style name="ThemeOverlay.HoldMyTrack.Dialog.Destructive">
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.HoldMyTrack.Button.DangerFilled</item>
+    </style>
+
+    <style name="MaterialAlertDialog.HoldMyTrack.Title" parent="MaterialAlertDialog.Material3.Title.Text">
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.DialogTitle</item>
+    </style>
+
+    <style name="MaterialAlertDialog.HoldMyTrack.Body" parent="MaterialAlertDialog.Material3.Body.Text">
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
+        <item name="android:textColor">@color/hmt_ink_message</item>
+        <item name="android:lineHeight">20sp</item>
+    </style>
+
+    <style name="TextAppearance.HoldMyTrack.DialogTitle" parent="TextAppearance.HoldMyTrack.TitleMedium">
+        <item name="android:textFontWeight">800</item>
+        <item name="android:letterSpacing">0.02</item>
+    </style>
+
+    <style name="Widget.HoldMyTrack.Button.DangerFilled" parent="Widget.HoldMyTrack.Button">
+        <item name="backgroundTint">@color/hmt_danger</item>
+        <item name="android:textColor">@color/hmt_surface</item>
+    </style>
+
+    <!-- A destructive action that isn't the screen's main one (Discard on the Save screen): the
+         outlined button with its label in the danger color. -->
+    <style name="Widget.HoldMyTrack.Button.Danger" parent="Widget.HoldMyTrack.Button.Outlined">
+        <item name="android:textColor">@color/hmt_danger</item>
+    </style>
+
+    <!-- An icon action on a list row (Edit, Delete): a 48dp touch target around the 24dp icon,
+         in ink unless the button says otherwise. -->
+    <style name="Widget.HoldMyTrack.Button.RowIcon" parent="Widget.Material3.Button.IconButton">
+        <item name="iconTint">@color/hmt_ink</item>
+        <item name="android:minWidth">48dp</item>
+        <item name="android:minHeight">48dp</item>
+    </style>
+
+    <!-- A drop-down field: the outlined text field with Lucide's chevron, what the Type field
+         already is on the recording form. -->
+    <style name="Widget.HoldMyTrack.Dropdown" parent="Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+        <item name="endIconDrawable">@drawable/ic_chevron_down</item>
+    </style>
+
+    <!-- A list's small uppercase title: the web's .sync-tab__list-title, 11sp bold, tracked. -->
+    <style name="TextAppearance.HoldMyTrack.Overline" parent="TextAppearance.HoldMyTrack.LabelSmall">
+        <item name="android:textFontWeight">700</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.06</item>
+        <item name="android:textColor">@color/hmt_ink_meta</item>
+    </style>
+
+    <!-- A text action that reads as a link — the web's link-button (.auth-card__link, button modifier): 13sp regular in
+         the strong accent, no fill, sized to its label (Sign out on "check your email"). -->
+    <style name="Widget.HoldMyTrack.Button.Link" parent="Widget.HoldMyTrack.Button.Text">
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
+    </style>
+
+    <!-- Continue with Google: the web's white button with an ink border, the untinted "G". -->
+    <style name="Widget.HoldMyTrack.Button.Google" parent="Widget.HoldMyTrack.Button.Outlined">
+        <item name="icon">@drawable/ic_brand_google</item>
+        <item name="iconTint">@null</item>
+        <item name="iconSize">18dp</item>
+        <item name="iconGravity">textStart</item>
+        <item name="iconPadding">@dimen/hmt_space_10</item>
+        <item name="backgroundTint">@color/hmt_surface</item>
+    </style>
+
+    <!-- Continue with Facebook: white on Facebook's blue with its white "f" (Meta's guidelines). -->
+    <style name="Widget.HoldMyTrack.Button.Facebook" parent="Widget.HoldMyTrack.Button">
+        <item name="icon">@drawable/ic_brand_facebook</item>
+        <item name="iconTint">@color/hmt_surface</item>
+        <item name="iconSize">18dp</item>
+        <item name="iconGravity">textStart</item>
+        <item name="iconPadding">@dimen/hmt_space_10</item>
+        <item name="backgroundTint">@color/hmt_facebook</item>
+        <item name="android:textColor">@color/hmt_surface</item>
     </style>
 </resources>

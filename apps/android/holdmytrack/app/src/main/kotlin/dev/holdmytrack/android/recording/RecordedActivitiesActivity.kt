@@ -2,18 +2,15 @@ package dev.holdmytrack.android.recording
 
 import android.content.Intent
 import android.os.Bundle
-import android.view.Gravity
+import android.view.LayoutInflater
 import android.view.View
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
-import android.widget.CheckBox
 import android.widget.LinearLayout
-import android.widget.Spinner
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.button.MaterialButton
+import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import dev.holdmytrack.android.R
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.recording.db.RecordedActivityRecord
@@ -33,28 +30,29 @@ import kotlinx.coroutines.launch
  * Phase 7). A row leaves this list once it syncs — it's deleted from the device, and lives on
  * the server from then on.
  *
- * Rows are built in code rather than from a row layout, matching `SyncStatusActivity`'s own
- * convention for the same reason it states there: no component vocabulary exists yet to build
- * one from (Phase 5 is that pass).
+ * Designed after the web's Activities panel: two drop-down filters, then rows from
+ * `item_recorded_activity` between hairlines (`.activities-panel__row`).
  */
 class RecordedActivitiesActivity : AppCompatActivity() {
 
     private lateinit var store: RecordedActivityStore
-    private lateinit var statusFilter: Spinner
-    private lateinit var typeFilter: Spinner
+    private lateinit var statusFilter: MaterialAutoCompleteTextView
+    private lateinit var typeFilter: MaterialAutoCompleteTextView
     private lateinit var rowsContainer: LinearLayout
     private lateinit var emptyView: TextView
     private lateinit var demoNotice: TextView
 
     private var all: List<RecordedActivityRecord> = emptyList()
 
-    /** Index-aligned with `statusFilter`'s adapter — null means "All". */
+    /** Index-aligned with `statusFilter`'s items — null means "All". */
     private val statusValues = listOf(null, SyncStatus.NOT_SYNCED, SyncStatus.QUEUED)
+    private var statusIndex = 0
 
-    /** Index-aligned with `typeFilter`'s adapter; rebuilt whenever the underlying activity
-     *  types on file change, so null (index 0, "All types") is the only value guaranteed to
+    /** Index-aligned with `typeFilter`'s items; rebuilt whenever the underlying activity
+     *  types on file change, so null (index 0, "All") is the only value guaranteed to
      *  survive a reload. */
     private var typeValues: List<String?> = listOf(null)
+    private var typeIndex = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,19 +65,21 @@ class RecordedActivitiesActivity : AppCompatActivity() {
         emptyView = findViewById(R.id.recorded_empty)
         demoNotice = findViewById(R.id.recorded_demo_notice)
 
-        statusFilter.adapter = dropdownAdapter(
-            listOf(
-                getString(R.string.recorded_filter_all),
-                getString(R.string.recorded_status_not_synced),
-                getString(R.string.recorded_status_queued),
-            ),
+        val statusLabels = listOf(
+            getString(R.string.recorded_filter_all),
+            getString(R.string.recorded_status_not_synced),
+            getString(R.string.recorded_status_queued),
         )
-        val filterListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) = render()
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        statusFilter.setSimpleItems(statusLabels.toTypedArray())
+        statusFilter.setText(statusLabels[statusIndex], false)
+        statusFilter.setOnItemClickListener { _, _, position, _ ->
+            statusIndex = position
+            render()
         }
-        statusFilter.onItemSelectedListener = filterListener
-        typeFilter.onItemSelectedListener = filterListener
+        typeFilter.setOnItemClickListener { _, _, position, _ ->
+            typeIndex = position
+            render()
+        }
     }
 
     /** Re-read on every resume, not just on create — returning from Edit (or from a Sync that
@@ -98,21 +98,18 @@ class RecordedActivitiesActivity : AppCompatActivity() {
     }
 
     private fun rebuildTypeFilterOptions() {
-        val previousValue = typeValues.getOrNull(typeFilter.selectedItemPosition)
+        val previousValue = typeValues.getOrNull(typeIndex)
         val distinctTypes = all.map { it.activityType }.distinct().sorted()
         typeValues = listOf(null) + distinctTypes
-        typeFilter.adapter = dropdownAdapter(listOf(getString(R.string.recorded_filter_all)) + distinctTypes)
-        typeFilter.setSelection(typeValues.indexOf(previousValue).coerceAtLeast(0), false)
+        val labels = listOf(getString(R.string.recorded_filter_all)) + distinctTypes
+        typeIndex = typeValues.indexOf(previousValue).coerceAtLeast(0)
+        typeFilter.setSimpleItems(labels.toTypedArray())
+        typeFilter.setText(labels[typeIndex], false)
     }
 
-    private fun dropdownAdapter(labels: List<String>) =
-        ArrayAdapter(this, android.R.layout.simple_spinner_item, labels).also {
-            it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        }
-
     private fun render() {
-        val statusValue = statusValues.getOrNull(statusFilter.selectedItemPosition)
-        val typeValue = typeValues.getOrNull(typeFilter.selectedItemPosition)
+        val statusValue = statusValues.getOrNull(statusIndex)
+        val typeValue = typeValues.getOrNull(typeIndex)
         val filtered = all.filter { record ->
             (statusValue == null || record.syncStatus == statusValue) &&
                 (typeValue == null || record.activityType == typeValue)
@@ -124,92 +121,50 @@ class RecordedActivitiesActivity : AppCompatActivity() {
     }
 
     private fun buildRow(record: RecordedActivityRecord): View {
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 20, 0, 20)
+        val row = LayoutInflater.from(this).inflate(R.layout.item_recorded_activity, rowsContainer, false)
+
+        row.findViewById<MaterialCheckBox>(R.id.row_queued).apply {
+            isChecked = record.syncStatus != SyncStatus.NOT_SYNCED
+            // A demo account can record and manage rows locally — only sync itself is a
+            // mutation the server rejects (requireNotDemo, services/server/internal/
+            // httpapi/auth.go) — so queuing is blocked here too, matching the Sync
+            // screen's own demo gate: no point letting a demo account queue something
+            // "Sync Now" can never actually take.
+            isEnabled = !Session.isDemo
+            setOnCheckedChangeListener { _, checked ->
+                val newStatus = if (checked) SyncStatus.QUEUED else SyncStatus.NOT_SYNCED
+                lifecycleScope.launch {
+                    store.setSyncStatus(record.id, newStatus)
+                    all = all.map { if (it.id == record.id) it.copy(syncStatus = newStatus) else it }
+                    render()
+                }
+            }
         }
 
-        row.addView(
-            CheckBox(this).apply {
-                isChecked = record.syncStatus != SyncStatus.NOT_SYNCED
-                // A demo account can record and manage rows locally — only sync itself is a
-                // mutation the server rejects (requireNotDemo, services/server/internal/
-                // httpapi/auth.go) — so queuing is blocked here too, matching the Sync
-                // screen's own demo gate: no point letting a demo account queue something
-                // "Sync Now" can never actually take.
-                isEnabled = !Session.isDemo
-                setOnCheckedChangeListener { _, checked ->
-                    val newStatus = if (checked) SyncStatus.QUEUED else SyncStatus.NOT_SYNCED
-                    lifecycleScope.launch {
-                        store.setSyncStatus(record.id, newStatus)
-                        all = all.map { if (it.id == record.id) it.copy(syncStatus = newStatus) else it }
-                        render()
-                    }
-                }
-            },
+        row.findViewById<TrackSilhouetteView>(R.id.row_preview).setPoints(record.points)
+        row.findViewById<TextView>(R.id.row_title).text = record.name.ifBlank { formatDate(record.startedAtMs) }
+        row.findViewById<TextView>(R.id.row_meta).text = getString(
+            R.string.recorded_row_subtitle,
+            record.activityType,
+            record.distanceMeters / 1000.0,
+            statusLabel(record.syncStatus),
         )
 
-        val previewSize = (48 * resources.displayMetrics.density).toInt()
-        row.addView(
-            TrackSilhouetteView(this).apply {
-                setPoints(record.points)
-                contentDescription = getString(R.string.recorded_row_preview)
-            },
-            LinearLayout.LayoutParams(previewSize, previewSize).apply { marginEnd = previewSize / 4 },
-        )
-
-        val textColumn = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        row.findViewById<View>(R.id.row_edit).setOnClickListener {
+            startActivity(
+                Intent(this, RecordingActivity::class.java)
+                    .putExtra(RecordingActivity.EXTRA_RECORDING_ID, record.id),
+            )
         }
-        textColumn.addView(
-            TextView(this).apply {
-                text = record.name.ifBlank { formatDate(record.startedAtMs) }
-                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyLarge)
-            },
-        )
-        textColumn.addView(
-            TextView(this).apply {
-                text = getString(
-                    R.string.recorded_row_subtitle,
-                    record.activityType,
-                    record.distanceMeters / 1000.0,
-                    statusLabel(record.syncStatus),
-                )
-                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
-                setTextColor(getColor(R.color.hmt_ink_secondary))
-            },
-        )
-        row.addView(textColumn)
-
-        row.addView(
-            MaterialButton(this, null, androidx.appcompat.R.attr.borderlessButtonStyle).apply {
-                text = getString(R.string.recording_edit)
-                setOnClickListener {
-                    startActivity(
-                        Intent(this@RecordedActivitiesActivity, RecordingActivity::class.java)
-                            .putExtra(RecordingActivity.EXTRA_RECORDING_ID, record.id),
-                    )
-                }
-            },
-        )
-
         // Every row here is unsynced, so Delete discards the only copy — the confirmation
         // dialog below says so.
-        row.addView(
-            MaterialButton(this, null, androidx.appcompat.R.attr.borderlessButtonStyle).apply {
-                text = getString(R.string.recording_delete)
-                setTextColor(getColor(R.color.hmt_danger))
-                setOnClickListener { confirmDelete(record) }
-            },
-        )
+        row.findViewById<View>(R.id.row_delete).setOnClickListener { confirmDelete(record) }
 
         return row
     }
 
     private fun confirmDelete(record: RecordedActivityRecord) {
-        MaterialAlertDialogBuilder(this)
+        MaterialAlertDialogBuilder(this, R.style.ThemeOverlay_HoldMyTrack_Dialog_Destructive)
             .setTitle(R.string.recorded_delete_confirm_title)
             .setMessage(R.string.recorded_delete_confirm_message)
             .setPositiveButton(R.string.recording_delete) { _, _ ->
@@ -230,7 +185,7 @@ class RecordedActivitiesActivity : AppCompatActivity() {
     }
 
     private fun formatDate(epochMs: Long): String =
-        DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
+        DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
             .withZone(ZoneId.systemDefault())
             .format(Instant.ofEpochMilli(epochMs))
 }

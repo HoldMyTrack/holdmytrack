@@ -19,9 +19,9 @@
         android:layout_height="wrap_content"
         android:layout_gravity="top"
         android:background="@color/hmt_ink"
-        android:padding="12dp"
+        android:padding="@dimen/hmt_space_12"
         android:textColor="@color/hmt_surface"
-        android:textSize="13sp"
+        android:textAppearance="?attr/textAppearanceBodyMedium"
         android:visibility="gone" />
 
     <!-- Floating chrome over the map, one row along the top: the burger menu and the map-mode
@@ -35,24 +35,23 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="top"
-        android:layout_margin="12dp"
+        android:layout_margin="@dimen/hmt_space_12"
         android:baselineAligned="false"
         android:orientation="horizontal">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/menu_button"
-            style="@style/Widget.HoldMyTrack.Button.Outlined"
+        <FrameLayout
+            style="@style/Widget.HoldMyTrack.MapPanel"
             android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:backgroundTint="@color/hmt_map_chrome"
-            android:insetTop="0dp"
-            android:insetBottom="0dp"
-            android:contentDescription="@string/menu_button"
-            android:minWidth="48dp"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:text="@string/menu_button"
-            app:strokeWidth="0dp" />
+            android:layout_height="wrap_content">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/menu_button"
+                style="@style/Widget.HoldMyTrack.Button.MapIcon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/menu_button"
+                app:icon="@drawable/ic_menu" />
+        </FrameLayout>
 
         <!-- Only shown to a signed-in account: all three layers the toggle switches between
              are behind requireAuth, so there is nothing for it to do without a session.
@@ -64,11 +63,9 @@
             android:id="@+id/mode_bar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
-            android:background="@drawable/bg_map_chrome"
-            android:elevation="2dp"
+            style="@style/Widget.HoldMyTrack.MapPanel"
+            android:layout_marginStart="@dimen/hmt_space_6"
             android:orientation="horizontal"
-            android:padding="3dp"
             android:visibility="gone">
 
             <com.google.android.material.button.MaterialButton
@@ -81,10 +78,10 @@
             <View
                 android:layout_width="1dp"
                 android:layout_height="match_parent"
-                android:layout_marginStart="4dp"
-                android:layout_marginTop="8dp"
-                android:layout_marginEnd="4dp"
-                android:layout_marginBottom="8dp"
+                android:layout_marginStart="@dimen/hmt_space_4"
+                android:layout_marginTop="@dimen/hmt_space_8"
+                android:layout_marginEnd="@dimen/hmt_space_4"
+                android:layout_marginBottom="@dimen/hmt_space_8"
                 android:background="@color/hmt_border_strong" />
 
             <com.google.android.material.button.MaterialButton
@@ -99,7 +96,7 @@
                 style="@style/Widget.HoldMyTrack.Button.MapMode"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="2dp"
+                android:layout_marginStart="@dimen/hmt_space_2"
                 android:text="@string/mode_heatmap" />
         </LinearLayout>
 
@@ -111,14 +108,20 @@
         <!-- Find my location (MainActivity.onLocateTap): shows the position dot and flies the
              camera to it, the counterpart of the web map's geolocate control. Hidden while
              recording, when the camera already follows the recording. -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/locate_button"
-            style="@style/Widget.HoldMyTrack.Button.MapIcon"
+        <FrameLayout
+            android:id="@+id/locate_panel"
+            style="@style/Widget.HoldMyTrack.MapPanel"
             android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:contentDescription="@string/locate_button"
-            android:minWidth="54dp"
-            app:icon="@drawable/ic_my_location" />
+            android:layout_height="wrap_content">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/locate_button"
+                style="@style/Widget.HoldMyTrack.Button.MapIcon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/locate_button"
+                app:icon="@drawable/ic_locate_fixed" />
+        </FrameLayout>
     </LinearLayout>
 
     <!-- One-tap GPS recording (MainActivity.onRecordTap): tap to start, tap again to pause or
@@ -130,10 +133,10 @@
         android:layout_width="72dp"
         android:layout_height="72dp"
         android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginBottom="32dp"
+        android:layout_marginBottom="@dimen/hmt_space_32"
         android:background="@drawable/bg_record_button"
         android:contentDescription="@string/record_button_start"
-        android:padding="20dp"
+        android:padding="@dimen/hmt_space_20"
         android:scaleType="fitCenter"
         android:src="@drawable/ic_record_start" />
 </FrameLayout>

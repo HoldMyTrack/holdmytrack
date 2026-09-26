@@ -2,7 +2,11 @@ package dev.holdmytrack.android
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Typeface
 import android.os.Bundle
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.StyleSpan
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
@@ -29,7 +33,8 @@ import dev.holdmytrack.android.net.Session
  */
 class VerifyEmailActivity : AppCompatActivity() {
 
-    private lateinit var message: TextView
+    private lateinit var notice: TextView
+    private lateinit var error: TextView
     private lateinit var buttons: List<Button>
 
     /** Guards against a second `GET /v1/auth/me` while one is in flight. */
@@ -44,8 +49,9 @@ class VerifyEmailActivity : AppCompatActivity() {
         }
         setContentView(R.layout.activity_verify_email)
 
-        findViewById<TextView>(R.id.verify_hint).text = getString(R.string.verify_email_hint, Session.email)
-        message = findViewById(R.id.verify_message)
+        findViewById<TextView>(R.id.verify_hint).text = hint(Session.email)
+        notice = findViewById(R.id.verify_notice)
+        error = findViewById(R.id.verify_error)
         val proceed: Button = findViewById(R.id.verify_continue)
         val resend: Button = findViewById(R.id.verify_resend)
         val signOut: Button = findViewById(R.id.verify_sign_out)
@@ -85,7 +91,7 @@ class VerifyEmailActivity : AppCompatActivity() {
                     )
                     finish()
                 } else if (userAsked) {
-                    show(getString(R.string.verify_email_not_yet))
+                    show(getString(R.string.verify_email_not_yet), failed = false)
                 }
             }.onFailure { failure ->
                 if (failure is ApiException && failure.code == 401) {
@@ -93,7 +99,7 @@ class VerifyEmailActivity : AppCompatActivity() {
                     SignInActivity.open(this)
                     finish()
                 } else if (userAsked) {
-                    show(getString(R.string.verify_email_check_failed, failure.message.orEmpty()))
+                    show(getString(R.string.verify_email_check_failed, failure.message.orEmpty()), failed = true)
                 }
             }
         }
@@ -104,19 +110,36 @@ class VerifyEmailActivity : AppCompatActivity() {
         setBusy(true)
         HoldMyTrackApi.resendVerification { result ->
             setBusy(false)
-            result.onSuccess { text -> show(text) }
-                .onFailure { failure -> show(failure.message.orEmpty()) }
+            result.onSuccess { text -> show(text, failed = false) }
+                .onFailure { failure -> show(failure.message.orEmpty(), failed = true) }
         }
     }
 
     private fun setBusy(busy: Boolean) {
         buttons.forEach { it.isEnabled = !busy }
-        if (busy) message.visibility = View.GONE
+        if (busy) {
+            notice.visibility = View.GONE
+            error.visibility = View.GONE
+        }
     }
 
-    private fun show(text: String) {
-        message.text = text
-        message.visibility = View.VISIBLE
+    /** A notice for what the server confirmed or reported, the error box for a failure — the
+     *  web page's `.auth-card__notice` and `__error`. */
+    private fun show(text: String, failed: Boolean) {
+        val (shown, hidden) = if (failed) error to notice else notice to error
+        shown.text = text
+        shown.visibility = View.VISIBLE
+        hidden.visibility = View.GONE
+    }
+
+    /** The hint with the address in bold, as the web's `<strong>` sets it off. */
+    private fun hint(email: String): CharSequence {
+        val text = getString(R.string.verify_email_hint, email)
+        val start = text.indexOf(email)
+        if (email.isEmpty() || start < 0) return text
+        return SpannableString(text).apply {
+            setSpan(StyleSpan(Typeface.BOLD), start, start + email.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
     }
 
     companion object {

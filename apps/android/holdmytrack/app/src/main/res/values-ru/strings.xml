@@ -39,6 +39,7 @@
     <string name="mode_fog">Туман</string>
     <string name="mode_heatmap">Тепловая</string>
 
+    <string name="menu_button">Меню</string>
     <string name="locate_button">Моё местоположение</string>
     <string name="locate_needs_location">HoldMyTrack нужен доступ к местоположению, чтобы показать, где вы.</string>
     <string name="menu_profile">Профиль</string>
@@ -81,6 +82,9 @@
 
     <string name="recorded_empty">Записанных занятий пока нет.</string>
     <string name="recorded_filter_all">Все</string>
+    <string name="recorded_filter_status_label">Статус</string>
+    <string name="recorded_filter_type_label">Тип</string>
+    <string name="recorded_row_queue">Поставить в очередь на синхронизацию</string>
     <string name="recorded_status_not_synced">Не синхронизировано</string>
     <string name="recorded_status_queued">В очереди</string>
     <string name="recorded_row_subtitle">%1$s · %2$.2f км · %3$s</string>
@@ -130,13 +134,13 @@
     <string name="status_summary_processing">Обработано %1$d из %2$d…</string>
     <string name="status_summary_settled">Синхронизировано или загружено занятий: %1$d.</string>
     <string name="status_failed">Не удалось прочитать историю синхронизации: %1$s</string>
-    <string name="status_row_done">%1$s · %2$.1f км</string>
-    <string name="status_row_done_no_distance">%1$s · расстояние не записано</string>
-    <string name="status_row_processing">%1$s · обработка…</string>
-    <string name="status_row_failed">%1$s · ошибка — %2$s</string>
+    <string name="status_row_distance">%1$.1f км</string>
+    <string name="status_row_no_distance">расстояние не записано</string>
+    <string name="status_row_processing">обработка…</string>
     <string name="status_no_reason">причина не указана</string>
     <string name="status_duplicates_heading">Уже записано из другого источника</string>
-    <string name="status_duplicate_row">%1$s · %2$s из %3$s — уже есть из %4$s, поэтому не рисуется дважды</string>
+    <string name="status_duplicate_what">%1$s из %2$s</string>
+    <string name="status_duplicate_why">уже есть из %1$s, поэтому не рисуется дважды</string>
     <string name="source_upload">загруженного файла</string>
     <string name="source_takeout">импорта Google Takeout</string>
     <string name="source_recorded">GPS-записи</string>

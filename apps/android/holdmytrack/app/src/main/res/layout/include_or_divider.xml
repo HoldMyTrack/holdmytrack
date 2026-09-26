@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "or" between two rules — the web's .auth-card__divider. Included with an id where the code
+     shows or hides it. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="1dp"
+        android:layout_weight="1"
+        android:background="@color/hmt_card_border" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/hmt_space_10"
+        android:layout_marginEnd="@dimen/hmt_space_10"
+        android:text="@string/sign_in_or"
+        android:textAppearance="?attr/textAppearanceLabelSmall"
+        android:textColor="@color/hmt_ink_faint_text"
+        android:textFontWeight="400" />
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="1dp"
+        android:layout_weight="1"
+        android:background="@color/hmt_card_border" />
+</LinearLayout>

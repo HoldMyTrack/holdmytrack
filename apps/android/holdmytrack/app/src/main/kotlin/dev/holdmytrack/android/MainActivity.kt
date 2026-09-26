@@ -67,6 +67,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var recordButton: RecordButton
     private lateinit var locateButton: MaterialButton
 
+    /** Find my location's panel — what hides while recording, so no empty panel is left. */
+    private lateinit var locatePanel: View
+
     private var map: MapLibreMap? = null
     private var style: Style? = null
     private var mode = MapMode.NORMAL
@@ -177,6 +180,7 @@ class MainActivity : AppCompatActivity() {
         recordButton.onHoldComplete = ::stopRecording
 
         locateButton = findViewById(R.id.locate_button)
+        locatePanel = findViewById(R.id.locate_panel)
         locateButton.setOnClickListener { onLocateTap() }
 
         insetSystemBars()
@@ -400,15 +404,15 @@ class MainActivity : AppCompatActivity() {
         val active = state != RecordingState.IDLE
         val (icon, background, description) = when (state) {
             RecordingState.IDLE -> Triple(R.drawable.ic_record_start, R.drawable.bg_record_button, R.string.record_button_start)
-            RecordingState.RECORDING -> Triple(R.drawable.ic_record_pause, R.drawable.bg_record_button_recording, R.string.record_button_pause)
-            RecordingState.PAUSED -> Triple(R.drawable.ic_record_resume, R.drawable.bg_record_button_paused, R.string.record_button_resume)
+            RecordingState.RECORDING -> Triple(R.drawable.ic_pause, R.drawable.bg_record_button_recording, R.string.record_button_pause)
+            RecordingState.PAUSED -> Triple(R.drawable.ic_play, R.drawable.bg_record_button_paused, R.string.record_button_resume)
         }
         recordButton.setImageResource(icon)
         recordButton.setBackgroundResource(background)
         recordButton.contentDescription = getString(description)
         recordButton.holdEnabled = active
         if (modeBarReady) modeBar.visibility = if (active) View.GONE else View.VISIBLE
-        locateButton.visibility = if (active) View.GONE else View.VISIBLE
+        locatePanel.visibility = if (active) View.GONE else View.VISIBLE
 
         val loaded = style ?: return
         if (overlaysAttached) MapOverlays.setRecording(loaded, active, mode)

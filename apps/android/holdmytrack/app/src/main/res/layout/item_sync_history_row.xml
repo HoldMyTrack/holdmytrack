@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One sync history or duplicate row, after the web's .sync-tab__row: the name on the left,
+     one line, and a detail column on the right — the status, and under it a detail line when
+     there's something more to say. Filled by SyncStatusActivity. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_row_divider"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingTop="@dimen/hmt_space_8"
+    android:paddingBottom="@dimen/hmt_space_8">
+
+    <TextView
+        android:id="@+id/row_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+    <!-- Capped, so a long failure reason wraps in its own column instead of pushing the name
+         off the row — the web's max-width: 60%, as a width in dp. -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/hmt_space_8"
+        android:gravity="end"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/row_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:maxWidth="220dp"
+            android:textAppearance="?attr/textAppearanceLabelSmall"
+            android:textColor="@color/hmt_ink_meta"
+            android:textFontWeight="400" />
+
+        <TextView
+            android:id="@+id/row_detail"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_2"
+            android:gravity="end"
+            android:maxWidth="220dp"
+            android:textColor="@color/hmt_ink_meta"
+            android:textSize="@dimen/hmt_text_2xs"
+            android:visibility="gone" />
+    </LinearLayout>
+</LinearLayout>

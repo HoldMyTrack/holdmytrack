@@ -1,111 +1,145 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The web's sign-in page (templates/pages/signin.html): one card on the cream page, the serif
+     title inside it, and the same order — providers, "or", the email form, then the demo. The
+     screen has no action bar (Theme.HoldMyTrack.NoActionBar); the card carries the title. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true"
     android:fitsSystemWindows="true">
 
-    <LinearLayout
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="vertical"
-        android:padding="24dp">
+        android:paddingStart="@dimen/hmt_space_16"
+        android:paddingTop="@dimen/hmt_space_32"
+        android:paddingEnd="@dimen/hmt_space_16"
+        android:paddingBottom="@dimen/hmt_space_32">
 
-        <TextView
+        <com.google.android.material.card.MaterialCardView
+            style="@style/Widget.HoldMyTrack.Card"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingBottom="16dp"
-            android:text="@string/sign_in_intro"
-            android:textAppearance="?attr/textAppearanceBodyLarge" />
+            android:layout_height="wrap_content">
 
-        <!-- Hidden until GET /v1/auth/providers says the server has each configured
-             (SignInActivity), above the email form as on the web's sign-in page. -->
-        <Button
-            android:id="@+id/google"
-            style="@style/Widget.HoldMyTrack.Button.Outlined"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/continue_with_google"
-            android:visibility="gone" />
-
-        <Button
-            android:id="@+id/facebook"
-            style="@style/Widget.HoldMyTrack.Button.Outlined"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/continue_with_facebook"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/providers_divider"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:paddingTop="8dp"
-            android:text="@string/sign_in_or"
-            android:textAppearance="?attr/textAppearanceBodyMedium"
-            android:visibility="gone" />
-
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/email"
+            <!-- The card's 16dp gap between everything, as the web's flex gap: 16px. -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:autofillHints="emailAddress"
-                android:hint="@string/email_hint"
-                android:importantForAutofill="yes"
-                android:inputType="textEmailAddress" />
-        </com.google.android.material.textfield.TextInputLayout>
+                android:divider="@drawable/gap_16"
+                android:orientation="vertical"
+                android:showDividers="middle">
 
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp">
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:accessibilityHeading="true"
+                    android:text="@string/sign_in_title"
+                    android:textAppearance="?attr/textAppearanceTitleLarge" />
 
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/password"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:autofillHints="password"
-                android:hint="@string/password_hint"
-                android:importantForAutofill="yes"
-                android:inputType="textPassword" />
-        </com.google.android.material.textfield.TextInputLayout>
+                <TextView
+                    style="@style/Widget.HoldMyTrack.Hint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/sign_in_intro" />
 
-        <!-- The server's own wording, verbatim — see SignInActivity for why it isn't reworded
-             on the way through. -->
-        <TextView
-            android:id="@+id/error"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingTop="12dp"
-            android:textAppearance="@style/TextAppearance.HoldMyTrack.Error"
-            android:visibility="gone" />
+                <!-- Hidden until GET /v1/auth/providers says the server has each configured
+                     (SignInActivity), above the email form as on the web's sign-in page. -->
+                <Button
+                    android:id="@+id/google"
+                    style="@style/Widget.HoldMyTrack.Button.Google"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/continue_with_google"
+                    android:visibility="gone" />
 
-        <Button
-            android:id="@+id/sign_in"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="@string/sign_in" />
+                <Button
+                    android:id="@+id/facebook"
+                    style="@style/Widget.HoldMyTrack.Button.Facebook"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/continue_with_facebook"
+                    android:visibility="gone" />
 
-        <Button
-            android:id="@+id/sign_up"
-            style="@style/Widget.HoldMyTrack.Button.Outlined"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/create_account" />
+                <include
+                    android:id="@+id/providers_divider"
+                    layout="@layout/include_or_divider"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone" />
 
-        <Button
-            android:id="@+id/demo"
-            style="@style/Widget.HoldMyTrack.Button.Text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/try_demo" />
-    </LinearLayout>
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/email"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:autofillHints="emailAddress"
+                        android:hint="@string/email_hint"
+                        android:importantForAutofill="yes"
+                        android:inputType="textEmailAddress" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/password"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:autofillHints="password"
+                        android:hint="@string/password_hint"
+                        android:importantForAutofill="yes"
+                        android:inputType="textPassword" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- The server's own wording, verbatim — see SignInActivity for why it isn't
+                     reworded on the way through — in the web's error box. -->
+                <TextView
+                    android:id="@+id/error"
+                    style="@style/Widget.HoldMyTrack.Notice.Error"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:accessibilityLiveRegion="polite"
+                    android:visibility="gone" />
+
+                <!-- Sign in and Create account share the one form; the web splits them across
+                     /signin and /signup, which a single app screen doesn't need. -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <Button
+                        android:id="@+id/sign_in"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/sign_in" />
+
+                    <Button
+                        android:id="@+id/sign_up"
+                        style="@style/Widget.HoldMyTrack.Button.Outlined"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/create_account" />
+                </LinearLayout>
+
+                <include
+                    layout="@layout/include_or_divider"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <Button
+                    android:id="@+id/demo"
+                    style="@style/Widget.HoldMyTrack.Button.Outlined"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/try_demo"
+                    app:backgroundTint="@color/hmt_surface" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </FrameLayout>
 </ScrollView>

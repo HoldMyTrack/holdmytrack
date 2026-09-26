@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One Recorded Activities row, after the web's .activities-panel__row: the queue checkbox, the
+     route's silhouette, the name over its metadata, then Edit and Delete as icon buttons with the
+     web's own icons for those actions. Filled by RecordedActivitiesActivity. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_row_divider"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingTop="@dimen/hmt_space_10"
+    android:paddingBottom="@dimen/hmt_space_10">
+
+    <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/row_queued"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:contentDescription="@string/recorded_row_queue" />
+
+    <dev.holdmytrack.android.recording.TrackSilhouetteView
+        android:id="@+id/row_preview"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginEnd="@dimen/hmt_space_10"
+        android:contentDescription="@string/recorded_row_preview" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/row_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+        <TextView
+            android:id="@+id/row_meta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_2"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="?attr/textAppearanceLabelSmall"
+            android:textColor="@color/hmt_ink_meta"
+            android:textFontWeight="400" />
+    </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/row_edit"
+        style="@style/Widget.HoldMyTrack.Button.RowIcon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:contentDescription="@string/recording_edit"
+        app:icon="@drawable/ic_pencil" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/row_delete"
+        style="@style/Widget.HoldMyTrack.Button.RowIcon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:contentDescription="@string/recording_delete"
+        app:icon="@drawable/ic_trash_2"
+        app:iconTint="@color/hmt_danger" />
+</LinearLayout>

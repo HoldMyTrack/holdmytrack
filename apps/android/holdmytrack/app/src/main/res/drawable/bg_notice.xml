@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A notice: accent-tinted, small radius (the web's .auth-card__notice, .sync-tab__notice). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/hmt_notice_bg" />
+    <corners android:radius="@dimen/hmt_radius_sm" />
+</shape>

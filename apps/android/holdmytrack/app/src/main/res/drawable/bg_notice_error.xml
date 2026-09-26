@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- An error: danger-tinted, small radius (the web's .auth-card__error, and .sync-tab__notice's error modifier). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/hmt_error_bg" />
+    <corners android:radius="@dimen/hmt_radius_sm" />
+</shape>

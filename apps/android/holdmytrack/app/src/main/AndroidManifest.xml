@@ -75,14 +75,13 @@
             android:label="@string/menu_profile"
             android:theme="@style/Theme.HoldMyTrack" />
 
-        <!-- Not exported: reached only from MainActivity, never by another app. It keeps an
-             action bar (Theme.HoldMyTrack, not the map's Theme.HoldMyTrack.Map) purely so
-             it reads as a screen with a title rather than a form floating on nothing. -->
+        <!-- Not exported: reached only from MainActivity, never by another app. No action bar:
+             the screen is the web's auth card, with the title inside the card. -->
         <activity
             android:name=".SignInActivity"
             android:exported="false"
             android:label="@string/sign_in_title"
-            android:theme="@style/Theme.HoldMyTrack" />
+            android:theme="@style/Theme.HoldMyTrack.NoActionBar" />
 
         <!-- Not exported, like SignInActivity: MainActivity and SignInActivity send an account
              whose email isn't confirmed here instead of to the map. -->
@@ -90,7 +89,7 @@
             android:name=".VerifyEmailActivity"
             android:exported="false"
             android:label="@string/verify_email_title"
-            android:theme="@style/Theme.HoldMyTrack" />
+            android:theme="@style/Theme.HoldMyTrack.NoActionBar" />
 
         <!-- Exported, unlike SignInActivity, because the browser launches it: a Facebook
              sign-in in a Custom Tab ends at holdmytrack://oauth, which this forwards to

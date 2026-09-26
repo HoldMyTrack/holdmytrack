@@ -1,26 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- After the web header's account menu (templates/header.html, user-menu): who is signed in,
+     then Sign out, on one card like the sign-in screen's. Not the web's /profile page, whose
+     year grids and trends are statistics the app doesn't have. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true"
     android:fitsSystemWindows="true">
 
-    <LinearLayout
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="24dp">
+        android:padding="@dimen/hmt_space_16">
 
-        <TextView
-            android:id="@+id/profile_status"
+        <com.google.android.material.card.MaterialCardView
+            style="@style/Widget.HoldMyTrack.Card"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textAppearance="?attr/textAppearanceBodyLarge" />
+            android:layout_height="wrap_content">
 
-        <Button
-            android:id="@+id/profile_action"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp" />
-    </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:divider="@drawable/gap_16"
+                android:orientation="vertical"
+                android:showDividers="middle">
+
+                <TextView
+                    android:id="@+id/profile_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+                <Button
+                    android:id="@+id/profile_action"
+                    style="@style/Widget.HoldMyTrack.Button.Outlined"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </FrameLayout>
 </ScrollView>

@@ -48,7 +48,7 @@ object ActivityTypePicker {
             known.forEach { add(option(it.type, it.count)) }
         }
 
-        val padding = (16 * context.resources.displayMetrics.density).toInt()
+        val padding = context.resources.getDimensionPixelSize(R.dimen.hmt_space_16)
         val search = EditText(context).apply {
             hint = context.getString(R.string.recording_type_search_hint)
             inputType = InputType.TYPE_CLASS_TEXT
@@ -149,15 +149,25 @@ object ActivityTypePicker {
             val row = convertView as? LinearLayout ?: LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                val vertical = (12 * context.resources.displayMetrics.density).toInt()
+                val vertical = context.resources.getDimensionPixelSize(R.dimen.hmt_space_12)
                 setPadding(0, vertical, 0, vertical)
-                addView(TextView(context).apply { textSize = 16f }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-                addView(TextView(context).apply { textSize = 13f; alpha = 0.6f })
+                addView(
+                    TextView(context).apply { setTextAppearance(R.style.TextAppearance_HoldMyTrack_BodyLarge) },
+                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+                )
+                addView(
+                    TextView(context).apply {
+                        setTextAppearance(R.style.TextAppearance_HoldMyTrack_BodyMedium)
+                        alpha = 0.6f
+                    },
+                )
             }
             val option = shown[position]
             (row.getChildAt(0) as TextView).apply {
                 text = option.label
-                setTypeface(null, if (option.value == current) Typeface.BOLD else Typeface.NORMAL)
+                // By weight within the theme's own family: setTypeface(null, BOLD) would drop
+                // back to the system font.
+                typeface = Typeface.create(typeface, if (option.value == current) 700 else 400, false)
             }
             (row.getChildAt(1) as TextView).text = option.detail
             return row
