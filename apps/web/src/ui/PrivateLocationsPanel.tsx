@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Trash2 } from 'lucide-react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
@@ -125,22 +125,30 @@ export function PrivateLocationsPanel({ map, readOnly, onChanged, onEditorOpen }
     onEditorOpen();
   }
 
+  // Attached once, reading everything else through this ref: re-attaching detaches first, and
+  // detaching ends a drag in progress. A drag crossing a track re-renders this (the track's
+  // hover goes up to MapView), with a new `open` — found live, the circle stopped dead on the
+  // first track it was dragged over.
+  const clickInputs = useRef({ locations, open, readOnly });
+  clickInputs.current = { locations, open, readOnly };
+  const loaded = locations !== null;
   useEffect(() => {
-    if (!locations) return;
+    if (!loaded) return;
     return attachPrivateLocationsHandlers(map, {
       onClick: (target: PrivateLocationsClick) => {
+        const { locations, open, readOnly } = clickInputs.current;
         if (target.kind === 'saved') {
-          const location = locations.find((l) => l.id === target.id);
+          const location = locations?.find((l) => l.id === target.id);
           if (location) open(location);
         } else if (target.kind === 'empty' && readOnly) {
           setDraft(null);
         }
       },
       onDrag: (lngLat) => {
-        if (!readOnly) setDraft((d) => (d ? { ...d, lon: lngLat.lng, lat: lngLat.lat } : d));
+        if (!clickInputs.current.readOnly) setDraft((d) => (d ? { ...d, lon: lngLat.lng, lat: lngLat.lat } : d));
       },
     });
-  }, [map, locations, readOnly, open]);
+  }, [map, loaded]);
 
   const saved = draft?.id === undefined ? undefined : locations?.find((l) => l.id === draft.id);
   const dirty = draft !== null && !sameDraft(draft, saved);
