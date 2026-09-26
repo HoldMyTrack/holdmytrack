@@ -101,7 +101,7 @@ func ParseGPX(r io.Reader) (Activity, error) {
 	}
 
 	if len(act.Points) == 0 {
-		return Activity{}, fmt.Errorf("parse gpx: no track points found")
+		return Activity{}, fmt.Errorf("parse gpx: %w", ErrNoPoints)
 	}
 	return act, nil
 }

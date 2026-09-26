@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 )
 
 type statusResponse struct {
@@ -29,13 +31,13 @@ func (s *Server) handleActivityStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var state string
-	var lastError *string
+	var lastError, errorCode *string
 	err := s.pool.QueryRow(r.Context(),
-		`SELECT state, last_error FROM jobs
+		`SELECT state, last_error, error_code FROM jobs
 		 WHERE kind = 'ingest' AND payload->>'external_id' = $1
 		 ORDER BY id DESC LIMIT 1`,
 		externalID,
-	).Scan(&state, &lastError)
+	).Scan(&state, &lastError, &errorCode)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeJSON(w, http.StatusOK, statusResponse{Status: "unknown"})
@@ -54,9 +56,7 @@ func (s *Server) handleActivityStatus(w http.ResponseWriter, r *http.Request) {
 		resp.Status = "done"
 	case "failed":
 		resp.Status = "failed"
-		if lastError != nil {
-			resp.Error = *lastError
-		}
+		resp.Error = jobErrorMessage(i18n.Get(requestLang(r)), errorCode, lastError)
 	default:
 		resp.Status = state // forward-compatible with any future jobs.state value
 	}

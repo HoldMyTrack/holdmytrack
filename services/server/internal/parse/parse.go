@@ -4,6 +4,7 @@ package parse
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -34,6 +35,15 @@ type Activity struct {
 	Description string
 }
 
+// ErrNoPoints is a file that parsed cleanly but holds no point with a position: an indoor
+// workout's FIT file, typically. ErrUnsupportedFormat is an extension no parser here reads.
+// Both are the person's file rather than a fault here, so ingest reports each as its own
+// failure code (ingest.FailureCode), which the apps show translated.
+var (
+	ErrNoPoints          = errors.New("no track points with a position")
+	ErrUnsupportedFormat = errors.New("unrecognized extension")
+)
+
 // ByExtension dispatches on the uploaded filename's extension and streams from r — callers
 // must not read r into memory first (§5.2: a 100-mile ride at 1 Hz is 36,000+ points).
 func ByExtension(filename string, r io.Reader) (Activity, error) {
@@ -47,7 +57,7 @@ func ByExtension(filename string, r io.Reader) (Activity, error) {
 	case ".json":
 		return ParseJSON(r)
 	default:
-		return Activity{}, fmt.Errorf("parse: unrecognized extension %q", filepath.Ext(filename))
+		return Activity{}, fmt.Errorf("parse: %w %q", ErrUnsupportedFormat, filepath.Ext(filename))
 	}
 }
 

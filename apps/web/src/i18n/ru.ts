@@ -6,6 +6,7 @@ import type { MessageKey } from './en';
  * .one (1, 21), .few (2–4, 22–24), .many (0, 5–20, 25…), and .other for a fraction.
  */
 export const ru: Record<MessageKey, string> & Record<string, string> = {
+  'common.bad_response': 'Не удалось прочитать ответ сервера.',
   'common.cancel': 'Отмена',
   'common.confirm': 'Подтвердить',
   'common.delete': 'Удалить',
@@ -14,7 +15,9 @@ export const ru: Record<MessageKey, string> & Record<string, string> = {
   'common.loading': 'Загрузка…',
   'common.next_page': 'Следующая страница',
   'common.previous_page': 'Предыдущая страница',
+  'common.network_error': 'Не удалось связаться с сервером.',
   'common.range': '{from}–{to} из {total}',
+  'common.request_failed': 'Сервер не смог выполнить запрос (код {status}).',
   'common.save': 'Сохранить',
   'common.saving': 'Сохранение…',
   'common.something_wrong': 'Что-то пошло не так',

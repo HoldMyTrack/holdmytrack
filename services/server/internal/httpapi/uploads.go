@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 )
 
 // defaultUploadsLimit matches the upload panel's own page size — 5 rows at a time.
@@ -80,7 +82,7 @@ const uploadsListQuery = `
 SELECT j.payload->>'source_detail' AS filename,
        j.payload->>'external_id' AS external_id,
        j.payload->>'source' AS source,
-       j.state, j.last_error, j.created_at,
+       j.state, j.last_error, j.error_code, j.created_at,
        a.started_at, a.distance_meters, a.id
 FROM jobs j
 LEFT JOIN activities a
@@ -89,6 +91,20 @@ WHERE j.kind = 'ingest' AND j.user_id = $1
   AND ($4::text[] IS NULL OR j.payload->>'source' = ANY($4))
 ORDER BY j.id DESC
 LIMIT $2 OFFSET $3`
+
+// jobErrorMessage is what a failed ingest job shows a person: its error_code's catalog message
+// in the reader's language (ingest.FailureCode, IMPLEMENTATION.md §4.21). A failure with no code
+// shows last_error as it is; the worker and migration 0034 give every failed ingest job a
+// code, so that fallback is only a guard.
+func jobErrorMessage(l *i18n.Localizer, errorCode, lastError *string) string {
+	if errorCode != nil {
+		return l.T("ingest_error." + *errorCode)
+	}
+	if lastError != nil {
+		return *lastError
+	}
+	return ""
+}
 
 // handleListUploads serves §4.0.1's `GET /v1/uploads?limit=&offset=`.
 func (s *Server) handleListUploads(w http.ResponseWriter, r *http.Request) {
@@ -148,12 +164,13 @@ func (s *Server) handleListUploads(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
+	l := i18n.Get(requestLang(r))
 	uploads := make([]uploadRow, 0)
 	for rows.Next() {
 		var u uploadRow
 		var state string
-		var lastError *string
-		if err := rows.Scan(&u.Filename, &u.ExternalID, &u.Source, &state, &lastError, &u.SubmittedAt, &u.StartedAt, &u.DistanceMeters, &u.ActivityID); err != nil {
+		var lastError, errorCode *string
+		if err := rows.Scan(&u.Filename, &u.ExternalID, &u.Source, &state, &lastError, &errorCode, &u.SubmittedAt, &u.StartedAt, &u.DistanceMeters, &u.ActivityID); err != nil {
 			s.log.Error("uploads scan failed", "err", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
@@ -168,9 +185,7 @@ func (s *Server) handleListUploads(w http.ResponseWriter, r *http.Request) {
 			u.Status = "done"
 		case "failed":
 			u.Status = "failed"
-			if lastError != nil {
-				u.Error = *lastError
-			}
+			u.Error = jobErrorMessage(l, errorCode, lastError)
 		default:
 			u.Status = state
 		}

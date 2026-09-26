@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
 )
 
@@ -101,9 +102,10 @@ func (s *Server) handleSyncActivities(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	userID := userIDFromContext(ctx)
+	l := i18n.Get(requestLang(r))
 	results := make([]syncActivityResult, len(req.Activities))
 	for i, act := range req.Activities {
-		results[i] = s.syncOneActivity(ctx, userID, req.Source, act)
+		results[i] = s.syncOneActivity(ctx, l, userID, req.Source, act)
 	}
 
 	w.Header().Set("Cache-Control", "no-store")
@@ -113,11 +115,11 @@ func (s *Server) handleSyncActivities(w http.ResponseWriter, r *http.Request) {
 // syncOneActivity validates and persists+enqueues a single batch entry, isolated into its own
 // function so a marshal or persistAndEnqueue failure on one activity can't unwind the loop
 // handling the rest of the batch.
-func (s *Server) syncOneActivity(ctx context.Context, userID, source string, act syncActivityRequest) syncActivityResult {
+func (s *Server) syncOneActivity(ctx context.Context, l *i18n.Localizer, userID, source string, act syncActivityRequest) syncActivityResult {
 	result := syncActivityResult{ExternalID: act.ExternalID}
 
 	if act.ExternalID == "" {
-		result.Status, result.Error = "rejected", "external_id is required"
+		result.Status, result.Error = "rejected", l.T("error.sync_external_id_required")
 		return result
 	}
 	// Same >= 2 raw points floor ingest.Process itself enforces on the raw points
@@ -125,11 +127,11 @@ func (s *Server) syncOneActivity(ctx context.Context, userID, source string, act
 	// clearing it will also survive the trim; that deeper rejection still happens
 	// asynchronously in the worker, exactly as it already does for Path 3 uploads.
 	if len(act.Points) < 2 {
-		result.Status, result.Error = "rejected", "an activity needs at least 2 points"
+		result.Status, result.Error = "rejected", l.T("error.sync_too_few_points")
 		return result
 	}
 	if len(act.Points) > maxSyncPointsPerActivity {
-		result.Status, result.Error = "rejected", fmt.Sprintf("too many points (%d), want %d or fewer", len(act.Points), maxSyncPointsPerActivity)
+		result.Status, result.Error = "rejected", l.T("error.sync_too_many_points", "n", len(act.Points), "max", maxSyncPointsPerActivity)
 		return result
 	}
 	// Same bounds handleUpdateActivity enforces for an edit after the fact — these columns
@@ -139,15 +141,15 @@ func (s *Server) syncOneActivity(ctx context.Context, userID, source string, act
 	// an over-length value would fail as a raw, unhandled column-width error at insert time
 	// deep in the worker instead of a clean rejection here.
 	if len(act.ActivityType) > maxActivityTypeLen {
-		result.Status, result.Error = "rejected", fmt.Sprintf("activity_type must be %d characters or fewer", maxActivityTypeLen)
+		result.Status, result.Error = "rejected", l.T("error.activity_type_too_long", "max", maxActivityTypeLen)
 		return result
 	}
 	if len(act.Name) > maxActivityNameLen {
-		result.Status, result.Error = "rejected", fmt.Sprintf("name must be %d characters or fewer", maxActivityNameLen)
+		result.Status, result.Error = "rejected", l.T("error.activity_name_too_long", "max", maxActivityNameLen)
 		return result
 	}
 	if len(act.Description) > maxActivityDescriptionLen {
-		result.Status, result.Error = "rejected", fmt.Sprintf("description must be %d characters or fewer", maxActivityDescriptionLen)
+		result.Status, result.Error = "rejected", l.T("error.activity_description_too_long", "max", maxActivityDescriptionLen)
 		return result
 	}
 
@@ -158,7 +160,7 @@ func (s *Server) syncOneActivity(ctx context.Context, userID, source string, act
 	data, err := json.Marshal(act.JSONActivity)
 	if err != nil {
 		s.log.Error("sync activity marshal failed", "external_id", act.ExternalID, "err", err)
-		result.Status, result.Error = "rejected", "internal error"
+		result.Status, result.Error = "rejected", l.T("error.internal")
 		return result
 	}
 
@@ -172,7 +174,7 @@ func (s *Server) syncOneActivity(ctx context.Context, userID, source string, act
 	})
 	if err != nil {
 		s.log.Error("sync activity persist/enqueue failed", "external_id", act.ExternalID, "err", err)
-		result.Status, result.Error = "rejected", "internal error"
+		result.Status, result.Error = "rejected", l.T("error.internal")
 		return result
 	}
 

@@ -1,3 +1,5 @@
+import { t } from './i18n';
+
 /**
  * The Go backend's upload endpoint (IMPLEMENTATION.md §4.0).
  * VITE_API_BASE_URL follows the same convention as the rest of the web client's env vars —
@@ -132,7 +134,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   const res = await fetch(`${API_BASE_URL}${API_V1}/auth/me`, { credentials: 'include' });
   if (res.status === 401) return null;
   if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `session check failed (${res.status})`));
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
   const body = (await res.json()) as AuthResponseBody;
   return toSessionUser(body);
@@ -223,13 +225,13 @@ export function uploadFile(
         try {
           resolve(toUploadOutcome(JSON.parse(xhr.responseText) as UploadResponseBody));
         } catch {
-          reject(new Error('upload succeeded but the response could not be read'));
+          reject(new Error(t('common.bad_response')));
         }
       } else {
-        reject(new Error(messageFromErrorBody(xhr.responseText, `upload failed (${xhr.status})`)));
+        reject(new Error(messageFromErrorBody(xhr.responseText, t('common.request_failed', { status: xhr.status }))));
       }
     };
-    xhr.onerror = () => reject(new Error('upload failed (network error)'));
+    xhr.onerror = () => reject(new Error(t('common.network_error')));
     xhr.onabort = () => reject(new DOMException('upload aborted', 'AbortError'));
     if (signal) {
       if (signal.aborted) {
@@ -315,7 +317,7 @@ export async function getUploadHistory(query: UploadHistoryQuery = {}, signal?: 
     ...(signal ? { signal } : {}),
   });
   if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `upload history failed (${res.status})`));
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
   const body = (await res.json()) as UploadHistoryBody;
   return {
@@ -431,7 +433,7 @@ export async function listActivities(query: ActivityQuery = {}, signal?: AbortSi
     credentials: 'include',
   });
   if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `activity list failed (${res.status})`));
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
   const body = (await res.json()) as ActivitiesBody;
   return body.activities.map(toActivity);
@@ -456,7 +458,7 @@ export async function updateActivity(
     body: JSON.stringify({ activity_type: patch.activityType, name: patch.name, description: patch.description }),
   });
   if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `activity update failed (${res.status})`));
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
   const body = (await res.json()) as ActivityRowBody;
   return toActivity(body);
@@ -474,7 +476,7 @@ export async function deleteActivity(id: string): Promise<void> {
     credentials: 'include',
   });
   if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `activity delete failed (${res.status})`));
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
 }
 
@@ -523,7 +525,7 @@ export async function getDuplicates(signal?: AbortSignal): Promise<DuplicateActi
     ...(signal ? { signal } : {}),
   });
   if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `duplicates fetch failed (${res.status})`));
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
   const body = (await res.json()) as DuplicatesBody;
   return body.duplicates.map((d) => ({
@@ -566,7 +568,7 @@ export async function getActivityTotals(query: ActivityQuery = {}, signal?: Abor
     credentials: 'include',
   });
   if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `activity summary failed (${res.status})`));
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
   const body = (await res.json()) as ActivityTotalsBody;
   return {
@@ -635,7 +637,7 @@ export async function getActivityDayPage(query: DayPageQuery, signal?: AbortSign
     credentials: 'include',
   });
   if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `activity histogram failed (${res.status})`));
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
   const body = (await res.json()) as HistogramBody;
   return {
@@ -701,7 +703,7 @@ export async function getActivityTrackMetrics(
     credentials: 'include',
   });
   if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `track metrics failed (${res.status})`));
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
   const body = (await res.json()) as ActivityTrackMetricsBody;
   return {
@@ -747,7 +749,7 @@ export async function getActivityTrackPoints(activityId: string, signal?: AbortS
     credentials: 'include',
   });
   if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `track points failed (${res.status})`));
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
   return (await res.json()) as ActivityTrackPoints;
 }
@@ -765,7 +767,7 @@ export async function saveActivityTrackEdit(activityId: string, edit: TrackEdit 
     body: JSON.stringify({ edit }),
   });
   if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `track edit failed (${res.status})`));
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
 }
 
@@ -803,7 +805,7 @@ export async function listPrivateLocations(signal?: AbortSignal): Promise<Privat
     credentials: 'include',
   });
   if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `private locations failed (${res.status})`));
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
   return ((await res.json()) as PrivateLocationBody[]).map(toPrivateLocation);
 }
@@ -821,7 +823,7 @@ export async function savePrivateLocation(input: PrivateLocationInput, id?: stri
     body: JSON.stringify({ name: input.name, lon: input.lon, lat: input.lat, radius_m: input.radiusM }),
   });
   if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `saving the private location failed (${res.status})`));
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
   return toPrivateLocation((await res.json()) as PrivateLocationBody);
 }
@@ -829,7 +831,7 @@ export async function savePrivateLocation(input: PrivateLocationInput, id?: stri
 export async function deletePrivateLocation(id: string): Promise<void> {
   const res = await fetch(`${API_BASE_URL}${API_V1}/private-locations/${id}`, { method: 'DELETE', credentials: 'include' });
   if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `deleting the private location failed (${res.status})`));
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
 }
 
@@ -852,7 +854,7 @@ export async function getCoverageStatus(signal?: AbortSignal): Promise<CoverageS
     credentials: 'include',
   });
   if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, `coverage status failed (${res.status})`));
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
   return (await res.json()) as CoverageStatus;
 }
