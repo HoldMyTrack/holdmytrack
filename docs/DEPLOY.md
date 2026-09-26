@@ -164,6 +164,18 @@ WHERE u.timezone = r.old;
 
 That's the rename table in `services/server/internal/web/timezones_data.go` (`timezoneRenames`, tzdata 2026d) at the time of writing. If the table has been regenerated since, rebuild the list from it. Then check that nothing is left that the new image won't know: run `SELECT DISTINCT timezone FROM users` and look each result up in the new image's `pg_timezone_names`.
 
+## 10. Publishing the Android APK
+
+`https://<your-domain>/download/*` serves whatever is in `/srv/holdmytrack/downloads/` on the host, bind-mounted read-only into the `web` container (`compose.prod.yml`, `apps/web/docker/Caddyfile`), so publishing a new build is a copy with no rebuild or restart. Build against the deployment's own origin, then copy it up:
+
+```
+cd apps/android/holdmytrack
+./gradlew :app:assembleDebug -Pholdmytrack.apiBaseUrl=https://<your-domain>
+scp app/build/outputs/apk/debug/app-debug.apk <vps>:/srv/holdmytrack/downloads/holdmytrack.apk
+```
+
+It's served with `Cache-Control: no-cache`, so a replaced file is never masked by a cached copy. There's no release signing config yet, so this is a debug-signed APK: installable by sideloading, but not a Play Store build, and a later release-signed APK can't install over it without uninstalling first. Google sign-in works in it only if that debug key's SHA-1 has an Android OAuth client (step 4).
+
 ## What this doesn't cover
 
 Per `docs/ROADMAP.md`, still open beyond this minimal setup: backups and a restore drill, host hardening, log rotation and monitoring (its "Production deployment" section), per-user quotas and rate limits with a spend cap (Phase 5), and the compliance work (DPIA, EU-region hosting — Phase 6) a genuine public launch needs regardless of how small the deployment is. This document gets you to "it's live," not to "it's ready for the public."
