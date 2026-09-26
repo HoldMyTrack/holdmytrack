@@ -32,7 +32,7 @@ import { EditTrackPanel } from '../ui/EditTrackPanel';
 import { ExportControl } from '../ui/ExportControl';
 import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
 import { PrivateLocationsPanel } from '../ui/PrivateLocationsPanel';
-import { dayDiff, todayLocal } from '../ui/dateMath';
+import { dayDiff, dayInZone, todayLocal } from '../ui/dateMath';
 import type { DateRange } from '../ui/RangePicker';
 import { TrackProfile } from '../ui/TrackProfile';
 import { useUnitSystem } from '../ui/units';
@@ -531,7 +531,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   const viewActivityOnMap = useCallback(
     (activityId: string, startedAtIso: string) => {
       if (mapMode !== 'normal') changeMapMode('normal');
-      const day = startedAtIso.slice(0, 10); // YYYY-MM-DD (UTC) — same day-precision selectedRange itself uses
+      const day = dayInZone(startedAtIso, user.timezone);
       if (selectedRange !== null && day >= selectedRange.from && day <= selectedRange.to) {
         focusActivity(activityId);
         return;
@@ -541,7 +541,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       // The focus below flies to the activity itself; the range fly would override it.
       flyToNextRangeRef.current = false;
     },
-    [mapMode, changeMapMode, selectedRange, changeSelectedRange, focusActivity],
+    [mapMode, changeMapMode, selectedRange, changeSelectedRange, focusActivity, user.timezone],
   );
   useEffect(() => {
     const pending = pendingFocusIdRef.current;

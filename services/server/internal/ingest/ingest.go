@@ -12,6 +12,7 @@ package ingest
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -198,6 +199,9 @@ func loadClippedPoints(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 	if err != nil {
 		return parse.Activity{}, nil, fmt.Errorf("ingest: parse: %w", err)
 	}
+	if act.Points, err = keepTimed(act.Points); err != nil {
+		return parse.Activity{}, nil, err
+	}
 	if len(act.Points) < 2 {
 		return parse.Activity{}, nil, fmt.Errorf("ingest: fewer than 2 points recorded (%d)", len(act.Points))
 	}
@@ -207,6 +211,28 @@ func loadClippedPoints(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 		return parse.Activity{}, nil, fmt.Errorf("ingest: load private locations: %w", err)
 	}
 	return act, ClipEnds(act.Points, zones), nil
+}
+
+// errNoTimestamps fails a file whose points carry no time at all — a planned route exported
+// as GPX, typically. Every parser leaves a missing time as the zero time.Time, so such a
+// track would otherwise be persisted as starting on 0001-01-01, with no duration, and be
+// unreachable through the date range the whole map is filtered by.
+var errNoTimestamps = errors.New("the file has no timestamps — a planned route, not a recorded activity")
+
+// keepTimed drops the points with no timestamp, and fails when none has one. A few untimed
+// points among timed ones (a stray waypoint) are dropped rather than failing the file; kept,
+// each would read as a jump back to year 1 in the duration and pace arithmetic.
+func keepTimed(points []parse.Point) ([]parse.Point, error) {
+	timed := points[:0:0]
+	for _, p := range points {
+		if !p.Time.IsZero() {
+			timed = append(timed, p)
+		}
+	}
+	if len(timed) == 0 && len(points) > 0 {
+		return nil, errNoTimestamps
+	}
+	return timed, nil
 }
 
 // LoadClippedPoints is loadClippedPoints for the track editor's point endpoint
