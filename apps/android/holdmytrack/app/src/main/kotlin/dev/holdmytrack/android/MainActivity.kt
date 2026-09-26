@@ -153,6 +153,11 @@ class MainActivity : AppCompatActivity() {
             openSignIn()
             return
         }
+        // Likewise an account whose email isn't confirmed: the server refuses it every tile.
+        if (!Session.emailVerified) {
+            openVerifyEmail()
+            return
+        }
         setContentView(R.layout.activity_main)
 
         status = findViewById(R.id.status)
@@ -290,7 +295,9 @@ class MainActivity : AppCompatActivity() {
      *
      * A token restored from disk is not trusted until the server confirms it. An expired or
      * revoked one would otherwise surface as a wall of 401s on tile requests, which show up
-     * only in logcat: on screen it would look like an ordinary blank map.
+     * only in logcat: on screen it would look like an ordinary blank map. The same check says
+     * whether the account's email is confirmed; one that isn't goes to `VerifyEmailActivity`,
+     * since every tile and sync request would be a `403` it has no way to explain.
      */
     private fun syncSession() {
         if (!Session.isSignedIn) {
@@ -299,6 +306,10 @@ class MainActivity : AppCompatActivity() {
         }
         if (!Session.verified) {
             verifyStoredSession()
+            return
+        }
+        if (!Session.emailVerified) {
+            openVerifyEmail()
             return
         }
 
@@ -429,12 +440,17 @@ class MainActivity : AppCompatActivity() {
         finish()
     }
 
+    private fun openVerifyEmail() {
+        VerifyEmailActivity.open(this)
+        finish()
+    }
+
     private fun verifyStoredSession() {
         if (verifying) return
         verifying = true
         HoldMyTrackApi.verifySession { result ->
             verifying = false
-            result.onSuccess { Session.markVerified() }.onFailure { failure ->
+            result.onSuccess { emailVerified -> Session.markVerified(emailVerified) }.onFailure { failure ->
                 // Only a 401 means the token itself is dead. Anything else — no network, a
                 // stopped dev stack — says nothing about the credential, so it survives and
                 // gets re-checked on the next resume rather than silently signing the user out.

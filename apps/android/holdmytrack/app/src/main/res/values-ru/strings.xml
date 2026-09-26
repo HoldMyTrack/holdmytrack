@@ -28,6 +28,13 @@
     <string name="signed_in_demo">Вы вошли в демо-аккаунт</string>
     <string name="checking_session">Проверяем вход…</string>
 
+    <string name="verify_email_title">Подтвердите почту</string>
+    <string name="verify_email_hint">Мы отправили ссылку для подтверждения на %1$s. Перейдите по ней, чтобы открыть доступ к аккаунту, — карта и синхронизация заработают сразу после этого.</string>
+    <string name="verify_email_continue">Продолжить</string>
+    <string name="verify_email_resend">Отправить письмо ещё раз</string>
+    <string name="verify_email_not_yet">Почта ещё не подтверждена. Перейдите по ссылке из письма и нажмите «Продолжить».</string>
+    <string name="verify_email_check_failed">Не удалось связаться с HoldMyTrack: %1$s</string>
+
     <string name="mode_normal">Обычный</string>
     <string name="mode_fog">Туман</string>
     <string name="mode_heatmap">Тепловая</string>
@@ -86,6 +93,7 @@
     <string name="sync_title">Синхронизация с Health Connect</string>
     <string name="sync_rationale">HoldMyTrack читает из Health Connect ваши записанные тренировки и их GPS-маршруты и добавляет тренировки на улице на вашу карту. Больше он ничего не читает — ни пульс, ни вес, ни сон — и никогда ничего не записывает обратно. У тренировок в помещении нет маршрута, поэтому они пропускаются.</string>
     <string name="sync_needs_account">Сначала войдите в HoldMyTrack — до этого синхронизировать некуда.</string>
+    <string name="sync_needs_verified_email">Сначала подтвердите адрес почты — если нужна новая ссылка, откройте HoldMyTrack.</string>
     <string name="sync_demo_read_only">Демо-аккаунт только для просмотра — в нём нельзя добавлять, изменять и удалять занятия. Создайте аккаунт, чтобы синхронизировать свои данные.</string>
     <string name="sync_unavailable">На этом устройстве нет Health Connect, так что синхронизировать не из чего.</string>
     <string name="sync_update_required">Health Connect нужно обновить, прежде чем он сможет чем-то поделиться.</string>

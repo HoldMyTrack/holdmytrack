@@ -84,6 +84,14 @@
             android:label="@string/sign_in_title"
             android:theme="@style/Theme.HoldMyTrack" />
 
+        <!-- Not exported, like SignInActivity: MainActivity and SignInActivity send an account
+             whose email isn't confirmed here instead of to the map. -->
+        <activity
+            android:name=".VerifyEmailActivity"
+            android:exported="false"
+            android:label="@string/verify_email_title"
+            android:theme="@style/Theme.HoldMyTrack" />
+
         <!-- Exported, unlike SignInActivity, because the browser launches it: a Facebook
              sign-in in a Custom Tab ends at holdmytrack://oauth, which this forwards to
              SignInActivity (docs/adr/0016-native-sign-in.md). -->

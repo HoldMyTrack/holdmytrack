@@ -229,11 +229,15 @@ class SignInActivity : AppCompatActivity() {
     private fun onResult(result: Result<Account>) {
         setBusy(false)
         result.onSuccess { account ->
-            Session.start(account.token, account.email)
-            startActivity(
-                Intent(this, MainActivity::class.java)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
-            )
+            Session.start(account.token, account.email, account.emailVerified)
+            if (account.emailVerified) {
+                startActivity(
+                    Intent(this, MainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
+                )
+            } else {
+                VerifyEmailActivity.open(this)
+            }
             finish()
         }.onFailure { failure ->
             showError(failure.message ?: getString(R.string.sign_in_failed))
@@ -256,7 +260,8 @@ class SignInActivity : AppCompatActivity() {
         private const val KEY_VERIFIER = "verifier"
 
         /** Replaces the whole back stack with this screen — used on a cold start with no
-         *  session, when a stored token turns out to be revoked, and on sign-out, so no screen
+         *  session, when a stored token turns out to be revoked, and on sign-out (from Profile
+         *  or from `VerifyEmailActivity`), so no screen
          *  that needs a session is ever left underneath it. */
         fun open(context: Context) {
             context.startActivity(

@@ -29,6 +29,7 @@ object Session {
     private const val PREFS_NAME = "holdmytrack.session"
     private const val KEY_TOKEN = "session_token"
     private const val KEY_EMAIL = "email"
+    private const val KEY_EMAIL_VERIFIED = "email_verified"
 
     private lateinit var prefs: SharedPreferences
 
@@ -65,19 +66,35 @@ object Session {
      *  auth.go`, rejects it server-side regardless) doesn't re-derive the check its own way. */
     val isDemo: Boolean get() = isSignedIn && email.isEmpty()
 
-    fun start(token: String, email: String) {
+    /**
+     * Whether the account's email address is confirmed — the server's `requireVerified` gate,
+     * which answers every tile and sync request of an unconfirmed account with `403
+     * email_not_verified`. Always true for a demo account (the server says so, since the gate
+     * never applies to one). Kept on disk so a cold start goes straight to the right screen,
+     * then refreshed by every `GET /v1/auth/me`; a session stored before this was recorded
+     * reads as confirmed until that first check says otherwise.
+     */
+    val emailVerified: Boolean get() = prefs.getBoolean(KEY_EMAIL_VERIFIED, true)
+
+    fun start(token: String, email: String, emailVerified: Boolean) {
         cachedToken = token
         verified = true
-        prefs.edit().putString(KEY_TOKEN, token).putString(KEY_EMAIL, email).apply()
+        prefs.edit()
+            .putString(KEY_TOKEN, token)
+            .putString(KEY_EMAIL, email)
+            .putBoolean(KEY_EMAIL_VERIFIED, emailVerified)
+            .apply()
     }
 
-    fun markVerified() {
+    /** What `GET /v1/auth/me` just confirmed: the token is live, and whether its email is. */
+    fun markVerified(emailVerified: Boolean) {
         verified = true
+        prefs.edit().putBoolean(KEY_EMAIL_VERIFIED, emailVerified).apply()
     }
 
     fun clear() {
         cachedToken = null
         verified = false
-        prefs.edit().remove(KEY_TOKEN).remove(KEY_EMAIL).apply()
+        prefs.edit().remove(KEY_TOKEN).remove(KEY_EMAIL).remove(KEY_EMAIL_VERIFIED).apply()
     }
 }
