@@ -1,4 +1,4 @@
-# HoldMyTrack
+# <img src="services/server/internal/web/static/logo.png" alt="" height="48" align="bottom"> HoldMyTrack
 
 [![codecov](https://codecov.io/gh/HoldMyTrack/holdmytrack/graph/badge.svg)](https://codecov.io/gh/HoldMyTrack/holdmytrack)
 
