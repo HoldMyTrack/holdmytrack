@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Map as MapLibreMap } from 'maplibre-gl';
 import { ChevronDown, ChevronUp, Eye, EyeOff, Focus, Pencil, Trash2, Waypoints } from 'lucide-react';
 import { deleteActivity, type Activity, type ActivityTotals, type DuplicateActivity } from '../api';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DistanceFilter } from './DistanceFilter';
 import { EditActivityDialog } from './EditActivityDialog';
+import { PrivateLocationsPanel } from './PrivateLocationsPanel';
 import { SyncTab } from './SyncTab';
 import type { DistanceRange, TypeFacet } from './activityFacets';
 import {
@@ -19,10 +21,12 @@ import type { ImportsState } from './useImports';
 import { lang, t, tn } from '../i18n';
 
 /**
- * The left sidebar, with two tabs: **Activities** (the list, below) and **Sync** (SyncTab.tsx —
- * file upload and the import history, formerly the header's Import dropdown). The tab is local
- * UI state; the upload queue behind Sync is MapView's (useImports), so it keeps running while
- * the Activities tab is showing.
+ * The left sidebar, with three tabs: **Activities** (the list, below), **Sync** (SyncTab.tsx —
+ * file upload and the import history, formerly the header's Import dropdown) and **Privacy**
+ * (PrivateLocationsPanel.tsx — FR-8.1's list, whose editor floats over the map like Edit track's). The
+ * tab is MapView's state, so `/?private-locations` can open onto Privacy and the tab survives
+ * this panel unmounting for Fog/Heatmap; the upload queue behind Sync is MapView's too
+ * (useImports), so it keeps running while another tab is showing.
  *
  * The activity list — a permanent left sidebar (not a collapsible
  * dropdown, nor a paginated one: §4.7's list
@@ -140,9 +144,15 @@ export interface ActivitiesPanelProps {
   imports: ImportsState;
   /** A Sync-tab row's "View on map" — MapView's viewActivityOnMap. */
   onViewOnMap: (activityId: string, startedAt: string) => void;
+  tab: PanelTab;
+  onTabChange: (tab: PanelTab) => void;
+  /** The Privacy tab's map, for its overlay — null until MapView's map has loaded. */
+  map: MapLibreMap | null;
+  /** A saved or deleted Private location — MapView's handlePrivateLocationsChanged. */
+  onPrivateLocationsChanged: () => void;
 }
 
-type PanelTab = 'activities' | 'sync';
+export type PanelTab = 'activities' | 'sync' | 'private';
 
 export function ActivitiesPanel({
   readOnly = false,
@@ -176,8 +186,11 @@ export function ActivitiesPanel({
   duplicatesError,
   imports,
   onViewOnMap,
+  tab,
+  onTabChange: setTab,
+  map,
+  onPrivateLocationsChanged,
 }: ActivitiesPanelProps) {
-  const [tab, setTab] = useState<PanelTab>('activities');
   const hasActiveFilters = excludedTypes.size > 0 || distanceFilter !== null;
 
   // The Type dropdown (Type + Distance, per the header toolbar redesign) — closed by
@@ -380,6 +393,16 @@ export function ActivitiesPanel({
               the moment you switch away from it. */}
           {imports.badgeCount > 0 && <span className="activities-panel__sync-badge">{imports.badgeCount}</span>}
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'private'}
+          className="activities-panel__tab"
+          data-testid="activities-panel-tab-private"
+          onClick={() => setTab('private')}
+        >
+          <span className="activities-panel__heading-text">{t('private.tab')}</span>
+        </button>
       </div>
       {/* A <button>, not a <p> — on mobile this is the bottom sheet's own peek-strip tap
           target (expand/collapse), styled identically to the old plain text on desktop
@@ -394,15 +417,30 @@ export function ActivitiesPanel({
       >
         {tab === 'sync'
           ? t('sync.subtext')
-          : totals !== null
-            ? t('activities.loaded', { distance: formatTotalDistance(totals.distanceMeters, system) })
-            : t('common.loading')}
+          : tab === 'private'
+            ? t('private.subtitle')
+            : totals !== null
+              ? t('activities.loaded', { distance: formatTotalDistance(totals.distanceMeters, system) })
+              : t('common.loading')}
         <span className="activities-panel__sheet-chevron" aria-hidden="true">
           {sheetExpanded ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
         </span>
       </button>
 
-      {tab === 'sync' ? (
+      {tab === 'private' ? (
+        map ? (
+          <PrivateLocationsPanel
+            map={map}
+            readOnly={readOnly}
+            onChanged={onPrivateLocationsChanged}
+            // On a phone the expanded sheet would cover the editor window and the circle it edits.
+            // No visible effect at desktop width.
+            onEditorOpen={() => setSheetExpanded(false)}
+          />
+        ) : (
+          <p className="edit-track__note">{t('common.loading')}</p>
+        )
+      ) : tab === 'sync' ? (
         <SyncTab
           imports={imports}
           readOnly={readOnly}

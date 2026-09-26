@@ -26,12 +26,11 @@ import { DEFAULT_FLAVOR, parseHash, replaceHash, type HashState, type ViewState 
 import { getActivityTrackMetrics, type Activity, type ActivityTrackMetrics } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
-import { ActivitiesPanel } from '../ui/ActivitiesPanel';
+import { ActivitiesPanel, type PanelTab } from '../ui/ActivitiesPanel';
 import { ActivityHistogram } from '../ui/ActivityHistogram';
 import { EditTrackPanel } from '../ui/EditTrackPanel';
 import { ExportControl } from '../ui/ExportControl';
 import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
-import { PrivateLocationsPanel } from '../ui/PrivateLocationsPanel';
 import { dayDiff, dayInZone, todayLocal } from '../ui/dateMath';
 import type { DateRange } from '../ui/RangePicker';
 import { TrackProfile } from '../ui/TrackProfile';
@@ -53,8 +52,8 @@ const SELECTION_FLY_DEBOUNCE_MS = 300;
 const EDIT_PENDING_POLL_MS = 2000;
 
 export interface MapViewProps {
-  /** Mount with the Private locations window already open — `/?private-locations`, the
-   *  header's account menu and Settings' link to it (App.tsx). */
+  /** Mount with the Activities panel on its Privacy tab — `/?private-locations`, the header's
+   *  account menu and Settings' link to it (App.tsx). */
   initialPrivateLocationsOpen?: boolean;
 }
 
@@ -157,9 +156,9 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
   const editingTrack = editingActivityId !== null;
 
-  // The Private locations window (FR-8.1). Shares the top-left corner with the Edit track
-  // window, so the two never open together — each one closes the other.
-  const [privateLocationsOpen, setPrivateLocationsOpen] = useState(initialPrivateLocationsOpen);
+  // The Activities panel's tab — here rather than in the panel so `/?private-locations` can open
+  // onto Privacy (FR-8.1), and so the tab outlives the panel unmounting for Fog/Heatmap.
+  const [panelTab, setPanelTab] = useState<PanelTab>(initialPrivateLocationsOpen ? 'private' : 'activities');
 
   // The list/summary filter — the highlighted band in the range picker. The picker's own pan
   // position is not here on purpose: it lives in useActivityDays and the two are independent,
@@ -839,7 +838,6 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   const startEditTrack = useCallback(
     (activity: Activity) => {
       setHoveredActivityId(null);
-      setPrivateLocationsOpen(false);
       setEditingActivityId(activity.id);
       fitToSelection([activity]);
     },
@@ -1059,6 +1057,10 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
               duplicatesError={duplicates.error}
               imports={imports}
               onViewOnMap={viewActivityOnMap}
+              tab={panelTab}
+              onTabChange={setPanelTab}
+              map={map}
+              onPrivateLocationsChanged={handlePrivateLocationsChanged}
             />
           </div>
         )}
@@ -1083,14 +1085,6 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
             />
           )}
           {map && editingActivity && <EditTrackPanel map={map} activity={editingActivity} onClose={closeEditTrack} />}
-          {map && privateLocationsOpen && !editingTrack && (
-            <PrivateLocationsPanel
-              map={map}
-              readOnly={isDemo}
-              onChanged={handlePrivateLocationsChanged}
-              onClose={() => setPrivateLocationsOpen(false)}
-            />
-          )}
           {!editingTrack && (
             <div className="map-mode-toggle" role="group" aria-label={t('map.mode')} data-testid="map-mode-toggle">
               <button
