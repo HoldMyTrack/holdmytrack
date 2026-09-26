@@ -408,6 +408,9 @@ export function ActivitiesPanel({
           readOnly={readOnly}
           onViewOnMap={(activityId, startedAt) => {
             setTab('activities');
+            // On a phone the sheet is expanded to show this tab, and would stay drawn over the
+            // very map the link is meant to show. No visible effect at desktop width.
+            setSheetExpanded(false);
             onViewOnMap(activityId, startedAt);
           }}
         />

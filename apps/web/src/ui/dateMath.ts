@@ -18,6 +18,17 @@ export function todayLocal(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
+/** The calendar day an instant falls on in `timeZone` (an IANA name) — the account's own
+ *  timezone, since that's the day the server reads a bare `from`/`to` as. Slicing the ISO
+ *  string instead gives the UTC day, which is a day late for an evening activity west of
+ *  Greenwich and puts it outside a one-day range the server then answers. */
+export function dayInZone(iso: string, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(new Date(iso));
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)!.value;
+  return `${part('year').padStart(4, '0')}-${part('month')}-${part('day')}`;
+}
+
 /** Whole calendar days from `from` to `to`, inclusive of neither end — `dayDiff(a, a) === 0`.
  *  UTC-parsed on purpose, unlike todayLocal above: this diffs two already-resolved date-only
  *  strings, and parsing a date-only string as UTC (rather than the browser's own zone) is what
