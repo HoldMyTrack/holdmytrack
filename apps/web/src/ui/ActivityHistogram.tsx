@@ -29,8 +29,9 @@ import { t, tn } from '../i18n';
  * **On a phone, none of that.** The bars, handles and month rail are too small to use with a
  * fingertip on a phone-width strip, and the legend costs height a short screen can't spare, so
  * below index.css's phone breakpoint the whole footer is just DateRangeSlider.tsx — two knobs
- * over a 15-day window of calendar days, stepped 5 days at a time by its own Earlier/Later
- * buttons, with the selected dates under them. Switched in JS
+ * over a 15-bar window of the same activity-days the chart draws (it reports that capacity
+ * itself, so `days` is exactly that window), stepped 5 at a time by its own Earlier/Later
+ * buttons through the same `onPan`, with the selected dates under them. Switched in JS
  * (`useMediaQuery`), not hidden with CSS, so the desktop chart isn't mounted and measuring
  * itself behind a phone layout.
  */
@@ -55,11 +56,9 @@ export interface ActivityHistogramProps {
    *  both numbers collapse to 1. Not a computation bug; the rendered label just didn't say
    *  "day" a second time, so keep that word in whatever phrasing uses this number. */
   selectedActiveDays: number;
-  /** Forwarded straight to RangePicker.tsx — see its own doc comment. */
+  /** Forwarded straight to RangePicker.tsx (or, on a phone, DateRangeSlider.tsx) — see its
+   *  own doc comment. */
   onCapacityChange: (barsPerView: number) => void;
-  /** The phone slider's two ends: this user's first activity day and today (YYYY-MM-DD). */
-  historyStart: string;
-  today: string;
 }
 
 export function ActivityHistogram({
@@ -73,21 +72,23 @@ export function ActivityHistogram({
   selectedRangeDays,
   selectedActiveDays,
   onCapacityChange,
-  historyStart,
-  today,
 }: ActivityHistogramProps) {
   const isPhone = useMediaQuery(MOBILE_QUERY);
   const first = days[0];
   const last = days[days.length - 1];
 
   if (isPhone) {
-    // A selection can predate what's been loaded as history's start only transiently (the
-    // default range resolves from the same page), but never let a knob sit off the scale.
-    const start = selectedRange.from < historyStart ? selectedRange.from : historyStart;
-    const end = selectedRange.to > today ? selectedRange.to : today;
     return (
       <footer className="activity-histogram activity-histogram--compact" data-testid="activity-histogram">
-        <DateRangeSlider first={start} last={end} value={selectedRange} onChange={onChangeSelection} />
+        <DateRangeSlider
+          days={days}
+          onPan={onPan}
+          canPanEarlier={canPanEarlier}
+          canPanLater={canPanLater}
+          onCapacityChange={onCapacityChange}
+          value={selectedRange}
+          onChange={onChangeSelection}
+        />
       </footer>
     );
   }
