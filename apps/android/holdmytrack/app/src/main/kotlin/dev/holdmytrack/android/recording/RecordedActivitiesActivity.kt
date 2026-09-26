@@ -164,7 +164,7 @@ class RecordedActivitiesActivity : AppCompatActivity() {
     }
 
     private fun confirmDelete(record: RecordedActivityRecord) {
-        MaterialAlertDialogBuilder(this)
+        MaterialAlertDialogBuilder(this, R.style.ThemeOverlay_HoldMyTrack_Dialog_Destructive)
             .setTitle(R.string.recorded_delete_confirm_title)
             .setMessage(R.string.recorded_delete_confirm_message)
             .setPositiveButton(R.string.recording_delete) { _, _ ->

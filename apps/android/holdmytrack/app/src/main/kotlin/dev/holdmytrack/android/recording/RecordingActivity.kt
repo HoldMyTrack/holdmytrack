@@ -126,7 +126,7 @@ class RecordingActivity : AppCompatActivity() {
     }
 
     private fun confirmDiscard() {
-        MaterialAlertDialogBuilder(this)
+        MaterialAlertDialogBuilder(this, R.style.ThemeOverlay_HoldMyTrack_Dialog_Destructive)
             .setTitle(R.string.recording_discard_confirm_title)
             .setMessage(R.string.recording_discard_confirm_message)
             .setPositiveButton(R.string.recording_discard) { _, _ ->

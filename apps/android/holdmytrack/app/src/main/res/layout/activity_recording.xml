@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- After the web's edit window (EditActivityWindow.tsx, .edit-window): its 10dp gap between
+     fields, the time and distance as labelled figures, and Discard marked as destructive. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -10,12 +12,11 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="@dimen/hmt_space_24">
+        android:padding="@dimen/hmt_space_16">
 
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/hmt_space_8">
+            android:layout_height="wrap_content">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/recording_name"
@@ -31,7 +32,7 @@
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/hmt_space_8"
+            android:layout_marginTop="@dimen/hmt_space_10"
             android:hint="@string/recording_type_hint"
             app:endIconDrawable="@drawable/ic_chevron_down"
             app:endIconMode="custom">
@@ -48,7 +49,7 @@
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/hmt_space_8">
+            android:layout_marginTop="@dimen/hmt_space_10">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/recording_description"
@@ -72,16 +73,14 @@
                 android:layout_height="wrap_content"
                 android:layout_columnWeight="1"
                 android:text="@string/recording_stat_time"
-                android:textAppearance="?attr/textAppearanceLabelMedium"
-                android:textColor="?attr/colorOnSurfaceVariant" />
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.Overline" />
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_columnWeight="1"
                 android:text="@string/recording_stat_distance"
-                android:textAppearance="?attr/textAppearanceLabelMedium"
-                android:textColor="?attr/colorOnSurfaceVariant" />
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.Overline" />
 
             <TextView
                 android:id="@+id/recording_stat_time_value"
@@ -89,6 +88,7 @@
                 android:layout_height="wrap_content"
                 android:layout_columnWeight="1"
                 android:text="@string/recording_stat_placeholder"
+                android:fontFeatureSettings="tnum"
                 android:textAppearance="?attr/textAppearanceHeadlineSmall" />
 
             <TextView
@@ -97,6 +97,7 @@
                 android:layout_height="wrap_content"
                 android:layout_columnWeight="1"
                 android:text="@string/recording_stat_placeholder"
+                android:fontFeatureSettings="tnum"
                 android:textAppearance="?attr/textAppearanceHeadlineSmall" />
         </GridLayout>
 
@@ -125,7 +126,7 @@
             <!-- Save screen only (RecordingActivity.saveIntent), in place of Download GPX. -->
             <Button
                 android:id="@+id/recording_discard"
-                style="@style/Widget.HoldMyTrack.Button.Outlined"
+                style="@style/Widget.HoldMyTrack.Button.Danger"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"

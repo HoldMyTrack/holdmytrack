@@ -76,6 +76,7 @@
         <item name="borderlessButtonStyle">@style/Widget.HoldMyTrack.Button.Text</item>
         <item name="textInputStyle">@style/Widget.Material3.TextInputLayout.OutlinedBox</item>
         <item name="actionBarStyle">@style/Widget.HoldMyTrack.ActionBar</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.HoldMyTrack.Dialog</item>
     </style>
 
     <!-- Every screen with a title: the sign-in, sync, history, profile and recording forms. -->
@@ -323,6 +324,48 @@
 
     <style name="Widget.HoldMyTrack.Notice.Error">
         <item name="android:background">@drawable/bg_notice_error</item>
+        <item name="android:textColor">@color/hmt_danger</item>
+    </style>
+
+    <!-- Every dialog, after the web's .confirm-dialog: the large radius (the theme's corners
+         already give it), a 16sp heavy title, the message at 13sp and ink 70%. -->
+    <style name="ThemeOverlay.HoldMyTrack.Dialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <!-- White, as the web's dialog is, rather than Material's cream container tone. -->
+        <item name="colorSurfaceContainerHigh">@color/hmt_surface</item>
+        <item name="materialAlertDialogTitleTextStyle">@style/MaterialAlertDialog.HoldMyTrack.Title</item>
+        <item name="materialAlertDialogBodyTextStyle">@style/MaterialAlertDialog.HoldMyTrack.Body</item>
+    </style>
+
+    <!-- A dialog whose confirm action destroys something (Delete, Discard): the confirm button
+         filled in the danger color, the web's .confirm-dialog__confirm. Passed explicitly by the
+         builders that need it, so no other dialog's confirm turns red. -->
+    <style name="ThemeOverlay.HoldMyTrack.Dialog.Destructive">
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.HoldMyTrack.Button.DangerFilled</item>
+    </style>
+
+    <style name="MaterialAlertDialog.HoldMyTrack.Title" parent="MaterialAlertDialog.Material3.Title.Text">
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.DialogTitle</item>
+    </style>
+
+    <style name="MaterialAlertDialog.HoldMyTrack.Body" parent="MaterialAlertDialog.Material3.Body.Text">
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
+        <item name="android:textColor">@color/hmt_ink_message</item>
+        <item name="android:lineHeight">20sp</item>
+    </style>
+
+    <style name="TextAppearance.HoldMyTrack.DialogTitle" parent="TextAppearance.HoldMyTrack.TitleMedium">
+        <item name="android:textFontWeight">800</item>
+        <item name="android:letterSpacing">0.02</item>
+    </style>
+
+    <style name="Widget.HoldMyTrack.Button.DangerFilled" parent="Widget.HoldMyTrack.Button">
+        <item name="backgroundTint">@color/hmt_danger</item>
+        <item name="android:textColor">@color/hmt_surface</item>
+    </style>
+
+    <!-- A destructive action that isn't the screen's main one (Discard on the Save screen): the
+         outlined button with its label in the danger color. -->
+    <style name="Widget.HoldMyTrack.Button.Danger" parent="Widget.HoldMyTrack.Button.Outlined">
         <item name="android:textColor">@color/hmt_danger</item>
     </style>
 
