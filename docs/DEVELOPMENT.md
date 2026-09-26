@@ -46,10 +46,10 @@ Adding a *language* is a catalog on each surface, `about`/`help` translations, i
 
 ```bash
 docker compose run --rm api seed-admin-boundaries   # Natural Earth country/region polygons (IMPLEMENTATION.md §4.2.4)
-docker compose run --rm api seed-demo-customer      # the Demo Customer's 611 GPX activities (IMPLEMENTATION.md §4.10 / SPEC.md FR-2.2)
+docker compose run --rm api seed-demo-customer      # the Demo Customer's activities, if demo_data/ has any yet (IMPLEMENTATION.md §4.10 / SPEC.md FR-2.2)
 ```
 
-Boundaries first, so the demo's activities get their country/region matches at ingest — the other order also works, since `seed-admin-boundaries` backfills matches for activities already present, just with one more pass. Both are idempotent: re-running skips whatever is already loaded. `seed-demo-customer` pushes every file through the real ingest pipeline, so it takes a few minutes.
+Boundaries first, so the demo's activities get their country/region matches at ingest — the other order also works, since `seed-admin-boundaries` backfills matches for activities already present, just with one more pass. Both are idempotent: re-running skips whatever is already loaded. `seed-demo-customer` pushes every file through the real ingest pipeline, so it takes a few minutes. Re-running it never changes or removes an activity already seeded, so after `demo_data/` itself changes (a pull that edits the demo history), run `docker compose run --rm api seed-demo-customer --reset` once — it deletes the demo account's activities first and seeds from scratch.
 
 To see the admin panel (`/admin`, `IMPLEMENTATION.md` §4.20), sign up a local account and make it an admin: `docker compose run --rm api set-admin you@example.com true`.
 

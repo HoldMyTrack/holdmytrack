@@ -76,7 +76,16 @@ docker compose -f compose.prod.yml --env-file .env.prod run --rm api seed-admin-
 docker compose -f compose.prod.yml --env-file .env.prod run --rm api seed-demo-customer
 ```
 
-Skip them and "Try it now" opens an empty demo account (`SPEC.md` FR-2.2), and Fog/Heatmap's Country/Region zoom tiers have no boundaries to draw. Both are idempotent — safe to re-run on a later deploy, they skip whatever is already loaded — so running them after every deploy is harmless, just unnecessary. Boundaries first, so the demo's activities are matched to countries/regions as they're ingested (`docs/DEVELOPMENT.md`'s "Seeding a fresh database" has the detail).
+Skip them and "Try it now" opens an empty demo account (`SPEC.md` FR-2.2), and Fog/Heatmap's Country/Region zoom tiers have no boundaries to draw. Both are idempotent — safe to re-run on a later deploy, they skip whatever is already loaded — so running them after every deploy is harmless, just unnecessary. Boundaries first, so the demo's activities are matched to countries/regions as they're ingested (`docs/DEVELOPMENT.md`'s "Seeding a fresh database" has the detail). A deploy that changes the demo history itself (`services/server/internal/httpapi/demo_data/`) needs `seed-demo-customer --reset` once instead, since a plain re-run leaves already-seeded activities as they were.
+
+The demo history is picked from real activities on a deployment. To copy some out, with their ids from the admin panel's activity list:
+
+```
+mkdir -p /tmp/demo-export && chmod 777 /tmp/demo-export
+docker compose -f compose.prod.yml --env-file .env.prod run --rm -v /tmp/demo-export:/out api export-demo-activities /out <activity-id> <activity-id> ...
+```
+
+That writes each activity's original upload plus `manifest.json` (names and types) into `/tmp/demo-export`, reading the database and storage only. Copy the files into `demo_data/`, merging the manifest entries into the one already there, and review every track before committing — they are the raw uploads, with none of the owner's Private locations applied, going into a public repository.
 
 To open the admin panel (`/admin`, `SPEC.md` FR-12), make your own account an admin. It has to exist first, so sign up on the site, then:
 
