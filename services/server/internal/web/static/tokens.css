@@ -13,6 +13,7 @@
   color-scheme: light;
   --fm-font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --fm-font-serif: 'Fraunces', serif;
+  --fm-font-wordmark: 'Fraunces', serif;
 
   --fm-bg: #f7f4ec;
   --fm-surface: #fff;
@@ -86,4 +87,11 @@
   --fm-shadow-md: 0 2px 10px rgb(var(--fm-ink-rgb) / 22%); /* floating toolbars, chips */
   --fm-shadow-lg: 0 12px 32px rgb(var(--fm-ink-rgb) / 18%); /* dropdowns, popovers */
   --fm-shadow-xl: 0 24px 60px rgb(var(--fm-ink-rgb) / 25%); /* dialogs */
+}
+
+/* Fraunces has no Cyrillic, so a Russian page's headings take Source Serif 4 instead: a whole
+   heading in one face, rather than Fraunces for its Latin letters and a fallback for the rest.
+   The wordmark is Latin in every language, so it keeps Fraunces through its own token. */
+:root:lang(ru) {
+  --fm-font-serif: 'Source Serif 4', serif;
 }
