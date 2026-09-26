@@ -33,6 +33,9 @@ const HOVER_COLOR = '#93691f'; // --fm-accent-strong
 // Half-width, in screen pixels, of the box a click's hit-test is queried against — see the
 // click handler below for why this can't just be the bare click pixel.
 const CLICK_TOLERANCE_PX = 4;
+// The same for a tap: a fingertip covers ~40px and lands wherever its center falls, so the 8px
+// box above missed a track under the finger most of the time — and a miss clears the focus.
+const TAP_TOLERANCE_PX = 14;
 
 /** Only `from`/`to` — `types` stays a client-side-only filter (activityFacets.ts,
  *  setHiddenTracks below), matching DISTANCE, which has no server-side equivalent at all;
@@ -236,15 +239,25 @@ function attachTrackInteractivity(map: MapLibreMap): void {
     // re-adding this layer.
     if (!map.getLayer(TRACKS_LAYER_ID)) return;
     const { x, y } = e.point;
+    const tolerance = isTouch(e.originalEvent) ? TAP_TOLERANCE_PX : CLICK_TOLERANCE_PX;
     const box: [[number, number], [number, number]] = [
-      [x - CLICK_TOLERANCE_PX, y - CLICK_TOLERANCE_PX],
-      [x + CLICK_TOLERANCE_PX, y + CLICK_TOLERANCE_PX],
+      [x - tolerance, y - tolerance],
+      [x + tolerance, y + tolerance],
     ];
     const hits = map.queryRenderedFeatures(box, { layers: [TRACKS_LAYER_ID] });
     const id = hits[0]?.properties?.id as string | undefined;
     if (id) handlers?.onSelect(id);
     else handlers?.onClickAway();
   });
+}
+
+/** Whether a map click came from a finger. The browser's click after a tap is a PointerEvent
+ *  saying so where supported; elsewhere, a coarse primary pointer is the best available guess. */
+function isTouch(event: MouseEvent): boolean {
+  if ('pointerType' in event && typeof event.pointerType === 'string' && event.pointerType) {
+    return event.pointerType === 'touch';
+  }
+  return window.matchMedia('(pointer: coarse)').matches;
 }
 
 // The previously-hovered id, so setHoveredTrack can clear exactly that feature's state —

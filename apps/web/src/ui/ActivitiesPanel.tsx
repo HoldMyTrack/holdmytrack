@@ -208,11 +208,23 @@ export function ActivitiesPanel({
   // `checked`): a row click always has exactly one target to center on, while a checkbox spree
   // building up a multi-row group has no single row to scroll to, and would otherwise jerk the
   // list around after every click. `data-activity-id` on the row below is what this looks up.
+  //
+  // Scrolls the list alone, not `row.scrollIntoView()`: that scrolls every ancestor too, and
+  // on a phone the collapsed sheet (`overflow: hidden`, 68px tall) is one — a tap on a track
+  // scrolled the whole sheet up by its own content, pushing the header and the expand strip
+  // out of its visible box, where no gesture could bring them back.
   const listRef = useRef<HTMLUListElement>(null);
   useEffect(() => {
     if (focusedId === null) return;
-    const row = listRef.current?.querySelector(`[data-activity-id="${CSS.escape(focusedId)}"]`);
-    row?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const list = listRef.current;
+    const row = list?.querySelector(`[data-activity-id="${CSS.escape(focusedId)}"]`);
+    if (!list || !row) return;
+    const rowRect = row.getBoundingClientRect();
+    const offset = rowRect.top - list.getBoundingClientRect().top;
+    list.scrollTo({
+      top: list.scrollTop + offset - (list.clientHeight - rowRect.height) / 2,
+      behavior: 'smooth',
+    });
   }, [focusedId]);
 
   useEffect(() => {
