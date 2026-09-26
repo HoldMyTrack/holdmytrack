@@ -306,6 +306,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 - File too large, or malformed request → `413 Request Entity Too Large`.
 - Empty file → `400 Bad Request`.
 - Unparseable/corrupt file content → the background job fails; the upload history shows "Failed" with a reason, and no `Activity` is created.
+- A file whose points carry no timestamps at all (a planned route rather than a recorded activity) → the background job fails the same way, with a reason saying the file has no timestamps. Points without a timestamp inside an otherwise timed track are dropped, not failed on.
 
 ### FR-3.2 Bulk upload via `.zip` archive
 

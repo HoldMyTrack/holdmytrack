@@ -1876,12 +1876,15 @@ body {
 }
 
 .sync-tab__row-detail {
-  flex: none;
+  /* Shrinkable, and capped, so a long failure reason wraps in its own column instead of
+     pushing the filename out and running off the panel's edge. */
+  flex: 0 1 auto;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: var(--fm-space-4);
   min-width: 6.5rem;
+  max-width: 60%;
 }
 
 .sync-tab__row-status {
@@ -1891,6 +1894,8 @@ body {
 
 .sync-tab__row-status--error {
   color: var(--fm-danger);
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .sync-tab__row-status--ready {
