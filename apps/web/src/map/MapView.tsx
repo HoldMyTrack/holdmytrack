@@ -1162,8 +1162,6 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
             selectedRangeDays={selectedRangeDays}
             selectedActiveDays={selectedActiveDays}
             onCapacityChange={setBarsPerView}
-            historyStart={earliest ?? selectedRange?.from ?? today}
-            today={today}
           />
         </div>
       )}
