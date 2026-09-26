@@ -499,8 +499,8 @@ func (s *Server) requestPasswordReset(r *http.Request, rawEmail string) error {
 	return nil
 }
 
-// sendPasswordReset looks up a real, claimed account — one with a password or a linked Google
-// identity (a Google-only account sets its first password this way, docs/SPEC.md FR-1.5);
+// sendPasswordReset looks up a real, claimed account — one with a password or a linked external
+// identity (a Google- or Facebook-only account sets its first password this way, docs/SPEC.md FR-1.5);
 // excludes the unclaimed placeholder row and demo accounts, whose email is an internal
 // placeholder nobody can type in anyway — and, if one exists, creates a token and emails the reset link. A no-op
 // for an unmatched email: handleForgotPassword responds the same way either way, so there is
@@ -511,7 +511,7 @@ func (s *Server) sendPasswordReset(r *http.Request, email string) error {
 	var userID, locale string
 	err := s.pool.QueryRow(ctx, `
 		SELECT id, COALESCE(locale, '') FROM users
-		WHERE email = $1 AND demo_expires_at IS NULL AND (password_hash IS NOT NULL OR google_sub IS NOT NULL)
+		WHERE email = $1 AND demo_expires_at IS NULL AND (password_hash IS NOT NULL OR EXISTS (SELECT 1 FROM user_identities i WHERE i.user_id = users.id))
 	`, email).Scan(&userID, &locale)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil

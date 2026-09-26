@@ -20,7 +20,7 @@ func newPagesTestServer(t *testing.T) *Server {
 	if err != nil {
 		t.Fatalf("templates: %v", err)
 	}
-	return New(nil, nil, slog.New(slog.DiscardHandler), nil, "https://app.example", "", "test", false, GoogleOAuthConfig{}, pages)
+	return New(nil, nil, slog.New(slog.DiscardHandler), nil, "https://app.example", "", "test", false, GoogleOAuthConfig{}, FacebookOAuthConfig{}, pages)
 }
 
 func TestPagesRenderSignedOut(t *testing.T) {
@@ -260,13 +260,14 @@ func TestAccountErrorLanguages(t *testing.T) {
 	}
 }
 
-func TestSignInOffersGoogleOnlyWhenConfigured(t *testing.T) {
+func TestSignInOffersProvidersOnlyWhenConfigured(t *testing.T) {
 	pages, err := web.New(web.Embedded(), false, "test", "https://app.example")
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := New(nil, nil, slog.New(slog.DiscardHandler), nil, "https://app.example", "", "test", false,
-		GoogleOAuthConfig{ClientID: testClientID, ClientSecret: "secret", RedirectURL: "https://app.example/v1/auth/google/callback"}, pages)
+		GoogleOAuthConfig{ClientID: testClientID, ClientSecret: "secret", RedirectURL: "https://app.example/v1/auth/google/callback"},
+		FacebookOAuthConfig{AppID: testAppID, AppSecret: "secret", RedirectURL: "https://app.example/v1/auth/facebook/callback"}, pages)
 	for _, path := range []string{"/signin", "/signup"} {
 		rec := httptest.NewRecorder()
 		s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
@@ -274,9 +275,34 @@ func TestSignInOffersGoogleOnlyWhenConfigured(t *testing.T) {
 		if !strings.Contains(body, `href="/v1/auth/google/start"`) || !strings.Contains(body, "Continue with Google") {
 			t.Errorf("%s: no Google button with Google configured", path)
 		}
-		// The browser's timezone rides along for an account Google creates (FR-1.9).
+		if !strings.Contains(body, `href="/v1/auth/facebook/start"`) || !strings.Contains(body, "Continue with Facebook") {
+			t.Errorf("%s: no Facebook button with Facebook configured", path)
+		}
+		// The browser's timezone rides along for an account a provider creates (FR-1.9, FR-1.10).
 		if !strings.Contains(body, "'?tz=' + encodeURIComponent") {
-			t.Errorf("%s: Google link doesn't add ?tz=", path)
+			t.Errorf("%s: provider links don't add ?tz=", path)
+		}
+	}
+
+	bare := newPagesTestServer(t)
+	rec := httptest.NewRecorder()
+	bare.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/signin", nil))
+	if body := rec.Body.String(); strings.Contains(body, "/v1/auth/google/start") || strings.Contains(body, "/v1/auth/facebook/start") {
+		t.Error("provider buttons shown with no provider configured")
+	}
+}
+
+func TestSignInShowsFacebookErrors(t *testing.T) {
+	s := newPagesTestServer(t)
+	for code, want := range map[string]string{
+		"facebook":              "sign in with Facebook. Please try again.",
+		"facebook_no_email":     "share an email address",
+		"facebook_email_in_use": "already exists",
+	} {
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/signin?error="+code, nil))
+		if !strings.Contains(rec.Body.String(), want) {
+			t.Errorf("error=%s: page doesn't say %q", code, want)
 		}
 	}
 }

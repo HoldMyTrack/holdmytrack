@@ -2,7 +2,7 @@
 <main class="auth-page">
   <div class="auth-card">
     <h1 class="auth-card__title">{{t "signin.title"}}</h1>
-    {{if .Google}}{{template "google" .}}{{end}}
+    {{if or .Google .Facebook}}{{template "providers" .}}{{end}}
     <form class="auth-card__form" method="post" action="/signin">
       <label class="auth-card__field"><span>{{t "auth.email"}}</span><input type="email" name="email" value="{{.Email}}" required autocomplete="email" /></label>
       <label class="auth-card__field"><span>{{t "auth.password"}}</span><input type="password" name="password" required minlength="8" autocomplete="current-password" /></label>

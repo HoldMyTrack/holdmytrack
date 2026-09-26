@@ -139,6 +139,11 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-}
+      # Sign in with Facebook (docs/SPEC.md FR-1.10) — the same, keyed on FACEBOOK_APP_ID, with
+      # FACEBOOK_REDIRECT_URL pointed at http://localhost:8080/v1/auth/facebook/callback.
+      FACEBOOK_APP_ID: ${FACEBOOK_APP_ID:-}
+      FACEBOOK_APP_SECRET: ${FACEBOOK_APP_SECRET:-}
+      FACEBOOK_REDIRECT_URL: ${FACEBOOK_REDIRECT_URL:-}
     depends_on:
       db: { condition: service_healthy }
 

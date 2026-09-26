@@ -15,7 +15,7 @@ This document specifies HoldMyTrack's functional behavior as currently implement
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google on the web, FR-1.9), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), and the interface language — English or Russian (FR-13).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), and the interface language — English or Russian (FR-13).
 
 **Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), explorer-tile gamification, the rest of "Export" (story cards, animated reveals — high-resolution map export itself is built, FR-4.10 below). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace/heart-rate stay as per-activity route context (FR-4.9) rather than an analysed, all-time performance record. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
@@ -30,7 +30,7 @@ Engineers implementing against or modifying this system, QA deriving test cases,
 | **Activity** | One recorded exercise session (a run, ride, hike, swim, etc.) with a start time, and usually a GPS trajectory and heart-rate data. |
 | **Track** | An activity's GPS trajectory, as rendered on the map. |
 | **Session** | A signed-in browser's authentication state, held as an opaque cookie. |
-| **Registered user** | An account with a real email and a password, a linked Google identity, or both — created via sign-up (FR-1.1) or Sign in with Google (FR-1.9). |
+| **Registered user** | An account with a real email and a password, a linked Google or Facebook identity, or any combination — created via sign-up (FR-1.1), Sign in with Google (FR-1.9) or Sign in with Facebook (FR-1.10). |
 | **Demo user** | An ephemeral account created via "Try it now — no signup," functionally identical to a registered user except for its lifetime (FR-2.2 below). |
 | **Fog of War** | A map mode that shows a dark veil over everywhere the signed-in user has *not* recorded an activity, so recorded routes appear as "cleared" ground. |
 | **Heatmap** | A map mode that shades every recorded location by how many times it's been crossed, brightest where crossed most. |
@@ -53,7 +53,7 @@ There is no multi-tenancy beyond per-account data isolation. The admin panel is 
 
 | Page | Purpose |
 | :-- | :-- |
-| `GET`/`POST /signin` | Sign in (FR-1.2); links to sign-up and "Forgot password?", "Continue with Google" when configured (FR-1.9), and "Try it now — no signup" (`POST /demo`, FR-2.1). `?error=google` shows FR-1.9's failure message. |
+| `GET`/`POST /signin` | Sign in (FR-1.2); links to sign-up and "Forgot password?", "Continue with Google" and "Continue with Facebook" when configured (FR-1.9, FR-1.10), and "Try it now — no signup" (`POST /demo`, FR-2.1). `?error=google` shows FR-1.9's failure message; `?error=facebook`, `facebook_no_email` and `facebook_email_in_use` show FR-1.10's. |
 | `GET`/`POST /signup` | Sign up (FR-1.1, FR-2.3); `noindex`, since `/signin` links to it and is the one that should appear in search results |
 | `GET`/`POST /forgot` | Request a reset link (FR-1.5); answers "Check your email" whatever the address |
 | `GET`/`POST /reset?token=` | Set a new password from the emailed link (FR-1.6) |
@@ -100,7 +100,7 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 **Outputs**: A valid session cookie; the account's email is returned to the client.
 
 **Error cases**:
-- Email not found, account with no password set (never claimed, or Google-only — FR-1.9), or password mismatch → `401 Unauthorized` with a single generic message ("invalid email or password") in every case — the system does not distinguish these to a caller, so it cannot be used to discover which emails are registered.
+- Email not found, account with no password set (never claimed, or Google- or Facebook-only — FR-1.9, FR-1.10), or password mismatch → `401 Unauthorized` with a single generic message ("invalid email or password") in every case — the system does not distinguish these to a caller, so it cannot be used to discover which emails are registered.
 
 ### FR-1.3 Sign out
 
@@ -135,7 +135,7 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 
 **Behavior**:
 1. Client submits an email address to `POST /v1/auth/forgot-password`.
-2. If that email matches a real, claimed account — one with a password, or a Google-only account (FR-1.9), for which this is how a first password gets set — the server creates a reset token (valid 1 hour, single-use) and emails a link containing it to that address.
+2. If that email matches a real, claimed account — one with a password, or a Google- or Facebook-only account (FR-1.9, FR-1.10), for which this is how a first password gets set — the server creates a reset token (valid 1 hour, single-use) and emails a link containing it to that address.
 3. The server responds identically (`200 OK`, the same generic confirmation message) whether or not the email matched an account, so the response cannot be used to discover which emails are registered.
 
 **Outputs**: A generic confirmation message. No indication of whether an email was actually sent.
@@ -226,7 +226,7 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 3. Google redirects back to `GET /v1/auth/google/callback`. The server checks `state` against the cookie (and clears the cookie either way), exchanges the authorization code with Google, and reads the Google account's stable id, email and name. A Google account whose email Google itself reports as unverified is refused.
 4. The server picks the account:
    - An account already linked to this Google account is signed in, even if its HoldMyTrack email has since changed.
-   - Otherwise, a real (non-demo) account with the same email is linked to this Google account and signed in; the email counts as verified from then on (FR-1.8). If that account's email had **not** been verified, its password is also removed and all its sessions and outstanding reset/verification links are ended — whoever chose that password never proved they own the address.
+   - Otherwise, a real (non-demo) account with the same email is linked to this Google account and signed in; the email counts as verified from then on (FR-1.8). If that account's email had **not** been verified, its password and any linked Facebook identity (FR-1.10) are also removed and all its sessions and outstanding reset/verification links are ended — whoever chose that password or linked that identity never proved they own the address.
    - Otherwise, a new account is created: already verified, display name taken from the Google profile, timezone from step 2 (falling back to UTC, as FR-1.1).
 5. The server creates a session (30-day expiry) exactly as FR-1.2 does and redirects to the app's root, where FR-1.4's session check picks it up. A new account then continues to FR-1.7's first-run Settings page.
 
@@ -235,6 +235,33 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 **Error cases**: Every failure — the visitor cancelled on Google's screen, a missing or mismatched `state`, the code exchange failed, the Google email is unverified, or the matching account is already linked to a *different* Google account — redirects to `/signin?error=google`, which shows a generic "Couldn't sign in with Google. Please try again." message. The cause is logged server-side, not revealed in the URL.
 
 **Notes**: A Google-only account has no password, so FR-1.2 rejects it with the same generic error as any other mismatch; it can set a password at any time through FR-1.5/FR-1.6, after which both ways in work. Changing the account's email (FR-1.8 step 4) leaves the Google link in place.
+
+### FR-1.10 Sign in with Facebook
+
+**Description**: A visitor signs in, or creates an account, with a Facebook account instead of an email and password. Web client only. Unlike FR-1.9, a Facebook identity is never linked to an existing account by email: Facebook doesn't say whether the email it returns has been verified.
+
+**Preconditions**: The deployment has a Facebook app configured. Without it, `GET /v1/auth/providers` reports `{"facebook": false}`, the client shows no Facebook button, and the start and callback endpoints below return `404 Not Found`.
+
+**Inputs**: The Facebook account the visitor is signed in to on Facebook, and the permission to share its email; the browser's IANA timezone, sent automatically as with FR-1.1.
+
+**Behavior**:
+1. When the server has a Facebook app configured (`GET /v1/auth/providers` reports `facebook: true`), the sign-in and sign-up pages show "Continue with Facebook" above the email/password form, below "Continue with Google" when both are configured.
+2. Clicking it navigates the whole page to `GET /v1/auth/facebook/start?tz=<timezone>`. The server sets a short-lived (10-minute) cookie holding a random `state` value, and redirects to Facebook's login dialog asking for the `email` and `public_profile` permissions — again for the email, if the visitor declined it on an earlier attempt.
+3. Facebook redirects back to `GET /v1/auth/facebook/callback`. The server checks `state` against the cookie (and clears the cookie either way), exchanges the authorization code with Facebook, and reads the Facebook account's app-scoped id, name and email.
+4. The server picks the account:
+   - An account already linked to this Facebook account is signed in, even if its HoldMyTrack email has since changed.
+   - Otherwise, if any account already has that email, nothing is linked and the sign-in is refused (below).
+   - Otherwise, a new account is created with that email, **unverified**, display name taken from the Facebook profile, timezone from step 2 (falling back to UTC, as FR-1.1), and a verification email is sent exactly as for a sign-up (FR-1.8).
+5. The server creates a session (30-day expiry) exactly as FR-1.2 does and redirects to the app's root. A new account then waits on `/verify-pending` until its email is verified (FR-1.8), then continues to FR-1.7's first-run Settings page.
+
+**Outputs**: A valid session cookie and a redirect to the app.
+
+**Error cases**:
+- The Facebook account shared no email (it was registered with a phone number, or the visitor declined the permission) → `/signin?error=facebook_no_email`: "Your Facebook account didn't share an email address, and HoldMyTrack needs one. Try again and allow access to your email, or sign up with email and password."
+- An account with that email already exists → `/signin?error=facebook_email_in_use`: "An account with this email already exists. Sign in the way you usually do, or use “Forgot password?” to set a password."
+- Anything else — the visitor cancelled on Facebook's screen, a missing or mismatched `state`, the code exchange or profile request failed → `/signin?error=facebook`: "Couldn't sign in with Facebook. Please try again." The cause is logged server-side, not revealed in the URL.
+
+**Notes**: A Facebook-only account has no password, so FR-1.2 rejects it with the same generic error as any other mismatch; it can set one through FR-1.5/FR-1.6. Changing the account's email (FR-1.8 step 4) leaves the Facebook link in place. An account created here whose email is later claimed through Sign in with Google while still unverified loses its Facebook link (FR-1.9 step 4). There is no way yet to link Facebook to an existing account.
 
 ## 4. FR-2 — No-Signup Demo
 
@@ -812,7 +839,7 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 
 ### FR-10.2 Help page
 
-**Description**: A public page at `/help` that explains how HoldMyTrack works, in five sections reachable from jump links under its title: the map (the opening view, the Normal / Fog of War / Heatmap modes, and how Fog and Heatmap switch to whole states or regions, then whole countries, as the map zooms out — FR-4), the timeline (what a bar is, the selection band and how to extend, move or scroll it, and the phone slider — FR-6), getting activities in (files, `.zip` archives, Google Takeout with a link to Google's own download guide, the Android app, and what happens on a repeated or cross-source import — FR-3), exporting a map image (FR-4.10), and settings and privacy (Country, Timezone, Private locations — FR-1.7, FR-8.1).
+**Description**: A public page at `/help` that explains how HoldMyTrack works, in five sections reachable from jump links under its title: the map (the opening view, the Normal / Fog of War / Heatmap modes, and how Fog and Heatmap switch to whole states or regions, then whole countries, as the map zooms out — FR-4), the timeline (what a bar is, the selection band and how to extend, move or scroll it, and the phone slider — FR-6), getting activities in (files, `.zip` archives, Google Takeout with a link to Google's own download guide, the Android app, and what happens on a repeated or cross-source import — FR-3), exporting a map image (FR-4.10), and settings and privacy (Country, Timezone, Private locations — FR-1.7, FR-8.1 — and how to ask for an account to be deleted, which is by email to the Contacts address since there is no self-service deletion yet, and how to revoke Google's or Facebook's access on their side; its `#delete-account` anchor is the deployment's data-deletion instructions URL for Facebook, FR-1.10).
 
 **Preconditions**: None.
 
