@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Earlier/Later border (.range-picker__page): the panel border, faded when disabled. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/hmt_divider_tint" android:state_enabled="false" />
+    <item android:color="@color/hmt_border_panel" />
+</selector>

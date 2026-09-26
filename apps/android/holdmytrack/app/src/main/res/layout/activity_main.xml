@@ -171,19 +171,104 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- One-tap GPS recording (MainActivity.onRecordTap): tap to start, tap again to pause or
-         resume, hold for two seconds to stop (RecordButton draws the countdown ring). Translucent, bottom-centre, so it's reachable one-handed
-         and the map still reads through it. The bottom margin is raised by the gesture bar's
-         inset in MainActivity.insetSystemBars. -->
-    <dev.holdmytrack.android.recording.RecordButton
-        android:id="@+id/record_button"
-        android:layout_width="72dp"
-        android:layout_height="72dp"
-        android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginBottom="@dimen/hmt_space_32"
-        android:background="@drawable/bg_record_button"
-        android:contentDescription="@string/record_button_start"
-        android:padding="@dimen/hmt_space_20"
-        android:scaleType="fitCenter"
-        android:src="@drawable/ic_record_start" />
+    <!-- The bottom of the map: the record button, and under it the date-range footer. Like the
+         top, the column takes no touches outside its own views. The gesture bar's inset is
+         added to its bottom padding in MainActivity.insetSystemBars. -->
+    <LinearLayout
+        android:id="@+id/bottom_chrome"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="vertical">
+
+        <!-- One-tap GPS recording (MainActivity.onRecordTap): tap to start, tap again to pause or
+             resume, hold for two seconds to stop (RecordButton draws the countdown ring).
+             Translucent, bottom-centre, so it's reachable one-handed and the map still reads
+             through it. Its bottom margin is 32dp alone, 16dp above the date-range footer
+             (MainActivity.renderDateFooter). -->
+        <dev.holdmytrack.android.recording.RecordButton
+            android:id="@+id/record_button"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="@dimen/hmt_space_32"
+            android:background="@drawable/bg_record_button"
+            android:contentDescription="@string/record_button_start"
+            android:padding="@dimen/hmt_space_20"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_record_start" />
+
+        <!-- The date range the tracks are drawn for (map/DateRangeSlider): the web's phone
+             footer (apps/web/src/ui/DateRangeSlider.tsx) — Earlier, a two-knob track over 15
+             activity days, Later, and the selected dates under it — on the map chrome's panel.
+             Normal mode only, as on the web; clickable so a touch in its padding doesn't pan the
+             map underneath. -->
+        <LinearLayout
+            android:id="@+id/date_footer"
+            style="@style/Widget.HoldMyTrack.MapPanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/hmt_space_12"
+            android:layout_marginEnd="@dimen/hmt_space_12"
+            android:layout_marginBottom="@dimen/hmt_space_12"
+            android:clickable="true"
+            android:focusable="false"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/hmt_space_8"
+            android:paddingEnd="@dimen/hmt_space_8"
+            android:paddingBottom="@dimen/hmt_space_6"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/date_range_earlier"
+                    style="@style/Widget.HoldMyTrack.Button.MapPage"
+                    android:layout_width="32dp"
+                    android:layout_height="wrap_content"
+                    app:icon="@drawable/ic_chevron_left" />
+
+                <dev.holdmytrack.android.map.DateRangeTrackView
+                    android:id="@+id/date_range_track"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="@dimen/hmt_space_8"
+                    android:layout_marginEnd="@dimen/hmt_space_8"
+                    android:layout_weight="1" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/date_range_later"
+                    style="@style/Widget.HoldMyTrack.Button.MapPage"
+                    android:layout_width="32dp"
+                    android:layout_height="wrap_content"
+                    app:icon="@drawable/ic_chevron_right" />
+            </LinearLayout>
+
+            <!-- The selected dates, under the track's ends: the web's .date-range-slider__labels,
+                 12sp semibold at 65% ink. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/date_range_from"
+                    style="@style/Widget.HoldMyTrack.DateRangeLabel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1" />
+
+                <TextView
+                    android:id="@+id/date_range_to"
+                    style="@style/Widget.HoldMyTrack.DateRangeLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="end" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
 </FrameLayout>

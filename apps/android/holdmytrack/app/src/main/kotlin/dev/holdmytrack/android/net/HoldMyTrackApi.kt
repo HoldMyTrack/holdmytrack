@@ -6,9 +6,12 @@ import android.os.LocaleList
 import android.os.Looper
 import dev.holdmytrack.android.BuildConfig
 import java.io.IOException
+import java.time.Instant
+import java.time.OffsetDateTime
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.Dispatcher
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -77,6 +80,16 @@ data class Duplicate(
     val source: String,
     val supersededBySource: String,
 )
+
+/** One day that has activity, as `GET /v1/activities/histogram` counts it; [date] is `YYYY-MM-DD`
+ *  in the account's timezone. Days with none are never returned. */
+data class ActivityDay(val date: String, val count: Int, val distanceMeters: Double)
+
+/**
+ * A page of [ActivityDay]s, ascending, and the account's first activity day — how far back
+ * paging can go, independent of this page's own bounds; null for an account with no activity.
+ */
+data class ActivityDayPage(val days: List<ActivityDay>, val earliest: String?)
 
 /**
  * A request the server answered with a non-2xx status. The API writes its errors as plain
@@ -360,18 +373,84 @@ object HoldMyTrackApi {
     }
 
     /**
-     * The bounding box containing every activity the account has, or null when it has none
-     * with geometry yet.
+     * The bounding box of the account's most recent drawn activity, or null when it has none
+     * with geometry yet — what the map opens on, as the web's does (`docs/SPEC.md` FR-4.5): an
+     * account with scattered recent history would otherwise open on a near-world view.
      *
      * From `GET /v1/activities`'s per-row `bbox` rather than from anything the map itself
      * knows: a track outside the current viewport is in no loaded tile, so asking the renderer
      * where the user's history is would only ever answer for history already on screen. Rows
      * with a null bbox — an activity whose trajectory never made it in — are skipped rather
-     * than treated as a point at (0, 0).
+     * than treated as a point at (0, 0), and so are Pending ones, which the tracks tile doesn't
+     * draw.
      */
-    fun activityBounds(onResult: (Result<DoubleArray?>) -> Unit) {
+    fun latestActivityBounds(onResult: (Result<DoubleArray?>) -> Unit) {
         val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/activities").build()
-        call(request, ::parseBounds, onResult)
+        call(request, { body ->
+            var latest: Instant? = null
+            var box: DoubleArray? = null
+            forEachDrawn(body) { row, bbox ->
+                val startedAt = runCatching { OffsetDateTime.parse(row.optString("started_at")).toInstant() }.getOrNull()
+                if (startedAt != null && (latest == null || startedAt > latest)) {
+                    latest = startedAt
+                    box = bbox
+                }
+            }
+            box
+        }, onResult)
+    }
+
+    /**
+     * The bounding box of every drawn activity from [from] to [to] (`YYYY-MM-DD`, inclusive,
+     * read by the server as days in the account's timezone), or null when none has geometry —
+     * where the map flies when the user picks a new date range (`docs/SPEC.md` FR-6.6).
+     */
+    fun activityBounds(from: String, to: String, onResult: (Result<DoubleArray?>) -> Unit) {
+        val url = (BuildConfig.API_BASE_URL + API_V1 + "/activities").toHttpUrl().newBuilder()
+            .addQueryParameter("from", from)
+            .addQueryParameter("to", to)
+            .build()
+        call(Request.Builder().url(url).build(), { body ->
+            var union: DoubleArray? = null
+            forEachDrawn(body) { _, next ->
+                val current = union
+                union = if (current == null) {
+                    next
+                } else {
+                    doubleArrayOf(
+                        minOf(current[0], next[0]),
+                        minOf(current[1], next[1]),
+                        maxOf(current[2], next[2]),
+                        maxOf(current[3], next[3]),
+                    )
+                }
+            }
+            union
+        }, onResult)
+    }
+
+    /**
+     * `GET /v1/activities/histogram?days=&before=` — one page of the days that have activity
+     * (`docs/IMPLEMENTATION.md` §4.7's activity-day pagination mode): the [limit] most recent,
+     * or the [limit] most recent strictly before [before]. What the map's date-range slider
+     * (`map/ActivityDays.kt`) pages through, as the web's does.
+     */
+    fun activityDayPage(limit: Int, before: String?, onResult: (Result<ActivityDayPage>) -> Unit) {
+        val url = (BuildConfig.API_BASE_URL + API_V1 + "/activities/histogram").toHttpUrl().newBuilder()
+            .addQueryParameter("days", limit.toString())
+            .apply { if (before != null) addQueryParameter("before", before) }
+            .build()
+        call(Request.Builder().url(url).build(), { body ->
+            val json = JSONObject(body)
+            val buckets = json.getJSONArray("buckets")
+            ActivityDayPage(
+                days = List(buckets.length()) { i ->
+                    val bucket = buckets.getJSONObject(i)
+                    ActivityDay(bucket.getString("date"), bucket.optInt("count"), bucket.optDouble("distance_meters", 0.0))
+                },
+                earliest = json.optString("earliest").ifEmpty { null },
+            )
+        }, onResult)
     }
 
     /**
@@ -393,26 +472,17 @@ object HoldMyTrackApi {
         }, onResult)
     }
 
-    private fun parseBounds(body: String): DoubleArray? {
+    /** Each row of a `GET /v1/activities` body the tracks tile draws — one with a bbox and
+     *  not Pending — with that bbox as `[minLon, minLat, maxLon, maxLat]`. */
+    private fun forEachDrawn(body: String, action: (JSONObject, DoubleArray) -> Unit) {
         val activities = JSONObject(body).getJSONArray("activities")
-        var union: DoubleArray? = null
         for (i in 0 until activities.length()) {
-            val box = activities.getJSONObject(i).optJSONArray("bbox") ?: continue
+            val row = activities.getJSONObject(i)
+            if (row.optBoolean("pending")) continue
+            val box = row.optJSONArray("bbox") ?: continue
             if (box.length() != 4) continue
-            val next = DoubleArray(4) { box.getDouble(it) }
-            val current = union
-            union = if (current == null) {
-                next
-            } else {
-                doubleArrayOf(
-                    minOf(current[0], next[0]),
-                    minOf(current[1], next[1]),
-                    maxOf(current[2], next[2]),
-                    maxOf(current[3], next[3]),
-                )
-            }
+            action(row, DoubleArray(4) { box.getDouble(it) })
         }
-        return union
     }
 
     private fun credentials(email: String, password: String): RequestBody =

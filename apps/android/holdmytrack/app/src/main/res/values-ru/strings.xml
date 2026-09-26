@@ -44,6 +44,18 @@
 
     <string name="menu_button">Меню</string>
     <string name="locate_button">Моё местоположение</string>
+    <plurals name="date_range_earlier">
+        <item quantity="one">На %d активный день раньше</item>
+        <item quantity="few">На %d активных дня раньше</item>
+        <item quantity="many">На %d активных дней раньше</item>
+        <item quantity="other">На %d активных дня раньше</item>
+    </plurals>
+    <plurals name="date_range_later">
+        <item quantity="one">На %d активный день позже</item>
+        <item quantity="few">На %d активных дня позже</item>
+        <item quantity="many">На %d активных дней позже</item>
+        <item quantity="other">На %d активных дня позже</item>
+    </plurals>
     <string name="locate_needs_location">HoldMyTrack нужен доступ к местоположению, чтобы показать, где вы.</string>
     <string name="menu_profile">Профиль</string>
     <string name="menu_sync">Синхронизация</string>

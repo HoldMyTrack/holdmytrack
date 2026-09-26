@@ -41,6 +41,14 @@
 
     <string name="menu_button">Menu</string>
     <string name="locate_button">Find my location</string>
+    <plurals name="date_range_earlier">
+        <item quantity="one">%d active day earlier</item>
+        <item quantity="other">%d active days earlier</item>
+    </plurals>
+    <plurals name="date_range_later">
+        <item quantity="one">%d active day later</item>
+        <item quantity="other">%d active days later</item>
+    </plurals>
     <string name="locate_needs_location">HoldMyTrack needs location access to show where you are.</string>
     <string name="menu_profile">Profile</string>
     <string name="menu_sync">Sync</string>
