@@ -13,10 +13,6 @@ This file stays lean and current-only. Once an entry is fixed, its root-cause/fi
 - [ ] Trust `X-Forwarded-For` only from the proxy — Caddy sets it; take its client address when `RemoteAddr` is the `web` container (or a configured trusted proxy), and fall back to `RemoteAddr` otherwise, so a direct caller still can't spoof it.
 - [ ] Verify against a local `compose.prod.yml`-shaped stack: two different client addresses should each get their own five demo starts an hour.
 
-### Russian headings fall back to a generic serif
-
-Fraunces, the heading and wordmark font (`tokens.css`'s `--fm-font-serif`, loaded from Google Fonts), has no Cyrillic glyphs. In Russian (FR-13), every heading — page titles, the Activities panel's tabs, section headings, the tagline — renders in the browser's default serif instead, so it looks different from the English design, and different again from one browser to another. Inter, the body font, covers Cyrillic, so body text is unaffected. Found in the Russian Playwright pass for `IMPLEMENTATION.md` §4.21. The fix is a design decision, not a code change: pick a serif with Cyrillic (the Fraunces look-alikes on Google Fonts that have it), or a Cyrillic fallback named in `--fm-font-serif` ahead of the generic `serif`.
-
 ### A few server messages the apps show are still English in Russian
 
 FR-13 translates every error message a person can cause, but three kinds of server text reach the screen untranslated, because the server writes them before it knows who will read them: an import's failure reason in the Sync tab's history (`sync.failed_with`, the worker's ingest error, stored on the job), the Android app's per-activity sync rejection reasons (`sync_activities.go`'s per-row `error`), and the web app's generic fallbacks for an error response with no body (`api.ts`'s "`… failed (status)`" messages, mainly a proxy or a crash between the app and the API). The first two need the stored reason to become a code the reader's side translates, rather than a sentence; the last only happens when something between the app and the API has already failed.
