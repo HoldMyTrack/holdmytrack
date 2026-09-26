@@ -170,6 +170,50 @@ func processTrackEdit(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 	return nil
 }
 
+// DisplayedPoints returns an activity's points as its owner sees them: parsed from the raw
+// payload, clipped against the owner's current Private locations, with the stored track edit
+// applied — the full-resolution points the displayed trajectory was simplified from. Nil when
+// nothing is left to show. Used by the demo export (httpapi's ExportDemoActivities), which
+// must never carry what the owner's zones and edits removed.
+func DisplayedPoints(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, activityID string) ([]parse.Point, error) {
+	var userID, sourceDetail string
+	var rawKey *string
+	var storedEdit []byte
+	var editPending bool
+	err := pool.QueryRow(ctx, `
+		SELECT user_id, COALESCE(source_detail, ''), raw_payload_key, track_edit, edit_pending
+		FROM activities WHERE id = $1
+	`, activityID).Scan(&userID, &sourceDetail, &rawKey, &storedEdit, &editPending)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, errors.New("not found")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if rawKey == nil {
+		return nil, errors.New("no raw payload stored")
+	}
+	if editPending {
+		// The stored trajectory and the stored spec may disagree until the job lands.
+		return nil, errors.New("an edit or Private location change is still being applied")
+	}
+	_, points, err := loadClippedPoints(ctx, pool, store, userID, sourceDetail, *rawKey)
+	if err != nil {
+		return nil, err
+	}
+	if storedEdit != nil && points != nil {
+		var edit TrackEdit
+		if err := json.Unmarshal(storedEdit, &edit); err != nil {
+			return nil, fmt.Errorf("stored track edit unreadable: %w", err)
+		}
+		points = edit.Apply(points)
+	}
+	if len(points) < 2 {
+		return nil, nil
+	}
+	return points, nil
+}
+
 // errFewPointsAfterEdit is a user's edit leaving less than a line — rejected, unlike a Private
 // location hiding the whole track, which is a valid outcome (the activity just has no geometry).
 var errFewPointsAfterEdit = errors.New("fewer than 2 points survive the edit")
