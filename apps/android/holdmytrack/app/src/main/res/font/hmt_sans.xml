@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The interface face, fm-font-sans: Inter, one variable file (wght 400-800) named once per
+     weight so textFontWeight and textStyle="bold" pick the right instance. The file is Google
+     Fonts' Inter trimmed to Latin and Cyrillic with optical size fixed at its text setting
+     (apps/android/docs/IMPLEMENTATION.md §1.3). -->
+<font-family xmlns:android="http://schemas.android.com/apk/res/android">
+    <font
+        android:font="@font/inter"
+        android:fontStyle="normal"
+        android:fontVariationSettings="'wght' 400"
+        android:fontWeight="400" />
+    <font
+        android:font="@font/inter"
+        android:fontStyle="normal"
+        android:fontVariationSettings="'wght' 500"
+        android:fontWeight="500" />
+    <font
+        android:font="@font/inter"
+        android:fontStyle="normal"
+        android:fontVariationSettings="'wght' 600"
+        android:fontWeight="600" />
+    <font
+        android:font="@font/inter"
+        android:fontStyle="normal"
+        android:fontVariationSettings="'wght' 700"
+        android:fontWeight="700" />
+    <font
+        android:font="@font/inter"
+        android:fontStyle="normal"
+        android:fontVariationSettings="'wght' 800"
+        android:fontWeight="800" />
+</font-family>

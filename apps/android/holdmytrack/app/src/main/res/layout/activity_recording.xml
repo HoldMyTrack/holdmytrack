@@ -10,12 +10,12 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:padding="@dimen/hmt_space_24">
 
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp">
+            android:layout_marginTop="@dimen/hmt_space_8">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/recording_name"
@@ -31,7 +31,7 @@
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="@dimen/hmt_space_8"
             android:hint="@string/recording_type_hint"
             app:endIconDrawable="@drawable/ic_arrow_drop_down"
             app:endIconMode="custom">
@@ -48,7 +48,7 @@
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp">
+            android:layout_marginTop="@dimen/hmt_space_8">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/recording_description"
@@ -63,7 +63,7 @@
         <GridLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="@dimen/hmt_space_20"
             android:columnCount="2"
             android:rowCount="1">
 
@@ -103,14 +103,14 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="@dimen/hmt_space_20"
             android:orientation="horizontal">
 
             <Button
                 android:id="@+id/recording_save"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
+                android:layout_marginEnd="@dimen/hmt_space_8"
                 android:layout_weight="1"
                 android:text="@string/recording_save" />
 

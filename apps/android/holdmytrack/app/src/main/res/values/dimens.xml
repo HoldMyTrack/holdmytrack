@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The web's scales (services/server/internal/web/static/tokens.css: the fm-space, fm-radius and
+     fm-text custom properties), value for value, with CSS px read as dp (sp for text): a phone browser draws
+     one CSS px as one dp, so the mobile web and the app come out the same size. Provisional
+     until root Phase 3's design freeze, like colors.xml; the freeze changes values here only.
+     Literal dimensions left in layouts are sizes rather than spacing — the record button, icon
+     boxes, hairlines — the same exceptions tokens.css makes. The whole scale is here, steps no
+     screen uses yet included, so UnusedResources is off for this file. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="UnusedResources">
+    <dimen name="hmt_space_2">2dp</dimen>
+    <dimen name="hmt_space_4">4dp</dimen>
+    <dimen name="hmt_space_6">6dp</dimen>
+    <dimen name="hmt_space_8">8dp</dimen>
+    <dimen name="hmt_space_10">10dp</dimen>
+    <dimen name="hmt_space_12">12dp</dimen>
+    <dimen name="hmt_space_16">16dp</dimen>
+    <dimen name="hmt_space_20">20dp</dimen>
+    <dimen name="hmt_space_24">24dp</dimen>
+    <dimen name="hmt_space_32">32dp</dimen>
+
+    <dimen name="hmt_radius_xs">2dp</dimen>
+    <dimen name="hmt_radius_sm">6dp</dimen>
+    <dimen name="hmt_radius_md">8dp</dimen>
+    <dimen name="hmt_radius_lg">12dp</dimen>
+
+    <dimen name="hmt_text_3xs">9sp</dimen>
+    <dimen name="hmt_text_2xs">10sp</dimen>
+    <dimen name="hmt_text_xs">11sp</dimen>
+    <dimen name="hmt_text_sm">12sp</dimen>
+    <dimen name="hmt_text_md">13sp</dimen>
+    <dimen name="hmt_text_lg">14sp</dimen>
+    <dimen name="hmt_text_xl">16sp</dimen>
+    <dimen name="hmt_text_2xl">20sp</dimen>
+</resources>

@@ -9,7 +9,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="16dp">
+        android:padding="@dimen/hmt_space_16">
 
         <Spinner
             android:id="@+id/recorded_filter_status"
@@ -21,7 +21,7 @@
             android:id="@+id/recorded_filter_type"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="@dimen/hmt_space_8"
             android:layout_weight="1" />
     </LinearLayout>
 
@@ -29,7 +29,7 @@
         android:id="@+id/recorded_demo_notice"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="16dp"
+        android:padding="@dimen/hmt_space_16"
         android:text="@string/recorded_demo_notice"
         android:textAppearance="?attr/textAppearanceBodyMedium"
         android:visibility="gone" />
@@ -38,7 +38,7 @@
         android:id="@+id/recorded_empty"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="24dp"
+        android:padding="@dimen/hmt_space_24"
         android:text="@string/recorded_empty"
         android:textAppearance="?attr/textAppearanceBodyLarge"
         android:visibility="gone" />
@@ -53,8 +53,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:paddingBottom="16dp" />
+            android:paddingStart="@dimen/hmt_space_16"
+            android:paddingEnd="@dimen/hmt_space_16"
+            android:paddingBottom="@dimen/hmt_space_16" />
     </ScrollView>
 </LinearLayout>

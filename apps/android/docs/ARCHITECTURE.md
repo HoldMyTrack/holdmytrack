@@ -63,7 +63,7 @@ This app is the smaller of the two boxes root `docs/ARCHITECTURE.md` §1.2 draws
 | Component | Add it when |
 | :--- | :--- |
 | Compose | The app outgrows "a handful of screens" — Phase 5 chose Material 3 on Views, and Views/Compose interop means any later move can go one screen at a time |
-| The final palette, type scale and fonts | The design freeze (root `docs/ROADMAP.md` Phase 3) ships them — until then the theme carries the web's palette provisionally (`apps/android/docs/IMPLEMENTATION.md` §1.3) |
+| The final palette, type scale and fonts | The design freeze (root `docs/ROADMAP.md` Phase 3) ships them — until then the theme carries the web's current tokens, palette, fonts and scales, provisionally (`apps/android/docs/IMPLEMENTATION.md` §1.3) |
 | Date-range / type / hidden-track filters on the map | Phase 5's "Filter controls" item — fitting the web's date-range picker and eye-icon set onto a phone is a design problem before an implementation one |
 | Background sync of any kind | Never, for Health Connect routes specifically — the platform constraint this app is built around, not a sequencing gap |
 | An encrypted token store | A threat model beyond "physical access to the device's own private storage" is identified — not the case today |

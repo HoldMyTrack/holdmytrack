@@ -9,7 +9,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:padding="@dimen/hmt_space_24">
 
         <TextView
             android:id="@+id/profile_status"
@@ -21,6 +21,6 @@
             android:id="@+id/profile_action"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp" />
+            android:layout_marginTop="@dimen/hmt_space_16" />
     </LinearLayout>
 </ScrollView>

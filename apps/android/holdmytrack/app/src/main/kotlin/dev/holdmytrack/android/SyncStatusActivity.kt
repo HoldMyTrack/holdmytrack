@@ -146,8 +146,9 @@ class SyncStatusActivity : AppCompatActivity() {
     private fun row(text: String, failed: Boolean): TextView =
         TextView(this).apply {
             this.text = text
-            textSize = 13f
-            setPadding(0, 8, 0, 8)
+            setTextAppearance(R.style.TextAppearance_HoldMyTrack_BodyMedium)
+            val vertical = resources.getDimensionPixelSize(R.dimen.hmt_space_4)
+            setPadding(0, vertical, 0, vertical)
             if (failed) setTextColor(getColor(R.color.hmt_danger))
         }
 

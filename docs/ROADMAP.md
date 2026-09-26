@@ -89,7 +89,7 @@ The shipped UI so far is functional scaffolding, not a finished product. Partly 
   - [ ] Walk the core flows on a real iPhone (Safari) and Android phone (Chrome) — sign in, the three map modes, tap a track, expand and collapse the sheet, the date slider, edit an activity's name — and record any symptom concretely (device, browser, screen, what happened), not as "unusable".
 - [ ] Design freeze: once this pass lands, declare the visual design final and communicate it as such — the explicit milestone this phase produces, not an open-ended polish effort.
 
-This pass is where HoldMyTrack's palette, typography and icon set come from for the product as a whole, not for the web alone. The Android app carries only a provisional theme (the web's current palette in Material 3) and its own phase for landing this output on the platform (`apps/android/docs/ROADMAP.md`, Phase 5) — it inherits the freeze rather than deciding a second visual design, since two clients that each invented their own would not read as one product.
+This pass is where HoldMyTrack's palette, typography and icon set come from for the product as a whole, not for the web alone. The Android app carries only a provisional theme (the web's current tokens — palette, fonts and scales — in Material 3) and its own phase for landing this output on the platform (`apps/android/docs/ROADMAP.md`, Phase 5) — it inherits the freeze rather than deciding a second visual design, since two clients that each invented their own would not read as one product.
 
 ---
 

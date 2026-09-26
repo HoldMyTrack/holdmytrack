@@ -10,13 +10,13 @@
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:padding="@dimen/hmt_space_24">
 
         <TextView
             android:id="@+id/verify_hint"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingBottom="16dp"
+            android:paddingBottom="@dimen/hmt_space_16"
             android:textAppearance="?attr/textAppearanceBodyLarge" />
 
         <!-- Not yet confirmed, a failed check, or the server's answer to Resend. -->
@@ -24,7 +24,7 @@
             android:id="@+id/verify_message"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingBottom="12dp"
+            android:paddingBottom="@dimen/hmt_space_12"
             android:textAppearance="?attr/textAppearanceBodyMedium"
             android:visibility="gone" />
 

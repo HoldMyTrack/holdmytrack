@@ -9,13 +9,13 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:padding="@dimen/hmt_space_24">
 
         <TextView
             android:id="@+id/status_summary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingBottom="8dp"
+            android:paddingBottom="@dimen/hmt_space_8"
             android:textAppearance="?attr/textAppearanceTitleMedium" />
 
         <LinearLayout
@@ -30,8 +30,8 @@
             android:id="@+id/status_duplicates_heading"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingTop="24dp"
-            android:paddingBottom="4dp"
+            android:paddingTop="@dimen/hmt_space_24"
+            android:paddingBottom="@dimen/hmt_space_4"
             android:text="@string/status_duplicates_heading"
             android:textAppearance="?attr/textAppearanceTitleMedium"
             android:visibility="gone" />

@@ -127,7 +127,8 @@ class RecordedActivitiesActivity : AppCompatActivity() {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 20, 0, 20)
+            val vertical = resources.getDimensionPixelSize(R.dimen.hmt_space_8)
+            setPadding(0, vertical, 0, vertical)
         }
 
         row.addView(
@@ -166,7 +167,7 @@ class RecordedActivitiesActivity : AppCompatActivity() {
         textColumn.addView(
             TextView(this).apply {
                 text = record.name.ifBlank { formatDate(record.startedAtMs) }
-                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyLarge)
+                setTextAppearance(R.style.TextAppearance_HoldMyTrack_BodyLarge)
             },
         )
         textColumn.addView(
@@ -177,7 +178,7 @@ class RecordedActivitiesActivity : AppCompatActivity() {
                     record.distanceMeters / 1000.0,
                     statusLabel(record.syncStatus),
                 )
-                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+                setTextAppearance(R.style.TextAppearance_HoldMyTrack_BodySmall)
                 setTextColor(getColor(R.color.hmt_ink_secondary))
             },
         )

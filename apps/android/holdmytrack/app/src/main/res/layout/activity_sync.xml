@@ -9,14 +9,14 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:padding="@dimen/hmt_space_24">
 
         <!-- Health Connect opens this screen as the app's permission rationale, so this has to
              stand on its own as an answer to "why does this app want my exercise data". -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingBottom="16dp"
+            android:paddingBottom="@dimen/hmt_space_16"
             android:text="@string/sync_rationale"
             android:textAppearance="?attr/textAppearanceBodyLarge" />
 
@@ -30,7 +30,7 @@
             android:id="@+id/sync_instructions"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingTop="12dp"
+            android:paddingTop="@dimen/hmt_space_12"
             android:textAppearance="?attr/textAppearanceBodyLarge"
             android:visibility="gone" />
 
@@ -38,7 +38,7 @@
             android:id="@+id/sync_primary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp" />
+            android:layout_marginTop="@dimen/hmt_space_16" />
 
         <!-- A state-specific alternative to the primary action; only the 30-day-history state
              uses one so far ("sync what's reachable anyway"). -->
@@ -69,7 +69,7 @@
             android:id="@+id/sync_results"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingTop="16dp"
+            android:paddingTop="@dimen/hmt_space_16"
             android:textIsSelectable="true"
             android:textAppearance="?attr/textAppearanceBodyMedium"
             android:visibility="gone" />
