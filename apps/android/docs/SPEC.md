@@ -130,7 +130,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 **Behavior**:
 1. **Normal** draws the account's tracks as a single-color vector line layer (`GET /tiles/v1/tracks/{z}/{x}/{y}.mvt`), from zoom 4 inward, the same as the web (`docs/SPEC.md` FR-4.1).
-2. **Fog** replaces the tracks with the server-rendered dark-veil raster (`GET /tiles/v1/fog/{z}/{x}/{y}.png`); tracks are hidden.
+2. **Fog** replaces the tracks with the server-rendered dark-veil raster (`GET /tiles/v1/fog/{z}/{x}/{y}.png`); tracks are hidden. Map labels (place names, street names, points of interest) stay drawn on top of the veil but are dimmed, so they remain readable without competing with the cleared ground — as on the web (`docs/SPEC.md` FR-4.2); they return to full strength in Normal and Heatmap, and while recording.
 3. **Heatmap** replaces the tracks with the server-rendered intensity raster (`GET /tiles/v1/heatmap/{z}/{x}/{y}.png`); tracks are hidden.
 4. All three layers sit beneath the basemap's first label layer, so place names stay legible; within that, the active raster (fog or heatmap) is drawn beneath the tracks layer so a cleared route reads as visible through the fog rather than obscured by it — the same ordering the web client uses.
 5. Exactly one of the three is active at a time; tapping the active one leaves it active. Its button is filled (dark ink, white text); the other two are plain text on the toggle's light panel.
