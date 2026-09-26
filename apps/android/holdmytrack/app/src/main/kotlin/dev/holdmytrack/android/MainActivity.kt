@@ -34,6 +34,8 @@ import dev.holdmytrack.android.recording.RecordButton
 import dev.holdmytrack.android.recording.RecordedActivitiesActivity
 import dev.holdmytrack.android.recording.RecordingService
 import dev.holdmytrack.android.recording.RecordingState
+import dev.holdmytrack.android.settings.AppLanguage
+import dev.holdmytrack.android.settings.SettingsActivity
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -280,23 +282,24 @@ class MainActivity : AppCompatActivity() {
                 .build()
             applyCompassMargin()
             applyAttributionMargin()
-            mapView.post { enlargeAttributionTarget(instance) }
+            mapView.post { enlargeAttributionTarget() }
             loadStyle()
         }
     }
 
-    /**
-     * MapLibre's attribution "i" is a 21dp view — under the 48dp touch target, and the one
-     * control on the map that isn't the app's own. It has no id, so it's found by the content
-     * description MapLibre gives it and padded out to 48dp — sideways evenly, moving it back by
-     * the same amount through the attribution margins, and upward only, since it sits against
-     * the bottom edge and padding below would put half the target off the screen. The icon
-     * itself stays where MapLibre put it.
-     */
     /** [MIN_TOUCH_TARGET_DP] in pixels, rounded up. */
     private fun minTouchTargetPx() = kotlin.math.ceil(MIN_TOUCH_TARGET_DP * resources.displayMetrics.density).toInt()
 
-    private fun enlargeAttributionTarget(instance: MapLibreMap) {
+    /**
+     * MapLibre's attribution "i" is a 21dp view — under the 48dp touch target, and the one
+     * control on the map that isn't the app's own. It has no id, so it's found by the content
+     * description MapLibre gives it and padded out to 48dp on its right and top only: the view
+     * grows into the empty map beside and above the icon, and the icon stays exactly where
+     * MapLibre put it. The margins are left alone — `applyAttributionMargin` owns them for the
+     * date footer, and moving the view back through them to pad evenly put the icon over the
+     * MapLibre logo once the two met.
+     */
+    private fun enlargeAttributionTarget() {
         val found = ArrayList<View>()
         mapView.findViewsWithText(
             found,
@@ -305,18 +308,10 @@ class MainActivity : AppCompatActivity() {
         )
         val icon = found.firstOrNull() ?: return
         val target = minTouchTargetPx()
-        // Rounded up, so an odd shortfall still reaches the full 48dp.
-        val padX = ((target - icon.width + 1) / 2).coerceAtLeast(0)
-        val padY = ((target - icon.height + 1) / 2).coerceAtLeast(0)
+        val padX = (target - icon.width).coerceAtLeast(0)
+        val padY = (target - icon.height).coerceAtLeast(0)
         if (padX == 0 && padY == 0) return
-        icon.setPadding(padX, padY * 2, padX, 0)
-        val settings = instance.uiSettings
-        settings.setAttributionMargins(
-            settings.attributionMarginLeft - padX,
-            settings.attributionMarginTop,
-            settings.attributionMarginRight,
-            settings.attributionMarginBottom,
-        )
+        icon.setPadding(0, padY, padX, 0)
     }
 
     /**
@@ -473,6 +468,14 @@ class MainActivity : AppCompatActivity() {
         }
         if (!Session.emailVerified) {
             openVerifyEmail()
+            return
+        }
+        // The first run, as on the web: a real account that has never saved Settings (no
+        // Country) goes there before the map — its Country decides the units the map's own
+        // screens show, and nothing else would ever ask for it.
+        if (!Session.isDemo && Session.country.isEmpty()) {
+            SettingsActivity.openOnboarding(this)
+            finish()
             return
         }
 
@@ -672,8 +675,9 @@ class MainActivity : AppCompatActivity() {
             verifying = false
             notice.removeCallbacks(showChecking)
             hideNotice(Notice.CHECKING)
-            result.onSuccess { emailVerified ->
-                Session.markVerified(emailVerified)
+            result.onSuccess { profile ->
+                Session.markVerified(profile)
+                AppLanguage.followAccount(applicationContext, profile.locale)
                 hideNotice(Notice.UNREACHABLE)
             }.onFailure { failure ->
                 // Only a 401 means the token itself is dead. Anything else — no network, a
@@ -752,11 +756,13 @@ class MainActivity : AppCompatActivity() {
         menu.menu.add(0, MENU_PROFILE, 0, R.string.menu_profile)
         menu.menu.add(0, MENU_SYNC, 1, R.string.menu_sync)
         menu.menu.add(0, MENU_RECORDED_ACTIVITIES, 2, R.string.menu_recorded_activities)
+        menu.menu.add(0, MENU_SETTINGS, 3, R.string.menu_settings)
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 MENU_PROFILE -> startActivity(Intent(this, ProfileActivity::class.java))
                 MENU_SYNC -> startActivity(Intent(this, SyncActivity::class.java))
                 MENU_RECORDED_ACTIVITIES -> startActivity(Intent(this, RecordedActivitiesActivity::class.java))
+                MENU_SETTINGS -> SettingsActivity.open(this)
             }
             true
         }
@@ -934,6 +940,7 @@ class MainActivity : AppCompatActivity() {
         const val MENU_PROFILE = 1
         const val MENU_SYNC = 2
         const val MENU_RECORDED_ACTIVITIES = 3
+        const val MENU_SETTINGS = 4
 
         /** The default range's length in activity days (`docs/SPEC.md` FR-6.1). */
         const val DEFAULT_RANGE_DAYS = 5

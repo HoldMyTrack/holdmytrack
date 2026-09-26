@@ -54,6 +54,36 @@
     <string name="menu_sync">Sync</string>
     <string name="menu_recorded_activities">Recorded Activities</string>
 
+    <string name="settings_title">Settings</string>
+    <string name="settings_onboarding_title">Welcome — set up your account</string>
+    <string name="settings_onboarding_intro">Two things before your map: your country sets whether distances show in km or miles, and your timezone sets which day each activity falls on. You can change both here later.</string>
+    <string name="settings_demo_notice">This is the shared demo account, so its settings can\'t be changed. Create your own account to save yours.</string>
+    <string name="settings_load_failed">Couldn\'t load your settings: %1$s</string>
+    <string name="settings_avatar">Avatar</string>
+    <string name="settings_avatar_description">Your avatar</string>
+    <string name="settings_avatar_choose">Choose an image</string>
+    <string name="settings_avatar_remove">Remove</string>
+    <string name="settings_avatar_hint">A photo from your phone, shrunk to fit.</string>
+    <string name="settings_avatar_unreadable">Couldn\'t read that image.</string>
+    <string name="settings_name">Name</string>
+    <string name="settings_name_placeholder">Not set</string>
+    <string name="settings_country">Country</string>
+    <string name="settings_country_choose">Choose a country</string>
+    <string name="settings_country_hint">Decides whether distance and elevation show in km/m or mi/ft, here and on the website.</string>
+    <string name="settings_timezone">Timezone</string>
+    <string name="settings_timezone_hint">Decides which calendar day an activity falls on everywhere in HoldMyTrack. Set from your phone when you signed up; change it here if you\'re somewhere else now.</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_auto">Automatic (phone)</string>
+    <string name="settings_language_hint">The language of the app, the website and the emails we send you. Automatic follows your phone\'s language.</string>
+    <string name="settings_save">Save</string>
+    <string name="settings_save_continue">Save and continue</string>
+    <string name="settings_saved">Saved.</string>
+    <string name="settings_avatar_updated">Avatar updated.</string>
+    <string name="settings_avatar_removed">Avatar removed.</string>
+    <string name="settings_search_hint">Search</string>
+    <string name="settings_no_match">Nothing matches.</string>
+    <string name="menu_settings">Settings</string>
+
     <string name="recording_name_hint">Name</string>
     <string name="recording_type_hint">Activity type</string>
     <string name="recording_description_hint">Description (optional)</string>
@@ -88,6 +118,9 @@
     <string name="unit_km">%1$.2f km</string>
     <string name="unit_m">%1$.0f m</string>
     <string name="unit_kmh">%1$.1f km/h</string>
+    <string name="unit_mi">%1$.2f mi</string>
+    <string name="unit_ft">%1$.0f ft</string>
+    <string name="unit_mph">%1$.1f mph</string>
 
     <string name="recorded_empty">No recorded activities yet.</string>
     <string name="recorded_filter_all">All</string>
@@ -99,7 +132,7 @@
     <string name="recorded_row_delete_named">Delete %1$s</string>
     <string name="recorded_status_not_synced">Not synced</string>
     <string name="recorded_status_queued">Queued</string>
-    <string name="recorded_row_subtitle">%1$s · %2$.2f km · %3$s</string>
+    <string name="recorded_row_subtitle">%1$s · %2$s · %3$s</string>
     <string name="recorded_demo_notice">The demo account is read-only — recordings can be saved and edited here, but never synced. Create an account to sync your own data.</string>
     <string name="recording_delete">Delete</string>
     <string name="recorded_row_preview">Route preview</string>
@@ -147,7 +180,6 @@
     <string name="status_summary_processing">Processing %1$d of %2$d…</string>
     <string name="status_summary_settled">%1$d activities synced or uploaded.</string>
     <string name="status_failed">Could not read the sync history: %1$s</string>
-    <string name="status_row_distance">%1$.1f km</string>
     <string name="status_row_no_distance">no distance recorded</string>
     <string name="status_row_processing">processing…</string>
     <string name="status_no_reason">no reason given</string>

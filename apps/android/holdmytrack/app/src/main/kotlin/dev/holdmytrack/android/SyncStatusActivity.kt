@@ -12,6 +12,7 @@ import dev.holdmytrack.android.net.Duplicate
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.SyncHistory
 import dev.holdmytrack.android.net.SyncHistoryEntry
+import dev.holdmytrack.android.recording.RecordingFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -123,7 +124,7 @@ class SyncStatusActivity : AppCompatActivity() {
         val name = entry.startedAt?.let { format(it) } ?: format(entry.submittedAt)
         val failed = entry.status == "failed"
         val status = when (entry.status) {
-            "done" -> entry.distanceMeters?.let { getString(R.string.status_row_distance, it / 1000.0) }
+            "done" -> entry.distanceMeters?.let { RecordingFormat.distance(resources, it) }
                 ?: getString(R.string.status_row_no_distance)
             "failed" -> entry.error.ifBlank { getString(R.string.status_no_reason) }
             else -> getString(R.string.status_row_processing)

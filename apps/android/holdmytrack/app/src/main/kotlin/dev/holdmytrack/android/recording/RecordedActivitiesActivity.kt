@@ -152,7 +152,7 @@ class RecordedActivitiesActivity : AppCompatActivity() {
         row.findViewById<TextView>(R.id.row_meta).text = getString(
             R.string.recorded_row_subtitle,
             record.activityType,
-            record.distanceMeters / 1000.0,
+            RecordingFormat.distance(resources, record.distanceMeters),
             statusLabel(record.syncStatus),
         )
 

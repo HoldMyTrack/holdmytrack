@@ -1,11 +1,14 @@
 package dev.holdmytrack.android.net
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Handler
 import android.os.LocaleList
 import android.os.Looper
 import dev.holdmytrack.android.BuildConfig
 import java.io.IOException
+import java.time.ZoneId
 import java.time.Instant
 import java.time.OffsetDateTime
 import okhttp3.Call
@@ -14,6 +17,7 @@ import okhttp3.Dispatcher
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
@@ -25,12 +29,55 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * An account with a live session — what a successful sign-in, sign-up or demo start yields.
- * [emailVerified] is false for a new email-and-password account (when the server sends
- * verification emails) and for a new Sign in with Facebook account, until the emailed link is
- * clicked; true for a demo account.
+ * The account as the server describes it — `GET /v1/auth/me`, and the same shape every
+ * sign-in answers with and `PATCH /v1/account/settings` returns (`authResponse`,
+ * `services/server/internal/httpapi/auth.go`). [email] is empty for a demo account, which the
+ * server never names. [emailVerified] is false for a new email-and-password account (when the
+ * server sends verification emails) and for a new Sign in with Facebook account, until the
+ * emailed link is clicked; true for a demo account. [country] is empty until Settings is first
+ * saved (the first-run gate); [locale] is empty for "automatic"; [avatarUrl] is an API path, or
+ * empty with no avatar.
  */
-data class Account(val token: String, val email: String, val emailVerified: Boolean)
+data class Profile(
+    val email: String,
+    val isDemo: Boolean,
+    val emailVerified: Boolean,
+    val displayName: String,
+    val country: String,
+    val timezone: String,
+    val locale: String,
+    val avatarUrl: String,
+) {
+    companion object {
+        fun parse(json: JSONObject) = Profile(
+            email = json.optString("email"),
+            isDemo = json.optBoolean("isDemo"),
+            emailVerified = json.optBoolean("email_verified", true),
+            displayName = json.optString("display_name"),
+            country = json.optString("country"),
+            timezone = json.optString("timezone"),
+            locale = json.optString("locale"),
+            avatarUrl = json.optString("avatar_url"),
+        )
+    }
+}
+
+/** An account with a live session — what a successful sign-in, sign-up or demo start yields. */
+data class Account(val token: String, val profile: Profile)
+
+/** One choice in a Settings list: what the server stores, and what to show for it. */
+data class SettingsOption(val value: String, val label: String)
+
+/** A region of the Timezone list ("Europe", named in the request's language). */
+data class TimezoneGroup(val label: String, val options: List<SettingsOption>)
+
+/** `GET /v1/account/settings/options` — the lists Settings chooses from, the server's own, so
+ *  a choice is always one the save accepts. */
+data class SettingsOptions(
+    val countries: List<SettingsOption>,
+    val timezones: List<TimezoneGroup>,
+    val languages: List<SettingsOption>,
+)
 
 /**
  * The optional sign-in methods this deployment has configured (`GET /v1/auth/providers`).
@@ -309,8 +356,14 @@ object HoldMyTrackApi {
         authenticate("/auth/login", credentials(email, password), onResult)
     }
 
+    /** Sends the phone's IANA zone as `timezone`, as the web's sign-up sends the browser's, so
+     *  a new account starts on it rather than on UTC (Google and Facebook already send it). */
     fun signUp(email: String, password: String, onResult: (Result<Account>) -> Unit) {
-        authenticate("/auth/signup", credentials(email, password), onResult)
+        val body = JSONObject()
+            .put("email", email)
+            .put("password", password)
+            .put("timezone", ZoneId.systemDefault().id)
+        authenticate("/auth/signup", body.toString().toRequestBody(JSON), onResult)
     }
 
     /**
@@ -355,9 +408,92 @@ object HoldMyTrackApi {
      * Answers with the account's `email_verified`, since a live token is not by itself enough
      * for the map: an unconfirmed email gets `403` on every tile (`VerifyEmailActivity`).
      */
-    fun verifySession(onResult: (Result<Boolean>) -> Unit) {
+    fun verifySession(onResult: (Result<Profile>) -> Unit) {
         val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/auth/me").build()
-        call(request, { body -> JSONObject(body).optBoolean("email_verified", true) }, onResult)
+        call(request, { body -> Profile.parse(JSONObject(body)) }, onResult)
+    }
+
+    /** `GET /v1/account/settings/options` — see [SettingsOptions]. */
+    fun settingsOptions(onResult: (Result<SettingsOptions>) -> Unit) {
+        val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/account/settings/options").build()
+        call(request, { body ->
+            val json = JSONObject(body)
+            fun options(array: JSONArray?) = List(array?.length() ?: 0) { i ->
+                val o = array!!.getJSONObject(i)
+                SettingsOption(o.optString("value"), o.optString("label"))
+            }
+            val groups = json.optJSONArray("timezones")
+            SettingsOptions(
+                countries = options(json.optJSONArray("countries")),
+                timezones = List(groups?.length() ?: 0) { i ->
+                    val g = groups!!.getJSONObject(i)
+                    TimezoneGroup(g.optString("label").ifBlank { g.optString("region") }, options(g.optJSONArray("options")))
+                },
+                languages = options(json.optJSONArray("languages")),
+            )
+        }, onResult)
+    }
+
+    /**
+     * `PATCH /v1/account/settings` — Name, Country, Timezone and Language as one save, as the
+     * web page saves them. [locale] is empty for "automatic". Answers with the saved profile;
+     * a refusal (a missing country, a demo account) is the server's own wording.
+     */
+    fun updateSettings(
+        displayName: String,
+        country: String,
+        timezone: String,
+        locale: String,
+        onResult: (Result<Profile>) -> Unit,
+    ) {
+        val body = JSONObject()
+            .put("display_name", displayName)
+            .put("country", country)
+            .put("timezone", timezone)
+            .put("locale", locale)
+        val request = Request.Builder()
+            .url(BuildConfig.API_BASE_URL + API_V1 + "/account/settings")
+            .patch(body.toString().toRequestBody(JSON))
+            .build()
+        call(request, { text -> Profile.parse(JSONObject(text)) }, onResult)
+    }
+
+    /** `POST /v1/account/avatar` — the image as picked; the server checks its type (PNG,
+     *  JPEG, WebP) and size (5 MB) itself. */
+    fun uploadAvatar(bytes: ByteArray, contentType: String, onResult: (Result<Profile>) -> Unit) {
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("file", "avatar", bytes.toRequestBody(contentType.toMediaType()))
+            .build()
+        val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/account/avatar").post(body).build()
+        call(request, { text -> Profile.parse(JSONObject(text)) }, onResult)
+    }
+
+    /** `DELETE /v1/account/avatar`. */
+    fun deleteAvatar(onResult: (Result<Profile>) -> Unit) {
+        val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/account/avatar").delete().build()
+        call(request, { text -> Profile.parse(JSONObject(text)) }, onResult)
+    }
+
+    /** The avatar at [path] (a [Profile.avatarUrl], relative to the API), fetched with the
+     *  session's bearer token like any other API request, and decoded. */
+    fun avatar(path: String, onResult: (Result<Bitmap>) -> Unit) {
+        val request = Request.Builder().url(BuildConfig.API_BASE_URL + path).build()
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                main.post { onResult(Result.failure(e)) }
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                val result = response.use {
+                    if (!it.isSuccessful) return@use Result.failure(ApiException(it.code, ""))
+                    val bytes = it.body?.bytes() ?: ByteArray(0)
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let { bitmap -> Result.success(bitmap) }
+                        ?: Result.failure(IOException("not an image"))
+                }
+                main.post { onResult(result) }
+            }
+        })
     }
 
     /**
@@ -501,11 +637,7 @@ object HoldMyTrackApi {
             val json = JSONObject(text)
             val token = json.optString("session_token")
             if (token.isEmpty()) throw IOException("the server returned no session token")
-            Account(
-                token = token,
-                email = json.optString("email"),
-                emailVerified = json.optBoolean("email_verified", true),
-            )
+            Account(token = token, profile = Profile.parse(json))
         }, onResult)
     }
 

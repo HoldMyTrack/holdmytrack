@@ -23,6 +23,7 @@ import dev.holdmytrack.android.net.Account
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Providers
 import dev.holdmytrack.android.net.Session
+import dev.holdmytrack.android.settings.AppLanguage
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.ZoneId
@@ -228,8 +229,10 @@ class SignInActivity : AppCompatActivity() {
     private fun onResult(result: Result<Account>) {
         setBusy(false)
         result.onSuccess { account ->
-            Session.start(account.token, account.email, account.emailVerified)
-            if (account.emailVerified) {
+            Session.start(account.token, account.profile)
+            // The account's own language, if it has chosen one — before the next screen opens.
+            AppLanguage.followAccount(applicationContext, account.profile.locale)
+            if (account.profile.emailVerified) {
                 startActivity(
                     Intent(this, MainActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),

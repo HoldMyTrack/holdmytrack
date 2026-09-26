@@ -61,6 +61,36 @@
     <string name="menu_sync">Синхронизация</string>
     <string name="menu_recorded_activities">Записанные занятия</string>
 
+    <string name="settings_title">Настройки</string>
+    <string name="settings_onboarding_title">Добро пожаловать! Настройте аккаунт</string>
+    <string name="settings_onboarding_intro">Два шага перед картой: страна определяет, в километрах или милях показывать расстояния, а часовой пояс — к какому дню относится каждое занятие. Позже всё это можно изменить здесь.</string>
+    <string name="settings_demo_notice">Это общий демо-аккаунт, его настройки изменить нельзя. Создайте свой аккаунт, чтобы сохранить свои.</string>
+    <string name="settings_load_failed">Не удалось загрузить настройки: %1$s</string>
+    <string name="settings_avatar">Аватар</string>
+    <string name="settings_avatar_description">Ваш аватар</string>
+    <string name="settings_avatar_choose">Выбрать изображение</string>
+    <string name="settings_avatar_remove">Удалить</string>
+    <string name="settings_avatar_hint">Фото с телефона, уменьшенное до нужного размера.</string>
+    <string name="settings_avatar_unreadable">Не удалось прочитать это изображение.</string>
+    <string name="settings_name">Имя</string>
+    <string name="settings_name_placeholder">Не указано</string>
+    <string name="settings_country">Страна</string>
+    <string name="settings_country_choose">Выберите страну</string>
+    <string name="settings_country_hint">Определяет, в каких единицах показывать расстояние и высоту — км/м или мили/футы — здесь и на сайте.</string>
+    <string name="settings_timezone">Часовой пояс</string>
+    <string name="settings_timezone_hint">Определяет, к какому календарному дню относится занятие во всём HoldMyTrack. Определён по телефону при регистрации; измените его, если сейчас вы в другом месте.</string>
+    <string name="settings_language">Язык</string>
+    <string name="settings_language_auto">Автоматически (как на телефоне)</string>
+    <string name="settings_language_hint">Язык приложения, сайта и писем, которые мы вам отправляем. «Автоматически» — язык вашего телефона.</string>
+    <string name="settings_save">Сохранить</string>
+    <string name="settings_save_continue">Сохранить и продолжить</string>
+    <string name="settings_saved">Сохранено.</string>
+    <string name="settings_avatar_updated">Аватар обновлён.</string>
+    <string name="settings_avatar_removed">Аватар удалён.</string>
+    <string name="settings_search_hint">Поиск</string>
+    <string name="settings_no_match">Ничего не найдено.</string>
+    <string name="menu_settings">Настройки</string>
+
     <string name="recording_name_hint">Название</string>
     <string name="recording_type_hint">Тип занятия</string>
     <string name="recording_description_hint">Описание (необязательно)</string>
@@ -94,6 +124,9 @@
     <string name="unit_km">%1$.2f км</string>
     <string name="unit_m">%1$.0f м</string>
     <string name="unit_kmh">%1$.1f км/ч</string>
+    <string name="unit_mi">%1$.2f ми</string>
+    <string name="unit_ft">%1$.0f фт</string>
+    <string name="unit_mph">%1$.1f ми/ч</string>
 
     <string name="recorded_empty">Записанных занятий пока нет.</string>
     <string name="recorded_filter_all">Все</string>
@@ -105,7 +138,7 @@
     <string name="recorded_row_delete_named">Удалить: %1$s</string>
     <string name="recorded_status_not_synced">Не синхронизировано</string>
     <string name="recorded_status_queued">В очереди</string>
-    <string name="recorded_row_subtitle">%1$s · %2$.2f км · %3$s</string>
+    <string name="recorded_row_subtitle">%1$s · %2$s · %3$s</string>
     <string name="recorded_demo_notice">Демо-аккаунт только для просмотра: записи можно сохранять и редактировать здесь, но не синхронизировать. Создайте аккаунт, чтобы синхронизировать свои данные.</string>
     <string name="recording_delete">Удалить</string>
     <string name="recorded_row_preview">Предпросмотр маршрута</string>
@@ -153,7 +186,6 @@
     <string name="status_summary_processing">Обработано %1$d из %2$d…</string>
     <string name="status_summary_settled">Синхронизировано или загружено занятий: %1$d.</string>
     <string name="status_failed">Не удалось прочитать историю синхронизации: %1$s</string>
-    <string name="status_row_distance">%1$.1f км</string>
     <string name="status_row_no_distance">расстояние не записано</string>
     <string name="status_row_processing">обработка…</string>
     <string name="status_no_reason">причина не указана</string>

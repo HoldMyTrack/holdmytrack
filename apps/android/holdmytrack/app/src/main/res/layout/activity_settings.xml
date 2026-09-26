@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- After the web's Settings page (templates/pages/settings.html): the avatar, changed on its
+     own, then Name, Country, Timezone and Language saved together — and, for a new account, the
+     same screen as its first run (SettingsActivity). -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:divider="@drawable/gap_16"
+        android:orientation="vertical"
+        android:padding="@dimen/hmt_space_16"
+        android:showDividers="middle">
+
+        <TextView
+            android:id="@+id/settings_intro"
+            style="@style/Widget.HoldMyTrack.Hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_onboarding_intro"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/settings_demo_notice"
+            style="@style/Widget.HoldMyTrack.Notice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_demo_notice"
+            android:visibility="gone" />
+
+        <!-- What the last save or avatar change said: a notice, or the error box. -->
+        <TextView
+            android:id="@+id/settings_notice"
+            style="@style/Widget.HoldMyTrack.Notice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:accessibilityLiveRegion="polite"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/settings_error"
+            style="@style/Widget.HoldMyTrack.Notice.Error"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:accessibilityLiveRegion="polite"
+            android:visibility="gone" />
+
+        <!-- The avatar takes effect as soon as it's picked or removed, as on the web — it
+             isn't part of the Save below. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:accessibilityHeading="true"
+                android:text="@string/settings_avatar"
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.Overline" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_8"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/settings_avatar"
+                    android:layout_width="72dp"
+                    android:layout_height="72dp"
+                    android:background="@color/hmt_surface_tint_strong"
+                    android:contentDescription="@string/settings_avatar_description"
+                    android:padding="@dimen/hmt_space_16"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_user"
+                    app:shapeAppearanceOverlay="@style/ShapeAppearance.HoldMyTrack.Round"
+                    app:tint="@color/hmt_ink_meta" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/hmt_space_16"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <Button
+                        android:id="@+id/settings_avatar_choose"
+                        style="@style/Widget.HoldMyTrack.Button.Outlined"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_avatar_choose" />
+
+                    <Button
+                        android:id="@+id/settings_avatar_remove"
+                        style="@style/Widget.HoldMyTrack.Button.Link"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_avatar_remove"
+                        android:visibility="gone" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                style="@style/Widget.HoldMyTrack.Hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_6"
+                android:text="@string/settings_avatar_hint" />
+        </LinearLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/settings_name_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/settings_name"
+            app:placeholderText="@string/settings_name_placeholder">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/settings_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:autofillHints="name"
+                android:inputType="textPersonName|textCapWords" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Country and Timezone open a searchable list (ChoicePicker) rather than taking
+             typing, like the recording form's Type field. -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/settings_country_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/settings_country"
+            app:endIconContentDescription="@string/settings_country"
+            app:endIconDrawable="@drawable/ic_chevron_down"
+            app:endIconMode="custom"
+            app:helperText="@string/settings_country_hint"
+            app:placeholderText="@string/settings_country_choose">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/settings_country"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:cursorVisible="false"
+                android:focusable="false"
+                android:inputType="none" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/settings_timezone_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/settings_timezone"
+            app:endIconContentDescription="@string/settings_timezone"
+            app:endIconDrawable="@drawable/ic_chevron_down"
+            app:endIconMode="custom"
+            app:helperText="@string/settings_timezone_hint">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/settings_timezone"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:cursorVisible="false"
+                android:focusable="false"
+                android:inputType="none" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Three choices: an ordinary drop-down, not the searchable list. -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/settings_language_layout"
+            style="@style/Widget.HoldMyTrack.Dropdown"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/settings_language"
+            app:helperText="@string/settings_language_hint">
+
+            <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                android:id="@+id/settings_language"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="none"
+                android:saveEnabled="false" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <Button
+            android:id="@+id/settings_save"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_save" />
+    </LinearLayout>
+</ScrollView>

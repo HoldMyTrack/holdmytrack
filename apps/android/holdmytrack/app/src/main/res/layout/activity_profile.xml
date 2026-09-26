@@ -3,6 +3,7 @@
      then Sign out, on one card like the sign-in screen's. Not the web's /profile page, whose
      year grids and trends are statistics the app doesn't have. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true"
@@ -25,11 +26,47 @@
                 android:orientation="vertical"
                 android:showDividers="middle">
 
-                <TextView
-                    android:id="@+id/profile_status"
+                <!-- The avatar and the name, when Settings has them, beside who is signed in —
+                     the web header's account menu leads with the avatar the same way. -->
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textAppearance="?attr/textAppearanceBodyLarge" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/profile_avatar"
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:background="@color/hmt_surface_tint_strong"
+                        android:importantForAccessibility="no"
+                        android:padding="@dimen/hmt_space_12"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/ic_user"
+                        app:shapeAppearanceOverlay="@style/ShapeAppearance.HoldMyTrack.Round"
+                        app:tint="@color/hmt_ink_meta" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/hmt_space_16"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/profile_name"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textAppearance="?attr/textAppearanceTitleMedium"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/profile_status"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textAppearance="?attr/textAppearanceBodyLarge" />
+                    </LinearLayout>
+                </LinearLayout>
 
                 <Button
                     android:id="@+id/profile_action"

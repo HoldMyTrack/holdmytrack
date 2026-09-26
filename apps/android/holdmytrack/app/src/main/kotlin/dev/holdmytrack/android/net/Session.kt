@@ -30,6 +30,8 @@ object Session {
     private const val KEY_TOKEN = "session_token"
     private const val KEY_EMAIL = "email"
     private const val KEY_EMAIL_VERIFIED = "email_verified"
+    private const val KEY_COUNTRY = "country"
+    private const val KEY_LOCALE = "locale"
 
     private lateinit var prefs: SharedPreferences
 
@@ -76,25 +78,54 @@ object Session {
      */
     val emailVerified: Boolean get() = prefs.getBoolean(KEY_EMAIL_VERIFIED, true)
 
-    fun start(token: String, email: String, emailVerified: Boolean) {
+    /**
+     * The account's Country (ISO code), empty until Settings is first saved — which is what the
+     * first-run gate keys on (`MainActivity`), and what decides the app's units
+     * (`recording/Units`). Kept on disk, like [emailVerified], so a cold start routes and
+     * formats correctly before the first `GET /v1/auth/me` answers; that answer refreshes it.
+     */
+    val country: String get() = prefs.getString(KEY_COUNTRY, "").orEmpty()
+
+    /** The account's Language, empty for automatic — see `AppLanguage`. */
+    val locale: String get() = prefs.getString(KEY_LOCALE, "").orEmpty()
+
+    fun start(token: String, profile: Profile) {
         cachedToken = token
         verified = true
         prefs.edit()
             .putString(KEY_TOKEN, token)
-            .putString(KEY_EMAIL, email)
-            .putBoolean(KEY_EMAIL_VERIFIED, emailVerified)
+            .putString(KEY_EMAIL, profile.email)
+            .also { store(it, profile) }
             .apply()
     }
 
-    /** What `GET /v1/auth/me` just confirmed: the token is live, and whether its email is. */
-    fun markVerified(emailVerified: Boolean) {
+    /** What `GET /v1/auth/me` just confirmed: the token is live, and the account as it is now. */
+    fun markVerified(profile: Profile) {
         verified = true
-        prefs.edit().putBoolean(KEY_EMAIL_VERIFIED, emailVerified).apply()
+        update(profile)
+    }
+
+    /** Takes in a profile the server just returned — a Settings save, an avatar change. */
+    fun update(profile: Profile) {
+        prefs.edit().also { store(it, profile) }.apply()
+    }
+
+    private fun store(editor: SharedPreferences.Editor, profile: Profile) {
+        editor
+            .putBoolean(KEY_EMAIL_VERIFIED, profile.emailVerified)
+            .putString(KEY_COUNTRY, profile.country)
+            .putString(KEY_LOCALE, profile.locale)
     }
 
     fun clear() {
         cachedToken = null
         verified = false
-        prefs.edit().remove(KEY_TOKEN).remove(KEY_EMAIL).remove(KEY_EMAIL_VERIFIED).apply()
+        prefs.edit()
+            .remove(KEY_TOKEN)
+            .remove(KEY_EMAIL)
+            .remove(KEY_EMAIL_VERIFIED)
+            .remove(KEY_COUNTRY)
+            .remove(KEY_LOCALE)
+            .apply()
     }
 }
