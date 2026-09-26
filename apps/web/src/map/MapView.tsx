@@ -28,7 +28,7 @@ import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
 import { ActivitiesPanel, type PanelTab } from '../ui/ActivitiesPanel';
 import { ActivityHistogram } from '../ui/ActivityHistogram';
-import { EditTrackPanel } from '../ui/EditTrackPanel';
+import { EditActivityWindow } from '../ui/EditActivityWindow';
 import { ExportControl } from '../ui/ExportControl';
 import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
 import { dayDiff, dayInZone, todayLocal } from '../ui/dateMath';
@@ -150,8 +150,12 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // refetched against its new points — the fetch below is otherwise keyed on the id alone.
   const [trackMetricsVersion, setTrackMetricsVersion] = useState(0);
 
-  // The Edit track session (§4.7.7) — at most one activity at a time. While it's set, every
-  // other track is hidden, the panel and timeline are inert, and EditTrackPanel owns the map.
+  // The Edit window (EditActivityWindow.tsx) — the checked group it was opened over, by id. While
+  // it's open the panel and timeline are inert and the map's own controls step aside.
+  const [editWindowIds, setEditWindowIds] = useState<string[] | null>(null);
+  const editOpen = editWindowIds !== null;
+  // Its Track tab's session (§4.7.7) — one activity, from the first time that tab opens until
+  // the window closes. While it's set, every other track is hidden and TrackEditor owns the map.
   const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
   const editingTrack = editingActivityId !== null;
 
@@ -187,7 +191,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     setGroupFlyRequest((n) => n + 1);
   }, []);
   // focusActivity itself (the row-click handler) is defined further down, alongside
-  // clearSelection — both need fitToSelection/activities/mapHiddenIds, which aren't in scope
+  // selectAll — both need fitToSelection/activities/mapHiddenIds, which aren't in scope
   // yet at this point in the component.
   //
   // The header toolbar's "Group visible" — there's no per-row eye icon any more (hiding a
@@ -502,7 +506,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // the checkbox group above (see the state comment near checkedActivityIds/focusedActivityId
   // for why these no longer share a Set). Immediate, not debounced: it's one deliberate click
   // that fully replaces the previous focus, not a spree of partial changes to coalesce — the
-  // same reasoning clearSelection below already has for its own single-click case. Excludes a
+  // same reasoning selectAll below already has for its own single-click case. Excludes a
   // currently-hidden target the same way the checked-group effect above does: fitToSelection
   // over an empty array (the target filtered out) is a no-op, not a fly to empty water.
   const focusActivity = useCallback(
@@ -550,22 +554,20 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     }
   }, [activities, focusActivity]);
 
-  // The footer's "Clear" button (shown once at least one row is checked): empties the checked
-  // group (so every previously-bold-by-checkbox track drops that highlight — a focused row,
-  // if any, is untouched) and flies out to fit everything currently drawn — the same "don't
-  // fly to something not drawn" exclusion as the effects above, just over the whole list
-  // instead of the group. Immediate, not debounced: a single deliberate click.
+  // The toolbar's master checkbox, clicked while fully checked: empties the checked group (so
+  // every previously-bold-by-checkbox track drops that highlight — a focused row, if any, is
+  // untouched). Leaves the camera where it is — with nothing checked there's no group to look
+  // at, and flying out to everything would undo whatever the user had panned to.
   const clearSelection = useCallback(() => {
     setCheckedActivityIds(new Set());
-    const visible = activities.filter((a) => !mapHiddenIds.has(a.id));
-    fitToSelection(visible);
-  }, [activities, mapHiddenIds, fitToSelection]);
+  }, []);
 
-  // The footer's "Select all" button (shown instead of "Clear" once nothing is checked) —
-  // checks every row the panel currently lists (already narrowed by TYPE/DISTANCE, per
-  // filteredActivities below) and flies to fit them, the same immediate shape clearSelection
-  // uses. Deliberately scoped to what's actually shown, not every activity in the date range
-  // regardless of filters — checking rows the user can't see would be a surprise.
+  // The master checkbox, clicked while unchecked or partial — checks every row the panel
+  // currently lists (already narrowed by TYPE/DISTANCE, per filteredActivities below) and flies
+  // to fit them, excluding hidden tracks as the effects above do. Immediate, not debounced: a
+  // single deliberate click. Deliberately scoped to what's actually shown, not every activity
+  // in the date range regardless of filters — checking rows the user can't see would be a
+  // surprise.
   const selectAll = useCallback(() => {
     const ids = filteredActivities.map((a) => a.id);
     setCheckedActivityIds(new Set(ids));
@@ -576,14 +578,18 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // The toolbar's invert-selection icon — checks every listed row that isn't checked and unchecks
   // every one that is. Same scope as selectAll: only rows the panel currently lists, so a
   // checked row outside the current TYPE/DISTANCE filters is dropped rather than kept checked
-  // out of sight. Flies to fit the new group, or — when inverting leaves nothing checked —
-  // out to everything drawn, exactly as clearSelection would.
+  // out of sight. The camera follows the master checkbox's rules for the same outcome: an
+  // invert that leaves every listed row checked (from none checked) flies to fit them, as
+  // selectAll does; one that leaves some or none checked doesn't move it — a partial flip is a
+  // selection edit, not a request to look at the new group, and Focus on map (showSelected
+  // below) is there for that.
   const invertSelection = useCallback(() => {
     const inverted = filteredActivities.filter((a) => !checkedActivityIds.has(a.id));
     setCheckedActivityIds(new Set(inverted.map((a) => a.id)));
-    const group = inverted.length > 0 ? inverted : activities;
-    fitToSelection(group.filter((a) => !mapHiddenIds.has(a.id)));
-  }, [filteredActivities, checkedActivityIds, activities, mapHiddenIds, fitToSelection]);
+    if (inverted.length > 0 && inverted.length === filteredActivities.length) {
+      fitToSelection(inverted.filter((a) => !mapHiddenIds.has(a.id)));
+    }
+  }, [filteredActivities, checkedActivityIds, mapHiddenIds, fitToSelection]);
 
   // "Show selected" — no state change, just a manual re-trigger of the same fly-to-fit the
   // debounced checkbox effect above already computes, for after panning away from the group.
@@ -675,16 +681,16 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // the same way — reported live as the missing counterpart to clicking a track — but leaves
   // the checked group alone, matching that the two never touch each other in either direction.
   //
-  // While a track is being edited the tracks layer is hidden, so every click would read as a
-  // click away — and in Delete point mode, every click is aimed at a point. The handlers go
-  // quiet for the session instead.
+  // While the Edit window is open the checked group and focus it was opened over must stay put,
+  // and during a track session the tracks layer is hidden, so every click would read as a click
+  // away — and in Delete point mode, every click is aimed at a point. The handlers go quiet.
   useEffect(() => {
     setTrackInteractivityHandlers(
-      editingTrack
+      editOpen
         ? { onSelect: () => {}, onHover: () => {}, onClickAway: () => {} }
         : { onSelect: focusActivity, onHover: setHoveredActivityId, onClickAway: () => setFocusedActivityId(null) },
     );
-  }, [focusActivity, editingTrack]);
+  }, [focusActivity, editOpen]);
 
   // The single source of truth for which tracks are bold on the map: the union of the checked
   // group and the focused row, however each got that way — a row's checkbox for the former, a
@@ -832,8 +838,13 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     [handleUploaded],
   );
 
-  // §4.7.7's Edit track: the toolbar's action over exactly one checked activity. Flies there
-  // the same way a row click does, then hands the map to EditTrackPanel until it closes.
+  // The toolbar's Edit button over the checked group: opens the Edit window.
+  const openEditWindow = useCallback((group: Activity[]) => {
+    setHoveredActivityId(null);
+    setEditWindowIds(group.map((a) => a.id));
+  }, []);
+  // §4.7.7's track session, from the Edit window's Track tab. Flies there the same way a row
+  // click does, then hands the map to TrackEditor until the window closes.
   const startEditTrack = useCallback(
     (activity: Activity) => {
       setHoveredActivityId(null);
@@ -846,12 +857,13 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // picked up yet — see the completion effect below for why seeing the row go Pending isn't
   // enough on its own.
   const awaitingEditIdsRef = useRef<Set<string>>(new Set());
-  const closeEditTrack = useCallback(
-    (applied: boolean) => {
-      if (applied && editingActivityId !== null) awaitingEditIdsRef.current.add(editingActivityId);
+  const closeEditWindow = useCallback(
+    ({ saved, trackApplied }: { saved: boolean; trackApplied: boolean }) => {
+      if (trackApplied && editingActivityId !== null) awaitingEditIdsRef.current.add(editingActivityId);
+      setEditWindowIds(null);
       setEditingActivityId(null);
-      // The row now reads Pending — the effects below poll until the reprocess lands.
-      if (applied) reloadActivities();
+      // A track edit leaves the row Pending — the effects below poll until the reprocess lands.
+      if (saved) reloadActivities();
     },
     [editingActivityId, reloadActivities],
   );
@@ -869,15 +881,28 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       setTrackMetricsVersion((v) => v + 1);
     });
   }, [map, activityQuery, reloadActivities, reloadTotals, reloadHistogram, watchCoverage]);
-  const editingActivity = useMemo(
-    () => (editingActivityId === null ? null : (activities.find((a) => a.id === editingActivityId) ?? null)),
-    [activities, editingActivityId],
-  );
-  // The session can't outlive its activity — deleted from another tab, say, and gone from the
+  const editWindowActivities = useMemo(() => {
+    if (editWindowIds === null) return null;
+    const group = activities.filter((a) => editWindowIds.includes(a.id));
+    return group.length === editWindowIds.length ? group : null;
+  }, [activities, editWindowIds]);
+  // The window can't outlive its activities — deleted from another tab, say, and gone from the
   // next reload. Without this the map would stay locked with no editor left to close it.
   useEffect(() => {
-    if (editingActivityId !== null && editingActivity === null && !activitiesLoading) setEditingActivityId(null);
-  }, [editingActivityId, editingActivity, activitiesLoading]);
+    if (editOpen && editWindowActivities === null && !activitiesLoading) {
+      setEditWindowIds(null);
+      setEditingActivityId(null);
+    }
+  }, [editOpen, editWindowActivities, activitiesLoading]);
+  // The Track tab edits one activity's points, so it needs exactly one — with a finished track.
+  const editTrackUnavailable =
+    editWindowActivities === null || editWindowActivities.length !== 1
+      ? t('activities.edit_track_check_one')
+      : editWindowActivities[0]!.pending
+        ? t('activities.edit_track_processing')
+        : editWindowActivities[0]!.bbox === null
+          ? t('activities.no_track')
+          : null;
 
   // While any row is pending, re-read the list every few seconds. Keyed on `activities`
   // itself, so each landed reload schedules the next and polling stops by itself once nothing
@@ -1020,10 +1045,10 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     <div className="app-shell">
       <div className="app-body">
         {mapMode === 'normal' && (
-          // Inert for the whole Edit track session: changing the range, the selection or a
-          // filter underneath an open editor would pull the activity out from under it.
+          // Inert while the Edit window is open: changing the range, the selection or a filter
+          // underneath it would pull its activities out from under it.
           // display: contents keeps the wrapper out of the flex layout.
-          <div className="edit-track-lock" inert={editingTrack}>
+          <div className="edit-track-lock" inert={editOpen}>
             <ActivitiesPanel
               readOnly={isDemo}
               activities={filteredActivities}
@@ -1049,9 +1074,8 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
               onShowSelected={showSelected}
               hiddenIds={hiddenActivityIds}
               onToggleGroupVisibility={toggleGroupVisibility}
-              onActivityUpdated={reloadActivities}
               onActivitiesDeleted={handleActivitiesDeleted}
-              onEditTrack={startEditTrack}
+              onEdit={openEditWindow}
               duplicates={duplicates.duplicates}
               duplicatesError={duplicates.error}
               imports={imports}
@@ -1083,8 +1107,17 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
               onCancel={handleExportCancel}
             />
           )}
-          {map && editingActivity && <EditTrackPanel map={map} activity={editingActivity} onClose={closeEditTrack} />}
-          {!editingTrack && (
+          {map && editWindowActivities && (
+            <EditActivityWindow
+              map={map}
+              activities={editWindowActivities}
+              knownTypes={facets}
+              trackUnavailable={editTrackUnavailable}
+              onStartTrack={startEditTrack}
+              onClose={closeEditWindow}
+            />
+          )}
+          {!editOpen && (
             <div className="map-mode-toggle" role="group" aria-label={t('map.mode')} data-testid="map-mode-toggle">
               <button
                 type="button"
@@ -1114,7 +1147,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
               </button>
             </div>
           )}
-          {trackMetrics && !editingTrack && (
+          {trackMetrics && !editOpen && (
             <div className="track-metric-toggle" data-testid="track-metric-toggle">
               {/* Only worth a toggle when there's something to toggle to — an activity with
                   no heart-rate coverage just shows pace, with no single-option control for
@@ -1150,7 +1183,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       </div>
 
       {mapMode === 'normal' && (
-        <div className="edit-track-lock" inert={editingTrack}>
+        <div className="edit-track-lock" inert={editOpen}>
           <ActivityHistogram
             days={visibleDays}
             onPan={panBy}
