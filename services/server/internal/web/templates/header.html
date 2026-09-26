@@ -3,9 +3,7 @@
      the app's shell loads alone and every other page alongside pages.css. The two menus are
      <details> dropdowns: they open and close with no script. Sign out is a form POST to
      /logout (pages.go), not a link, so a GET from another site can't end someone's session.
-     Signed out, the account menu is a Sign in link. "Private locations" is the map's
-     Activities panel on its Privacy tab, opened by the ?private-locations the React app reads
-     on load. */}}
+     Signed out, the account menu is a Sign in link. */}}
 {{define "header"}}
 <header class="page-header">
   <a class="page-header__brand" href="/">
@@ -35,7 +33,6 @@
         {{if .IsDemo}}<a role="menuitem" class="header-menu__item header-menu__item--accent" href="/signup">{{t "header.create_account"}}</a>{{end}}
         <a role="menuitem" class="header-menu__item" href="/profile">{{t "header.profile"}}</a>
         <a role="menuitem" class="header-menu__item" href="/settings">{{t "header.settings"}}</a>
-        <a role="menuitem" class="header-menu__item" href="/?private-locations">{{t "header.private_locations"}}</a>
         {{if .IsAdmin}}<a role="menuitem" class="header-menu__item" href="/admin">{{t "header.admin"}}</a>{{end}}
         <form method="post" action="/logout">
           <button type="submit" role="menuitem" class="header-menu__item">{{t "header.sign_out"}}</button>

@@ -14,8 +14,7 @@ function AuthenticatedApp() {
   return <MapView initialPrivateLocationsOpen={openPrivateLocations} />;
 }
 
-/** `?private-locations` (the header's account menu, Settings' "Manage on the map") is the map
- *  arriving with that window open. Read once per page load, here at module load rather than
+/** `?private-locations` is the map arriving with the Activities panel on its Privacy tab. Read once per page load, here at module load rather than
  *  during a render — reading also strips it (so a refresh doesn't reopen the window), and a
  *  render can run more than once (StrictMode does exactly that in dev), which would see it
  *  already gone. */
