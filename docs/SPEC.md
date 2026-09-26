@@ -749,7 +749,7 @@ Only one track is hovered and only one is focused at a time; any number can be c
 
 ### FR-6.1 Default selection
 
-**Description**: On first reaching the map with no prior selection, the range defaults to the 5 most recent days that have at least one activity (not the account's entire history) — chosen so the selection band starts with room to demonstrate dragging it, rather than already spanning the full loaded view. An account with no activity history at all defaults to "today" only, and the default is recalculated automatically as new activities arrive until the user makes their own explicit choice (dragging a handle or the band, or clicking a single day).
+**Description**: On first reaching the map with no prior selection, the range defaults to the 5 most recent days that have at least one activity (not the account's entire history) — chosen so the selection band starts with room to demonstrate dragging it, rather than already spanning the full loaded view. An account with no activity history at all defaults to "today" only, and the default is recalculated automatically as new activities arrive until the user makes their own explicit choice (dragging a handle or the band, or clicking a single day). While the Edit window (FR-5) is open the default holds still, so activities still arriving from a large upload never move the activity being edited out of the range and close the window; it catches up once the window closes.
 
 ### FR-6.2 Resize the selection
 
