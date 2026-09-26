@@ -2318,6 +2318,14 @@ a.settings-page__button {
     height: 78vh;
   }
 
+  /* Edit track is started from the sheet's toolbar, so the sheet is expanded at that moment —
+     and, inert for the session, it couldn't be collapsed again, leaving it drawn over both the
+     map and the Edit track window (z-index 3). Collapsed to the peek strip for the session
+     instead; `sheetExpanded` itself is untouched, so the sheet comes back as it was. */
+  .edit-track-lock[inert] > .activities-panel {
+    height: 68px;
+  }
+
   /* The width-drag resize handle is meaningless once the panel is full-width and
      bottom-anchored — no JS branching needed, the handle simply never renders visibly or
      receives pointer events once hidden. */
