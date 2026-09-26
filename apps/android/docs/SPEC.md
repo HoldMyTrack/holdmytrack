@@ -48,23 +48,25 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 ### FR-1.1 Sign in, sign up, start a demo
 
-**Description**: From a single screen (`SignInActivity`), an anonymous visitor signs in to an existing account, creates a new one, or starts a no-signup demo — the same three operations `docs/SPEC.md` FR-1.1/FR-1.2/FR-2.1 define server-side — or continues with Google or Facebook, when the server has them configured (`docs/SPEC.md` FR-1.9, FR-1.10).
+**Description**: From a single screen (`SignInActivity`) with the web's two pages as two modes — sign in (`/signin`) and create an account (`/signup`) — an anonymous visitor signs in to an existing account, creates a new one, or starts a no-signup demo — the same three operations `docs/SPEC.md` FR-1.1/FR-1.2/FR-2.1 define server-side — or continues with Google or Facebook, when the server has them configured (`docs/SPEC.md` FR-1.9, FR-1.10).
 
 **Preconditions**: No active session.
 
 **Inputs**: For Google, an account picked in the system's Google account picker; for Facebook, a Facebook login in a browser tab. For sign-in/sign-up, an email address and password, checked client-side only for "both fields non-empty" — every other validation (address format, password length, whether the account exists) is left to the server, and the server's own response text is shown verbatim rather than reworded, so the two can never disagree about what is acceptable. Starting a demo takes no input.
 
 **Behavior**:
-1. Sign in calls `POST /v1/auth/login`; sign up calls `POST /v1/auth/signup`; demo calls `POST /v1/auth/demo` — the same three endpoints the web client uses.
-2. On success, the response's `session_token` field (present on all four session-minting endpoints, specifically for a native caller that has no cookie jar to rely on) is stored via `Session.start` with the response's `email` and `email_verified`, and the map replaces this screen — or, for an account whose email isn't confirmed yet, the "check your email" screen (FR-1.4).
-3. On failure, the server's own error message is shown inline; the action buttons are disabled while a request is in flight and re-enabled after.
-4. "Continue with Google" and "Continue with Facebook" appear above the email field only when `GET /v1/auth/providers` reports each configured (Google also needs its `google_client_id`); if that request fails, neither shows.
-5. Google: the system's Google account picker (Credential Manager) returns an ID token, which is posted to `POST /v1/auth/google/token` with the device's timezone, and the answer is handled as in step 2. Closing the picker does nothing; any other failure shows "Couldn't sign in with Google. Please try again."
-6. Facebook: the server's own Facebook sign-in opens in a browser tab (not Meta's SDK), started with the S256 hash of a random verifier the app keeps. The tab closes when the server redirects to `holdmytrack://oauth`: with a code, the app redeems it and the verifier at `POST /v1/auth/handoff`, then continues as in step 2; with an error code, it shows the web's message for it (no email shared, email already has an account, or a generic failure). Closing the tab returns to this screen with nothing shown.
+1. The screen opens in sign-in mode: the providers, email, password, "Forgot password?", Sign in, "Don't have an account? Create one", and Try the demo. That link switches to sign-up mode: titled "Create your account", with the providers, email, password, Create account, and "Already have an account? Sign in" — no demo and no "Forgot password?", as on the web. The typed email carries over a switch. Back in sign-up mode returns to sign-in mode; in sign-in mode it leaves the app.
+2. Sign in calls `POST /v1/auth/login`; Create account calls `POST /v1/auth/signup`; demo calls `POST /v1/auth/demo` — the same three endpoints the web client uses.
+3. "Forgot password?" opens the web's own "Forgot password?" page (`docs/SPEC.md` FR-1.5) in a browser tab.
+4. On success, the response's `session_token` field (present on all four session-minting endpoints, specifically for a native caller that has no cookie jar to rely on) is stored via `Session.start` with the response's `email` and `email_verified`, and the map replaces this screen — or, for an account whose email isn't confirmed yet, the "check your email" screen (FR-1.4).
+5. On failure, the server's own error message is shown inline; the action buttons are disabled while a request is in flight and re-enabled after.
+6. "Continue with Google" and "Continue with Facebook" appear above the email field only when `GET /v1/auth/providers` reports each configured (Google also needs its `google_client_id`); if that request fails, neither shows.
+7. Google: the system's Google account picker (Credential Manager) returns an ID token, which is posted to `POST /v1/auth/google/token` with the device's timezone, and the answer is handled as in step 4. Closing the picker does nothing; any other failure shows "Couldn't sign in with Google. Please try again."
+8. Facebook: the server's own Facebook sign-in opens in a browser tab (not Meta's SDK), started with the S256 hash of a random verifier the app keeps. The tab closes when the server redirects to `holdmytrack://oauth`: with a code, the app redeems it and the verifier at `POST /v1/auth/handoff`, then continues as in step 4; with an error code, it shows the web's message for it (no email shared, email already has an account, or a generic failure). Closing the tab returns to this screen with nothing shown.
 
 **Outputs**: A stored bearer token and the account's email (empty for a demo account, which the server deliberately never returns a real email for).
 
-**Notes**: This is the app's first screen whenever no session is held — on launch, after sign-out (FR-1.3), and after a stored token is rejected (FR-1.2) — and nothing sits behind it: Back leaves the app. The map is never shown signed out, since a basemap with none of the account's layers is a weak demonstration of the product next to the Demo button here.
+**Notes**: This is the app's first screen whenever no session is held — on launch, after sign-out (FR-1.3), and after a stored token is rejected (FR-1.2) — and nothing sits behind it: Back leaves the app (from sign-in mode; from sign-up mode it returns to sign-in). The map is never shown signed out, since a basemap with none of the account's layers is a weak demonstration of the product next to the Demo button here.
 
 ### FR-1.2 Session persistence and re-verification
 

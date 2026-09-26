@@ -346,6 +346,9 @@ object HoldMyTrackApi {
             .appendQueryParameter("app_challenge", challenge)
             .build()
 
+    /** The web's "Forgot password?" page — served by the API's own origin, outside `/v1`. */
+    fun forgotPasswordUri(): Uri = Uri.parse(BuildConfig.API_BASE_URL + "/forgot")
+
     /** `POST /v1/auth/handoff` — redeems a browser-tab round trip's one-time code, once. */
     fun exchangeHandoff(code: String, verifier: String, onResult: (Result<Account>) -> Unit) {
         val body = JSONObject().put("code", code).put("verifier", verifier)
