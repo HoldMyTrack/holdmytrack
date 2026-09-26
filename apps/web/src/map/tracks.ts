@@ -40,6 +40,13 @@ const CLICK_TOLERANCE_PX = 4;
 type TrackDateRange = Pick<ActivityQuery, 'from' | 'to'>;
 
 /**
+ * Bumped by every refreshTrackLayer, and sent as `v` (the handler ignores it) so each refresh
+ * is a new tile URL — see refreshTrackLayer for why the same URL isn't enough. Module-level,
+ * like coverageVersion.ts, so a source re-created by a theme swap starts at the current one.
+ */
+let tracksVersion = 0;
+
+/**
  * `GET /tiles/v1/tracks/{z}/{x}/{y}.mvt?from=&to=` — the backend already applies this
  * filter (§4.3 shares `parseActivityFilter` with §4.7's list endpoints), but until this
  * function actually sent the params, the map drew every track ever uploaded regardless of
@@ -51,6 +58,7 @@ function trackTileURL(range: TrackDateRange): string {
   const params = new URLSearchParams();
   if (range.from) params.set('from', range.from);
   if (range.to) params.set('to', range.to);
+  if (tracksVersion > 0) params.set('v', String(tracksVersion));
   const qs = params.toString();
   return `${API_BASE_URL}${TILES_V1}/tracks/{z}/{x}/{y}.mvt${qs ? `?${qs}` : ''}`;
 }
@@ -313,8 +321,16 @@ export function setSelectedTracks(map: MapLibreMap, activityIds: readonly string
  * internal `load(true)` unconditionally — verified directly against the installed
  * maplibre-gl 6.9.0 bundle, not assumed from the type declarations alone, since a naive
  * implementation could plausibly skip reloading when the value hasn't changed.
+ *
+ * It refetches, but beyond the source's maxzoom that isn't enough: the worker slices each
+ * overzoomed tile out of its z14 parent and caches the slice keyed on the tile ids and the
+ * request URL (maplibre-gl 6.9.0's `_getOverzoomTile`). With the URL unchanged, the fresh z14
+ * tile is fetched and then ignored for every zoom already sliced — an edited track kept its
+ * old shape close in until the next zoom level (found live). So every refresh bumps
+ * `tracksVersion`, making the URL, and with it the cache key, new.
  */
 export function refreshTrackLayer(map: MapLibreMap, range: TrackDateRange): void {
+  tracksVersion += 1;
   const source = map.getSource(TRACKS_SOURCE_ID) as VectorTileSource | undefined;
   source?.setTiles([trackTileURL(range)]);
 }
