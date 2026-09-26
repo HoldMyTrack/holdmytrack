@@ -84,6 +84,21 @@
             android:label="@string/sign_in_title"
             android:theme="@style/Theme.HoldMyTrack" />
 
+        <!-- Exported, unlike SignInActivity, because the browser launches it: a Facebook
+             sign-in in a Custom Tab ends at holdmytrack://oauth, which this forwards to
+             SignInActivity (docs/adr/0016-native-sign-in.md). -->
+        <activity
+            android:name=".OAuthRedirectActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="holdmytrack" android:host="oauth" />
+            </intent-filter>
+        </activity>
+
         <!-- Exported, unlike SignInActivity, because Health Connect itself launches it: the
              rationale intent below is how the platform shows the user why this app wants
              their exercise data, and without that filter the permission dialog can refuse to

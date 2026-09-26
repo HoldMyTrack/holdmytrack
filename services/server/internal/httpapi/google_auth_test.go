@@ -105,7 +105,7 @@ func TestGoogleStartRedirectsWithPKCE(t *testing.T) {
 		t.Fatalf("bad oauth cookie: %+v", cookies)
 	}
 	parts := strings.Split(cookies[0].Value, ".")
-	if len(parts) != 3 || parts[0] != q.Get("state") || parts[2] != "Europe/Berlin" {
+	if len(parts) != 4 || parts[0] != q.Get("state") || parts[2] != "Europe/Berlin" || parts[3] != "" {
 		t.Fatalf("cookie %q does not carry state/verifier/tz", cookies[0].Value)
 	}
 }

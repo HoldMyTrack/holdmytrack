@@ -73,7 +73,9 @@ func (f facebookOAuth) enabled() bool { return f.AppID != "" }
 // handleFacebookStart serves `GET /v1/auth/facebook/start?tz=<IANA name>` — a full-page
 // navigation, as handleGoogleStart is. No PKCE: Facebook's manual web flow doesn't document
 // it, and the code is only redeemable with the app secret, which never leaves this server;
-// state still ties the callback to this browser.
+// state still ties the callback to this browser. The Android app opens this same URL in a
+// browser tab with `&app_challenge=` added (oauth.go), which is how it signs in with Facebook
+// without Meta's SDK (docs/adr/0016-native-sign-in.md).
 func (s *Server) handleFacebookStart(w http.ResponseWriter, r *http.Request) {
 	if !s.facebook.enabled() {
 		http.NotFound(w, r)
@@ -97,13 +99,15 @@ func (s *Server) handleFacebookStart(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleFacebookCallback serves `GET /v1/auth/facebook/callback`. Failures redirect to
-// `/signin?error=facebook`, with the detail in the log — except the two a person can act on
-// (no email shared, email already has an account), which get their own error codes.
+// `/signin?error=facebook` (or back to the app, for a round trip it started — failOAuth), with
+// the detail in the log — except the two a person can act on (no email shared, email already
+// has an account), which get their own error codes.
 func (s *Server) handleFacebookCallback(w http.ResponseWriter, r *http.Request) {
 	if !s.facebook.enabled() {
 		http.NotFound(w, r)
 		return
 	}
+	rt, err := s.readOAuthCallback(w, r, facebookCookiePath)
 	fail := func(msg string, err error) {
 		s.log.Warn("facebook sign-in failed: "+msg, "err", err)
 		code := "facebook"
@@ -113,21 +117,19 @@ func (s *Server) handleFacebookCallback(w http.ResponseWriter, r *http.Request) 
 		case errors.Is(err, errFacebookEmailInUse):
 			code = "facebook_email_in_use"
 		}
-		http.Redirect(w, r, s.appBaseURL+"/signin?error="+code, http.StatusFound)
+		s.failOAuth(w, r, rt, code)
 	}
-
-	code, _, tz, err := s.readOAuthCallback(w, r, facebookCookiePath)
 	if err != nil {
 		fail("callback", err)
 		return
 	}
 	ctx := r.Context()
-	profile, err := s.fetchFacebookProfile(ctx, code)
+	profile, err := s.fetchFacebookProfile(ctx, rt.code)
 	if err != nil {
 		fail("profile", err)
 		return
 	}
-	userID, created, err := s.resolveFacebookUser(ctx, profile, tz)
+	userID, created, err := s.resolveFacebookUser(ctx, profile, rt.tz)
 	if err != nil {
 		fail("account resolution", err)
 		return
@@ -138,7 +140,7 @@ func (s *Server) handleFacebookCallback(w http.ResponseWriter, r *http.Request) 
 			s.log.Error("verification email failed", "err", err)
 		}
 	}
-	if err := s.finishOAuthSignIn(w, r, userID); err != nil {
+	if err := s.finishOAuth(w, r, rt, userID); err != nil {
 		fail("session start", err)
 	}
 }

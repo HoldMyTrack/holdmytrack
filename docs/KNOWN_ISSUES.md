@@ -30,3 +30,11 @@ Fraunces, the heading and wordmark font (`tokens.css`'s `--fm-font-serif`, loade
 ### A few server messages the apps show are still English in Russian
 
 FR-13 translates every error message a person can cause, but three kinds of server text reach the screen untranslated, because the server writes them before it knows who will read them: an import's failure reason in the Sync tab's history (`sync.failed_with`, the worker's ingest error, stored on the job), the Android app's per-activity sync rejection reasons (`sync_activities.go`'s per-row `error`), and the web app's generic fallbacks for an error response with no body (`api.ts`'s "`… failed (status)`" messages, mainly a proxy or a crash between the app and the API). The first two need the stored reason to become a code the reader's side translates, rather than a sentence; the last only happens when something between the app and the API has already failed.
+
+---
+
+### The Android app has no email-verification screen, so an unverified account sees an empty map
+
+The server gates the map's tiles and sync behind a verified email (`requireVerified`, `403 email_not_verified`), and the web sends an unverified account to `/verify-pending`. The Android app has no counterpart: an account that signs up there with email and password (when the server sends verification emails), or a new account made through Sign in with Facebook (FR-1.10, always unverified), opens the map with nothing on it and sync failing, and nothing on screen says why. It clears once the emailed link is clicked.
+
+- [ ] Read `email_verified` from the session response and `GET /v1/auth/me`, and show a "check your email" screen with a resend button (`POST /v1/auth/resend-verification`) instead of the map until it's true.

@@ -1,5 +1,6 @@
 package dev.holdmytrack.android.net
 
+import android.net.Uri
 import android.os.Handler
 import android.os.LocaleList
 import android.os.Looper
@@ -22,6 +23,14 @@ import org.json.JSONObject
 
 /** An account with a live session — what a successful sign-in, sign-up or demo start yields. */
 data class Account(val token: String, val email: String)
+
+/**
+ * The optional sign-in methods this deployment has configured (`GET /v1/auth/providers`).
+ * [googleClientId] is the server's *web* client ID, which Credential Manager needs as its
+ * `serverClientId` for the ID token it returns to be one the server accepts; empty when Google
+ * is off.
+ */
+data class Providers(val google: Boolean, val facebook: Boolean, val googleClientId: String)
 
 /**
  * What the server did with one activity in a sync batch. [status] is `"enqueued"`,
@@ -74,8 +83,8 @@ class ApiException(val code: Int, message: String) :
     IOException(message.ifBlank { "request failed ($code)" })
 
 /**
- * The app's whole HTTP surface: the four auth endpoints, plus the one activity read the map
- * uses to frame its opening camera.
+ * The app's whole HTTP surface: the auth endpoints, sync and its history, and the activity
+ * reads the map and the recording screen use.
  *
  * Deliberately callback-based over OkHttp's own `enqueue` rather than coroutine-based. There
  * are five calls in the entire app and OkHttp is already a dependency (MapLibre Native pulls
@@ -238,6 +247,46 @@ object HoldMyTrackApi {
         }, onResult)
     }
 
+    /** `GET /v1/auth/providers` — which of the Google and Facebook buttons to show. */
+    fun providers(onResult: (Result<Providers>) -> Unit) {
+        val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/auth/providers").build()
+        call(request, { body ->
+            val json = JSONObject(body)
+            Providers(
+                google = json.optBoolean("google"),
+                facebook = json.optBoolean("facebook"),
+                googleClientId = json.optString("google_client_id"),
+            )
+        }, onResult)
+    }
+
+    /**
+     * `POST /v1/auth/google/token` — trades the ID token Credential Manager returned for a
+     * session. The server checks the token's signature against Google's keys before trusting
+     * anything in it (`docs/adr/0016-native-sign-in.md`).
+     */
+    fun signInWithGoogle(idToken: String, timezone: String, onResult: (Result<Account>) -> Unit) {
+        val body = JSONObject().put("id_token", idToken).put("tz", timezone)
+        authenticate("/auth/google/token", body.toString().toRequestBody(JSON), onResult)
+    }
+
+    /**
+     * Where Sign in with Facebook starts: the server's own web flow, opened in a browser tab,
+     * with the S256 [challenge] of a verifier only this app holds. The round trip ends at
+     * `holdmytrack://oauth?code=…`, redeemed with [exchangeHandoff].
+     */
+    fun facebookStartUri(timezone: String, challenge: String): Uri =
+        Uri.parse(BuildConfig.API_BASE_URL + API_V1 + "/auth/facebook/start").buildUpon()
+            .appendQueryParameter("tz", timezone)
+            .appendQueryParameter("app_challenge", challenge)
+            .build()
+
+    /** `POST /v1/auth/handoff` — redeems a browser-tab round trip's one-time code, once. */
+    fun exchangeHandoff(code: String, verifier: String, onResult: (Result<Account>) -> Unit) {
+        val body = JSONObject().put("code", code).put("verifier", verifier)
+        authenticate("/auth/handoff", body.toString().toRequestBody(JSON), onResult)
+    }
+
     fun signIn(email: String, password: String, onResult: (Result<Account>) -> Unit) {
         authenticate("/auth/login", credentials(email, password), onResult)
     }
@@ -352,8 +401,8 @@ object HoldMyTrackApi {
     private val EMPTY_BODY: RequestBody = ByteArray(0).toRequestBody(null, 0, 0)
 
     /**
-     * The four endpoints that mint a session all answer with the same body, and all of them
-     * carry `session_token` — the field a browser ignores (it already has the credential as a
+     * Every endpoint that mints a session answers with the same body, and all of them carry
+     * `session_token` — the field a browser ignores (it already has the credential as a
      * `Set-Cookie`) and a native client exists to read.
      */
     private fun authenticate(path: String, body: RequestBody, onResult: (Result<Account>) -> Unit) {
