@@ -112,6 +112,10 @@ object MapOverlays {
     private const val HEATMAP_FILL_COLOR = "#b07e2e"
     private const val HEATMAP_FILL_OPACITY = 0.45f
 
+    /** How far Fog mode mutes basemap labels — the web's `FOG_LABEL_OPACITY`: dim enough to
+     *  recede behind the veil, still readable enough to orient by. */
+    private const val FOG_LABEL_OPACITY = 0.4f
+
     /** Every user layer [attach] adds — what [setRecording] hides wholesale. */
     private val USER_LAYER_IDS = listOf(
         FOG_LAYER_ID, HEATMAP_LAYER_ID,
@@ -185,6 +189,20 @@ object MapOverlays {
         setVisible(style, COUNTRY_HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
         setVisible(style, REGION_HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
         setVisible(style, TRACKS_LAYER_ID, mode == MapMode.NORMAL)
+        setLabelOpacity(style, if (mode == MapMode.FOG) FOG_LABEL_OPACITY else 1f)
+    }
+
+    /**
+     * Basemap labels stay above the veil so they're legible, but at full strength they read
+     * brighter than the fog itself and pull the eye off what's actually been cleared — so Fog
+     * mode mutes them, as the web does (`apps/web/src/map/mapMode.ts`). Every symbol layer on
+     * the map is the basemap's own (no overlay adds one), and the served style never sets
+     * text-/icon-opacity, so 1 restores exactly its default.
+     */
+    private fun setLabelOpacity(style: Style, opacity: Float) {
+        style.layers.filterIsInstance<SymbolLayer>().forEach {
+            it.setProperties(PropertyFactory.textOpacity(opacity), PropertyFactory.iconOpacity(opacity))
+        }
     }
 
     /**
@@ -194,7 +212,12 @@ object MapOverlays {
      * on and simply empty when nothing is recording.
      */
     fun setRecording(style: Style, recording: Boolean, mode: MapMode) {
-        if (recording) USER_LAYER_IDS.forEach { setVisible(style, it, false) } else setMode(style, mode)
+        if (recording) {
+            USER_LAYER_IDS.forEach { setVisible(style, it, false) }
+            setLabelOpacity(style, 1f)
+        } else {
+            setMode(style, mode)
+        }
     }
 
     /**
