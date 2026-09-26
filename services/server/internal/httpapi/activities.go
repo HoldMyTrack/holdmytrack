@@ -92,11 +92,11 @@ ORDER BY started_at DESC, id DESC`
 // for some rows and not others in the one list every activity shares would read as broken
 // data rather than as what it is. duration_seconds has no such gap.
 //
-// Name (migrations/0015_activity_name.sql) is a user-entered title, nullable — a row with
+// Name (migrations/0002_activities.sql) is a user-entered title, nullable — a row with
 // none has never had one set, and the client falls back to started_at for its primary line
 // (§4.7 revised its earlier "no name column" decision to add exactly this, and nothing
 // more: still no parser reads a name out of a source file). Description (§4.7.4,
-// migrations/0001_init.sql's activities.description) stays separate free-text, shown only
+// migrations/0002_activities.sql's activities.description) stays separate free-text, shown only
 // as a hover tooltip — a row with nothing written there has never been edited, not "an
 // empty description."
 //
@@ -197,7 +197,7 @@ const maxActivityTypeLen = 50
 // not opine on reasonable length" reasoning.
 const maxActivityDescriptionLen = 2000
 
-// maxActivityNameLen matches migrations/0015_activity_name.sql's VARCHAR(200) — a single-line
+// maxActivityNameLen matches migrations/0002_activities.sql's VARCHAR(200) — a single-line
 // title bound, deliberately shorter than maxActivityDescriptionLen: anything longer belongs
 // in the description field, not the row's primary line.
 const maxActivityNameLen = 200

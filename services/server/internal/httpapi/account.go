@@ -14,9 +14,8 @@ import (
 )
 
 // The Settings page (Avatar, Name, Country, Timezone) — see
-// migrations/0001_init.sql's users table (display_name/country/avatar_key/
-// avatar_content_type/avatar_updated_at), migrations/0021_user_timezone.sql (timezone) and
-// migrations/0030_user_locale.sql (locale).
+// migrations/0001_users_and_auth.sql's users table (display_name/country/avatar_key/
+// avatar_content_type/avatar_updated_at, timezone, locale).
 // Name, Country and Timezone are covered by handleUpdateSettings; the avatar is a
 // separate content type entirely, so it gets its own three endpoints below.
 
@@ -60,7 +59,7 @@ func (s *Server) saveSettings(ctx context.Context, userID, displayName, country,
 		return accountFailure(http.StatusBadRequest, "error.country_invalid")
 	}
 	// Unlike Country, timezone has no "unset" state (the column is NOT NULL DEFAULT 'UTC' —
-	// migrations/0021_user_timezone.sql) — Settings always sends the field's current
+	// migrations/0001_users_and_auth.sql) — Settings always sends the field's current
 	// selection, so an empty/unloadable value here means a malformed request, not a deliberate
 	// clear, and is rejected rather than silently defaulted.
 	tz, ok := normalizeTimezone(timezone)

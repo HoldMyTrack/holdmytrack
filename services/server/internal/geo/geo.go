@@ -3,7 +3,7 @@
 // all," as a whole-polygon reveal, distinct from the per-pixel raster pyramid internal/fog
 // owns and which stays exactly as it is above that threshold.
 //
-// admin_countries/admin_regions (migrations/0020_admin_boundaries.sql) hold Natural Earth
+// admin_countries/admin_regions (migrations/0004_admin_boundaries.sql) hold Natural Earth
 // country and admin-1 (state/province) polygons, vendored under seed-data/ and loaded once by
 // SeedAdminBoundaries. activity_country/activity_region record, once per activity, which of
 // those polygons its trajectory touches — computed by MatchActivity, called from
