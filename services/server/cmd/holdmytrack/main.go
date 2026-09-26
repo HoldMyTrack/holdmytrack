@@ -38,7 +38,7 @@ func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: holdmytrack <serve|work|migrate|seed-demo-customer|seed-admin-boundaries|set-admin>")
+		fmt.Fprintln(os.Stderr, "usage: holdmytrack <serve|work|migrate|seed-demo-customer|export-demo-activities|seed-admin-boundaries|set-admin>")
 		os.Exit(2)
 	}
 
@@ -133,7 +133,13 @@ func main() {
 	case "seed-demo-customer":
 		// One-time (idempotent — safe to re-run on redeploy) seed of the persistent demo
 		// account's activity history — httpapi.SeedDemoCustomer's own doc comment explains
-		// why this runs here, out of band, rather than per "Try Demo" request.
+		// why this runs here, out of band, rather than per "Try Demo" request. --reset wipes
+		// the account's existing activities first, for when demo_data/ itself changed.
+		reset := len(os.Args) == 3 && os.Args[2] == "--reset"
+		if len(os.Args) > 3 || (len(os.Args) == 3 && !reset) {
+			fmt.Fprintln(os.Stderr, "usage: holdmytrack seed-demo-customer [--reset]")
+			os.Exit(2)
+		}
 		store, err := storage.New(cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3Bucket)
 		if err != nil {
 			log.Error("storage", "err", err)
@@ -143,12 +149,35 @@ func main() {
 			log.Error("storage bucket", "err", err)
 			os.Exit(1)
 		}
-		log.Info("seed-demo-customer: starting")
-		if err := httpapi.SeedDemoCustomer(ctx, pool, store, log); err != nil {
+		log.Info("seed-demo-customer: starting", "reset", reset)
+		if err := httpapi.SeedDemoCustomer(ctx, pool, store, log, reset); err != nil {
 			log.Error("seed-demo-customer", "err", err)
 			os.Exit(1)
 		}
 		log.Info("seed-demo-customer: done")
+
+	case "export-demo-activities":
+		// Copies picked activities' raw uploads out of this deployment as demo_data/ files for
+		// the Demo Customer's history — httpapi.ExportDemoActivities's doc comment has the
+		// details. Writes only to the local directory given; the DB and storage are only read.
+		if len(os.Args) < 4 {
+			fmt.Fprintln(os.Stderr, "usage: holdmytrack export-demo-activities <out-dir> <activity-id>...")
+			os.Exit(2)
+		}
+		store, err := storage.New(cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3Bucket)
+		if err != nil {
+			log.Error("storage", "err", err)
+			os.Exit(1)
+		}
+		files, err := httpapi.ExportDemoActivities(ctx, pool, store, os.Args[2], os.Args[3:])
+		for _, f := range files {
+			log.Info("export-demo-activities: wrote", "file", f)
+		}
+		if err != nil {
+			log.Error("export-demo-activities", "err", err)
+			os.Exit(1)
+		}
+		log.Info("export-demo-activities: done", "files", len(files))
 
 	case "seed-admin-boundaries":
 		// One-time (idempotent — safe to re-run on redeploy) load of the Natural Earth
@@ -177,7 +206,7 @@ func main() {
 		log.Info("set-admin: done", "email", os.Args[2], "admin", admin)
 
 	default:
-		fmt.Fprintf(os.Stderr, "unknown subcommand %q; want serve, work, migrate, seed-demo-customer, seed-admin-boundaries, or set-admin\n", os.Args[1])
+		fmt.Fprintf(os.Stderr, "unknown subcommand %q; want serve, work, migrate, seed-demo-customer, export-demo-activities, seed-admin-boundaries, or set-admin\n", os.Args[1])
 		os.Exit(2)
 	}
 }
