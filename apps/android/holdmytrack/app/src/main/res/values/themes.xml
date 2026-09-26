@@ -326,6 +326,14 @@
         <item name="android:textColor">@color/hmt_danger</item>
     </style>
 
+    <!-- A list's small uppercase title: the web's .sync-tab__list-title, 11sp bold, tracked. -->
+    <style name="TextAppearance.HoldMyTrack.Overline" parent="TextAppearance.HoldMyTrack.LabelSmall">
+        <item name="android:textFontWeight">700</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.06</item>
+        <item name="android:textColor">@color/hmt_ink_meta</item>
+    </style>
+
     <!-- A text action that reads as a link — the web's link-button (.auth-card__link, button modifier): 13sp regular in
          the strong accent, no fill, sized to its label (Sign out on "check your email"). -->
     <style name="Widget.HoldMyTrack.Button.Link" parent="Widget.HoldMyTrack.Button.Text">

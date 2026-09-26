@@ -129,13 +129,13 @@
     <string name="status_summary_processing">Processing %1$d of %2$d…</string>
     <string name="status_summary_settled">%1$d activities synced or uploaded.</string>
     <string name="status_failed">Could not read the sync history: %1$s</string>
-    <string name="status_row_done">%1$s · %2$.1f km</string>
-    <string name="status_row_done_no_distance">%1$s · no distance recorded</string>
-    <string name="status_row_processing">%1$s · processing…</string>
-    <string name="status_row_failed">%1$s · failed — %2$s</string>
+    <string name="status_row_distance">%1$.1f km</string>
+    <string name="status_row_no_distance">no distance recorded</string>
+    <string name="status_row_processing">processing…</string>
     <string name="status_no_reason">no reason given</string>
     <string name="status_duplicates_heading">Already recorded from another source</string>
-    <string name="status_duplicate_row">%1$s · %2$s from %3$s — already here from %4$s, so it is not drawn twice</string>
+    <string name="status_duplicate_what">%1$s from %2$s</string>
+    <string name="status_duplicate_why">already here from %1$s, so it isn\'t drawn twice</string>
     <string name="source_health_connect" translatable="false">Health Connect</string>
     <string name="source_health_kit" translatable="false">HealthKit</string>
     <string name="source_upload">an uploaded file</string>

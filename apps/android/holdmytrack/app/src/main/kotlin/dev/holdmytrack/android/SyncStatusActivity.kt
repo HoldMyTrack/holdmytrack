@@ -3,6 +3,7 @@ package dev.holdmytrack.android
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.LayoutInflater
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -32,8 +33,10 @@ import java.time.format.FormatStyle
 class SyncStatusActivity : AppCompatActivity() {
 
     private lateinit var summary: TextView
+    private lateinit var error: TextView
+    private lateinit var empty: View
     private lateinit var rows: LinearLayout
-    private lateinit var duplicatesHeading: TextView
+    private lateinit var duplicatesHead: View
     private lateinit var duplicateRows: LinearLayout
 
     private val main = Handler(Looper.getMainLooper())
@@ -50,9 +53,16 @@ class SyncStatusActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_sync_status)
-        summary = findViewById(R.id.status_summary)
+        // The two list heads are the same include, so each one's title and summary are looked
+        // up inside it rather than by a screen-wide id.
+        val head: View = findViewById(R.id.status_head)
+        head.findViewById<TextView>(R.id.list_title).setText(R.string.status_history)
+        summary = head.findViewById(R.id.list_summary)
+        error = findViewById(R.id.status_error)
+        empty = findViewById(R.id.status_empty)
         rows = findViewById(R.id.status_rows)
-        duplicatesHeading = findViewById(R.id.status_duplicates_heading)
+        duplicatesHead = findViewById(R.id.status_duplicates_head)
+        duplicatesHead.findViewById<TextView>(R.id.list_title).setText(R.string.status_duplicates_heading)
         duplicateRows = findViewById(R.id.status_duplicates)
     }
 
@@ -70,25 +80,28 @@ class SyncStatusActivity : AppCompatActivity() {
     private fun load() {
         HoldMyTrackApi.syncHistory(HISTORY_PAGE) { result ->
             result.onSuccess { render(it) }.onFailure {
-                summary.text = getString(R.string.status_failed, it.message.orEmpty())
+                error.text = getString(R.string.status_failed, it.message.orEmpty())
+                error.visibility = View.VISIBLE
             }
         }
         HoldMyTrackApi.duplicates { result ->
-            result.onSuccess { renderDuplicates(it) }.onFailure { duplicatesHeading.visibility = View.GONE }
+            result.onSuccess { renderDuplicates(it) }.onFailure { renderDuplicates(emptyList()) }
         }
     }
 
     private fun render(history: SyncHistory) {
+        error.visibility = View.GONE
         summary.text = when {
             history.processing > 0 ->
                 getString(R.string.status_summary_processing, history.processing, history.total)
-            history.total == 0L -> getString(R.string.status_summary_empty)
+            history.total == 0L -> ""
             else -> getString(R.string.status_summary_settled, history.total)
         }
+        empty.visibility = if (history.total == 0L) View.VISIBLE else View.GONE
 
         rows.removeAllViews()
         for (entry in history.entries) {
-            rows.addView(row(describe(entry), entry.status == "failed"))
+            addHistoryRow(entry)
         }
 
         // Only while something is in flight, and never twice over: every load can schedule at
@@ -99,57 +112,54 @@ class SyncStatusActivity : AppCompatActivity() {
     }
 
     /**
-     * One history row as a line of text. The label is the job's own `source_detail`, which for
-     * a synced activity is the Health Connect record id — no use to anyone on its own, so a
-     * finished job is described by what it actually became (when it happened, how far) and the
-     * id is left out of it.
+     * One history row: when, on the left, and what came of it on the right. The label is the
+     * job's own `source_detail`, which for a synced activity is the Health Connect record id —
+     * no use to anyone on its own, so a row is named by when the activity happened (or, until
+     * it has been processed, when it was sent) and the id is left out of it.
      */
-    private fun describe(entry: SyncHistoryEntry): String {
-        val when_ = entry.startedAt?.let { format(it) } ?: format(entry.submittedAt)
-        return when (entry.status) {
-            "done" -> {
-                val distance = entry.distanceMeters
-                if (distance != null) {
-                    getString(R.string.status_row_done, when_, distance / 1000.0)
-                } else {
-                    getString(R.string.status_row_done_no_distance, when_)
-                }
-            }
-            "failed" -> getString(
-                R.string.status_row_failed,
-                when_,
-                entry.error.ifBlank { getString(R.string.status_no_reason) },
-            )
-            else -> getString(R.string.status_row_processing, when_)
+    private fun addHistoryRow(entry: SyncHistoryEntry) {
+        val name = entry.startedAt?.let { format(it) } ?: format(entry.submittedAt)
+        val failed = entry.status == "failed"
+        val status = when (entry.status) {
+            "done" -> entry.distanceMeters?.let { getString(R.string.status_row_distance, it / 1000.0) }
+                ?: getString(R.string.status_row_no_distance)
+            "failed" -> entry.error.ifBlank { getString(R.string.status_no_reason) }
+            else -> getString(R.string.status_row_processing)
         }
+        rows.addView(row(rows, name, status, detail = null, failed = failed))
     }
 
     private fun renderDuplicates(duplicates: List<Duplicate>) {
-        duplicatesHeading.visibility = if (duplicates.isEmpty()) View.GONE else View.VISIBLE
+        val visibility = if (duplicates.isEmpty()) View.GONE else View.VISIBLE
+        duplicatesHead.visibility = visibility
+        duplicateRows.visibility = visibility
         duplicateRows.removeAllViews()
         for (duplicate in duplicates) {
             duplicateRows.addView(
                 row(
-                    getString(
-                        R.string.status_duplicate_row,
-                        format(duplicate.startedAt),
-                        duplicate.activityType,
-                        sourceName(duplicate.source),
-                        sourceName(duplicate.supersededBySource),
-                    ),
-                    false,
+                    duplicateRows,
+                    name = format(duplicate.startedAt),
+                    status = getString(R.string.status_duplicate_what, duplicate.activityType, sourceName(duplicate.source)),
+                    detail = getString(R.string.status_duplicate_why, sourceName(duplicate.supersededBySource)),
+                    failed = false,
                 ),
             )
         }
     }
 
-    private fun row(text: String, failed: Boolean): TextView =
-        TextView(this).apply {
-            this.text = text
-            setTextAppearance(R.style.TextAppearance_HoldMyTrack_BodyMedium)
-            val vertical = resources.getDimensionPixelSize(R.dimen.hmt_space_4)
-            setPadding(0, vertical, 0, vertical)
-            if (failed) setTextColor(getColor(R.color.hmt_danger))
+    /** A row from `item_sync_history_row`: the web's `.sync-tab__row`, with a failure's reason
+     *  in the danger color, as `.sync-tab__row-status--error` sets it. */
+    private fun row(parent: LinearLayout, name: String, status: String, detail: String?, failed: Boolean): View =
+        LayoutInflater.from(this).inflate(R.layout.item_sync_history_row, parent, false).apply {
+            findViewById<TextView>(R.id.row_name).text = name
+            findViewById<TextView>(R.id.row_status).apply {
+                text = status
+                if (failed) setTextColor(getColor(R.color.hmt_danger))
+            }
+            findViewById<TextView>(R.id.row_detail).apply {
+                text = detail
+                visibility = if (detail == null) View.GONE else View.VISIBLE
+            }
         }
 
     /** The `source` values §3.3 defines, said the way a person would say them. */
@@ -169,6 +179,6 @@ class SyncStatusActivity : AppCompatActivity() {
         const val HISTORY_PAGE = 25
         const val POLL_INTERVAL_MS = 2_000L
         val DATE_FORMAT: DateTimeFormatter =
-            DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM).withZone(ZoneId.systemDefault())
+            DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT).withZone(ZoneId.systemDefault())
     }
 }

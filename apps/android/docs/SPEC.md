@@ -199,7 +199,7 @@ All of FR-3 requires an active session (demo or registered); Health Connect sync
 
 **Description**: A dedicated screen (`SyncStatusActivity`) lists every ingest job this account has ever produced, from any path — a Health Connect sync and a file upload from the web client appear in the same list, because server-side they are the same kind of job (`docs/IMPLEMENTATION.md` §4.0.1).
 
-**Behavior**: Reads `GET /v1/uploads` (the same endpoint the web client's upload history uses). Each row shows when the activity happened and how far it went once it has finished processing, the server's own error text when it failed, or its submission time while still processing. The screen polls every two seconds only while at least one job is still processing, and stops entirely once everything has settled — a screen of finished rows makes no further requests.
+**Behavior**: Reads `GET /v1/uploads` (the same endpoint the web client's upload history uses). Each row is named by when the activity happened (its submission time while still processing), and shows at its other end how far it went once finished, the server's own error text in red when it failed, or "processing…". Above the rows, a "History" heading carries the overall count; an account with no jobs gets "Nothing has been synced or uploaded yet." instead, and a failed read an error box. The screen polls every two seconds only while at least one job is still processing, and stops entirely once everything has settled — a screen of finished rows makes no further requests.
 
 **Outputs**: A list of rows plus overall counts (total, still processing).
 
@@ -207,7 +207,7 @@ All of FR-3 requires an active session (demo or registered); Health Connect sync
 
 **Description**: A second section on the same screen answers a question specific to having more than one ingest path: an activity can be missing from the map because it failed, or because it was already present from a different source — and only the first is a fault.
 
-**Behavior**: Reads `GET /v1/activities/duplicates`. Each row names the activity's type and start time, the source it arrived from, and the source of the copy that superseded it (`docs/IMPLEMENTATION.md` §4.6) — phrased as, for example, "cycling from HealthKit — already here from Health Connect, so it is not drawn twice." The section is hidden entirely when there are no duplicates to show.
+**Behavior**: Reads `GET /v1/activities/duplicates`. Each row is named by the activity's start time, and says the activity's type and the source it arrived from, then the source of the copy that superseded it (`docs/IMPLEMENTATION.md` §4.6) — for example "cycling from HealthKit" over "already here from Health Connect, so it isn't drawn twice". The section is hidden entirely when there are no duplicates to show.
 
 ## 7. FR-5 — In-App GPS Recording
 
