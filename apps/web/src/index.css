@@ -2015,12 +2015,6 @@ body {
   cursor: pointer;
 }
 
-/* "Manage on the map" is a link to /?private-locations, dressed as the other buttons. */
-a.settings-page__button {
-  display: inline-block;
-  text-decoration: none;
-}
-
 .settings-page__button:disabled {
   color: rgb(var(--fm-ink-rgb) / 30%);
   border-color: rgb(var(--fm-ink-rgb) / 10%);

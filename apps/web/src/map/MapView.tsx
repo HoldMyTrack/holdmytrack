@@ -52,8 +52,7 @@ const SELECTION_FLY_DEBOUNCE_MS = 300;
 const EDIT_PENDING_POLL_MS = 2000;
 
 export interface MapViewProps {
-  /** Mount with the Activities panel on its Privacy tab — `/?private-locations`, the header's
-   *  account menu and Settings' link to it (App.tsx). */
+  /** Mount with the Activities panel on its Privacy tab — `/?private-locations` (App.tsx). */
   initialPrivateLocationsOpen?: boolean;
 }
 

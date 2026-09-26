@@ -72,13 +72,5 @@
       <button type="submit" class="settings__submit">{{if .Onboarding}}{{t "settings.save_continue"}}{{else}}{{t "settings.save"}}{{end}}</button>
     </fieldset>
   </form>
-
-  {{if not .Onboarding}}
-  <section class="settings__section" aria-labelledby="settings-private">
-    <h2 class="settings__label" id="settings-private">{{t "header.private_locations"}}</h2>
-    <p class="settings__hint">{{t "settings.private_hint"}}</p>
-    <div><a class="settings__button" href="/?private-locations">{{t "settings.private_manage"}}</a></div>
-  </section>
-  {{end}}
 </main>
 {{end}}{{end}}
