@@ -89,7 +89,7 @@
             android:name=".VerifyEmailActivity"
             android:exported="false"
             android:label="@string/verify_email_title"
-            android:theme="@style/Theme.HoldMyTrack" />
+            android:theme="@style/Theme.HoldMyTrack.NoActionBar" />
 
         <!-- Exported, unlike SignInActivity, because the browser launches it: a Facebook
              sign-in in a Custom Tab ends at holdmytrack://oauth, which this forwards to

@@ -326,6 +326,12 @@
         <item name="android:textColor">@color/hmt_danger</item>
     </style>
 
+    <!-- A text action that reads as a link — the web's link-button (.auth-card__link, button modifier): 13sp regular in
+         the strong accent, no fill, sized to its label (Sign out on "check your email"). -->
+    <style name="Widget.HoldMyTrack.Button.Link" parent="Widget.HoldMyTrack.Button.Text">
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
+    </style>
+
     <!-- Continue with Google: the web's white button with an ink border, the untinted "G". -->
     <style name="Widget.HoldMyTrack.Button.Google" parent="Widget.HoldMyTrack.Button.Outlined">
         <item name="icon">@drawable/ic_brand_google</item>
