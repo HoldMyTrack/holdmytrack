@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The web's sign-in page (templates/pages/signin.html): one card on the cream page, the serif
-     title inside it, and the same order — providers, "or", the email form, then the demo. The
-     screen has no action bar (Theme.HoldMyTrack.NoActionBar); the card carries the title. -->
+<!-- The web's sign-in and sign-up pages (templates/pages/signin.html, signup.html) as two modes
+     of one card, which SignInActivity switches between: the serif title inside it, and the same
+     order — providers, "or", the email form, then (sign-in only) the demo. The screen has no
+     action bar (Theme.HoldMyTrack.NoActionBar); the card carries the title. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -31,6 +32,7 @@
                 android:showDividers="middle">
 
                 <TextView
+                    android:id="@+id/title"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:accessibilityHeading="true"
@@ -38,6 +40,7 @@
                     android:textAppearance="?attr/textAppearanceTitleLarge" />
 
                 <TextView
+                    android:id="@+id/intro"
                     style="@style/Widget.HoldMyTrack.Hint"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -82,19 +85,35 @@
                         android:inputType="textEmailAddress" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <com.google.android.material.textfield.TextInputLayout
+                <!-- The password and, on sign-in, "Forgot password?" under its right edge (the
+                     web's .auth-card__forgot), grouped so the card's gap doesn't separate them. -->
+                <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
 
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/password"
+                    <com.google.android.material.textfield.TextInputLayout
                         android:layout_width="match_parent"
+                        android:layout_height="wrap_content">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/password"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:autofillHints="password"
+                            android:hint="@string/password_hint"
+                            android:importantForAutofill="yes"
+                            android:inputType="textPassword" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <Button
+                        android:id="@+id/forgot"
+                        style="@style/Widget.HoldMyTrack.Button.Link"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:autofillHints="password"
-                        android:hint="@string/password_hint"
-                        android:importantForAutofill="yes"
-                        android:inputType="textPassword" />
-                </com.google.android.material.textfield.TextInputLayout>
+                        android:layout_gravity="end"
+                        android:text="@string/forgot_password" />
+                </LinearLayout>
 
                 <!-- The server's own wording, verbatim — see SignInActivity for why it isn't
                      reworded on the way through — in the web's error box. -->
@@ -106,28 +125,23 @@
                     android:accessibilityLiveRegion="polite"
                     android:visibility="gone" />
 
-                <!-- Sign in and Create account share the one form; the web splits them across
-                     /signin and /signup, which a single app screen doesn't need. -->
-                <LinearLayout
+                <!-- Sign in or Create account, by mode, then the web's link to the other page. -->
+                <Button
+                    android:id="@+id/submit"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical">
+                    android:text="@string/sign_in" />
 
-                    <Button
-                        android:id="@+id/sign_in"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/sign_in" />
-
-                    <Button
-                        android:id="@+id/sign_up"
-                        style="@style/Widget.HoldMyTrack.Button.Outlined"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/create_account" />
-                </LinearLayout>
+                <Button
+                    android:id="@+id/switch_mode"
+                    style="@style/Widget.HoldMyTrack.Button.Link"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:text="@string/to_sign_up" />
 
                 <include
+                    android:id="@+id/demo_divider"
                     layout="@layout/include_or_divider"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />

@@ -8,6 +8,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.credentials.CredentialManager
@@ -35,9 +36,13 @@ import kotlinx.coroutines.launch
  * `services/server/internal/httpapi/auth.go` mints a session — or continue with Google or
  * Facebook, when the server has them configured (`docs/adr/0016-native-sign-in.md`).
  *
- * Designed as the web's sign-in page (`templates/pages/signin.html`): one card, the serif title
- * inside it, the providers, then the email form, then the demo — the layout carries all of
- * that, and this class only shows, hides and wires it.
+ * Designed as the web's sign-in and sign-up pages (`templates/pages/signin.html`,
+ * `signup.html`): one card, the serif title inside it, the providers, then the email form, then
+ * (sign-in only) the demo — the layout carries all of that, and this class only shows, hides
+ * and wires it. The two pages are two modes of this one screen, switched by the link under the
+ * button, rather than two activities: the Facebook round trip comes back here
+ * ([OAuthRedirectActivity]) with the verifier this screen keeps, whichever page started it.
+ * Back from sign-up returns to sign-in, as Back from `/signup` does on the web.
  *
  * The app's first screen whenever no session is held, mirroring web's `AuthGate`: a bare
  * basemap with no tracks, fog or heatmap is a weak demonstration of what HoldMyTrack does, and the
@@ -51,6 +56,13 @@ class SignInActivity : AppCompatActivity() {
     private lateinit var email: EditText
     private lateinit var password: EditText
     private lateinit var error: TextView
+    private lateinit var title: TextView
+    private lateinit var intro: TextView
+    private lateinit var submit: Button
+    private lateinit var switchMode: Button
+    private lateinit var forgot: Button
+    private lateinit var demo: Button
+    private lateinit var demoDivider: View
     private lateinit var buttons: List<Button>
     private lateinit var google: Button
     private lateinit var facebook: Button
@@ -61,6 +73,15 @@ class SignInActivity : AppCompatActivity() {
      *  opened, come back on in [onResume] if it was simply closed. */
     private var awaitingBrowser = false
 
+    /** The web's `/signup` rather than `/signin` — kept across a recreation, including one
+     *  after the process died behind a Facebook browser tab. */
+    private var signingUp = false
+
+    /** Back from sign-up is back to sign-in; from sign-in it leaves the app, as ever. */
+    private val backToSignIn = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() = setSigningUp(false)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_sign_in)
@@ -68,17 +89,30 @@ class SignInActivity : AppCompatActivity() {
         email = findViewById(R.id.email)
         password = findViewById(R.id.password)
         error = findViewById(R.id.error)
-
-        val signIn: Button = findViewById(R.id.sign_in)
-        val signUp: Button = findViewById(R.id.sign_up)
-        val demo: Button = findViewById(R.id.demo)
+        title = findViewById(R.id.title)
+        intro = findViewById(R.id.intro)
+        submit = findViewById(R.id.submit)
+        switchMode = findViewById(R.id.switch_mode)
+        forgot = findViewById(R.id.forgot)
+        demo = findViewById(R.id.demo)
+        demoDivider = findViewById(R.id.demo_divider)
         google = findViewById(R.id.google)
         facebook = findViewById(R.id.facebook)
         providersDivider = findViewById(R.id.providers_divider)
-        buttons = listOf(signIn, signUp, demo, google, facebook)
+        buttons = listOf(submit, switchMode, forgot, demo, google, facebook)
 
-        signIn.setOnClickListener { withCredentials(HoldMyTrackApi::signIn) }
-        signUp.setOnClickListener { withCredentials(HoldMyTrackApi::signUp) }
+        onBackPressedDispatcher.addCallback(this, backToSignIn)
+        setSigningUp(savedInstanceState?.getBoolean(STATE_SIGNING_UP) ?: false)
+
+        submit.setOnClickListener {
+            withCredentials(if (signingUp) HoldMyTrackApi::signUp else HoldMyTrackApi::signIn)
+        }
+        switchMode.setOnClickListener { setSigningUp(!signingUp) }
+        // The web's own /forgot, not a native form: the emailed reset link opens the web's
+        // /reset page anyway, so the flow ends in the browser whichever way it starts.
+        forgot.setOnClickListener {
+            CustomTabsIntent.Builder().build().launchUrl(this, HoldMyTrackApi.forgotPasswordUri())
+        }
         demo.setOnClickListener {
             setBusy(true)
             HoldMyTrackApi.startDemo(::onResult)
@@ -101,6 +135,29 @@ class SignInActivity : AppCompatActivity() {
 
         // Not on a recreation: the intent is the same one already handled before it.
         if (savedInstanceState == null) handleRedirect(intent)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(STATE_SIGNING_UP, signingUp)
+    }
+
+    /**
+     * Switches between the web's two pages. The typed email carries over; an error from the
+     * other page doesn't. The password's autofill hint follows, so a password manager offers a
+     * saved password on sign-in and suggests a new one on sign-up.
+     */
+    private fun setSigningUp(value: Boolean) {
+        signingUp = value
+        backToSignIn.isEnabled = value
+        title.setText(if (value) R.string.sign_up_title else R.string.sign_in_title)
+        submit.setText(if (value) R.string.create_account else R.string.sign_in)
+        switchMode.setText(if (value) R.string.to_sign_in else R.string.to_sign_up)
+        listOf(intro, forgot, demoDivider, demo).forEach { it.visibility = if (value) View.GONE else View.VISIBLE }
+        // "newPassword" is androidx.autofill's HintConstants.AUTOFILL_HINT_NEW_PASSWORD, spelled
+        // out rather than pulling in that library for one constant.
+        password.setAutofillHints(if (value) "newPassword" else View.AUTOFILL_HINT_PASSWORD)
+        error.visibility = View.GONE
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -260,6 +317,7 @@ class SignInActivity : AppCompatActivity() {
         private const val TAG = "SignInActivity"
         private const val HANDOFF_PREFS = "sign_in_handoff"
         private const val KEY_VERIFIER = "verifier"
+        private const val STATE_SIGNING_UP = "signing_up"
 
         /** Replaces the whole back stack with this screen — used on a cold start with no
          *  session, when a stored token turns out to be revoked, and on sign-out (from Profile
