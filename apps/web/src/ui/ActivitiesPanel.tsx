@@ -646,12 +646,18 @@ export function ActivitiesPanel({
                       {formatActivityType(activity.activityType)}
                     </span>
                   </button>
-                  {isPending && (
-                    <span className="activities-panel__hidden-badge" title={t('activities.pending_title')}>
-                      {t('activities.pending')}
+                  {(isPending || isHidden) && (
+                    // One right-aligned group, so the badges share one right edge whatever the
+                    // text beside them does, and a row that's both stacks them there together.
+                    <span className="activities-panel__badges">
+                      {isPending && (
+                        <span className="activities-panel__hidden-badge" title={t('activities.pending_title')}>
+                          {t('activities.pending')}
+                        </span>
+                      )}
+                      {isHidden && <span className="activities-panel__hidden-badge">{t('activities.hidden')}</span>}
                     </span>
                   )}
-                  {isHidden && <span className="activities-panel__hidden-badge">{t('activities.hidden')}</span>}
                 </li>
               );
             })}

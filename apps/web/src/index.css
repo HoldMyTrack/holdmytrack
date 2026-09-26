@@ -515,6 +515,18 @@ body {
   cursor: progress;
 }
 
+/* Pinned to the row's right edge explicitly (margin-left: auto), not just left there by the
+   text column's flex: 1 — so Pending and Hidden end at the same edge on every row, and a row
+   that's both keeps its two badges together, stacked on that edge. */
+.activities-panel__badges {
+  flex: none;
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--fm-space-2);
+}
+
 .activities-panel__hidden-badge {
   flex: none;
   font-size: var(--fm-text-2xs);
