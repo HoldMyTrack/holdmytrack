@@ -157,7 +157,7 @@ func main() {
 		log.Info("seed-demo-customer: done")
 
 	case "export-demo-activities":
-		// Copies picked activities' raw uploads out of this deployment as demo_data/ files for
+		// Writes picked activities out of this deployment, as their owner sees them, as demo_data/ GPX files for
 		// the Demo Customer's history — httpapi.ExportDemoActivities's doc comment has the
 		// details. Writes only to the local directory given; the DB and storage are only read.
 		if len(os.Args) < 4 {

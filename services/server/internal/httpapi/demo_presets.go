@@ -28,9 +28,9 @@ import (
 const DemoCustomerUserID = "22222222-2222-2222-2222-222222222222"
 
 // demo_data/ holds the account's history as raw activity files in any format ingest parses
-// (parse.ByExtension: .gpx, .tcx, .fit, .json), plus manifest.json. Most of them are the
-// original uploads of real activities on a live deployment, copied out by
-// `export-demo-activities` (demo_export.go) and reviewed by hand before being committed.
+// (parse.ByExtension: .gpx, .tcx, .fit, .json), plus manifest.json. They are real activities
+// on a live deployment, written out as GPX by `export-demo-activities` (demo_export.go)
+// exactly as their owner sees them, and reviewed by hand before being committed.
 //
 //go:embed demo_data
 var demoData embed.FS
@@ -44,9 +44,11 @@ const demoManifestFile = "manifest.json"
 // "<Type> - <date>" every unnamed activity gets. Type is the activity_type, needed for files
 // that don't carry their own: a synced activity (Health Connect, in-app recording) reports
 // its type in the sync request, not inside the JSON payload the export copies out.
+// Description is the activity's free-text description, which no file carries either.
 type demoManifestEntry struct {
-	Name string `json:"name,omitempty"`
-	Type string `json:"type,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Type        string `json:"type,omitempty"`
+	Description string `json:"description,omitempty"`
 }
 
 // loadDemoManifest reads demo_data/manifest.json, keyed by filename. A missing manifest is an
@@ -174,9 +176,12 @@ func SeedDemoCustomer(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 		// one already there (ON CONFLICT DO NOTHING still returns the existing row's id) — so
 		// re-running the seed always leaves the manifest's names in place, not only the one
 		// time a row is first inserted.
-		if entry.Name != "" {
-			if _, err := pool.Exec(ctx, `UPDATE activities SET name = $1 WHERE id = $2`, entry.Name, result.ActivityID); err != nil {
-				log.Error("demo customer seed: name override failed", "err", err, "file", filename)
+		if entry.Name != "" || entry.Description != "" {
+			if _, err := pool.Exec(ctx,
+				`UPDATE activities SET name = COALESCE(NULLIF($1, ''), name), description = COALESCE(NULLIF($2, ''), description) WHERE id = $3`,
+				entry.Name, entry.Description, result.ActivityID,
+			); err != nil {
+				log.Error("demo customer seed: name/description override failed", "err", err, "file", filename)
 				failed++
 			}
 		}
