@@ -267,7 +267,7 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 
 Named here rather than left implicit, the way `docs/SPEC.md` §18 does for the wider system:
 
-- **No final visual design.** The palette, type scale, fonts and Lucide icons are the web's current ones carried over (Material 3) rather than a frozen design, and its screens wait on root `docs/ROADMAP.md` Phase 3's design freeze (`apps/android/docs/ROADMAP.md` Phase 5). The app's own chrome is light only; only the map follows the system dark setting.
+- **No final visual design.** The palette, type scale, fonts and Lucide icons are the web's current ones carried over (Material 3) rather than a frozen design, and the screens are designed after their web counterparts until root `docs/ROADMAP.md` Phase 3's design freeze settles the final look (`apps/android/docs/ROADMAP.md` Phase 5). The app's own chrome is light only; only the map follows the system dark setting.
 - **The account's Language setting isn't applied.** The web's Settings choice (`docs/SPEC.md` FR-1.7) changes the web only; the app follows the phone or its per-app language.
 - **No filter controls.** The map always shows the account's complete, unfiltered history; there is no Android equivalent of the web's date-range picker, TYPE/DISTANCE filters, or per-track hide/show.
 - **No accessibility work done.** No content descriptions, no verified touch-target sizing, untested under a large system font or TalkBack.
