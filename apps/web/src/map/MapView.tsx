@@ -313,12 +313,18 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // `visibleDays` just as much but must never re-pick the selection out from under a user
   // who's simply browsing) is what lets this safely reconsider on new data without also
   // firing on every Earlier/Later click.
+  //
+  // Held still while the Edit window is open: a big zip lands newer activity-days on every
+  // poll tick, sliding the default forward past the activity being edited — which drops it
+  // from the list, and the window can't outlive its activities (below), so it kept closing
+  // itself until the whole zip had finished. `editOpen` is a dependency so the default
+  // catches up on whatever landed meanwhile the moment the window closes.
   useEffect(() => {
-    if (userChangedRangeRef.current || !daysReady) return;
+    if (userChangedRangeRef.current || !daysReady || editOpen) return;
     const recentDays = visibleDays.slice(-5);
     setSelectedRangeState({ from: recentDays[0]?.date ?? earliest ?? today, to: today });
     // visibleDays deliberately isn't a dependency — see the comment above.
-  }, [daysReady, earliest, historyGeneration, today]);
+  }, [daysReady, earliest, historyGeneration, today, editOpen]);
 
   // The histogram header's own stats — deliberately not totals.count/distanceMeters, which
   // ActivitiesPanel's subtext already shows; repeating them in the histogram too would just
