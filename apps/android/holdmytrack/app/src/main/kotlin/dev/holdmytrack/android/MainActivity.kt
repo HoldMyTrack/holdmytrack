@@ -67,6 +67,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var recordButton: RecordButton
     private lateinit var locateButton: MaterialButton
 
+    /** Find my location's panel — what hides while recording, so no empty panel is left. */
+    private lateinit var locatePanel: View
+
     private var map: MapLibreMap? = null
     private var style: Style? = null
     private var mode = MapMode.NORMAL
@@ -177,6 +180,7 @@ class MainActivity : AppCompatActivity() {
         recordButton.onHoldComplete = ::stopRecording
 
         locateButton = findViewById(R.id.locate_button)
+        locatePanel = findViewById(R.id.locate_panel)
         locateButton.setOnClickListener { onLocateTap() }
 
         insetSystemBars()
@@ -408,7 +412,7 @@ class MainActivity : AppCompatActivity() {
         recordButton.contentDescription = getString(description)
         recordButton.holdEnabled = active
         if (modeBarReady) modeBar.visibility = if (active) View.GONE else View.VISIBLE
-        locateButton.visibility = if (active) View.GONE else View.VISIBLE
+        locatePanel.visibility = if (active) View.GONE else View.VISIBLE
 
         val loaded = style ?: return
         if (overlaysAttached) MapOverlays.setRecording(loaded, active, mode)

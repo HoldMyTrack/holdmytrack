@@ -39,14 +39,19 @@
         android:baselineAligned="false"
         android:orientation="horizontal">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/menu_button"
-            style="@style/Widget.HoldMyTrack.Button.MapIcon"
+        <FrameLayout
+            style="@style/Widget.HoldMyTrack.MapPanel"
             android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:contentDescription="@string/menu_button"
-            android:minWidth="54dp"
-            app:icon="@drawable/ic_menu" />
+            android:layout_height="wrap_content">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/menu_button"
+                style="@style/Widget.HoldMyTrack.Button.MapIcon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/menu_button"
+                app:icon="@drawable/ic_menu" />
+        </FrameLayout>
 
         <!-- Only shown to a signed-in account: all three layers the toggle switches between
              are behind requireAuth, so there is nothing for it to do without a session.
@@ -58,11 +63,9 @@
             android:id="@+id/mode_bar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            style="@style/Widget.HoldMyTrack.MapPanel"
             android:layout_marginStart="@dimen/hmt_space_6"
-            android:background="@drawable/bg_map_chrome"
-            android:elevation="2dp"
             android:orientation="horizontal"
-            android:padding="@dimen/hmt_space_4"
             android:visibility="gone">
 
             <com.google.android.material.button.MaterialButton
@@ -105,14 +108,20 @@
         <!-- Find my location (MainActivity.onLocateTap): shows the position dot and flies the
              camera to it, the counterpart of the web map's geolocate control. Hidden while
              recording, when the camera already follows the recording. -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/locate_button"
-            style="@style/Widget.HoldMyTrack.Button.MapIcon"
+        <FrameLayout
+            android:id="@+id/locate_panel"
+            style="@style/Widget.HoldMyTrack.MapPanel"
             android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:contentDescription="@string/locate_button"
-            android:minWidth="54dp"
-            app:icon="@drawable/ic_locate_fixed" />
+            android:layout_height="wrap_content">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/locate_button"
+                style="@style/Widget.HoldMyTrack.Button.MapIcon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/locate_button"
+                app:icon="@drawable/ic_locate_fixed" />
+        </FrameLayout>
     </LinearLayout>
 
     <!-- One-tap GPS recording (MainActivity.onRecordTap): tap to start, tap again to pause or

@@ -218,23 +218,34 @@
     </style>
 
     <!-- The map's Normal / Fog / Heatmap toggle, after the web's .map-mode-toggle__btn: ink
-         text on nothing, and ink fill with white text when active. -->
+         text on nothing, and ink fill with white text when active; the web's 12px regular
+         label, its 10px side padding, and its small radius nested inside the panel's medium
+         one. Height stays at Material's 48dp minimum, a full touch target. -->
     <style name="Widget.HoldMyTrack.Button.MapMode" parent="Widget.Material3.Button.TextButton">
-        <item name="shapeAppearance">@style/ShapeAppearance.HoldMyTrack.Small</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.HoldMyTrack.ExtraSmall</item>
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodySmall</item>
         <item name="android:textColor">@color/map_mode_text</item>
         <item name="backgroundTint">@color/map_mode_bg</item>
         <item name="android:minWidth">0dp</item>
-        <item name="android:paddingStart">@dimen/hmt_space_12</item>
-        <item name="android:paddingEnd">@dimen/hmt_space_12</item>
+        <item name="android:paddingStart">@dimen/hmt_space_10</item>
+        <item name="android:paddingEnd">@dimen/hmt_space_10</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
         <item name="android:checkable">true</item>
     </style>
 
-    <!-- A square icon-only button on the map's near-white chrome panel (Find my location). -->
+    <!-- A square icon-only button on the map's chrome (the menu, Find my location). It sits in
+         a MapPanel frame, the mode toggle's own panel, rather than carrying the panel color and
+         shadow itself: a translucent MaterialButton with elevation draws its shadow through its
+         own fill, as a lighter square around the icon. -->
     <style name="Widget.HoldMyTrack.Button.MapIcon" parent="Widget.Material3.Button.IconButton">
         <item name="shapeAppearance">@style/ShapeAppearance.HoldMyTrack.Small</item>
-        <item name="backgroundTint">@color/hmt_map_chrome</item>
+        <item name="backgroundTint">@android:color/transparent</item>
+        <!-- Square, at the mode buttons' own 48dp height, so each panel comes out the same
+             56dp tall — set here rather than borrowed from the row, which is empty of
+             anything else while recording. -->
+        <item name="android:minHeight">48dp</item>
+        <item name="android:minWidth">48dp</item>
         <item name="iconTint">@color/hmt_ink</item>
         <item name="iconGravity">textStart</item>
         <item name="iconPadding">0dp</item>
@@ -246,6 +257,14 @@
     <!-- The title is named directly: the Material 3 action bar's own title style is a fixed
          style rather than the theme's TitleLarge role, so it would otherwise stay in the
          system face. -->
+    <!-- The floating panel every piece of map chrome sits on, after the web's .map-mode-toggle:
+         near-white, medium radius, a small shadow (fm-shadow-sm). -->
+    <style name="Widget.HoldMyTrack.MapPanel" parent="">
+        <item name="android:background">@drawable/bg_map_chrome</item>
+        <item name="android:elevation">2dp</item>
+        <item name="android:padding">@dimen/hmt_space_4</item>
+    </style>
+
     <style name="Widget.HoldMyTrack.ActionBar" parent="Widget.Material3.ActionBar.Solid">
         <item name="background">@color/hmt_bg</item>
         <item name="elevation">0dp</item>
