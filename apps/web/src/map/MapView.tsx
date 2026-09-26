@@ -6,9 +6,8 @@ import { WORLD_VIEW } from './config';
 import { countryView } from './countryView';
 import { exportFramedImage } from './exportMap';
 import type { ExportPreset } from './exportPresets';
-import { bumpCoverageVersion } from './coverageVersion';
-import { ensureFogLayer, refreshFogLayers } from './fog';
-import { ensureHeatmapLayer, refreshHeatmapLayers } from './heatmap';
+import { ensureFogLayer } from './fog';
+import { ensureHeatmapLayer } from './heatmap';
 import { setMapMode, type MapMode } from './mapMode';
 import { labelInsertionPoint } from './layers';
 import { type Flavor } from './style';
@@ -243,8 +242,12 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // never silently override that choice the way it's allowed to before any real choice has
   // been made.
   const userChangedRangeRef = useRef(false);
+  // Set here and consumed by the range fly further down: only a range the user picked moves
+  // the camera, never the default re-deriving itself after an upload or sync.
+  const flyToNextRangeRef = useRef(false);
   const changeSelectedRange = useCallback((next: DateRange) => {
     userChangedRangeRef.current = true;
+    flyToNextRangeRef.current = true;
     setSelectedRangeState(next);
     setCheckedActivityIds(new Set());
     setFocusedActivityId(null);
@@ -265,6 +268,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     loading: activitiesLoading,
     error: activitiesError,
     reload: reloadActivities,
+    loadedKey: activitiesLoadedKey,
   } = useActivityList(activityQuery);
   const { totals, reload: reloadTotals } = useActivityTotals(activityQuery);
   // Not scoped by activityQuery — FR-3.7's duplicate list, like the histogram, answers "what
@@ -328,8 +332,9 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     [activities],
   );
 
-  // Rows with an Edit track reprocess still pending (§4.7.7) — read by the polling and
-  // completion effects further down, and by the bands effect.
+  // Rows with a reprocess still pending — an Edit track (§4.7.7) or a Private location change
+  // — read by the polling and completion effects further down, by the bands effect, and by
+  // mapHiddenIds: a Pending track isn't drawn (FR-5.15).
   const pendingIds = useMemo(() => activities.filter((a) => a.pending).map((a) => a.id), [activities]);
 
   const activityDistanceBounds = useMemo(() => distanceBounds(activities), [activities]);
@@ -338,12 +343,16 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     () => activities.filter((a) => passesFilters(a, excludedTypes, distanceFilter)),
     [activities, excludedTypes, distanceFilter],
   );
-  // Union of "filtered out by TYPE/DISTANCE" and "hidden by its own eye icon" — both answer
-  // the same question for the map (don't paint this track), so both flow into one filter.
+  // Union of "filtered out by TYPE/DISTANCE", "hidden by its own eye icon" and "Pending" — all
+  // answer the same question for the map (don't paint this track, don't fly to it), so all
+  // flow into one filter. The tracks tile already leaves a Pending activity out server-side;
+  // this hides it the moment the list shows it Pending, before the layer's refetch lands.
+  // Pending isn't added to hiddenActivityIds itself, so the user's own Visibility choice
+  // survives the reprocess untouched.
   const mapHiddenIds = useMemo(() => {
     const filteredOut = activities.filter((a) => !passesFilters(a, excludedTypes, distanceFilter)).map((a) => a.id);
-    return new Set([...filteredOut, ...hiddenActivityIds]);
-  }, [activities, excludedTypes, distanceFilter, hiddenActivityIds]);
+    return new Set([...filteredOut, ...hiddenActivityIds, ...pendingIds]);
+  }, [activities, excludedTypes, distanceFilter, hiddenActivityIds, pendingIds]);
 
   const unitSystem = useUnitSystem();
   const map = useMapInstance({
@@ -529,6 +538,8 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       }
       pendingFocusIdRef.current = activityId;
       changeSelectedRange({ from: day, to: day });
+      // The focus below flies to the activity itself; the range fly would override it.
+      flyToNextRangeRef.current = false;
     },
     [mapMode, changeMapMode, selectedRange, changeSelectedRange, focusActivity],
   );
@@ -584,11 +595,9 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   }, [activities, checkedActivityIds, mapHiddenIds, fitToSelection]);
 
   // Read inside the effect below without being one of its dependencies: the fly-to-fit it
-  // does is keyed on the *range* changing (activities is only ever a new array when
-  // selectedRange or an upload changes it — TYPE/DISTANCE/eye-icon toggles narrow
-  // mapHiddenIds without a new activities fetch), but the bounds it flies to still have to
-  // exclude whatever those filters currently hide, or the camera would zoom out to include
-  // a track that isn't even being drawn.
+  // does is keyed on the *range* changing, but the bounds it flies to still have to exclude
+  // whatever those filters currently hide (Pending included), or the camera would zoom out to
+  // include a track that isn't even being drawn.
   const mapHiddenIdsRef = useRef(mapHiddenIds);
   useEffect(() => {
     mapHiddenIdsRef.current = mapHiddenIds;
@@ -603,23 +612,38 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // flies to just the single most recent activity rather than the whole default selection —
   // an account with scattered recent history (e.g. one activity in another country yesterday,
   // one locally today) would otherwise fitBounds to a near-world view, which reads as broken
-  // rather than just generic. Every change after the first flies to fit whatever's now
-  // actually visible, as before.
+  // rather than just generic. After that, only a range the user picked (changeSelectedRange)
+  // flies, to fit whatever's now actually visible.
+  //
+  // Nothing else moves the camera: not a reload of the same range (the Pending poll every 2s,
+  // a finished upload or sync, a Private location change), and not a new range the default
+  // re-derived because new data arrived (the auto-default effect above, until the user picks
+  // one). Keyed on the query the list was fetched for, not on `activities`, which is a new
+  // array on every reload — keyed on that, a batch of uploads or Pending rows flew the camera
+  // back over and over (reported live).
   const hasFlownToActivitiesRef = useRef(false);
+  const flownRangeKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!map || activities.length === 0) return;
+    if (!map || activitiesLoadedKey === null) return;
+    if (activitiesLoadedKey === flownRangeKeyRef.current) return;
+    flownRangeKeyRef.current = activitiesLoadedKey;
     if (!hasFlownToActivitiesRef.current) {
+      // The first list, even an empty one: an account with no history yet gets the fallback
+      // view below, and its first upload doesn't fly either.
       hasFlownToActivitiesRef.current = true;
-      if (initial.hash.view == null) {
-        const mostRecent = activities.reduce((latest, a) => (a.startedAt > latest.startedAt ? a : latest));
+      const drawn = activities.filter((a) => a.bbox !== null && !a.pending);
+      if (initial.hash.view == null && drawn.length > 0) {
+        const mostRecent = drawn.reduce((latest, a) => (a.startedAt > latest.startedAt ? a : latest));
         fitToSelection([mostRecent]);
       }
       return;
     }
+    if (!flyToNextRangeRef.current) return;
+    flyToNextRangeRef.current = false;
     const visible = activities.filter((a) => !mapHiddenIdsRef.current.has(a.id));
     const flyBounds = unionBBox(visible.flatMap((a) => (a.bbox ? [a.bbox] : [])));
     if (flyBounds) flyToBBox(map, flyBounds);
-  }, [map, activities, fitToSelection]);
+  }, [map, activities, activitiesLoadedKey, fitToSelection]);
 
   // The counterpart for an account with genuinely zero history (docs/ROADMAP.md's same "Fly
   // to the most recent activity" item, its zero-history fallback): the effect above never
@@ -869,6 +893,12 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
 
   // A row that stops being pending has new points, distance and duration: the drawn track,
   // the totals, the timeline bars and (if it's focused) its bands all need the new version.
+  // None of it moves the camera — the row simply reappears where it is (FR-5.15).
+  //
+  // Fog/Heatmap go through the coverage watch rather than refetching here: the server clears
+  // Pending just before its last render (ProcessTrackEdit), so the badge clearing doesn't yet
+  // mean the tiles are current — the job finishing does. A row that *starts* being pending
+  // starts the same watch, which also picks up the render that drops it from coverage.
   //
   // Two ways to tell a reprocess finished. A row seen Pending and now not is the obvious one,
   // but it misses the common case: the job is often done within milliseconds of being
@@ -887,26 +917,26 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     lastPendingIdsRef.current = pendingIds;
     const now = new Set(pendingIds);
     let finished = [...previousPendingRef.current].some((id) => !now.has(id));
+    const started = pendingIds.some((id) => !previousPendingRef.current.has(id));
     previousPendingRef.current = now;
+    if (started) {
+      // Drawn from tiles fetched before it went Pending; the server now leaves it out.
+      if (map) refreshTrackLayer(map, activityQuery);
+      watchCoverage();
+    }
     for (const id of awaitingEditIdsRef.current) {
       if (now.has(id)) continue;
       awaitingEditIdsRef.current.delete(id);
       finished = true;
     }
     if (!finished) return;
-    if (map) {
-      refreshTrackLayer(map, activityQuery);
-      // The server re-renders the account's Fog/Heatmap tiles before it clears Pending
-      // (ProcessTrackEdit), so fetching them again now gets the edited coverage — including
-      // the Country/Region tiers, since an edit can un-visit a region too.
-      bumpCoverageVersion();
-      refreshFogLayers(map);
-      refreshHeatmapLayers(map);
-    }
+    if (map) refreshTrackLayer(map, activityQuery);
+    // Includes the Country/Region tiers, since an edit can un-visit a region too.
+    watchCoverage();
     reloadTotals();
     reloadHistogram();
     setTrackMetricsVersion((v) => v + 1);
-  }, [pendingIds, map, activityQuery, reloadTotals, reloadHistogram]);
+  }, [pendingIds, map, activityQuery, reloadTotals, reloadHistogram, watchCoverage]);
 
   /**
    * Re-attach anything that is not part of the basemap style.

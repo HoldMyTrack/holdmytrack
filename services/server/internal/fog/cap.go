@@ -61,7 +61,7 @@ func RecomputeHeatmapCap(ctx context.Context, pool *pgxpool.Pool, userID string)
 		SELECT COUNT(DISTINCT m.activity_id)
 		FROM activity_tile_masks m
 		JOIN activities a ON a.id = m.activity_id
-		WHERE a.user_id = $1 AND a.superseded_by IS NULL
+		WHERE a.user_id = $1 AND a.superseded_by IS NULL AND NOT a.edit_pending
 		  AND a.in_heatmap_window AND m.zoom = $2
 		GROUP BY m.tile_x, m.tile_y
 	`, userID, Zoom)

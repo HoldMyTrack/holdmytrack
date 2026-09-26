@@ -63,6 +63,8 @@ func AffectedHiddenActivities(ctx context.Context, tx pgx.Tx, userID string) ([]
 // inside the caller's transaction so a location is never saved without its reprocessing on
 // the way. Unlike EnqueueTrackEdit it doesn't skip an activity already pending: an edit in
 // flight was clipped with the old locations, and this job, queued behind it, fixes that.
+// Their tiles are marked dirty too, so the job's first render drops them from Fog/Heatmap
+// (markPendingTilesDirty).
 func EnqueueReprivacy(ctx context.Context, tx pgx.Tx, job ReprivacyJob) error {
 	if len(job.ActivityIDs) == 0 {
 		return nil
@@ -70,6 +72,9 @@ func EnqueueReprivacy(ctx context.Context, tx pgx.Tx, job ReprivacyJob) error {
 	if _, err := tx.Exec(ctx, `
 		UPDATE activities SET edit_pending = true WHERE user_id = $1 AND id = ANY($2::uuid[])
 	`, job.UserID, job.ActivityIDs); err != nil {
+		return err
+	}
+	if err := markPendingTilesDirty(ctx, tx, job.UserID, job.ActivityIDs); err != nil {
 		return err
 	}
 	payload, err := json.Marshal(job)
@@ -81,21 +86,25 @@ func EnqueueReprivacy(ctx context.Context, tx pgx.Tx, job ReprivacyJob) error {
 }
 
 // ProcessReprivacy reprocesses a batch of activities against the account's current Private
-// locations, then renders every tile they touched once — not one composite per activity, which
-// for a location at home would redo the same busy tiles hundreds of times — and only then
-// clears Pending, so a row's badge never clears before its Fog and Heatmap are current.
+// locations. It renders twice, each time every dirty tile once — not one composite per
+// activity, which for a location at home would redo the same busy tiles hundreds of times:
+// first before reprocessing, which drops the batch (Pending, and so left out of the render)
+// from Fog/Heatmap; then after clearing Pending, which brings it back with its new masks.
+// Pending therefore clears just before the second render; the client refreshes Fog/Heatmap
+// off the coverage status (this job counts as rendering until it returns), not off the badge.
 //
 // One activity failing doesn't stop the rest; the job still fails afterwards, naming them.
 // Pending is cleared for failed ones too, rather than left stuck on.
 func ProcessReprivacy(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, jobID int64, job ReprivacyJob) error {
+	if err := fog.RenderUser(ctx, pool, store, job.UserID); err != nil {
+		return fmt.Errorf("reprivacy: render fog/heatmap: %w", err)
+	}
+
 	var failed []string
 	for _, id := range job.ActivityIDs {
 		if err := reprocessActivity(ctx, pool, store, job.UserID, id, nil); err != nil {
 			failed = append(failed, fmt.Sprintf("%s: %v", id, err))
 		}
-	}
-	if err := fog.RenderUser(ctx, pool, store, job.UserID); err != nil {
-		return fmt.Errorf("reprivacy: render fog/heatmap: %w", err)
 	}
 
 	// A later location change still queued for any of these will reprocess it again — leave
@@ -111,9 +120,27 @@ func ProcessReprivacy(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 	`, job.UserID, job.ActivityIDs, jobID); err != nil {
 		return fmt.Errorf("reprivacy: clear edit_pending: %w", err)
 	}
+	if err := fog.RenderUser(ctx, pool, store, job.UserID); err != nil {
+		return fmt.Errorf("reprivacy: render fog/heatmap: %w", err)
+	}
 
 	if len(failed) > 0 {
 		return fmt.Errorf("reprivacy: %d of %d activities failed: %s", len(failed), len(job.ActivityIDs), strings.Join(failed, "; "))
 	}
 	return nil
+}
+
+// markPendingTilesDirty flags every z14 tile the given activities' current masks cover, inside
+// the transaction that marks them Pending — so the reprocess job's first render leaves them out
+// of Fog/Heatmap, and the tiles are already dirty however soon that job runs. The same upsert
+// as MarkFogTilesDirty, fed straight from activity_tile_masks rather than a tile list.
+func markPendingTilesDirty(ctx context.Context, tx pgx.Tx, userID string, activityIDs []string) error {
+	_, err := tx.Exec(ctx, `
+		INSERT INTO fog_tiles (user_id, zoom, tile_x, tile_y, dirty)
+		SELECT DISTINCT $1::uuid, m.zoom, m.tile_x, m.tile_y, true
+		FROM activity_tile_masks m
+		WHERE m.activity_id = ANY($2::uuid[]) AND m.zoom = $3
+		ON CONFLICT (user_id, zoom, tile_x, tile_y) DO UPDATE SET dirty = true
+	`, userID, activityIDs, FogZoom)
+	return err
 }

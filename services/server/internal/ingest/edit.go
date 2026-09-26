@@ -113,8 +113,9 @@ type EditJob struct {
 
 // ProcessTrackEdit reprocesses one activity with a new edit spec: the same parse → clip →
 // metrics → simplify → masks pipeline as Process, ending in an UPDATE of the existing row
-// instead of an INSERT. On any failure the activity's edit_pending flag is cleared again, so a
-// failed edit leaves the activity as it was rather than stuck showing Pending.
+// instead of an INSERT. On any failure the activity's edit_pending flag is cleared again and
+// its tiles re-rendered, so a failed edit leaves the activity as it was — back in Fog/Heatmap
+// with its old masks — rather than stuck showing Pending.
 func ProcessTrackEdit(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job EditJob) error {
 	err := processTrackEdit(ctx, pool, store, job)
 	if err != nil {
@@ -123,6 +124,9 @@ func ProcessTrackEdit(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 			job.ActivityID, job.UserID,
 		); uerr != nil {
 			return fmt.Errorf("%w (and clearing edit_pending failed: %v)", err, uerr)
+		}
+		if rerr := fog.RenderUser(ctx, pool, store, job.UserID); rerr != nil {
+			return fmt.Errorf("%w (and re-rendering fog/heatmap failed: %v)", err, rerr)
 		}
 	}
 	return err
@@ -133,17 +137,15 @@ func processTrackEdit(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 	if edit == nil {
 		edit = &TrackEdit{} // reset: an explicitly empty spec, not "keep the stored one"
 	}
-	if err := reprocessActivity(ctx, pool, store, job.UserID, job.ActivityID, edit); err != nil {
-		return fmt.Errorf("edit: %w", err)
-	}
-	// Rendered here rather than enqueued as a `render_fog` job the way ingest does it: Pending
-	// promises the client that once it clears, *everything* derived from the points — Fog and
-	// Heatmap included — is current, and the client refetches both rasters at exactly that
-	// moment. A separate job would clear Pending seconds before the rasters caught up, and the
-	// refetch would pick up the old tiles. RenderUser only renders dirty tiles, so this costs
-	// the same as the job would have.
+	// Rendered here, in the job, rather than enqueued as `render_fog` jobs the way ingest does
+	// it — a separate job could run alongside this one and race it over the same dirty flags.
+	// First, with the activity Pending (EnqueueTrackEdit dirtied its tiles), so it drops out
+	// of Fog/Heatmap while it's reprocessed.
 	if err := fog.RenderUser(ctx, pool, store, job.UserID); err != nil {
 		return fmt.Errorf("edit: render fog/heatmap: %w", err)
+	}
+	if err := reprocessActivity(ctx, pool, store, job.UserID, job.ActivityID, edit); err != nil {
+		return fmt.Errorf("edit: %w", err)
 	}
 	// A Private location change queued while this edit ran reprocesses the activity again;
 	// its badge stays on until that lands.
@@ -157,6 +159,13 @@ func processTrackEdit(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 		  )
 	`, job.ActivityID, job.UserID); err != nil {
 		return fmt.Errorf("edit: clear edit_pending: %w", err)
+	}
+	// Then again once Pending is cleared, which brings it back with its new masks. The badge
+	// clears a moment before these tiles land, so the client refreshes Fog/Heatmap off the
+	// coverage status — this job counts as rendering until it returns — not off the badge.
+	// RenderUser only renders dirty tiles, so each pass costs what one `render_fog` would.
+	if err := fog.RenderUser(ctx, pool, store, job.UserID); err != nil {
+		return fmt.Errorf("edit: render fog/heatmap: %w", err)
 	}
 	return nil
 }
@@ -329,8 +338,8 @@ func tilesNotIn(a, b [][2]int) [][2]int {
 	return out
 }
 
-// EnqueueTrackEdit marks the activity pending and enqueues its `edit_track` job in one
-// transaction, so an activity is never shown Pending without a job on its way, nor gets a job
+// EnqueueTrackEdit marks the activity pending (and its tiles dirty — markPendingTilesDirty)
+// and enqueues its `edit_track` job in one transaction, so an activity is never shown Pending without a job on its way, nor gets a job
 // while already pending. Returns false when the activity isn't this user's, is a superseded
 // duplicate, or already has an edit pending.
 func EnqueueTrackEdit(ctx context.Context, pool *pgxpool.Pool, job EditJob) (bool, error) {
@@ -353,6 +362,9 @@ func EnqueueTrackEdit(ctx context.Context, pool *pgxpool.Pool, job EditJob) (boo
 	}
 	if tag.RowsAffected() == 0 {
 		return false, nil
+	}
+	if err := markPendingTilesDirty(ctx, tx, job.UserID, []string{job.ActivityID}); err != nil {
+		return false, err
 	}
 	if _, err := tx.Exec(ctx,
 		`INSERT INTO jobs (kind, user_id, payload) VALUES ('edit_track', $1, $2)`,

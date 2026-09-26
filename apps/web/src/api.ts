@@ -839,7 +839,14 @@ export async function deletePrivateLocation(id: string): Promise<void> {
  * upload or delete by `useCoverageRefresh.ts`, which refetches both layers once this reports
  * nothing left.
  */
-export async function getCoverageStatus(signal?: AbortSignal): Promise<{ rendering: boolean }> {
+export interface CoverageStatus {
+  rendering: boolean;
+  /** When any of the account's Fog/Heatmap tiles was last written (Unix ms; 0 before the
+   *  first) — changes mid-job too, e.g. when a Pending activity drops out of coverage. */
+  version: number;
+}
+
+export async function getCoverageStatus(signal?: AbortSignal): Promise<CoverageStatus> {
   const res = await fetch(`${API_BASE_URL}${API_V1}/coverage/status`, {
     ...(signal ? { signal } : {}),
     credentials: 'include',
@@ -847,5 +854,5 @@ export async function getCoverageStatus(signal?: AbortSignal): Promise<{ renderi
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, `coverage status failed (${res.status})`));
   }
-  return (await res.json()) as { rendering: boolean };
+  return (await res.json()) as CoverageStatus;
 }
