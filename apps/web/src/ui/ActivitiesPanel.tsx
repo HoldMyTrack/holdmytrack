@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { ChevronDown, ChevronUp, Eye, EyeOff, Focus, Pencil, Trash2, Waypoints } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, EyeOff, Focus, Pencil, Trash2 } from 'lucide-react';
 import { deleteActivity, type Activity, type ActivityTotals, type DuplicateActivity } from '../api';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DistanceFilter } from './DistanceFilter';
-import { EditActivityDialog } from './EditActivityDialog';
 import { PrivateLocationsPanel } from './PrivateLocationsPanel';
 import { SyncTab } from './SyncTab';
 import type { DistanceRange, TypeFacet } from './activityFacets';
@@ -34,17 +33,18 @@ import { lang, t, tn } from '../i18n';
  * further by TYPE/DISTANCE). MapView owns the fetch, the range, and both filters' state; this
  * component is purely presentational plus its own dropdown-open/panel-resize local UI state.
  *
- * DistanceFilter.tsx renders standalone and always visible now, between the subtext line and
- * the toolbar below — no longer hidden behind the old "Filter" toggle button, which is gone.
+ * The filters share one row between the subtext line and the toolbar below: the Type dropdown
+ * (TYPE checkboxes plus an "All types" convenience row that clears every exclusion), then
+ * DistanceFilter.tsx, always visible — no longer hidden behind the old "Filter" toggle button,
+ * which is gone.
  *
  * A header toolbar sits directly above the row list. Every single-item action (edit, delete,
  * hide) lives here now, not on the row — a row has only its checkbox and its text; there are
  * no more per-row icon buttons at all. Acting on one activity means checking just its own box
- * first, the same as acting on many: a master checkbox mirrors the checked group's state, a
- * Type dropdown (TYPE checkboxes plus an "All types" convenience row that clears every
- * exclusion; Distance is its own standalone control above, see above), then four icon actions
- * over the checked group — Show/hide, Edit (Type/Name/Description for exactly one checked
- * activity, Type only for more than one — see EditActivityDialog.tsx), Delete, and, set off by
+ * first, the same as acting on many: a master checkbox mirrors the checked group's state, then icon actions
+ * over the checked group — Show/hide, Edit (the Edit window, EditActivityWindow.tsx: its Activity
+ * tab edits Type/Name/Description for exactly one checked activity and Type only for more than
+ * one, its Track tab one activity's track), Delete, and, set off by
  * a divider, Focus on map (fly-to-fit, moved here from the footer's old text button). The
  * footer keeps only the "N selected · X km" summary.
  *
@@ -120,9 +120,6 @@ export interface ActivitiesPanelProps {
    *  the whole checked group; otherwise hide the whole group. See MapView's
    *  toggleGroupVisibility for the exact rule. */
   onToggleGroupVisibility: () => void;
-  /** §4.7.4: a row's edit dialog saved successfully — reload the list so the renamed type/
-   *  description (and the TYPE filter chip it may now belong to) reflect it immediately. */
-  onActivityUpdated: () => void;
   /** §4.7.5's "Delete group" — the only delete entry point now (a single activity is deleted
    *  by checking just its own box first, then this same button), so always an array even for
    *  one id. Unlike onActivityUpdated, this also has to drop every deleted id from
@@ -130,9 +127,9 @@ export interface ActivitiesPanelProps {
    *  (deleting changes distance/duration, editing never does) — MapView's own
    *  handleActivitiesDeleted does more than a plain reload. */
   onActivitiesDeleted: (ids: string[]) => void;
-  /** §4.7.7's Edit track — the toolbar action over exactly one checked activity. MapView owns
-   *  the session itself (hiding the other tracks, the flight, the editor window). */
-  onEditTrack: (activity: Activity) => void;
+  /** The toolbar's Edit button, over the checked group — MapView opens the Edit window
+   *  (EditActivityWindow.tsx: Activity and Track tabs) over the map. */
+  onEdit: (activities: Activity[]) => void;
   /** FR-3.7's "Not yet built" gap, closed: activities cross-source dedup took out of
    *  circulation, each alongside the richer copy that superseded it — mirrors the Android
    *  app's own duplicates section (`SyncStatusActivity`). Never filtered by the date range or
@@ -179,9 +176,8 @@ export function ActivitiesPanel({
   onShowSelected,
   hiddenIds,
   onToggleGroupVisibility,
-  onActivityUpdated,
   onActivitiesDeleted,
-  onEditTrack,
+  onEdit,
   duplicates,
   duplicatesError,
   imports,
@@ -193,7 +189,7 @@ export function ActivitiesPanel({
 }: ActivitiesPanelProps) {
   const hasActiveFilters = excludedTypes.size > 0 || distanceFilter !== null;
 
-  // The Type dropdown (Type + Distance, per the header toolbar redesign) — closed by
+  // The Type dropdown, in the filter row beside Distance — closed by
   // default, same "most sessions don't start by narrowing filters" reasoning the old "Filter"
   // toggle button had. Dismiss on outside click or Escape, the same hand-wired pattern
   // the Duplicates disclosure below uses too (not shared into a hook for two call sites).
@@ -251,13 +247,6 @@ export function ActivitiesPanel({
     };
   }, [duplicatesOpen]);
 
-  // §4.7.4's edit dialog — at most one open at a time, but now over either one row (a row's
-  // own text no longer has a pencil icon; there isn't one any more) or the whole checked
-  // group (the toolbar's Edit-selected button), so this holds an array rather than a single
-  // Activity. EditActivityDialog itself branches on its length: exactly one edits Type, Name,
-  // and Description as before; more than one edits Type only. `facets` (already computed for
-  // the TYPE filter chips) doubles as the dialog's <datalist> suggestions either way.
-  const [editingActivities, setEditingActivities] = useState<Activity[] | null>(null);
 
   // §4.7.5's delete confirm dialog — the toolbar's "Delete group" is now the only delete
   // entry point (there's no per-row delete button any more; a single activity is deleted by
@@ -329,18 +318,6 @@ export function ActivitiesPanel({
   // MapView's toggleGroupVisibility rule (show the whole group the moment any of it is hidden).
   const groupHasHidden = checkedActivities.some((a) => hiddenIds.has(a.id));
 
-  // Edit track works on one activity's points, so it needs exactly one checked row — and one
-  // with a track to edit that isn't already mid-reprocess.
-  const editTrackTarget = checkedActivities.length === 1 ? checkedActivities[0]! : null;
-  const editTrackReason = readOnly
-    ? t('activities.demo_edit_tracks')
-    : editTrackTarget === null
-      ? t('activities.edit_track_check_one')
-      : editTrackTarget.pending
-        ? t('activities.edit_track_processing')
-        : editTrackTarget.bbox === null
-          ? t('activities.no_track')
-          : null;
   // Pending rows can't be edited or deleted until their reprocess lands — the job would
   // otherwise race the edit or delete for the same row.
   const groupHasPending = checkedActivities.some((a) => a.pending);
@@ -454,58 +431,9 @@ export function ActivitiesPanel({
         />
       ) : (
         <>
-          <DistanceFilter
-            bounds={distanceBounds}
-            value={distanceFilter}
-            onChangeDistance={onChangeDistance}
-            onReset={onResetFilters}
-            hasActiveFilters={hasActiveFilters}
-          />
-
-          {/* The header toolbar — right above the row list. There are no more per-row action
-              icons to stay column-aligned with (Visible/Edit/Delete all moved here, operating on
-              the checked group), so this is a plain compact strip: select-all checkbox, the invert-selection icon, the Type
-              dropdown, a spacer, the three group-action chips, a divider, then the one
-              accent-tinted "focus the map on this group" action. */}
-          <div className="activities-panel__toolbar">
-            <input
-              ref={selectAllRef}
-              type="checkbox"
-              className="activities-panel__checkbox"
-              checked={allChecked}
-              disabled={activities.length === 0}
-              aria-label={allChecked ? t('activities.uncheck_all_label') : t('activities.check_all_label')}
-              title={allChecked ? t('activities.uncheck_all') : t('activities.check_all')}
-              onChange={() => (allChecked || someChecked ? onClear() : onSelectAll())}
-            />
-            <button
-              type="button"
-              className="activities-panel__invert"
-              disabled={activities.length === 0}
-              onClick={onInvertSelection}
-              aria-label={t('activities.invert')}
-              title={t('activities.invert_title')}
-            >
-              {/* A checkbox-sized square split on the diagonal, one half filled — reads as a
-                  sibling of the select-all checkbox beside it rather than a separate text chip.
-                  Lucide has no such glyph, so it's drawn to Lucide's own geometry (its `square`:
-                  24-unit grid, 2-unit stroke, rx 2) to stay one family with the rest. */}
-              <svg
-                viewBox="0 0 24 24"
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinejoin="round"
-                aria-hidden="true"
-                focusable="false"
-              >
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <path d="M21 3v16a2 2 0 0 1-2 2H3Z" fill="currentColor" />
-              </svg>
-            </button>
-
+          {/* The two filters side by side: Type's dropdown, then Distance's slider taking the
+              rest of the row. */}
+          <div className="activities-panel__filters">
             <div className="activities-panel__type-dropdown" ref={typeFilterRef}>
               <button
                 type="button"
@@ -561,6 +489,58 @@ export function ActivitiesPanel({
                 </div>
               )}
             </div>
+            <DistanceFilter
+              bounds={distanceBounds}
+              value={distanceFilter}
+              onChangeDistance={onChangeDistance}
+              onReset={onResetFilters}
+              hasActiveFilters={hasActiveFilters}
+            />
+          </div>
+
+          {/* The header toolbar — right above the row list. There are no more per-row action
+              icons to stay column-aligned with (Visible/Edit/Delete all moved here, operating on
+              the checked group), so this is a plain compact strip: select-all checkbox, the invert-selection icon, a
+              spacer, the group-action chips, a divider, then the one accent-tinted "focus the
+              map on this group" action. */}
+          <div className="activities-panel__toolbar">
+            <input
+              ref={selectAllRef}
+              type="checkbox"
+              className="activities-panel__checkbox"
+              checked={allChecked}
+              disabled={activities.length === 0}
+              aria-label={allChecked ? t('activities.uncheck_all_label') : t('activities.check_all_label')}
+              title={allChecked ? t('activities.uncheck_all') : t('activities.check_all')}
+              onChange={() => (allChecked || someChecked ? onClear() : onSelectAll())}
+            />
+            <button
+              type="button"
+              className="activities-panel__invert"
+              disabled={activities.length === 0}
+              onClick={onInvertSelection}
+              aria-label={t('activities.invert')}
+              title={t('activities.invert_title')}
+            >
+              {/* A checkbox-sized square split on the diagonal, one half filled — reads as a
+                  sibling of the select-all checkbox beside it rather than a separate text chip.
+                  Lucide has no such glyph, so it's drawn to Lucide's own geometry (its `square`:
+                  24-unit grid, 2-unit stroke, rx 2) to stay one family with the rest. */}
+              <svg
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M21 3v16a2 2 0 0 1-2 2H3Z" fill="currentColor" />
+              </svg>
+            </button>
 
             <span className="activities-panel__toolbar-spacer" aria-hidden="true" />
 
@@ -578,7 +558,7 @@ export function ActivitiesPanel({
               type="button"
               className="activities-panel__edit"
               disabled={readOnly || checked.size === 0}
-              onClick={() => setEditingActivities(checkedActivities)}
+              onClick={() => onEdit(checkedActivities)}
               aria-label={t('activities.edit_group_label')}
               title={
                 readOnly
@@ -589,16 +569,6 @@ export function ActivitiesPanel({
               }
             >
               <Pencil size={16} />
-            </button>
-            <button
-              type="button"
-              className="activities-panel__edit-track"
-              disabled={editTrackReason !== null}
-              onClick={() => editTrackTarget && onEditTrack(editTrackTarget)}
-              aria-label={t('activities.edit_track_label')}
-              title={editTrackReason ?? t('activities.edit_track')}
-            >
-              <Waypoints size={16} />
             </button>
             <button
               type="button"
@@ -755,14 +725,6 @@ export function ActivitiesPanel({
         </>
       )}
 
-      {editingActivities && (
-        <EditActivityDialog
-          activities={editingActivities}
-          knownTypes={facets}
-          onClose={() => setEditingActivities(null)}
-          onSaved={onActivityUpdated}
-        />
-      )}
 
       {deletingGroup && (
         <ConfirmDialog

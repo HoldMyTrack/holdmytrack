@@ -438,9 +438,9 @@ export async function listActivities(query: ActivityQuery = {}, signal?: AbortSi
 }
 
 /**
- * §4.7.4's `PATCH /v1/activities/{id}` — the edit-type-name-and-description dialog's Save
- * button. Full-replace-on-save, not per-field: all three fields commit together.
- * Returns the updated row so the caller can `reload()` the list (EditActivityDialog.tsx does,
+ * §4.7.4's `PATCH /v1/activities/{id}` — the Edit window's Save, for its Activity tab's
+ * fields. Full-replace-on-save, not per-field: all three fields commit together.
+ * Returns the updated row so the caller can `reload()` the list (EditActivityWindow.tsx's caller does,
  * matching the "just refetch" convention an upload completion already uses) rather than
  * needing this return value directly — returned anyway: one fewer thing for a caller to
  * assume about the request.

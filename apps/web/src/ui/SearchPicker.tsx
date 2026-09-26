@@ -57,7 +57,7 @@ export interface SearchPickerProps {
    *  prompt for a required field (Country's "Choose a country"), never itself selectable. */
   emptyLabel?: string;
   /** Makes the list open-ended: while the search text doesn't exactly match an existing
-   *  option, this builds an extra last row from it (EditActivityDialog's "Add “Solowheel”"),
+   *  option, this builds an extra last row from it (the Edit window's "Add “Solowheel”"),
    *  so the search field doubles as the field for entering a new value. Returns null for text
    *  that can't be a value (empty, too long). */
   createOption?: (text: string) => PickerOption | null;

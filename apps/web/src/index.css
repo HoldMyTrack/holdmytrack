@@ -41,51 +41,7 @@ body {
   min-height: 0;
 }
 
-/* EditActivityDialog.tsx (§4.7.4) — a real <dialog>/showModal(), wide enough for the
-   description field, and its own
-   form-field layout reuses .settings-page__* classes rather than duplicating them. */
-/* `overflow: visible` overrides the UA's `overflow: auto` on a modal dialog, so the Type
-   picker's dropdown (ActivityTypePicker.tsx) can hang past the dialog's bottom edge instead
-   of scrolling inside it. */
-.edit-activity-dialog {
-  overflow: visible;
-  width: min(28rem, calc(100vw - 40px));
-  margin: auto;
-  padding: var(--fm-space-20);
-  border: 1px solid rgb(var(--fm-ink-rgb) / 10%);
-  border-radius: var(--fm-radius-lg);
-  background: var(--fm-surface);
-  color: var(--fm-ink);
-  box-shadow: var(--fm-shadow-xl);
-  display: flex;
-  flex-direction: column;
-  gap: var(--fm-space-16);
-}
-
-.edit-activity-dialog::backdrop {
-  background: rgb(var(--fm-ink-rgb) / 35%);
-}
-
-.edit-activity-dialog__title {
-  margin: 0;
-  font-size: var(--fm-text-xl);
-  font-weight: var(--fm-weight-heavy);
-  letter-spacing: 0.02em;
-}
-
-.edit-activity-dialog__subtitle {
-  margin: calc(-1 * var(--fm-space-10)) 0 0;
-  font-size: var(--fm-text-md);
-  color: rgb(var(--fm-ink-rgb) / 55%);
-}
-
-.edit-activity-dialog__description {
-  resize: vertical;
-  min-height: 4.5em;
-  font: inherit;
-}
-
-/* ConfirmDialog.tsx — same real-<dialog>/showModal() shape as .edit-activity-dialog, sized for
+/* ConfirmDialog.tsx — a real <dialog>/showModal(), sized for
    a short title+message rather than a form. Generic, not delete-specific, but the one caller
    today (§4.7.5's Delete button) is what the red confirm button is tuned for — a future
    non-destructive use of this component can still override confirmLabel/styling as needed. */
@@ -265,9 +221,19 @@ body {
    out to its own dropdown (checkboxes inline in ActivitiesPanel.tsx, reusing
    .activity-filters__type-* below directly). */
 .activity-filters {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--fm-space-12);
+}
+
+/* Type's dropdown and the Distance slider share one row (ActivitiesPanel.tsx), the dropdown
+   centered against the slider's label/track/bounds stack. */
+.activities-panel__filters {
+  display: flex;
+  align-items: center;
+  gap: var(--fm-space-16);
   padding: var(--fm-space-4) var(--fm-space-16) var(--fm-space-16);
   border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 8%);
 }
@@ -750,9 +716,9 @@ body {
 .activities-panel__type-panel {
   position: absolute;
   top: calc(100% + 8px);
-  /* left, not right: the trigger sits near the toolbar's left edge now (checkbox, then Type),
-     not mid-row above a TYPE column any more — anchoring the panel's right edge to that
-     narrow, left-positioned trigger pushed a 13rem-wide panel leftward past x: 0, clipped
+  /* left, not right: the trigger sits at the filter row's left edge, not mid-row above a
+     TYPE column any more — anchoring the panel's right edge to that narrow, left-positioned
+     trigger pushed a 13rem-wide panel leftward past x: 0, clipped
      out of view entirely by .activities-panel's own overflow: hidden. */
   left: 0;
   z-index: 3;
@@ -1411,10 +1377,11 @@ body {
   box-shadow: var(--fm-shadow-sm);
 }
 
-/* The Edit track window (EditTrackPanel.tsx, §4.7.7) — floats over the map's top-left while
-   one activity is being edited, the same white card treatment as the mode toggle and the
-   track-metric card. The top-left is free because the mode toggle is hidden for the session;
-   the top-right belongs to MapLibre's own zoom/locate controls. */
+/* The Edit window (EditActivityWindow.tsx, §4.7.4/§4.7.7) — floats over the map's top-left
+   while it's open, the same white card treatment as the mode toggle and the track-metric card.
+   The top-left is free because the mode toggle is hidden while it's open; the top-right
+   belongs to MapLibre's own zoom/locate controls. Class names are the Edit track window's,
+   which it grew out of; its Track tab (TrackEditor.tsx) still uses the rest of them. */
 .edit-track {
   position: absolute;
   top: 10px;
@@ -1526,6 +1493,66 @@ body {
   margin: 0;
   font-size: var(--fm-text-sm);
   color: var(--fm-danger);
+}
+
+/* EditActivityWindow.tsx — the Edit window is the .edit-track card above with two tabs, the
+   Activities panel's own tab look at a smaller size. Its Activity form reuses the
+   .settings-page__* field classes. */
+.edit-window__tabs {
+  display: flex;
+  gap: var(--fm-space-16);
+  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 10%);
+}
+
+.edit-window__tab {
+  display: flex;
+  align-items: center;
+  gap: var(--fm-space-6);
+  margin-bottom: -1px;
+  padding: 0 0 var(--fm-space-6);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--fm-ink);
+  font: inherit;
+  font-size: var(--fm-text-md);
+  font-weight: var(--fm-weight-semibold);
+  cursor: pointer;
+  opacity: 0.5;
+}
+
+.edit-window__tab[aria-selected='true'] {
+  border-bottom-color: var(--fm-accent);
+  opacity: 1;
+}
+
+.edit-window__tab:disabled {
+  cursor: default;
+  opacity: 0.3;
+}
+
+/* The Track tab holds unsaved edits — visible from the Activity tab too. */
+.edit-window__tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--fm-radius-pill);
+  background: var(--fm-accent);
+}
+
+.edit-window__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fm-space-10);
+}
+
+.edit-window__panel[hidden] {
+  display: none;
+}
+
+.edit-window__description {
+  resize: vertical;
+  min-height: 4.5em;
+  font: inherit;
 }
 
 /* The Activities panel's Privacy tab (PrivateLocationsPanel.tsx) — built from the Activities
@@ -1964,7 +1991,7 @@ body {
   font-size: var(--fm-text-md);
 }
 
-/* Form fields in the Edit activity dialog (EditActivityDialog.tsx). Named for the React
+/* Form fields in the Edit window's Activity tab (EditActivityWindow.tsx). Named for the React
    Settings page they came from, which is now a server-rendered page with its own styles
    (services/server/internal/web/static/pages.css). */
 .settings-page__section {
@@ -1994,7 +2021,7 @@ body {
   outline-offset: 1px;
 }
 
-/* EditActivityDialog.tsx's Name/Description fields when editing more than one checked
+/* EditActivityWindow.tsx's Name/Description fields when editing more than one checked
    activity at once — visibly inert, not just inert on click, so "why can't I type here"
    reads before anyone hovers long enough for the field's own title tooltip. */
 .settings-page__input:disabled {

@@ -28,7 +28,7 @@ import { lang, t } from '../i18n';
  * The Activities panel's Privacy tab (FR-8.1): the account's circles listed, each with its own
  * Delete, and a Create that puts a new circle in the middle of the map. Picking one — its row,
  * or the circle itself on the map — opens its editor, a window floating over the map like
- * EditTrackPanel's (portaled into the map's container, since this tab lives in the side
+ * the Edit window's (portaled into the map's container, since this tab lives in the side
  * panel), where its center drags, a slider sets its radius, and Save or Cancel closes it. The
  * circles are drawn, and clickable, for exactly as long as this is mounted: switching tabs, or
  * to Fog/Heatmap (which unmounts the whole panel), clears them and drops an unsaved edit. Save

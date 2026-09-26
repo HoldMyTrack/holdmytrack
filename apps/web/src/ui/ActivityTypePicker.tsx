@@ -25,7 +25,7 @@ function typeOption(type: string, count?: number): PickerOption {
 }
 
 /**
- * EditActivityDialog.tsx's Type field — the same SearchPicker as Settings' Country and
+ * The Edit window's Type field (EditActivityWindow.tsx) — the same SearchPicker as Settings' Country and
  * Timezone, over this account's existing types (formatted, with how many activities use each),
  * but open-ended: activity_type is free-form (§4.7.2), not a controlled vocabulary, so any
  * search text that doesn't exactly match an existing type offers itself as a last "Add …" row
