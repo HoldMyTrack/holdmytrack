@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.TextInputLayout
 import dev.holdmytrack.android.R
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.recording.db.RecordedActivityStore
@@ -74,6 +75,9 @@ class RecordingActivity : AppCompatActivity() {
         val distanceValue: TextView = findViewById(R.id.recording_stat_distance_value)
 
         typeField.setOnClickListener { openTypePicker() }
+        // The chevron is its own tappable view: it opens the same picker, rather than being a
+        // target that looks like it does something and doesn't.
+        findViewById<TextInputLayout>(R.id.recording_type_layout).setEndIconOnClickListener { openTypePicker() }
         findViewById<Button>(R.id.recording_save).setOnClickListener { onSave() }
         val download: Button = findViewById(R.id.recording_download)
         download.setOnClickListener { onDownload() }

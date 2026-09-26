@@ -224,7 +224,11 @@ class MainActivity : AppCompatActivity() {
             MapMode.FOG to findViewById(R.id.mode_fog),
             MapMode.HEATMAP to findViewById(R.id.mode_heatmap),
         )
-        modeButtons.forEach { (value, button) -> button.setOnClickListener { setMode(value) } }
+        modeButtons.forEach { (value, button) ->
+            button.setOnClickListener { setMode(value) }
+            button.minWidth = minTouchTargetPx()
+            button.minimumWidth = minTouchTargetPx()
+        }
         menuButton.setOnClickListener { showMenu(it) }
 
         recordButton = findViewById(R.id.record_button)
@@ -276,8 +280,43 @@ class MainActivity : AppCompatActivity() {
                 .build()
             applyCompassMargin()
             applyAttributionMargin()
+            mapView.post { enlargeAttributionTarget(instance) }
             loadStyle()
         }
+    }
+
+    /**
+     * MapLibre's attribution "i" is a 21dp view — under the 48dp touch target, and the one
+     * control on the map that isn't the app's own. It has no id, so it's found by the content
+     * description MapLibre gives it and padded out to 48dp — sideways evenly, moving it back by
+     * the same amount through the attribution margins, and upward only, since it sits against
+     * the bottom edge and padding below would put half the target off the screen. The icon
+     * itself stays where MapLibre put it.
+     */
+    /** [MIN_TOUCH_TARGET_DP] in pixels, rounded up. */
+    private fun minTouchTargetPx() = kotlin.math.ceil(MIN_TOUCH_TARGET_DP * resources.displayMetrics.density).toInt()
+
+    private fun enlargeAttributionTarget(instance: MapLibreMap) {
+        val found = ArrayList<View>()
+        mapView.findViewsWithText(
+            found,
+            getString(org.maplibre.android.R.string.maplibre_attributionsIconContentDescription),
+            View.FIND_VIEWS_WITH_CONTENT_DESCRIPTION,
+        )
+        val icon = found.firstOrNull() ?: return
+        val target = minTouchTargetPx()
+        // Rounded up, so an odd shortfall still reaches the full 48dp.
+        val padX = ((target - icon.width + 1) / 2).coerceAtLeast(0)
+        val padY = ((target - icon.height + 1) / 2).coerceAtLeast(0)
+        if (padX == 0 && padY == 0) return
+        icon.setPadding(padX, padY * 2, padX, 0)
+        val settings = instance.uiSettings
+        settings.setAttributionMargins(
+            settings.attributionMarginLeft - padX,
+            settings.attributionMarginTop,
+            settings.attributionMarginRight,
+            settings.attributionMarginBottom,
+        )
     }
 
     /**
@@ -889,6 +928,9 @@ class MainActivity : AppCompatActivity() {
         /** How long a session check may take before the map says it's checking — a fast one
          *  shouldn't flash a notice. */
         const val CHECKING_DELAY_MS = 600L
+
+        /** Material's and the platform's minimum touch target. */
+        const val MIN_TOUCH_TARGET_DP = 48
         const val MENU_PROFILE = 1
         const val MENU_SYNC = 2
         const val MENU_RECORDED_ACTIVITIES = 3

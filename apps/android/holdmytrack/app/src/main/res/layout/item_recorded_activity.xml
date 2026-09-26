@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- One Recorded Activities row, after the web's .activities-panel__row: the queue checkbox, the
      route's silhouette, the name over its metadata, then Edit and Delete as icon buttons with the
-     web's own icons for those actions. Filled by RecordedActivitiesActivity. -->
+     web's own icons for those actions. Filled by RecordedActivitiesActivity. The name and its
+     metadata take two lines each before eliding: at a large font size, one line left a date
+     cut to "Sep 26, 202…". -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -36,7 +38,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:ellipsize="end"
-            android:maxLines="1"
+            android:maxLines="2"
             android:textAppearance="?attr/textAppearanceTitleSmall" />
 
         <TextView
@@ -45,7 +47,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/hmt_space_2"
             android:ellipsize="end"
-            android:maxLines="1"
+            android:maxLines="2"
             android:textAppearance="?attr/textAppearanceLabelSmall"
             android:textColor="@color/hmt_ink_meta"
             android:textFontWeight="400" />

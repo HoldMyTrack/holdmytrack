@@ -3,6 +3,7 @@ package dev.holdmytrack.android.recording
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -84,6 +85,10 @@ class RecordButton @JvmOverloads constructor(
         isLongClickable = false
     }
 
+    // Lint's ClickableViewAccessibility doesn't see that every event still reaches
+    // super.onTouchEvent, which performs the click; TalkBack's stop is the long-click action
+    // (updateAccessibilityAction), since a screen reader can't hold.
+    @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {

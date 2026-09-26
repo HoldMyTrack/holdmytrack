@@ -94,6 +94,9 @@
     <string name="recorded_filter_status_label">Status</string>
     <string name="recorded_filter_type_label">Type</string>
     <string name="recorded_row_queue">Queue for sync</string>
+    <string name="recorded_row_queue_named">Queue %1$s for sync</string>
+    <string name="recorded_row_edit_named">Edit %1$s</string>
+    <string name="recorded_row_delete_named">Delete %1$s</string>
     <string name="recorded_status_not_synced">Not synced</string>
     <string name="recorded_status_queued">Queued</string>
     <string name="recorded_row_subtitle">%1$s · %2$.2f km · %3$s</string>
