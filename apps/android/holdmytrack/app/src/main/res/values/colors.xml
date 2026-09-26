@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The web client's palette (apps/web/src/index.css, the fm- custom properties), carried over value for
-     value so the two clients read as one product. Provisional until root Phase 3's design freeze;
-     that pass replaces these values here, and nothing else should need to change. The web has no
-     dark palette, so neither does this. -->
+<!-- The web client's palette (services/server/internal/web/static/tokens.css, the fm- custom
+     properties), carried over value for value so the two clients read as one product.
+     Provisional until root Phase 3's design freeze; that pass replaces these values here, and
+     nothing else should need to change. The web has no dark palette, so neither does this. -->
 <resources>
     <color name="hmt_bg">#F7F4EC</color>
     <color name="hmt_surface">#FFFFFF</color>
