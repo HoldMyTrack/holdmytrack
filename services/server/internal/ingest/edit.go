@@ -252,7 +252,7 @@ func reprocessActivity(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
 
 	// started_at moves with a Chop — the activity now starts where its first kept point does.
-	// in_heatmap_window follows it, the same predicate migrations/0018 backfilled with.
+	// in_heatmap_window follows it, against the same fog.HeatmapWindowDays heatmap_aging.go sweeps with.
 	// track_edit is only rewritten by a user's edit; a reprivacy pass leaves it as stored.
 	if _, err := tx.Exec(ctx, `
 		UPDATE activities SET

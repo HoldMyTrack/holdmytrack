@@ -12,7 +12,7 @@ import (
 )
 
 // recomputeHeatmapCaps is what keeps each account's users.heatmap_cap (migrations/
-// 0019_heatmap_cap.sql) matching its own actual coverage, since nothing about an account's
+// 0001_users_and_auth.sql) matching its own actual coverage, since nothing about an account's
 // touch-count distribution changes on an event a request handler could hook — it drifts
 // gradually as activities are ingested, deleted, or age out of the heatmap window
 // (heatmap_aging.go, run independently — whichever of the two runs first on a given day, the

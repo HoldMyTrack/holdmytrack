@@ -67,7 +67,7 @@ func RenderUser(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, u
 // re-renders each affected activity's own masks from freshly clipped points (internal/ingest's
 // ProcessReprivacy) before this recomposites.
 
-// userHeatmapCap reads the account's own users.heatmap_cap (migrations/0019_heatmap_cap.sql)
+// userHeatmapCap reads the account's own users.heatmap_cap (migrations/0001_users_and_auth.sql)
 // — kept current by internal/worker/heatmap_cap.go's daily sweep (cap.go's
 // RecomputeHeatmapCap), never derived here. A render pass always uses whatever value is
 // currently stored, even if a recompute is mid-flight elsewhere; the next render after that

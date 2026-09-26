@@ -70,7 +70,7 @@ export interface UserProfile {
   country: string;
   avatarUrl: string;
   /** IANA zone name (e.g. "America/New_York"), never `''` — unlike displayName/country there
-   *  is no "unset" state (services/server/migrations/0021_user_timezone.sql's column is
+   *  is no "unset" state (services/server/migrations/0001_users_and_auth.sql's column is
    *  `NOT NULL DEFAULT 'UTC'`). Drives every day-bucketing query server-side
    *  (docs/KNOWN_ISSUES.md's "UTC-day bucketing" entry) — the client never buckets by day
    *  itself, it only offers this value for editing in Settings. */

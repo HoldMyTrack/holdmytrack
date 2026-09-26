@@ -171,7 +171,7 @@ func blankTile() *image.Gray {
 
 const (
 	// defaultHeatmapCap seeds every account's users.heatmap_cap (migrations/
-	// 0019_heatmap_cap.sql) and is also the floor RecomputeHeatmapCap falls back to before an
+	// 0001_users_and_auth.sql) and is also the floor RecomputeHeatmapCap falls back to before an
 	// account has enough coverage to derive its own value (see minTouchedTilesForAdaptiveCap
 	// in cap.go) — "about 8 separate activities through the same spot reads as maximally hot,"
 	// the same adopted-not-derived reasoning §4.2.1 recorded fog's reveal radius with, kept as

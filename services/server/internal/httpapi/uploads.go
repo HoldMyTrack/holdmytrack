@@ -94,7 +94,7 @@ LIMIT $2 OFFSET $3`
 
 // jobErrorMessage is what a failed ingest job shows a person: its error_code's catalog message
 // in the reader's language (ingest.FailureCode, IMPLEMENTATION.md §4.21). A failure with no code
-// shows last_error as it is; the worker and migration 0034 give every failed ingest job a
+// shows last_error as it is; the worker gives every failed ingest job a
 // code, so that fallback is only a guard.
 func jobErrorMessage(l *i18n.Localizer, errorCode, lastError *string) string {
 	if errorCode != nil {

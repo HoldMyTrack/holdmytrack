@@ -16,7 +16,7 @@ import (
 const demoPurgeBatchSize = 100
 
 // purgeExpiredDemoUsers deletes every demo account (users.demo_expires_at,
-// migrations/0001_init.sql; VISION.md §8.2) whose expiry has passed. `DELETE FROM users` cascades the
+// migrations/0001_users_and_auth.sql; VISION.md §8.2) whose expiry has passed. `DELETE FROM users` cascades the
 // DB side of this for free — activities, activity_streams, activity_tile_masks, fog_tiles,
 // jobs and sessions all reference user_id ON DELETE CASCADE — but object storage has no
 // foreign keys, so raw uploads and rendered tile pyramids have to be swept explicitly first.

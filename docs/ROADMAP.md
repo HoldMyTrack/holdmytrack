@@ -105,7 +105,7 @@ Connecting the app to third-party services, and the explorer-tile scoring work t
 
 ### Path 1 — cloud connectors (gated on the prerequisites above)
 
-- [ ] Generic OAuth connection scaffolding — `connections` table already exists (`migrations/0001_init.sql` §3.2); build the authorize/callback/token-refresh flow once, provider-agnostic, before any specific provider.
+- [ ] Generic OAuth connection scaffolding — `connections` table already exists (`migrations/0002_activities.sql`, §3.2); build the authorize/callback/token-refresh flow once, provider-agnostic, before any specific provider.
 - [ ] Garmin connector (after the licence prerequisite is settled).
 - [ ] Wahoo connector (after partner approval).
 - [ ] COROS connector (after partner approval).

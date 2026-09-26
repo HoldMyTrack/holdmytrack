@@ -22,7 +22,7 @@ import (
 
 // DemoCustomerUserID is the one persistent, shared demo account every "Try Demo" visitor's
 // session is pointed at (handleDemoStart) — not a fresh row created and re-seeded per visitor.
-// Must match migrations/0017_demo_customer_user.sql's fixed id. Its demo_expires_at is a
+// Must match migrations/0006_demo_customer.sql's fixed id. Its demo_expires_at is a
 // far-future timestamp, not NULL, so it stays isDemo == true (read-only, verification-exempt)
 // without ever being swept by internal/worker/demo_purge.go.
 const DemoCustomerUserID = "22222222-2222-2222-2222-222222222222"

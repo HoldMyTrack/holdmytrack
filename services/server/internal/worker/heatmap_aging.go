@@ -18,7 +18,7 @@ import (
 // needs something to notice that on the calendar's own schedule, not an event.
 //
 // Deliberately per-activity, not per-user: activities.in_heatmap_window (migrations/
-// 0018_activity_in_heatmap_window.sql) turns "is this activity still within the window" into
+// 0002_activities.sql) turns "is this activity still within the window" into
 // a stored fact this query can select directly, and each one that just crossed the boundary
 // only ever needs *its own* tiles re-rendered (ActivityTiles, the same lookup
 // handleDeleteActivity's activityFogTiles uses) — never a full account-wide rebuild the way an

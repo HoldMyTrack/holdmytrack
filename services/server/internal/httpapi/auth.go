@@ -20,7 +20,7 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 )
 
-// Email+password auth, server-side sessions (migrations/0006_sessions.sql) — resolved toward
+// Email+password auth, server-side sessions (migrations/0001_users_and_auth.sql) — resolved toward
 // the smallest thing that removes the old placeholder-user stand-in, with no vendor to depend
 // on, the same bias Path 3 uploads already made. Sign in with Google (google_auth.go) is an
 // optional second way into the same accounts and the same sessions, off unless configured —
@@ -59,9 +59,9 @@ type authRequest struct {
 	// only by handleSignup's caller (decodeAuthRequest itself is shared with login, which
 	// ignores this field). Invalid or absent falls back to "UTC" rather than rejecting the
 	// signup over it — auto-detection is a convenience default, not something worth blocking
-	// account creation over (see migrations/0021_user_timezone.sql's own doc comment).
+	// account creation over (users.timezone is always editable in Settings).
 	Timezone string `json:"timezone"`
-	// Locale is the account's language (migrations/0030_user_locale.sql), "" for automatic —
+	// Locale is the account's language (migrations/0001_users_and_auth.sql), "" for automatic —
 	// the web app then follows the browser's.
 	Locale string `json:"locale"`
 }
@@ -102,9 +102,9 @@ type authResponse struct {
 	Country     string `json:"country"`
 	AvatarURL   string `json:"avatar_url"`
 	// IANA name (e.g. "America/New_York"), never empty — unlike DisplayName/Country there is
-	// no "unset" state: the column is NOT NULL DEFAULT 'UTC' (migrations/0021_user_timezone.sql).
+	// no "unset" state: the column is NOT NULL DEFAULT 'UTC' (migrations/0001_users_and_auth.sql).
 	Timezone string `json:"timezone"`
-	// Locale is the account's language (migrations/0030_user_locale.sql), "" for automatic —
+	// Locale is the account's language (migrations/0001_users_and_auth.sql), "" for automatic —
 	// the web app then follows the browser's.
 	Locale string `json:"locale"`
 }
@@ -289,7 +289,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 // createAccount is signup's shared core — handleSignup (JSON) and the /signup page
 // (auth_pages.go) both call it. email and password are validated here, not by the caller.
 // timezone is the browser's own guess and falls back to "UTC" when absent or unknown, rather
-// than failing the signup over a convenience default (migrations/0021_user_timezone.sql).
+// than failing the signup over a convenience default (migrations/0001_users_and_auth.sql).
 func (s *Server) createAccount(ctx context.Context, rawEmail, password, timezone, lang string) (string, error) {
 	email, err := validateCredentials(rawEmail, password)
 	if err != nil {
