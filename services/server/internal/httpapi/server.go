@@ -131,6 +131,8 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	// + demo without real ingest" says a demo account must never reach. requireVerified alone
 	// covers everything else a signed-in-but-unverified real account must also not reach yet.
 	s.mux.HandleFunc(route("PATCH", "/account/settings"), s.requireNotDemo(s.handleUpdateSettings))
+	// Readable by a demo session, whose Settings screen shows the fields, disabled.
+	s.mux.HandleFunc(route("GET", "/account/settings/options"), s.requireVerified(s.handleSettingsOptions))
 	s.mux.HandleFunc(route("POST", "/account/avatar"), s.requireNotDemo(s.handleUploadAvatar))
 	s.mux.HandleFunc(route("GET", "/account/avatar"), s.requireVerified(s.handleGetAvatar))
 	s.mux.HandleFunc(route("DELETE", "/account/avatar"), s.requireNotDemo(s.handleDeleteAvatar))

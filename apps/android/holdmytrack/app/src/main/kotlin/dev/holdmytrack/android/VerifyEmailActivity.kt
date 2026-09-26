@@ -82,9 +82,9 @@ class VerifyEmailActivity : AppCompatActivity() {
         HoldMyTrackApi.verifySession { result ->
             checking = false
             setBusy(false)
-            result.onSuccess { emailVerified ->
-                Session.markVerified(emailVerified)
-                if (emailVerified) {
+            result.onSuccess { profile ->
+                Session.markVerified(profile)
+                if (profile.emailVerified) {
                     startActivity(
                         Intent(this, MainActivity::class.java)
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),

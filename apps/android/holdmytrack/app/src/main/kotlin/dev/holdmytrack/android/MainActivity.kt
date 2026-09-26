@@ -34,6 +34,8 @@ import dev.holdmytrack.android.recording.RecordButton
 import dev.holdmytrack.android.recording.RecordedActivitiesActivity
 import dev.holdmytrack.android.recording.RecordingService
 import dev.holdmytrack.android.recording.RecordingState
+import dev.holdmytrack.android.settings.AppLanguage
+import dev.holdmytrack.android.settings.SettingsActivity
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -468,6 +470,14 @@ class MainActivity : AppCompatActivity() {
             openVerifyEmail()
             return
         }
+        // The first run, as on the web: a real account that has never saved Settings (no
+        // Country) goes there before the map — its Country decides the units the map's own
+        // screens show, and nothing else would ever ask for it.
+        if (!Session.isDemo && Session.country.isEmpty()) {
+            SettingsActivity.openOnboarding(this)
+            finish()
+            return
+        }
 
         modeBarReady = true
         modeBar.visibility = if (isRecording()) View.GONE else View.VISIBLE
@@ -665,8 +675,9 @@ class MainActivity : AppCompatActivity() {
             verifying = false
             notice.removeCallbacks(showChecking)
             hideNotice(Notice.CHECKING)
-            result.onSuccess { emailVerified ->
-                Session.markVerified(emailVerified)
+            result.onSuccess { profile ->
+                Session.markVerified(profile)
+                AppLanguage.followAccount(applicationContext, profile.locale)
                 hideNotice(Notice.UNREACHABLE)
             }.onFailure { failure ->
                 // Only a 401 means the token itself is dead. Anything else — no network, a
@@ -745,11 +756,13 @@ class MainActivity : AppCompatActivity() {
         menu.menu.add(0, MENU_PROFILE, 0, R.string.menu_profile)
         menu.menu.add(0, MENU_SYNC, 1, R.string.menu_sync)
         menu.menu.add(0, MENU_RECORDED_ACTIVITIES, 2, R.string.menu_recorded_activities)
+        menu.menu.add(0, MENU_SETTINGS, 3, R.string.menu_settings)
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 MENU_PROFILE -> startActivity(Intent(this, ProfileActivity::class.java))
                 MENU_SYNC -> startActivity(Intent(this, SyncActivity::class.java))
                 MENU_RECORDED_ACTIVITIES -> startActivity(Intent(this, RecordedActivitiesActivity::class.java))
+                MENU_SETTINGS -> SettingsActivity.open(this)
             }
             true
         }
@@ -927,6 +940,7 @@ class MainActivity : AppCompatActivity() {
         const val MENU_PROFILE = 1
         const val MENU_SYNC = 2
         const val MENU_RECORDED_ACTIVITIES = 3
+        const val MENU_SETTINGS = 4
 
         /** The default range's length in activity days (`docs/SPEC.md` FR-6.1). */
         const val DEFAULT_RANGE_DAYS = 5

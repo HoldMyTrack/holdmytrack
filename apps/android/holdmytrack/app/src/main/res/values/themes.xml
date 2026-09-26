@@ -98,6 +98,12 @@
         <item name="cornerSize">@dimen/hmt_radius_md</item>
     </style>
 
+    <!-- A circle: the avatar, as the web's header and Settings draw it. -->
+    <style name="ShapeAppearance.HoldMyTrack.Round" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
     <style name="ShapeAppearance.HoldMyTrack.Medium" parent="">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">@dimen/hmt_radius_lg</item>

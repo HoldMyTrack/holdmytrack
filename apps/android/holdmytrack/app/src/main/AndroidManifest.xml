@@ -68,6 +68,13 @@
             </intent-filter>
         </activity>
 
+        <!-- Not exported: reached from the burger menu, or as a new account's first run. -->
+        <activity
+            android:name=".settings.SettingsActivity"
+            android:exported="false"
+            android:label="@string/settings_title"
+            android:theme="@style/Theme.HoldMyTrack" />
+
         <!-- Not exported: reached only from MainActivity's burger menu, never by another app. -->
         <activity
             android:name=".ProfileActivity"

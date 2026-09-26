@@ -99,6 +99,23 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 **Notes**: Changing a mistyped address (`docs/SPEC.md` FR-1.8 step 4) is web-only: the app keys its local recordings and sync watermark by email (FR-5.3), which a change would orphan. Verified on an emulator rather than a physical device.
 
+### FR-1.5 Settings
+
+**Description**: The account's Settings — Avatar, Name, Country, Timezone and Language, the same five the web's page edits (`docs/SPEC.md` FR-1.7) — on a Settings screen reached from the map's menu, and shown in place of the map on a new account's first run.
+
+**Preconditions**: A session whose email is confirmed (FR-1.4), or a demo account.
+
+**Behavior**:
+1. The screen loads the account (`GET /v1/auth/me`) and the Country, Timezone and Language lists (`GET /v1/account/settings/options`, the server's own, named in the app's language) together; nothing is editable until both are in.
+2. Avatar: "Choose an image" opens Android's photo picker (no storage permission); the picked image is shrunk to at most 512 px on its long side and uploaded as JPEG straight away (`POST /v1/account/avatar`), showing "Avatar updated."; Remove deletes it (`DELETE /v1/account/avatar`). Profile shows the avatar and the Name too.
+3. Country and Timezone each open a searchable list; Language is a drop-down of Automatic (phone), English and Русский. Save sends Name, Country, Timezone and Language together (`PATCH /v1/account/settings`) and shows "Saved."; a refusal shows the server's own message.
+4. **Country sets the app's units**: miles, feet and mph for the United States, Liberia and Myanmar, kilometres, metres and km/h everywhere else — the recording stats and notification, Recorded Activities and sync history — as on the web. Metric until a Country is saved.
+5. **Language sets the app's language** (its per-app language, the setting Android's own "App languages" screen writes): saving English or Русский switches the app at once, and saving Automatic returns it to the phone's language. A sign-in, or a session check, applies the account's language when it is English or Русский, and leaves the app alone when it is Automatic.
+6. **First run**: a real, confirmed account with no Country — every new account — opens on Settings instead of the map, titled "Welcome — set up your account", with the web's short explanation, and "Save and continue" takes it on to the map. There is no way past it but saving. A new email-and-password account starts on the phone's timezone.
+7. A demo account sees every field and button disabled, with a note that the shared demo account can't be changed.
+
+**Error cases**: The server's own wording, in the error box — a missing Country, an image it won't take.
+
 ## 4. FR-2 — Map Visualization
 
 ### FR-2.1 Base map
@@ -279,7 +296,6 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 Named here rather than left implicit, the way `docs/SPEC.md` §18 does for the wider system:
 
 - **No final visual design.** The palette, type scale, fonts and Lucide icons are the web's current ones carried over (Material 3) rather than a frozen design, and the screens are designed after their web counterparts until root `docs/ROADMAP.md` Phase 3's design freeze settles the final look (`apps/android/docs/ROADMAP.md` Phase 5). The app's own chrome is light only; only the map follows the system dark setting.
-- **The account's Language setting isn't applied.** The web's Settings choice (`docs/SPEC.md` FR-1.7) changes the web only; the app follows the phone or its per-app language.
 - **Date range only.** The map's date range (FR-2.6) is the web's; its TYPE/DISTANCE filters and per-track hide/show, which work over the Activities panel's list, have no Android equivalent — there is no activity list on the map.
 - **Accessibility is audited, not yet listened to.** Every actionable view is labelled and at least 48dp, checked on every screen at the default and the largest font scale; screens stay usable at the largest scale (text wraps, the map's mode toggle scrolls). A spoken TalkBack pass on a real device hasn't been done.
 - **Samsung Galaxy Watch is unsupported**, not degraded — Samsung does not expose route geometry to Health Connect at all, so every Samsung-sourced session is rejected for having no route, indistinguishable at sync time from an ordinary indoor workout.
