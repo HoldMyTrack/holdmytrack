@@ -142,7 +142,13 @@ class RecordedActivitiesActivity : AppCompatActivity() {
         }
 
         row.findViewById<TrackSilhouetteView>(R.id.row_preview).setPoints(record.points)
-        row.findViewById<TextView>(R.id.row_title).text = record.name.ifBlank { formatDate(record.startedAtMs) }
+        val title = record.name.ifBlank { formatDate(record.startedAtMs) }
+        row.findViewById<TextView>(R.id.row_title).text = title
+        // Named per row: TalkBack reads each control on its own, and "Delete" alone doesn't
+        // say which recording goes.
+        row.findViewById<View>(R.id.row_queued).contentDescription = getString(R.string.recorded_row_queue_named, title)
+        row.findViewById<View>(R.id.row_edit).contentDescription = getString(R.string.recorded_row_edit_named, title)
+        row.findViewById<View>(R.id.row_delete).contentDescription = getString(R.string.recorded_row_delete_named, title)
         row.findViewById<TextView>(R.id.row_meta).text = getString(
             R.string.recorded_row_subtitle,
             record.activityType,

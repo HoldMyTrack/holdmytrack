@@ -30,10 +30,12 @@
              account's existing types with an "Add …" row for a new one — free text, not a
              closed vocabulary, but steered toward the types already in use. -->
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/recording_type_layout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/hmt_space_10"
             android:hint="@string/recording_type_hint"
+            app:endIconContentDescription="@string/recording_type_hint"
             app:endIconDrawable="@drawable/ic_chevron_down"
             app:endIconMode="custom">
 

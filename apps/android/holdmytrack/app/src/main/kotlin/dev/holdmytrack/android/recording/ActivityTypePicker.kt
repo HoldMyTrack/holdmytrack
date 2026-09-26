@@ -54,6 +54,9 @@ object ActivityTypePicker {
             inputType = InputType.TYPE_CLASS_TEXT
             imeOptions = EditorInfo.IME_ACTION_DONE
             isSingleLine = true
+            // A bare EditText measures 45dp here; 48dp is the touch target. After isSingleLine,
+            // which resets the minimum to one line of text.
+            minHeight = (48 * context.resources.displayMetrics.density).toInt()
         }
         val list = ListView(context)
         val empty = TextView(context).apply {

@@ -54,52 +54,64 @@
                  A divider sets Normal apart from the two coverage views (Fog, Heatmap), as the
                  web's .map-mode-toggle__divider does: the choice is two-level. Plain checkable
                  buttons, not a MaterialButtonToggleGroup (which admits no divider child) —
-                 MainActivity.setMode checks exactly one of the three. -->
-            <LinearLayout
-                android:id="@+id/mode_bar"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                style="@style/Widget.HoldMyTrack.MapPanel"
-                android:layout_marginStart="@dimen/hmt_space_6"
-                android:orientation="horizontal"
-                android:visibility="gone">
+                 MainActivity.setMode checks exactly one of the three.
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/mode_normal"
-                    style="@style/Widget.HoldMyTrack.Button.MapMode"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/mode_normal" />
-
-                <View
-                    android:layout_width="1dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginStart="@dimen/hmt_space_4"
-                    android:layout_marginTop="@dimen/hmt_space_8"
-                    android:layout_marginEnd="@dimen/hmt_space_4"
-                    android:layout_marginBottom="@dimen/hmt_space_8"
-                    android:background="@color/hmt_border_strong" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/mode_fog"
-                    style="@style/Widget.HoldMyTrack.Button.MapMode"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/mode_fog" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/mode_heatmap"
-                    style="@style/Widget.HoldMyTrack.Button.MapMode"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/hmt_space_2"
-                    android:text="@string/mode_heatmap" />
-            </LinearLayout>
-
-            <Space
+                 It sits in a weighted scroll container rather than taking its own width first:
+                 LinearLayout sizes weighted children last, so the burger and Find my location
+                 always get theirs, and at a large font size, where the three labels outgrow the
+                 row, the toggle scrolls sideways instead of pushing Find my location off the
+                 screen. -->
+            <HorizontalScrollView
                 android:layout_width="0dp"
-                android:layout_height="0dp"
-                android:layout_weight="1" />
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/hmt_space_6"
+                android:layout_marginEnd="@dimen/hmt_space_6"
+                android:layout_weight="1"
+                android:clipToPadding="false"
+                android:overScrollMode="never"
+                android:paddingBottom="@dimen/hmt_space_4"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/mode_bar"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    style="@style/Widget.HoldMyTrack.MapPanel"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/mode_normal"
+                        style="@style/Widget.HoldMyTrack.Button.MapMode"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/mode_normal" />
+
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="@dimen/hmt_space_4"
+                        android:layout_marginTop="@dimen/hmt_space_8"
+                        android:layout_marginEnd="@dimen/hmt_space_4"
+                        android:layout_marginBottom="@dimen/hmt_space_8"
+                        android:background="@color/hmt_border_strong" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/mode_fog"
+                        style="@style/Widget.HoldMyTrack.Button.MapMode"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/mode_fog" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/mode_heatmap"
+                        style="@style/Widget.HoldMyTrack.Button.MapMode"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/hmt_space_2"
+                        android:text="@string/mode_heatmap" />
+                </LinearLayout>
+            </HorizontalScrollView>
 
             <!-- Find my location (MainActivity.onLocateTap): shows the position dot and flies the
                  camera to it, the counterpart of the web map's geolocate control. Hidden while
