@@ -12,11 +12,3 @@ This file stays lean and current-only. Once an entry is fixed, its root-cause/fi
 
 - [ ] Trust `X-Forwarded-For` only from the proxy — Caddy sets it; take its client address when `RemoteAddr` is the `web` container (or a configured trusted proxy), and fall back to `RemoteAddr` otherwise, so a direct caller still can't spoof it.
 - [ ] Verify against a local `compose.prod.yml`-shaped stack: two different client addresses should each get their own five demo starts an hour.
-
----
-
-### The Android app has no email-verification screen, so an unverified account sees an empty map
-
-The server gates the map's tiles and sync behind a verified email (`requireVerified`, `403 email_not_verified`), and the web sends an unverified account to `/verify-pending`. The Android app has no counterpart: an account that signs up there with email and password (when the server sends verification emails), or a new account made through Sign in with Facebook (FR-1.10, always unverified), opens the map with nothing on it and sync failing, and nothing on screen says why. It clears once the emailed link is clicked.
-
-- [ ] Read `email_verified` from the session response and `GET /v1/auth/me`, and show a "check your email" screen with a resend button (`POST /v1/auth/resend-verification`) instead of the map until it's true.

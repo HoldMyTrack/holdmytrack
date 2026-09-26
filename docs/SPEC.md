@@ -197,7 +197,7 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 
 **Behavior**:
 1. On signup (FR-1.1) and whenever the email address changes (step 4 below), the server emails a link containing a verification token (valid 24 hours, single-use) to the address on file.
-2. The link opens `/verify?token=…`, which verifies the token the same way `POST /v1/auth/verify-email` does (the endpoint the Android app would call). A missing, expired, used or malformed token shows "This verification link is invalid or has expired." On success, the server marks the account verified, invalidates every other outstanding verification token for it, and creates a fresh session for whichever browser opened the link — regardless of whether that browser already held a session of its own, so the link works from any device.
+2. The link opens `/verify?token=…`, which verifies the token the same way `POST /v1/auth/verify-email` does. The Android app doesn't call that endpoint: the link is opened in a browser, and the app finds out by asking `GET /v1/auth/me` again (`apps/android/docs/SPEC.md` FR-1.4). A missing, expired, used or malformed token shows "This verification link is invalid or has expired." On success, the server marks the account verified, invalidates every other outstanding verification token for it, and creates a fresh session for whichever browser opened the link — regardless of whether that browser already held a session of its own, so the link works from any device.
 3. While waiting, the account holder can request another copy of the link (`POST /v1/auth/resend-verification`, rate-limited to 5 per hour per account) without needing to already know it was lost or expired.
 4. The account holder can also change the address on file (`PATCH /v1/auth/email`) before ever verifying — correcting a typo the original signup made, since a resend alone cannot fix a wrong address. Any change resets the account back to unverified and sends a new link to the new address, whether or not the account was already verified.
 5. Once verified, the account continues to FR-1.7's first-run Settings page, not straight to the map, until Country and Timezone have been saved once.
@@ -278,7 +278,7 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 5. A code works once. An unknown, already used or expired code, or a verifier that doesn't match → `401` "This sign-in link has expired or was already used. Please try again.", and the code is used up either way.
 6. The three error cases above redirect to `holdmytrack://oauth?error=<code>` instead, and the app shows the same messages. Closing the tab returns to the sign-in screen with no message.
 
-A new account made this way is unverified, like one made on the web; the Android app has no verification screen yet (`KNOWN_ISSUES.md`).
+A new account made this way is unverified, like one made on the web; the Android app shows its own "check your email" screen until it is (`apps/android/docs/SPEC.md` FR-1.4).
 
 ## 4. FR-2 — No-Signup Demo
 

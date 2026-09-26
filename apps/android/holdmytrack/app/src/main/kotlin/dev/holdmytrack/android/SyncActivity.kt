@@ -121,6 +121,19 @@ class SyncActivity : AppCompatActivity() {
             return
         }
 
+        // Reachable without the map, from Health Connect's own rationale link, so it can't
+        // count on the map having sent an unconfirmed account to VerifyEmailActivity first —
+        // and the server refuses such an account's sync (requireVerified) and its history.
+        if (!Session.emailVerified) {
+            status.setText(R.string.sync_needs_verified_email)
+            instructions.visibility = View.GONE
+            primary.visibility = View.GONE
+            secondary.visibility = View.GONE
+            openHealthConnect.visibility = View.GONE
+            history.visibility = View.GONE
+            return
+        }
+
         // The server's requireNotDemo (services/server/internal/httpapi/auth.go) rejects
         // POST /sync/activities for a demo account regardless of what this screen offers, the
         // same way it rejects upload/edit/delete for every other client — but the web app

@@ -15,7 +15,7 @@ This document specifies the Android app's functional behavior as currently imple
 
 ### 1.2 Scope
 
-**In scope**: everything currently built and verified on a physical device — sign in, sign up, and starting a demo account (FR-1); session persistence and server-side re-verification on cold start (FR-1); a full-screen map with Normal, Fog of War, and Heatmap modes over the account's entire history (FR-2); Health Connect onboarding and permission acquisition (FR-3); a foreground sync run with resumable watermark tracking (FR-3); per-activity sync rejection feedback (FR-3); and a sync status/history screen that also surfaces cross-source duplicates (FR-4). Also in scope, verified on an emulator rather than a physical device (noted where it matters — §7): casual in-app GPS recording started from a button on the map, with a live track on the map and notification controls, its Recorded Activities review/queue screen with a searchable activity-type picker in Edit with a route preview per row and GPX download (FR-5).
+**In scope**: everything currently built and verified on a physical device — sign in, sign up, and starting a demo account (FR-1); an unconfirmed email held at a "check your email" screen (FR-1.4, not yet device-verified); session persistence and server-side re-verification on cold start (FR-1); a full-screen map with Normal, Fog of War, and Heatmap modes over the account's entire history (FR-2); Health Connect onboarding and permission acquisition (FR-3); a foreground sync run with resumable watermark tracking (FR-3); per-activity sync rejection feedback (FR-3); and a sync status/history screen that also surfaces cross-source duplicates (FR-4). Also in scope, verified on an emulator rather than a physical device (noted where it matters — §7): casual in-app GPS recording started from a button on the map, with a live track on the map and notification controls, its Recorded Activities review/queue screen with a searchable activity-type picker in Edit with a route preview per row and GPX download (FR-5).
 
 **Out of scope, not yet built**: everything root `docs/ROADMAP.md` Phase 3 (design finalization) and `apps/android/docs/ROADMAP.md` Phase 5 gate — a visual design system, an icon set, a launcher icon, and the date-range/type/hidden-track filter controls the web client already has (the map here always shows the account's unfiltered, entire history). Out of scope as a platform limitation rather than a "not yet": background Health Connect sync (will not be built — see §3.3 note; this does not apply to in-app recording, which is not subject to the same platform constraint — [ADR-0007](../../../docs/adr/0007-in-app-gps-recording-submits-directly.md)), and Samsung Galaxy Watch sync (Samsung does not expose route geometry to Health Connect at all, so every Samsung-sourced session is rejected for having no route, same as any other route-less activity). iOS does not exist. Accessibility (content descriptions, touch-target sizing, large-font and TalkBack testing) has not been done and is scoped to Phase 5. See §9 for the complete list.
 
@@ -56,7 +56,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 **Behavior**:
 1. Sign in calls `POST /v1/auth/login`; sign up calls `POST /v1/auth/signup`; demo calls `POST /v1/auth/demo` — the same three endpoints the web client uses.
-2. On success, the response's `session_token` field (present on all four session-minting endpoints, specifically for a native caller that has no cookie jar to rely on) is stored via `Session.start`, and the map replaces this screen.
+2. On success, the response's `session_token` field (present on all four session-minting endpoints, specifically for a native caller that has no cookie jar to rely on) is stored via `Session.start` with the response's `email` and `email_verified`, and the map replaces this screen — or, for an account whose email isn't confirmed yet, the "check your email" screen (FR-1.4).
 3. On failure, the server's own error message is shown inline; the action buttons are disabled while a request is in flight and re-enabled after.
 4. "Continue with Google" and "Continue with Facebook" appear above the email field only when `GET /v1/auth/providers` reports each configured (Google also needs its `google_client_id`); if that request fails, neither shows.
 5. Google: the system's Google account picker (Credential Manager) returns an ID token, which is posted to `POST /v1/auth/google/token` with the device's timezone, and the answer is handled as in step 2. Closing the picker does nothing; any other failure shows "Couldn't sign in with Google. Please try again."
@@ -72,7 +72,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 **Behavior**:
 1. On cold start, if a token is stored but not yet marked verified in this process, the map defers attaching any signed-in-only layer, shows "Checking session…", and calls `GET /v1/auth/me`.
-2. A `200` marks the token verified for the rest of the process's lifetime; the map then proceeds as signed in.
+2. A `200` marks the token verified for the rest of the process's lifetime and records the response's `email_verified`; the map then proceeds as signed in, or, if the email isn't confirmed, is replaced by the "check your email" screen (FR-1.4).
 3. A `401` — and only a `401` — clears the stored token and replaces the map with the sign-in screen (FR-1.1). Any other failure (no network, an unreachable dev stack) leaves the token in place and is retried on the next resume, since it says nothing about whether the credential itself is still good.
 
 **Outputs**: Either a confirmed, attached session, or a clean return to the sign-in screen — never a map that silently 401s on every tile request while looking merely blank.
@@ -82,6 +82,22 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 **Description**: Ends the current session, both on the device and on the server.
 
 **Behavior**: `POST /v1/auth/logout` deletes the session row server-side; the stored token and email are cleared locally regardless of whether the request succeeded (a token that can't reach the server to be revoked is not one worth keeping either way). The app then shows the sign-in screen (FR-1.1) with every other screen cleared from the back stack.
+
+### FR-1.4 Email verification
+
+**Description**: An account whose email isn't confirmed yet — a new email-and-password account when the server sends verification emails, or a new Sign in with Facebook account (`docs/SPEC.md` FR-1.8, FR-1.10) — sees a "check your email" screen (`VerifyEmailActivity`) instead of the map, the app's counterpart of the web's `/verify-pending`. The server refuses such an account every tile and sync request (`403 email_not_verified`), so the map would otherwise open empty with nothing saying why.
+
+**Preconditions**: A session whose `email_verified` is false, from the sign-in response (FR-1.1) or from `GET /v1/auth/me` (FR-1.2). A demo account is always verified.
+
+**Behavior**:
+1. The screen says a confirmation link was sent to the account's address, and offers Continue, "Resend verification email", and Sign out. It is the root of its own task: Back leaves the app.
+2. On every resume — coming back from the mail app or the browser included — the screen asks `GET /v1/auth/me` again, silently. Once it reports `email_verified: true`, the map replaces the screen.
+3. Continue asks the same question; if the email still isn't confirmed it says so ("Your email isn't confirmed yet…"), and if the server can't be reached it says that.
+4. Resend calls `POST /v1/auth/resend-verification` and shows the server's reply verbatim — its confirmation, or its refusal once the 5-per-hour limit is reached.
+5. A `401` from `GET /v1/auth/me` clears the session and shows the sign-in screen, as on the map (FR-1.2). Sign out behaves as FR-1.3.
+6. The Sync screen, which Health Connect can open without the map, shows "Confirm your email address first…" and hides every sync control and the history for such an account.
+
+**Notes**: Changing a mistyped address (`docs/SPEC.md` FR-1.8 step 4) is web-only: the app keys its local recordings and sync watermark by email (FR-5.3), which a change would orphan. Not yet exercised on a device or emulator (§9).
 
 ## 4. FR-2 — Map Visualization
 
@@ -252,6 +268,7 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 Named here rather than left implicit, the way `docs/SPEC.md` §18 does for the wider system:
 
 - **No final visual design.** No icon set and no final palette, type scale or fonts — the app is themed with the web's palette as a provisional stand-in (Material 3), and its screens wait on root `docs/ROADMAP.md` Phase 3's design freeze (`apps/android/docs/ROADMAP.md` Phase 5). The app's own chrome is light only; only the map follows the system dark setting.
+- **The email-verification screen (FR-1.4) is unverified on a device.** It was built without an emulator or device to hand; only the server responses it relies on were checked, against the local stack.
 - **The account's Language setting isn't applied.** The web's Settings choice (`docs/SPEC.md` FR-1.7) changes the web only; the app follows the phone or its per-app language.
 - **No filter controls.** The map always shows the account's complete, unfiltered history; there is no Android equivalent of the web's date-range picker, TYPE/DISTANCE filters, or per-track hide/show.
 - **No accessibility work done.** No content descriptions, no verified touch-target sizing, untested under a large system font or TalkBack.

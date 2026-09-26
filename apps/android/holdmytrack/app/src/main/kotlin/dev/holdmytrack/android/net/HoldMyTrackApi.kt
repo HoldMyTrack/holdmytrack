@@ -21,8 +21,13 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** An account with a live session — what a successful sign-in, sign-up or demo start yields. */
-data class Account(val token: String, val email: String)
+/**
+ * An account with a live session — what a successful sign-in, sign-up or demo start yields.
+ * [emailVerified] is false for a new email-and-password account (when the server sends
+ * verification emails) and for a new Sign in with Facebook account, until the emailed link is
+ * clicked; true for a demo account.
+ */
+data class Account(val token: String, val email: String, val emailVerified: Boolean)
 
 /**
  * The optional sign-in methods this deployment has configured (`GET /v1/auth/providers`).
@@ -333,10 +338,25 @@ object HoldMyTrackApi {
      * question the web client asks on first load. A 401 means the session is gone (revoked,
      * or expired past its TTL while the app was closed) and the token should be dropped; any
      * other failure is the network's fault and says nothing about the token.
+     *
+     * Answers with the account's `email_verified`, since a live token is not by itself enough
+     * for the map: an unconfirmed email gets `403` on every tile (`VerifyEmailActivity`).
      */
-    fun verifySession(onResult: (Result<Unit>) -> Unit) {
+    fun verifySession(onResult: (Result<Boolean>) -> Unit) {
         val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/auth/me").build()
-        call(request, { }, onResult)
+        call(request, { body -> JSONObject(body).optBoolean("email_verified", true) }, onResult)
+    }
+
+    /**
+     * `POST /v1/auth/resend-verification` — mails a fresh confirmation link. Answers with the
+     * server's own confirmation text ("Verification email sent."), in the app's language.
+     */
+    fun resendVerification(onResult: (Result<String>) -> Unit) {
+        val request = Request.Builder()
+            .url(BuildConfig.API_BASE_URL + API_V1 + "/auth/resend-verification")
+            .post(EMPTY_BODY)
+            .build()
+        call(request, { body -> JSONObject(body).optString("message") }, onResult)
     }
 
     /**
@@ -411,7 +431,11 @@ object HoldMyTrackApi {
             val json = JSONObject(text)
             val token = json.optString("session_token")
             if (token.isEmpty()) throw IOException("the server returned no session token")
-            Account(token = token, email = json.optString("email"))
+            Account(
+                token = token,
+                email = json.optString("email"),
+                emailVerified = json.optBoolean("email_verified", true),
+            )
         }, onResult)
     }
 
