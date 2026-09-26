@@ -4,7 +4,10 @@
      names the same things the same way — Обычный/Туман, «Синхронизировать» — except the Heatmap mode:
      «Тепловая» here, since «Тепловая карта» doesn't fit the map's toolbar beside the locate button. -->
 <resources>
-    <string name="map_load_failed">Не удалось загрузить карту с %1$s\n%2$s</string>
+    <string name="map_load_failed">Не удалось загрузить карту.</string>
+    <string name="map_unreachable">Не удалось связаться с HoldMyTrack, поэтому ваших треков пока нет на карте.</string>
+    <string name="map_empty">На карте пока ничего нет. Синхронизируйте занятия из Health Connect или запишите прогулку кнопкой внизу.</string>
+    <string name="retry">Повторить</string>
 
     <string name="sign_in">Войти</string>
     <string name="sign_out">Выйти</string>
@@ -130,6 +133,7 @@
     <string name="sync_now_anyway">Всё равно синхронизировать последние 30 дней</string>
     <string name="status_title">История синхронизации</string>
     <string name="status_history">История</string>
+    <string name="status_loading">Загрузка…</string>
     <string name="status_summary_empty">Пока ничего не синхронизировано и не загружено.</string>
     <string name="status_summary_processing">Обработано %1$d из %2$d…</string>
     <string name="status_summary_settled">Синхронизировано или загружено занятий: %1$d.</string>

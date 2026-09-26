@@ -10,118 +10,165 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- Hidden unless the map fails to load. A blank grey map is the single most common way
-         this app will break — a wrong API origin, a stalled dev stack, an unreachable
-         archive — and none of those say anything on screen by themselves. -->
-    <TextView
-        android:id="@+id/status"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="top"
-        android:background="@color/hmt_ink"
-        android:padding="@dimen/hmt_space_12"
-        android:textColor="@color/hmt_surface"
-        android:textAppearance="?attr/textAppearanceBodyMedium"
-        android:visibility="gone" />
-
-    <!-- Floating chrome over the map, one row along the top: the burger menu and the map-mode
-         toggle at the start, mirroring the web client's own top-left mode control
-         (apps/web/src/index.css's .map-mode-toggle), and Find my location at the end, where
-         the web has its geolocate control. MapLibre's compass, also top-end, is pushed below
-         this row (MainActivity.applyCompassMargin). The row itself takes no touches, so the
-         map still pans through the gap. Styled from the theme (res/values/themes.xml). -->
+    <!-- The top of the map: the chrome row, and under it the one notice the map can show —
+         checking the session, the server unreachable, the map failing to load, or nothing on
+         it yet (MainActivity.showNotice). Neither takes touches outside its own panels, so the
+         map still pans through the gaps. -->
     <LinearLayout
-        android:id="@+id/top_bar"
+        android:id="@+id/top_chrome"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="top"
-        android:layout_margin="@dimen/hmt_space_12"
-        android:baselineAligned="false"
-        android:orientation="horizontal">
+        android:orientation="vertical">
 
-        <FrameLayout
-            style="@style/Widget.HoldMyTrack.MapPanel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/menu_button"
-                style="@style/Widget.HoldMyTrack.Button.MapIcon"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:contentDescription="@string/menu_button"
-                app:icon="@drawable/ic_menu" />
-        </FrameLayout>
-
-        <!-- Only shown to a signed-in account: all three layers the toggle switches between
-             are behind requireAuth, so there is nothing for it to do without a session.
-             A divider sets Normal apart from the two coverage views (Fog, Heatmap), as the
-             web's .map-mode-toggle__divider does: the choice is two-level. Plain checkable
-             buttons, not a MaterialButtonToggleGroup (which admits no divider child) —
-             MainActivity.setMode checks exactly one of the three. -->
+        <!-- Floating chrome over the map, one row along the top: the burger menu and the map-mode
+             toggle at the start, mirroring the web client's own top-left mode control
+             (apps/web/src/index.css's .map-mode-toggle), and Find my location at the end, where
+             the web has its geolocate control. MapLibre's compass, also top-end, is pushed below
+             this row (MainActivity.applyCompassMargin). The row itself takes no touches, so the
+             map still pans through the gap. Styled from the theme (res/values/themes.xml). -->
         <LinearLayout
-            android:id="@+id/mode_bar"
-            android:layout_width="wrap_content"
+            android:id="@+id/top_bar"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            style="@style/Widget.HoldMyTrack.MapPanel"
-            android:layout_marginStart="@dimen/hmt_space_6"
-            android:orientation="horizontal"
-            android:visibility="gone">
+            android:layout_margin="@dimen/hmt_space_12"
+            android:baselineAligned="false"
+            android:orientation="horizontal">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/mode_normal"
-                style="@style/Widget.HoldMyTrack.Button.MapMode"
+            <FrameLayout
+                style="@style/Widget.HoldMyTrack.MapPanel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/menu_button"
+                    style="@style/Widget.HoldMyTrack.Button.MapIcon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/menu_button"
+                    app:icon="@drawable/ic_menu" />
+            </FrameLayout>
+
+            <!-- Only shown to a signed-in account: all three layers the toggle switches between
+                 are behind requireAuth, so there is nothing for it to do without a session.
+                 A divider sets Normal apart from the two coverage views (Fog, Heatmap), as the
+                 web's .map-mode-toggle__divider does: the choice is two-level. Plain checkable
+                 buttons, not a MaterialButtonToggleGroup (which admits no divider child) —
+                 MainActivity.setMode checks exactly one of the three. -->
+            <LinearLayout
+                android:id="@+id/mode_bar"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/mode_normal" />
+                style="@style/Widget.HoldMyTrack.MapPanel"
+                android:layout_marginStart="@dimen/hmt_space_6"
+                android:orientation="horizontal"
+                android:visibility="gone">
 
-            <View
-                android:layout_width="1dp"
-                android:layout_height="match_parent"
-                android:layout_marginStart="@dimen/hmt_space_4"
-                android:layout_marginTop="@dimen/hmt_space_8"
-                android:layout_marginEnd="@dimen/hmt_space_4"
-                android:layout_marginBottom="@dimen/hmt_space_8"
-                android:background="@color/hmt_border_strong" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/mode_normal"
+                    style="@style/Widget.HoldMyTrack.Button.MapMode"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mode_normal" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/mode_fog"
-                style="@style/Widget.HoldMyTrack.Button.MapMode"
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="@dimen/hmt_space_4"
+                    android:layout_marginTop="@dimen/hmt_space_8"
+                    android:layout_marginEnd="@dimen/hmt_space_4"
+                    android:layout_marginBottom="@dimen/hmt_space_8"
+                    android:background="@color/hmt_border_strong" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/mode_fog"
+                    style="@style/Widget.HoldMyTrack.Button.MapMode"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mode_fog" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/mode_heatmap"
+                    style="@style/Widget.HoldMyTrack.Button.MapMode"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/hmt_space_2"
+                    android:text="@string/mode_heatmap" />
+            </LinearLayout>
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <!-- Find my location (MainActivity.onLocateTap): shows the position dot and flies the
+                 camera to it, the counterpart of the web map's geolocate control. Hidden while
+                 recording, when the camera already follows the recording. -->
+            <FrameLayout
+                android:id="@+id/locate_panel"
+                style="@style/Widget.HoldMyTrack.MapPanel"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/mode_fog" />
+                android:layout_height="wrap_content">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/mode_heatmap"
-                style="@style/Widget.HoldMyTrack.Button.MapMode"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/hmt_space_2"
-                android:text="@string/mode_heatmap" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/locate_button"
+                    style="@style/Widget.HoldMyTrack.Button.MapIcon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/locate_button"
+                    app:icon="@drawable/ic_locate_fixed" />
+            </FrameLayout>
         </LinearLayout>
 
-        <Space
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
-
-        <!-- Find my location (MainActivity.onLocateTap): shows the position dot and flies the
-             camera to it, the counterpart of the web map's geolocate control. Hidden while
-             recording, when the camera already follows the recording. -->
-        <FrameLayout
-            android:id="@+id/locate_panel"
+        <!-- The map's notice: the map chrome's own panel, after the web's on-map banner
+             (.version-banner) — a message, a smaller detail line, and one action. -->
+        <LinearLayout
+            android:id="@+id/map_notice"
             style="@style/Widget.HoldMyTrack.MapPanel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content">
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/hmt_space_12"
+            android:layout_marginEnd="@dimen/hmt_space_12"
+            android:accessibilityLiveRegion="polite"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="@dimen/hmt_space_12"
+            android:paddingEnd="@dimen/hmt_space_4"
+            android:visibility="gone">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/locate_button"
-                style="@style/Widget.HoldMyTrack.Button.MapIcon"
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:paddingTop="@dimen/hmt_space_8"
+                android:paddingBottom="@dimen/hmt_space_8">
+
+                <TextView
+                    android:id="@+id/map_notice_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:lineHeight="18sp" />
+
+                <TextView
+                    android:id="@+id/map_notice_detail"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/hmt_space_2"
+                    android:textColor="@color/hmt_ink_meta"
+                    android:textIsSelectable="true"
+                    android:textSize="@dimen/hmt_text_2xs"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/map_notice_action"
+                style="@style/Widget.HoldMyTrack.Button.Link"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:contentDescription="@string/locate_button"
-                app:icon="@drawable/ic_locate_fixed" />
-        </FrameLayout>
+                android:layout_marginStart="@dimen/hmt_space_4"
+                android:visibility="gone" />
+        </LinearLayout>
     </LinearLayout>
 
     <!-- One-tap GPS recording (MainActivity.onRecordTap): tap to start, tap again to pause or

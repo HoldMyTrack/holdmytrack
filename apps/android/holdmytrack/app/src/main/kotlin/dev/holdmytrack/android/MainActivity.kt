@@ -20,6 +20,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
 import com.google.android.material.button.MaterialButton
 import dev.holdmytrack.android.map.MapMode
 import dev.holdmytrack.android.map.MapOverlays
@@ -60,7 +61,20 @@ import org.maplibre.android.maps.Style
 class MainActivity : AppCompatActivity() {
 
     private lateinit var mapView: MapView
-    private lateinit var status: TextView
+    private lateinit var topChrome: View
+    private lateinit var notice: View
+    private lateinit var noticeText: TextView
+    private lateinit var noticeDetail: TextView
+    private lateinit var noticeAction: Button
+
+    /** Which notice is up, if any — see [Notice]. */
+    private var shownNotice: Notice? = null
+
+    /** Posted when a session check starts, so "Checking your session…" appears only if the
+     *  check is slow enough to notice; removed when it answers. */
+    private val showChecking = Runnable {
+        showNotice(Notice.CHECKING, getString(R.string.checking_session))
+    }
     private lateinit var menuButton: Button
     private lateinit var modeBar: View
     private lateinit var modeButtons: Map<MapMode, MaterialButton>
@@ -163,7 +177,11 @@ class MainActivity : AppCompatActivity() {
         }
         setContentView(R.layout.activity_main)
 
-        status = findViewById(R.id.status)
+        topChrome = findViewById(R.id.top_chrome)
+        notice = findViewById(R.id.map_notice)
+        noticeText = findViewById(R.id.map_notice_text)
+        noticeDetail = findViewById(R.id.map_notice_detail)
+        noticeAction = findViewById(R.id.map_notice_action)
         menuButton = findViewById(R.id.menu_button)
         modeBar = findViewById(R.id.mode_bar)
         modeButtons = mapOf(
@@ -203,16 +221,29 @@ class MainActivity : AppCompatActivity() {
                 .zoom(1.0)
                 .build()
             applyCompassMargin()
-            // Attribution is not decoration here — the Protomaps basemap is an ODbL Produced
-            // Work, and MapLibre's own attribution control renders the credit the style's
-            // source already carries, so it must stay enabled.
-            instance.setStyle(Style.Builder().fromUri(styleUrl())) { loaded ->
-                style = loaded
-                status.visibility = View.GONE
-                MapOverlays.attachLiveTrack(loaded)
-                syncSession()
-                renderRecording()
-            }
+            loadStyle()
+        }
+    }
+
+    /**
+     * Loads the served style, and on load puts the live track and (once the session allows)
+     * the user layers on it. Also what "Try again" re-runs after a failed load: a new style
+     * starts with none of the app's own layers, so they are attached afresh.
+     *
+     * Attribution is not decoration here — the Protomaps basemap is an ODbL Produced Work, and
+     * MapLibre's own attribution control renders the credit the style's source already
+     * carries, so it must stay enabled.
+     */
+    private fun loadStyle() {
+        val instance = map ?: return
+        style = null
+        overlaysAttached = false
+        instance.setStyle(Style.Builder().fromUri(styleUrl())) { loaded ->
+            style = loaded
+            hideNotice(Notice.MAP_FAILED)
+            MapOverlays.attachLiveTrack(loaded)
+            syncSession()
+            renderRecording()
         }
     }
 
@@ -249,7 +280,6 @@ class MainActivity : AppCompatActivity() {
     private fun insetSystemBars() {
         val topBar: View = findViewById(R.id.top_bar)
         val barTopMargin = (topBar.layoutParams as MarginLayoutParams).topMargin
-        val statusPadding = status.paddingTop
         val recordBottomMargin = (recordButton.layoutParams as MarginLayoutParams).bottomMargin
         findViewById<View>(R.id.map_root).setOnApplyWindowInsetsListener { _, insets ->
             val bars = insets.getInsets(WindowInsets.Type.systemBars())
@@ -257,13 +287,13 @@ class MainActivity : AppCompatActivity() {
             topBar.requestLayout()
             (recordButton.layoutParams as MarginLayoutParams).bottomMargin = recordBottomMargin + bars.bottom
             recordButton.requestLayout()
-            status.setPadding(status.paddingLeft, statusPadding + bars.top, status.paddingRight, status.paddingBottom)
             systemBarInsetTop = bars.top
             applyCompassMargin()
             insets
         }
-        // The compass sits below the top row, whose height is only known once it's laid out.
-        topBar.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyCompassMargin() }
+        // The compass sits below the top row and any notice under it, whose heights are only
+        // known once they're laid out.
+        topChrome.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyCompassMargin() }
     }
 
     /**
@@ -281,8 +311,9 @@ class MainActivity : AppCompatActivity() {
             compassBaseMarginCaptured = true
         }
         // Below the top row (burger, modes, Find my location), which already sits below the
-        // status bar; before that row is laid out, below the status bar at least.
-        val belowTopBar = findViewById<View>(R.id.top_bar).bottom
+        // status bar, and below the notice while one is up; before that row is laid out, below
+        // the status bar at least.
+        val belowTopBar = if (notice.isVisible) notice.bottom else findViewById<View>(R.id.top_bar).bottom
         settings.setCompassMargins(
             settings.compassMarginLeft,
             compassBaseMarginTop + maxOf(systemBarInsetTop, belowTopBar),
@@ -413,6 +444,7 @@ class MainActivity : AppCompatActivity() {
         recordButton.holdEnabled = active
         if (modeBarReady) modeBar.visibility = if (active) View.GONE else View.VISIBLE
         locatePanel.visibility = if (active) View.GONE else View.VISIBLE
+        updateNoticeVisibility()
 
         val loaded = style ?: return
         if (overlaysAttached) MapOverlays.setRecording(loaded, active, mode)
@@ -452,19 +484,82 @@ class MainActivity : AppCompatActivity() {
     private fun verifyStoredSession() {
         if (verifying) return
         verifying = true
+        notice.postDelayed(showChecking, CHECKING_DELAY_MS)
         HoldMyTrackApi.verifySession { result ->
             verifying = false
-            result.onSuccess { emailVerified -> Session.markVerified(emailVerified) }.onFailure { failure ->
+            notice.removeCallbacks(showChecking)
+            hideNotice(Notice.CHECKING)
+            result.onSuccess { emailVerified ->
+                Session.markVerified(emailVerified)
+                hideNotice(Notice.UNREACHABLE)
+            }.onFailure { failure ->
                 // Only a 401 means the token itself is dead. Anything else — no network, a
                 // stopped dev stack — says nothing about the credential, so it survives and
-                // gets re-checked on the next resume rather than silently signing the user out.
+                // gets re-checked on the next resume rather than silently signing the user out;
+                // meanwhile the map says why none of their layers is on it.
                 if (failure is ApiException && failure.code == 401) {
                     Session.clear()
                 } else {
                     Log.w(TAG, "could not verify the stored session", failure)
+                    showNotice(
+                        Notice.UNREACHABLE,
+                        getString(R.string.map_unreachable),
+                        failed = true,
+                        action = R.string.retry,
+                    ) { verifyStoredSession() }
                 }
             }
             syncSession()
+        }
+    }
+
+    /**
+     * What the map can have to say, most important first: when two apply, the earlier one
+     * stays up. They share the one panel under the chrome row rather than stacking.
+     */
+    private enum class Notice { MAP_FAILED, UNREACHABLE, CHECKING, EMPTY }
+
+    /**
+     * The map's notice panel, after the web's on-map banner: [text], an optional smaller
+     * [detail], and at most one action. A less important notice never replaces a more
+     * important one that is up (see [Notice]).
+     */
+    private fun showNotice(
+        kind: Notice,
+        text: String,
+        detail: String? = null,
+        failed: Boolean = false,
+        action: Int? = null,
+        onAction: (() -> Unit)? = null,
+    ) {
+        val current = shownNotice
+        if (current != null && current.ordinal < kind.ordinal) return
+        shownNotice = kind
+        noticeText.text = text
+        noticeText.setTextColor(getColor(if (failed) R.color.hmt_danger else R.color.hmt_ink))
+        noticeDetail.text = detail
+        noticeDetail.visibility = if (detail == null) View.GONE else View.VISIBLE
+        noticeAction.visibility = if (action == null) View.GONE else View.VISIBLE
+        if (action != null) noticeAction.setText(action)
+        noticeAction.setOnClickListener { onAction?.invoke() }
+        updateNoticeVisibility()
+    }
+
+    /** Takes [kind] down if it's the one up; any other notice stays. */
+    private fun hideNotice(kind: Notice) {
+        if (shownNotice != kind) return
+        shownNotice = null
+        updateNoticeVisibility()
+    }
+
+    /** "Nothing on your map yet" has nothing to say while a recording has the map, so it
+     *  steps aside then and comes back after; the failures stay up regardless. */
+    private fun updateNoticeVisibility() {
+        val kind = shownNotice
+        notice.visibility = when {
+            kind == null -> View.GONE
+            kind == Notice.EMPTY && isRecording() -> View.GONE
+            else -> View.VISIBLE
         }
     }
 
@@ -500,13 +595,25 @@ class MainActivity : AppCompatActivity() {
      * The zoom is capped because a single short activity — or one clipped to almost nothing by
      * a Private location — has a near-zero extent, and fitting the camera to that box lands well
      * past the basemap's z14 data, on a grey rectangle. An account with no geometry yet is left
-     * at the world view, which is the truthful thing to show for a history that is empty.
+     * at the world view, which is the truthful thing to show for a history that is empty — with
+     * a notice saying so and pointing at Sync, re-checked on every resume until something
+     * arrives (`onResume`). Not for a demo account, which always has history and can't sync.
      */
     private fun frameActivities() {
         if (framed) return
         framed = true
         HoldMyTrackApi.activityBounds { result ->
-            val box = result.getOrNull() ?: return@activityBounds
+            if (result.isFailure) return@activityBounds
+            val box = result.getOrNull()
+            if (box == null) {
+                if (!Session.isDemo) {
+                    showNotice(Notice.EMPTY, getString(R.string.map_empty), action = R.string.menu_sync) {
+                        startActivity(Intent(this, SyncActivity::class.java))
+                    }
+                }
+                return@activityBounds
+            }
+            hideNotice(Notice.EMPTY)
             val instance = map ?: return@activityBounds
             // Reopening the app mid-recording: the camera belongs to the live track.
             if (isRecording()) return@activityBounds
@@ -522,8 +629,9 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * Flavor follows the system's day/night setting. The API serves five (`light`, `dark`,
-     * `white`, `black`, `grayscale`); picking between the two general-purpose ones keeps this
-     * shell from inventing a theme preference that the design pass has not decided yet.
+     * `white`, `black`, `grayscale`); this picks between the two general-purpose ones, and
+     * there is no in-app preference — decided in Phase 5 (`apps/android/docs/ROADMAP.md`):
+     * the system setting is the only input, and the app's own chrome stays light.
      */
     private fun styleUrl(): String {
         val night = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
@@ -532,10 +640,17 @@ class MainActivity : AppCompatActivity() {
         return "${BuildConfig.API_BASE_URL}/v1/map/style/$flavor"
     }
 
+    /** The style (or its sources) couldn't be fetched: a plain sentence, with the origin and
+     *  MapLibre's own error in small print for whoever has to fix it, and a way to try again. */
     private fun reportFailure(error: String) {
         Log.e(TAG, "map failed to load: $error")
-        status.text = getString(R.string.map_load_failed, BuildConfig.API_BASE_URL, error)
-        status.visibility = View.VISIBLE
+        showNotice(
+            Notice.MAP_FAILED,
+            getString(R.string.map_load_failed),
+            detail = "${BuildConfig.API_BASE_URL} — $error",
+            failed = true,
+            action = R.string.retry,
+        ) { loadStyle() }
     }
 
     // MapLibre's MapView holds a native renderer and a GL surface, so every lifecycle
@@ -551,6 +666,12 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         mapView.onResume()
         syncSession()
+        // An empty map is asked again on every return — typically from Sync — so the notice
+        // goes, and the camera frames the new history, as soon as something has arrived.
+        if (shownNotice == Notice.EMPTY) {
+            framed = false
+            frameActivities()
+        }
     }
 
     override fun onPause() {
@@ -599,6 +720,10 @@ class MainActivity : AppCompatActivity() {
          *  the user recognises; a closer zoom the user already chose is kept. */
         const val LOCATE_ZOOM = 14.0
         const val FRAME_DURATION_MS = 900
+
+        /** How long a session check may take before the map says it's checking — a fast one
+         *  shouldn't flash a notice. */
+        const val CHECKING_DELAY_MS = 600L
         const val MENU_PROFILE = 1
         const val MENU_SYNC = 2
         const val MENU_RECORDED_ACTIVITIES = 3

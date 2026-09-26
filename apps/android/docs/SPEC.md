@@ -71,9 +71,9 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 **Description**: A session survives the app being closed and relaunched, but a restored token is not trusted until the server confirms it — the same caution `docs/SPEC.md` FR-1.4 describes for the web client, applied to a store that isn't a cookie jar.
 
 **Behavior**:
-1. On cold start, if a token is stored but not yet marked verified in this process, the map defers attaching any signed-in-only layer, shows "Checking session…", and calls `GET /v1/auth/me`.
+1. On cold start, if a token is stored but not yet marked verified in this process, the map defers attaching any signed-in-only layer and calls `GET /v1/auth/me`; if the answer takes more than 600ms, a notice under the map's chrome reads "Checking your session…".
 2. A `200` marks the token verified for the rest of the process's lifetime and records the response's `email_verified`; the map then proceeds as signed in, or, if the email isn't confirmed, is replaced by the "check your email" screen (FR-1.4).
-3. A `401` — and only a `401` — clears the stored token and replaces the map with the sign-in screen (FR-1.1). Any other failure (no network, an unreachable dev stack) leaves the token in place and is retried on the next resume, since it says nothing about whether the credential itself is still good.
+3. A `401` — and only a `401` — clears the stored token and replaces the map with the sign-in screen (FR-1.1). Any other failure (no network, an unreachable dev stack) leaves the token in place and is retried on the next resume, since it says nothing about whether the credential itself is still good; meanwhile the notice says "Couldn't reach HoldMyTrack, so your tracks aren't on the map yet." with Try again.
 
 **Outputs**: Either a confirmed, attached session, or a clean return to the sign-in screen — never a map that silently 401s on every tile request while looking merely blank.
 
@@ -105,7 +105,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 **Description**: A full-screen map renders on launch for a signed-in account; with no session, the sign-in screen (FR-1.1) is shown instead and the map is not created at all.
 
-**Behavior**: The style document is fetched unauthenticated from `GET /v1/map/style/{flavor}`, `flavor` chosen from the system's day/night setting (`light` or `dark` — two of the five the API serves; the app does not offer a way to pick the other three or to override the system setting, per `apps/android/docs/ARCHITECTURE.md` §2.1). The camera opens on a whole-world view (equator, zoom 1) until an account's own activity extent is known (FR-2.3). A style or tile load failure is reported on screen as visible text, not only in logcat.
+**Behavior**: The style document is fetched unauthenticated from `GET /v1/map/style/{flavor}`, `flavor` chosen from the system's day/night setting (`light` or `dark` — two of the five the API serves; the app does not offer a way to pick the other three or to override the system setting, per `apps/android/docs/ARCHITECTURE.md` §2.1). The camera opens on a whole-world view (equator, zoom 1) until an account's own activity extent is known (FR-2.3). A style load failure is reported on screen, not only in logcat: a notice under the chrome reads "The map couldn't load.", with the API origin and MapLibre's error in small print and Try again, which loads the style afresh.
 
 ### FR-2.2 Three map modes: Normal, Fog of War, Heatmap
 
@@ -127,7 +127,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 **Description**: On first attaching the user layers each app session, the camera flies to fit the account's full activity extent, once.
 
-**Behavior**: `GET /v1/activities` is read once per session start, and the bounding box of every row's `bbox` field is unioned client-side (rows with no `bbox` — no recorded trajectory — are skipped). The camera animates to fit that box, capped at zoom 15 so a single very short activity, or one heavily clipped by a Private location, doesn't zoom in on an empty rectangle past the basemap's own z14 data. An account with no geometry at all stays at the whole-world view. Re-attaching the session (e.g., returning from the sign-in screen without actually changing account) does not re-fly the camera a second time in the same app session.
+**Behavior**: `GET /v1/activities` is read once per session start, and the bounding box of every row's `bbox` field is unioned client-side (rows with no `bbox` — no recorded trajectory — are skipped). The camera animates to fit that box, capped at zoom 15 so a single very short activity, or one heavily clipped by a Private location, doesn't zoom in on an empty rectangle past the basemap's own z14 data. An account with no geometry at all stays at the whole-world view, with a notice — "Nothing on your map yet…" and a Sync action — that is asked again on every return to the map and goes, and the camera frames the new history, once something has arrived. A demo account never gets it. Re-attaching the session (e.g., returning from the sign-in screen without actually changing account) does not re-fly the camera a second time in the same app session.
 
 ### FR-2.4 Attribution
 

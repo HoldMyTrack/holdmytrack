@@ -58,6 +58,8 @@ class SyncStatusActivity : AppCompatActivity() {
         val head: View = findViewById(R.id.status_head)
         head.findViewById<TextView>(R.id.list_title).setText(R.string.status_history)
         summary = head.findViewById(R.id.list_summary)
+        // Until the first page answers, so a slow network reads as loading rather than empty.
+        summary.setText(R.string.status_loading)
         error = findViewById(R.id.status_error)
         empty = findViewById(R.id.status_empty)
         rows = findViewById(R.id.status_rows)

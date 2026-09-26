@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">HoldMyTrack</string>
-    <string name="map_load_failed">Map failed to load from %1$s\n%2$s</string>
+    <string name="map_load_failed">The map couldn\'t load.</string>
+    <string name="map_unreachable">Couldn\'t reach HoldMyTrack, so your tracks aren\'t on the map yet.</string>
+    <string name="map_empty">Nothing on your map yet. Sync from Health Connect, or record a walk with the button below.</string>
+    <string name="retry">Try again</string>
 
     <string name="sign_in">Sign in</string>
     <string name="sign_out">Sign out</string>
@@ -128,6 +131,7 @@
     <string name="sync_now_anyway">Sync the last 30 days anyway</string>
     <string name="status_title">Sync history</string>
     <string name="status_history">History</string>
+    <string name="status_loading">Loading…</string>
     <string name="status_summary_empty">Nothing has been synced or uploaded yet.</string>
     <string name="status_summary_processing">Processing %1$d of %2$d…</string>
     <string name="status_summary_settled">%1$d activities synced or uploaded.</string>
