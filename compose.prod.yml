@@ -154,6 +154,10 @@ services:
       # path apps/web/src/map/config.ts's PMTILES_PATH names — no rebuild needed to update
       # it, just a container restart. See docs/DEPLOY.md §5.
       # - /srv/holdmytrack/basemap/basemap.pmtiles:/srv/web/basemap/basemap.pmtiles:ro
+      # Files offered for download at /download/* — the Android APK (docs/DEPLOY.md §10).
+      # A host directory rather than part of the image, so publishing a new build is a copy,
+      # not a rebuild. Docker creates it empty if it doesn't exist yet.
+      - /srv/holdmytrack/downloads:/srv/web/download:ro
     depends_on:
       - api
 
