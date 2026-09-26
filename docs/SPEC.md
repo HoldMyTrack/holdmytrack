@@ -951,11 +951,11 @@ A read-only view of every account and every account's activities, for the people
 3. Numbers and dates follow the language: `1,234.5 km` and `Sep 8` in English, `1 234,5 км` and `8 сент.` in Russian. Units are unchanged by language — they follow Country (FR-1.7).
 4. Counts take the language's plural forms (`1 занятие`, `2 занятия`, `5 занятий`).
 5. The verification and password-reset emails (FR-1.8, FR-1.5) are in the account's language, or when it has none set, the language of the request that sent them.
-6. Error messages a person can see (a wrong password, a taken email, a rejected upload or track edit) are full sentences in the request's language, in page forms and in the JSON API's plain-text and `message` bodies alike. Machine-readable codes (`email_not_verified`, `demo_read_only`) never change with language.
+6. Error messages a person can see (a wrong password, a taken email, a rejected upload or track edit) are full sentences in the request's language, in page forms and in the JSON API's plain-text and `message` bodies alike. Machine-readable codes (`email_not_verified`, `demo_read_only`) never change with language. An import's failure reason, in the upload history, and the Android app's per-activity sync rejections are in the language of the request reading them, however long ago the import failed.
 7. Saving a different Language in Settings takes effect from that save's own reload onward, everywhere; other open pages change on their next load.
 8. The Android app follows the phone's language, or its own per-app language (Android's Settings → Apps → HoldMyTrack → Language). It doesn't read the account's setting, and sends its language as `Accept-Language`, so the server's messages match it.
 
-**Not translated**: activity names and descriptions people type, place names on the map, activity types outside the common set (shown as recorded), and the reasons an ingest or a `.zip` entry failed.
+**Not translated**: activity names and descriptions people type, place names on the map, activity types outside the common set (shown as recorded), and the reason a `.zip` entry was skipped.
 
 ## 16. Non-Functional Requirements (summary)
 

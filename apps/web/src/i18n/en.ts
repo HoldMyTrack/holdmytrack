@@ -5,6 +5,7 @@
  * as its raw value, underscores to spaces (format.ts's formatActivityType).
  */
 export const en = {
+  'common.bad_response': "The server's reply couldn't be read.",
   'common.cancel': 'Cancel',
   'common.confirm': 'Confirm',
   'common.delete': 'Delete',
@@ -13,7 +14,9 @@ export const en = {
   'common.loading': 'Loading…',
   'common.next_page': 'Next page',
   'common.previous_page': 'Previous page',
+  'common.network_error': "Couldn't reach the server.",
   'common.range': '{from}–{to} of {total}',
+  'common.request_failed': "The server couldn't complete this ({status}).",
   'common.save': 'Save',
   'common.saving': 'Saving…',
   'common.something_wrong': 'Something went wrong',

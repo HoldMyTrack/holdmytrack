@@ -197,13 +197,13 @@ func loadClippedPoints(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 
 	act, err := parseByExtensionReader(sourceDetail, obj)
 	if err != nil {
-		return parse.Activity{}, nil, fmt.Errorf("ingest: parse: %w", err)
+		return parse.Activity{}, nil, parseError{err}
 	}
 	if act.Points, err = keepTimed(act.Points); err != nil {
 		return parse.Activity{}, nil, err
 	}
 	if len(act.Points) < 2 {
-		return parse.Activity{}, nil, fmt.Errorf("ingest: fewer than 2 points recorded (%d)", len(act.Points))
+		return parse.Activity{}, nil, fmt.Errorf("ingest: %w (%d)", errTooFewPoints, len(act.Points))
 	}
 
 	zones, err := LoadZones(ctx, pool, userID)

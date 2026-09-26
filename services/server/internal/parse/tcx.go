@@ -96,7 +96,7 @@ func ParseTCX(r io.Reader) (Activity, error) {
 	}
 
 	if len(act.Points) == 0 {
-		return Activity{}, fmt.Errorf("parse tcx: no track points with position found")
+		return Activity{}, fmt.Errorf("parse tcx: %w", ErrNoPoints)
 	}
 	return act, nil
 }

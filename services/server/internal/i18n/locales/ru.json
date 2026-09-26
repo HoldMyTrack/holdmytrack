@@ -254,5 +254,14 @@
   "error.location_name_too_long": "Название должно быть не длиннее {max} символов.",
   "error.location_position": "Широта должна быть в пределах ±85, а долгота — ±180.",
   "error.location_radius": "Радиус должен быть от {min} до {max} метров.",
-  "error.location_too_many": "Не больше {max} приватных мест."
+  "error.location_too_many": "Не больше {max} приватных мест.",
+  "error.sync_external_id_required": "У каждого занятия должен быть external_id.",
+  "error.sync_too_few_points": "В занятии должно быть не меньше двух GPS-точек.",
+  "error.sync_too_many_points": "Слишком много GPS-точек ({n}), допускается не больше {max}.",
+  "ingest_error.unsupported_format": "Этот тип файла не поддерживается (нужен .gpx, .fit или .tcx).",
+  "ingest_error.unreadable_file": "Не удалось прочитать файл. Возможно, он повреждён или его формат не совпадает с расширением.",
+  "ingest_error.no_track": "В файле нет GPS-точек. Возможно, это тренировка в помещении.",
+  "ingest_error.too_few_points": "В файле меньше двух GPS-точек, поэтому трек не построить.",
+  "ingest_error.no_timestamps": "В файле нет отметок времени. Это запланированный маршрут, а не записанное занятие.",
+  "ingest_error.internal": "При обработке что-то пошло не так на нашей стороне."
 }

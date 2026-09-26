@@ -137,7 +137,7 @@ func ParseFIT(r io.Reader) (Activity, error) {
 	}
 
 	if len(act.Points) == 0 {
-		return Activity{}, fmt.Errorf("parse fit: no record messages with position found")
+		return Activity{}, fmt.Errorf("parse fit: %w", ErrNoPoints)
 	}
 	return act, nil
 }

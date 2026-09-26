@@ -250,5 +250,14 @@
   "error.location_name_too_long": "Name must be at most {max} characters.",
   "error.location_position": "Latitude must be within ±85 and longitude within ±180.",
   "error.location_radius": "Radius must be between {min} and {max} meters.",
-  "error.location_too_many": "At most {max} private locations."
+  "error.location_too_many": "At most {max} private locations.",
+  "error.sync_external_id_required": "Every activity needs an external_id.",
+  "error.sync_too_few_points": "An activity needs at least two GPS points.",
+  "error.sync_too_many_points": "Too many GPS points ({n}); at most {max}.",
+  "ingest_error.unsupported_format": "This file type isn't supported (want .gpx, .fit or .tcx).",
+  "ingest_error.unreadable_file": "The file couldn't be read. It may be damaged, or not the format its name says.",
+  "ingest_error.no_track": "The file has no GPS points. It may be from an indoor workout.",
+  "ingest_error.too_few_points": "The file has fewer than two GPS points, so there's no track to draw.",
+  "ingest_error.no_timestamps": "The file has no timestamps. It's a planned route, not a recorded activity.",
+  "ingest_error.internal": "Something went wrong on our side while processing it."
 }

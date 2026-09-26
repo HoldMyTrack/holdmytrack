@@ -122,10 +122,17 @@ func claimAndRunOne(ctx context.Context, pool *pgxpool.Pool, store *storage.Stor
 
 	if runErr != nil {
 		log.Error("job failed", "job_id", j.id, "kind", j.kind, "err", runErr)
+		// Only an ingest job's failure reaches a person (the upload history), so only it gets
+		// a code to be translated from; the other kinds' failures are for the logs.
+		var code *string
+		if j.kind == "ingest" {
+			c := ingest.FailureCode(runErr)
+			code = &c
+		}
 		_, uerr := pool.Exec(ctx, `
-			UPDATE jobs SET state = 'failed', attempts = attempts + 1, last_error = $2
+			UPDATE jobs SET state = 'failed', attempts = attempts + 1, last_error = $2, error_code = $3
 			WHERE id = $1
-		`, j.id, runErr.Error())
+		`, j.id, runErr.Error(), code)
 		if uerr != nil {
 			return true, fmt.Errorf("worker: mark failed: %w", uerr)
 		}
