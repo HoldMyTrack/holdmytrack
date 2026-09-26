@@ -10,7 +10,8 @@ import (
 )
 
 // The committed demo_data/ must always seed: every file parseable, every manifest entry
-// pointing at a real file.
+// pointing at a real file. An empty history is allowed — manifest.json alone keeps the
+// directory embeddable while the real set is being picked.
 func TestEmbeddedDemoDataIsSeedable(t *testing.T) {
 	fsys, err := fs.Sub(demoData, "demo_data")
 	if err != nil {
@@ -19,9 +20,6 @@ func TestEmbeddedDemoDataIsSeedable(t *testing.T) {
 	names, err := demoFiles(fsys)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if len(names) == 0 {
-		t.Fatal("demo_data/ has no activity files")
 	}
 	if _, err := loadDemoManifest(fsys, names); err != nil {
 		t.Fatal(err)

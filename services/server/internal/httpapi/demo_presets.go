@@ -12,6 +12,7 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -196,7 +197,16 @@ func SeedDemoCustomer(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 // so its prefixes are swept first, in the same log-and-continue style demo_purge.go uses.
 // heatmap_cap goes back to its column default: the old history's value would scale the new
 // one's heatmap until the worker's daily cap sweep caught up.
+//
+// The worker is quiesced for this account first: every ingest enqueues a render_fog job, so a
+// previous seed can leave hundreds queued, and one already running would rewrite fog_tiles
+// rows (and their objects) right after they were deleted. The queued ones are dropped — the
+// seed that follows enqueues its own — and a running one is waited out.
 func resetDemoCustomer(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger) error {
+	if err := quiesceDemoJobs(ctx, pool, log); err != nil {
+		return fmt.Errorf("reset: %w", err)
+	}
+
 	rows, err := pool.Query(ctx, `SELECT id FROM activities WHERE user_id = $1`, DemoCustomerUserID)
 	if err != nil {
 		return fmt.Errorf("reset: list activities: %w", err)
@@ -231,6 +241,7 @@ func resetDemoCustomer(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 	}
 	defer tx.Rollback(ctx)
 	for _, q := range []string{
+		`DELETE FROM jobs WHERE user_id = $1 AND state = 'pending'`,
 		`DELETE FROM activities WHERE user_id = $1`,
 		`DELETE FROM fog_tiles WHERE user_id = $1`,
 		`UPDATE users SET heatmap_cap = DEFAULT WHERE id = $1`,
@@ -244,4 +255,42 @@ func resetDemoCustomer(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 	}
 	log.Info("demo customer reset: done", "activities_removed", len(activityIDs))
 	return nil
+}
+
+// demoJobLockStale bounds how long quiesceDemoJobs waits on a claimed job: past this, a job
+// still claimed but never finished belongs to a worker that died mid-run, not one still going.
+const demoJobLockStale = 10 * time.Minute
+
+// quiesceDemoJobs deletes the demo account's unclaimed pending jobs and waits until none is
+// running. A claim (internal/worker's claimAndRunOne) only sets locked_at — the job stays
+// 'pending' until it finishes — so a running job is a pending one with a recent locked_at.
+func quiesceDemoJobs(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger) error {
+	tag, err := pool.Exec(ctx,
+		`DELETE FROM jobs WHERE user_id = $1 AND state = 'pending' AND locked_at IS NULL`, DemoCustomerUserID)
+	if err != nil {
+		return fmt.Errorf("drop queued jobs: %w", err)
+	}
+	if n := tag.RowsAffected(); n > 0 {
+		log.Info("demo customer reset: dropped queued jobs", "jobs", n)
+	}
+	for waited := false; ; waited = true {
+		var running int
+		if err := pool.QueryRow(ctx,
+			`SELECT count(*) FROM jobs WHERE user_id = $1 AND state = 'pending' AND locked_at > NOW() - make_interval(secs => $2)`,
+			DemoCustomerUserID, demoJobLockStale.Seconds(),
+		).Scan(&running); err != nil {
+			return fmt.Errorf("check running jobs: %w", err)
+		}
+		if running == 0 {
+			return nil
+		}
+		if !waited {
+			log.Info("demo customer reset: waiting for running jobs to finish", "jobs", running)
+		}
+		select {
+		case <-time.After(2 * time.Second):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 }
