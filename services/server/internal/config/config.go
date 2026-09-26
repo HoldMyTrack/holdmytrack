@@ -54,6 +54,12 @@ type Config struct {
 	GoogleClientID     string
 	GoogleClientSecret string
 	GoogleRedirectURL  string
+	// Facebook* configure "Sign in with Facebook" (docs/SPEC.md FR-1.10) exactly as Google*
+	// configure Google's: an empty FacebookAppID turns it off, and FacebookRedirectURL
+	// defaults to AppBaseURL's own /v1/auth/facebook/callback. Only read by `serve`.
+	FacebookAppID       string
+	FacebookAppSecret   string
+	FacebookRedirectURL string
 	// WebDevDir, when set, is a checkout's services/server/internal/web directory that `serve`
 	// reads page templates and their stylesheet from, re-parsing on every request, instead
 	// of the copies embedded in the binary — so editing a page in dev needs no image rebuild
@@ -91,6 +97,14 @@ func Load() (Config, error) {
 	}
 	if c.GoogleClientID != "" && c.GoogleClientSecret == "" {
 		return c, fmt.Errorf("config: GOOGLE_CLIENT_SECRET is required when GOOGLE_CLIENT_ID is set")
+	}
+	c.FacebookAppID = env("FACEBOOK_APP_ID", "")
+	c.FacebookAppSecret = env("FACEBOOK_APP_SECRET", "")
+	if c.FacebookRedirectURL = env("FACEBOOK_REDIRECT_URL", ""); c.FacebookRedirectURL == "" {
+		c.FacebookRedirectURL = c.AppBaseURL + "/v1/auth/facebook/callback"
+	}
+	if c.FacebookAppID != "" && c.FacebookAppSecret == "" {
+		return c, fmt.Errorf("config: FACEBOOK_APP_SECRET is required when FACEBOOK_APP_ID is set")
 	}
 	if c.DatabaseURL == "" {
 		// Built from the POSTGRES_* Compose-interpolation vars in .env.example, the same

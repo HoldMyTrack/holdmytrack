@@ -2,9 +2,7 @@ package httpapi
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
-	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -30,13 +28,8 @@ const (
 	googleAuthURL  = "https://accounts.google.com/o/oauth2/v2/auth"
 	googleTokenURL = "https://oauth2.googleapis.com/token"
 
-	// oauthCookieName carries state + PKCE verifier + the browser's timezone across the
-	// round trip through Google. Scoped to /v1/auth/google so no other request ever sends it.
-	oauthCookieName = "holdmytrack_oauth"
-	oauthCookiePath = apiPrefix + "/auth/google"
-	// oauthCookieTTL bounds how long someone can sit on Google's account chooser before the
-	// callback stops accepting the round trip.
-	oauthCookieTTL = 10 * time.Minute
+	// googleCookiePath scopes oauth.go's round-trip cookie to this flow alone.
+	googleCookiePath = apiPrefix + "/auth/google"
 )
 
 // GoogleOAuthConfig is what cmd/holdmytrack hands New — config.Config's three Google* values.
@@ -62,10 +55,10 @@ func newGoogleOAuth(cfg GoogleOAuthConfig) googleOAuth {
 func (g googleOAuth) enabled() bool { return g.ClientID != "" }
 
 // handleAuthProviders serves `GET /v1/auth/providers` — which optional sign-in methods this
-// deployment has configured, so the web client decides whether to render the Google button
-// from the server's own config rather than a build-time flag that could disagree with it.
+// deployment has configured, so a client decides whether to render the Google and Facebook
+// buttons from the server's own config rather than a build-time flag that could disagree with it.
 func (s *Server) handleAuthProviders(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]bool{"google": s.google.enabled()})
+	writeJSON(w, http.StatusOK, map[string]bool{"google": s.google.enabled(), "facebook": s.facebook.enabled()})
 }
 
 // handleGoogleStart serves `GET /v1/auth/google/start?tz=<IANA name>` — a full-page navigation,
@@ -77,21 +70,10 @@ func (s *Server) handleGoogleStart(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	state, err := randomToken()
-	if err != nil {
-		s.log.Error("oauth state generation failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+	state, verifier, ok := s.beginOAuth(w, r, googleCookiePath, true)
+	if !ok {
 		return
 	}
-	verifier, err := randomToken()
-	if err != nil {
-		s.log.Error("pkce verifier generation failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	tz, _ := normalizeTimezone(r.URL.Query().Get("tz"))
-
-	s.setOAuthCookie(w, strings.Join([]string{state, verifier, tz}, "."), oauthCookieTTL)
 
 	challenge := sha256.Sum256([]byte(verifier))
 	q := url.Values{
@@ -124,28 +106,13 @@ func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, s.appBaseURL+"/signin?error=google", http.StatusFound)
 	}
 
-	// Single-use: cleared before anything else, whatever the outcome.
-	cookie, cookieErr := r.Cookie(oauthCookieName)
-	s.setOAuthCookie(w, "", -1)
-
-	q := r.URL.Query()
-	if e := q.Get("error"); e != "" {
-		fail("google returned an error", errors.New(e))
+	code, verifier, tz, err := s.readOAuthCallback(w, r, googleCookiePath)
+	if err != nil {
+		fail("callback", err)
 		return
 	}
-	if cookieErr != nil {
-		fail("missing oauth cookie", cookieErr)
-		return
-	}
-	parts := strings.SplitN(cookie.Value, ".", 3)
-	if len(parts) != 3 || subtle.ConstantTimeCompare([]byte(parts[0]), []byte(q.Get("state"))) != 1 {
-		fail("state mismatch", nil)
-		return
-	}
-	verifier, tz := parts[1], parts[2]
-
 	ctx := r.Context()
-	claims, err := s.exchangeGoogleCode(ctx, q.Get("code"), verifier)
+	claims, err := s.exchangeGoogleCode(ctx, code, verifier)
 	if err != nil {
 		fail("code exchange", err)
 		return
@@ -155,25 +122,9 @@ func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 		fail("account resolution", err)
 		return
 	}
-	if _, err := s.startSession(w, ctx, userID, sessionTTL); err != nil {
+	if err := s.finishOAuthSignIn(w, r, userID); err != nil {
 		fail("session start", err)
-		return
 	}
-	http.Redirect(w, r, s.appBaseURL+"/", http.StatusFound)
-}
-
-func (s *Server) setOAuthCookie(w http.ResponseWriter, value string, maxAge time.Duration) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     oauthCookieName,
-		Value:    value,
-		Path:     oauthCookiePath,
-		HttpOnly: true,
-		Secure:   strings.HasPrefix(s.appBaseURL, "https://"), // same derivation as startSession
-		// Lax, not Strict: the callback is a top-level cross-site GET navigation from
-		// accounts.google.com, which Lax still sends the cookie on and Strict would not.
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   int(maxAge / time.Second),
-	})
 }
 
 // googleClaims is the subset of Google's id_token payload this flow reads.
@@ -272,8 +223,9 @@ func parseGoogleIDToken(idToken, clientID string, now time.Time) (googleClaims, 
 //  1. An account already linked to this Google sub signs in — whatever its email is now.
 //  2. Otherwise a real (non-demo) account with the same email gets linked. Google has just
 //     vouched that this person controls that mailbox. If the account's own email was never
-//     verified, its password is also cleared and its sessions ended: whoever set that password
-//     never proved they own the address, and leaving it would let someone pre-register a
+//     verified, its password is also cleared, its sessions ended and any other identity it
+//     links (Facebook, FR-1.10) removed: whoever set that password or linked that identity
+//     never proved they own the address, and leaving either would let someone pre-register a
 //     victim's email and keep a way in after the victim signs in with Google. An account
 //     already linked to a *different* Google sub is refused rather than silently relinked.
 //  3. Otherwise a new, already-verified account is created.
@@ -285,7 +237,7 @@ func (s *Server) resolveGoogleUser(ctx context.Context, c googleClaims, tz strin
 	defer tx.Rollback(ctx)
 
 	var userID string
-	err = tx.QueryRow(ctx, `SELECT id FROM users WHERE google_sub = $1`, c.Sub).Scan(&userID)
+	err = tx.QueryRow(ctx, `SELECT user_id FROM user_identities WHERE provider = 'google' AND subject = $1`, c.Sub).Scan(&userID)
 	if err == nil {
 		return userID, tx.Commit(ctx)
 	}
@@ -293,65 +245,50 @@ func (s *Server) resolveGoogleUser(ctx context.Context, c googleClaims, tz strin
 		return "", err
 	}
 
-	var verified bool
-	var linkedSub *string
+	var verified, linked bool
 	err = tx.QueryRow(ctx, `
-		SELECT id, email_verified, google_sub FROM users
+		SELECT id, email_verified,
+		       EXISTS (SELECT 1 FROM user_identities i WHERE i.user_id = users.id AND i.provider = 'google')
+		FROM users
 		WHERE email = $1 AND demo_expires_at IS NULL
 		FOR UPDATE
-	`, c.Email).Scan(&userID, &verified, &linkedSub)
+	`, c.Email).Scan(&userID, &verified, &linked)
 	switch {
 	case err == nil:
-		if linkedSub != nil {
+		if linked {
 			return "", errors.New("email already linked to a different google account")
 		}
-		if verified {
-			_, err = tx.Exec(ctx, `UPDATE users SET google_sub = $2 WHERE id = $1`, userID, c.Sub)
-		} else {
-			_, err = tx.Exec(ctx, `UPDATE users SET google_sub = $2, email_verified = true, password_hash = NULL WHERE id = $1`, userID, c.Sub)
+		if _, err := tx.Exec(ctx, `INSERT INTO user_identities (user_id, provider, subject) VALUES ($1, 'google', $2)`, userID, c.Sub); err != nil {
+			return "", err
+		}
+		if !verified {
 			for _, q := range []string{
+				`UPDATE users SET email_verified = true, password_hash = NULL WHERE id = $1`,
+				`DELETE FROM user_identities WHERE user_id = $1 AND provider <> 'google'`,
 				`DELETE FROM sessions WHERE user_id = $1`,
 				`DELETE FROM password_resets WHERE user_id = $1`,
 				`DELETE FROM email_verifications WHERE user_id = $1`,
 			} {
-				if err != nil {
-					break
+				if _, err := tx.Exec(ctx, q, userID); err != nil {
+					return "", err
 				}
-				_, err = tx.Exec(ctx, q, userID)
 			}
-		}
-		if err != nil {
-			return "", err
 		}
 	case errors.Is(err, pgx.ErrNoRows):
 		if tz == "" {
 			tz = "UTC"
 		}
-		var displayName *string
-		if name := []rune(strings.TrimSpace(c.Name)); len(name) > 0 {
-			// users.display_name is VARCHAR(255); a longer Google profile name shouldn't
-			// fail the whole sign-in over a cosmetic field.
-			v := string(name[:min(len(name), 255)])
-			displayName = &v
-		}
 		if err := tx.QueryRow(ctx, `
-			INSERT INTO users (email, google_sub, email_verified, display_name, timezone)
-			VALUES ($1, $2, true, $3, $4) RETURNING id
-		`, c.Email, c.Sub, displayName, tz).Scan(&userID); err != nil {
+			INSERT INTO users (email, email_verified, display_name, timezone)
+			VALUES ($1, true, $2, $3) RETURNING id
+		`, c.Email, newAccountDisplayName(c.Name), tz).Scan(&userID); err != nil {
+			return "", err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO user_identities (user_id, provider, subject) VALUES ($1, 'google', $2)`, userID, c.Sub); err != nil {
 			return "", err
 		}
 	default:
 		return "", err
 	}
 	return userID, tx.Commit(ctx)
-}
-
-// randomToken returns 32 random bytes, base64url-encoded — used for both the OAuth state and
-// the PKCE verifier (43 characters, inside RFC 7636's 43–128 range).
-func randomToken() (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(b), nil
 }

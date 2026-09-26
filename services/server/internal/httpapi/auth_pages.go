@@ -24,8 +24,10 @@ type authForm struct {
 	NoticeKey string
 	Email     string
 	Token     string
-	// Google shows "Continue with Google" — only when the server can complete that flow.
-	Google bool
+	// Google and Facebook show "Continue with Google"/"Continue with Facebook" — each only
+	// when the server can complete that flow.
+	Google   bool
+	Facebook bool
 	// Upgrading is a demo session creating a real account (the account menu's "Create your
 	// own account"): the sign-up page offers "Back to the map" instead of another demo.
 	Upgrading bool
@@ -154,10 +156,18 @@ func (s *Server) handleSignInPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, acct.home(), http.StatusSeeOther)
 		return
 	}
-	form := authForm{Google: s.google.enabled()}
-	// google_auth.go's callback lands here on any failure, with no detail on purpose.
-	if r.URL.Query().Get("error") == "google" {
+	form := authForm{Google: s.google.enabled(), Facebook: s.facebook.enabled()}
+	// google_auth.go's and facebook_auth.go's callbacks land here on failure — with no detail
+	// on purpose, except Facebook's two cases the person can do something about.
+	switch r.URL.Query().Get("error") {
+	case "google":
 		form.ErrorKey = "signin.google_failed"
+	case "facebook":
+		form.ErrorKey = "signin.facebook_failed"
+	case "facebook_no_email":
+		form.ErrorKey = "signin.facebook_no_email"
+	case "facebook_email_in_use":
+		form.ErrorKey = "signin.facebook_email_in_use"
 	}
 	s.renderAuth(w, r, http.StatusOK, "signin", "signin.title", false, form)
 }
@@ -167,7 +177,7 @@ func (s *Server) handleSignInForm(w http.ResponseWriter, r *http.Request) {
 	email := r.PostFormValue("email")
 	userID, err := s.checkPassword(r.Context(), email, r.PostFormValue("password"))
 	if err != nil {
-		s.renderAuthError(w, r, "sign in", "signin", "signin.title", false, authForm{Email: email, Google: s.google.enabled()}, err)
+		s.renderAuthError(w, r, "sign in", "signin", "signin.title", false, authForm{Email: email, Google: s.google.enabled(), Facebook: s.facebook.enabled()}, err)
 		return
 	}
 	s.signIn(w, r, userID)
@@ -181,7 +191,7 @@ func (s *Server) handleSignUpPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// noindex: /signin is the one sign-in-or-up page search results should show (it links here).
-	s.renderAuth(w, r, http.StatusOK, "signup", "signup.title", true, authForm{Google: s.google.enabled(), Upgrading: acct != nil})
+	s.renderAuth(w, r, http.StatusOK, "signup", "signup.title", true, authForm{Google: s.google.enabled(), Facebook: s.facebook.enabled(), Upgrading: acct != nil})
 }
 
 // POST /signup. timezone comes from a hidden field the page's one-line script fills from the
@@ -191,7 +201,7 @@ func (s *Server) handleSignUpForm(w http.ResponseWriter, r *http.Request) {
 	userID, err := s.createAccount(r.Context(), email, r.PostFormValue("password"), r.PostFormValue("timezone"), pageLang(s.pageAccount(r), r))
 	if err != nil {
 		acct := s.pageAccount(r)
-		s.renderAuthError(w, r, "sign up", "signup", "signup.title", true, authForm{Email: email, Google: s.google.enabled(), Upgrading: acct != nil && acct.info.isDemo}, err)
+		s.renderAuthError(w, r, "sign up", "signup", "signup.title", true, authForm{Email: email, Google: s.google.enabled(), Facebook: s.facebook.enabled(), Upgrading: acct != nil && acct.info.isDemo}, err)
 		return
 	}
 	s.signIn(w, r, userID)
@@ -200,7 +210,7 @@ func (s *Server) handleSignUpForm(w http.ResponseWriter, r *http.Request) {
 // POST /demo — the sign-in page's "Try it now — no signup".
 func (s *Server) handleDemoForm(w http.ResponseWriter, r *http.Request) {
 	if err := allowDemo(r); err != nil {
-		s.renderAuthError(w, r, "demo start", "signin", "signin.title", false, authForm{Google: s.google.enabled()}, err)
+		s.renderAuthError(w, r, "demo start", "signin", "signin.title", false, authForm{Google: s.google.enabled(), Facebook: s.facebook.enabled()}, err)
 		return
 	}
 	if _, err := s.startSession(w, r.Context(), DemoCustomerUserID, demoSessionTTL); err != nil {

@@ -102,6 +102,8 @@ func main() {
 		}
 		srv := httpapi.New(pool, store, log, mailer, cfg.AppBaseURL, cfg.BasemapOrigin, gitSHA, cfg.SkipEmailVerification, httpapi.GoogleOAuthConfig{
 			ClientID: cfg.GoogleClientID, ClientSecret: cfg.GoogleClientSecret, RedirectURL: cfg.GoogleRedirectURL,
+		}, httpapi.FacebookOAuthConfig{
+			AppID: cfg.FacebookAppID, AppSecret: cfg.FacebookAppSecret, RedirectURL: cfg.FacebookRedirectURL,
 		}, pages)
 		httpSrv := &http.Server{Addr: cfg.ListenAddr, Handler: srv}
 		log.Info("serve: listening", "addr", cfg.ListenAddr)

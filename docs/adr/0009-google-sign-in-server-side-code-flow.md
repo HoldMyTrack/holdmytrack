@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Accepted. Its decision to store the link as a `users.google_sub` column is superseded by ADR-0015, which moved it into a `user_identities` table when Facebook sign-in arrived.
 
 ## Context
 

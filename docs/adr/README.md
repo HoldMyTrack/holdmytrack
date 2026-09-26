@@ -23,6 +23,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0012](0012-server-rendered-pages-react-for-the-map.md) | Every page is server-rendered HTML sharing one header; React is kept for the map page |
 | [0013](0013-admin-panel.md) | An in-app, read-only admin panel, gated by a CLI-granted flag |
 | [0014](0014-localization.md) | Localization with in-house catalogs, one language decided by the server |
+| [0015](0015-identities-table-and-facebook-sign-in.md) | Sign in with Facebook, never linked by email, with identities in their own table |
 
 ## Writing a new one
 

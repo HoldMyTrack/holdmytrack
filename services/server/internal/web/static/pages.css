@@ -249,7 +249,8 @@ code {
 
 .auth-card__submit,
 .auth-card__secondary,
-.auth-card__google {
+.auth-card__google,
+.auth-card__facebook {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -285,6 +286,18 @@ code {
 .auth-card__google:hover {
   color: var(--fm-ink);
   background: rgb(var(--fm-ink-rgb) / 4%);
+}
+
+/* Facebook's brand blue with its white "f", as Meta's login-button guidelines ask. */
+.auth-card__facebook {
+  border: 1px solid #1877f2;
+  background: #1877f2;
+  color: #fff;
+}
+
+.auth-card__facebook:hover {
+  color: #fff;
+  background: #166fe5;
 }
 
 .auth-card__link {

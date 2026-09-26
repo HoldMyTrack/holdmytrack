@@ -30,6 +30,15 @@ Fill in every value — see that file's own comments for what each one means and
 2. Under Credentials, create an OAuth client ID of type **Web application** with the authorized redirect URI `https://<your-domain>/v1/auth/google/callback`, exactly `APP_BASE_URL` plus that path. No JavaScript origins are needed, since the flow runs server-side.
 3. Put the client ID and secret into `.env.prod` as `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` and leave `GOOGLE_REDIRECT_URL` empty; it defaults to that same URI. Recreate `api` (`up -d`) to pick them up; no rebuild is needed, because the web client asks the API at runtime whether to show the button.
 
+**Sign in with Facebook (optional).** Leave `FACEBOOK_APP_ID` empty to run without it. Facebook never links to an existing account by email, and a new account it creates verifies its email by mail (`SPEC.md` FR-1.10, ADR-0015), so SMTP must work before you turn this on. Meta renames dashboard labels from time to time; if one below doesn't match, search the dashboard for the setting.
+
+1. At developers.facebook.com, log in and register as a developer (Get Started), then **My Apps → Create App**: name HoldMyTrack, a contact email, and the use case "Authenticate and request data from users with Facebook Login". A business portfolio isn't needed.
+2. Under the use case's **Customize**, make sure the `email` permission is added next to `public_profile`. Both have standard access and need no App Review.
+3. In **Facebook Login → Settings**, keep Client OAuth login, Web OAuth login and Enforce HTTPS on, and add `https://<your-domain>/v1/auth/facebook/callback` to **Valid OAuth Redirect URIs**, exactly `APP_BASE_URL` plus that path. For local dev also add `http://localhost:<API_PORT>/v1/auth/facebook/callback` (allowed over http while the app is in Development mode).
+4. In **App settings → Basic**, copy the **App ID** and, after **Show** and re-entering your Facebook password, the **App secret** — treat it as a password: `.env.prod` only, never a committed file; **Reset** there if it leaks. On the same page, fill in App domains (the domain from step 3), a Privacy Policy URL, "Data deletion instructions URL" set to `https://<your-domain>/help#delete-account`, an app icon (1024×1024) and a category, and save.
+5. Put them into `.env.prod` as `FACEBOOK_APP_ID`/`FACEBOOK_APP_SECRET`, leave `FACEBOOK_REDIRECT_URL` empty, and recreate `api` (`up -d`).
+6. While the app is in Development mode, only people with a role on it (**App roles → Roles**) can sign in — test with one. Then switch it to **Live** (Publish on the app's dashboard); Meta checks the fields from step 4 first.
+
 ## 5. Basemap
 
 The basemap is the full Protomaps planet build (z0–15, ~138 GB), served unmodified from a public R2 bucket. The archive is deliberately excluded from every Docker build context (`apps/web/.dockerignore`), so the `web` image never has it baked in.
