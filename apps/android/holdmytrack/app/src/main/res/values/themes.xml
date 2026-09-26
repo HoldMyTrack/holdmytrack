@@ -269,6 +269,35 @@
          system face. -->
     <!-- The floating panel every piece of map chrome sits on, after the web's .map-mode-toggle:
          near-white, medium radius, a small shadow (fm-shadow-sm). -->
+    <!-- The date-range slider's Earlier/Later, after the web's .range-picker__page: a small
+         bordered chevron, 32dp across as on the web's phone footer, inside a 48dp-tall touch
+         target. -->
+    <style name="Widget.HoldMyTrack.Button.MapPage" parent="Widget.Material3.Button.IconButton.Outlined">
+        <item name="shapeAppearance">@style/ShapeAppearance.HoldMyTrack.Small</item>
+        <item name="backgroundTint">@color/map_page_bg</item>
+        <item name="strokeColor">@color/map_page_stroke</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="iconTint">@color/map_page_icon</item>
+        <item name="iconSize">16dp</item>
+        <item name="iconGravity">textStart</item>
+        <item name="iconPadding">0dp</item>
+        <item name="android:minWidth">32dp</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:insetTop">8dp</item>
+        <item name="android:insetBottom">8dp</item>
+        <item name="android:padding">@dimen/hmt_space_8</item>
+    </style>
+
+    <!-- A date under the date-range slider (.date-range-slider__labels): 12sp semibold, lightly
+         tracked, at 65% ink. -->
+    <style name="Widget.HoldMyTrack.DateRangeLabel" parent="">
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.LabelMedium</item>
+        <item name="android:textColor">@color/hmt_ink_hint</item>
+        <item name="android:letterSpacing">0.02</item>
+        <item name="android:paddingStart">@dimen/hmt_space_2</item>
+        <item name="android:paddingEnd">@dimen/hmt_space_2</item>
+    </style>
+
     <style name="Widget.HoldMyTrack.MapPanel" parent="">
         <item name="android:background">@drawable/bg_map_chrome</item>
         <item name="android:elevation">2dp</item>

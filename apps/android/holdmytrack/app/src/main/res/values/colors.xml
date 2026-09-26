@@ -17,6 +17,7 @@
 
     <color name="hmt_border">#E6E1D2</color>
     <color name="hmt_border_strong">#DCD6C4</color>
+    <color name="hmt_border_panel">#E2DCC8</color>
 
     <color name="hmt_accent">#B07E2E</color>
     <color name="hmt_accent_strong">#93691F</color>

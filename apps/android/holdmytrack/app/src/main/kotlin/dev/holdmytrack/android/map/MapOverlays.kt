@@ -128,18 +128,17 @@ object MapOverlays {
     private const val LIVE_POSITION_RADIUS = 6f
 
     /**
-     * Adds all three layers, hidden or visible per [mode]. Safe to call against a style that
-     * already has them: a style reload (a day/night flavor swap) discards custom layers, so
-     * this has to be re-runnable rather than one-shot.
+     * Adds all three layers, hidden or visible per [mode], with the tracks narrowed to [range]
+     * (null draws the whole history). Safe to call against a style that already has them: a
+     * style reload (a day/night flavor swap) discards custom layers, so this has to be
+     * re-runnable rather than one-shot.
      *
-     * Every tile URL here is unfiltered. All three endpoints accept `from`/`to`/`types`/
-     * `exclude`, and the web client drives them from its date-range picker and hidden set —
-     * neither of which the Android app has yet. Those controls are part of the design pass
-     * (`apps/android/docs/ROADMAP.md`'s note on Phase 3 of the root roadmap), and an omitted
-     * filter already means "no restriction" server-side, so the unfiltered URL is the whole
-     * history rather than a placeholder for something missing.
+     * Only the tracks tile carries a filter, and only `from`/`to` — the same as the web, whose
+     * date range narrows the tracks alone: Fog and Heatmap show coverage no filter narrows
+     * (`docs/SPEC.md` FR-4.2, FR-4.3), and the web's TYPE/DISTANCE filters and hidden set are
+     * applied client-side over the Activities list, which this app doesn't have.
      */
-    fun attach(style: Style, mode: MapMode) {
+    fun attach(style: Style, mode: MapMode, range: DateRange?) {
         val beforeId = labelInsertionPoint(style)
         addRaster(style, FOG_SOURCE_ID, FOG_LAYER_ID, tileUrl("fog", "png"), beforeId, minZoom = CITY_MIN_ZOOM)
         addRaster(style, HEATMAP_SOURCE_ID, HEATMAP_LAYER_ID, tileUrl("heatmap", "png"), beforeId, minZoom = CITY_MIN_ZOOM)
@@ -159,8 +158,23 @@ object MapOverlays {
             style, REGION_HEATMAP_SOURCE_ID, REGION_HEATMAP_LAYER_ID, REGIONS_SOURCE_LAYER,
             tileUrl("region-heatmap", "mvt"), beforeId, REGION_MIN_ZOOM, REGION_MAX_ZOOM, HEATMAP_FILL_COLOR, HEATMAP_FILL_OPACITY,
         )
-        addTracks(style, beforeId)
+        addTracks(style, beforeId, range)
         setMode(style, mode)
+    }
+
+    /**
+     * Narrows the tracks to [range]. MapLibre Native has no way to change a vector source's
+     * tile URL in place, so the tracks layer and its source are replaced, at the same place in
+     * the layer stack and with the old layer's visibility — whatever mode or recording state
+     * had set it.
+     */
+    fun setTrackRange(style: Style, range: DateRange?) {
+        val old = style.getLayer(TRACKS_LAYER_ID) ?: return
+        val visibility = old.visibility.value
+        style.removeLayer(old)
+        style.removeSource(TRACKS_SOURCE_ID)
+        addTracks(style, labelInsertionPoint(style), range)
+        style.getLayer(TRACKS_LAYER_ID)?.setProperties(PropertyFactory.visibility(visibility))
     }
 
     fun setMode(style: Style, mode: MapMode) {
@@ -282,9 +296,10 @@ object MapOverlays {
         }
     }
 
-    private fun addTracks(style: Style, beforeId: String?) {
+    private fun addTracks(style: Style, beforeId: String?, range: DateRange?) {
         if (style.getSource(TRACKS_SOURCE_ID) == null) {
-            style.addSource(VectorSource(TRACKS_SOURCE_ID, tileSet(tileUrl("tracks", "mvt"))))
+            val query = if (range == null) "" else "?from=${range.from}&to=${range.to}"
+            style.addSource(VectorSource(TRACKS_SOURCE_ID, tileSet(tileUrl("tracks", "mvt") + query)))
         }
         if (style.getLayer(TRACKS_LAYER_ID) == null) {
             val layer = LineLayer(TRACKS_LAYER_ID, TRACKS_SOURCE_ID)

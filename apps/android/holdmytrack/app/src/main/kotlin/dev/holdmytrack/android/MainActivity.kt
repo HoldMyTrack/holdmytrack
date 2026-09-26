@@ -22,6 +22,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import com.google.android.material.button.MaterialButton
+import dev.holdmytrack.android.map.ActivityDays
+import dev.holdmytrack.android.map.DateRange
+import dev.holdmytrack.android.map.DateRangeSlider
 import dev.holdmytrack.android.map.MapMode
 import dev.holdmytrack.android.map.MapOverlays
 import dev.holdmytrack.android.net.ApiException
@@ -40,12 +43,17 @@ import org.maplibre.android.location.modes.CameraMode
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import java.time.LocalDate
 
 /**
  * The map, and everything that hangs off it: the served basemap, the session the user layers
  * need, and the Normal / Fog of War / Heatmap toggle between them. The toggle and the burger
  * menu (Profile, Sync) both float over the map top-start, rather than living in a bar of their
  * own, mirroring the web client's own on-map mode control (`apps/web/src/map/MapView.tsx`).
+ *
+ * Along the bottom in Normal mode, the date range the tracks are drawn for — the web's phone
+ * footer (`map/DateRangeSlider`), defaulting to the five most recent activity days as the web
+ * does (`docs/SPEC.md` FR-6.1).
  *
  * Also the one place GPS recording is controlled from in the app: a record button floats
  * bottom-centre (tap to start, tap to pause/resume, hold for two seconds to stop —
@@ -84,6 +92,26 @@ class MainActivity : AppCompatActivity() {
     /** Find my location's panel — what hides while recording, so no empty panel is left. */
     private lateinit var locatePanel: View
 
+    /** The record button and, under it, the date-range footer. */
+    private lateinit var bottomChrome: View
+    private lateinit var dateFooter: View
+    private lateinit var dateSlider: DateRangeSlider
+    private lateinit var activityDays: ActivityDays
+
+    /** The date range the tracks are drawn for; null until the first page of activity days
+     *  has set the default, when the tracks are the whole history. */
+    private var selectedRange: DateRange? = null
+
+    /** Whether the user has picked [selectedRange] themselves. Until then it is the default,
+     *  re-derived whenever the activity days reload — so a first sync on an empty account
+     *  moves it onto what arrived, as the web's does. */
+    private var userChangedRange = false
+
+    /** Set on every resume, since Sync or a recording may have added days; `syncSession`
+     *  reloads them once the session allows. The default range follows until the user picks
+     *  one. */
+    private var daysStale = false
+
     private var map: MapLibreMap? = null
     private var style: Style? = null
     private var mode = MapMode.NORMAL
@@ -98,6 +126,13 @@ class MainActivity : AppCompatActivity() {
      *  a rotation) add the status bar height on top of it rather than compounding it. */
     private var compassBaseMarginTop = 0
     private var compassBaseMarginCaptured = false
+
+    /** The logo's and attribution's own bottom margins, captured once, like the compass's —
+     *  and carried through `onSaveInstanceState`, since MapLibre restores its UI settings with
+     *  the lift already applied, and capturing those again would lift them twice. */
+    private var logoBaseMarginBottom = 0
+    private var attributionBaseMarginBottom = 0
+    private var attributionBaseCaptured = false
 
     /** Whether the user layers are currently on the style — see `syncSession`. */
     private var overlaysAttached = false
@@ -191,7 +226,6 @@ class MainActivity : AppCompatActivity() {
         )
         modeButtons.forEach { (value, button) -> button.setOnClickListener { setMode(value) } }
         menuButton.setOnClickListener { showMenu(it) }
-        setMode(mode)
 
         recordButton = findViewById(R.id.record_button)
         recordButton.setOnClickListener { onRecordTap() }
@@ -200,6 +234,26 @@ class MainActivity : AppCompatActivity() {
         locateButton = findViewById(R.id.locate_button)
         locatePanel = findViewById(R.id.locate_panel)
         locateButton.setOnClickListener { onLocateTap() }
+
+        bottomChrome = findViewById(R.id.bottom_chrome)
+        dateFooter = findViewById(R.id.date_footer)
+        activityDays = ActivityDays(DateRangeSlider.WINDOW_DAYS, ::onActivityDaysChanged)
+        dateSlider = DateRangeSlider(dateFooter, onPan = activityDays::panBy) { range ->
+            userChangedRange = true
+            applyRange(range, fly = true)
+        }
+        savedInstanceState?.getString(STATE_RANGE_FROM)?.let { from ->
+            val to = savedInstanceState.getString(STATE_RANGE_TO) ?: return@let
+            selectedRange = DateRange(from, to)
+            dateSlider.value = selectedRange
+            userChangedRange = savedInstanceState.getBoolean(STATE_RANGE_CHOSEN)
+        }
+        if (savedInstanceState?.containsKey(STATE_LOGO_MARGIN) == true) {
+            logoBaseMarginBottom = savedInstanceState.getInt(STATE_LOGO_MARGIN)
+            attributionBaseMarginBottom = savedInstanceState.getInt(STATE_ATTRIBUTION_MARGIN)
+            attributionBaseCaptured = true
+        }
+        setMode(mode)
 
         insetSystemBars()
         if (savedInstanceState == null) handleStopIntent(intent)
@@ -221,6 +275,7 @@ class MainActivity : AppCompatActivity() {
                 .zoom(1.0)
                 .build()
             applyCompassMargin()
+            applyAttributionMargin()
             loadStyle()
         }
     }
@@ -280,20 +335,25 @@ class MainActivity : AppCompatActivity() {
     private fun insetSystemBars() {
         val topBar: View = findViewById(R.id.top_bar)
         val barTopMargin = (topBar.layoutParams as MarginLayoutParams).topMargin
-        val recordBottomMargin = (recordButton.layoutParams as MarginLayoutParams).bottomMargin
+        val bottomPadding = bottomChrome.paddingBottom
         findViewById<View>(R.id.map_root).setOnApplyWindowInsetsListener { _, insets ->
             val bars = insets.getInsets(WindowInsets.Type.systemBars())
             (topBar.layoutParams as MarginLayoutParams).topMargin = barTopMargin + bars.top
             topBar.requestLayout()
-            (recordButton.layoutParams as MarginLayoutParams).bottomMargin = recordBottomMargin + bars.bottom
-            recordButton.requestLayout()
+            bottomChrome.setPadding(
+                bottomChrome.paddingLeft,
+                bottomChrome.paddingTop,
+                bottomChrome.paddingRight,
+                bottomPadding + bars.bottom,
+            )
             systemBarInsetTop = bars.top
             applyCompassMargin()
             insets
         }
         // The compass sits below the top row and any notice under it, whose heights are only
-        // known once they're laid out.
+        // known once they're laid out; the attribution above the date-range footer likewise.
         topChrome.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyCompassMargin() }
+        bottomChrome.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyAttributionMargin() }
     }
 
     /**
@@ -319,6 +379,35 @@ class MainActivity : AppCompatActivity() {
             compassBaseMarginTop + maxOf(systemBarInsetTop, belowTopBar),
             settings.compassMarginRight,
             settings.compassMarginBottom,
+        )
+    }
+
+    /**
+     * MapLibre's logo and attribution sit bottom-start, where the date-range footer is — and the
+     * attribution is the basemap's ODbL credit, which must stay visible (`FR-2.4`). So while
+     * the footer is up both move above it; the rest of the time they keep their own margins,
+     * which already clear the gesture bar.
+     */
+    private fun applyAttributionMargin() {
+        val instance = map ?: return
+        val settings = instance.uiSettings
+        if (!attributionBaseCaptured) {
+            logoBaseMarginBottom = settings.logoMarginBottom
+            attributionBaseMarginBottom = settings.attributionMarginBottom
+            attributionBaseCaptured = true
+        }
+        val above = if (dateFooter.isVisible) bottomChrome.height - dateFooter.top else 0
+        settings.setLogoMargins(
+            settings.logoMarginLeft,
+            settings.logoMarginTop,
+            settings.logoMarginRight,
+            logoBaseMarginBottom + above,
+        )
+        settings.setAttributionMargins(
+            settings.attributionMarginLeft,
+            settings.attributionMarginTop,
+            settings.attributionMarginRight,
+            attributionBaseMarginBottom + above,
         )
     }
 
@@ -350,14 +439,68 @@ class MainActivity : AppCompatActivity() {
 
         modeBarReady = true
         modeBar.visibility = if (isRecording()) View.GONE else View.VISIBLE
+        if (daysStale) {
+            daysStale = false
+            activityDays.reload()
+        }
+        renderDateFooter()
 
         val loaded = style ?: return
         if (!overlaysAttached) {
-            MapOverlays.attach(loaded, mode)
+            MapOverlays.attach(loaded, mode, selectedRange)
             overlaysAttached = true
             if (isRecording()) MapOverlays.setRecording(loaded, true, mode)
             frameActivities()
         }
+    }
+
+    /**
+     * The date-range slider's window has moved or reloaded. A reload — the first page, or a
+     * fresh one on returning to the map — re-derives the default range until the user has
+     * picked one: the five most recent activity days, through today (`docs/SPEC.md` FR-6.1).
+     */
+    private fun onActivityDaysChanged(reloaded: Boolean) {
+        dateSlider.setDays(activityDays.visibleDays, activityDays.canPanEarlier, activityDays.canPanLater)
+        if (reloaded && !userChangedRange) {
+            val today = LocalDate.now().toString()
+            val from = activityDays.visibleDays.takeLast(DEFAULT_RANGE_DAYS).firstOrNull()?.date
+                ?: activityDays.earliest
+                ?: today
+            val range = DateRange(from, today)
+            if (range != selectedRange) applyRange(range, fly = false)
+        }
+        renderDateFooter()
+    }
+
+    /**
+     * Draws the tracks for [range]. Only a range the user picked moves the camera — onto that
+     * range's activities, as the web does (`docs/SPEC.md` FR-6.6) — never the default
+     * re-deriving itself after a sync.
+     */
+    private fun applyRange(range: DateRange, fly: Boolean) {
+        selectedRange = range
+        dateSlider.value = range
+        style?.takeIf { overlaysAttached }?.let { MapOverlays.setTrackRange(it, range) }
+        if (!fly) return
+        HoldMyTrackApi.activityBounds(range.from, range.to) { result ->
+            val box = result.getOrNull() ?: return@activityBounds
+            // A later pick, or a recording started since, owns the camera now.
+            if (range != selectedRange || isRecording()) return@activityBounds
+            flyTo(box)
+        }
+    }
+
+    /** The footer is Normal mode's alone, as on the web (Fog and Heatmap ignore the range —
+     *  `docs/SPEC.md` FR-4.2), and steps aside while recording. It waits for the session and
+     *  the first page of days, and an account with no activity at all has nothing to pick
+     *  from — the empty notice speaks for it instead. */
+    private fun renderDateFooter() {
+        val visible = modeBarReady && mode == MapMode.NORMAL && !isRecording() &&
+            activityDays.ready && activityDays.earliest != null
+        dateFooter.visibility = if (visible) View.VISIBLE else View.GONE
+        (recordButton.layoutParams as MarginLayoutParams).bottomMargin =
+            resources.getDimensionPixelSize(if (visible) R.dimen.hmt_space_16 else R.dimen.hmt_space_32)
+        recordButton.requestLayout()
     }
 
     private fun isRecording() = (recorder?.state ?: RecordingState.IDLE) != RecordingState.IDLE
@@ -444,6 +587,7 @@ class MainActivity : AppCompatActivity() {
         recordButton.holdEnabled = active
         if (modeBarReady) modeBar.visibility = if (active) View.GONE else View.VISIBLE
         locatePanel.visibility = if (active) View.GONE else View.VISIBLE
+        renderDateFooter()
         updateNoticeVisibility()
 
         val loaded = style ?: return
@@ -587,23 +731,24 @@ class MainActivity : AppCompatActivity() {
             button.isChecked = active
         }
         style?.takeIf { overlaysAttached }?.let { MapOverlays.setMode(it, next) }
+        renderDateFooter()
     }
 
     /**
-     * Moves the camera to cover everything the account has uploaded, once per session.
+     * Moves the camera onto the account's most recent activity, once per session — the web's
+     * opening view (`docs/SPEC.md` FR-4.5), not the whole history, which for an account with
+     * scattered recent history is a near-world view that reads as broken.
      *
-     * The zoom is capped because a single short activity — or one clipped to almost nothing by
-     * a Private location — has a near-zero extent, and fitting the camera to that box lands well
-     * past the basemap's z14 data, on a grey rectangle. An account with no geometry yet is left
-     * at the world view, which is the truthful thing to show for a history that is empty — with
-     * a notice saying so and pointing at Sync, re-checked on every resume until something
-     * arrives (`onResume`). Not for a demo account, which always has history and can't sync.
+     * An account with no geometry yet is left at the world view, which is the truthful thing to
+     * show for a history that is empty — with a notice saying so and pointing at Sync,
+     * re-checked on every resume until something arrives (`onResume`). Not for a demo account,
+     * which always has history and can't sync.
      */
     private fun frameActivities() {
         if (framed) return
         framed = true
-        HoldMyTrackApi.activityBounds { result ->
-            if (result.isFailure) return@activityBounds
+        HoldMyTrackApi.latestActivityBounds { result ->
+            if (result.isFailure) return@latestActivityBounds
             val box = result.getOrNull()
             if (box == null) {
                 if (!Session.isDemo) {
@@ -611,20 +756,29 @@ class MainActivity : AppCompatActivity() {
                         startActivity(Intent(this, SyncActivity::class.java))
                     }
                 }
-                return@activityBounds
+                return@latestActivityBounds
             }
             hideNotice(Notice.EMPTY)
-            val instance = map ?: return@activityBounds
             // Reopening the app mid-recording: the camera belongs to the live track.
-            if (isRecording()) return@activityBounds
-            val bounds = LatLngBounds.from(box[3], box[2], box[1], box[0])
-            val fitted = instance.getCameraForLatLngBounds(bounds, IntArray(4) { FRAME_PADDING_PX })
-                ?: return@activityBounds
-            val target = CameraPosition.Builder(fitted)
-                .zoom(minOf(fitted.zoom, MAX_FRAME_ZOOM))
-                .build()
-            instance.animateCamera(CameraUpdateFactory.newCameraPosition(target), FRAME_DURATION_MS)
+            if (isRecording()) return@latestActivityBounds
+            flyTo(box)
         }
+    }
+
+    /**
+     * Flies the camera to fit [box] (`[minLon, minLat, maxLon, maxLat]`). The zoom is capped
+     * because a single short activity — or one clipped to almost nothing by a Private location —
+     * has a near-zero extent, and fitting the camera to that box lands well past the basemap's
+     * z14 data, on a grey rectangle.
+     */
+    private fun flyTo(box: DoubleArray) {
+        val instance = map ?: return
+        val bounds = LatLngBounds.from(box[3], box[2], box[1], box[0])
+        val fitted = instance.getCameraForLatLngBounds(bounds, IntArray(4) { FRAME_PADDING_PX }) ?: return
+        val target = CameraPosition.Builder(fitted)
+            .zoom(minOf(fitted.zoom, MAX_FRAME_ZOOM))
+            .build()
+        instance.animateCamera(CameraUpdateFactory.newCameraPosition(target), FRAME_DURATION_MS)
     }
 
     /**
@@ -665,6 +819,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         mapView.onResume()
+        daysStale = true
         syncSession()
         // An empty map is asked again on every return — typically from Sync — so the notice
         // goes, and the camera frames the new history, as soon as something has arrived.
@@ -693,6 +848,15 @@ class MainActivity : AppCompatActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         mapView.onSaveInstanceState(outState)
+        selectedRange?.let {
+            outState.putString(STATE_RANGE_FROM, it.from)
+            outState.putString(STATE_RANGE_TO, it.to)
+            outState.putBoolean(STATE_RANGE_CHOSEN, userChangedRange)
+        }
+        if (attributionBaseCaptured) {
+            outState.putInt(STATE_LOGO_MARGIN, logoBaseMarginBottom)
+            outState.putInt(STATE_ATTRIBUTION_MARGIN, attributionBaseMarginBottom)
+        }
     }
 
     override fun onLowMemory() {
@@ -704,6 +868,7 @@ class MainActivity : AppCompatActivity() {
     // callback above but still reaches this one.
     override fun onDestroy() {
         if (::mapView.isInitialized) mapView.onDestroy()
+        if (::dateSlider.isInitialized) dateSlider.release()
         super.onDestroy()
     }
 
@@ -727,5 +892,13 @@ class MainActivity : AppCompatActivity() {
         const val MENU_PROFILE = 1
         const val MENU_SYNC = 2
         const val MENU_RECORDED_ACTIVITIES = 3
+
+        /** The default range's length in activity days (`docs/SPEC.md` FR-6.1). */
+        const val DEFAULT_RANGE_DAYS = 5
+        const val STATE_RANGE_FROM = "range_from"
+        const val STATE_RANGE_TO = "range_to"
+        const val STATE_RANGE_CHOSEN = "range_chosen"
+        const val STATE_LOGO_MARGIN = "logo_margin"
+        const val STATE_ATTRIBUTION_MARGIN = "attribution_margin"
     }
 }
