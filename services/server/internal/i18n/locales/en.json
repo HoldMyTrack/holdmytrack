@@ -209,6 +209,7 @@
   "error.password_too_short": "Password must be at least {min} characters.",
   "error.email_taken": "An account with this email already exists.",
   "error.invalid_credentials": "Invalid email or password.",
+  "error.handoff_invalid": "This sign-in link has expired or was already used. Please try again.",
   "error.demo_rate_limited": "Too many demo sessions from this address; try again later.",
   "error.rate_limited": "Too many requests; try again later.",
   "error.reset_link_invalid": "This reset link is invalid or has expired.",

@@ -13,6 +13,13 @@
     <string name="password_hint">Password</string>
     <string name="credentials_required">Enter an email and a password.</string>
     <string name="sign_in_failed">Could not sign in.</string>
+    <string name="continue_with_google">Continue with Google</string>
+    <string name="continue_with_facebook">Continue with Facebook</string>
+    <string name="sign_in_or">or</string>
+    <string name="google_failed">Couldn\'t sign in with Google. Please try again.</string>
+    <string name="facebook_failed">Couldn\'t sign in with Facebook. Please try again.</string>
+    <string name="facebook_no_email">Your Facebook account didn\'t share an email address, and HoldMyTrack needs one. Try again and allow access to your email, or sign up with email and password.</string>
+    <string name="facebook_email_in_use">An account with this email already exists. Sign in the way you usually do, or set a password with “Forgot password?” on the website.</string>
 
     <string name="signed_in_as">Signed in as %1$s</string>
     <string name="signed_in_demo">Signed in to the demo account</string>

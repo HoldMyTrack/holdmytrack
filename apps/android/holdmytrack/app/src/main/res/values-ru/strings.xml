@@ -16,6 +16,13 @@
     <string name="password_hint">Пароль</string>
     <string name="credentials_required">Введите адрес почты и пароль.</string>
     <string name="sign_in_failed">Не удалось войти.</string>
+    <string name="continue_with_google">Войти через Google</string>
+    <string name="continue_with_facebook">Войти через Facebook</string>
+    <string name="sign_in_or">или</string>
+    <string name="google_failed">Не удалось войти через Google. Попробуйте ещё раз.</string>
+    <string name="facebook_failed">Не удалось войти через Facebook. Попробуйте ещё раз.</string>
+    <string name="facebook_no_email">Ваш аккаунт Facebook не передал адрес электронной почты, а он нужен HoldMyTrack. Попробуйте ещё раз и разрешите доступ к почте или зарегистрируйтесь по почте и паролю.</string>
+    <string name="facebook_email_in_use">Аккаунт с этой почтой уже существует. Войдите так, как обычно, или задайте пароль через «Забыли пароль?» на сайте.</string>
 
     <string name="signed_in_as">Вы вошли как %1$s</string>
     <string name="signed_in_demo">Вы вошли в демо-аккаунт</string>

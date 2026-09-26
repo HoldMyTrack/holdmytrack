@@ -15,7 +15,7 @@ This document specifies HoldMyTrack's functional behavior as currently implement
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), and the interface language — English or Russian (FR-13).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web and in the Android app, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), and the interface language — English or Russian (FR-13).
 
 **Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), explorer-tile gamification, the rest of "Export" (story cards, animated reveals — high-resolution map export itself is built, FR-4.10 below). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace/heart-rate stay as per-activity route context (FR-4.9) rather than an analysed, all-time performance record. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
@@ -214,9 +214,9 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 
 ### FR-1.9 Sign in with Google
 
-**Description**: A visitor signs in, or creates an account, with a Google account instead of an email and password. Web client only; the Android app does not offer it yet.
+**Description**: A visitor signs in, or creates an account, with a Google account instead of an email and password, on the web or in the Android app.
 
-**Preconditions**: The deployment has Google OAuth credentials configured. Without them, `GET /v1/auth/providers` reports `{"google": false}`, the client shows no Google button, and the start and callback endpoints below return `404 Not Found`.
+**Preconditions**: The deployment has Google OAuth credentials configured. Without them, `GET /v1/auth/providers` reports `{"google": false}`, the client shows no Google button, and the start and callback endpoints below, and Android's `POST /v1/auth/google/token`, return `404 Not Found`. With them, it also reports the web client ID as `google_client_id`, which the Android app needs.
 
 **Inputs**: The Google account the visitor picks on Google's own account chooser; the browser's IANA timezone, sent automatically as with FR-1.1.
 
@@ -236,9 +236,16 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 
 **Notes**: A Google-only account has no password, so FR-1.2 rejects it with the same generic error as any other mismatch; it can set a password at any time through FR-1.5/FR-1.6, after which both ways in work. Changing the account's email (FR-1.8 step 4) leaves the Google link in place.
 
+**On Android** (ADR-0016):
+1. The sign-in screen shows "Continue with Google" when `GET /v1/auth/providers` reports `google: true` with a `google_client_id`.
+2. Tapping it opens the system's Google account picker (Credential Manager), which returns a Google ID token issued for that client ID.
+3. The app posts `{id_token, tz}` to `POST /v1/auth/google/token`, `tz` being the device's IANA timezone. The server checks the token's signature against Google's published keys, then everything in steps 3–4 above applies unchanged: the same claim checks, the same choice of account.
+4. It answers with the same body as `POST /v1/auth/login` (FR-1.2), including `session_token`, and the app opens the map.
+5. Closing the picker does nothing. Any other failure (an invalid token, the email check, the account already linked to a different Google account, or the picker itself failing) shows "Couldn't sign in with Google. Please try again."; the server's answer is a `401` with that text.
+
 ### FR-1.10 Sign in with Facebook
 
-**Description**: A visitor signs in, or creates an account, with a Facebook account instead of an email and password. Web client only. Unlike FR-1.9, a Facebook identity is never linked to an existing account by email: Facebook doesn't say whether the email it returns has been verified.
+**Description**: A visitor signs in, or creates an account, with a Facebook account instead of an email and password, on the web or in the Android app. Unlike FR-1.9, a Facebook identity is never linked to an existing account by email: Facebook doesn't say whether the email it returns has been verified.
 
 **Preconditions**: The deployment has a Facebook app configured. Without it, `GET /v1/auth/providers` reports `{"facebook": false}`, the client shows no Facebook button, and the start and callback endpoints below return `404 Not Found`.
 
@@ -262,6 +269,16 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 - Anything else — the visitor cancelled on Facebook's screen, a missing or mismatched `state`, the code exchange or profile request failed → `/signin?error=facebook`: "Couldn't sign in with Facebook. Please try again." The cause is logged server-side, not revealed in the URL.
 
 **Notes**: A Facebook-only account has no password, so FR-1.2 rejects it with the same generic error as any other mismatch; it can set one through FR-1.5/FR-1.6. Changing the account's email (FR-1.8 step 4) leaves the Facebook link in place. An account created here whose email is later claimed through Sign in with Google while still unverified loses its Facebook link (FR-1.9 step 4). There is no way yet to link Facebook to an existing account.
+
+**On Android** (ADR-0016). The app runs the same flow in a browser tab rather than through Meta's SDK:
+1. The sign-in screen shows "Continue with Facebook" when `GET /v1/auth/providers` reports `facebook: true`.
+2. Tapping it makes a random verifier and opens `GET /v1/auth/facebook/start?tz=<timezone>&app_challenge=<S256 hash of the verifier>` in a browser tab. A malformed `app_challenge` → `400 Bad Request`.
+3. Steps 2–4 above happen in the tab, unchanged, including the verification email for a new account.
+4. Instead of step 5, the server stores a one-time code, valid for 2 minutes and tied to the challenge, and redirects the tab to `holdmytrack://oauth?code=<code>`, which closes the tab and returns to the app. The app posts `{code, verifier}` to `POST /v1/auth/handoff` and gets the same body as `POST /v1/auth/login` (FR-1.2), including `session_token`.
+5. A code works once. An unknown, already used or expired code, or a verifier that doesn't match → `401` "This sign-in link has expired or was already used. Please try again.", and the code is used up either way.
+6. The three error cases above redirect to `holdmytrack://oauth?error=<code>` instead, and the app shows the same messages. Closing the tab returns to the sign-in screen with no message.
+
+A new account made this way is unverified, like one made on the web; the Android app has no verification screen yet (`KNOWN_ISSUES.md`).
 
 ## 4. FR-2 — No-Signup Demo
 

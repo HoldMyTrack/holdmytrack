@@ -76,8 +76,8 @@ func TestFacebookStartRedirectsToDialog(t *testing.T) {
 	if len(cookies) != 1 || cookies[0].Name != oauthCookieName || cookies[0].Path != "/v1/auth/facebook" || !cookies[0].Secure || !cookies[0].HttpOnly {
 		t.Fatalf("bad oauth cookie: %+v", cookies)
 	}
-	if want := q.Get("state") + "..Europe/Berlin"; cookies[0].Value != want {
-		t.Fatalf("cookie %q, want %q (state, no verifier, tz)", cookies[0].Value, want)
+	if want := q.Get("state") + "..Europe/Berlin."; cookies[0].Value != want {
+		t.Fatalf("cookie %q, want %q (state, no verifier, tz, no app challenge)", cookies[0].Value, want)
 	}
 }
 

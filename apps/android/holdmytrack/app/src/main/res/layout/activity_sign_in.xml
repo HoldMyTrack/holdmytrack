@@ -19,6 +19,34 @@
             android:text="@string/sign_in_intro"
             android:textAppearance="?attr/textAppearanceBodyLarge" />
 
+        <!-- Hidden until GET /v1/auth/providers says the server has each configured
+             (SignInActivity), above the email form as on the web's sign-in page. -->
+        <Button
+            android:id="@+id/google"
+            style="@style/Widget.HoldMyTrack.Button.Outlined"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/continue_with_google"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/facebook"
+            style="@style/Widget.HoldMyTrack.Button.Outlined"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/continue_with_facebook"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/providers_divider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:paddingTop="8dp"
+            android:text="@string/sign_in_or"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:visibility="gone" />
+
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

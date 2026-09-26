@@ -66,4 +66,8 @@ dependencies {
     // lifecycleScope the sync run is tied to, which is what keeps it foreground-only.
     implementation(libs.lifecycle.runtime)
     implementation(libs.coroutines.android)
+    implementation(libs.credentials)
+    implementation(libs.credentials.play.services)
+    implementation(libs.google.id)
+    implementation(libs.browser)
 }

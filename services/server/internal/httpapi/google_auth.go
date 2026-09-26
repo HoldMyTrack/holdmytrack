@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 )
 
 // Sign in with Google (docs/SPEC.md FR-1.9, docs/adr/0009-google-sign-in-server-side-code-flow.md)
@@ -40,16 +42,19 @@ type GoogleOAuthConfig struct {
 	RedirectURL  string
 }
 
-// googleOAuth is GoogleOAuthConfig plus the two things a test needs to swap out: the token
-// endpoint and the HTTP client that reaches it.
+// googleOAuth is GoogleOAuthConfig plus what a test needs to swap out: the token endpoint, the
+// HTTP client that reaches it, and the signing keys a native client's id_token is checked
+// against (google_idtoken.go).
 type googleOAuth struct {
 	GoogleOAuthConfig
 	tokenURL string
 	client   *http.Client
+	keys     *googleKeySet
 }
 
 func newGoogleOAuth(cfg GoogleOAuthConfig) googleOAuth {
-	return googleOAuth{GoogleOAuthConfig: cfg, tokenURL: googleTokenURL, client: &http.Client{Timeout: 10 * time.Second}}
+	client := &http.Client{Timeout: 10 * time.Second}
+	return googleOAuth{GoogleOAuthConfig: cfg, tokenURL: googleTokenURL, client: client, keys: newGoogleKeySet(client)}
 }
 
 func (g googleOAuth) enabled() bool { return g.ClientID != "" }
@@ -57,8 +62,19 @@ func (g googleOAuth) enabled() bool { return g.ClientID != "" }
 // handleAuthProviders serves `GET /v1/auth/providers` — which optional sign-in methods this
 // deployment has configured, so a client decides whether to render the Google and Facebook
 // buttons from the server's own config rather than a build-time flag that could disagree with it.
+// google_client_id is the web client's ID, which the Android app passes to Credential Manager
+// as its serverClientId so the id_token it gets back is one handleGoogleToken accepts. It's
+// public — every Google sign-in page carries it in its URL.
 func (s *Server) handleAuthProviders(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]bool{"google": s.google.enabled(), "facebook": s.facebook.enabled()})
+	resp := struct {
+		Google         bool   `json:"google"`
+		Facebook       bool   `json:"facebook"`
+		GoogleClientID string `json:"google_client_id,omitempty"`
+	}{Google: s.google.enabled(), Facebook: s.facebook.enabled()}
+	if resp.Google {
+		resp.GoogleClientID = s.google.ClientID
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // handleGoogleStart serves `GET /v1/auth/google/start?tz=<IANA name>` — a full-page navigation,
@@ -101,30 +117,67 @@ func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	rt, err := s.readOAuthCallback(w, r, googleCookiePath)
 	fail := func(msg string, err error) {
 		s.log.Warn("google sign-in failed: "+msg, "err", err)
-		http.Redirect(w, r, s.appBaseURL+"/signin?error=google", http.StatusFound)
+		s.failOAuth(w, r, rt, "google")
 	}
-
-	code, verifier, tz, err := s.readOAuthCallback(w, r, googleCookiePath)
 	if err != nil {
 		fail("callback", err)
 		return
 	}
 	ctx := r.Context()
-	claims, err := s.exchangeGoogleCode(ctx, code, verifier)
+	claims, err := s.exchangeGoogleCode(ctx, rt.code, rt.verifier)
 	if err != nil {
 		fail("code exchange", err)
 		return
 	}
+	userID, err := s.resolveGoogleUser(ctx, claims, rt.tz)
+	if err != nil {
+		fail("account resolution", err)
+		return
+	}
+	if err := s.finishOAuth(w, r, rt, userID); err != nil {
+		fail("session start", err)
+	}
+}
+
+// handleGoogleToken serves `POST /v1/auth/google/token` `{id_token, tz}` — Sign in with Google
+// for a native client (docs/adr/0016-native-sign-in.md). The Android app gets the id_token from
+// Credential Manager's account picker and posts it here; its signature is verified
+// (verifyGoogleIDToken), the account resolved exactly as the web callback does, and the answer
+// is the same session JSON as a password sign-in. Every failure is a 401 with the web's own
+// "Couldn't sign in with Google" wording; the detail goes to the log.
+func (s *Server) handleGoogleToken(w http.ResponseWriter, r *http.Request) {
+	if !s.google.enabled() {
+		http.NotFound(w, r)
+		return
+	}
+	var req struct {
+		IDToken string `json:"id_token"`
+		TZ      string `json:"tz"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		return
+	}
+	fail := func(msg string, err error) {
+		s.log.Warn("google sign-in failed: "+msg, "err", err)
+		http.Error(w, i18n.Get(requestLang(r)).T("signin.google_failed"), http.StatusUnauthorized)
+	}
+	ctx := r.Context()
+	claims, err := s.verifyGoogleIDToken(ctx, req.IDToken, time.Now())
+	if err != nil {
+		fail("id_token", err)
+		return
+	}
+	tz, _ := normalizeTimezone(req.TZ)
 	userID, err := s.resolveGoogleUser(ctx, claims, tz)
 	if err != nil {
 		fail("account resolution", err)
 		return
 	}
-	if err := s.finishOAuthSignIn(w, r, userID); err != nil {
-		fail("session start", err)
-	}
+	s.writeSession(w, r, userID, sessionTTL, http.StatusOK)
 }
 
 // googleClaims is the subset of Google's id_token payload this flow reads.
