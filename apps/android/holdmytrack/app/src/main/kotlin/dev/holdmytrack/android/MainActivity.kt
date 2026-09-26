@@ -280,23 +280,24 @@ class MainActivity : AppCompatActivity() {
                 .build()
             applyCompassMargin()
             applyAttributionMargin()
-            mapView.post { enlargeAttributionTarget(instance) }
+            mapView.post { enlargeAttributionTarget() }
             loadStyle()
         }
     }
 
-    /**
-     * MapLibre's attribution "i" is a 21dp view — under the 48dp touch target, and the one
-     * control on the map that isn't the app's own. It has no id, so it's found by the content
-     * description MapLibre gives it and padded out to 48dp — sideways evenly, moving it back by
-     * the same amount through the attribution margins, and upward only, since it sits against
-     * the bottom edge and padding below would put half the target off the screen. The icon
-     * itself stays where MapLibre put it.
-     */
     /** [MIN_TOUCH_TARGET_DP] in pixels, rounded up. */
     private fun minTouchTargetPx() = kotlin.math.ceil(MIN_TOUCH_TARGET_DP * resources.displayMetrics.density).toInt()
 
-    private fun enlargeAttributionTarget(instance: MapLibreMap) {
+    /**
+     * MapLibre's attribution "i" is a 21dp view — under the 48dp touch target, and the one
+     * control on the map that isn't the app's own. It has no id, so it's found by the content
+     * description MapLibre gives it and padded out to 48dp on its right and top only: the view
+     * grows into the empty map beside and above the icon, and the icon stays exactly where
+     * MapLibre put it. The margins are left alone — `applyAttributionMargin` owns them for the
+     * date footer, and moving the view back through them to pad evenly put the icon over the
+     * MapLibre logo once the two met.
+     */
+    private fun enlargeAttributionTarget() {
         val found = ArrayList<View>()
         mapView.findViewsWithText(
             found,
@@ -305,18 +306,10 @@ class MainActivity : AppCompatActivity() {
         )
         val icon = found.firstOrNull() ?: return
         val target = minTouchTargetPx()
-        // Rounded up, so an odd shortfall still reaches the full 48dp.
-        val padX = ((target - icon.width + 1) / 2).coerceAtLeast(0)
-        val padY = ((target - icon.height + 1) / 2).coerceAtLeast(0)
+        val padX = (target - icon.width).coerceAtLeast(0)
+        val padY = (target - icon.height).coerceAtLeast(0)
         if (padX == 0 && padY == 0) return
-        icon.setPadding(padX, padY * 2, padX, 0)
-        val settings = instance.uiSettings
-        settings.setAttributionMargins(
-            settings.attributionMarginLeft - padX,
-            settings.attributionMarginTop,
-            settings.attributionMarginRight,
-            settings.attributionMarginBottom,
-        )
+        icon.setPadding(0, padY, padX, 0)
     }
 
     /**
