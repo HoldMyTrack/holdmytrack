@@ -191,7 +191,7 @@ All of FR-3 requires an active session (demo or registered); Health Connect sync
 
 **Behavior**: The summary reports: how many sessions were newly synced or already present; how many were skipped for having no route at all, phrased as an explanation rather than an error (e.g., "Skipped 32 recorded indoors — no route to map"); and, separately, each session the server or the app itself actually refused, alongside the specific reason (too few points, more points than one request accepts, or the server's own rejection text). If the run stopped early — a `ConsentRequired` route or a failed request — that is reported too, with guidance to keep the app in the foreground and try again, and an explicit statement that nothing after that point was skipped, only not yet attempted.
 
-**Outputs**: A textual report on the sync screen. This is the run just watched, not a browsable history — that is FR-4.
+**Outputs**: A report on the sync screen, under the buttons that started the run, in two parts: what the run did (synced, already present, skipped, the recorded queue) in a notice, and what it couldn't do — each refused session with its reason, why it stopped early, or the whole run failing — in a separate red error box, which stays after the status line above returns to "Ready to sync". This is the run just watched, not a browsable history — that is FR-4.
 
 ## 6. FR-4 — Sync Status & Duplicates
 

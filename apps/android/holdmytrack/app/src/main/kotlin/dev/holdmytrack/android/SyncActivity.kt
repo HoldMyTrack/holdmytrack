@@ -50,6 +50,7 @@ class SyncActivity : AppCompatActivity() {
     private lateinit var status: TextView
     private lateinit var instructions: TextView
     private lateinit var results: TextView
+    private lateinit var problems: TextView
     private lateinit var primary: Button
     private lateinit var secondary: Button
     private lateinit var openHealthConnect: Button
@@ -70,6 +71,7 @@ class SyncActivity : AppCompatActivity() {
         status = findViewById(R.id.sync_status)
         instructions = findViewById(R.id.sync_instructions)
         results = findViewById(R.id.sync_results)
+        problems = findViewById(R.id.sync_problems)
         primary = findViewById(R.id.sync_primary)
         secondary = findViewById(R.id.sync_secondary)
         openHealthConnect = findViewById(R.id.sync_open_health_connect)
@@ -113,7 +115,7 @@ class SyncActivity : AppCompatActivity() {
         }
 
         if (!Session.isSignedIn) {
-            status.setText(R.string.sync_needs_account)
+            showStatus(getString(R.string.sync_needs_account))
             instructions.visibility = View.GONE
             primary.visibility = View.GONE
             secondary.visibility = View.GONE
@@ -125,7 +127,7 @@ class SyncActivity : AppCompatActivity() {
         // count on the map having sent an unconfirmed account to VerifyEmailActivity first —
         // and the server refuses such an account's sync (requireVerified) and its history.
         if (!Session.emailVerified) {
-            status.setText(R.string.sync_needs_verified_email)
+            showStatus(getString(R.string.sync_needs_verified_email))
             instructions.visibility = View.GONE
             primary.visibility = View.GONE
             secondary.visibility = View.GONE
@@ -144,7 +146,7 @@ class SyncActivity : AppCompatActivity() {
         // demo account can never actually sync no matter what it grants. History stays
         // visible — reading the demo account's own (shared, seeded) history is not a mutation.
         if (Session.isDemo) {
-            status.setText(R.string.sync_demo_read_only)
+            showStatus(getString(R.string.sync_demo_read_only))
             instructions.visibility = View.GONE
             primary.visibility = View.GONE
             secondary.visibility = View.GONE
@@ -161,16 +163,16 @@ class SyncActivity : AppCompatActivity() {
 
         when (readiness) {
             HealthConnect.Readiness.UNAVAILABLE -> {
-                status.setText(R.string.sync_unavailable)
+                showStatus(getString(R.string.sync_unavailable))
                 primary.visibility = View.GONE
             }
             HealthConnect.Readiness.UPDATE_REQUIRED -> {
-                status.setText(R.string.sync_update_required)
+                showStatus(getString(R.string.sync_update_required))
                 primary.setText(R.string.sync_open_health_connect)
                 primary.setOnClickListener { openSettings() }
             }
             HealthConnect.Readiness.NEEDS_EXERCISE_PERMISSION -> {
-                status.setText(R.string.sync_needs_exercise_permission)
+                showStatus(getString(R.string.sync_needs_exercise_permission))
                 primary.setText(R.string.sync_allow_access)
                 primary.setOnClickListener {
                     permissionLauncher.launch(
@@ -179,7 +181,7 @@ class SyncActivity : AppCompatActivity() {
                 }
             }
             HealthConnect.Readiness.NEEDS_ROUTES_PERMISSION -> {
-                status.setText(R.string.sync_needs_routes_permission)
+                showStatus(getString(R.string.sync_needs_routes_permission))
                 // The one place this app spells out another app's menu path. It is not
                 // hand-holding: Phase 1 found the screen is two levels down and unlinked, so a
                 // user sent to Health Connect without it has no reason to find it.
@@ -189,7 +191,7 @@ class SyncActivity : AppCompatActivity() {
                 primary.setOnClickListener { openSettings() }
             }
             HealthConnect.Readiness.NEEDS_HISTORY_PERMISSION -> {
-                status.text = getString(R.string.sync_needs_history_permission, lastSyncedLabel())
+                showStatus(getString(R.string.sync_needs_history_permission, lastSyncedLabel()))
                 instructions.setText(R.string.sync_history_hint)
                 instructions.visibility = View.VISIBLE
                 // Unlike the routes permission, this one *is* requestable, so the app asks
@@ -206,7 +208,7 @@ class SyncActivity : AppCompatActivity() {
                 secondary.visibility = View.VISIBLE
             }
             HealthConnect.Readiness.READY -> {
-                status.text = getString(R.string.sync_ready, lastSyncedLabel())
+                showStatus(getString(R.string.sync_ready, lastSyncedLabel()))
                 primary.setText(R.string.sync_now)
                 primary.setOnClickListener { startSync() }
             }
@@ -235,7 +237,8 @@ class SyncActivity : AppCompatActivity() {
         primary.isEnabled = false
         secondary.isEnabled = false
         results.visibility = View.GONE
-        status.setText(R.string.sync_running)
+        problems.visibility = View.GONE
+        showStatus(getString(R.string.sync_running))
 
         syncJob = lifecycleScope.launch {
             val runner = SyncRunner(client, cursor(), resources)
@@ -243,7 +246,7 @@ class SyncActivity : AppCompatActivity() {
                 val report = runner.run { progress -> showProgress(progress) }
                 show(report, flushRecordedQueue())
             } catch (e: Exception) {
-                status.text = getString(R.string.sync_failed, e.message.orEmpty())
+                showProblems(listOf(getString(R.string.sync_failed, e.message.orEmpty())))
                 flushRecordedQueue()
             } finally {
                 syncJob = null
@@ -280,7 +283,7 @@ class SyncActivity : AppCompatActivity() {
     private data class RecordedSyncResult(val synced: Int, val failed: Int)
 
     private fun showProgress(progress: SyncProgress) {
-        status.text = getString(R.string.sync_progress, progress.scanned, progress.synced)
+        showStatus(getString(R.string.sync_progress, progress.scanned, progress.synced))
     }
 
     /**
@@ -295,19 +298,20 @@ class SyncActivity : AppCompatActivity() {
      */
     private fun show(report: SyncReport, recordedResult: RecordedSyncResult) {
         val lines = mutableListOf<String>()
+        val trouble = mutableListOf<String>()
         lines += getString(R.string.sync_summary, report.synced, report.alreadyPresent, report.scanned)
         if (report.skippedNoRoute > 0) {
             lines += getString(R.string.sync_skipped_no_route, report.skippedNoRoute)
         }
         for (rejection in report.rejected) {
-            lines += getString(
+            trouble += getString(
                 R.string.sync_rejected_row,
                 DATE_FORMAT.withZone(ZoneId.systemDefault()).format(rejection.startedAt),
                 rejection.activityType,
                 rejection.reason,
             )
         }
-        report.stoppedBecause?.let { lines += "\n" + getString(R.string.sync_stopped, it) }
+        report.stoppedBecause?.let { trouble += getString(R.string.sync_stopped, it) }
         if (recordedResult.synced > 0 || recordedResult.failed > 0) {
             lines += if (recordedResult.failed > 0) {
                 getString(R.string.sync_recorded_summary_with_failed, recordedResult.synced, recordedResult.failed)
@@ -316,9 +320,24 @@ class SyncActivity : AppCompatActivity() {
             }
         }
 
-        status.setText(R.string.sync_done)
+        showStatus(getString(R.string.sync_done))
         results.text = lines.joinToString("\n")
         results.visibility = View.VISIBLE
+        showProblems(trouble)
+    }
+
+    /** What went wrong in the run — rejected activities, why it stopped early, or the whole
+     *  run failing — in the error box, which stays after the status line has moved on. */
+    private fun showProblems(lines: List<String>) {
+        problems.text = lines.joinToString("\n")
+        problems.visibility = if (lines.isEmpty()) View.GONE else View.VISIBLE
+    }
+
+    /** Where things stand, in a notice — or in the error box's colors when it's a failure. */
+    private fun showStatus(text: CharSequence, failed: Boolean = false) {
+        status.text = text
+        status.setBackgroundResource(if (failed) R.drawable.bg_notice_error else R.drawable.bg_notice)
+        status.setTextColor(getColor(if (failed) R.color.hmt_danger else R.color.hmt_ink))
     }
 
     /**
@@ -333,7 +352,7 @@ class SyncActivity : AppCompatActivity() {
             startActivity(HealthConnect.settingsIntent())
         } catch (e: Exception) {
             Log.w(TAG, "could not open Health Connect", e)
-            status.setText(R.string.sync_unavailable)
+            showStatus(getString(R.string.sync_unavailable), failed = true)
         }
     }
 
