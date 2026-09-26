@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.util.AttributeSet
 import android.view.View
 import dev.holdmytrack.android.map.MapOverlays
 import kotlin.math.PI
@@ -21,7 +22,7 @@ import kotlin.math.max
  * and without it a route far from the equator would draw stretched east–west. The track is
  * fitted to the view keeping that aspect ratio, and centred along the shorter side.
  */
-class TrackSilhouetteView(context: Context) : View(context) {
+class TrackSilhouetteView(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE

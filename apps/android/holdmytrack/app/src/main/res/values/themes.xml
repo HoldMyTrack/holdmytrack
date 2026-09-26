@@ -326,6 +326,20 @@
         <item name="android:textColor">@color/hmt_danger</item>
     </style>
 
+    <!-- An icon action on a list row (Edit, Delete): a 48dp touch target around the 24dp icon,
+         in ink unless the button says otherwise. -->
+    <style name="Widget.HoldMyTrack.Button.RowIcon" parent="Widget.Material3.Button.IconButton">
+        <item name="iconTint">@color/hmt_ink</item>
+        <item name="android:minWidth">48dp</item>
+        <item name="android:minHeight">48dp</item>
+    </style>
+
+    <!-- A drop-down field: the outlined text field with Lucide's chevron, what the Type field
+         already is on the recording form. -->
+    <style name="Widget.HoldMyTrack.Dropdown" parent="Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+        <item name="endIconDrawable">@drawable/ic_chevron_down</item>
+    </style>
+
     <!-- A list's small uppercase title: the web's .sync-tab__list-title, 11sp bold, tracked. -->
     <style name="TextAppearance.HoldMyTrack.Overline" parent="TextAppearance.HoldMyTrack.LabelSmall">
         <item name="android:textFontWeight">700</item>

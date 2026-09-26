@@ -82,6 +82,9 @@
 
     <string name="recorded_empty">Записанных занятий пока нет.</string>
     <string name="recorded_filter_all">Все</string>
+    <string name="recorded_filter_status_label">Статус</string>
+    <string name="recorded_filter_type_label">Тип</string>
+    <string name="recorded_row_queue">Поставить в очередь на синхронизацию</string>
     <string name="recorded_status_not_synced">Не синхронизировано</string>
     <string name="recorded_status_queued">В очереди</string>
     <string name="recorded_row_subtitle">%1$s · %2$.2f км · %3$s</string>
