@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- An error box's fill (.auth-card__error): the web's danger at 8%. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:alpha="0.08" android:color="@color/hmt_danger" />
+</selector>

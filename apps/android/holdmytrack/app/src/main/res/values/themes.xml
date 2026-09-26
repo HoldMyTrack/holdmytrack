@@ -60,8 +60,17 @@
         <item name="textAppearanceLabelLarge">@style/TextAppearance.HoldMyTrack.LabelLarge</item>
         <item name="textAppearanceLabelMedium">@style/TextAppearance.HoldMyTrack.LabelMedium</item>
         <item name="textAppearanceLabelSmall">@style/TextAppearance.HoldMyTrack.LabelSmall</item>
-        <item name="android:fontFamily">@font/hmt_sans</item>
-        <item name="fontFamily">@font/hmt_sans</item>
+        <!-- The default face for text with no role of its own, through a default TextView style
+             rather than the theme's own fontFamily: a theme-level fontFamily reaches every
+             TextView as if set on it directly, which outranks its textAppearance — so a serif
+             TitleLarge came out in the sans. -->
+        <item name="android:textViewStyle">@style/Widget.HoldMyTrack.TextView</item>
+        <!-- Text the platform lays out from its own attributes rather than a TextView style:
+             PopupMenu's items (the burger menu) and list and spinner rows. -->
+        <item name="android:textAppearanceLargePopupMenu">@style/TextAppearance.HoldMyTrack.BodyLarge</item>
+        <item name="android:textAppearanceSmallPopupMenu">@style/TextAppearance.HoldMyTrack.BodyLarge</item>
+        <item name="android:textAppearanceListItem">@style/TextAppearance.HoldMyTrack.BodyLarge</item>
+        <item name="android:textAppearanceListItemSmall">@style/TextAppearance.HoldMyTrack.BodyLarge</item>
         <item name="materialButtonStyle">@style/Widget.HoldMyTrack.Button</item>
         <item name="materialButtonOutlinedStyle">@style/Widget.HoldMyTrack.Button.Outlined</item>
         <item name="borderlessButtonStyle">@style/Widget.HoldMyTrack.Button.Text</item>
@@ -271,7 +280,70 @@
         <item name="titleTextStyle">@style/TextAppearance.HoldMyTrack.TitleLarge</item>
     </style>
 
-    <style name="TextAppearance.HoldMyTrack.Error" parent="TextAppearance.Material3.BodyMedium">
-        <item name="android:textColor">?attr/colorError</item>
+    <style name="Widget.HoldMyTrack.TextView" parent="Widget.AppCompat.TextView">
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
+    </style>
+
+    <!-- Screens designed as the web's auth card (sign-in, "check your email"): no action bar,
+         the title inside the card as on the web. -->
+    <style name="Theme.HoldMyTrack.NoActionBar" parent="Base.Theme.HoldMyTrack">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+
+    <!-- The web's .auth-card: white on the cream page, a hairline border, the large radius.
+         No elevation — Material 3 tints an elevated surface toward the primary color. -->
+    <style name="Widget.HoldMyTrack.Card" parent="Widget.Material3.CardView.Outlined">
+        <item name="cardBackgroundColor">@color/hmt_surface</item>
+        <item name="strokeColor">@color/hmt_card_border</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="cardElevation">0dp</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.HoldMyTrack.Medium</item>
+        <item name="contentPadding">@dimen/hmt_space_24</item>
+    </style>
+
+    <!-- Explanatory text under a title: the web's .auth-card__hint, 13sp at 65% ink. -->
+    <style name="Widget.HoldMyTrack.Hint" parent="">
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
+        <item name="android:textColor">@color/hmt_ink_hint</item>
+        <item name="android:lineHeight">20sp</item>
+    </style>
+
+    <!-- A notice box (.auth-card__notice, .sync-tab__notice) and its error variant
+         (.auth-card__error): tinted fill, small radius, 8/10 padding, 13sp. -->
+    <style name="Widget.HoldMyTrack.Notice" parent="">
+        <item name="android:background">@drawable/bg_notice</item>
+        <item name="android:paddingStart">@dimen/hmt_space_10</item>
+        <item name="android:paddingEnd">@dimen/hmt_space_10</item>
+        <item name="android:paddingTop">@dimen/hmt_space_8</item>
+        <item name="android:paddingBottom">@dimen/hmt_space_8</item>
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
+        <item name="android:textColor">@color/hmt_ink</item>
+    </style>
+
+    <style name="Widget.HoldMyTrack.Notice.Error">
+        <item name="android:background">@drawable/bg_notice_error</item>
+        <item name="android:textColor">@color/hmt_danger</item>
+    </style>
+
+    <!-- Continue with Google: the web's white button with an ink border, the untinted "G". -->
+    <style name="Widget.HoldMyTrack.Button.Google" parent="Widget.HoldMyTrack.Button.Outlined">
+        <item name="icon">@drawable/ic_brand_google</item>
+        <item name="iconTint">@null</item>
+        <item name="iconSize">18dp</item>
+        <item name="iconGravity">textStart</item>
+        <item name="iconPadding">@dimen/hmt_space_10</item>
+        <item name="backgroundTint">@color/hmt_surface</item>
+    </style>
+
+    <!-- Continue with Facebook: white on Facebook's blue with its white "f" (Meta's guidelines). -->
+    <style name="Widget.HoldMyTrack.Button.Facebook" parent="Widget.HoldMyTrack.Button">
+        <item name="icon">@drawable/ic_brand_facebook</item>
+        <item name="iconTint">@color/hmt_surface</item>
+        <item name="iconSize">18dp</item>
+        <item name="iconGravity">textStart</item>
+        <item name="iconPadding">@dimen/hmt_space_10</item>
+        <item name="backgroundTint">@color/hmt_facebook</item>
+        <item name="android:textColor">@color/hmt_surface</item>
     </style>
 </resources>

@@ -26,6 +26,9 @@
     <color name="hmt_danger_container">#F6DEDA</color>
     <color name="hmt_success">#2F8A4E</color>
 
+    <!-- Facebook's brand blue, for its sign-in button only (Meta's login-button guidelines). -->
+    <color name="hmt_facebook">#1877F2</color>
+
     <!-- The floating map chrome's background: the web's rgb(255 255 255 / 92%). -->
     <color name="hmt_map_chrome">#EBFFFFFF</color>
 </resources>
