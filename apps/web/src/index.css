@@ -1528,78 +1528,38 @@ body {
   color: var(--fm-danger);
 }
 
-/* The Private locations window (PrivateLocationsPanel.tsx) reuses the Edit track window's
-   shell and buttons; these are only its own list and fields. */
+/* The Activities panel's Privacy tab (PrivateLocationsPanel.tsx) — built from the Activities
+   tab's own toolbar/list/row/footer classes; this only makes it the panel's flexible body. */
 .private-locations {
-  /* Below the map-mode toggle rather than over it — unlike Edit track, which hides that
-     toggle, this window keeps Normal/Fog/Heatmap available so a circle can be placed against
-     whichever view shows the problem. Scrolls rather than running off a short screen. */
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.private-locations__footer-note {
+  font-size: var(--fm-text-sm);
+  color: rgb(var(--fm-ink-rgb) / 55%);
+}
+
+.private-locations__slider {
+  width: 100%;
+  accent-color: var(--fm-accent);
+}
+
+/* The editor window — Edit track's shell, but below the map-mode toggle rather than over it:
+   unlike Edit track, which hides that toggle, this keeps Normal visible. Scrolls rather than
+   running off a short screen. */
+.private-locations__window {
   top: 54px;
   max-height: calc(100% - 64px);
   overflow-y: auto;
-}
-
-.private-locations .edit-track__subtitle {
-  white-space: normal;
-}
-
-.private-locations__list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fm-space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.private-locations__item {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--fm-space-8);
-  width: 100%;
-  border: 0;
-  border-radius: var(--fm-radius-sm);
-  padding: var(--fm-space-6) var(--fm-space-8);
-  background: transparent;
-  color: var(--fm-ink);
-  font: inherit;
-  font-size: var(--fm-text-md);
-  text-align: left;
-  cursor: pointer;
-}
-
-.private-locations__item:hover,
-.private-locations__item[aria-pressed='true'] {
-  background: var(--fm-surface-tint);
-}
-
-.private-locations__name {
-  overflow: hidden;
-  font-weight: var(--fm-weight-semibold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.private-locations__radius {
-  flex: none;
-  color: rgb(var(--fm-ink-rgb) / 60%);
-}
-
-.private-locations__editor {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fm-space-10);
 }
 
 .private-locations__field {
   display: flex;
   flex-direction: column;
   gap: var(--fm-space-4);
-}
-
-.private-locations__slider {
-  width: 100%;
-  accent-color: var(--fm-accent);
 }
 
 /* MapView wraps the Activities panel and the timeline in this for the session, `inert` while

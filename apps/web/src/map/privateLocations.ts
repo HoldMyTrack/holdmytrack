@@ -37,9 +37,8 @@ const SELECTED: ExpressionSpecification = ['boolean', ['get', 'selected'], false
 
 const EMPTY = { type: 'FeatureCollection' as const, features: [] as Feature[] };
 
-/** Below this zoom a click on empty map flies in rather than placing a circle: at country
- *  scale a 200 m circle is under a pixel, and placing one there puts it somewhere nobody
- *  could see, let alone aim. */
+/** Below this zoom Create flies in before placing its circle in the middle of the map: at
+ *  country scale a 200 m circle is under a pixel, somewhere nobody could see, let alone aim. */
 export const PRIVATE_LOCATIONS_MIN_PLACE_ZOOM = 12;
 
 /** A geodesic circle as a polygon — drawn from destination points at a true ground distance,
