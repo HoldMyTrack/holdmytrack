@@ -280,7 +280,7 @@ class RecordingService : Service() {
         ).joinToString(" · ")
 
         val builder = Notification.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setSmallIcon(R.drawable.ic_circle_dot)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(Notification.CATEGORY_STATUS)
@@ -294,14 +294,14 @@ class RecordingService : Service() {
             )
             .addAction(
                 action(
-                    if (recording) R.drawable.ic_record_pause else R.drawable.ic_record_resume,
+                    if (recording) R.drawable.ic_pause else R.drawable.ic_play,
                     if (recording) R.string.recording_pause else R.string.recording_resume,
                     ACTION_TOGGLE,
                 ),
             )
             .addAction(
                 Notification.Action.Builder(
-                    Icon.createWithResource(this, R.drawable.ic_record_stop),
+                    Icon.createWithResource(this, R.drawable.ic_square),
                     getString(R.string.recording_stop),
                     PendingIntent.getActivity(
                         this, ACTION_STOP.hashCode(),

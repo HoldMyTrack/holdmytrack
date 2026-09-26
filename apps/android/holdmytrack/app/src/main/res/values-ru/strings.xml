@@ -39,6 +39,7 @@
     <string name="mode_fog">Туман</string>
     <string name="mode_heatmap">Тепловая</string>
 
+    <string name="menu_button">Меню</string>
     <string name="locate_button">Моё местоположение</string>
     <string name="locate_needs_location">HoldMyTrack нужен доступ к местоположению, чтобы показать, где вы.</string>
     <string name="menu_profile">Профиль</string>

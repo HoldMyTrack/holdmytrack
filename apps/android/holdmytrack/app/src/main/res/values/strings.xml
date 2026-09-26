@@ -36,7 +36,7 @@
     <string name="mode_fog">Fog</string>
     <string name="mode_heatmap">Heatmap</string>
 
-    <string name="menu_button" translatable="false">☰</string>
+    <string name="menu_button">Menu</string>
     <string name="locate_button">Find my location</string>
     <string name="locate_needs_location">HoldMyTrack needs location access to show where you are.</string>
     <string name="menu_profile">Profile</string>

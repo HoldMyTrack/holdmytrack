@@ -33,7 +33,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/hmt_space_8"
             android:hint="@string/recording_type_hint"
-            app:endIconDrawable="@drawable/ic_arrow_drop_down"
+            app:endIconDrawable="@drawable/ic_chevron_down"
             app:endIconMode="custom">
 
             <com.google.android.material.textfield.TextInputEditText

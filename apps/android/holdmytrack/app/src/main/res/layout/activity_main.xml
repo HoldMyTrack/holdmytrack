@@ -41,18 +41,12 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/menu_button"
-            style="@style/Widget.HoldMyTrack.Button.Outlined"
+            style="@style/Widget.HoldMyTrack.Button.MapIcon"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:backgroundTint="@color/hmt_map_chrome"
-            android:insetTop="0dp"
-            android:insetBottom="0dp"
             android:contentDescription="@string/menu_button"
-            android:minWidth="48dp"
-            android:paddingStart="@dimen/hmt_space_16"
-            android:paddingEnd="@dimen/hmt_space_16"
-            android:text="@string/menu_button"
-            app:strokeWidth="0dp" />
+            android:minWidth="54dp"
+            app:icon="@drawable/ic_menu" />
 
         <!-- Only shown to a signed-in account: all three layers the toggle switches between
              are behind requireAuth, so there is nothing for it to do without a session.
@@ -118,7 +112,7 @@
             android:layout_height="match_parent"
             android:contentDescription="@string/locate_button"
             android:minWidth="54dp"
-            app:icon="@drawable/ic_my_location" />
+            app:icon="@drawable/ic_locate_fixed" />
     </LinearLayout>
 
     <!-- One-tap GPS recording (MainActivity.onRecordTap): tap to start, tap again to pause or

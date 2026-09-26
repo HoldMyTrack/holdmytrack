@@ -400,8 +400,8 @@ class MainActivity : AppCompatActivity() {
         val active = state != RecordingState.IDLE
         val (icon, background, description) = when (state) {
             RecordingState.IDLE -> Triple(R.drawable.ic_record_start, R.drawable.bg_record_button, R.string.record_button_start)
-            RecordingState.RECORDING -> Triple(R.drawable.ic_record_pause, R.drawable.bg_record_button_recording, R.string.record_button_pause)
-            RecordingState.PAUSED -> Triple(R.drawable.ic_record_resume, R.drawable.bg_record_button_paused, R.string.record_button_resume)
+            RecordingState.RECORDING -> Triple(R.drawable.ic_pause, R.drawable.bg_record_button_recording, R.string.record_button_pause)
+            RecordingState.PAUSED -> Triple(R.drawable.ic_play, R.drawable.bg_record_button_paused, R.string.record_button_resume)
         }
         recordButton.setImageResource(icon)
         recordButton.setBackgroundResource(background)

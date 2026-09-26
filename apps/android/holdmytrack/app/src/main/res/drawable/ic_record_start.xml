@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Idle record button: a solid red dot, the universal "record" mark. -->
+<!-- Idle record button: a solid red dot, the universal "record" mark. The one glyph outside the
+     Lucide set (ic_pause, ic_play, ic_square beside it): a filled signal color is what says
+     "record", and an outlined circle in Lucide's stroke would read as an empty radio button. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"

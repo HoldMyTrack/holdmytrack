@@ -73,7 +73,7 @@ Native apps whose core job is exporting device-recorded health data to HoldMyTra
 
 The shipped UI so far is functional scaffolding, not a finished product. Partly addressed since this phase was written: icons are one Lucide set (`IMPLEMENTATION.md` §4.17), type is Inter with Fraunces for headings, and colors are `--fm-*` custom properties. Spacing, radius, type, weight and elevation are token scales too (`IMPLEMENTATION.md` §4.18). What's left is almost no animation — 5 `transition:`/`animation:`/`@keyframes` occurrences in the ~3,600-line `index.css` — and real-device mobile browser support. This phase is the pass that finishes it, across both desktop and mobile, ending in an explicit design freeze: "this is how it will look — no more changes."
 
-- [x] A real icon set — Lucide (`lucide-react`) replaces every hand-drawn inline SVG icon and text-glyph caret on the web (`IMPLEMENTATION.md` §4.17); Android adopts the same set in its own Phase 5.
+- [x] A real icon set — Lucide (`lucide-react`) replaces every hand-drawn inline SVG icon and text-glyph caret on the web (`IMPLEMENTATION.md` §4.17); Android uses the same set (`apps/android/docs/ROADMAP.md` Phase 5).
 - [x] Real typography — Inter for text, Fraunces for headings and the wordmark, with Source Serif 4 for Russian headings since Fraunces has no Cyrillic (`--fm-font-sans`/`--fm-font-serif`, loaded from Google Fonts in `index.html`).
 - [x] An actual design system — the `--fm-*` palette plus spacing, radius, type, weight and elevation scales in one shared `tokens.css` (served by the Go server, loaded by every page and the map app), used by every declaration except a few deliberate literals (`IMPLEMENTATION.md` §4.18). The one literal color left in use is `#fff` (12 uses), plus two single-use colors.
 - [x] Server-rendered pages sharing one header, React kept for the map page ([ADR-0012](adr/0012-server-rendered-pages-react-for-the-map.md), `IMPLEMENTATION.md` §4.19), in shippable steps:
@@ -89,7 +89,7 @@ The shipped UI so far is functional scaffolding, not a finished product. Partly 
   - [ ] Walk the core flows on a real iPhone (Safari) and Android phone (Chrome) — sign in, the three map modes, tap a track, expand and collapse the sheet, the date slider, edit an activity's name — and record any symptom concretely (device, browser, screen, what happened), not as "unusable".
 - [ ] Design freeze: once this pass lands, declare the visual design final and communicate it as such — the explicit milestone this phase produces, not an open-ended polish effort.
 
-This pass is where HoldMyTrack's palette, typography and icon set come from for the product as a whole, not for the web alone. The Android app carries only a provisional theme (the web's current tokens — palette, fonts and scales — in Material 3) and its own phase for landing this output on the platform (`apps/android/docs/ROADMAP.md`, Phase 5) — it inherits the freeze rather than deciding a second visual design, since two clients that each invented their own would not read as one product.
+This pass is where HoldMyTrack's palette, typography and icon set come from for the product as a whole, not for the web alone. The Android app carries only a provisional theme (the web's current tokens — palette, fonts and scales — and Lucide icons, in Material 3) and its own phase for landing this output on the platform (`apps/android/docs/ROADMAP.md`, Phase 5) — it inherits the freeze rather than deciding a second visual design, since two clients that each invented their own would not read as one product.
 
 ---
 
