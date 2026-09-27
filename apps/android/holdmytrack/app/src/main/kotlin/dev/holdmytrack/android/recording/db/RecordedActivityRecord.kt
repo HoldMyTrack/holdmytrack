@@ -17,8 +17,8 @@ object SyncStatus {
 
 /**
  * One GPS recording, persisted locally by `RecordingService` the moment it stops rather than
- * submitted immediately — submission is a separate, explicit step (`RecordedActivitiesActivity`'s
- * sync checkbox plus the Sync screen's existing "Sync Now", extended to also walk rows here
+ * submitted immediately — submission is a separate, explicit step (the row's checkbox on the
+ * Sync Source screen, `RecordedActivityRows`, then its "Sync now", which walks rows here
  * marked [SyncStatus.QUEUED]), after which the row is deleted from the device.
  *
  * [id] is the same client-generated UUID used as `external_id` on the wire
