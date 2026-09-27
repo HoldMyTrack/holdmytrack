@@ -37,20 +37,24 @@ flowchart LR
     subgraph Clients
         browser["Browser<br/>server-rendered pages + React map app<br/>file upload (Path 3)"]
         android["Android app<br/>Kotlin · MapLibre Native<br/>Health Connect sync, GPS recording (Path 2)"]
+        bcache[("Browser HTTP cache<br/>map tiles, keyed by tile version")]
+        acache[("MapLibre Native cache<br/>map tiles, keyed by tile version")]
     end
     subgraph VPS["One VPS — compose.prod.yml"]
         caddy["Caddy<br/>TLS (Let's Encrypt) · serves /assets/* ·<br/>reverse-proxies everything else"]
         api["api<br/>Go binary, serve mode<br/>/v1/* API · track + fog tiles · pages"]
         worker["worker<br/>same binary, work mode<br/>ingest · fog/heatmap rendering"]
-        pg[("PostgreSQL 16 + PostGIS<br/>all tables + job queue")]
+        pg[("PostgreSQL 16 + PostGIS<br/>all tables + job queue ·<br/>users.map_version")]
     end
     subgraph CF["Cloudflare"]
         edge["CDN edge<br/>tiles.holdmytrack.com (proxied)"]
         pub[("R2 public bucket<br/>planet .pmtiles · fonts · sprites<br/>per dated build prefix")]
         priv[("R2 private bucket<br/>raw payloads · activity masks ·<br/>fog/heatmap PNGs · avatars")]
     end
+    browser -.->|"tiles with ?cv=<br/>(hit: no request)"| bcache
+    android -.->|"tiles with ?cv=<br/>(hit: no request)"| acache
     browser -->|"HTTPS holdmytrack.com<br/>(DNS-only, not proxied)"| caddy
-    android -->|HTTPS /v1/*| caddy
+    android -->|"HTTPS /v1/* · /tiles/v1/*"| caddy
     caddy --> api
     api -->|queries · enqueue| pg
     worker -->|dequeue SKIP LOCKED · writes| pg
@@ -63,7 +67,7 @@ flowchart LR
 
 Everything server-side runs as one binary in two modes (`serve` and `work`) against one database, deployed as a single-VPS sandbox at `https://holdmytrack.com` rather than Production (`docs/DEPLOY.md`, `IMPLEMENTATION.md` §5.4, §5.8).
 
-Everything the app serves — the API, track and fog tiles, and every page — comes from one origin, `holdmytrack.com`, through Caddy (ADR-0006). That origin is deliberately not proxied through Cloudflare, whose proxy caps uploads at 100 MB, below what a bulk export can reach, so the app's own tile routes don't pass through the CDN. The CDN serves only the basemap, and its free plan edge-caches only the fonts and sprites; range reads into the archive still reach R2 (`IMPLEMENTATION.md` §5.4). Postgres stores keys for object-storage items, never their bytes: `activities.raw_payload_key` and `fog_tiles.object_key`/`heatmap_object_key`, for example. Local dev reads the same planet basemap from `tiles.holdmytrack.com`, and RustFS stands in for the private bucket (`docs/DEVELOPMENT.md`).
+Everything the app serves — the API, track and fog tiles, and every page — comes from one origin, `holdmytrack.com`, through Caddy (ADR-0006). That origin is deliberately not proxied through Cloudflare, whose proxy caps uploads at 100 MB, below what a bulk export can reach, so the app's own tile routes don't pass through the CDN; each browser or phone keeps those tiles itself, under a per-account version that moves whenever any of them may have changed (`IMPLEMENTATION.md` §4.2.6). The CDN serves only the basemap, and its free plan edge-caches only the fonts and sprites; range reads into the archive still reach R2 (`IMPLEMENTATION.md` §5.4). Postgres stores keys for object-storage items, never their bytes: `activities.raw_payload_key` and `fog_tiles.object_key`/`heatmap_object_key`, for example. Local dev reads the same planet basemap from `tiles.holdmytrack.com`, and RustFS stands in for the private bucket (`docs/DEVELOPMENT.md`).
 
 **All ingest paths converge on one pipeline.** They differ only in how bytes arrive; from `IMPLEMENTATION.md` §4.1 step 2 onward the code is identical (`IMPLEMENTATION.md` §4.0). This is the property that keeps each additional path affordable to maintain. Path 1 cloud connectors and the iOS app are not built yet (`docs/ROADMAP.md`).
 
@@ -71,7 +75,7 @@ Everything the app serves — the API, track and fog tiles, and every page — c
 
 | Component | Add it when |
 | :--- | :--- |
-| Redis | Tile cache-hit measurements show the CDN is insufficient |
+| Redis | Measurements show per-device tile caching (`IMPLEMENTATION.md` §4.2.6) leaves too many first-view tile requests |
 | Dedicated queue (SQS/RabbitMQ) | Postgres `FOR UPDATE SKIP LOCKED` throughput becomes the bottleneck |
 | Separate render service | Export rendering starves the API of CPU |
 | Read replicas | Read load, not write load, saturates the primary |

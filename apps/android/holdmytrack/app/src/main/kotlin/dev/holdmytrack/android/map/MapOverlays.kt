@@ -1,6 +1,8 @@
 package dev.holdmytrack.android.map
 
+import android.net.Uri
 import dev.holdmytrack.android.BuildConfig
+import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.net.TrackMetricPoint
 import dev.holdmytrack.android.recording.RecordedPoint
 import org.maplibre.android.maps.Style
@@ -134,17 +136,17 @@ object MapOverlays {
     private var selectedTrack: String? = null
 
     /**
-     * Bumped by [refreshTracks] and [refreshCoverage] and sent as `v` (the server ignores it),
-     * the web's `tracksVersion` and `coverageVersion`: the tiles carry no cache headers, so
-     * the same URL can be answered from MapLibre's cache with what was there before a delete
-     * or a reprocess.
+     * Bumped by [refreshTracks] and sent as `v` (the server ignores it), the web's
+     * `tracksVersion`: every tile URL also carries the account's tile version as `cv`
+     * ([Session.tileVersion]), under which MapLibre keeps the tile for good, and a change the
+     * app hasn't read a new version for yet (a type edit) would otherwise be answered from that
+     * cache. Fog and Heatmap need no counter of their own — they only change with the version.
      */
     private var tracksVersion = 0
 
     /** A track is being edited (`TrackEditOverlay`): every other track and the bands step
      *  aside for it, as the web's `setMapMode(…, editingTrack)` has them. */
     private var editingTrack = false
-    private var coverageVersion = 0
 
     /** Every Fog and Heatmap layer and the source under it — what [refreshCoverage] replaces. */
     private val COVERAGE_LAYERS = listOf(
@@ -273,7 +275,6 @@ object MapOverlays {
      */
     fun refreshCoverage(style: Style) {
         if (style.getLayer(FOG_LAYER_ID) == null) return
-        coverageVersion += 1
         val visibility = COVERAGE_LAYERS.associate { (layer, _) -> layer to style.getLayer(layer)?.visibility?.value }
         COVERAGE_LAYERS.forEach { (layer, source) ->
             style.getLayer(layer)?.let(style::removeLayer)
@@ -479,6 +480,7 @@ object MapOverlays {
                     add("from=${range.from}")
                     add("to=${range.to}")
                 }
+                Session.tileVersion.takeIf { it.isNotEmpty() }?.let { add("cv=${Uri.encode(it)}") }
                 if (tracksVersion > 0) add("v=$tracksVersion")
             }
             val query = if (params.isEmpty()) "" else params.joinToString("&", prefix = "?")
@@ -525,5 +527,5 @@ object MapOverlays {
         "${BuildConfig.API_BASE_URL}$TILES_V1/$kind/{z}/{x}/{y}.$extension"
 
     private fun coverageUrl(kind: String, extension: String): String =
-        tileUrl(kind, extension) + if (coverageVersion > 0) "?v=$coverageVersion" else ""
+        tileUrl(kind, extension) + Session.tileVersion.let { if (it.isEmpty()) "" else "?cv=${Uri.encode(it)}" }
 }

@@ -72,5 +72,6 @@ func (s *Server) handleTracksTile(w http.ResponseWriter, r *http.Request) {
 	// rows, just with an empty bytea, not NULL and not an error. Writing zero bytes with a
 	// 200 is the correct "no data here" response; MapLibre treats it as an empty tile.
 	w.Header().Set("Content-Type", "application/vnd.mapbox-vector-tile")
+	setTileCacheControl(w, r)
 	_, _ = w.Write(tile)
 }

@@ -33,6 +33,7 @@ object Session {
     private const val KEY_COUNTRY = "country"
     private const val KEY_LOCALE = "locale"
     private const val KEY_TIMEZONE = "timezone"
+    private const val KEY_TILE_VERSION = "tile_version"
 
     private lateinit var prefs: SharedPreferences
 
@@ -95,6 +96,18 @@ object Session {
     /** The account's Language, empty for automatic — see `AppLanguage`. */
     val locale: String get() = prefs.getString(KEY_LOCALE, "").orEmpty()
 
+    /**
+     * The account's tile version as `GET /v1/coverage/status` last gave it, sent as every tile
+     * request's `cv` so MapLibre can keep the tile (`map/MapOverlays`). Kept on disk so a cold
+     * start draws from that cache straight away; the map then reads the current one and
+     * fetches again only if it moved. Empty until the first read — tiles load uncached.
+     */
+    var tileVersion: String
+        get() = prefs.getString(KEY_TILE_VERSION, "").orEmpty()
+        set(value) {
+            prefs.edit().putString(KEY_TILE_VERSION, value).apply()
+        }
+
     fun start(token: String, profile: Profile) {
         cachedToken = token
         verified = true
@@ -134,6 +147,7 @@ object Session {
             .remove(KEY_COUNTRY)
             .remove(KEY_LOCALE)
             .remove(KEY_TIMEZONE)
+            .remove(KEY_TILE_VERSION)
             .apply()
     }
 }

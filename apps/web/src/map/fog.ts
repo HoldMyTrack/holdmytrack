@@ -8,8 +8,8 @@ import { CITY_MIN_ZOOM, COUNTRY_MAX_ZOOM, REGION_MAX_ZOOM, REGION_MIN_ZOOM } fro
  * scoped by the date range/TYPE/DISTANCE/hidden-track state that drives Normal mode — it
  * shows true all-time coverage, unconditionally (a place once cleared stays cleared, which is
  * the whole point of the mechanic). There is therefore no query to build: one fixed tile URL,
- * changed only by the cache-busting version coverageVersion.ts bumps when an Edit track
- * changes coverage under an open page. See heatmap.ts, which has its own fixed URL for the
+ * changed only by the account's tile version (coverageVersion.ts), which moves whenever its
+ * coverage does. See heatmap.ts, which has its own fixed URL for the
  * same reason, just a different fixed rolling window computed server-side.
  *
  * Below city zoom (§4.2.4), this per-pixel raster is replaced entirely by the Country/Region
@@ -119,7 +119,7 @@ export function ensureFogLayer(map: MapLibreMap, beforeId: string | undefined): 
 }
 
 /** Re-points this mode's sources at the current coverage version (coverageVersion.ts), so
- *  MapLibre refetches every tile — the caller bumps the version first. A no-op for a source
+ *  MapLibre refetches every tile — the caller sets the new version first. A no-op for a source
  *  that isn't on the map yet; ensureFogLayer will create it at the current version. */
 export function refreshFogLayers(map: MapLibreMap): void {
   for (const [sourceId, url] of [

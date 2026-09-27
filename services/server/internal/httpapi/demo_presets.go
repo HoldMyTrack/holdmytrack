@@ -249,7 +249,8 @@ func resetDemoCustomer(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 		`DELETE FROM jobs WHERE user_id = $1 AND state = 'pending'`,
 		`DELETE FROM activities WHERE user_id = $1`,
 		`DELETE FROM fog_tiles WHERE user_id = $1`,
-		`UPDATE users SET heatmap_cap = DEFAULT WHERE id = $1`,
+		// Its tiles are about to be rendered from scratch; nothing cached before this is its.
+		`UPDATE users SET heatmap_cap = DEFAULT, map_version = map_version + 1 WHERE id = $1`,
 	} {
 		if _, err := tx.Exec(ctx, q, DemoCustomerUserID); err != nil {
 			return fmt.Errorf("reset: %w", err)

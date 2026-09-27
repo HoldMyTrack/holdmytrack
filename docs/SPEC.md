@@ -589,6 +589,22 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 
 **Notes**: This is one of three things `VISION.md` §4.2 groups under "Export" — story cards and animated reveals are not built. Pace-colored segments (FR-4.8) are not reflected in a capture even when currently shown on screen — exporting a single focused activity's bands is a narrower case not covered by this slice. Vector/SVG output is not offered; raster (PNG) only. Platform preset dimensions are curated from Hootsuite's social-media-image-sizes guide; profile-picture/cover-photo sizes are excluded, since this feature frames map content, not an account avatar.
 
+### FR-4.11 Map tile caching
+
+**Description**: The map's own tiles (tracks, Fog, Heatmap, and their Country/Region tiers) are kept by the browser or app that fetched them, so a revisited area or a reload doesn't ask the server again, and never shown after they've gone stale.
+
+**Preconditions**: Active session.
+
+**Behavior**:
+1. Every account has a tile version, which changes whenever anything that could change one of its tiles happens: an upload or sync landing, a delete, an edit (type, name, description, or track), a Private location change, an activity leaving the heatmap window, a heatmap re-scale, or a change of timezone. It never goes back to an earlier value.
+2. The web map and the Android app request every tile with the account's current tile version, which the page carries when it loads and `GET /v1/coverage/status` returns as `tile_version`.
+3. A tile requested with the account's own tile version is sent `Cache-Control: private, max-age=31536000, immutable`. A tile requested without one, or with another account's, is sent `Cache-Control: private, no-cache`. No response lets a shared cache keep a tile.
+4. After a change on the page itself (FR-3, FR-5), the map fetches the affected tiles again without a reload, as before. After a change made elsewhere (another device, a background sync), a reload or the next app launch shows it.
+
+**Outputs**: Tile responses carrying the caching headers above; `tile_version` in `GET /v1/coverage/status`.
+
+**Notes**: Caching is per device, not shared: the app's origin is not behind a CDN, and a tile points at where the account's owner has been. `IMPLEMENTATION.md` §4.2.6 covers how the version is kept.
+
 ## 7. FR-5 — Activities Panel
 
 ### FR-5.1 Activity list

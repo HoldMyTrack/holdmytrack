@@ -56,6 +56,7 @@ func (s *Server) handleFogTile(w http.ResponseWriter, r *http.Request) {
 
 	rgba := fog.RenderFogPNG(mask)
 	w.Header().Set("Content-Type", "image/png")
+	setTileCacheControl(w, r)
 	if err := png.Encode(w, rgba); err != nil {
 		s.log.Error("fog tile encode failed", "err", err)
 	}

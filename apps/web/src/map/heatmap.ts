@@ -113,7 +113,7 @@ export function ensureHeatmapLayer(map: MapLibreMap, beforeId: string | undefine
 }
 
 /** Re-points this mode's sources at the current coverage version (coverageVersion.ts), so
- *  MapLibre refetches every tile — the caller bumps the version first. A no-op for a source
+ *  MapLibre refetches every tile — the caller sets the new version first. A no-op for a source
  *  that isn't on the map yet; ensureHeatmapLayer will create it at the current version. */
 export function refreshHeatmapLayers(map: MapLibreMap): void {
   for (const [sourceId, url] of [
