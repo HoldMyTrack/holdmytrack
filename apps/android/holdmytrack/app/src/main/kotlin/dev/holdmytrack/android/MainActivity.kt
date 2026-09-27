@@ -568,9 +568,13 @@ class MainActivity : AppCompatActivity() {
 
     /** Idle: start (asking for permissions first if they're missing). Recording or paused:
      *  toggle between the two. Nothing here ever asks for a name or a type — see
-     *  `RecordingService`'s class doc for where those come from. */
+     *  `RecordingService`'s class doc for where those come from. Pausing says how to stop
+     *  instead: a tap is the obvious guess at "stop", and it only pauses. */
     private fun onRecordTap() {
         if (isRecording()) {
+            if (recorder?.state == RecordingState.RECORDING) {
+                Toast.makeText(this, R.string.record_hold_to_stop, Toast.LENGTH_SHORT).show()
+            }
             startService(RecordingService.intent(this, RecordingService.ACTION_TOGGLE))
             return
         }
