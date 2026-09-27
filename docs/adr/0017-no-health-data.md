@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Accepted. Migration `0007_drop_heartrate.sql`, named below, was later folded into `0002_activities.sql` (2026-09-27): the column is simply absent from `activity_streams` now, and databases that had already run 0007 were left as they were.
 
 ## Context
 

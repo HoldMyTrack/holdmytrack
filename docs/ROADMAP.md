@@ -94,9 +94,9 @@ This pass is where HoldMyTrack's palette, typography and icon set come from for 
 
 ---
 
-## Phase 4 — Cloud sources + Exploration scoring
+## Phase 4 — Cloud sources
 
-Connecting the app to third-party services, and the explorer-tile scoring work that benefits from the broader activity history that unlocks.
+Connecting the app to third-party services.
 
 ### Prerequisites — gate the specific connectors below, not this phase's other work
 
@@ -112,10 +112,6 @@ Connecting the app to third-party services, and the explorer-tile scoring work t
 - [ ] COROS connector (after partner approval).
 - [ ] Deauthorization deletion for each connector as it ships, not after — Garmin/Wahoo/COROS contractually require it (§7).
 - [ ] These connectors are the one part of the Activities panel's Sync tab on the web (`docs/IMPLEMENTATION.md` §4.0.1) that's actually triggerable from the tab itself — connect/disconnect, and (once token-refresh runs on a schedule) a last-synced/status summary alongside Health Connect/GPS Logger's own read-only rows there. Sync stayed read-only-only through Phase 2 specifically because neither on-device source can be triggered from the web; a cloud connector can.
-
-### Explorer-tile gamification
-
-- [ ] `user_tiles` table exists but nothing writes or reads it yet — populating it at ingest (`IMPLEMENTATION.md` §4.1 step 4), scoring queries (total tiles, max square, max connected cluster, per-region coverage %, `IMPLEMENTATION.md` §4.4) and a UI surface for them (a natural fit on the Profile page, alongside the activity grid).
 
 ---
 

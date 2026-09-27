@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Planned, not yet built — tracked in `apps/android/docs/ROADMAP.md`.
+Accepted. Built on Android — `docs/SPEC.md` FR-3.8, `apps/android/docs/IMPLEMENTATION.md` §7; the iOS half is not built yet.
 
 ## Context
 

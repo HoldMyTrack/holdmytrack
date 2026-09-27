@@ -66,7 +66,6 @@ CREATE TABLE activity_streams (
     -- Parallel arrays, one entry per raw point. Compact, and cheap to slice.
     elapsed_s    INT[],
     elevation_m  REAL[],
-    heartrate    SMALLINT[],
     dist_m       REAL[]   -- cumulative distance at this point
 );
 

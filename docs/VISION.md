@@ -35,7 +35,7 @@ To let athletes, runners, cyclists and explorers see and keep the shape of where
 * **No tracking friction** — fits existing workflows; HoldMyTrack never asks to record a workout.
 * **Bring everything** — one place for data scattered across a watch, a cloud service and a folder of old exports.
 * **Exploration insight** — how much ground you've covered this year versus last, how well a neighborhood is explored, and where you go most.
-* **Gamified exploration** — "Fog of War" and explorer-tile mechanics turn routine training into map discovery.
+* **Gamified exploration** — "Fog of War" turns routine training into map discovery.
 * **Beautiful by default** — render quality is the differentiator, not feature count.
 * **Manual data manipulation** — stored data can be created, updated or deleted manually.
 * **Free, and honest about why** — funded by the people who use it, with the books open.
@@ -67,11 +67,13 @@ Digital fitness tracking continues to grow, and the major platforms remain focus
 | **Fog of World** | The fog mechanic itself | One-time | Requires its own tracking; fog over *satellite* imagery, which we deliberately do not match |
 | **Runalyze / Intervals.icu** | Free, deep performance analysis | Free / donation | Analysis-first, visually plain; the closest model for our funding approach |
 
-**Two honest observations about this table.**
+**Three honest observations about this table.**
 
 First, **almost every product in it ingests via the Strava API**, which makes them Strava satellites — they inherit Strava's terms and die if Strava changes them. HoldMyTrack's three independent paths (§4.1) are the structural answer, and notably **Strava itself is not one of our sources**: the largest existing activity archive reaches us only through manual export (§4.1), which is friction we should be honest about rather than hide.
 
 Second, **Intervals.icu and Runalyze already prove the model we are choosing** — serious, free, donation-funded fitness analysis with real users. They are validation that this can work and evidence that it stays small. Neither is a venture-scale business, and HoldMyTrack should not pretend it is planning to be one.
+
+Third, **the tile games (Statshunters, VeloViewer, Squadrats) are a mechanic HoldMyTrack deliberately does not copy.** Counting visited map squares measures the same thing the fog already shows, only coarser and less pleasant to look at; Fog of War is HoldMyTrack's exploration mechanic, and there is no tile score (ADR-0018).
 
 **Implication for strategy:** feature parity is achievable in weeks and is not defensible. The defensible assets are render quality, breadth of ingest, and being genuinely free.
 
@@ -144,7 +146,6 @@ This isn't a resilience decision the way Paths 1–3 are — §4.1's provider-in
 | **In-app GPS recording** (mobile) | Convenience capture, not a fitness-tracker replacement | Start/pause/stop a GPS-only track directly in the app; feeds the same ingest pipeline as any other source |
 | **Visual Map Engine** | Interactive renderer with custom styles | Fog of War, heatmap and track/normal modes (`IMPLEMENTATION.md` §4.2, §4.2.2); curated themes; smooth (non-hexagonal) fog edges |
 | **Per-activity detail** | Pace as route context, not a coaching product | The selected activity's route colored by pace (`IMPLEMENTATION.md` §4.3.1) |
-| **Exploration Game** | Coverage scoring | Explorer-tile counts (z14 / z17), max cluster, coverage % by region |
 | **Activity graph** | Private, single-player motivation | A GitHub-style daily contribution grid, year by year, shadeable by count or distance (`IMPLEMENTATION.md` §4.8) |
 | **Distance & coverage trends** | See how much ground you've covered this period vs last | Weekly/monthly distance, moving-time and elevation trends |
 | **Filtering** | Slice the history | Activity type, date range, geographic bounding box, source |
@@ -153,7 +154,7 @@ This isn't a resilience decision the way Paths 1–3 are — §4.1's provider-in
 
 **We don't keep your health profile, only the geographical data you trust us with.** An activity is a route: positions, times and elevation. Pace is derived from those and shown as the color of a selected track — a supporting detail on the route, not a pillar and not a training product; the pillars are the map and the exploration stats. Heart rate, cadence, power, calories and every other body signal are never read, stored or shown, whichever source an activity came from. The one place such data can still sit is inside an original upload, which is kept as-is so a track edit or a Private location change can rebuild the activity, is only ever read for its route, and is deleted with the activity. The schema carries per-point streams (`IMPLEMENTATION.md` §3.3) for the route, and no more. A pace/heart-rate/elevation profile card was built and then removed for this reason — see ADR-0017.
 
-**The activity graph is deliberately private, not a profile page.** It's the same genre of thing as Fog of War and the explorer-tile game above — motivation through your own history, no comparison required — not a step toward the social features §1.1 and §5.7 explicitly hold off on. It has no follows, no feed, and nothing another user can view; it's a personal dashboard, available once accounts exist (§5.2), not a public artifact. If a shareable version is ever worth building, that's a §5.7 social-phase decision to make deliberately, not a side effect of how this one ships.
+**The activity graph is deliberately private, not a profile page.** It's the same genre of thing as Fog of War above — motivation through your own history, no comparison required — not a step toward the social features §1.1 and §5.7 explicitly hold off on. It has no follows, no feed, and nothing another user can view; it's a personal dashboard, available once accounts exist (§5.2), not a public artifact. If a shareable version is ever worth building, that's a §5.7 social-phase decision to make deliberately, not a side effect of how this one ships.
 
 ### 4.3 Cost Model — running a free service
 
@@ -220,9 +221,8 @@ Sequenced so the unconditional ingest path ships first and the ones that depend 
 * The first shipped UI is functional scaffolding. This pass finishes it — one icon set, deliberate typography, design tokens, motion — across desktop and phone browsers, and ends in a declared design freeze.
 * The mobile apps inherit that freeze rather than inventing a second visual language: two clients that each chose their own would not read as one product.
 
-### 5.5 Phase 4: Cloud Sources + Exploration
+### 5.5 Phase 4: Cloud Sources
 * Path 1 connectors, in whatever order §4.1's approvals actually land.
-* Explorer-tile gamification and coverage stats, which get more interesting with the broader history cloud sources bring in.
 
 ### 5.6 Phases 5–6: Cost control and compliance
 Gates rather than features. Cost control — retention, per-user quotas, rate limits, and measuring cost per active user — can land alongside any phase, and is what keeps §6's funding model honest (§4.3). Compliance (§7) — a DPIA, EU-region hosting, working data export and account deletion — gates any public launch, however small.
