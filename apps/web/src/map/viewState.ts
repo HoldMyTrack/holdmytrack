@@ -1,4 +1,4 @@
-import { FLAVORS, isFlavor, type Flavor } from './style';
+import { isFlavor, type Flavor } from './style';
 
 /**
  * Two-way sync between the camera plus theme and the URL hash, so a view is
@@ -8,7 +8,9 @@ import { FLAVORS, isFlavor, type Flavor } from './style';
  * is deliberately not used: the theme has to live in the same hash, and mixing the
  * built-in writer with our own produces two components fighting over one string.
  *
- * Format: `#map=<zoom>/<lat>/<lon>&theme=<flavor>`
+ * Format: `#map=<zoom>/<lat>/<lon>[&theme=<flavor>]`. `theme` is an override: without it the
+ * map's flavor follows the page's light/dark theme (MapView.tsx), so it is written back only
+ * when the page was opened with one — a link that asks for a flavor keeps asking for it.
  */
 
 export interface ViewState {
@@ -53,24 +55,27 @@ export function parseHash(hash: string): HashState {
   return result;
 }
 
-export function formatHash(view: ViewState, flavor: Flavor): string {
+export function formatHash(view: ViewState, flavor?: Flavor): string {
   const map = [
     view.zoom.toFixed(ZOOM_PRECISION),
     view.latitude.toFixed(COORD_PRECISION),
     view.longitude.toFixed(COORD_PRECISION),
   ].join('/');
-  return `#map=${map}&theme=${flavor}`;
+  return flavor ? `#map=${map}&theme=${flavor}` : `#map=${map}`;
 }
 
 /**
  * Rewrite the hash without touching history: panning a map should not fill the
  * back button with hundreds of entries.
  */
-export function replaceHash(view: ViewState, flavor: Flavor): void {
+export function replaceHash(view: ViewState, flavor?: Flavor): void {
   const next = formatHash(view, flavor);
   if (next !== window.location.hash) {
     window.history.replaceState(null, '', next);
   }
 }
 
-export const DEFAULT_FLAVOR: Flavor = FLAVORS[0];
+/** The basemap flavor that matches the page's theme when the URL doesn't name one. */
+export function flavorForTheme(theme: 'light' | 'dark'): Flavor {
+  return theme;
+}

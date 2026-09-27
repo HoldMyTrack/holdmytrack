@@ -193,5 +193,54 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/settings_save" />
+
+        <!-- The device's own theme (AppTheme.kt): not part of the account, so not part of Save —
+             a tap applies it at once. -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_24"
+            android:accessibilityHeading="true"
+            android:text="@string/settings_theme"
+            android:textAppearance="@style/TextAppearance.HoldMyTrack.Overline" />
+
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/settings_theme"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_8"
+            android:contentDescription="@string/settings_theme"
+            app:selectionRequired="true"
+            app:singleSelection="true">
+
+            <Button
+                android:id="@+id/settings_theme_system"
+                style="@style/Widget.HoldMyTrack.Button.ProfileToggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_theme_system" />
+
+            <Button
+                android:id="@+id/settings_theme_light"
+                style="@style/Widget.HoldMyTrack.Button.ProfileToggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_theme_light" />
+
+            <Button
+                android:id="@+id/settings_theme_dark"
+                style="@style/Widget.HoldMyTrack.Button.ProfileToggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_theme_dark" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_4"
+            android:text="@string/settings_theme_hint"
+            android:textAppearance="@style/TextAppearance.HoldMyTrack.BodySmall"
+            android:textColor="@color/hmt_ink_secondary" />
     </LinearLayout>
 </ScrollView>

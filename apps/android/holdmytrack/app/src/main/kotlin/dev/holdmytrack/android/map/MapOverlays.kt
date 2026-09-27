@@ -158,10 +158,17 @@ object MapOverlays {
         REGION_HEATMAP_LAYER_ID to REGION_HEATMAP_SOURCE_ID,
     )
 
-    /** Same dark veil colour/opacity as the raster tier's own fog_colour/fog_opacity
-     *  (`internal/fog/raster.go`'s RenderFogPNG: #202b25 @ 0.82). */
+    /** The same two veils as the raster tier's (`internal/fog/raster.go`'s LightVeil and
+     *  DarkVeil), each the opposite of the basemap under it: dark ink over the light flavor, a
+     *  cream mist over the dark one. */
     private const val FOG_FILL_COLOR = "#202b25"
     private const val FOG_FILL_OPACITY = 0.82f
+    private const val FOG_FILL_COLOR_DARK = "#f7f4ec"
+    private const val FOG_FILL_OPACITY_DARK = 0.6f
+
+    /** Whether the style [attach] last drew on is the dark flavor — which veil [addCoverage]
+     *  uses, and keeps using across a [refreshCoverage]. */
+    private var darkVeil = false
 
     /** The heatmap ramp's own base hue (also `TRACK_COLOR` above) at a fixed moderate
      *  opacity — "you've been somewhere in this country," not graded by how much. */
@@ -196,8 +203,11 @@ object MapOverlays {
      * date range narrows the tracks alone: Fog and Heatmap show coverage no filter narrows
      * (`docs/SPEC.md` FR-4.2, FR-4.3). The Activities panel's TYPE/DISTANCE filters, hidden
      * set and selection are applied on the client, as layer filters ([setTrackFilter]).
+     *
+     * [dark] says the style is the dark basemap flavor, so Fog gets the cream veil.
      */
-    fun attach(style: Style, mode: MapMode, range: DateRange?) {
+    fun attach(style: Style, mode: MapMode, range: DateRange?, dark: Boolean) {
+        darkVeil = dark
         val beforeId = labelInsertionPoint(style)
         addCoverage(style, beforeId)
         addTracks(style, beforeId, range)
@@ -241,11 +251,14 @@ object MapOverlays {
 
     /** Fog and Heatmap at every tier, each inserted below [beforeId]. */
     private fun addCoverage(style: Style, beforeId: String?) {
-        addRaster(style, FOG_SOURCE_ID, FOG_LAYER_ID, coverageUrl("fog", "png"), beforeId, minZoom = CITY_MIN_ZOOM)
+        val fogUrl = coverageUrl("fog", "png").let { if (darkVeil) it + (if ('?' in it) "&" else "?") + "theme=dark" else it }
+        val fogColor = if (darkVeil) FOG_FILL_COLOR_DARK else FOG_FILL_COLOR
+        val fogOpacity = if (darkVeil) FOG_FILL_OPACITY_DARK else FOG_FILL_OPACITY
+        addRaster(style, FOG_SOURCE_ID, FOG_LAYER_ID, fogUrl, beforeId, minZoom = CITY_MIN_ZOOM)
         addRaster(style, HEATMAP_SOURCE_ID, HEATMAP_LAYER_ID, coverageUrl("heatmap", "png"), beforeId, minZoom = CITY_MIN_ZOOM)
         addFill(
             style, COUNTRY_FOG_SOURCE_ID, COUNTRY_FOG_LAYER_ID, COUNTRIES_SOURCE_LAYER,
-            coverageUrl("country-fog", "mvt"), beforeId, 0f, COUNTRY_MAX_ZOOM, FOG_FILL_COLOR, FOG_FILL_OPACITY,
+            coverageUrl("country-fog", "mvt"), beforeId, 0f, COUNTRY_MAX_ZOOM, fogColor, fogOpacity,
         )
         addFill(
             style, COUNTRY_HEATMAP_SOURCE_ID, COUNTRY_HEATMAP_LAYER_ID, COUNTRIES_SOURCE_LAYER,
@@ -253,7 +266,7 @@ object MapOverlays {
         )
         addFill(
             style, REGION_FOG_SOURCE_ID, REGION_FOG_LAYER_ID, REGIONS_SOURCE_LAYER,
-            coverageUrl("region-fog", "mvt"), beforeId, REGION_MIN_ZOOM, REGION_MAX_ZOOM, FOG_FILL_COLOR, FOG_FILL_OPACITY,
+            coverageUrl("region-fog", "mvt"), beforeId, REGION_MIN_ZOOM, REGION_MAX_ZOOM, fogColor, fogOpacity,
         )
         addFill(
             style, REGION_HEATMAP_SOURCE_ID, REGION_HEATMAP_LAYER_ID, REGIONS_SOURCE_LAYER,

@@ -138,6 +138,11 @@
     <string name="settings_language_auto">Automatic (phone)</string>
     <string name="settings_language_hint">The language of the app, the website and the emails we send you. Automatic follows your phone\'s language.</string>
     <string name="settings_save">Save</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_hint">On this phone only. Applies at once.</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
     <string name="settings_save_continue">Save and continue</string>
     <string name="settings_saved">Saved.</string>
     <string name="settings_avatar_updated">Avatar updated.</string>

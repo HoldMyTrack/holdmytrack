@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The web client's palette (services/server/internal/web/static/tokens.css, the fm- custom
-     properties), carried over value for value so the two clients read as one product.
-     Provisional until root Phase 3's design freeze; that pass replaces these values here, and
-     nothing else should need to change. The web has no dark palette, so neither does this. -->
+<!-- The web client's light palette (services/server/internal/web/static/tokens.css, the fm-
+     custom properties), carried over value for value so the two clients read as one product;
+     res/values-night/colors.xml is its dark palette the same way. Provisional until root
+     Phase 3's design freeze; that pass replaces these values in both files, and nothing else
+     should need to change. A name added here needs its night value there too. -->
 <resources>
     <color name="hmt_bg">#F7F4EC</color>
     <color name="hmt_surface">#FFFFFF</color>
@@ -14,6 +15,14 @@
     <color name="hmt_ink_secondary">#6C7A70</color>
     <color name="hmt_ink_muted">#8B9186</color>
     <color name="hmt_ink_faint">#B7AF9A</color>
+    <!-- Ink at 6%, 8% and 10% — the web's fm-ink-rgb hover, badge and hairline
+         tints, which flip to a cream tint in the dark palette. -->
+    <color name="hmt_ink_tint_6">#0F202B25</color>
+    <color name="hmt_ink_tint_8">#14202B25</color>
+    <color name="hmt_ink_tint_10">#1A202B25</color>
+
+    <!-- Text on a filled accent: the web's fm-on-accent token. -->
+    <color name="hmt_on_accent">#FFFFFF</color>
 
     <color name="hmt_border">#E6E1D2</color>
     <color name="hmt_border_strong">#DCD6C4</color>

@@ -7,7 +7,7 @@ import { ensureFogLayer } from './fog';
 import { ensureHeatmapLayer } from './heatmap';
 import { labelInsertionPoint } from './layers';
 import { setMapMode, type MapMode } from './mapMode';
-import { ATTRIBUTION_TEXT, buildStyle, type Flavor } from './style';
+import { ATTRIBUTION_TEXT, buildStyle, isDarkFlavor, type Flavor } from './style';
 import { ensureTrackLayer, setHiddenTracks } from './tracks';
 
 /**
@@ -230,7 +230,7 @@ async function drawWatermark(canvas: HTMLCanvasElement, bottomY: number, flavor:
 
   const logoW = logo ? (logo.naturalWidth / logo.naturalHeight) * logoH : 0;
   const midY = bottomY - Math.max(logoH, fontPx) / 2;
-  const dark = flavor === 'dark' || flavor === 'black';
+  const dark = isDarkFlavor(flavor);
 
   ctx.save();
   ctx.globalAlpha = WATERMARK_ALPHA;
@@ -323,7 +323,7 @@ async function renderOffscreen(
     });
 
     const beforeId = labelInsertionPoint(instance);
-    ensureFogLayer(instance, beforeId);
+    ensureFogLayer(instance, beforeId, isDarkFlavor(state.flavor));
     ensureHeatmapLayer(instance, beforeId);
     ensureTrackLayer(instance, beforeId, state.activityQuery);
     setMapMode(instance, state.mode);

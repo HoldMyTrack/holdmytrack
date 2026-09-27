@@ -1,0 +1,15 @@
+{{/* The page's light/dark theme, before anything paints. tokens.css follows data-theme on
+     <html> when it's set and the OS's preference when it isn't (§4.18); the choice is the
+     account menu's (static/theme.js), kept per device in localStorage under hmt_theme. This
+     runs in <head>, ahead of the stylesheets, so a dark choice never flashes light first. It
+     can't be server-rendered from a cookie instead: RenderPublic's pages are one cached copy
+     for every visitor. */}}
+{{define "theme-head"}}
+    <script>
+      try {
+        var theme = localStorage.getItem('hmt_theme');
+        if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+      } catch (e) {}
+    </script>
+    <script src="{{asset "theme.js"}}" defer></script>
+{{end}}

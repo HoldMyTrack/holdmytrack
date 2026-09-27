@@ -2,6 +2,6 @@
 <!-- A row's Pending / Hidden badge, the web's .activities-panel__hidden-badge: ink at 8%, the
      extra-small radius. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#14202B25" />
+    <solid android:color="@color/hmt_ink_tint_8" />
     <corners android:radius="@dimen/hmt_radius_xs" />
 </shape>

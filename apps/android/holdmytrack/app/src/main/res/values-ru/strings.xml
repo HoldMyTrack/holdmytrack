@@ -149,6 +149,11 @@
     <string name="settings_language_auto">Автоматически (как на телефоне)</string>
     <string name="settings_language_hint">Язык приложения, сайта и писем, которые мы вам отправляем. «Автоматически» — язык вашего телефона.</string>
     <string name="settings_save">Сохранить</string>
+    <string name="settings_theme">Тема</string>
+    <string name="settings_theme_hint">Только на этом телефоне. Применяется сразу.</string>
+    <string name="settings_theme_system">Системная</string>
+    <string name="settings_theme_light">Светлая</string>
+    <string name="settings_theme_dark">Тёмная</string>
     <string name="settings_save_continue">Сохранить и продолжить</string>
     <string name="settings_saved">Сохранено.</string>
     <string name="settings_avatar_updated">Аватар обновлён.</string>

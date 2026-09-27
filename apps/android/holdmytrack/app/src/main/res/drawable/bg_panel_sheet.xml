@@ -11,7 +11,7 @@
         android:height="1dp"
         android:gravity="top">
         <shape>
-            <solid android:color="#1A202B25" />
+            <solid android:color="@color/hmt_ink_tint_10" />
         </shape>
     </item>
 </layer-list>

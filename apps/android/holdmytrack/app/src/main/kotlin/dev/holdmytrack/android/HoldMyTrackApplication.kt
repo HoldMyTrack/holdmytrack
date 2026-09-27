@@ -3,6 +3,7 @@ package dev.holdmytrack.android
 import android.app.Application
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
+import dev.holdmytrack.android.settings.AppTheme
 import org.maplibre.android.MapLibre
 import org.maplibre.android.module.http.HttpRequestUtil
 
@@ -25,6 +26,8 @@ class HoldMyTrackApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         Session.init(this)
+        // Before any screen inflates, so the first one already has the chosen theme's colors.
+        AppTheme.applySaved(this)
         // Loads the native library and installs the module provider a MapView's constructor
         // asks for immediately, so no Activity has to remember to do it first.
         MapLibre.getInstance(this)

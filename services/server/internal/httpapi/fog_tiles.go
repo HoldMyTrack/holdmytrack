@@ -12,8 +12,8 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
 )
 
-// handleFogTile serves §4.2's coverage mask as a ready-to-draw white-veil RGBA PNG:
-// fog_colour in RGB, alpha = fog_opacity × (255 - coverage).
+// handleFogTile serves §4.2's coverage mask as a ready-to-draw fog-veil RGBA PNG: the veil's
+// colour in RGB, alpha = veil opacity × (255 - coverage).
 //
 // Always reads the precomputed fog_tiles aggregate — Fog of War shows true all-time coverage,
 // unconditionally: it isn't scoped by date range, TYPE/DISTANCE, or hidden-track state (a
@@ -22,10 +22,8 @@ import (
 // same shape now too — see its own doc comment for why it's a plain lookup as well, not a
 // live composite, despite Heatmap's rolling window.
 //
-// `theme` is accepted, per §4.2's own reasoning for putting it in the URL (so a CDN caches
-// one variant per theme) — but there is only one documented veil treatment (§4.2.1's white
-// veil), so it's applied regardless of the theme value for now. A dark-theme variant is a
-// real, undecided gap, not silently invented here.
+// `?theme=dark` picks the cream veil drawn over dark basemaps; anything else gets the dark ink
+// veil (fog.VeilForTheme). The theme is part of the URL, so a cached tile is one theme's.
 func (s *Server) handleFogTile(w http.ResponseWriter, r *http.Request) {
 	z, errZ := strconv.Atoi(r.PathValue("z"))
 	x, errX := strconv.Atoi(r.PathValue("x"))
@@ -54,7 +52,7 @@ func (s *Server) handleFogTile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rgba := fog.RenderFogPNG(mask)
+	rgba := fog.RenderFogPNG(mask, fog.VeilForTheme(r.URL.Query().Get("theme")))
 	w.Header().Set("Content-Type", "image/png")
 	setTileCacheControl(w, r)
 	if err := png.Encode(w, rgba); err != nil {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { flyToBBox, flyToView, unionBBox } from './bbox';
-import { WORLD_VIEW } from './config';
+import { basemapOrigin, WORLD_VIEW } from './config';
 import { countryView } from './countryView';
 import { exportFramedImage } from './exportMap';
 import type { ExportPreset } from './exportPresets';
@@ -10,7 +10,7 @@ import { ensureFogLayer } from './fog';
 import { ensureHeatmapLayer } from './heatmap';
 import { setMapMode, type MapMode } from './mapMode';
 import { labelInsertionPoint } from './layers';
-import { type Flavor } from './style';
+import { buildStyle, isDarkFlavor, type Flavor } from './style';
 import { clearTrackBands, ensureBandLayer, setTrackBands } from './trackBands';
 import {
   ensureTrackLayer,
@@ -22,7 +22,7 @@ import {
 } from './tracks';
 import { useCoverageRefresh } from './useCoverageRefresh';
 import { useMapInstance } from './useMapInstance';
-import { DEFAULT_FLAVOR, parseHash, replaceHash, type HashState, type ViewState } from './viewState';
+import { flavorForTheme, parseHash, replaceHash, type HashState, type ViewState } from './viewState';
 import { getActivityTrackMetrics, type Activity, type ActivityTrackMetrics } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
@@ -39,6 +39,7 @@ import { useActivityList } from '../ui/useActivityList';
 import { useActivityTotals } from '../ui/useActivityTotals';
 import { useDuplicates } from '../ui/useDuplicates';
 import { useImports } from '../ui/useImports';
+import { currentTheme, useTheme } from '../ui/useTheme';
 import { t } from '../i18n';
 
 /** How often the list is re-read while an Edit track reprocess is pending — the job is one
@@ -92,9 +93,15 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     return {
       hash,
       view: hash.view ?? { longitude: WORLD_VIEW.longitude, latitude: WORLD_VIEW.latitude, zoom: WORLD_VIEW.zoom },
-      flavor: hash.flavor ?? DEFAULT_FLAVOR,
+      flavor: hash.flavor ?? flavorForTheme(currentTheme()),
     };
   });
+
+  // The basemap flavor: a `&theme=` in the URL pins it (a shared link shows what its sender
+  // saw); otherwise it follows the page's light/dark theme, OS preference or account-menu
+  // choice alike, and swaps live when that changes.
+  const theme = useTheme();
+  const flavor: Flavor = initial.hash.flavor ?? flavorForTheme(theme);
 
   const container = useRef<HTMLDivElement>(null);
   const [exportFlow, setExportFlow] = useState<ExportFlow>({ stage: 'idle' });
@@ -402,7 +409,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     try {
       const blob = await exportFramedImage(
         map,
-        { flavor: initial.flavor, mode: mapMode, activityQuery, hiddenIds: [...mapHiddenIds] },
+        { flavor, mode: mapMode, activityQuery, hiddenIds: [...mapHiddenIds] },
         {
           ...geometry,
           ...(preset !== 'custom' && { target: { widthPx: preset.widthPx, heightPx: preset.heightPx } }),
@@ -425,7 +432,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       // discard the frame the user just positioned, forcing them to redo it from scratch.
       setExportFlow((flow) => (flow.stage === 'capturing' ? { stage: 'framing', preset: flow.preset, geometry: flow.geometry } : flow));
     }
-  }, [exportFlow, map, initial.flavor, mapMode, activityQuery, mapHiddenIds]);
+  }, [exportFlow, map, flavor, mapMode, activityQuery, mapHiddenIds]);
 
   const handleExportCancel = useCallback(() => {
     setExportFlow({ stage: 'idle' });
@@ -933,7 +940,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       // it. setMapMode has to run again after this: addLayer always starts a fresh layer
       // hidden (fog.ts/heatmap.ts), so a styledata mid-non-Normal-mode would otherwise
       // silently drop back to Normal.
-      ensureFogLayer(instance, beforeId);
+      ensureFogLayer(instance, beforeId, isDarkFlavor(flavor));
       ensureHeatmapLayer(instance, beforeId);
       ensureTrackLayer(instance, beforeId, activityQuery);
       // After tracks, so it paints on top and fully overlays the one track it applies to —
@@ -956,7 +963,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
         setTrackBands(instance, trackMetrics.points);
       }
     },
-    [mapMode, editingTrack, mapHiddenIds, activityQuery, trackMetrics, focusedActivityId, focusedPending],
+    [flavor, mapMode, editingTrack, mapHiddenIds, activityQuery, trackMetrics, focusedActivityId, focusedPending],
   );
 
   useEffect(() => {
@@ -974,6 +981,19 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     };
   }, [map, reattachOverlays]);
 
+  // A theme change swaps the basemap style in place — camera kept, overlays re-added by the
+  // styledata handler above. Declared after it on purpose: effects run in order, so a
+  // reattach against the outgoing style happens before setStyle starts loading the new one,
+  // never against a style still loading. diff: false, so the swap is a clean reload that
+  // drops every custom source too, rather than a diff that might keep the fog raster at the
+  // other theme's URL.
+  const appliedFlavor = useRef(initial.flavor);
+  useEffect(() => {
+    if (!map || appliedFlavor.current === flavor) return;
+    appliedFlavor.current = flavor;
+    map.setStyle(buildStyle({ flavor, origin: basemapOrigin() }), { diff: false });
+  }, [map, flavor]);
+
   // Mode changes outside of a styledata event (the toggle itself, not a theme swap) still
   // need to flip the layer's visibility — reattachOverlays only re-runs on styledata.
   useEffect(() => {
@@ -987,7 +1007,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     if (!map) return;
     const sync = () => {
       const centre = map.getCenter();
-      replaceHash({ longitude: centre.lng, latitude: centre.lat, zoom: map.getZoom() }, initial.flavor);
+      replaceHash({ longitude: centre.lng, latitude: centre.lat, zoom: map.getZoom() }, initial.hash.flavor);
     };
     sync();
     map.on('moveend', sync);

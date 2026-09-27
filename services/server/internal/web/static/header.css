@@ -38,12 +38,12 @@
 
 .page-header__wordmark-light {
   font-weight: 400;
-  color: #4a5750;
+  color: rgb(var(--fm-ink-rgb) / 82%);
 }
 
 .page-header__wordmark-bold {
   font-weight: 800;
-  color: #9a6b1e;
+  color: var(--fm-accent-strong);
 }
 
 .page-header__divider {
@@ -120,7 +120,7 @@
   background: var(--fm-surface);
   border: 1px solid rgb(var(--fm-ink-rgb) / 10%);
   border-radius: 8px;
-  box-shadow: 0 12px 32px rgb(var(--fm-ink-rgb) / 18%);
+  box-shadow: var(--fm-shadow-lg);
 }
 
 .header-menu__label {
@@ -165,6 +165,53 @@
 
 .header-menu form {
   margin: 0;
+}
+
+/* The account menu's System/Light/Dark control (static/theme.js). */
+.header-menu__theme {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+}
+
+.header-menu__theme[hidden] {
+  display: none;
+}
+
+.header-menu__theme-label {
+  font-size: 13px;
+  color: rgb(var(--fm-ink-rgb) / 70%);
+}
+
+.theme-toggle {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 6px;
+  background: rgb(var(--fm-ink-rgb) / 7%);
+}
+
+.theme-toggle__btn {
+  border: 0;
+  border-radius: 4px;
+  padding: 3px 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: rgb(var(--fm-ink-rgb) / 70%);
+  cursor: pointer;
+}
+
+.theme-toggle__btn:hover {
+  color: var(--fm-ink);
+}
+
+.theme-toggle__btn[aria-pressed='true'] {
+  background: var(--fm-surface);
+  color: var(--fm-ink);
+  font-weight: 600;
+  box-shadow: var(--fm-shadow-sm);
 }
 
 .info-menu__trigger {
@@ -215,19 +262,19 @@
   font-weight: 600;
   line-height: 1.2;
   text-decoration: none;
-  color: #fff;
+  color: var(--fm-on-accent);
   background: var(--fm-accent);
   border: 1px solid var(--fm-accent);
 }
 
 .page-button:hover {
-  color: #fff;
+  color: var(--fm-on-accent);
   background: var(--fm-accent-hover);
   border-color: var(--fm-accent-hover);
 }
 
 .page-button--quiet {
-  color: #3e4a43;
+  color: rgb(var(--fm-ink-rgb) / 88%);
   background: var(--fm-surface);
   border-color: var(--fm-border-strong);
   font-weight: 500;

@@ -21,6 +21,12 @@ export function isFlavor(value: string): value is Flavor {
   return (FLAVORS as readonly string[]).includes(value);
 }
 
+/** The flavors drawn light-on-dark — the ones the cream fog veil and the export watermark's
+ *  light colors are for. */
+export function isDarkFlavor(flavor: Flavor): boolean {
+  return flavor === 'dark' || flavor === 'black';
+}
+
 /** The source id every basemap layer is bound to; fog and track layers will not reuse it. */
 export const BASEMAP_SOURCE = 'protomaps';
 

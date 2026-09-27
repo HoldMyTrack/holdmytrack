@@ -29,11 +29,22 @@ const FOG_TILE_URL = `${API_BASE_URL}${TILES_V1}/fog/{z}/{x}/{y}.png`;
 const COUNTRY_FOG_TILE_URL = `${API_BASE_URL}${TILES_V1}/country-fog/{z}/{x}/{y}.mvt`;
 const REGION_FOG_TILE_URL = `${API_BASE_URL}${TILES_V1}/region-fog/{z}/{x}/{y}.mvt`;
 
-// Same dark veil colour/opacity as the raster tier's own fog_colour/fog_opacity
-// (internal/fog/raster.go's RenderFogPNG: #202b25 @ 0.82) — kept identical so nothing shifts
-// hue when a pan/zoom crosses the Region/City boundary.
-const FOG_FILL_COLOR = '#202b25';
-const FOG_FILL_OPACITY = 0.82;
+// The same two veils as the raster tier's (internal/fog/raster.go's LightVeil/DarkVeil) — kept
+// identical so nothing shifts hue when a pan/zoom crosses the Region/City boundary. Each is the
+// opposite of the basemap it sits on: dark ink over a light map, a cream mist over a dark one.
+const LIGHT_VEIL = { color: '#202b25', opacity: 0.82 };
+const DARK_VEIL = { color: '#f7f4ec', opacity: 0.6 };
+
+/** Which veil each map currently has, so a coverage refresh keeps it and a theme swap that
+ *  somehow left the fog in place can still repaint it. */
+const darkVeil = new WeakMap<MapLibreMap, boolean>();
+
+/** The raster tile URL at the current coverage version, plus `theme=dark` for the cream veil
+ *  (the server's fog.VeilForTheme). */
+function fogRasterURL(dark: boolean): string {
+  const url = versionedTileURL(FOG_TILE_URL);
+  return dark ? `${url}${url.includes('?') ? '&' : '?'}theme=dark` : url;
+}
 
 /**
  * Adds the fog source and layer if not already present — idempotent for the same reason
@@ -45,12 +56,18 @@ const FOG_FILL_OPACITY = 0.82;
  * Layer order between fog and tracks matters too: fog is added first here and MapView adds
  * tracks after it, both with the same `beforeId`, which makes tracks paint *above* fog —
  * a cleared route should be visible through the veil, not hidden under it.
+ *
+ * `dark` picks the veil: the cream one on a dark basemap flavor (style.ts's isDarkFlavor).
  */
-export function ensureFogLayer(map: MapLibreMap, beforeId: string | undefined): void {
+export function ensureFogLayer(map: MapLibreMap, beforeId: string | undefined, dark: boolean): void {
+  const veil = dark ? DARK_VEIL : LIGHT_VEIL;
+  const veilChanged = darkVeil.has(map) && darkVeil.get(map) !== dark;
+  darkVeil.set(map, dark);
+
   if (!map.getSource(FOG_SOURCE_ID)) {
     map.addSource(FOG_SOURCE_ID, {
       type: 'raster',
-      tiles: [versionedTileURL(FOG_TILE_URL)],
+      tiles: [fogRasterURL(dark)],
       tileSize: 512,
       minzoom: 0,
       maxzoom: 14,
@@ -86,7 +103,7 @@ export function ensureFogLayer(map: MapLibreMap, beforeId: string | undefined): 
         'source-layer': 'countries',
         minzoom: 0,
         maxzoom: COUNTRY_MAX_ZOOM,
-        paint: { 'fill-color': FOG_FILL_COLOR, 'fill-opacity': FOG_FILL_OPACITY },
+        paint: { 'fill-color': veil.color, 'fill-opacity': veil.opacity },
         layout: { visibility: 'none' },
       },
       beforeId,
@@ -110,11 +127,19 @@ export function ensureFogLayer(map: MapLibreMap, beforeId: string | undefined): 
         'source-layer': 'regions',
         minzoom: REGION_MIN_ZOOM,
         maxzoom: REGION_MAX_ZOOM,
-        paint: { 'fill-color': FOG_FILL_COLOR, 'fill-opacity': FOG_FILL_OPACITY },
+        paint: { 'fill-color': veil.color, 'fill-opacity': veil.opacity },
         layout: { visibility: 'none' },
       },
       beforeId,
     );
+  }
+
+  if (veilChanged) {
+    (map.getSource(FOG_SOURCE_ID) as { setTiles?: (tiles: string[]) => unknown } | undefined)?.setTiles?.([fogRasterURL(dark)]);
+    for (const layerId of [COUNTRY_FOG_LAYER_ID, REGION_FOG_LAYER_ID]) {
+      map.setPaintProperty(layerId, 'fill-color', veil.color);
+      map.setPaintProperty(layerId, 'fill-opacity', veil.opacity);
+    }
   }
 }
 
@@ -123,10 +148,10 @@ export function ensureFogLayer(map: MapLibreMap, beforeId: string | undefined): 
  *  that isn't on the map yet; ensureFogLayer will create it at the current version. */
 export function refreshFogLayers(map: MapLibreMap): void {
   for (const [sourceId, url] of [
-    [FOG_SOURCE_ID, FOG_TILE_URL],
-    [COUNTRY_FOG_SOURCE_ID, COUNTRY_FOG_TILE_URL],
-    [REGION_FOG_SOURCE_ID, REGION_FOG_TILE_URL],
+    [FOG_SOURCE_ID, fogRasterURL(darkVeil.get(map) ?? false)],
+    [COUNTRY_FOG_SOURCE_ID, versionedTileURL(COUNTRY_FOG_TILE_URL)],
+    [REGION_FOG_SOURCE_ID, versionedTileURL(REGION_FOG_TILE_URL)],
   ] as const) {
-    (map.getSource(sourceId) as { setTiles?: (tiles: string[]) => unknown } | undefined)?.setTiles?.([versionedTileURL(url)]);
+    (map.getSource(sourceId) as { setTiles?: (tiles: string[]) => unknown } | undefined)?.setTiles?.([url]);
   }
 }

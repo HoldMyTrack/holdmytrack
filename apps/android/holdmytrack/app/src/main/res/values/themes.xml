@@ -3,12 +3,14 @@
      web's design tokens mapped onto Material's roles once, so every widget picks them up from
      the theme rather than from literals — colors.xml onto the color roles, dimens.xml's type
      and radius scales onto the type roles and corner sizes, and Inter/Fraunces (res/font) as
-     the two faces. Light only, like the web. Dynamic color is deliberately not applied — it
-     would replace this palette with one derived from the user's wallpaper. -->
+     the two faces. DayNight, like the web: res/values-night/colors.xml swaps in the dark
+     palette under the same names, so nothing here changes between the two. Dynamic color is
+     deliberately not applied — it would replace this palette with one derived from the user's
+     wallpaper. -->
 <resources>
-    <style name="Base.Theme.HoldMyTrack" parent="Theme.Material3.Light">
+    <style name="Base.Theme.HoldMyTrack" parent="Theme.Material3.DayNight">
         <item name="colorPrimary">@color/hmt_accent</item>
-        <item name="colorOnPrimary">@color/hmt_surface</item>
+        <item name="colorOnPrimary">@color/hmt_on_accent</item>
         <item name="colorPrimaryContainer">@color/hmt_accent_container</item>
         <item name="colorOnPrimaryContainer">@color/hmt_ink</item>
         <item name="colorSecondary">@color/hmt_ink</item>
@@ -34,8 +36,8 @@
         <item name="colorOutlineVariant">@color/hmt_border</item>
 
         <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowLightStatusBar">@bool/hmt_light_system_bars</item>
+        <item name="android:windowLightNavigationBar">@bool/hmt_light_system_bars</item>
 
         <!-- The web's radius scale: inputs at sm, buttons and map toggles at md, menus, sheets
              and dialogs at lg — rather than Material's 4dp fields, pill buttons and 28dp dialogs. -->

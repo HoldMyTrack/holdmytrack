@@ -629,7 +629,7 @@ class MainActivity : AppCompatActivity() {
 
         val loaded = style ?: return
         if (!overlaysAttached) {
-            MapOverlays.attach(loaded, mode, selectedRange)
+            MapOverlays.attach(loaded, mode, selectedRange, isNight())
             MapOverlays.setTrackFilter(loaded, panelState.mapHidden, panelState.focused)
             overlaysAttached = true
             renderTrackMetrics()
@@ -1353,17 +1353,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Flavor follows the system's day/night setting. The API serves five (`light`, `dark`,
-     * `white`, `black`, `grayscale`); this picks between the two general-purpose ones, and
-     * there is no in-app preference — decided in Phase 5 (`apps/android/docs/ROADMAP.md`):
-     * the system setting is the only input, and the app's own chrome stays light.
+     * Flavor follows the app's night mode, the same one its own colors follow: the system's
+     * day/night setting, or Settings' Theme toggle when that overrides it (`AppTheme`). The
+     * API serves five (`light`, `dark`, `white`, `black`, `grayscale`); this picks between the
+     * two general-purpose ones.
      */
     private fun styleUrl(): String {
-        val night = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
-            Configuration.UI_MODE_NIGHT_YES
-        val flavor = if (night) "dark" else "light"
+        val flavor = if (isNight()) "dark" else "light"
         return "${BuildConfig.API_BASE_URL}/v1/map/style/$flavor"
     }
+
+    private fun isNight(): Boolean =
+        resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
 
     /** The style (or its sources) couldn't be fetched: a plain sentence, with the origin and
      *  MapLibre's own error in small print for whoever has to fix it, and a way to try again. */

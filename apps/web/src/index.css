@@ -57,7 +57,7 @@ body {
 }
 
 .confirm-dialog::backdrop {
-  background: rgb(var(--fm-ink-rgb) / 35%);
+  background: rgb(var(--fm-shadow-rgb) / 35%);
 }
 
 .confirm-dialog__title {
@@ -81,7 +81,7 @@ body {
   border-radius: var(--fm-radius-md);
   padding: var(--fm-space-10) var(--fm-space-16);
   background: var(--fm-danger);
-  color: #fff;
+  color: var(--fm-on-accent);
   font: inherit;
   font-weight: var(--fm-weight-semibold);
   font-size: var(--fm-text-lg);
@@ -1121,8 +1121,8 @@ body {
   box-sizing: border-box;
   border: 2px dashed var(--fm-ink);
   box-shadow:
-    0 0 0 1px rgb(255 255 255 / 70%),
-    inset 0 0 0 1px rgb(255 255 255 / 70%);
+    0 0 0 1px rgb(var(--fm-surface-rgb) / 70%),
+    inset 0 0 0 1px rgb(var(--fm-surface-rgb) / 70%);
 }
 
 /* Move targets: 12px strips straddling each side of the border. */
@@ -1169,7 +1169,7 @@ body {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--fm-surface);
   border: 2px solid var(--fm-ink);
   touch-action: none;
   pointer-events: auto;
@@ -1261,7 +1261,7 @@ body {
 
 .export-frame__button--capture {
   background: var(--fm-accent);
-  color: #fff;
+  color: var(--fm-on-accent);
 }
 
 .export-frame__button--capture:hover:not(:disabled) {
@@ -1276,8 +1276,8 @@ body {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  border: 2px solid rgb(255 255 255 / 35%);
-  border-top-color: #fff;
+  border: 2px solid color-mix(in srgb, var(--fm-on-accent) 35%, transparent);
+  border-top-color: var(--fm-on-accent);
   animation: export-frame-spin 0.7s linear infinite;
 }
 
@@ -1313,7 +1313,7 @@ body {
   gap: var(--fm-space-2);
   padding: var(--fm-space-4);
   border-radius: var(--fm-radius-md);
-  background: rgb(255 255 255 / 92%);
+  background: rgb(var(--fm-surface-rgb) / 92%);
   box-shadow: var(--fm-shadow-sm);
 }
 
@@ -1334,7 +1334,7 @@ body {
 
 .map-mode-toggle__btn--active {
   background: var(--fm-ink);
-  color: #fff;
+  color: var(--fm-on-accent);
 }
 
 /* Separates Normal from the two coverage views (Fog, Heatmap) — the choice is two-level. */
@@ -1363,7 +1363,7 @@ body {
   box-sizing: border-box;
   padding: var(--fm-space-12) var(--fm-space-16);
   border-radius: var(--fm-radius-lg);
-  background: rgb(255 255 255 / 96%);
+  background: rgb(var(--fm-surface-rgb) / 96%);
   box-shadow: var(--fm-shadow-md);
   color: var(--fm-ink);
 }
@@ -1439,7 +1439,7 @@ body {
 
 .edit-track__btn--primary {
   background: var(--fm-accent);
-  color: #fff;
+  color: var(--fm-on-accent);
 }
 
 .edit-track__btn--primary:hover:not(:disabled) {
@@ -1448,7 +1448,7 @@ body {
 
 .edit-track__btn--primary:disabled {
   background: rgb(var(--fm-accent-rgb) / 35%);
-  color: #fff;
+  color: var(--fm-on-accent);
 }
 
 .edit-track__note {
@@ -1588,7 +1588,7 @@ body {
   padding: 0 var(--fm-space-4);
   border-radius: var(--fm-radius-pill);
   background: var(--fm-accent);
-  color: #fff;
+  color: var(--fm-on-accent);
   font-size: var(--fm-text-2xs);
   font-weight: var(--fm-weight-bold);
 }
@@ -1848,7 +1848,7 @@ body {
   font-size: var(--fm-text-md);
   line-height: 1.4;
   color: var(--fm-ink);
-  background: rgb(255 244 214 / 96%);
+  background: var(--fm-notice-bg);
   box-shadow: var(--fm-shadow-sm);
 }
 
@@ -1938,7 +1938,7 @@ body {
   border-radius: var(--fm-radius-md);
   padding: var(--fm-space-10) var(--fm-space-16);
   background: var(--fm-accent);
-  color: #fff;
+  color: var(--fm-on-accent);
   font: inherit;
   font-weight: var(--fm-weight-semibold);
   font-size: var(--fm-text-lg);
@@ -2200,7 +2200,7 @@ body {
     height: var(--phone-sheet-peek);
     border-right: none;
     border-top: 1px solid rgb(var(--fm-ink-rgb) / 10%);
-    box-shadow: 0 -2px 10px rgb(var(--fm-ink-rgb) / 18%);
+    box-shadow: 0 -2px 10px rgb(var(--fm-shadow-rgb) / 18%);
     /* Above the map's own floating widgets (the mode toggle, z-index: 3)
        and MapLibre's own controls, below the app header (z-index: 5). */
     z-index: 4;
@@ -2350,6 +2350,39 @@ body {
   font-weight: var(--fm-weight-semibold);
   letter-spacing: 0.02em;
   color: rgb(var(--fm-ink-rgb) / 65%);
+}
+
+/* MapLibre's own controls (zoom, locate, the scale bar, attribution) on the palette, so they
+   follow the theme like the rest of the map chrome. Their icons are dark SVG backgrounds, so
+   the dark palette inverts them (--fm-control-icon-filter) rather than restyling each glyph. */
+.maplibregl-ctrl-group {
+  background: var(--fm-surface);
+}
+
+.maplibregl-ctrl-group button + button {
+  border-top-color: var(--fm-border);
+}
+
+.maplibregl-ctrl-group button:not(:disabled):hover {
+  background-color: rgb(var(--fm-ink-rgb) / 6%);
+}
+
+.maplibregl-ctrl-group .maplibregl-ctrl-icon {
+  filter: var(--fm-control-icon-filter);
+}
+
+.maplibregl-ctrl-scale {
+  border-color: var(--fm-ink-secondary);
+  background-color: rgb(var(--fm-surface-rgb) / 75%);
+  color: var(--fm-ink);
+}
+
+.maplibregl-ctrl.maplibregl-ctrl-attrib {
+  background-color: rgb(var(--fm-surface-rgb) / 60%);
+}
+
+.maplibregl-ctrl-attrib a {
+  color: rgb(var(--fm-ink-rgb) / 75%);
 }
 
 /* ExportControl.tsx — a button in MapLibre's own top-right control stack, under zoom and

@@ -95,7 +95,7 @@
                     android:minWidth="16dp"
                     android:paddingStart="@dimen/hmt_space_4"
                     android:paddingEnd="@dimen/hmt_space_4"
-                    android:textColor="#FFFFFFFF"
+                    android:textColor="@color/hmt_on_accent"
                     android:textFontWeight="700"
                     android:textSize="@dimen/hmt_text_2xs"
                     android:visibility="gone"

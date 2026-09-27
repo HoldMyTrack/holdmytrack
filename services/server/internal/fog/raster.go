@@ -282,31 +282,46 @@ func RenderHeatmapPNG(mask *image.Gray) *image.RGBA {
 	return out
 }
 
+// Veil is one theme's fog treatment: the colour unexplored territory is painted in, and how
+// opaque it is where coverage is zero.
+type Veil struct {
+	R, G, B uint8
+	Opacity float64
+}
+
+// LightVeil and DarkVeil are the two fog treatments, one per basemap brightness. Each one is
+// the opposite of the map it sits on, so unexplored territory reads as covered whatever shade
+// the basemap happens to be: on the light basemap, the app's dark ink (`--fm-ink`, #202b25);
+// on the dark one, a cream mist in the app's light background (`--fm-bg`, #f7f4ec). The
+// country/region fill layers on both clients use the same two colour/opacity pairs, so
+// nothing shifts hue when a pan/zoom crosses the Region/City boundary.
+var (
+	LightVeil = Veil{R: 32, G: 43, B: 37, Opacity: 0.82}
+	DarkVeil  = Veil{R: 247, G: 244, B: 236, Opacity: 0.6}
+)
+
+// VeilForTheme maps a tile request's `theme` query value to its veil: `dark` gets DarkVeil,
+// anything else (including no value) LightVeil.
+func VeilForTheme(theme string) Veil {
+	if theme == "dark" {
+		return DarkVeil
+	}
+	return LightVeil
+}
+
 // RenderFogPNG converts a stored single-channel coverage mask into the ready-to-draw fog-veil
-// RGBA PNG: fog_colour in RGB, alpha = fog_opacity × (255 - coverage). theme is accepted by the
-// serving handler (§4.2: "part of the URL so the CDN caches one variant per theme") but not yet
-// applied to anything — there is only the one veil treatment below; a dark-theme variant is a
-// real gap, not silently invented here.
-func RenderFogPNG(mask *image.Gray) *image.RGBA {
-	// §4.2.1 originally measured a white veil at ~0.66 opacity from reference screenshots, but
-	// found live against this app's own light cream basemap (#F7F4EC-ish): white-on-cream is
-	// two similarly light colours, so unexplored territory barely read as covered at all —
-	// reported directly as "hardly distinguishable." Switched to the app's own dark ink token
-	// (`--fm-ink` in index.css, #202b25) at a higher opacity instead: a dark veil against a
-	// light basemap is real, unambiguous contrast regardless of what shade the basemap itself
-	// happens to be, which the white treatment never guaranteed.
-	const fogOpacity = 0.82
-	const fogR, fogG, fogB = 32, 43, 37
+// RGBA PNG: the veil's colour in RGB, alpha = veil opacity × (255 - coverage).
+func RenderFogPNG(mask *image.Gray, veil Veil) *image.RGBA {
 	out := image.NewRGBA(mask.Bounds())
 	for y := mask.Bounds().Min.Y; y < mask.Bounds().Max.Y; y++ {
 		for x := mask.Bounds().Min.X; x < mask.Bounds().Max.X; x++ {
 			coverage := mask.GrayAt(x, y).Y
-			alpha := uint8(fogOpacity * float64(255-coverage))
+			alpha := uint8(veil.Opacity * float64(255-coverage))
 			// Premultiplied, matching image.RGBA's convention (see RenderHeatmapPNG's own
 			// comment on the same point): scale each channel by the same alpha fraction.
 			a := float64(alpha) / 255
 			out.SetRGBA(x, y, color.RGBA{
-				R: uint8(fogR * a), G: uint8(fogG * a), B: uint8(fogB * a), A: alpha,
+				R: uint8(float64(veil.R) * a), G: uint8(float64(veil.G) * a), B: uint8(float64(veil.B) * a), A: alpha,
 			})
 		}
 	}

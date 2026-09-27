@@ -504,7 +504,7 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 
 ### FR-4.2 Fog of War mode
 
-**Description**: An alternate map mode showing a dark veil over everywhere the user has not recorded an activity — true all-time coverage, ignoring every other filter.
+**Description**: An alternate map mode showing a veil over everywhere the user has not recorded an activity — true all-time coverage, ignoring every other filter. The veil is the opposite of the basemap under it: dark over the light basemap, a light cream mist over the dark one (FR-4.12).
 
 **Behavior**:
 1. Selecting "Fog" from the map-mode toggle replaces the track lines with a raster veil: any area a recorded route has ever passed through is rendered clear; everywhere else stays fogged.
@@ -531,7 +531,7 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 
 ### FR-4.5 Base map, theming, and the opening view
 
-**Description**: The map renders a self-hosted vector base map (streets, labels) in either a light or dark theme, selected via the page's URL (no in-app toggle). The current camera position (center, zoom) and theme are reflected in the URL and restored on reload, so a specific view is shareable via link.
+**Description**: The map renders a self-hosted vector base map (streets, labels) in a light or dark flavor that follows the page's light/dark theme (FR-4.12), switching live when the theme does. A URL that names a flavor (`&theme=light`, `dark`, `white`, `black` or `grayscale`) overrides the theme for as long as the page stays open and is kept in the URL, so a shared link shows the flavor its sender chose. The current camera position (center, zoom) is reflected in the URL and restored on reload, so a specific view is shareable via link.
 
 **Preconditions**: Active session.
 
@@ -604,6 +604,21 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 **Outputs**: Tile responses carrying the caching headers above; `tile_version` in `GET /v1/coverage/status`.
 
 **Notes**: Caching is per device, not shared: the app's origin is not behind a CDN, and a tile points at where the account's owner has been. `IMPLEMENTATION.md` §4.2.6 covers how the version is kept.
+
+### FR-4.12 Light and dark theme
+
+**Description**: Every page and the Android app draw in a light or a dark palette. By default they follow the device's own light/dark setting; the user can instead pin this device to Light or Dark.
+
+**Preconditions**: None to follow the device setting; an active session to change it on the web (the control is in the account menu).
+
+**Behavior**:
+1. On the web, the account menu has a Theme control: System (the default), Light, Dark. A choice applies at once, without a reload, to the page, the header and the map, and is kept by this browser only — not on the account, and not on the user's other devices.
+2. In the Android app, Settings has the same three-way Theme control, applied at once and kept on the phone only.
+3. With System chosen, a change of the device's own setting applies while the page or app is open.
+4. The map follows the theme: the light basemap flavor in the light theme, the dark flavor in the dark one (FR-4.5), with Fog of War's veil switching to match (FR-4.2).
+5. A page opened with a saved dark choice draws dark from its first frame, never flashing light first.
+
+**Notes**: A signed-out visitor gets the device setting; the control is only in the signed-in account menu. `IMPLEMENTATION.md` §4.18 covers the two palettes.
 
 ## 7. FR-5 — Activities Panel
 
