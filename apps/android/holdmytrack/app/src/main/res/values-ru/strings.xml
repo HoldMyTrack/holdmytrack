@@ -62,8 +62,7 @@
     </plurals>
     <string name="locate_needs_location">HoldMyTrack нужен доступ к местоположению, чтобы показать, где вы.</string>
     <string name="menu_profile">Профиль</string>
-    <string name="menu_sync">Синхронизация</string>
-    <string name="menu_recorded_activities">Записанные занятия</string>
+    <string name="menu_sync">Источник синхронизации</string>
 
     <string name="settings_title">Настройки</string>
     <string name="settings_onboarding_title">Добро пожаловать! Настройте аккаунт</string>
@@ -133,24 +132,21 @@
     <string name="unit_mph">%1$.1f ми/ч</string>
 
     <string name="recorded_empty">Записанных занятий пока нет.</string>
-    <string name="recorded_filter_all">Все</string>
-    <string name="recorded_filter_status_label">Статус</string>
-    <string name="recorded_filter_type_label">Тип</string>
     <string name="recorded_row_queue">Поставить в очередь на синхронизацию</string>
     <string name="recorded_row_queue_named">Поставить в очередь на синхронизацию: %1$s</string>
     <string name="recorded_row_edit_named">Изменить: %1$s</string>
     <string name="recorded_row_delete_named">Удалить: %1$s</string>
-    <string name="recorded_status_not_synced">Не синхронизировано</string>
-    <string name="recorded_status_queued">В очереди</string>
-    <string name="recorded_row_subtitle">%1$s · %2$s · %3$s</string>
-    <string name="recorded_demo_notice">Демо-аккаунт только для просмотра: записи можно сохранять и редактировать здесь, но не синхронизировать. Создайте аккаунт, чтобы синхронизировать свои данные.</string>
+    <string name="recorded_row_subtitle">%1$s · %2$s</string>
     <string name="recording_delete">Удалить</string>
     <string name="recorded_row_preview">Предпросмотр маршрута</string>
     <string name="recorded_delete_confirm_title">Удалить эту запись?</string>
     <string name="recorded_delete_confirm_message">Она не синхронизирована, так что это единственная копия. Это нельзя отменить.</string>
 
-    <string name="sync_title">Синхронизация с Health Connect</string>
+    <string name="sync_title">Источник синхронизации</string>
     <string name="sync_rationale">HoldMyTrack читает из Health Connect ваши записанные тренировки и их GPS-маршруты и добавляет тренировки на улице на вашу карту. Больше он ничего не читает — ни пульс, ни вес, ни сон — и никогда ничего не записывает обратно. У тренировок в помещении нет маршрута, поэтому они пропускаются.</string>
+    <string name="sync_section_recorded">Записанные занятия</string>
+    <string name="sync_source_health_connect">Health Connect</string>
+    <string name="sync_running_recorded">Синхронизируем записанные занятия…</string>
     <string name="sync_needs_account">Сначала войдите в HoldMyTrack — до этого синхронизировать некуда.</string>
     <string name="sync_needs_verified_email">Сначала подтвердите адрес почты — если нужна новая ссылка, откройте HoldMyTrack.</string>
     <string name="sync_demo_read_only">Демо-аккаунт только для просмотра — в нём нельзя добавлять, изменять и удалять занятия. Создайте аккаунт, чтобы синхронизировать свои данные.</string>
@@ -182,7 +178,6 @@
     <string name="sync_needs_history_permission">Можно синхронизировать, но только последние 30 дней. Синхронизировано по: %1$s</string>
     <string name="sync_history_hint">Health Connect отдаёт только последние 30 дней, если не разрешить доступ к прошлым данным. HoldMyTrack показывает всё, где вы побывали, так что 30 дней — это совсем маленькая карта.</string>
     <string name="sync_allow_history">Разрешить доступ к прошлым данным</string>
-    <string name="sync_now_anyway">Всё равно синхронизировать последние 30 дней</string>
     <string name="status_title">История синхронизации</string>
     <string name="status_history">История</string>
     <string name="status_loading">Загрузка…</string>

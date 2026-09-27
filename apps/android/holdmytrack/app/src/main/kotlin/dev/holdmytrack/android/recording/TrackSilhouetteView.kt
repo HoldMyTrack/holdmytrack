@@ -13,8 +13,8 @@ import kotlin.math.cos
 import kotlin.math.max
 
 /**
- * A recording's route drawn as a bare line, no basemap — `RecordedActivitiesActivity`'s
- * per-row preview. Enough to tell two recordings apart at a glance, which the name, type and
+ * A recording's route drawn as a bare line, no basemap — Sync Source's per-row preview
+ * (`RecordedActivityRows`). Enough to tell two recordings apart at a glance, which the name, type and
  * distance alone often aren't (the same walk, a week apart).
  *
  * Longitude is scaled by cos(latitude) at the track's middle, an equirectangular projection

@@ -32,7 +32,6 @@ import dev.holdmytrack.android.net.ApiException
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.recording.RecordButton
-import dev.holdmytrack.android.recording.RecordedActivitiesActivity
 import dev.holdmytrack.android.recording.RecordingService
 import dev.holdmytrack.android.recording.RecordingState
 import dev.holdmytrack.android.settings.AppLanguage
@@ -772,13 +771,11 @@ class MainActivity : AppCompatActivity() {
         val menu = PopupMenu(this, anchor)
         menu.menu.add(0, MENU_PROFILE, 0, R.string.menu_profile)
         menu.menu.add(0, MENU_SYNC, 1, R.string.menu_sync)
-        menu.menu.add(0, MENU_RECORDED_ACTIVITIES, 2, R.string.menu_recorded_activities)
         menu.menu.add(0, MENU_SETTINGS, 3, R.string.menu_settings)
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 MENU_PROFILE -> startActivity(Intent(this, ProfileActivity::class.java))
                 MENU_SYNC -> startActivity(Intent(this, SyncActivity::class.java))
-                MENU_RECORDED_ACTIVITIES -> startActivity(Intent(this, RecordedActivitiesActivity::class.java))
                 MENU_SETTINGS -> SettingsActivity.open(this)
             }
             true
@@ -967,7 +964,6 @@ class MainActivity : AppCompatActivity() {
         private const val MIN_TOUCH_TARGET_DP = 48
         private const val MENU_PROFILE = 1
         private const val MENU_SYNC = 2
-        private const val MENU_RECORDED_ACTIVITIES = 3
         private const val MENU_SETTINGS = 4
 
         /** The default range's length in activity days (`docs/SPEC.md` FR-6.1). */

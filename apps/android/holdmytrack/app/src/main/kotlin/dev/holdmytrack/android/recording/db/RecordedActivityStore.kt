@@ -62,7 +62,7 @@ private class RecordingDbHelper(context: Context) :
 
 /**
  * Every local GPS recording not yet on the server — inserted by `RecordingService` on Stop,
- * edited from `RecordedActivitiesActivity`, and drained by `SyncActivity`'s "Sync Now" for
+ * edited from Sync Source's list (`RecordedActivityRows`), and drained by its "Sync now" for
  * whatever's [SyncStatus.QUEUED], each row deleted once the server has it. One instance per
  * caller is fine; `SQLiteOpenHelper` itself keeps the single underlying connection.
  *
@@ -124,7 +124,7 @@ class RecordedActivityStore(context: Context) {
         Unit
     }
 
-    /** Removes a row — the user's Delete in `RecordedActivitiesActivity` (the only copy,
+    /** Removes a row — the user's Delete in `RecordedActivityRows` (the only copy,
      *  since nothing here has synced), or `SyncActivity.flushRecordedQueue` once the server
      *  has accepted it and the activity lives there instead. */
     suspend fun delete(id: String) = withContext(Dispatchers.IO) {
