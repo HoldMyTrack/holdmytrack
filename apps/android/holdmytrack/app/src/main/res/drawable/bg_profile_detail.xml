@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A tapped day's or bar's detail line: the web's .trends__detail, ink at 4%, small radius. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/profile_detail_bg" />
+    <corners android:radius="@dimen/hmt_radius_sm" />
+</shape>

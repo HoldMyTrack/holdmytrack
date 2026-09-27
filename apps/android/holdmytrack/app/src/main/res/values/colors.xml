@@ -21,6 +21,7 @@
 
     <color name="hmt_accent">#B07E2E</color>
     <color name="hmt_accent_strong">#93691F</color>
+    <color name="hmt_accent_hover">#8A611F</color>
     <color name="hmt_accent_container">#F3E6CE</color>
 
     <color name="hmt_danger">#AA3333</color>

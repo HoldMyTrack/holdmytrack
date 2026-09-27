@@ -553,4 +553,60 @@
         <item name="backgroundTint">@color/hmt_facebook</item>
         <item name="android:textColor">@color/hmt_surface</item>
     </style>
+
+    <!-- Profile, after the web's /profile (services/server/internal/web/static/pages.css). A
+         section title, .profile__title: 13sp bold, tracked, uppercase, ink 60%. -->
+    <style name="TextAppearance.HoldMyTrack.ProfileTitle" parent="TextAppearance.HoldMyTrack.TitleSmall">
+        <item name="android:textFontWeight">700</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.06</item>
+        <item name="android:textColor">@color/profile_ink_60</item>
+    </style>
+
+    <!-- A stat card's value, .activity-graph__card-value: 20sp bold. -->
+    <style name="TextAppearance.HoldMyTrack.ProfileStat" parent="TextAppearance.HoldMyTrack.HeadlineSmall">
+        <item name="android:textFontWeight">700</item>
+        <item name="android:textColor">@color/hmt_ink</item>
+    </style>
+
+    <!-- Text under a title and a year's stats line, .profile__subtext and .year-grid__stats:
+         13sp at ink 55%. -->
+    <style name="Widget.HoldMyTrack.ProfileSubtext" parent="">
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
+        <item name="android:textColor">@color/hmt_ink_meta</item>
+    </style>
+
+    <!-- The legend and Trends' axis, .profile__legend and .trends__axis: 11sp regular at ink 50%. -->
+    <style name="TextAppearance.HoldMyTrack.ProfileCaption" parent="TextAppearance.HoldMyTrack.BodySmall">
+        <item name="android:textSize">@dimen/hmt_text_xs</item>
+        <item name="android:textColor">@color/panel_ink_50</item>
+    </style>
+
+    <!-- A tapped day's or bar's breakdown, .trends__detail: 13sp on ink 4%, 8/12 padding. -->
+    <style name="Widget.HoldMyTrack.ProfileDetail" parent="">
+        <item name="android:background">@drawable/bg_profile_detail</item>
+        <item name="android:paddingStart">@dimen/hmt_space_12</item>
+        <item name="android:paddingEnd">@dimen/hmt_space_12</item>
+        <item name="android:paddingTop">@dimen/hmt_space_8</item>
+        <item name="android:paddingBottom">@dimen/hmt_space_8</item>
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
+        <item name="android:textColor">@color/hmt_ink</item>
+    </style>
+
+    <!-- One side of a two-way switch, .profile__toggle-btn: white with an ink 20% border, the
+         selected side accent-filled with white text; 13sp, 12dp side padding, the small radius
+         on the outer corners (the toggle group squares the inner ones). Material's 48dp height
+         stays, a full touch target. -->
+    <style name="Widget.HoldMyTrack.Button.ProfileToggle" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="shapeAppearance">@style/ShapeAppearance.HoldMyTrack.ExtraSmall</item>
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
+        <item name="android:textColor">@color/profile_toggle_text</item>
+        <item name="backgroundTint">@color/profile_toggle_bg</item>
+        <item name="strokeColor">@color/profile_toggle_stroke</item>
+        <item name="android:paddingStart">@dimen/hmt_space_12</item>
+        <item name="android:paddingEnd">@dimen/hmt_space_12</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+    </style>
 </resources>

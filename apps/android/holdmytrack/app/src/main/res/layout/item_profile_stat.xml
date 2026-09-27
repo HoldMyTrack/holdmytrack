@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One stat card, the web's .activity-graph__card: its label over its value, 16dp padding, 6dp
+     between, on white. Two share a row in activity_profile's grid. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="0dp"
+    android:layout_height="match_parent"
+    android:layout_weight="1"
+    android:background="@color/hmt_surface"
+    android:orientation="vertical"
+    android:padding="@dimen/hmt_space_16">
+
+    <TextView
+        android:id="@+id/stat_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAppearance="@style/TextAppearance.HoldMyTrack.Overline" />
+
+    <TextView
+        android:id="@+id/stat_value"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/hmt_space_6"
+        android:textAppearance="@style/TextAppearance.HoldMyTrack.ProfileStat" />
+</LinearLayout>

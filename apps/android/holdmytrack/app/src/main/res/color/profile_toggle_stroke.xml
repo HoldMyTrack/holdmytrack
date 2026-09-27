@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Profile's two-way switches (.profile__toggle-btn): an ink 20% border, the accent on the selected one. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/hmt_accent" android:state_checked="true" />
+    <item android:alpha="0.2" android:color="@color/hmt_ink" />
+</selector>
