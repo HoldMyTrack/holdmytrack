@@ -42,11 +42,6 @@ import { useDuplicates } from '../ui/useDuplicates';
 import { useImports } from '../ui/useImports';
 import { t } from '../i18n';
 
-/** How long a checkbox-selection spree pauses before the map auto-flies to fit it (replacing
- *  the old explicit "Fit map" button — see IMPLEMENTATION.md §4.7) — long enough that ticking
- *  three boxes in a row flies once, at the end, not three times. */
-const SELECTION_FLY_DEBOUNCE_MS = 300;
-
 /** How often the list is re-read while an Edit track reprocess is pending — the job is one
  *  activity's worth of ingest, so a few seconds is the right order of magnitude. */
 const EDIT_PENDING_POLL_MS = 2000;
@@ -112,22 +107,18 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   const today = useMemo(() => todayLocal(), []);
 
   // Left-panel ActivitiesPanel/ActivityHistogram layout.
-  // Selection lives here, not in ActivitiesPanel, since the map instance and the auto-fly
-  // effects below both need it. The panel itself is not optional/toggleable.
+  // Selection lives here, not in ActivitiesPanel, since the map instance and the fly-to
+  // callbacks below both need it. The panel itself is not optional/toggleable.
   //
   // Two fully independent mechanisms, reported live as wrongly coupled when they shared one
-  // Set: the checkbox builds a multi-row group (toggleActivityChecked, add/remove, additive —
-  // checking a second row never unchecks the first), while clicking a row's own text/body is
-  // a single "look at just this one" focus (focusActivity, replace) that does not touch any
-  // checkbox. Both bold their row(s) on the map (unioned below), but each drives its own fly
-  // target — the checkbox flies to fit the whole group (debounced), a row click flies to that
-  // one activity alone (immediate) — and clearing/checking-all only ever touches the checked
-  // group, never the focused row. Both start empty/null: there is no sensible default over a
-  // real, unknown history.
+  // Set: clicking a row's own text/body (or its track on the map) *selects* it — the single
+  // focus (focusActivity, replace): bolds that one track, flies there, and replaces whatever
+  // was focused before; clicking empty map or empty list space clears it. The checkbox only
+  // builds a multi-row group (toggleActivityChecked, add/remove, additive) for the header
+  // toolbar to act on: it doesn't bold anything on the map, doesn't fly, and never touches the
+  // focus — nor does the focus ever touch a checkbox. Both start empty/null: there is no
+  // sensible default over a real, unknown history.
   const [checkedActivityIds, setCheckedActivityIds] = useState<Set<string>>(() => new Set());
-  // Bumped only by a checkbox click (toggleActivityChecked) — what the debounced group fly below
-  // answers to, rather than every change to checkedActivityIds.
-  const [groupFlyRequest, setGroupFlyRequest] = useState(0);
   const [focusedActivityId, setFocusedActivityId] = useState<string | null>(null);
   // The row (or map track) currently under the pointer — reported both ways (Activities
   // Panel's onMouseEnter/Leave, tracks.ts's onHover) into this one piece of state so a single
@@ -188,32 +179,41 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       }
       return next;
     });
-    setGroupFlyRequest((n) => n + 1);
   }, []);
   // focusActivity itself (the row-click handler) is defined further down, alongside
   // selectAll — both need fitToSelection/activities/mapHiddenIds, which aren't in scope
   // yet at this point in the component.
   //
+  // What the header toolbar acts on: the checked group whenever anything is checked, else the
+  // focused (selected) row alone, else nothing. Checked wins rather than the two being unioned:
+  // the group is built deliberately, one tick at a time, while a row gets focused just by
+  // looking at it — so a Delete never reaches further than what was ticked, and a focus never
+  // silently replaces a group either. The toolbar names its target, so which one applies is
+  // never a guess.
+  const toolbarTargetIds = useMemo(() => {
+    if (checkedActivityIds.size > 0) return checkedActivityIds;
+    return new Set(focusedActivityId !== null ? [focusedActivityId] : []);
+  }, [checkedActivityIds, focusedActivityId]);
+  //
   // The header toolbar's "Group visible" — there's no per-row eye icon any more (hiding a
-  // single activity now goes through check-then-toolbar, the same as every other single-item
-  // action), so this is the only visibility toggle left, always applied to the whole checked
-  // group. The rule: if any checked activity is currently hidden, show the whole group
-  // (removes every checked id from hiddenActivityIds); otherwise hide the whole group (adds
-  // every checked id). Mirrors a typical bulk-checkbox toggle — one click reveals everything
-  // in the group, click again to hide it — rather than per-row toggling each one
-  // individually, which would leave the group in a mixed state no single click could
-  // cleanly undo.
+  // single activity goes through the toolbar, the same as every other single-item action), so
+  // this is the only visibility toggle left, applied to the toolbar's whole target. The rule:
+  // if any of it is currently hidden, show all of it (removes every target id from
+  // hiddenActivityIds); otherwise hide all of it (adds every target id). Mirrors a typical
+  // bulk-checkbox toggle — one click reveals everything in the group, click again to hide it —
+  // rather than per-row toggling each one individually, which would leave the group in a mixed
+  // state no single click could cleanly undo.
   const toggleGroupVisibility = useCallback(() => {
     setHiddenActivityIds((prev) => {
-      const anyHidden = [...checkedActivityIds].some((id) => prev.has(id));
+      const anyHidden = [...toolbarTargetIds].some((id) => prev.has(id));
       const next = new Set(prev);
-      for (const id of checkedActivityIds) {
+      for (const id of toolbarTargetIds) {
         if (anyHidden) next.delete(id);
         else next.add(id);
       }
       return next;
     });
-  }, [checkedActivityIds]);
+  }, [toolbarTargetIds]);
   // A toggle, not a one-way remove: a row stays in the Type dropdown's list either way, so
   // there's always a way back to a type without needing "Reset filters" (which would also
   // throw away the distance filter).
@@ -478,43 +478,12 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     [mapMode, checkedActivityIds, focusedActivityId],
   );
 
-  // Auto-fly after a checkbox click ("FLYING TO 3 SELECTED"), replacing the old explicit "Fit
-  // map to selection" button — see IMPLEMENTATION.md §4.7. Debounced so a multi-checkbox spree
-  // flies once, after the user pauses, not once per checkbox.
-  //
-  // Keyed on groupFlyRequest, which only a checkbox click bumps — not on checkedActivityIds
-  // itself. Keyed on the state, it also fired whenever the group changed for any other reason:
-  // coming back to Normal from Fog/Heatmap (which restores the saved group) flew the camera back
-  // to it after the user had panned away — reported live — and so did a list refresh or hiding a
-  // checked track. Select all, Invert selection and Clear fly on their own, immediately, and the
-  // "Focus checked group" button re-flies on demand. The group, list and hidden set are read
-  // from a ref when the timer fires, so the fly always uses the current ones without the effect
-  // re-running when they change.
-  //
-  // Excludes mapHiddenIds: checking a row is independent of its own eye icon (hiding its track),
-  // so a hidden-but-checked activity is a real, reachable state — reported live as flying to
-  // that activity's bbox anyway, which looks like flying to empty water since nothing is drawn
-  // there. If every checked activity is hidden, unionBBox([]) is null and fitToSelection is a
-  // no-op, same as an empty group.
-  const groupFlyInputs = useRef({ checkedActivityIds, activities, mapHiddenIds });
-  groupFlyInputs.current = { checkedActivityIds, activities, mapHiddenIds };
-  useEffect(() => {
-    if (groupFlyRequest === 0) return;
-    const timer = window.setTimeout(() => {
-      const { checkedActivityIds: ids, activities: all, mapHiddenIds: hidden } = groupFlyInputs.current;
-      if (ids.size === 0) return;
-      fitToSelection(all.filter((a) => ids.has(a.id) && !hidden.has(a.id)));
-    }, SELECTION_FLY_DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [groupFlyRequest, fitToSelection]);
-
   // Clicking a row's own text/body — a single "look at just this one" focus, independent of
   // the checkbox group above (see the state comment near checkedActivityIds/focusedActivityId
-  // for why these no longer share a Set). Immediate, not debounced: it's one deliberate click
-  // that fully replaces the previous focus, not a spree of partial changes to coalesce — the
-  // same reasoning selectAll below already has for its own single-click case. Excludes a
-  // currently-hidden target the same way the checked-group effect above does: fitToSelection
-  // over an empty array (the target filtered out) is a no-op, not a fly to empty water.
+  // for why these no longer share a Set). Flies immediately: along with the toolbar's Focus
+  // button, the only thing that ever flies to an activity. Excludes a
+  // currently-hidden target: fitToSelection over an empty array (the target filtered out) is a
+  // no-op, not a fly to empty water.
   const focusActivity = useCallback(
     (id: string) => {
       setFocusedActivityId(id);
@@ -560,49 +529,44 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     }
   }, [activities, focusActivity]);
 
-  // The toolbar's master checkbox, clicked while fully checked: empties the checked group (so
-  // every previously-bold-by-checkbox track drops that highlight — a focused row, if any, is
-  // untouched). Leaves the camera where it is — with nothing checked there's no group to look
-  // at, and flying out to everything would undo whatever the user had panned to.
+  // A click on empty space in the Activities panel's list — the panel's counterpart to clicking
+  // away from every track on the map (tracks.ts's onClickAway). The checked group stays.
+  const clearFocus = useCallback(() => {
+    setFocusedActivityId(null);
+  }, []);
+
+  // The toolbar's master checkbox, clicked while fully checked: empties the checked group (a
+  // focused row, if any, is untouched). Like every checkbox action, it leaves the camera alone.
   const clearSelection = useCallback(() => {
     setCheckedActivityIds(new Set());
   }, []);
 
   // The master checkbox, clicked while unchecked or partial — checks every row the panel
-  // currently lists (already narrowed by TYPE/DISTANCE, per filteredActivities below) and flies
-  // to fit them, excluding hidden tracks as the effects above do. Immediate, not debounced: a
-  // single deliberate click. Deliberately scoped to what's actually shown, not every activity
-  // in the date range regardless of filters — checking rows the user can't see would be a
-  // surprise.
+  // currently lists (already narrowed by TYPE/DISTANCE, per filteredActivities below).
+  // Deliberately scoped to what's actually shown, not every activity in the date range
+  // regardless of filters — checking rows the user can't see would be a surprise. No fly: a
+  // checkbox only builds the toolbar's group, and Focus on map (showSelected below) is there to
+  // look at it.
   const selectAll = useCallback(() => {
-    const ids = filteredActivities.map((a) => a.id);
-    setCheckedActivityIds(new Set(ids));
-    const visible = filteredActivities.filter((a) => !mapHiddenIds.has(a.id));
-    fitToSelection(visible);
-  }, [filteredActivities, mapHiddenIds, fitToSelection]);
+    setCheckedActivityIds(new Set(filteredActivities.map((a) => a.id)));
+  }, [filteredActivities]);
 
   // The toolbar's invert-selection icon — checks every listed row that isn't checked and unchecks
   // every one that is. Same scope as selectAll: only rows the panel currently lists, so a
   // checked row outside the current TYPE/DISTANCE filters is dropped rather than kept checked
-  // out of sight. The camera follows the master checkbox's rules for the same outcome: an
-  // invert that leaves every listed row checked (from none checked) flies to fit them, as
-  // selectAll does; one that leaves some or none checked doesn't move it — a partial flip is a
-  // selection edit, not a request to look at the new group, and Focus on map (showSelected
-  // below) is there for that.
+  // out of sight. No fly, same as selectAll.
   const invertSelection = useCallback(() => {
     const inverted = filteredActivities.filter((a) => !checkedActivityIds.has(a.id));
     setCheckedActivityIds(new Set(inverted.map((a) => a.id)));
-    if (inverted.length > 0 && inverted.length === filteredActivities.length) {
-      fitToSelection(inverted.filter((a) => !mapHiddenIds.has(a.id)));
-    }
-  }, [filteredActivities, checkedActivityIds, mapHiddenIds, fitToSelection]);
+  }, [filteredActivities, checkedActivityIds]);
 
-  // "Show selected" — no state change, just a manual re-trigger of the same fly-to-fit the
-  // debounced checkbox effect above already computes, for after panning away from the group.
+  // The toolbar's Focus on map — no state change, just a fly to fit the toolbar's target (the
+  // checked group, else the focused row), the one way to look at a checked group. Excludes
+  // hidden tracks, so an all-hidden target is a no-op rather than a fly to empty water.
   const showSelected = useCallback(() => {
-    const visible = activities.filter((a) => checkedActivityIds.has(a.id) && !mapHiddenIds.has(a.id));
+    const visible = activities.filter((a) => toolbarTargetIds.has(a.id) && !mapHiddenIds.has(a.id));
     fitToSelection(visible);
-  }, [activities, checkedActivityIds, mapHiddenIds, fitToSelection]);
+  }, [activities, toolbarTargetIds, mapHiddenIds, fitToSelection]);
 
   // Read inside the effect below without being one of its dependencies: the fly-to-fit it
   // does is keyed on the *range* changing, but the bounds it flies to still have to exclude
@@ -694,23 +658,17 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     setTrackInteractivityHandlers(
       editOpen
         ? { onSelect: () => {}, onHover: () => {}, onClickAway: () => {} }
-        : { onSelect: focusActivity, onHover: setHoveredActivityId, onClickAway: () => setFocusedActivityId(null) },
+        : { onSelect: focusActivity, onHover: setHoveredActivityId, onClickAway: clearFocus },
     );
-  }, [focusActivity, editOpen]);
+  }, [focusActivity, clearFocus, editOpen]);
 
-  // The single source of truth for which tracks are bold on the map: the union of the checked
-  // group and the focused row, however each got that way — a row's checkbox for the former, a
+  // The one track bold on the map is the focused (selected) one, however it got that way — a
   // row's own text or a direct click on the map (both focusActivity, via the handler just
-  // above) for the latter. Both render identically bold; this is the one place that union is
-  // actually computed.
-  const boldedActivityIds = useMemo(() => {
-    const ids = new Set(checkedActivityIds);
-    if (focusedActivityId) ids.add(focusedActivityId);
-    return ids;
-  }, [checkedActivityIds, focusedActivityId]);
+  // above). A checked row isn't bolded: the checkbox only builds the toolbar's group, and a map
+  // full of bold checked tracks read as that many selections.
   useEffect(() => {
-    if (map) setSelectedTracks(map, [...boldedActivityIds]);
-  }, [map, boldedActivityIds]);
+    if (map) setSelectedTracks(map, focusedActivityId !== null ? [focusedActivityId] : []);
+  }, [map, focusedActivityId]);
 
   // Same idea for the transient hover preview — one effect, one place that ever calls
   // setHoveredTrack, fed by both a row's onMouseEnter/Leave (ActivitiesPanel, via
@@ -844,7 +802,8 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     [handleUploaded],
   );
 
-  // The toolbar's Edit button over the checked group: opens the Edit window.
+  // The toolbar's Edit button over its target (the checked group, else the focused row): opens
+  // the Edit window.
   const openEditWindow = useCallback((group: Activity[]) => {
     setHoveredActivityId(null);
     setEditWindowIds(group.map((a) => a.id));
@@ -1069,10 +1028,12 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
               onChangeDistance={setDistanceFilter}
               onResetFilters={resetActivityFilters}
               checked={checkedActivityIds}
+              targetIds={toolbarTargetIds}
               focusedId={focusedActivityId}
               hoveredId={hoveredActivityId}
               onToggle={toggleActivityChecked}
               onFocus={focusActivity}
+              onClearFocus={clearFocus}
               onHoverActivity={setHoveredActivityId}
               onClear={clearSelection}
               onSelectAll={selectAll}

@@ -39,32 +39,37 @@ import { lang, t, tn } from '../i18n';
  * which is gone.
  *
  * A header toolbar sits directly above the row list. Every single-item action (edit, delete,
- * hide) lives here now, not on the row — a row has only its checkbox and its text; there are
- * no more per-row icon buttons at all. Acting on one activity means checking just its own box
- * first, the same as acting on many: a master checkbox mirrors the checked group's state, then icon actions
- * over the checked group — Show/hide, Edit (the Edit window, EditActivityWindow.tsx: its Activity
- * tab edits Type/Name/Description for exactly one checked activity and Type only for more than
- * one, its Track tab one activity's track), Delete, and, set off by
- * a divider, Focus on map (fly-to-fit, moved here from the footer's old text button). The
- * footer keeps only the "N selected · X km" summary.
+ * hide) lives here, not on the row — a row has only its checkbox and its text; there are no
+ * per-row icon buttons at all. The toolbar acts on its *target* (MapView's toolbarTargetIds):
+ * the checked group whenever anything is checked, else the selected row alone. A master
+ * checkbox mirrors the checked group's state, then icon actions over the target — Show/hide,
+ * Edit (the Edit window, EditActivityWindow.tsx: its Activity tab edits Type/Name/Description
+ * for exactly one activity and Type only for more than one, its Track tab one activity's
+ * track), Delete, and, set off by a divider, Focus on map (fly-to-fit). Each one's tooltip
+ * names the target ("3 checked activities", or the selected row's own label), so which of the
+ * two applies is never a guess. The footer keeps only the target's "N selected · X km" summary.
  *
  * Four interactions per row, all living in MapView (which holds the map instance they need;
- * this component owns only rendering and its own local UI state). Row-click focus and the
- * checkbox group are two fully independent mechanisms — reported live as wrongly coupled once,
- * when a row click also silently checked/unchecked boxes:
+ * this component owns only rendering and its own local UI state). Selection and the checkbox
+ * group are two fully independent mechanisms — reported live as wrongly coupled once, when a
+ * row click also silently checked/unchecked boxes:
  *  - Hovering the row (anywhere on it) previews that activity's track — bold on the map,
  *    nothing else — for as long as the pointer stays there. Purely a preview: the camera
  *    never moves for it, and it clears the moment the pointer leaves.
- *  - Clicking the row's text sets it as the single row-click *focus* — bolds it, flies there,
- *    and replaces whichever row was focused before (only ever one row is "just clicked" at a
- *    time). Never touches any checkbox.
- *  - The checkbox instead *adds or removes* this one row from the checked group, for building
- *    up a multi-row selection — every checked row bolds, and MapView's debounced auto-fly
- *    moves to fit the whole group. Never touches the row-click focus, in either direction.
- *  - The toolbar's Show/hide button toggles whether the checked group's tracks paint on the
- *    map at all, independent of all three of the above — there is no longer a per-row eye icon
- *    to toggle just one activity directly; a hidden activity's row dims in place instead.
+ *  - Clicking the row's text *selects* it (the row-click focus) — bolds its track, highlights
+ *    the row, flies there, and replaces whichever row was selected before. Clicking empty
+ *    space in the list (or on the map) clears it. Never touches any checkbox.
+ *  - The checkbox only *adds or removes* this one row from the checked group the toolbar acts
+ *    on — no bold track, no row highlight, no fly. Never touches the selection.
+ *  - The toolbar's Show/hide button toggles whether the target's tracks paint on the map at
+ *    all, independent of all three of the above; a hidden activity's row dims in place.
  */
+/** A row's primary line: its user-entered name (§4.7's revised decision) when it has one, else
+ *  its start date/time — also how the toolbar names a single selected activity. */
+function rowLabel(activity: Activity): string {
+  return activity.name?.trim() || formatStartedAt(activity.startedAt);
+}
+
 export interface ActivitiesPanelProps {
   /** A demo account (`docs/SPEC.md` FR-2.1–FR-2.3) — the
    *  backend already rejects every mutation a demo session attempts (requireNotDemo), so this
@@ -90,7 +95,10 @@ export interface ActivitiesPanelProps {
   onResetFilters: () => void;
   /** The checkbox group — additive/subtractive, independent of `focusedId` below. */
   checked: Set<string>;
-  /** The row-click focus — at most one id, independent of `checked` above. */
+  /** What the header toolbar acts on — `checked` when it's non-empty, else `focusedId` alone,
+   *  else nothing (MapView's toolbarTargetIds). */
+  targetIds: Set<string>;
+  /** The selected row (row-click focus) — at most one id, independent of `checked` above. */
   focusedId: string | null;
   /** The shared hover-preview id (MapView's `hoveredActivityId`) — fed by both this panel's
    *  own row `onMouseEnter`/`onMouseLeave` below *and* the map's own track hover
@@ -101,6 +109,8 @@ export interface ActivitiesPanelProps {
   onToggle: (id: string) => void;
   /** The row's text: replaces `focusedId` with this one row. */
   onFocus: (id: string) => void;
+  /** A click on empty space in the list: clears `focusedId`, leaving `checked` alone. */
+  onClearFocus: () => void;
   /** The row's own hover preview, `null` on leave — see the component doc comment above. */
   onHoverActivity: (id: string | null) => void;
   /** Empties the checked group — the header checkbox's "uncheck all" state. */
@@ -110,24 +120,23 @@ export interface ActivitiesPanelProps {
   /** Checks every unchecked listed row and unchecks every checked one — the toolbar's
    *  invert-selection icon beside the header checkbox. */
   onInvertSelection: () => void;
-  /** Flies to fit the current checked group without changing it. */
+  /** Flies to fit the toolbar's target without changing it. */
   onShowSelected: () => void;
   /** Activities currently hidden from the map — dims the row (there's no per-row eye icon any
    *  more), and what the header toolbar's "Group visible" button toggles in bulk over
-   *  `checked`. */
+   *  `targetIds`. */
   hiddenIds: Set<string>;
-  /** The header toolbar's "Group visible": if any checked activity is currently hidden, show
-   *  the whole checked group; otherwise hide the whole group. See MapView's
+  /** The header toolbar's "Group visible": if any of the target is currently hidden, show all
+   *  of it; otherwise hide all of it. See MapView's
    *  toggleGroupVisibility for the exact rule. */
   onToggleGroupVisibility: () => void;
-  /** §4.7.5's "Delete group" — the only delete entry point now (a single activity is deleted
-   *  by checking just its own box first, then this same button), so always an array even for
-   *  one id. Unlike onActivityUpdated, this also has to drop every deleted id from
+  /** §4.7.5's toolbar Delete — the only delete entry point (over the toolbar's target: the
+   *  checked group, or the selected row alone), so always an array even for one id. Unlike onActivityUpdated, this also has to drop every deleted id from
    *  `checked`/`hiddenIds`/`focusedId` and refresh the map's track layer and totals/histogram
    *  (deleting changes distance/duration, editing never does) — MapView's own
    *  handleActivitiesDeleted does more than a plain reload. */
   onActivitiesDeleted: (ids: string[]) => void;
-  /** The toolbar's Edit button, over the checked group — MapView opens the Edit window
+  /** The toolbar's Edit button, over the toolbar's target — MapView opens the Edit window
    *  (EditActivityWindow.tsx: Activity and Track tabs) over the map. */
   onEdit: (activities: Activity[]) => void;
   /** FR-3.7's "Not yet built" gap, closed: activities cross-source dedup took out of
@@ -165,10 +174,12 @@ export function ActivitiesPanel({
   onChangeDistance,
   onResetFilters,
   checked,
+  targetIds,
   focusedId,
   hoveredId,
   onToggle,
   onFocus,
+  onClearFocus,
   onHoverActivity,
   onClear,
   onSelectAll,
@@ -260,10 +271,9 @@ export function ActivitiesPanel({
   }, [duplicatesOpen]);
 
 
-  // §4.7.5's delete confirm dialog — the toolbar's "Delete group" is now the only delete
-  // entry point (there's no per-row delete button any more; a single activity is deleted by
-  // checking just its own box first), so this covers both the one-activity and many-activity
-  // case uniformly. The confirm message below already branches on checkedActivities.length.
+  // §4.7.5's delete confirm dialog — the toolbar's Delete is the only delete entry point
+  // (there's no per-row delete button), so this covers both the one-activity and many-activity
+  // case uniformly. The confirm title and message below branch on targetActivities.length.
   const [deletingGroup, setDeletingGroup] = useState(false);
 
   // Mobile-only bottom sheet (index.css's `@media (max-width: 768px)` layer) — collapsed by
@@ -301,38 +311,66 @@ export function ActivitiesPanel({
     if (resizeRef.current?.pointerId === event.pointerId) resizeRef.current = null;
   }, []);
 
-  // The footer summary describes the checked group specifically, not the row-click focus —
-  // matching that the footer's own "Show selected" is about that group too.
-  const checkedActivities = activities.filter((a) => checked.has(a.id));
-  const checkedMeters = checkedActivities.reduce((sum, a) => sum + (a.distanceMeters ?? 0), 0);
+  const checkedCount = activities.filter((a) => checked.has(a.id)).length;
+  // The toolbar's target (see the component doc comment) — the footer summary describes it
+  // too, so the "N selected · X km" line always matches what the toolbar would act on.
+  const targetActivities = activities.filter((a) => targetIds.has(a.id));
+  const targetMeters = targetActivities.reduce((sum, a) => sum + (a.distanceMeters ?? 0), 0);
   const system = useUnitSystem();
+  // The toolbar tooltips' name for the target. Keyed on `checked`, not on the count alone: one
+  // checked activity is still "1 checked activity", so it's clear the group wins over a
+  // selected row, rather than reading like the selection itself.
+  // Null when none of the target is listed (e.g. every checked row filtered out by TYPE), which
+  // disables the toolbar the same as having no target at all.
+  const firstTarget = targetActivities[0];
+  const targetName =
+    firstTarget === undefined
+      ? null
+      : checked.size > 0
+        ? tn('activities.checked_count', targetActivities.length)
+        : t('activities.target_one', { label: rowLabel(firstTarget) });
+  const hasTarget = targetName !== null;
 
   // The header toolbar's master checkbox — checked once every currently-listed row is in
   // `checked`, indeterminate for a partial selection, unchecked for none. `indeterminate`
   // has no JSX prop (it's a DOM property, not an HTML attribute), hence the ref + effect.
   const selectAllRef = useRef<HTMLInputElement>(null);
-  const allChecked = activities.length > 0 && checkedActivities.length === activities.length;
-  const someChecked = checkedActivities.length > 0 && !allChecked;
+  const allChecked = activities.length > 0 && checkedCount === activities.length;
+  const someChecked = checkedCount > 0 && !allChecked;
   useEffect(() => {
     if (selectAllRef.current) selectAllRef.current.indeterminate = someChecked;
   }, [someChecked]);
 
-  // §4.7.5's ConfirmDialog message needs the group's own summary — reuses formatStartedAt's
-  // shortest form isn't meaningful for N activities, so this names the count and total
-  // distance instead, the same two numbers the footer summary already shows.
+  // §4.7.5's ConfirmDialog message needs the target's own summary: the count and total
+  // distance for a group, the same two numbers the footer summary already shows, or the
+  // activity's own label for a single selected row.
   const groupSummary = t('activities.group_summary', {
-    activities: tn('activities.count', checkedActivities.length),
-    distance: formatTotalDistance(checkedMeters, system),
+    activities: targetName ?? '',
+    distance: formatTotalDistance(targetMeters, system),
   });
 
   // Group visible's own icon mirrors the row-level eye icon's open/closed convention: closed
-  // (about to reveal) once any checked activity is currently hidden, open otherwise — matching
-  // MapView's toggleGroupVisibility rule (show the whole group the moment any of it is hidden).
-  const groupHasHidden = checkedActivities.some((a) => hiddenIds.has(a.id));
+  // (about to reveal) once any of the target is currently hidden, open otherwise — matching
+  // MapView's toggleGroupVisibility rule (show all of it the moment any of it is hidden).
+  const groupHasHidden = targetActivities.some((a) => hiddenIds.has(a.id));
 
   // Pending rows can't be edited or deleted until their reprocess lands — the job would
   // otherwise race the edit or delete for the same row.
-  const groupHasPending = checkedActivities.some((a) => a.pending);
+  const groupHasPending = targetActivities.some((a) => a.pending);
+
+  // Each toolbar action's tooltip (and accessible name) says what it would act on; with no
+  // target at all, the disabled buttons say how to get one instead.
+  const noTarget = t('activities.no_target');
+  const visibilityTitle =
+    targetName === null
+      ? noTarget
+      : t(groupHasHidden ? 'activities.show_target' : 'activities.hide_target', { target: targetName });
+  const editTitle =
+    targetName === null
+      ? noTarget
+      : t(targetActivities.length === 1 ? 'activities.edit_one' : 'activities.edit_many', { target: targetName });
+  const deleteTitle = targetName === null ? noTarget : t('activities.delete_target', { target: targetName });
+  const focusTitle = targetName === null ? noTarget : t('activities.focus_target', { target: targetName });
 
   return (
     <div
@@ -510,11 +548,11 @@ export function ActivitiesPanel({
             />
           </div>
 
-          {/* The header toolbar — right above the row list. There are no more per-row action
-              icons to stay column-aligned with (Visible/Edit/Delete all moved here, operating on
-              the checked group), so this is a plain compact strip: select-all checkbox, the invert-selection icon, a
-              spacer, the group-action chips, a divider, then the one accent-tinted "focus the
-              map on this group" action. */}
+          {/* The header toolbar — right above the row list. There are no per-row action icons
+              to stay column-aligned with (Visible/Edit/Delete all live here, operating on the
+              toolbar's target), so this is a plain compact strip: select-all checkbox, the
+              invert-selection icon, a spacer, the action chips, a divider, then the one
+              accent-tinted "focus the map on the target" action. */}
           <div className="activities-panel__toolbar">
             <input
               ref={selectAllRef}
@@ -559,36 +597,30 @@ export function ActivitiesPanel({
             <button
               type="button"
               className="activities-panel__visibility"
-              disabled={checked.size === 0}
+              disabled={!hasTarget}
               onClick={onToggleGroupVisibility}
-              aria-label={groupHasHidden ? t('activities.show_group_label') : t('activities.hide_group_label')}
-              title={groupHasHidden ? t('activities.show_group') : t('activities.hide_group')}
+              aria-label={visibilityTitle}
+              title={visibilityTitle}
             >
               {groupHasHidden ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
             <button
               type="button"
               className="activities-panel__edit"
-              disabled={readOnly || checked.size === 0}
-              onClick={() => onEdit(checkedActivities)}
-              aria-label={t('activities.edit_group_label')}
-              title={
-                readOnly
-                  ? t('activities.demo_edit_activities')
-                  : checkedActivities.length === 1
-                    ? t('activities.edit_one')
-                    : t('activities.edit_many')
-              }
+              disabled={readOnly || !hasTarget}
+              onClick={() => onEdit(targetActivities)}
+              aria-label={editTitle}
+              title={readOnly ? t('activities.demo_edit_activities') : editTitle}
             >
               <Pencil size={16} />
             </button>
             <button
               type="button"
               className="activities-panel__delete"
-              disabled={readOnly || checked.size === 0 || groupHasPending}
+              disabled={readOnly || !hasTarget || groupHasPending}
               onClick={() => setDeletingGroup(true)}
-              aria-label={t('activities.delete_group_label')}
-              title={readOnly ? t('activities.demo_delete') : t('activities.delete_group')}
+              aria-label={deleteTitle}
+              title={readOnly ? t('activities.demo_delete') : deleteTitle}
             >
               <Trash2 size={16} />
             </button>
@@ -596,16 +628,28 @@ export function ActivitiesPanel({
             <button
               type="button"
               className="activities-panel__focus"
-              disabled={checked.size === 0}
+              disabled={!hasTarget}
               onClick={onShowSelected}
-              aria-label={t('activities.focus_group_label')}
-              title={t('activities.focus_group')}
+              aria-label={focusTitle}
+              title={focusTitle}
             >
               <Focus size={16} />
             </button>
           </div>
 
-          <ul className="activities-panel__list" data-testid="activities-list" ref={listRef}>
+          {/* A click on the list's own empty space (or one of its notes) — not on a row —
+              clears the selection, the panel's counterpart to clicking away from every track
+              on the map. Rows are <li>s filling the list's width, so a click on one never
+              reaches here as the target. */}
+          <ul
+            className="activities-panel__list"
+            data-testid="activities-list"
+            ref={listRef}
+            onClick={(e) => {
+              const target = e.target as HTMLElement;
+              if (target === e.currentTarget || target.classList.contains('activities-panel__note')) onClearFocus();
+            }}
+          >
             {activities.map((activity) => {
               const isChecked = checked.has(activity.id);
               const isFocused = focusedId === activity.id;
@@ -618,10 +662,11 @@ export function ActivitiesPanel({
               // below instead). Sorting itself is untouched either way: the list's order comes
               // entirely from the server's own `ORDER BY started_at DESC`, never from this label.
               const displayName = activity.name?.trim() || null;
-              const label = displayName ?? formatStartedAt(activity.startedAt);
+              const label = rowLabel(activity);
               const classes = ['activities-panel__row'];
-              // Bold on the map is the union of checked and focused — the row highlight matches.
-              if (isChecked || isFocused) classes.push('activities-panel__row--selected');
+              // Only the selected row is bold on the map, so only it gets the row highlight — a
+              // checked row's ticked box is its only mark.
+              if (isFocused) classes.push('activities-panel__row--selected');
               if (isHidden) classes.push('activities-panel__row--hidden');
               if (isPending) classes.push('activities-panel__row--pending');
               return (
@@ -697,7 +742,7 @@ export function ActivitiesPanel({
               own accent-tinted "Focus checked group on the map" icon above. */}
           <div className="activities-panel__footer">
             <span className="activities-panel__footer-summary">
-              {t('activities.footer', { n: checkedActivities.length, distance: formatTotalDistance(checkedMeters, system) })}
+              {t('activities.footer', { n: targetActivities.length, distance: formatTotalDistance(targetMeters, system) })}
             </span>
           </div>
 
@@ -740,9 +785,9 @@ export function ActivitiesPanel({
 
       {deletingGroup && (
         <ConfirmDialog
-          title={t('activities.delete_title')}
+          title={targetActivities.length === 1 ? t('activities.delete_one_title') : t('activities.delete_title')}
           message={
-            checkedActivities.length === 1
+            targetActivities.length === 1
               ? t('activities.delete_one_body', { group: groupSummary })
               : t('activities.delete_many_body', { group: groupSummary })
           }
@@ -753,7 +798,7 @@ export function ActivitiesPanel({
             // fog_tiles rows would race each other's dirty-mark-and-render trigger for no
             // benefit — a checked group is a handful of rows a user selected by hand, not a
             // bulk-import scale operation, so there's no latency reason to parallelize this.
-            const ids = checkedActivities.map((a) => a.id);
+            const ids = targetActivities.map((a) => a.id);
             for (const id of ids) {
               await deleteActivity(id);
             }
