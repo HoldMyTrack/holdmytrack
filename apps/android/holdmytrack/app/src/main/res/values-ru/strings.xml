@@ -147,6 +147,7 @@
     <string name="sync_rationale">HoldMyTrack читает из Health Connect ваши записанные тренировки и их GPS-маршруты и добавляет тренировки на улице на вашу карту. Больше он ничего не читает — ни пульс, ни вес, ни сон — и никогда ничего не записывает обратно. У тренировок в помещении нет маршрута, поэтому они пропускаются.</string>
     <string name="sync_section_recorded">Записанные занятия</string>
     <string name="sync_source_health_connect">Health Connect</string>
+    <string name="sync_health_connect_info">О синхронизации с Health Connect</string>
     <string name="sync_running_recorded">Синхронизируем записанные занятия…</string>
     <string name="sync_needs_account">Сначала войдите в HoldMyTrack — до этого синхронизировать некуда.</string>
     <string name="sync_needs_verified_email">Сначала подтвердите адрес почты — если нужна новая ссылка, откройте HoldMyTrack.</string>

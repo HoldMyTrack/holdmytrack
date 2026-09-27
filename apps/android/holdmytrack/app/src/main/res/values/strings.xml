@@ -141,6 +141,7 @@
     <string name="sync_rationale">HoldMyTrack reads your recorded exercise sessions and their GPS routes from Health Connect, and adds the outdoor ones to your map. It reads nothing else — no heart rate, no weight, no sleep — and it never writes anything back. Sessions recorded indoors have no route, so they are skipped.</string>
     <string name="sync_section_recorded">Recorded activities</string>
     <string name="sync_source_health_connect">Health Connect</string>
+    <string name="sync_health_connect_info">About Health Connect sync</string>
     <string name="sync_running_recorded">Syncing recorded activities…</string>
     <string name="sync_needs_account">Sign in to HoldMyTrack first — there is nowhere to sync to until then.</string>
     <string name="sync_needs_verified_email">Confirm your email address first — open HoldMyTrack if you need a new confirmation link.</string>

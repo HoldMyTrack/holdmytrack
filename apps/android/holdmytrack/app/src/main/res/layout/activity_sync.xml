@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Sync Source: every place activities come from on this device, each with its own checkbox,
      and one "Sync now" that sends whatever is checked. After the web's Sync tab
-     (apps/web/src/ui/SyncTab.tsx, .sync-tab in index.css): its 16dp padding and gap, the
-     explanation as hint text, where things stand in a notice box, and what a run did in notices
+     (apps/web/src/ui/SyncTab.tsx, .sync-tab in index.css): its 16dp padding and gap, where
+     things stand in a notice box, and what a run did in notices
      under the button that started it. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true"
@@ -18,14 +19,6 @@
         android:padding="@dimen/hmt_space_16"
         android:showDividers="middle">
 
-        <!-- Health Connect opens this screen as the app's permission rationale, so this has to
-             stand on its own as an answer to "why does this app want my exercise data". -->
-        <TextView
-            style="@style/Widget.HoldMyTrack.Hint"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/sync_rationale" />
-
         <!-- Why nothing below can sync: signed out, email unconfirmed, or the read-only demo
              account (SyncActivity.render). -->
         <TextView
@@ -34,6 +27,73 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:visibility="gone" />
+
+        <!-- Health Connect: its own checkbox with an info button beside it, then "Open Health
+             Connect", where its setup stands and whatever it takes to finish it. The checkbox is
+             disabled while that setup is unfinished. The info button opens the rationale
+             (SyncActivity.showRationale), which Health Connect itself asks this screen for. -->
+        <LinearLayout
+            android:id="@+id/sync_health_connect_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:divider="@drawable/gap_16"
+            android:orientation="vertical"
+            android:showDividers="middle">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <com.google.android.material.checkbox.MaterialCheckBox
+                    android:id="@+id/sync_health_connect"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/sync_source_health_connect"
+                    android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+                <Button
+                    android:id="@+id/sync_health_connect_info"
+                    style="@style/Widget.HoldMyTrack.Button.RowIcon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/sync_health_connect_info"
+                    app:icon="@drawable/ic_info" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/sync_open_health_connect"
+                style="@style/Widget.HoldMyTrack.Button.Outlined"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/sync_open_health_connect" />
+
+            <!-- Where Health Connect stands: ready, a permission missing. A notice, or the error
+                 box when Health Connect couldn't be opened (SyncActivity.showStatus). -->
+            <TextView
+                android:id="@+id/sync_status"
+                style="@style/Widget.HoldMyTrack.Notice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:accessibilityLiveRegion="polite" />
+
+            <TextView
+                android:id="@+id/sync_instructions"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:lineHeight="20sp"
+                android:visibility="gone" />
+
+            <!-- The next setup step, when there is one: allow access, open Health Connect. -->
+            <Button
+                android:id="@+id/sync_primary"
+                style="@style/Widget.HoldMyTrack.Button.Outlined"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone" />
+        </LinearLayout>
 
         <!-- Recorded activities: the GPS recordings on this device that haven't synced yet,
              filled by RecordedActivityRows. -->
@@ -64,61 +124,6 @@
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_list_top"
                 android:orientation="vertical" />
-        </LinearLayout>
-
-        <!-- Health Connect: its own checkbox, then where its setup stands and whatever it takes
-             to finish it. The checkbox is disabled while that setup is unfinished. -->
-        <LinearLayout
-            android:id="@+id/sync_health_connect_section"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:divider="@drawable/gap_16"
-            android:orientation="vertical"
-            android:showDividers="middle">
-
-            <com.google.android.material.checkbox.MaterialCheckBox
-                android:id="@+id/sync_health_connect"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/sync_source_health_connect"
-                android:textAppearance="?attr/textAppearanceTitleSmall" />
-
-            <!-- Where Health Connect stands: ready, a permission missing. A notice, or the error
-                 box when Health Connect couldn't be opened (SyncActivity.showStatus). -->
-            <TextView
-                android:id="@+id/sync_status"
-                style="@style/Widget.HoldMyTrack.Notice"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:accessibilityLiveRegion="polite" />
-
-            <TextView
-                android:id="@+id/sync_instructions"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:lineHeight="20sp"
-                android:visibility="gone" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
-
-                <!-- The next setup step, when there is one: allow access, open Health Connect. -->
-                <Button
-                    android:id="@+id/sync_primary"
-                    style="@style/Widget.HoldMyTrack.Button.Outlined"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:visibility="gone" />
-
-                <Button
-                    android:id="@+id/sync_open_health_connect"
-                    style="@style/Widget.HoldMyTrack.Button.Outlined"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/sync_open_health_connect" />
-            </LinearLayout>
         </LinearLayout>
 
         <Button
