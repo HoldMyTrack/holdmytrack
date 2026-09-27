@@ -488,9 +488,9 @@ All upload functionality requires an active session (demo or registered — FR-1
 1. The map renders every activity within the currently selected date range (FR-6) that has not been individually hidden (FR-5.8), filtered out by TYPE/DISTANCE (FR-5.2/FR-5.3), or left out while Pending (FR-5.15), as a colored line following its recorded route.
 2. Hovering a track on the map draws it thicker; the corresponding row in the Activities panel is highlighted to match (FR-5.4's reverse direction).
 3. Clicking a track on the map sets it as the row-click focus (FR-5.5) — emphasizes it, flies the camera to fit it, and replaces whichever activity was previously focused. It does not add to or remove from the checkbox group (FR-5.6) in either direction.
-4. Clicking anywhere on the map that is not a track clears the row-click focus, if any — the focused activity loses its focus treatment and returns to how it looked before: checked if it is in the checkbox group, normal otherwise. This does not affect the checkbox group.
-5. Tracks are drawn from zoom 4 — a few states on screen — inward. Zoomed out further, Normal mode shows the base map alone; unlike Fog and Heatmap, it has no country/region fallback (FR-4.2, FR-4.3). Fitting the camera to an activity (FR-5.5, FR-5.6) lands at zoom 4 or closer for anything spanning up to about 60° of longitude at desktop width — a US coast-to-coast drive included — and about 25° on a phone; a wider activity is flown to but isn't drawn until the user zooms in.
-6. Every track is always in one of four states — Normal, Hovered, Checked, or Focused — each drawn distinctly (*Track states*, below).
+4. Clicking anywhere on the map that is not a track clears the row-click focus, if any — the focused activity loses its focus treatment and returns to Normal. Clicking empty space in the Activities panel's list does the same (FR-5.5). Neither affects the checkbox group.
+5. Tracks are drawn from zoom 4 — a few states on screen — inward. Zoomed out further, Normal mode shows the base map alone; unlike Fog and Heatmap, it has no country/region fallback (FR-4.2, FR-4.3). Fitting the camera to an activity (FR-5.5, FR-5.7) lands at zoom 4 or closer for anything spanning up to about 60° of longitude at desktop width — a US coast-to-coast drive included — and about 25° on a phone; a wider activity is flown to but isn't drawn until the user zooms in.
+6. Every track is always in one of three states — Normal, Hovered, or Focused — each drawn distinctly (*Track states*, below). Checking a row's checkbox (FR-5.6) is not a track state: a checked track draws in whichever of these it's otherwise in, and its row shows only the ticked checkbox.
 
 **Track states**:
 
@@ -498,10 +498,9 @@ All upload functionality requires an active session (demo or registered — FR-1
 | :-- | :-- | :-- | :-- | :-- | :-- |
 | Normal | default | thin gold line | — | plain | — |
 | Hovered | pointer over the track, or over its row (FR-5.4) | the thickest line, in a darker gold, no outline | — | title underlined | doesn't move |
-| Checked | the row's checkbox (FR-5.6), Select all or Invert selection (FR-5.7) | thicker gold line with a dark outline, fully opaque | — | tinted background with a gold bar on its left edge; checkbox ticked | flies to fit the whole checked group 300ms after the last checkbox click |
-| Focused | clicking the track (behavior 3) or its row's text (FR-5.5) | as Checked | colored zone segments over the line (FR-4.8) and the profile card (FR-4.9) | as Checked, checkbox unchanged | flies to fit that one track |
+| Focused | clicking the track (behavior 3) or its row's text (FR-5.5) | thicker gold line with a dark outline, fully opaque | colored zone segments over the line (FR-4.8) and the profile card (FR-4.9) | tinted background with a gold bar on its left edge; checkbox unchanged | flies to fit that one track |
 
-Only one track is hovered and only one is focused at a time; any number can be checked. Hovering a checked or focused track draws the hover line inside its outline, and underlines its row title. A track both checked and focused looks focused. A hidden track (FR-5.8) draws nothing in any state, and none of these states exist outside Normal mode (FR-4.2, FR-4.3). An emphasized track is not raised above other tracks where they overlap; its outline is what sets it apart.
+Only one track is hovered and only one is focused at a time. Hovering the focused track draws the hover line inside its outline, and underlines its row title. A hidden track (FR-5.8) draws nothing in any state, and none of these states exist outside Normal mode (FR-4.2, FR-4.3). An emphasized track is not raised above other tracks where they overlap; its outline is what sets it apart.
 
 ### FR-4.2 Fog of War mode
 
@@ -623,27 +622,29 @@ Only one track is hovered and only one is focused at a time; any number can be c
 
 ### FR-5.5 Row click — focus and fly
 
-**Description**: Clicking a row's text — or clicking that activity's track directly on the map (FR-4.1) — sets it as the single row-click *focus*: highlights it and flies the camera to fit it, so the activity spans 75% of the map along whichever axis is tighter (capped at zoom 18 for a very short track). Whichever activity was previously focused this way loses its highlight (only ever one activity is "just clicked" at a time, regardless of which surface the click came from). This is independent of FR-5.6: neither a row-text click nor a map click ever checks or unchecks any checkbox, in either direction.
+**Description**: Clicking a row's text — or clicking that activity's track directly on the map (FR-4.1) — sets it as the single row-click *focus*: highlights it and flies the camera to fit it, so the activity spans 75% of the map along whichever axis is tighter (capped at zoom 18 for a very short track). Whichever activity was previously focused this way loses its highlight (only ever one activity is "just clicked" at a time, regardless of which surface the click came from). This is independent of FR-5.6: neither a row-text click nor a map click ever checks or unchecks any checkbox, in either direction. Clicking empty space in the Activities panel's list — below the last row, or on its "no activities" note — clears the focus, the same as clicking the map away from every track (FR-4.1 behavior 4); the checked group is untouched. While nothing is checked, the focused activity is what the header toolbar acts on (FR-5.7).
 
 **Notes**: If the clicked activity has no recorded track (e.g., a source with no GPS), no fly occurs, since there is nothing to fit the camera to. The colored zone segments (FR-4.8) shown for a single focused activity are driven by this mechanism specifically, not by FR-5.6.
 
 ### FR-5.6 Checkbox — build a group
 
-**Description**: Each row also has a checkbox that adds or removes it from the current checked group without replacing the rest of it, for building a multi-activity selection. Checking a second row never unchecks the first. Each checkbox click flies the map to fit the combined bounds of every currently checked activity, 300ms after the last click (so a rapid multi-check settles once, not once per checkbox). Only a checkbox click does this: the group coming back after a Fog/Heatmap round trip (FR-4.2, FR-4.3), the list refreshing, or hiding a checked track (FR-5.8) never moves the camera. This is independent of FR-5.5 in both directions: checking a box never sets or clears the row-click focus.
+**Description**: Each row also has a checkbox that adds or removes it from the current checked group without replacing the rest of it, for building a multi-activity group for the header toolbar to act on (FR-5.7). Checking a second row never unchecks the first. A checkbox click changes only the checkbox: it doesn't emphasize the track on the map or highlight the row (FR-4.1's track states), and it never moves the camera — Focus on map (FR-5.7) flies to the group when wanted. This is independent of FR-5.5 in both directions: checking a box never sets or clears the row-click focus.
 
-**Notes**: A hidden activity (FR-5.8) can still be focused (FR-5.5) or checked; the system excludes hidden activities from the fly-to bounds specifically so the camera never flies to an area with nothing drawn on it. A row that is both focused and checked renders with the same single highlight treatment as either alone — there is no visually distinct "both" state.
+**Notes**: A hidden activity (FR-5.8) can still be focused (FR-5.5) or checked; the system excludes hidden activities from the fly-to bounds specifically so the camera never flies to an area with nothing drawn on it.
 
 ### FR-5.7 Select all / Clear / Invert selection / Focus on map
 
-**Description**: A master checkbox in the header toolbar selects or clears every currently listed activity at once, an **Invert selection** icon button beside it flips which listed activities are checked, and a separate toolbar icon re-flies to fit the current checked group on demand.
+**Description**: A master checkbox in the header toolbar selects or clears every currently listed activity at once, an **Invert selection** icon button beside it flips which listed activities are checked, and a separate toolbar icon flies to fit the toolbar's target on demand.
 
-**Behavior**: The header checkbox reflects the checked group's state against the currently listed (TYPE/DISTANCE-filtered) rows — checked once every listed row is checked, unchecked once none are, and indeterminate for a partial selection. Clicking it when unchecked or indeterminate checks every listed row and flies to fit them all; clicking it when fully checked empties the checked group and leaves the camera where it is. **Invert selection**, disabled when no activity is listed, checks every listed row that wasn't checked and unchecks every one that was; a checked activity that isn't currently listed (excluded by TYPE/DISTANCE) ends up unchecked. When that leaves every listed row checked (nothing was checked before), it flies to fit them all, the same as the header checkbox; when it leaves some or none checked, the camera doesn't move — Focus on map flies to the new group when wanted. The toolbar's accent-tinted **Focus on map** icon, disabled when nothing is checked, re-flies to fit the current checked group without changing it — for recovering the view after panning away from it. This is also the only way to fly to a single checked activity's own bounds by group rather than by row-click (FR-5.5).
+**Toolbar target**: The header toolbar's actions — Show/hide (FR-5.12), Edit (FR-5.10), Delete (FR-5.11) and Focus on map — act on its *target*: the listed activities in the checked group (FR-5.6) whenever at least one is checked, otherwise the row-click focus (FR-5.5) alone. With neither, they're disabled. Checked wins rather than the two combining: a focused row is never swept into an action on a checked group, and focusing a row never takes the toolbar away from a group already checked. Each action's tooltip names its target — "3 checked activities", or the focused activity's own name (or date/time) — and the footer's "N selected · X km" summary describes the same target.
+
+**Behavior**: The header checkbox reflects the checked group's state against the currently listed (TYPE/DISTANCE-filtered) rows — checked once every listed row is checked, unchecked once none are, and indeterminate for a partial selection. Clicking it when unchecked or indeterminate checks every listed row; clicking it when fully checked empties the checked group. **Invert selection**, disabled when no activity is listed, checks every listed row that wasn't checked and unchecks every one that was; a checked activity that isn't currently listed (excluded by TYPE/DISTANCE) ends up unchecked. Neither moves the camera, the same as a single checkbox (FR-5.6). The toolbar's accent-tinted **Focus on map** icon, disabled when there is no target, flies to fit the target without changing it — the one way to fly to a checked group, and a way back to the focused activity after panning away from it.
 
 **Notes**: None of these controls affects the row-click focus (FR-5.5) — a focused row keeps its own highlight regardless of the header checkbox, Invert selection, or Focus on map.
 
 ### FR-5.8 Hide/show a track
 
-**Description**: The header toolbar's Show/hide icon (FR-5.12) hides or shows every currently checked activity's track on the map, independent of the row-click focus (FR-5.5). There is no per-row hide/show control — hiding or showing a single activity means checking just its own box first, the same as any other single-item action. A hidden activity's track is not drawn in Normal mode until shown again — Fog of War and Heatmap ignore the hidden set (FR-4.2, FR-4.3); its row dims in place and carries a "Hidden" badge so its hidden state is still visible at a glance. Hiding/showing is purely client-side and does not refetch data. See FR-5.12 for the exact toggle rule.
+**Description**: The header toolbar's Show/hide icon (FR-5.12) hides or shows the tracks of the toolbar's target (FR-5.7) — the checked group, else the focused activity. There is no per-row hide/show control — hiding or showing a single activity means focusing it (FR-5.5) or checking just its own box, the same as any other single-item action. A hidden activity's track is not drawn in Normal mode until shown again — Fog of War and Heatmap ignore the hidden set (FR-4.2, FR-4.3); its row dims in place and carries a "Hidden" badge so its hidden state is still visible at a glance. Hiding/showing is purely client-side and does not refetch data. See FR-5.12 for the exact toggle rule.
 
 ### FR-5.9 Resizable panel
 
@@ -655,12 +656,12 @@ Only one track is hovered and only one is focused at a time; any number can be c
 
 **Preconditions**: Active session; the caller owns the activity.
 
-**Inputs**: The Edit window's **Activity** tab, reached via the header toolbar's Edit icon (FR-5.6's checkbox group must be non-empty) or a single row's checkbox followed by that same icon — there is no per-row edit control. The same window's **Track** tab is FR-5.14. Editing exactly one checked activity accepts a new type (required, 1–50 characters), a name (optional, up to 200 characters), and a description (optional, up to 2000 characters). Editing more than one checked activity at once accepts only a new type — the Name and Description fields are disabled, since there is nothing consistent to set across several different activities' names/descriptions in one request.
+**Inputs**: The Edit window's **Activity** tab, reached via the header toolbar's Edit icon over its target (FR-5.7) — the checked group, else the focused activity — there is no per-row edit control. The same window's **Track** tab is FR-5.14. Editing exactly one activity accepts a new type (required, 1–50 characters), a name (optional, up to 200 characters), and a description (optional, up to 2000 characters). Editing more than one activity at once accepts only a new type — the Name and Description fields are disabled, since there is nothing consistent to set across several different activities' names/descriptions in one request.
 
 **Behavior**:
-1. Checking one or more rows and clicking the toolbar's Edit icon opens the Edit window over the top-left of the map, on its Activity tab; the map doesn't move. It has two tabs, **Activity** and **Track** (FR-5.14), and one **Save** and one **Cancel** shared by both: switching tabs keeps whatever is unsaved in either. While it's open the Activities panel, the date-range picker and the map-mode toggle are inert, and clicking a track on the map does nothing. With exactly one activity checked, it is pre-filled with that activity's current type, name, and description, all three editable. With more than one checked, only the type field is editable, seeded from the first checked activity; the Name and Description fields render disabled with an explanation of why.
+1. Clicking the toolbar's Edit icon opens the Edit window over its target over the top-left of the map, on its Activity tab; the map doesn't move. It has two tabs, **Activity** and **Track** (FR-5.14), and one **Save** and one **Cancel** shared by both: switching tabs keeps whatever is unsaved in either. While it's open the Activities panel, the date-range picker and the map-mode toggle are inert, and clicking a track on the map does nothing. With exactly one activity in the target, it is pre-filled with that activity's current type, name, and description, all three editable. With more than one, only the type field is editable, seeded from the first of them; the Name and Description fields render disabled with an explanation of why.
 2. The type field is plain free text — the same "whatever the source reports, not a controlled vocabulary" rule FR-5.2's TYPE filter already follows (`IMPLEMENTATION.md` §4.7.2) applies equally to a manual rename. The field is a searchable picker, like Settings' Country and Timezone (FR-1.7): opening it shows this account's existing types, each with how many activities use it, and typing filters that list. It is only a convenience — nothing is enforced against it: whenever the typed text doesn't exactly match an existing type (ignoring case), the list also offers an "Add" row for that text, and picking it saves the value exactly as typed, even one nobody has used before. The name field is always plain free text, with no source to ever populate it automatically — an activity has a name only once a person types one in here (`IMPLEMENTATION.md` §4.7).
-3. Save commits the fields in one request per checked activity — only when at least one of them differs from what's saved. For a single checked activity, all three fields commit together. For a group, each activity's own request carries the new shared type alongside that activity's own existing name and description unchanged — a group edit never touches Name or Description, even though the underlying request is a full replace. Save then applies the Track tab's edit if there is one (FR-5.14 behavior 5) and closes the window. If the fields save but the track edit fails, the window stays open showing the error; saving again retries only the track edit. Cancel, or Escape, discards every unsaved change on both tabs and closes the window.
+3. Save commits the fields in one request per activity — only when at least one of them differs from what's saved. For a single activity, all three fields commit together. For a group, each activity's own request carries the new shared type alongside that activity's own existing name and description unchanged — a group edit never touches Name or Description, even though the underlying request is a full replace. Save then applies the Track tab's edit if there is one (FR-5.14 behavior 5) and closes the window. If the fields save but the track edit fails, the window stays open showing the error; saving again retries only the track edit. Cancel, or Escape, discards every unsaved change on both tabs and closes the window.
 4. Once saved: each affected row's displayed type updates immediately; the new/renamed type becomes (or remains) a real entry in FR-5.2's TYPE filter with a live count; a single-activity edit's row shows the name in place of its start date/time if one is set, or the start date/time as before if the name is cleared (FR-5.1); and its description becomes visible as a hover tooltip on the row — not a second visible line. **The Activities panel's sort order never changes**: rows stay ordered by start date/time (FR-5.1) regardless of what a row displays or whether it has a name at all.
 
 **Outputs**: Each edited activity's `activity_type` is updated (plus `name`/`description` for a single-activity edit); every other computed value for that activity (distance, duration, its Fog-of-War/Heatmap coverage, its inclusion in FR-9's performance-analysis aggregates) is unaffected, since none of those are keyed on type, name, or description.
@@ -671,30 +672,30 @@ Only one track is hovered and only one is focused at a time; any number can be c
 
 ### FR-5.11 Delete an activity
 
-**Description**: A signed-in user permanently deletes one or more of their own activities — a full purge, not a soft delete or an archive: each activity itself, its track, and its contribution to Fog-of-War/Heatmap coverage are all removed. There is no undo. Deleting a single activity and deleting a group are the same mechanism (FR-5.13) — there is no separate per-row delete control; deleting one activity means checking just its own box first.
+**Description**: A signed-in user permanently deletes one or more of their own activities — a full purge, not a soft delete or an archive: each activity itself, its track, and its contribution to Fog-of-War/Heatmap coverage are all removed. There is no undo. Deleting a single activity and deleting a group are the same mechanism (FR-5.13) — there is no separate per-row delete control; deleting one activity means focusing it (FR-5.5) or checking just its own box.
 
-**Preconditions**: Active session; the caller owns every checked activity.
+**Preconditions**: Active session; the caller owns every activity in the toolbar's target.
 
-**Inputs**: The checked group (FR-5.6), reached via the header toolbar's Delete icon.
+**Inputs**: The toolbar's target (FR-5.7) — the checked group (FR-5.6), else the focused activity (FR-5.5) — reached via the header toolbar's Delete icon.
 
 **Behavior**:
-1. Clicking the toolbar's Delete icon opens a confirmation dialog naming how many activities are checked and their combined distance, stating plainly that this can't be undone; nothing is deleted until the user confirms.
-2. Confirming removes every checked activity and everything derived from each one: its recorded stream data and its rendered coverage masks.
+1. Clicking the toolbar's Delete icon opens a confirmation dialog naming its target — how many activities are checked, or the focused activity's own name or date/time — and their combined distance, stating plainly that this can't be undone; nothing is deleted until the user confirms.
+2. Confirming removes every activity in the target and everything derived from each one: its recorded stream data and its rendered coverage masks.
 3. The Fog-of-War/Heatmap view updates to reflect the deletion — coverage a deleted activity was the only source for reverts to unrevealed, not left showing stale coverage for data that no longer exists. An open page picks this up on its own once the background re-render finishes, without a reload.
-4. Canceling the confirmation, or dismissing it, leaves every checked activity untouched.
+4. Canceling the confirmation, or dismissing it, leaves every activity untouched.
 
 **Outputs**: Every deleted activity, and everything derived from it, no longer exists; every list, filter, total, and aggregate that previously included it reflects the removal, in one combined refresh rather than once per deleted activity.
 
 **Error cases**:
-- A checked activity does not exist or belongs to another account → `404 Not Found`, indistinguishable from each other.
+- An activity in the target does not exist or belongs to another account → `404 Not Found`, indistinguishable from each other.
 
 ### FR-5.12 Group visible
 
-**Description**: An icon-only header toolbar button toggles whether every currently checked (FR-5.6) activity is drawn on the map, in bulk — this is FR-5.8's entire hide/show mechanism, applied to whatever is checked, one activity or many.
+**Description**: An icon-only header toolbar button toggles whether every activity in the toolbar's target (FR-5.7) is drawn on the map, in bulk — this is FR-5.8's entire hide/show mechanism, applied to the target, one activity or many.
 
-**Preconditions**: At least one activity is checked; the button is disabled otherwise.
+**Preconditions**: The toolbar has a target — at least one listed activity is checked, or one is focused; the button is disabled otherwise.
 
-**Behavior**: If any checked activity is currently hidden, clicking shows the entire checked group (removes all of them from the hidden set). If every checked activity is already visible, clicking hides the entire group instead.
+**Behavior**: If any activity in the target is currently hidden, clicking shows all of them (removes them from the hidden set). If every one is already visible, clicking hides them all instead.
 
 **Outputs**: The hidden-activity set updates; the map's drawn tracks reflect it immediately (Fog-of-War/Heatmap coverage doesn't change — FR-5.8).
 
@@ -708,7 +709,7 @@ Only one track is hovered and only one is focused at a time; any number can be c
 
 **Preconditions**: Active session, not a demo account; exactly one activity is checked (FR-5.6); that activity has a recorded track, isn't a superseded duplicate (FR-3.7), and isn't already Pending (behavior 7 below). The Edit window's Track tab is disabled otherwise, with a tooltip saying why.
 
-**Inputs**: The **Track** tab of the Edit window (FR-5.10), opened with the toolbar's Edit icon over the one checked activity; then, inside the tab, a two-knob range slider, the Chop/Cut/Delete point/Undo/Reset buttons, clicks on points on the map, and the window's shared Save and Cancel.
+**Inputs**: The **Track** tab of the Edit window (FR-5.10), opened with the toolbar's Edit icon over a single activity (FR-5.7's target: one checked activity, or the focused one when nothing is checked); then, inside the tab, a two-knob range slider, the Chop/Cut/Delete point/Undo/Reset buttons, clicks on points on the map, and the window's shared Save and Cancel.
 
 **Behavior**:
 1. Opening the Track tab for the first time flies the map to the activity (the same fit as FR-5.5's row click), hides every other activity's track, and draws this one from its full-resolution recorded points — every point visible — rather than the simplified display track. The points are the ones the activity is processed from: already clipped against the account's current Private locations (FR-8.1), so the hidden ends are never sent to the client. An activity entirely inside Private locations has no points to show and can't be edited. The other tracks stay hidden, and the edits made so far stay in place, until the window closes — switching back to the Activity tab keeps them. Delete point mode turns off on leaving the tab, and Cmd/Ctrl+Z undoes a track step only while the Track tab is showing.
@@ -730,7 +731,7 @@ Only one track is hovered and only one is focused at a time; any number can be c
 
 ### FR-5.15 Activity states
 
-**Description**: Every activity listed in the Activities panel is in exactly one of three states. They describe whether and how it takes part in the map, separately from the per-track display states (Hovered, Checked, Focused — FR-4.1's *Track states*), which apply only to a Normal activity.
+**Description**: Every activity listed in the Activities panel is in exactly one of three states. They describe whether and how it takes part in the map, separately from the per-track display states (Hovered, Focused — FR-4.1's *Track states*), which apply only to a Normal activity.
 
 | State | Entered by | Left by | Track on the map | Fog of War / Heatmap | Its row | Camera | Kept across reloads |
 | :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- |

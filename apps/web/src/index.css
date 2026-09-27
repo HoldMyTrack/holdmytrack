@@ -415,9 +415,8 @@ body {
   border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 6%);
 }
 
-/* Reached via the checkbox (adds/removes just this row) or the row's own text (replaces the
-   whole selection with just this row) — both land in the same selected set, so one treatment
-   covers whichever put a row in it. */
+/* The selected (focused) row — reached by clicking the row's own text or its track on the map.
+   A checked row doesn't get this: its ticked checkbox is its only mark (§4.7.3). */
 .activities-panel__row--selected {
   background: rgb(var(--fm-accent-rgb) / 8%);
   box-shadow: inset 3px 0 0 var(--fm-accent-strong);
@@ -540,9 +539,8 @@ body {
   white-space: nowrap;
 }
 
-/* §4.7.6's toolbar icon buttons — Show/Edit/Delete/Focus all operate on the checked group,
-   never a single row (there are no more per-row action icons; a single-item edit/delete/hide
-   goes through check-then-toolbar like everything else). One shared chip look, matching the
+/* §4.7.6's toolbar icon buttons — Show/Edit/Delete/Focus all operate on the toolbar's target:
+   the checked group, else the selected row (there are no per-row action icons). One shared chip look, matching the
    mockup: a soft tinted square rather than a bare icon, so the group actions read as one
    family regardless of which one is destructive. */
 .activities-panel__edit,

@@ -9,7 +9,7 @@ import { API_BASE_URL, TILES_V1, type ActivityQuery } from '../api';
  */
 export const TRACKS_SOURCE_ID = 'tracks';
 export const TRACKS_LAYER_ID = 'tracks-line';
-// The halo drawn under a selected track (checked or focused) — see ensureTrackLayer.
+// The halo drawn under the selected (focused) track — see ensureTrackLayer.
 export const TRACKS_CASING_LAYER_ID = 'tracks-casing';
 const TRACKS_SOURCE_LAYER = 'tracks'; // must match ST_AsMVT(t, 'tracks', ...) in the backend query
 
@@ -23,7 +23,7 @@ const TRACKS_SOURCE_LAYER = 'tracks'; // must match ST_AsMVT(t, 'tracks', ...) i
 const TRACKS_MIN_ZOOM = 4;
 
 const NORMAL_WIDTH = 2.5;
-const EMPHASIS_WIDTH = 4.5; // selected: checked or focused, plus the halo below
+const EMPHASIS_WIDTH = 4.5; // selected (focused), plus the halo below
 const HOVER_WIDTH = 5; // hovered: the widest, in HOVER_COLOR, with no halo of its own
 // 1.5px of halo showing on each side of an EMPHASIS_WIDTH line.
 const CASING_WIDTH = EMPHASIS_WIDTH + 3;
@@ -106,10 +106,10 @@ export function ensureTrackLayer(map: MapLibreMap, beforeId: string | undefined,
       promoteId: 'id',
     });
   }
-  // Hovered and selected (checked or focused, MapView's boldedActivityIds) tracks are both
+  // Hovered and selected (focused — see MapView's setSelectedTracks effect) tracks are both
   // widened, but differently: a hovered one is the widest and a darker gold, a selected one
-  // keeps the track color and gets this dark halo underneath, so a checked group still reads
-  // as checked while the pointer moves over other tracks (SPEC.md FR-4.1's state table).
+  // keeps the track color and gets this dark halo underneath, so it still reads as selected
+  // while the pointer moves over other tracks (SPEC.md FR-4.1's state table).
   // Hovering a selected track shows both: the hover line over its halo. Feature-state can't drive line-sort-key (a
   // layout property), so a selected track isn't raised above its neighbours; the halo is what
   // separates it where tracks overlap. Added before the line layer so it always sits beneath
@@ -298,9 +298,9 @@ let selectedIds = new Set<string>();
 
 /**
  * Applies the persistent "selected" feature-state to every id in `activityIds`, clearing it
- * from whatever was selected before but no longer is. Plural because the Activities panel's
- * row click toggles membership in a multi-select set (footer summary, debounced fly-to-fit),
- * not a single "focused" row — every checked row's track bolds, not just the last one clicked.
+ * from whatever was selected before but no longer is. MapView passes at most one id today — the
+ * focused (selected) activity; checked rows aren't bolded — but the diff below works for any
+ * number.
  */
 export function setSelectedTracks(map: MapLibreMap, activityIds: readonly string[]): void {
   // MapView's effect calling this can fire before ensureTrackLayer has added the source —
