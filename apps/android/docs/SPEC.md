@@ -115,6 +115,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 5. **Language sets the app's language** (its per-app language, the setting Android's own "App languages" screen writes): saving English or Русский switches the app at once, and saving Automatic returns it to the phone's language. A sign-in, or a session check, applies the account's language when it is English or Русский, and leaves the app alone when it is Automatic.
 6. **First run**: a real, confirmed account with no Country — every new account — opens on Settings instead of the map, titled "Welcome — set up your account", with the web's short explanation, and "Save and continue" takes it on to the map. There is no way past it but saving. A new email-and-password account starts on the phone's timezone.
 7. A demo account sees every field and button disabled, with a note that the shared demo account can't be changed.
+8. **Theme** (`docs/SPEC.md` FR-4.12): below Save, a System / Light / Dark toggle. It belongs to the phone, not the account — not part of Save, not disabled for a demo — and a tap applies it at once: every screen and the map switch between the light and dark palettes. System, the default, follows the phone's own dark setting.
 
 **Error cases**: The server's own wording, in the error box — a missing Country, an image it won't take.
 
@@ -142,7 +143,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 **Description**: A full-screen map renders on launch for a signed-in account; with no session, the sign-in screen (FR-1.1) is shown instead and the map is not created at all.
 
-**Behavior**: The style document is fetched unauthenticated from `GET /v1/map/style/{flavor}`, `flavor` chosen from the system's day/night setting (`light` or `dark` — two of the five the API serves; the app does not offer a way to pick the other three or to override the system setting, per `apps/android/docs/ARCHITECTURE.md` §2.1). The camera opens on a whole-world view (equator, zoom 1) until an account's own activity extent is known (FR-2.3). A style load failure is reported on screen, not only in logcat: a notice under the chrome reads "The map couldn't load.", with the API origin and MapLibre's error in small print and Try again, which loads the style afresh.
+**Behavior**: The style document is fetched unauthenticated from `GET /v1/map/style/{flavor}`, `flavor` chosen from the app's night mode (`light` or `dark` — two of the five the API serves), which is the system's day/night setting unless Settings' Theme overrides it (FR-1.5); the app offers no way to pick the other three. The camera opens on a whole-world view (equator, zoom 1) until an account's own activity extent is known (FR-2.3). A style load failure is reported on screen, not only in logcat: a notice under the chrome reads "The map couldn't load.", with the API origin and MapLibre's error in small print and Try again, which loads the style afresh.
 
 ### FR-2.2 Three map modes: Normal, Fog of War, Heatmap
 
@@ -352,7 +353,7 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 
 Named here rather than left implicit, the way `docs/SPEC.md` §18 does for the wider system:
 
-- **No final visual design.** The palette, type scale, fonts and Lucide icons are the web's current ones carried over (Material 3) rather than a frozen design, and the screens are designed after their web counterparts until root `docs/ROADMAP.md` Phase 3's design freeze settles the final look (`apps/android/docs/ROADMAP.md` Phase 5). The app's own chrome is light only; only the map follows the system dark setting.
+- **No final visual design.** The palette, type scale, fonts and Lucide icons are the web's current ones carried over (Material 3) rather than a frozen design, and the screens are designed after their web counterparts until root `docs/ROADMAP.md` Phase 3's design freeze settles the final look (`apps/android/docs/ROADMAP.md` Phase 5). The dark palette is the web's, carried over the same way.
 - **The Activities panel is the web's minus its uploads.** Every tab and action of the phone web's panel is ported (FR-2.7, FR-4.1), except the Sync tab's file upload: this app imports through Sync Source (FR-3.5). Where the web reads a value on hover — the profile's readout, Cut's preview — a touch and hold stands in.
 - **Accessibility is audited, not yet listened to.** Every actionable view is labelled and at least 48dp, checked on every screen at the default and the largest font scale; screens stay usable at the largest scale (text wraps, the map's mode toggle scrolls). A spoken TalkBack pass on a real device hasn't been done.
 - **Samsung Galaxy Watch is unsupported**, not degraded — Samsung does not expose route geometry to Health Connect at all, so every Samsung-sourced session is rejected for having no route, indistinguishable at sync time from an ordinary indoor workout.

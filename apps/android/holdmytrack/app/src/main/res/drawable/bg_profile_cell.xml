@@ -2,7 +2,7 @@
 <!-- A legend square, the web's .year-grid__cell: 12dp, 2dp corners. Its colour is a backgroundTint
      (profile_level_0 to _3), the same colours YearGridView draws its cells in. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="@android:color/white" />
+    <solid android:color="@color/hmt_surface" />
     <corners android:radius="@dimen/hmt_radius_xs" />
     <size android:width="12dp" android:height="12dp" />
 </shape>

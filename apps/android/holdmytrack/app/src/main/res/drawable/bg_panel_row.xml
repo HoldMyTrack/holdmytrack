@@ -21,7 +21,7 @@
                 android:height="1dp"
                 android:gravity="bottom">
                 <shape>
-                    <solid android:color="#0F202B25" />
+                    <solid android:color="@color/hmt_ink_tint_6" />
                 </shape>
             </item>
         </layer-list>
@@ -32,7 +32,7 @@
                 android:height="1dp"
                 android:gravity="bottom">
                 <shape>
-                    <solid android:color="#0F202B25" />
+                    <solid android:color="@color/hmt_ink_tint_6" />
                 </shape>
             </item>
         </layer-list>

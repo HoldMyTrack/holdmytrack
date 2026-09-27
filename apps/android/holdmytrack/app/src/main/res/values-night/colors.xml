@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The dark palette: tokens.css's dark block (services/server/internal/web/static/tokens.css),
+     value for value, under the same names as res/values/colors.xml. Applies whenever the app
+     is in night mode — the system's, or the in-app Theme setting's (settings/AppTheme.kt). -->
+<resources>
+    <color name="hmt_bg">#141B17</color>
+    <color name="hmt_surface">#1C2520</color>
+    <color name="hmt_surface_tint">#212B25</color>
+    <color name="hmt_surface_tint_strong">#26312A</color>
+    <color name="hmt_divider_tint">#2A352E</color>
+
+    <color name="hmt_ink">#ECE6D8</color>
+    <color name="hmt_ink_secondary">#A8B2A9</color>
+    <color name="hmt_ink_muted">#8E968C</color>
+    <color name="hmt_ink_faint">#646D63</color>
+    <color name="hmt_ink_tint_6">#0FECE6D8</color>
+    <color name="hmt_ink_tint_8">#14ECE6D8</color>
+    <color name="hmt_ink_tint_10">#1AECE6D8</color>
+
+    <color name="hmt_on_accent">#1A1509</color>
+
+    <color name="hmt_border">#2E3932</color>
+    <color name="hmt_border_strong">#3A463E</color>
+    <color name="hmt_border_panel">#34403A</color>
+
+    <color name="hmt_accent">#D6A553</color>
+    <color name="hmt_accent_strong">#E4B867</color>
+    <color name="hmt_accent_hover">#E9C27A</color>
+    <color name="hmt_accent_container">#3D3220</color>
+
+    <color name="hmt_danger">#E27272</color>
+    <color name="hmt_danger_container">#4A2626</color>
+    <color name="hmt_success">#5FC382</color>
+
+    <color name="hmt_facebook">#1877F2</color>
+
+    <!-- The floating map chrome's background: the surface at 92%, as on the light side. -->
+    <color name="hmt_map_chrome">#EB1C2520</color>
+</resources>

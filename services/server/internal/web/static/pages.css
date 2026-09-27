@@ -174,7 +174,7 @@ code {
   background: var(--fm-surface);
   border: 1px solid rgb(var(--fm-ink-rgb) / 10%);
   border-radius: 12px;
-  box-shadow: 0 12px 32px rgb(var(--fm-ink-rgb) / 18%);
+  box-shadow: var(--fm-shadow-lg);
   line-height: 1.4;
 }
 
@@ -268,7 +268,7 @@ code {
 .auth-card__submit {
   border: 0;
   background: var(--fm-accent);
-  color: #fff;
+  color: var(--fm-on-accent);
 }
 
 .auth-card__submit:hover {
@@ -493,7 +493,7 @@ code {
   font: inherit;
   font-size: 14px;
   font-weight: 600;
-  color: #fff;
+  color: var(--fm-on-accent);
   cursor: pointer;
 }
 
@@ -624,7 +624,7 @@ code {
 .profile__toggle-btn[aria-current='true'] {
   background: var(--fm-accent);
   border-color: var(--fm-accent);
-  color: #fff;
+  color: var(--fm-on-accent);
 }
 
 .year-grid {

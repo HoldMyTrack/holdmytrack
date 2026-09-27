@@ -4,11 +4,17 @@
    own. Moved here from index.css's :root when every page came to be served by the Go server
    (ADR-0012); its scales are IMPLEMENTATION.md §4.18.
 
-   There is no dark theme, so these are the only palette in play (color-scheme: light reflects
-   that; native controls get no browser-guessed dark tint with no matching CSS to back it up).
+   Two palettes: the light one below, and a dark one further down that replaces only the
+   colors. Which one applies is data-theme on <html> — "light" or "dark", written by the server
+   from the hmt_theme cookie the account menu's theme control sets (§4.18) — and, with no
+   data-theme (the "System" choice), the OS's prefers-color-scheme. The Android app's
+   res/values/colors.xml and res/values-night/colors.xml carry the same two palettes.
+
    The *-rgb tokens exist for opacity tints — rgb(var(--fm-ink-rgb) / N%) — so a border, text
    or hover can take the palette's hue at whatever alpha it needs, instead of a hand-picked hex
-   per element. */
+   per element. Ink tints flip with the theme, as text and hover tints should; shadows and
+   backdrops use --fm-shadow-rgb instead, which stays dark in both, since a light shadow would
+   glow rather than lift. */
 :root {
   color-scheme: light;
   --fm-font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -17,6 +23,7 @@
 
   --fm-bg: #f7f4ec;
   --fm-surface: #fff;
+  --fm-surface-rgb: 255 255 255;
   --fm-surface-tint: #f6f3e9;
   --fm-surface-tint-strong: #f1eee3;
   --fm-divider-tint: #efead9;
@@ -26,6 +33,17 @@
   --fm-ink-secondary: #6c7a70;
   --fm-ink-muted: #8b9186;
   --fm-ink-faint: #b7af9a;
+
+  /* Text and icons on a filled accent, danger or ink button. */
+  --fm-on-accent: #fff;
+
+  --fm-shadow-rgb: 32 43 37;
+
+  /* The "new version available" banner (index.css .version-banner). */
+  --fm-notice-bg: rgb(255 244 214 / 96%);
+
+  /* MapLibre's control icons are dark SVGs; the dark palette inverts them. */
+  --fm-control-icon-filter: none;
 
   --fm-border: #e6e1d2;
   --fm-border-strong: #dcd6c4;
@@ -83,10 +101,109 @@
   --fm-weight-bold: 700;
   --fm-weight-heavy: 800;
 
-  --fm-shadow-sm: 0 1px 4px rgb(var(--fm-ink-rgb) / 25%); /* small raised controls */
-  --fm-shadow-md: 0 2px 10px rgb(var(--fm-ink-rgb) / 22%); /* floating toolbars, chips */
-  --fm-shadow-lg: 0 12px 32px rgb(var(--fm-ink-rgb) / 18%); /* dropdowns, popovers */
-  --fm-shadow-xl: 0 24px 60px rgb(var(--fm-ink-rgb) / 25%); /* dialogs */
+  --fm-shadow-sm: 0 1px 4px rgb(var(--fm-shadow-rgb) / 25%); /* small raised controls */
+  --fm-shadow-md: 0 2px 10px rgb(var(--fm-shadow-rgb) / 22%); /* floating toolbars, chips */
+  --fm-shadow-lg: 0 12px 32px rgb(var(--fm-shadow-rgb) / 18%); /* dropdowns, popovers */
+  --fm-shadow-xl: 0 24px 60px rgb(var(--fm-shadow-rgb) / 25%); /* dialogs */
+}
+
+/* The dark palette — colors only; every scale above is shared. It is written twice, once per
+   way of asking for it: data-theme="dark" (the account menu's explicit choice) and the OS's
+   dark preference when no explicit choice overrides it. Keep the two copies identical.
+   "Strong" and "hover" accents go lighter here, not darker: on a dark surface, more emphasis
+   means more light. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --fm-bg: #141b17;
+  --fm-surface: #1c2520;
+  --fm-surface-rgb: 28 37 32;
+  --fm-surface-tint: #212b25;
+  --fm-surface-tint-strong: #26312a;
+  --fm-divider-tint: #2a352e;
+
+  --fm-ink: #ece6d8;
+  --fm-ink-rgb: 236 230 216;
+  --fm-ink-secondary: #a8b2a9;
+  --fm-ink-muted: #8e968c;
+  --fm-ink-faint: #646d63;
+
+  --fm-on-accent: #1a1509;
+
+  --fm-shadow-rgb: 0 0 0;
+
+  --fm-notice-bg: rgb(66 52 22 / 96%);
+
+  --fm-control-icon-filter: invert(0.9);
+
+  --fm-border: #2e3932;
+  --fm-border-strong: #3a463e;
+  --fm-border-panel: #34403a;
+
+  --fm-accent: #d6a553;
+  --fm-accent-rgb: 214 165 83;
+  --fm-accent-strong: #e4b867;
+  --fm-accent-hover: #e9c27a;
+
+  --fm-donate: #b0532f;
+  --fm-donate-hover: #c2613a;
+  --fm-donate-text: #fff7ee;
+
+  --fm-danger: #e27272;
+  --fm-danger-rgb: 226 114 114;
+  --fm-danger-hover: #ea8a8a;
+
+  --fm-success: #5fc382;
+  --fm-success-strong: #6fcf90;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --fm-bg: #141b17;
+    --fm-surface: #1c2520;
+    --fm-surface-rgb: 28 37 32;
+    --fm-surface-tint: #212b25;
+    --fm-surface-tint-strong: #26312a;
+    --fm-divider-tint: #2a352e;
+
+    --fm-ink: #ece6d8;
+    --fm-ink-rgb: 236 230 216;
+    --fm-ink-secondary: #a8b2a9;
+    --fm-ink-muted: #8e968c;
+    --fm-ink-faint: #646d63;
+
+    --fm-on-accent: #1a1509;
+
+    --fm-shadow-rgb: 0 0 0;
+
+    --fm-notice-bg: rgb(66 52 22 / 96%);
+
+    --fm-control-icon-filter: invert(0.9);
+
+  --fm-control-icon-filter: invert(0.9);
+
+    --fm-border: #2e3932;
+    --fm-border-strong: #3a463e;
+    --fm-border-panel: #34403a;
+
+    --fm-accent: #d6a553;
+    --fm-accent-rgb: 214 165 83;
+    --fm-accent-strong: #e4b867;
+    --fm-accent-hover: #e9c27a;
+
+    --fm-donate: #b0532f;
+    --fm-donate-hover: #c2613a;
+    --fm-donate-text: #fff7ee;
+
+    --fm-danger: #e27272;
+    --fm-danger-rgb: 226 114 114;
+    --fm-danger-hover: #ea8a8a;
+
+    --fm-success: #5fc382;
+    --fm-success-strong: #6fcf90;
+  }
 }
 
 /* Fraunces has no Cyrillic, so a Russian page's headings take Source Serif 4 instead: a whole

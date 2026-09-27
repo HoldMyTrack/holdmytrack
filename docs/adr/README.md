@@ -27,6 +27,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0016](0016-native-sign-in.md) | Native sign-in: Credential Manager for Google, a browser-tab handoff for Facebook |
 | [0017](0017-no-health-data.md) | No health data: heart rate is never read or stored, and the pace/heart-rate profile card is removed |
 | [0018](0018-no-explorer-tiles.md) | No explorer tiles: Fog of War is the exploration mechanic, with no tile score |
+| [0019](0019-dark-theme.md) | A dark theme: one palette per theme for both clients, chosen per device, with a fog veil per basemap |
 
 ## Writing a new one
 

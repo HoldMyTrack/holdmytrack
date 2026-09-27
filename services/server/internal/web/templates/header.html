@@ -1,7 +1,8 @@
 {{/* The header every page shares (ADR-0012), the React app's shell included — brand,
      tagline, Donate, the Info menu, the account menu. Its styles are static/header.css, which
      the app's shell loads alone and every other page alongside pages.css. The two menus are
-     <details> dropdowns: they open and close with no script. Sign out is a form POST to
+     <details> dropdowns: they open and close with no script. The account menu's theme control
+     is the one piece that needs one (static/theme.js), and stays hidden without it. Sign out is a form POST to
      /logout (pages.go), not a link, so a GET from another site can't end someone's session.
      Signed out, the account menu is a Sign in link. */}}
 {{define "header"}}
@@ -34,6 +35,14 @@
         <a role="menuitem" class="header-menu__item" href="/profile">{{t "header.profile"}}</a>
         <a role="menuitem" class="header-menu__item" href="/settings">{{t "header.settings"}}</a>
         {{if .IsAdmin}}<a role="menuitem" class="header-menu__item" href="/admin">{{t "header.admin"}}</a>{{end}}
+        <div class="header-menu__theme" role="group" aria-label="{{t "header.theme"}}" data-theme-control hidden>
+          <span class="header-menu__theme-label">{{t "header.theme"}}</span>
+          <span class="theme-toggle">
+            <button type="button" class="theme-toggle__btn" data-theme-choice="system" aria-pressed="false">{{t "header.theme_system"}}</button>
+            <button type="button" class="theme-toggle__btn" data-theme-choice="light" aria-pressed="false">{{t "header.theme_light"}}</button>
+            <button type="button" class="theme-toggle__btn" data-theme-choice="dark" aria-pressed="false">{{t "header.theme_dark"}}</button>
+          </span>
+        </div>
         <form method="post" action="/logout">
           <button type="submit" role="menuitem" class="header-menu__item">{{t "header.sign_out"}}</button>
         </form>

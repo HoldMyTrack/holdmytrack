@@ -14,6 +14,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.graphics.scale
 import androidx.core.view.isVisible
+import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.imageview.ShapeableImageView
 import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import com.google.android.material.textfield.TextInputEditText
@@ -111,6 +112,7 @@ class SettingsActivity : AppCompatActivity() {
         }
         avatarRemove.setOnClickListener { removeAvatar() }
         save.setOnClickListener { onSave() }
+        bindTheme()
 
         // A save that changed the language recreates the screen; its "Saved." survives that —
         // kept as the string's id, so it comes back in the language just chosen.
@@ -139,6 +141,23 @@ class SettingsActivity : AppCompatActivity() {
                 options = loaded
                 bind()
             }.onFailure { show(getString(R.string.settings_load_failed, it.message.orEmpty()), failed = true) }
+        }
+    }
+
+    /** The Theme toggle: shows this device's choice and applies a new one at once — AppTheme
+     *  recreates the screen, which comes back with the toggle already on the new choice. Not
+     *  part of [onSave]: the theme belongs to the phone, not the account. */
+    private fun bindTheme() {
+        val buttons = mapOf(
+            AppTheme.Choice.SYSTEM to R.id.settings_theme_system,
+            AppTheme.Choice.LIGHT to R.id.settings_theme_light,
+            AppTheme.Choice.DARK to R.id.settings_theme_dark,
+        )
+        val group = findViewById<MaterialButtonToggleGroup>(R.id.settings_theme)
+        group.check(buttons.getValue(AppTheme.current(this)))
+        group.addOnButtonCheckedListener { _, id, checked ->
+            if (!checked) return@addOnButtonCheckedListener
+            buttons.entries.firstOrNull { it.value == id }?.let { AppTheme.set(applicationContext, it.key) }
         }
     }
 
