@@ -414,6 +414,83 @@
         <item name="android:minHeight">48dp</item>
     </style>
 
+    <!-- The Activities panel's toolbar actions (Show/Hide, Edit, Delete), after the web's
+         .activities-panel__edit & co. at phone width: a 34dp tinted square around a 16dp icon,
+         drawn inset in a 48dp touch target (bg_panel_chip). -->
+    <style name="Widget.HoldMyTrack.PanelChip" parent="">
+        <item name="android:layout_width">48dp</item>
+        <item name="android:layout_height">48dp</item>
+        <item name="android:background">@drawable/bg_panel_chip</item>
+        <item name="android:padding">16dp</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="tint">@color/panel_chip_icon</item>
+    </style>
+
+    <!-- Focus on map, the toolbar's accent-tinted main action (.activities-panel__focus). -->
+    <style name="Widget.HoldMyTrack.PanelChip.Accent">
+        <item name="android:background">@drawable/bg_panel_chip_accent</item>
+        <item name="tint">@color/panel_chip_accent_icon</item>
+    </style>
+
+    <!-- A row's Pending / Hidden badge, the web's .activities-panel__hidden-badge: 10sp
+         semibold uppercase at ink 55% on an ink 8% tint. -->
+    <style name="Widget.HoldMyTrack.PanelStatusBadge" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:background">@drawable/bg_panel_status_badge</item>
+        <item name="android:paddingStart">@dimen/hmt_space_6</item>
+        <item name="android:paddingEnd">@dimen/hmt_space_6</item>
+        <item name="android:paddingTop">@dimen/hmt_space_2</item>
+        <item name="android:paddingBottom">@dimen/hmt_space_2</item>
+        <item name="android:textSize">@dimen/hmt_text_2xs</item>
+        <item name="android:textFontWeight">600</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.02</item>
+        <item name="android:textColor">@color/hmt_ink_meta</item>
+        <item name="android:maxLines">1</item>
+    </style>
+
+    <!-- A tab's title in the Activities panel's head, the web's .activities-panel__heading-text:
+         the serif, semibold, text-xl. -->
+    <style name="TextAppearance.HoldMyTrack.PanelTab" parent="TextAppearance.HoldMyTrack.TitleMedium">
+        <item name="fontFamily">@font/hmt_serif</item>
+        <item name="android:fontFamily">@font/hmt_serif</item>
+        <item name="android:textColor">@color/hmt_ink</item>
+    </style>
+
+    <!-- A filter's label (DISTANCE), the web's .activity-filters__label: 11sp heavy, uppercase,
+         tracked, ink 50%. -->
+    <style name="TextAppearance.HoldMyTrack.PanelFilterLabel" parent="TextAppearance.HoldMyTrack.LabelSmall">
+        <item name="android:textFontWeight">800</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.06</item>
+        <item name="android:textColor">@color/panel_ink_50</item>
+    </style>
+
+    <!-- The DISTANCE slider, the web's .activity-filters__range: a 2dp track, the band in the
+         accent, round white knobs ringed in the accent. The pre-Material 3 slider, whose knob is
+         a circle rather than Material 3's bar. -->
+    <style name="Widget.HoldMyTrack.PanelSlider" parent="Widget.MaterialComponents.Slider">
+        <item name="trackHeight">2dp</item>
+        <item name="trackColorActive">@color/hmt_accent</item>
+        <item name="trackColorInactive">@color/panel_track_inactive</item>
+        <item name="thumbColor">@color/hmt_surface</item>
+        <item name="thumbStrokeColor">@color/hmt_accent</item>
+        <item name="thumbStrokeWidth">2dp</item>
+        <item name="thumbRadius">8dp</item>
+        <!-- Material 1.13 sizes the knob with these rather than thumbRadius alone, and leaves a
+             gap and stop dots around it on the track; the web's knob sits on a plain line. -->
+        <item name="thumbWidth">16dp</item>
+        <item name="thumbHeight">16dp</item>
+        <item name="thumbTrackGapSize">0dp</item>
+        <item name="trackStopIndicatorSize">0dp</item>
+        <item name="trackInsideCornerSize">0dp</item>
+        <item name="haloRadius">16dp</item>
+        <item name="haloColor">#29B07E2E</item>
+        <item name="labelBehavior">gone</item>
+        <item name="tickVisible">false</item>
+    </style>
+
     <!-- A drop-down field: the outlined text field with Lucide's chevron, what the Type field
          already is on the recording form. -->
     <style name="Widget.HoldMyTrack.Dropdown" parent="Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">

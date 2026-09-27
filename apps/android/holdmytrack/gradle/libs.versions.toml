@@ -29,6 +29,12 @@ googleId = "1.2.0"
 # Custom Tabs, for Sign in with Facebook through the server's own web flow in a browser tab —
 # instead of Meta's SDK (the same ADR).
 browser = "1.10.0"
+# The map's Activities panel list (panel/ActivitiesPanel.kt) — declared rather than borrowed
+# from Material's own dependency on it, at the version Material 1.13.0 already resolves to,
+# so this pins rather than upgrades.
+recyclerview = "1.2.1"
+# Unit tests for the panel's pure logic (src/test).
+junit = "4.13.2"
 
 [libraries]
 maplibre = { module = "org.maplibre.gl:android-sdk", version.ref = "maplibre" }
@@ -42,6 +48,8 @@ credentials = { module = "androidx.credentials:credentials", version.ref = "cred
 credentials-play-services = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
 google-id = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleId" }
 browser = { module = "androidx.browser:browser", version.ref = "browser" }
+recyclerview = { module = "androidx.recyclerview:recyclerview", version.ref = "recyclerview" }
+junit = { module = "junit:junit", version.ref = "junit" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

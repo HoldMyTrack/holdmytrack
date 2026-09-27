@@ -1,6 +1,8 @@
 package dev.holdmytrack.android.recording
 
 import android.content.Context
+import android.content.res.Resources
+import dev.holdmytrack.android.R
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.recording.db.RecordedActivityRecord
 
@@ -45,10 +47,57 @@ object RecordingTypes {
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    /** `formatActivityType` in `apps/web/src/ui/format.ts`, the same behavior: spaces out
-     *  `snake_case` and title-cases each word, without remapping what the value means. */
-    fun format(type: String): String =
-        type.split('_').filter { it.isNotEmpty() }.joinToString(" ") { it.replaceFirstChar(Char::uppercaseChar) }
+    /** `formatActivityType` in `apps/web/src/ui/format.ts`, the same behavior: a common
+     *  type's display name in the app's language (the web's `activity_type.*` catalog, as
+     *  `activity_type_*` strings), matched case-insensitively; any other type spaced out from
+     *  `snake_case` and title-cased, without remapping what the value means. */
+    fun format(res: Resources, type: String): String {
+        LABELS[type.lowercase()]?.let { return res.getString(it) }
+        return type.split('_').filter { it.isNotEmpty() }.joinToString(" ") { it.replaceFirstChar(Char::uppercaseChar) }
+    }
+
+    private val LABELS: Map<String, Int> = mapOf(
+        "alpine_skiing" to R.string.activity_type_alpine_skiing,
+        "biking" to R.string.activity_type_biking,
+        "biking_stationary" to R.string.activity_type_biking_stationary,
+        "cross_country_skiing" to R.string.activity_type_cross_country_skiing,
+        "cycling" to R.string.activity_type_cycling,
+        "driving" to R.string.activity_type_driving,
+        "e_biking" to R.string.activity_type_e_biking,
+        "generic" to R.string.activity_type_generic,
+        "golf" to R.string.activity_type_golf,
+        "gravel_cycling" to R.string.activity_type_gravel_cycling,
+        "hiking" to R.string.activity_type_hiking,
+        "horseback_riding" to R.string.activity_type_horseback_riding,
+        "ice_skating" to R.string.activity_type_ice_skating,
+        "inline_skating" to R.string.activity_type_inline_skating,
+        "kayaking" to R.string.activity_type_kayaking,
+        "motorcycling" to R.string.activity_type_motorcycling,
+        "mountain_biking" to R.string.activity_type_mountain_biking,
+        "other_workout" to R.string.activity_type_other_workout,
+        "paddling" to R.string.activity_type_paddling,
+        "road_cycling" to R.string.activity_type_road_cycling,
+        "rock_climbing" to R.string.activity_type_rock_climbing,
+        "rowing" to R.string.activity_type_rowing,
+        "rowing_machine" to R.string.activity_type_rowing_machine,
+        "running" to R.string.activity_type_running,
+        "running_treadmill" to R.string.activity_type_running_treadmill,
+        "sailing" to R.string.activity_type_sailing,
+        "skating" to R.string.activity_type_skating,
+        "skiing" to R.string.activity_type_skiing,
+        "snowboarding" to R.string.activity_type_snowboarding,
+        "stand_up_paddleboarding" to R.string.activity_type_stand_up_paddleboarding,
+        "surfing" to R.string.activity_type_surfing,
+        "swimming" to R.string.activity_type_swimming,
+        "swimming_open_water" to R.string.activity_type_swimming_open_water,
+        "swimming_pool" to R.string.activity_type_swimming_pool,
+        "tennis" to R.string.activity_type_tennis,
+        "trail_running" to R.string.activity_type_trail_running,
+        "unknown" to R.string.activity_type_unknown,
+        "walk" to R.string.activity_type_walk,
+        "walking" to R.string.activity_type_walking,
+        "yoga" to R.string.activity_type_yoga,
+    )
 
     /**
      * What the Type picker lists: every type the account's server-side activities use, plus

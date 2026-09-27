@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A toolbar action's icon: secondary ink, faint while there's nothing to act on. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/hmt_ink_faint" android:state_enabled="false" />
+    <item android:color="@color/hmt_ink_secondary" />
+</selector>

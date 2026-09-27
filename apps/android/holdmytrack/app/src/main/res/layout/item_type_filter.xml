@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One Type dropdown row (.activity-filters__type-item): its checkbox, the type's name, and
+     its count in the monospace face at ink 50%. The whole row toggles the checkbox. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="0dp"
+    android:paddingEnd="@dimen/hmt_space_4">
+
+    <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/type_filter_check"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:clickable="false"
+        android:focusable="false"
+        android:importantForAccessibility="no" />
+
+    <TextView
+        android:id="@+id/type_filter_label"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/hmt_ink"
+        android:textSize="@dimen/hmt_text_md"
+        tools:text="Walking" />
+
+    <TextView
+        android:id="@+id/type_filter_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/hmt_space_8"
+        android:fontFamily="monospace"
+        android:textColor="@color/panel_ink_50"
+        android:textSize="@dimen/hmt_text_xs"
+        tools:text="2" />
+</LinearLayout>

@@ -53,6 +53,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     sourceSets["main"].java.srcDirs("src/main/kotlin")
+    sourceSets["test"].java.srcDirs("src/test/kotlin")
 }
 
 dependencies {
@@ -70,4 +71,6 @@ dependencies {
     implementation(libs.credentials.play.services)
     implementation(libs.google.id)
     implementation(libs.browser)
+    implementation(libs.recyclerview)
+    testImplementation(libs.junit)
 }

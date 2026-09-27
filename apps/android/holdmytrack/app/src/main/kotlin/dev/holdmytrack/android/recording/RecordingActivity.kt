@@ -103,7 +103,7 @@ class RecordingActivity : AppCompatActivity() {
 
     private fun setType(type: String) {
         selectedType = type
-        typeField.text = RecordingTypes.format(type).ifEmpty { type }
+        typeField.text = RecordingTypes.format(resources, type).ifEmpty { type }
     }
 
     private fun openTypePicker() {

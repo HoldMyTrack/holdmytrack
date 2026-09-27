@@ -3,6 +3,7 @@ package dev.holdmytrack.android.map
 import dev.holdmytrack.android.BuildConfig
 import dev.holdmytrack.android.recording.RecordedPoint
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.style.layers.LineLayer
@@ -46,7 +47,14 @@ object MapOverlays {
     private const val TILES_V1 = "/tiles/v1"
 
     private const val TRACKS_SOURCE_ID = "tracks"
-    private const val TRACKS_LAYER_ID = "tracks-line"
+    const val TRACKS_LAYER_ID = "tracks-line"
+
+    /** The selected track's dark halo, drawn under every line, and the selected line itself,
+     *  wider, over them — the web's `tracks-casing` and its `selected` feature-state width
+     *  (`apps/web/src/map/tracks.ts`). MapLibre Android has no feature-state, so both are
+     *  their own layers, filtered to the one selected id. */
+    private const val TRACKS_CASING_LAYER_ID = "tracks-casing"
+    private const val TRACKS_SELECTED_LAYER_ID = "tracks-selected"
 
     /** Must match `ST_AsMVT(t, 'tracks', ...)` in the backend's own tile query. */
     private const val TRACKS_SOURCE_LAYER = "tracks"
@@ -102,6 +110,20 @@ object MapOverlays {
     private const val TRACK_WIDTH = 2.5f
     private const val TRACK_OPACITY = 0.9f
 
+    /** The web's `EMPHASIS_WIDTH` and `CASING_WIDTH` (1.5 of halo showing each side). */
+    private const val SELECTED_WIDTH = 4.5f
+    private const val CASING_WIDTH = SELECTED_WIDTH + 3f
+    private const val CASING_COLOR = "#202b25"
+    private const val CASING_OPACITY = 0.95f
+
+    /** The track layers' ids, in paint order — what mode and recording show and hide together. */
+    private val TRACK_LAYER_IDS = listOf(TRACKS_CASING_LAYER_ID, TRACKS_LAYER_ID, TRACKS_SELECTED_LAYER_ID)
+
+    /** Which tracks aren't painted, and which one is selected — kept here rather than only on
+     *  the layers, because [setTrackRange] replaces the layers and has to put both back. */
+    private var hiddenTracks: Set<String> = emptySet()
+    private var selectedTrack: String? = null
+
     /** Same dark veil colour/opacity as the raster tier's own fog_colour/fog_opacity
      *  (`internal/fog/raster.go`'s RenderFogPNG: #202b25 @ 0.82). */
     private const val FOG_FILL_COLOR = "#202b25"
@@ -121,8 +143,7 @@ object MapOverlays {
         FOG_LAYER_ID, HEATMAP_LAYER_ID,
         COUNTRY_FOG_LAYER_ID, COUNTRY_HEATMAP_LAYER_ID,
         REGION_FOG_LAYER_ID, REGION_HEATMAP_LAYER_ID,
-        TRACKS_LAYER_ID,
-    )
+    ) + TRACK_LAYER_IDS
 
     private const val LIVE_TRACK_SOURCE_ID = "live-track"
     private const val LIVE_TRACK_LAYER_ID = "live-track-line"
@@ -139,8 +160,8 @@ object MapOverlays {
      *
      * Only the tracks tile carries a filter, and only `from`/`to` — the same as the web, whose
      * date range narrows the tracks alone: Fog and Heatmap show coverage no filter narrows
-     * (`docs/SPEC.md` FR-4.2, FR-4.3), and the web's TYPE/DISTANCE filters and hidden set are
-     * applied client-side over the Activities list, which this app doesn't have.
+     * (`docs/SPEC.md` FR-4.2, FR-4.3). The Activities panel's TYPE/DISTANCE filters, hidden
+     * set and selection are applied on the client, as layer filters ([setTrackFilter]).
      */
     fun attach(style: Style, mode: MapMode, range: DateRange?) {
         val beforeId = labelInsertionPoint(style)
@@ -175,10 +196,34 @@ object MapOverlays {
     fun setTrackRange(style: Style, range: DateRange?) {
         val old = style.getLayer(TRACKS_LAYER_ID) ?: return
         val visibility = old.visibility.value
-        style.removeLayer(old)
+        TRACK_LAYER_IDS.forEach { id -> style.getLayer(id)?.let(style::removeLayer) }
         style.removeSource(TRACKS_SOURCE_ID)
         addTracks(style, labelInsertionPoint(style), range)
-        style.getLayer(TRACKS_LAYER_ID)?.setProperties(PropertyFactory.visibility(visibility))
+        TRACK_LAYER_IDS.forEach { id -> style.getLayer(id)?.setProperties(PropertyFactory.visibility(visibility)) }
+    }
+
+    /**
+     * Leaves [hidden] off the map — filtered out by TYPE/DISTANCE, hidden with Show/Hide, or
+     * Pending — and draws [selected] bold over its halo, unless it's one of those. The web's
+     * `setHiddenTracks` and `setSelectedTracks`, as layer filters on the tile's `id` property.
+     */
+    fun setTrackFilter(style: Style, hidden: Set<String>, selected: String?) {
+        hiddenTracks = hidden
+        selectedTrack = selected
+        applyTrackFilter(style)
+    }
+
+    private fun applyTrackFilter(style: Style) {
+        val visible = if (hiddenTracks.isEmpty()) {
+            Expression.literal(true)
+        } else {
+            Expression.not(Expression.`in`(Expression.get("id"), Expression.literal(hiddenTracks.toTypedArray<Any>())))
+        }
+        val selected = selectedTrack?.takeIf { it !in hiddenTracks }
+        val only = if (selected == null) Expression.literal(false) else Expression.eq(Expression.get("id"), selected)
+        (style.getLayer(TRACKS_LAYER_ID) as? LineLayer)?.setFilter(visible)
+        (style.getLayer(TRACKS_CASING_LAYER_ID) as? LineLayer)?.setFilter(only)
+        (style.getLayer(TRACKS_SELECTED_LAYER_ID) as? LineLayer)?.setFilter(only)
     }
 
     fun setMode(style: Style, mode: MapMode) {
@@ -188,7 +233,7 @@ object MapOverlays {
         setVisible(style, HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
         setVisible(style, COUNTRY_HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
         setVisible(style, REGION_HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
-        setVisible(style, TRACKS_LAYER_ID, mode == MapMode.NORMAL)
+        TRACK_LAYER_IDS.forEach { setVisible(style, it, mode == MapMode.NORMAL) }
         setLabelOpacity(style, if (mode == MapMode.FOG) FOG_LABEL_OPACITY else 1f)
     }
 
@@ -324,19 +369,26 @@ object MapOverlays {
             val query = if (range == null) "" else "?from=${range.from}&to=${range.to}"
             style.addSource(VectorSource(TRACKS_SOURCE_ID, tileSet(tileUrl("tracks", "mvt") + query)))
         }
-        if (style.getLayer(TRACKS_LAYER_ID) == null) {
-            val layer = LineLayer(TRACKS_LAYER_ID, TRACKS_SOURCE_ID)
-                .withSourceLayer(TRACKS_SOURCE_LAYER)
-                .withProperties(
-                    PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
-                    PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
-                    PropertyFactory.lineColor(TRACK_COLOR),
-                    PropertyFactory.lineWidth(TRACK_WIDTH),
-                    PropertyFactory.lineOpacity(TRACK_OPACITY),
-                )
-                .apply { setMinZoom(TRACKS_MIN_ZOOM) }
-            insert(style, layer, beforeId)
-        }
+        // Halo first, then every line, then the selected line, all under the labels.
+        addTrackLine(style, TRACKS_CASING_LAYER_ID, beforeId, CASING_COLOR, CASING_WIDTH, CASING_OPACITY)
+        addTrackLine(style, TRACKS_LAYER_ID, beforeId, TRACK_COLOR, TRACK_WIDTH, TRACK_OPACITY)
+        addTrackLine(style, TRACKS_SELECTED_LAYER_ID, beforeId, TRACK_COLOR, SELECTED_WIDTH, 1f)
+        applyTrackFilter(style)
+    }
+
+    private fun addTrackLine(style: Style, layerId: String, beforeId: String?, color: String, width: Float, opacity: Float) {
+        if (style.getLayer(layerId) != null) return
+        val layer = LineLayer(layerId, TRACKS_SOURCE_ID)
+            .withSourceLayer(TRACKS_SOURCE_LAYER)
+            .withProperties(
+                PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+                PropertyFactory.lineColor(color),
+                PropertyFactory.lineWidth(width),
+                PropertyFactory.lineOpacity(opacity),
+            )
+            .apply { setMinZoom(TRACKS_MIN_ZOOM) }
+        insert(style, layer, beforeId)
     }
 
     private fun insert(style: Style, layer: org.maplibre.android.style.layers.Layer, beforeId: String?) {

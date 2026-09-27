@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Type dropdown (.activities-panel__type-panel): "All types", a divider, then one row per
+     type the listed activities use with how many do, checked meaning shown. Rows are added by
+     ActivitiesPanel.showTypeFilter; the list scrolls past about twelve rows. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_panel_popup"
+    android:elevation="8dp"
+    android:minWidth="208dp"
+    android:orientation="vertical"
+    android:padding="@dimen/hmt_space_8">
+
+    <TextView
+        android:id="@+id/type_filter_empty"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="@dimen/hmt_space_4"
+        android:text="@string/panel_type_empty"
+        android:textColor="@color/hmt_ink_meta"
+        android:textSize="@dimen/hmt_text_md"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/type_filter_body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <include
+            android:id="@+id/type_filter_all"
+            layout="@layout/item_type_filter" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="@dimen/hmt_space_6"
+            android:layout_marginBottom="@dimen/hmt_space_6"
+            android:background="@color/hmt_divider_tint" />
+
+        <ScrollView
+            android:id="@+id/type_filter_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout
+                android:id="@+id/type_filter_rows"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </ScrollView>
+    </LinearLayout>
+</LinearLayout>
