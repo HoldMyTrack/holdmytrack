@@ -44,8 +44,8 @@ Fill in every value — see that file's own comments for what each one means and
 
 The basemap is the full Protomaps planet build (z0–15, ~138 GB), served unmodified from a public R2 bucket. The archive is deliberately excluded from every Docker build context (`apps/web/.dockerignore`), so the `web` image never has it baked in.
 
-1. Create a second R2 bucket for the basemap (e.g. `holdmytrack-basemap`), separate from the app's private one, and enable public access on it. Public access is either the bucket's `r2.dev` URL, which is rate-limited and meant for development, or a custom domain, which needs the domain's DNS zone on Cloudflare.
-2. Add a CORS rule to that bucket: allowed origins `https://<your-domain>`, allowed methods `GET, HEAD`, allowed headers `range, if-match`, exposed headers `etag` (`IMPLEMENTATION.md` §5.4).
+1. Create a second R2 bucket for the basemap (e.g. `holdmytrack-basemap`), separate from the app's private one, and connect a custom domain to it (e.g. `tiles.<your-domain>`, which needs the domain's DNS zone on Cloudflare). A custom domain is proxied through Cloudflare, which is what puts the CDN in front of the basemap; the bucket's `r2.dev` URL is rate-limited and meant only for trying things out.
+2. Add a CORS rule to that bucket: allowed origins `https://<your-domain>` (plus `http://localhost:5173` if local dev should read the same archive, `docs/DEVELOPMENT.md`), allowed methods `GET, HEAD`, allowed headers `range, if-match`, exposed headers `etag` (`IMPLEMENTATION.md` §5.4).
 3. Pick a dated build key from `https://build-metadata.protomaps.dev/builds.json`, download it (`curl -C - -o planet.pmtiles https://build.protomaps.com/<YYYYMMDD>.pmtiles`), and check its md5 against the listed `md5sum`.
 4. Upload under the build's dated prefix, with an R2 API token that can write to the bucket:
    ```
@@ -53,7 +53,7 @@ The basemap is the full Protomaps planet build (z0–15, ~138 GB), served unmodi
    aws s3 cp --recursive apps/web/public/basemap/fonts s3://holdmytrack-basemap/<YYYYMMDD>/basemap/fonts --endpoint-url ...
    aws s3 cp --recursive apps/web/public/basemap/sprites s3://holdmytrack-basemap/<YYYYMMDD>/basemap/sprites --endpoint-url ...
    ```
-5. Set `VITE_BASEMAP_ORIGIN` in `.env.prod` to the public origin plus that prefix (e.g. `https://pub-xxxx.r2.dev/20260922`), with no trailing slash. It's a *build*-time value for the web bundle, and `compose.prod.yml` also passes it to `api` as `BASEMAP_ORIGIN` for the style document native clients fetch. Changing it later needs `docker compose -f compose.prod.yml build web` and an `up -d`, not just a restart.
+5. Set `VITE_BASEMAP_ORIGIN` in `.env.prod` to the public origin plus that prefix (e.g. `https://tiles.holdmytrack.com/20260922`), with no trailing slash. It's a *build*-time value for the web bundle, and `compose.prod.yml` also passes it to `api` as `BASEMAP_ORIGIN` for the style document native clients fetch. Changing it later needs `docker compose -f compose.prod.yml build web` and an `up -d`, not just a restart.
 
 Moving to a newer build repeats steps 3–5 under a new prefix. The old prefix stays readable until you delete it, so tabs already open keep working.
 

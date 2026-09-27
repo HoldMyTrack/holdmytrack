@@ -144,10 +144,6 @@ CREATE TABLE activity_streams (
 
 Elevation is present whenever the source records it: an optional per-point field in GPX (`<ele>`), TCX (`AltitudeMeters`), FIT (`altitude`) and Health Connect routes (`altitude`). Heart rate that a file carries — GPX's `gpxtpx:hr` extension, TCX's `HeartRateBpm`, FIT's `heart_rate` field — is skipped by the parsers, and stays only inside the stored raw upload (§4.1), which nothing reads it out of.
 
-### 3.5 `user_tiles` (removed)
-
-Removed — explorer-tile scoring is not part of the product; Fog of War is its exploration mechanic (ADR-0018). The number is kept so later sections keep theirs.
-
 ### 3.6 `fog_tiles`
 
 ```sql
@@ -376,6 +372,26 @@ CREATE TABLE auth_handoffs (
 
 They differ only in how bytes arrive. All converge on §4.1 step 2.
 
+```mermaid
+flowchart LR
+    subgraph P1["Path 1 — cloud-to-cloud"]
+        prov["Provider<br/>(Garmin .FIT, JSON)"] -->|webhook| wh["POST /v1/webhooks/{provider}<br/>200 OK, nothing fetched inline"]
+        wh --> ps[["provider_sync job<br/>(+ resumable backfill at connect)"]]
+    end
+    subgraph P2["Path 2 — on-device sync"]
+        dev["Health Connect · HealthKit<br/>in-app GPS recording"] --> sync["POST /v1/sync/activities<br/>external_id = caller's own id"]
+    end
+    subgraph P3["Path 3 — file upload"]
+        files[".gpx · .fit · .tcx<br/>.zip · Google Takeout"] --> up["POST /v1/activities/upload<br/>external_id = sha256(bytes)"]
+    end
+    sync --> fast{"(user_id, source, external_id)<br/>already seen?<br/>§4.1 step 1 fast path"}
+    up --> fast
+    fast -->|yes| skip["already_processed"]
+    fast -->|no| raw[("raw payload<br/>object storage")] --> job[["ingest job"]]
+    ps --> parse
+    job --> parse["§4.1 step 2: parse<br/>(shared from here on)"] --> rest["steps 3–5<br/>clip · coverage · simplify"] --> persist[("§4.1 step 6: activities<br/>ON CONFLICT DO NOTHING")]
+```
+
 **Path 1 — cloud-to-cloud.** OAuth connect, then webhook-driven where the provider supports it. Never poll on a schedule: a webhook returns `200 OK` in milliseconds and enqueues a `provider_sync` job; nothing is fetched inline. Providers deliver either a file (Garmin pushes `.FIT`) or structured JSON, so the parse step is per-provider and everything after it is shared. Backfill of history at connect time is a separate, rate-limited, resumable job — it is the largest single fetch the system ever performs.
 
 **Path 2 — on-device sync.** A native app reads the platform health store and uploads normalized points.
@@ -470,6 +486,28 @@ All three are idempotent on `(user_id, source, external_id)`, and this is a hard
 ### 4.1 Ingestion pipeline
 
 The order of these steps matters.
+
+```mermaid
+flowchart TD
+    subgraph API["api — inline, per request"]
+        s1{"1. Receive: validate<br/>(user_id, source, external_id) seen?"}
+    end
+    s1 -->|yes| dup["already_processed"]
+    s1 -->|no| q[["ingest job enqueued"]]
+    subgraph W["worker — ingest job"]
+        s2["2. Parse (streamed)<br/>.FIT · .GPX · .TCX · JSON"] --> timed{"any timed points?<br/>(keepTimed)"}
+        timed -->|no| fail["job fails<br/>errNoTimestamps"]
+        timed -->|yes| s3["3. Apply privacy<br/>ClipEnds vs privacy_zones"]
+        s3 --> inside{"entirely inside zones?"}
+        inside -->|yes| hidden["hidden path: NULL trajectory,<br/>zero metrics, no streams/masks/regions"]
+        inside -->|no| s4["4. Coverage from raw points<br/>rasterize segments, mark fog_tiles dirty"]
+        s4 --> s5["5. Simplify for display<br/>ST_SimplifyPreserveTopology"]
+        s5 --> s6[("6. Persist: activities, activity_streams,<br/>raw payload → object storage<br/>ON CONFLICT DO NOTHING")]
+        hidden --> s6
+    end
+    q --> s2
+    s6 --> s7[["7. Re-render dirty fog tiles<br/>(follow-up job, §4.2)"]]
+```
 
 1. **Receive** — via any of the three paths above. Validate, check for an existing match on `(user_id, source, external_id)` as a fast path (§4.0's idempotency invariant), enqueue an `ingest` job, return. Nothing heavy happens inline. This check is an optimization, not the guarantee — see step 6.
 2. **Parse** — stream `.FIT` binary or `.GPX`/`.TCX` XML, or map a provider's JSON. **Never load a whole file into memory**: a 100-mile ride at 1 Hz is 36,000+ points across a dozen channels, and a bulk archive is thousands of those. Every parser leaves a missing timestamp as the zero `time.Time`; `ingest.go`'s `keepTimed` then drops untimed points and fails the job (`errNoTimestamps`) when none is left. Without it a timestamp-less GPX (a planned route) was persisted starting on 0001-01-01 — outside every date range the map filters by, so "View on map" could never show it.
@@ -700,10 +738,6 @@ Attribution/logo bake-in belongs on the *final* canvas in step 3, not the offscr
 
 **Not in this slice**: pace-colored segments (§4.3.1 — a single-focused-activity view, narrower than "export my map"), vector/SVG output (raster only), story cards/animated reveals (`VISION.md` §4.2's other two "Export" items, unbuilt), and full mobile-touch polish of the frame's own handles/toolbar layout (the drag/resize interaction is pointer-events-based — mouse and touch unified — from the start, but comfortable touch-target sizing and small-screen toolbar layout are deferred to the mobile-browser-support pass `docs/ROADMAP.md` Phase 3 already tracks).
 
-### 4.4 Explorer tile scoring (removed)
-
-Removed with §3.5 (ADR-0018).
-
 ### 4.5 Per-activity pace, and distance trends
 
 Not a performance-analysis pillar — `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and keeps no health data at all. What's here is deliberately narrow: pace shown as route context on a single activity (§4.3.1's bands, derived from the display trajectory), and a plain distance/time rollup over a period. No heart rate, no HR zones, no power, no training load, no all-time performance records.
@@ -753,7 +787,7 @@ GET /v1/activities/duplicates
 
 **Pagination was considered and dropped.** A row-wise keyset cursor, `(started_at, id) < ($cursor_ts, $cursor_id)` — chosen over `started_at < $cursor_ts` alone because duplicate start times are real here (the same ride ingested from two files lands as two rows sharing a `started_at`), and a timestamp-only cursor either drops or repeats one at a page boundary — isn't worth it: the Activities panel's TYPE and DISTANCE filters, computed client-side over the panel's own rows, need the *whole* current range at once (their checkbox counts and slider bounds), and the map already draws every matching track regardless of what the list had paged in, so a cursor was never actually letting anyone skip work. Phase 1 has one seeded user with activity counts in the hundreds to low thousands at most; a real multi-user phase is what's likely to make this worth revisiting.
 
-**Revised: a name column, but a narrower one than the original idea.** An early design's row text ("Long ride — Karlštejn") implied an `activities.name` this schema didn't have — rather than add one plus the per-format parsing work to populate it (GPX's optional `<name>`, TCX's `<Notes>`, FIT's string fields, and a fallback for the very real case where the source carries none), the list showed `started_at` instead, for the reasons the original version of this paragraph gave. That still holds for *parsing* a name out of a source file — none of the three parsers read one, and this revision doesn't change that. What changed is allowing a name at all: `migrations/0002_activities.sql` adds `activities.name VARCHAR(200)`, nullable, set only by a person via `PATCH /v1/activities/{id}` (§4.7.4) — the same mechanism `description` already uses, not a new one. A row with a name shows it as the primary line; a row without one still falls back to the full start datetime exactly as before. Sorting is unaffected either way — `listActivitiesQuery`'s `ORDER BY started_at DESC, id DESC` never looked at this column and still doesn't.
+**A row's primary line is `activities.name` when set, otherwise the full start datetime.** `activities.name VARCHAR(200)` (§3.3, `migrations/0002_activities.sql`) is nullable and set by a person, either via `PATCH /v1/activities/{id}` (§4.7.4, the same mechanism as `description`) or at creation by in-app GPS recording (§4.0.4). No file parser reads a name out of the source file (GPX's `<name>`, TCX's `<Notes>` and FIT's string fields are all ignored; `parse.go` leaves `Name` empty for every file format), so an uploaded, Takeout or Health Connect activity has none until someone edits it. Sorting ignores the column: `listActivitiesQuery` orders by `started_at DESC, id DESC`.
 
 Two more things the screen needs that a list endpoint alone doesn't cover. They are separate endpoints, as expected — their query shapes have nothing in common with a paginated list, or with each other:
 
@@ -1041,7 +1075,7 @@ Avatar is three more endpoints, not folded into the settings PATCH, since it's a
 
 **The zero-history fallback effect uses `useActivityDays()`'s `earliest`/`ready`, not `activities.length === 0`, to detect "genuinely no history."** `activities` is scoped to `selectedRange`, which degenerates to `{today, today}` for a brand-new account regardless of whether it actually has any history at all (§4.7's own note on the same trap for the default-range effect) — `earliest` stays permanently `null` only for an account with no activities ever, which is the real signal this fallback needs.
 
-**`countryView.ts` (new)** is a hand-authored `Record<ISO 3166-1 alpha-2, ViewState>`, generated once, offline, from the same Admin-0 country polygons already seeded server-side for Fog/Heatmap's country unlocking (`admin_countries`, §4.4): `ST_PointOnSurface(geom)` per `iso_a2` (not `ST_Centroid`, which can land outside a concave or archipelago shape) for the point, and a zoom derived from the polygon's own bounding-box extent so a small country lands close and a large one lands wide. A handful of countries needed a hand override rather than the derived value: every antimeridian-crossing country (Russia, the United States, Fiji, Kiribati, New Zealand, Antarctica) breaks the bbox-extent calculation outright at the ±180° seam, and three more (France, the Netherlands, Norway) bundle a far-flung overseas dependency into the same `admin_countries` polygon as the mainland — France and the Netherlands still centroid correctly onto the mainland but with a wildly oversized derived zoom, while Norway's centroid lands on Svalbard instead. Scoped to exactly the codes the Settings page's Country list (`internal/web/places_data.go`) can write into `users.country`; a handful of small territories in that list have no polygon in `admin_countries` and simply have no entry, falling through to `WORLD_VIEW` like an unset country does. `countryView(country)` mirrors `units.ts`'s `unitSystemForCountry` null-handling convention (`''` or an unmapped code both resolve to `null`).
+**`countryView.ts` (new)** is a hand-authored `Record<ISO 3166-1 alpha-2, ViewState>`, generated once, offline, from the same Admin-0 country polygons already seeded server-side for Fog/Heatmap's country unlocking (`admin_countries`, §3.12, §4.2.4): `ST_PointOnSurface(geom)` per `iso_a2` (not `ST_Centroid`, which can land outside a concave or archipelago shape) for the point, and a zoom derived from the polygon's own bounding-box extent so a small country lands close and a large one lands wide. A handful of countries needed a hand override rather than the derived value: every antimeridian-crossing country (Russia, the United States, Fiji, Kiribati, New Zealand, Antarctica) breaks the bbox-extent calculation outright at the ±180° seam, and three more (France, the Netherlands, Norway) bundle a far-flung overseas dependency into the same `admin_countries` polygon as the mainland — France and the Netherlands still centroid correctly onto the mainland but with a wildly oversized derived zoom, while Norway's centroid lands on Svalbard instead. Scoped to exactly the codes the Settings page's Country list (`internal/web/places_data.go`) can write into `users.country`; a handful of small territories in that list have no polygon in `admin_countries` and simply have no entry, falling through to `WORLD_VIEW` like an unset country does. `countryView(country)` mirrors `units.ts`'s `unitSystemForCountry` null-handling convention (`''` or an unmapped code both resolve to `null`).
 
 **`WORLD_VIEW` (`config.ts`) replaced `DEFAULT_VIEW`**, a hardcoded Columbus, OH point that predated this fallback chain entirely and had no design rationale behind it beyond "roughly the centre of the [dev] extract" — it served as the no-hash opening view before fly-to-most-recent-activity existed, and remained the silent, undocumented result of every zero-history load afterward, with no fallback logic at all. `WORLD_VIEW` (`{ longitude: 10, latitude: 15, zoom: 1.3 }`) is deliberately zoomed out far enough to keep every continent in frame, and is now the one fallback used both by the resolution chain's last tier and by `MapView`'s own no-hash-at-all default.
 
@@ -1235,7 +1269,7 @@ Protomaps publishes daily planet builds at `https://build.protomaps.com/{YYYYMMD
 
 **Serving.** PMTiles requires HTTP range-request support plus CORS — allowed methods `GET, HEAD`, allowed headers `range, if-match`, exposed header `etag`. With those set the client reads the archive directly; no proxy or tile server is needed. Note that **every tile read is a separately billed GET** — that, not storage, is the cost that scales, and it is why a CDN sits in front.
 
-**Rollout.** Production serves the full planet build unmodified (z0–15), from the public R2 bucket `VITE_BASEMAP_ORIGIN`/`BASEMAP_ORIGIN` point at. Each build lives under its own dated prefix — `<origin>/basemap/basemap.pmtiles` with an origin like `https://pub-….r2.dev/20260922` — together with a copy of `fonts/` and `sprites/`, rather than overwriting in place, so in-flight clients are never served a half-swapped archive. The archive keeps one fixed name, `basemap.pmtiles` (`config.ts`'s `PMTILES_PATH`), in every environment, so moving to a new build changes only the origin and needs no code change. Dev serves a small Ohio extract under that same name (`apps/web/scripts/build-basemap.sh`). The public origin is the bucket's custom domain `tiles.holdmytrack.com`, proxied through Cloudflare, not its rate-limited `r2.dev` URL. Cloudflare's free plan edge-caches only the small fonts and sprites, not objects as large as the archive, so range reads into the archive still reach R2 every time. R2 charges per request, not for egress, so this costs only request fees. Real edge caching of the archive would mean splitting it into cacheable pieces or a plan with a higher cacheable-size limit.
+**Rollout.** Production serves the full planet build unmodified (z0–15), from the public R2 bucket `VITE_BASEMAP_ORIGIN`/`BASEMAP_ORIGIN` point at. Each build lives under its own dated prefix — `<origin>/basemap/basemap.pmtiles` with an origin like `https://tiles.holdmytrack.com/20260922` — together with a copy of `fonts/` and `sprites/`, rather than overwriting in place, so in-flight clients are never served a half-swapped archive. The archive keeps one fixed name, `basemap.pmtiles` (`config.ts`'s `PMTILES_PATH`), in every environment, so moving to a new build changes only the origin and needs no code change. Local dev reads the same planet archive from `tiles.holdmytrack.com`, through `apps/web/.env.local` (`docs/DEVELOPMENT.md`). A small Ohio extract under that same name (`apps/web/scripts/build-basemap.sh`) exists only for the `test` compose service's Playwright suites, so CI never makes production R2 requests. The public origin is the bucket's custom domain `tiles.holdmytrack.com`, proxied through Cloudflare, not its rate-limited `r2.dev` URL. Cloudflare's free plan edge-caches only the small fonts and sprites, not objects as large as the archive, so range reads into the archive still reach R2 every time. R2 charges per request, not for egress, so this costs only request fees. Real edge caching of the archive would mean splitting it into cacheable pieces or a plan with a higher cacheable-size limit.
 
 **No coverage check on the client.** With a planet-wide archive there is no area outside coverage, so the web client does not read the archive's header bounds or show an out-of-coverage notice (`SPEC.md` FR-4.6).
 
