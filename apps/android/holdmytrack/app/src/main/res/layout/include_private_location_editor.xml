@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Private location editor, after the web's .private-locations__window: a card over the
+     top of the map, as the Edit window is (MainActivity sets its top margin), so the circle it
+     edits stays in view. The title, Name, RADIUS with its readout and slider, a note, an error
+     line, and Cancel and Save. Moving the circle is dragging its handle on the map. Filled by
+     panel/PrivacyTab. -->
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/private_editor"
+    style="@style/Widget.HoldMyTrack.Card"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_gravity="top"
+    android:layout_marginStart="@dimen/hmt_space_10"
+    android:layout_marginEnd="@dimen/hmt_space_10"
+    android:clickable="true"
+    android:elevation="10dp"
+    android:focusable="false"
+    android:visibility="gone"
+    app:cardElevation="10dp"
+    app:contentPadding="@dimen/hmt_space_16">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/private_editor_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleMedium" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_12"
+            android:hint="@string/edit_name"
+            app:placeholderText="@string/private_name_placeholder">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/private_editor_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="textCapSentences"
+                android:maxLength="100" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_12"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/private_radius"
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.PanelFilterLabel" />
+
+            <TextView
+                android:id="@+id/private_editor_radius"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/hmt_ink_meta"
+                android:textSize="@dimen/hmt_text_xs" />
+        </LinearLayout>
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/private_editor_slider"
+            style="@style/Widget.HoldMyTrack.PanelSlider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="-8dp"
+            android:layout_marginEnd="-8dp"
+            android:contentDescription="@string/private_radius"
+            android:stepSize="10"
+            android:valueFrom="50"
+            android:valueTo="2000" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/private_editor_note"
+            android:textColor="@color/hmt_ink_meta"
+            android:textSize="@dimen/hmt_text_sm" />
+
+        <TextView
+            android:id="@+id/private_editor_error"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_8"
+            android:accessibilityLiveRegion="polite"
+            android:textColor="@color/hmt_danger"
+            android:textSize="@dimen/hmt_text_sm"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_12"
+            android:gravity="end"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/private_editor_cancel"
+                style="@style/Widget.HoldMyTrack.Button.Outlined"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/edit_cancel" />
+
+            <Button
+                android:id="@+id/private_editor_save"
+                style="@style/Widget.HoldMyTrack.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/hmt_space_8"
+                android:text="@string/edit_save" />
+        </LinearLayout>
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

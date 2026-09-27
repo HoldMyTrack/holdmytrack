@@ -102,6 +102,18 @@
                     tools:text="2"
                     tools:visibility="visible" />
             </LinearLayout>
+
+            <TextView
+                android:id="@+id/panel_tab_privacy"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/hmt_space_20"
+                android:alpha="0.45"
+                android:clickable="true"
+                android:focusable="true"
+                android:paddingBottom="@dimen/hmt_space_6"
+                android:text="@string/panel_tab_privacy"
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.PanelTab" />
         </LinearLayout>
 
         <View
@@ -519,5 +531,75 @@
                 </LinearLayout>
             </LinearLayout>
         </ScrollView>
+
+        <!-- The Privacy tab (apps/web/src/ui/PrivateLocationsPanel.tsx), laid out as the
+             Activities tab is: a toolbar strip with Create, the circles as rows, and a footer
+             note. Filled by panel/PrivacyTab. -->
+        <LinearLayout
+            android:id="@+id/panel_privacy_content"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/privacy_toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_row_divider"
+                android:orientation="horizontal"
+                android:paddingStart="@dimen/hmt_space_16"
+                android:paddingTop="@dimen/hmt_space_6"
+                android:paddingEnd="@dimen/hmt_space_16"
+                android:paddingBottom="@dimen/hmt_space_6">
+
+                <Button
+                    android:id="@+id/privacy_create"
+                    style="@style/Widget.HoldMyTrack.Button"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/private_create" />
+            </LinearLayout>
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:id="@+id/privacy_rows"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+
+                    <TextView
+                        android:id="@+id/privacy_note"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:padding="@dimen/hmt_space_16"
+                        android:textColor="@color/panel_ink_50"
+                        android:textSize="@dimen/hmt_text_md"
+                        android:visibility="gone" />
+                </LinearLayout>
+            </ScrollView>
+
+            <TextView
+                android:id="@+id/privacy_footer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_list_top"
+                android:paddingStart="@dimen/hmt_space_16"
+                android:paddingTop="@dimen/hmt_space_12"
+                android:paddingEnd="@dimen/hmt_space_16"
+                android:paddingBottom="@dimen/hmt_space_12"
+                android:text="@string/private_reprocess_note"
+                android:textColor="@color/hmt_ink_meta"
+                android:textSize="@dimen/hmt_text_sm" />
+        </LinearLayout>
     </FrameLayout>
 </LinearLayout>

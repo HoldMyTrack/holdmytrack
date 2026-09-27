@@ -447,7 +447,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Outputs**: At most one live `Activity` per real-world activity, regardless of how many sources reported it.
 
-5. The web app's Activities panel surfaces a "N duplicates found" disclosure whenever `GET /v1/activities/duplicates` returns any rows, listing each superseded activity's start time, type, distance and source, and which source's copy superseded it — mirroring the Android app's own sync screen, which has shown this since FR-3.6 shipped. Hidden entirely when there are none.
+5. The web app's Activities panel surfaces a "N duplicates found" disclosure whenever `GET /v1/activities/duplicates` returns any rows, listing each superseded activity's start time, type, distance and source, and which source's copy superseded it — the Android app's panel shows the same disclosure in the same place (`apps/android/docs/SPEC.md` FR-2.7). Hidden entirely when there are none.
 
 ### FR-3.8 In-app GPS recording (Android)
 

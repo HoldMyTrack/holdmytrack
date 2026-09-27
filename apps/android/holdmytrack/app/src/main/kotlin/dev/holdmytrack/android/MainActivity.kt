@@ -44,6 +44,8 @@ import dev.holdmytrack.android.panel.ActivitiesPanel
 import dev.holdmytrack.android.panel.ActivityFacets
 import dev.holdmytrack.android.panel.EditActivityWindow
 import dev.holdmytrack.android.panel.PanelFormat
+import dev.holdmytrack.android.panel.PanelTab
+import dev.holdmytrack.android.panel.PrivacyTab
 import dev.holdmytrack.android.panel.PanelState
 import dev.holdmytrack.android.panel.TrackProfileView
 import dev.holdmytrack.android.recording.RecordButton
@@ -119,6 +121,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var panel: ActivitiesPanel
     private val panelState = PanelState()
     private lateinit var editWindow: EditActivityWindow
+    private lateinit var privacyTab: PrivacyTab
+
+    /** Whether the Privacy tab has the map — its tab showing, in Normal mode. */
+    private var privacyShowing = false
     private lateinit var editLock: View
 
     /** Back closes the Edit window before it leaves the map. */
@@ -322,6 +328,24 @@ class MainActivity : AppCompatActivity() {
             onEdit = ::openEditWindow,
             onDeleted = ::onActivitiesDeleted,
             onViewOnMap = ::viewActivityOnMap,
+            onTabChanged = { renderPrivacy() },
+        )
+        privacyTab = PrivacyTab(
+            findViewById(R.id.panel_privacy_content),
+            findViewById(R.id.private_editor),
+            map = { map },
+            style = { style?.takeIf { overlaysAttached } },
+            onEditorOpen = {
+                panel.setExpanded(false)
+                placeEditWindow()
+            },
+            onChanged = ::onPrivateLocationsChanged,
+            openAreaCenterY = {
+                val editor = findViewById<View>(R.id.private_editor)
+                val top = if (editor.isVisible) editor.bottom else findViewById<View>(R.id.top_bar).bottom
+                val bottom = mapView.height - if (bottomChrome.isVisible) bottomChrome.height - sheetExtraHeight() else 0
+                (top + bottom) / 2f
+            },
         )
         trackCard = findViewById(R.id.track_card)
         trackProfile = findViewById(R.id.track_profile)
@@ -363,6 +387,7 @@ class MainActivity : AppCompatActivity() {
 
         mapView = findViewById(R.id.map_view)
         mapView.onCreate(savedInstanceState)
+        takeHandleDrags()
 
         // Failures are reported here rather than only in logcat: a style or tile fetch that
         // 404s leaves a plausible-looking blank map behind, with nothing on screen to say so.
@@ -383,6 +408,14 @@ class MainActivity : AppCompatActivity() {
             instance.addOnMapClickListener { point -> onMapTap(instance, point) }
             loadStyle()
         }
+    }
+
+    /** Dragging a Private location's handle takes the touch before the map can pan with it
+     *  (`PrivacyTab.onMapTouch`). Only a press on the handle is taken; every other touch,
+     *  taps included, still reaches the map, which performs its own clicks. */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun takeHandleDrags() {
+        mapView.setOnTouchListener { _, event -> privacyShowing && privacyTab.onMapTouch(event) }
     }
 
     /** [MIN_TOUCH_TARGET_DP] in pixels, rounded up. */
@@ -604,6 +637,8 @@ class MainActivity : AppCompatActivity() {
             MapOverlays.setTrackFilter(loaded, panelState.mapHidden, panelState.focused)
             overlaysAttached = true
             renderTrackMetrics()
+            // A new style has none of the circles; draw them again if the tab has the map.
+            if (privacyShowing) privacyTab.start()
             if (isRecording()) MapOverlays.setRecording(loaded, true, mode)
             frameActivities()
         }
@@ -772,15 +807,44 @@ class MainActivity : AppCompatActivity() {
         if (saved) selectedRange?.let { loadActivities(it, fly = false) }
     }
 
-    /** The window sits just under the chrome row, the web's `top: 54px`. */
+    /** The Edit window and the Private location editor sit just under the chrome row, the
+     *  web's `top: 54px`. */
     private fun placeEditWindow() {
-        if (!::editWindow.isInitialized || !editWindow.isOpen) return
-        val card = findViewById<View>(R.id.edit_window)
-        val params = card.layoutParams as MarginLayoutParams
         val top = findViewById<View>(R.id.top_bar).bottom + resources.getDimensionPixelSize(R.dimen.hmt_space_8)
-        if (params.topMargin != top) {
-            params.topMargin = top
-            card.layoutParams = params
+        for (id in listOf(R.id.edit_window, R.id.private_editor)) {
+            val card = findViewById<View>(id)
+            val params = card.layoutParams as MarginLayoutParams
+            if (params.topMargin != top) {
+                params.topMargin = top
+                card.layoutParams = params
+            }
+        }
+    }
+
+    /** The Privacy tab takes the map while its tab shows in Normal mode, and gives it back —
+     *  circles and any unsaved draft gone — the moment either stops. */
+    private fun renderPrivacy() {
+        if (!::privacyTab.isInitialized) return
+        val next = sheet.isVisible && panel.tab == PanelTab.PRIVACY
+        if (next == privacyShowing) return
+        privacyShowing = next
+        if (next) privacyTab.start() else privacyTab.stop()
+    }
+
+    /**
+     * A Private location saved or deleted — the web's `handlePrivateLocationsChanged`: the
+     * activities it touches go Pending and are reprocessed, so the list is read again at once,
+     * and once the server has drained its work, everything is: the tracks, the list, the days,
+     * the selected activity's metrics — a batch that finished before the first read never
+     * showed a row Pending at all.
+     */
+    private fun onPrivateLocationsChanged() {
+        selectedRange?.let { loadActivities(it, fly = false) }
+        coverageWatch.watch {
+            style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
+            selectedRange?.let { loadActivities(it, fly = false) }
+            activityDays.reload()
+            updateTrackMetrics(refetch = true)
         }
     }
 
@@ -934,6 +998,11 @@ class MainActivity : AppCompatActivity() {
      */
     private fun onMapTap(instance: MapLibreMap, point: LatLng): Boolean {
         if (!sheet.isVisible) return false
+        // The Privacy tab has the map to itself while it shows.
+        if (privacyShowing) {
+            privacyTab.onMapTap(point)
+            return true
+        }
         // The Edit window's group mustn't change underneath it; the one thing a tap does then
         // is Delete point's.
         if (editWindow.isOpen) {
@@ -975,6 +1044,7 @@ class MainActivity : AppCompatActivity() {
         bottomChrome.visibility = if (normal) View.VISIBLE else View.GONE
         if (!normal) panel.dismissPopups()
         if (::trackCard.isInitialized) renderTrackMetrics()
+        renderPrivacy()
     }
 
     private fun isRecording() = (recorder?.state ?: RecordingState.IDLE) != RecordingState.IDLE

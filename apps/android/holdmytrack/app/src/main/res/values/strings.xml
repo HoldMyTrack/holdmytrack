@@ -314,6 +314,24 @@
         <item quantity="other">Edit %1$d activities</item>
     </plurals>
 
+    <!-- The panel's Privacy tab (panel/PrivacyTab.kt), after the web's private.* messages. -->
+    <string name="panel_tab_privacy">Privacy</string>
+    <string name="private_subtitle">Tracks never start or end inside these circles.</string>
+    <string name="private_create">Create</string>
+    <string name="private_none">None yet.</string>
+    <string name="private_unnamed">Unnamed</string>
+    <string name="private_radius">Radius</string>
+    <string name="private_row_meta">Radius · %1$s</string>
+    <string name="private_name_placeholder">e.g. Home</string>
+    <string name="private_new_title">New private location</string>
+    <string name="private_edit_title">Edit private location</string>
+    <string name="private_editor_note">Drag the center to move it. Don\'t center it exactly on your door — a circle\'s middle is the first place anyone looks.</string>
+    <string name="private_reprocess_note">Saving a change reprocesses the activities it touches — they show Pending until done.</string>
+    <string name="private_delete_title">Delete this private location?</string>
+    <string name="private_delete_body">Activities that start or end inside it will show those parts again once they\'re reprocessed.</string>
+    <string name="private_delete_label">Delete %1$s</string>
+    <string name="private_delete_failed">Could not delete it: %1$s</string>
+
     <!-- Activity types' display names, the web's activity_type.* (RecordingTypes.label); a type without one is title-cased from its raw value. -->
     <string name="activity_type_alpine_skiing">Alpine Skiing</string>
     <string name="activity_type_biking">Biking</string>

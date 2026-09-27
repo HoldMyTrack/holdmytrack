@@ -207,6 +207,10 @@
     <!-- The Edit window (include_edit_window, panel/EditActivityWindow), under the chrome row. -->
     <include layout="@layout/include_edit_window" />
 
+    <!-- The Privacy tab's editor (include_private_location_editor, panel/PrivacyTab), where the
+         Edit window would be. -->
+    <include layout="@layout/include_private_location_editor" />
+
     <!-- The bottom of the map, Normal mode's alone, the web's phone layout: the Activities panel
          (include_activities_sheet, panel/ActivitiesPanel) sitting on the date-range footer, one
          white block the width of the screen with a hairline and a shadow along its top. Gone

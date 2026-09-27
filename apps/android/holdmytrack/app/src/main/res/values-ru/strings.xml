@@ -327,6 +327,24 @@
         <item quantity="other">Редактировать %1$d занятия</item>
     </plurals>
 
+    <!-- The panel's Privacy tab (panel/PrivacyTab.kt), after the web's private.* messages. -->
+    <string name="panel_tab_privacy">Приватность</string>
+    <string name="private_subtitle">Треки никогда не начинаются и не заканчиваются внутри этих кругов.</string>
+    <string name="private_create">Создать</string>
+    <string name="private_none">Пока нет.</string>
+    <string name="private_unnamed">Без названия</string>
+    <string name="private_radius">Радиус</string>
+    <string name="private_row_meta">Радиус · %1$s</string>
+    <string name="private_name_placeholder">например, Дом</string>
+    <string name="private_new_title">Новое приватное место</string>
+    <string name="private_edit_title">Изменить приватное место</string>
+    <string name="private_editor_note">Перетащите центр, чтобы сдвинуть круг. Не ставьте центр прямо на свою дверь — середину круга проверят в первую очередь.</string>
+    <string name="private_reprocess_note">Сохранение изменения запускает повторную обработку затронутых занятий — до её окончания они помечены «Ожидает».</string>
+    <string name="private_delete_title">Удалить это приватное место?</string>
+    <string name="private_delete_body">Занятия, которые начинаются или заканчиваются внутри него, снова покажут эти части после повторной обработки.</string>
+    <string name="private_delete_label">Удалить «%1$s»</string>
+    <string name="private_delete_failed">Не удалось удалить: %1$s</string>
+
     <!-- Activity types' display names, the web's activity_type.* (RecordingTypes.label); a type without one is title-cased from its raw value. -->
     <string name="activity_type_alpine_skiing">Горные лыжи</string>
     <string name="activity_type_biking">Велосипед</string>
