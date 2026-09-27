@@ -48,6 +48,8 @@ class PrivacyTab(
     private val style: () -> Style?,
     /** The editor opened: the sheet collapses, so it doesn't cover the circle being edited. */
     private val onEditorOpen: () -> Unit,
+    /** The editor closed. */
+    private val onEditorClose: () -> Unit,
     /** A location was saved or deleted. */
     private val onChanged: () -> Unit,
     /** The middle of the map left showing under the editor and above the collapsed panel, in
@@ -240,6 +242,7 @@ class PrivacyTab(
         context.getSystemService(InputMethodManager::class.java)?.hideSoftInputFromWindow(editor.windowToken, 0)
         editor.findFocus()?.clearFocus()
         editor.visibility = View.GONE
+        onEditorClose()
     }
 
     /** Unchanged from what's saved — the web's `sameDraft`; a new one is always a change. */

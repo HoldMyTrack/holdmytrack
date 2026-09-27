@@ -328,7 +328,9 @@ class MainActivity : AppCompatActivity() {
             onEditorOpen = {
                 panel.setExpanded(false)
                 placeEditWindow()
+                renderRecordButton()
             },
+            onEditorClose = ::renderRecordButton,
             onChanged = ::onPrivateLocationsChanged,
             openAreaCenterY = {
                 val editor = findViewById<View>(R.id.private_editor)
@@ -511,7 +513,8 @@ class MainActivity : AppCompatActivity() {
     /**
      * MapLibre's own compass control defaults to top-end with a small fixed margin, unaware of
      * the status bar — found sitting directly behind the clock/battery indicator on a real
-     * device — and of the top row, whose Find my location button shares that corner. Called from both `insetSystemBars` and `getMapAsync` because whichever of the
+     * device — and of the top row, whose Find my location button shares that corner, as does
+     * Record under it. Called from both `insetSystemBars` and `getMapAsync` because whichever of the
      * inset callback and the map-ready callback fires second is the one that actually has
      * everything it needs.
      */
@@ -523,9 +526,13 @@ class MainActivity : AppCompatActivity() {
             compassBaseMarginCaptured = true
         }
         // Below the top row (burger, modes, Find my location), which already sits below the
-        // status bar, and below the notice while one is up; before that row is laid out, below
-        // the status bar at least.
-        val belowTopBar = if (notice.isVisible) notice.bottom else findViewById<View>(R.id.top_bar).bottom
+        // status bar, Record under it and the notice while either is up; before the row is
+        // laid out, below the status bar at least.
+        val belowTopBar = maxOf(
+            findViewById<View>(R.id.top_bar).bottom,
+            if (recordButton.isVisible) recordButton.bottom else 0,
+            if (notice.isVisible) notice.bottom else 0,
+        )
         settings.setCompassMargins(
             settings.compassMarginLeft,
             compassBaseMarginTop + maxOf(systemBarInsetTop, belowTopBar),
@@ -754,6 +761,7 @@ class MainActivity : AppCompatActivity() {
         placeEditWindow()
         placeEditLock()
         renderModeBar()
+        renderRecordButton()
         renderTrackMetrics()
     }
 
@@ -783,6 +791,7 @@ class MainActivity : AppCompatActivity() {
         editLock.visibility = View.GONE
         panel.hold(false)
         renderModeBar()
+        renderRecordButton()
         renderTrackMetrics()
         if (saved) selectedRange?.let { loadActivities(it, fly = false) }
     }
@@ -852,6 +861,13 @@ class MainActivity : AppCompatActivity() {
     private fun renderModeBar() {
         if (!modeBarReady) return
         modeBar.visibility = if (isRecording() || editWindow.isOpen) View.GONE else View.VISIBLE
+    }
+
+    /** Record, on its own row under the chrome row: away while the Edit window or the Private
+     *  location editor is open, since both open over that row. */
+    private fun renderRecordButton() {
+        val editing = editWindow.isOpen || (::privacyTab.isInitialized && privacyTab.isEditing)
+        recordButton.visibility = if (editing) View.GONE else View.VISIBLE
     }
 
     /** The panel's hidden set, filters, Pending rows and selection, onto the track layers —
