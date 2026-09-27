@@ -128,6 +128,9 @@ type AppPage struct {
 	// ViteDev loads the app from Vite's dev server (/@vite/client, /src/main.tsx) instead of
 	// the built /assets/app.js and app.css — see Dev.
 	ViteDev bool
+	// TileVersion is the account's tile cache key (httpapi's setTileCacheControl), read by the
+	// map from <meta name="tile-version"> — empty when it couldn't be read.
+	TileVersion string
 }
 
 // New builds a Renderer over fsys (Embedded(), or os.DirFS of a checkout's internal/web in dev).

@@ -88,5 +88,6 @@ func (s *Server) serveAdminTile(w http.ResponseWriter, r *http.Request, query st
 	}
 
 	w.Header().Set("Content-Type", "application/vnd.mapbox-vector-tile")
+	setTileCacheControl(w, r)
 	_, _ = w.Write(tile)
 }

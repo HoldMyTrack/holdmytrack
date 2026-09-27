@@ -637,6 +637,25 @@ class MainActivity : AppCompatActivity() {
             if (privacyShowing) privacyTab.start()
             if (isRecording()) MapOverlays.setRecording(loaded, true, mode)
             frameActivities()
+            checkTileVersion()
+        }
+    }
+
+    /**
+     * The overlays were just attached at the tile version kept from last time
+     * ([Session.tileVersion]), so what MapLibre already has draws straight away. This reads the
+     * current one and, only if it moved while the app was away (an upload on the web, a sync),
+     * fetches every tile again at it.
+     */
+    private fun checkTileVersion() {
+        HoldMyTrackApi.coverageStatus { result ->
+            val status = result.getOrNull() ?: return@coverageStatus
+            if (status.tileVersion.isEmpty() || status.tileVersion == Session.tileVersion) return@coverageStatus
+            Session.tileVersion = status.tileVersion
+            style?.takeIf { overlaysAttached }?.let {
+                MapOverlays.refreshCoverage(it)
+                MapOverlays.refreshTracks(it, selectedRange)
+            }
         }
     }
 

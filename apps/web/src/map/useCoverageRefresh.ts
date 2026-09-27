@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { getCoverageStatus } from '../api';
-import { bumpCoverageVersion } from './coverageVersion';
+import { setTileVersion } from './coverageVersion';
 import { refreshFogLayers } from './fog';
 import { refreshHeatmapLayers } from './heatmap';
 
@@ -17,8 +17,8 @@ const MAX_POLLS = 90;
  * on their own, so an open page would otherwise show pre-change coverage until a reload.
  *
  * The returned `watch()` starts polling `GET /v1/coverage/status` and, once the account has
- * no coverage-changing job left, bumps the coverage version and refetches every Fog/Heatmap
- * source. Each call restarts the watch rather than joining one already running: a second
+ * no coverage-changing job left, takes its tile version (coverageVersion.ts) and refetches
+ * every Fog/Heatmap source. Each call restarts the watch rather than joining one already running: a second
  * upload or delete can enqueue its jobs just after an in-flight read already came back
  * "done", and restarting is what guarantees that read isn't the last word.
  *
@@ -43,23 +43,23 @@ export function useCoverageRefresh(map: MapLibreMap | null): (onDone?: () => voi
     const controller = new AbortController();
     let timer: number | undefined;
     let polls = 0;
-    const refetch = (version: number) => {
+    const refetch = (version: number, tileVersion: string) => {
       shownVersionRef.current = version;
-      bumpCoverageVersion();
+      setTileVersion(tileVersion);
       refreshFogLayers(map);
       refreshHeatmapLayers(map);
     };
     const check = () => {
       getCoverageStatus(controller.signal)
-        .then(({ rendering, version }) => {
+        .then(({ rendering, version, tile_version: tileVersion }) => {
           polls += 1;
           if (rendering && polls < MAX_POLLS) {
             if (shownVersionRef.current === null) shownVersionRef.current = version;
-            else if (version !== shownVersionRef.current) refetch(version);
+            else if (version !== shownVersionRef.current) refetch(version, tileVersion);
             timer = window.setTimeout(check, POLL_MS);
             return;
           }
-          refetch(version);
+          refetch(version, tileVersion);
           const onDone = onDoneRef.current;
           onDoneRef.current = undefined;
           onDone?.();

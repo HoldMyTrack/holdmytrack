@@ -1,5 +1,6 @@
 import type { FilterSpecification, Map as MapLibreMap, VectorTileSource } from 'maplibre-gl';
 import { API_BASE_URL, TILES_V1, type ActivityQuery } from '../api';
+import { getTileVersion } from './coverageVersion';
 
 /**
  * The live tracks MVT layer (IMPLEMENTATION.md §4.3). Unlike the basemap —
@@ -46,6 +47,9 @@ type TrackDateRange = Pick<ActivityQuery, 'from' | 'to'>;
  * Bumped by every refreshTrackLayer, and sent as `v` (the handler ignores it) so each refresh
  * is a new tile URL — see refreshTrackLayer for why the same URL isn't enough. Module-level,
  * like coverageVersion.ts, so a source re-created by a theme swap starts at the current one.
+ * Sent alongside the tile version (`cv`, coverageVersion.ts), which is what lets the browser
+ * keep a tracks tile: this one only tells refreshes apart within the page, so a refresh after
+ * a change the page hasn't read a new tile version for yet (a type edit) still asks again.
  */
 let tracksVersion = 0;
 
@@ -61,6 +65,7 @@ function trackTileURL(range: TrackDateRange): string {
   const params = new URLSearchParams();
   if (range.from) params.set('from', range.from);
   if (range.to) params.set('to', range.to);
+  if (getTileVersion()) params.set('cv', getTileVersion());
   if (tracksVersion > 0) params.set('v', String(tracksVersion));
   const qs = params.toString();
   return `${API_BASE_URL}${TILES_V1}/tracks/{z}/{x}/{y}.mvt${qs ? `?${qs}` : ''}`;

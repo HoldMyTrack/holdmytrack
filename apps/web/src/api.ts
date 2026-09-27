@@ -817,9 +817,12 @@ export async function deletePrivateLocation(id: string): Promise<void> {
  */
 export interface CoverageStatus {
   rendering: boolean;
-  /** When any of the account's Fog/Heatmap tiles was last written (Unix ms; 0 before the
-   *  first) — changes mid-job too, e.g. when a Pending activity drops out of coverage. */
+  /** The account's map version — changes whenever any of its map tiles may have, mid-job
+   *  too, e.g. when a Pending activity drops out of coverage. */
   version: number;
+  /** `version` as the opaque key tile URLs carry as `cv`, so the browser can keep each tile
+   *  (coverageVersion.ts). */
+  tile_version: string;
 }
 
 export async function getCoverageStatus(signal?: AbortSignal): Promise<CoverageStatus> {

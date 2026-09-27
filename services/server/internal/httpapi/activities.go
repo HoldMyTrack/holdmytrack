@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 )
 
@@ -276,6 +277,10 @@ func (s *Server) handleUpdateActivity(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "activity not found", http.StatusNotFound)
 		return
 	}
+	// activity_type is in every tracks tile this activity crosses, and no render follows.
+	if err := fog.BumpMapVersion(ctx, s.pool, userID); err != nil {
+		s.log.Error("activity update: bump map version failed", "activity_id", activityID, "err", err)
+	}
 
 	row, err := scanActivityRow(s.pool.QueryRow(ctx, activityByIDQuery, activityID, userID))
 	if err != nil {
@@ -381,6 +386,10 @@ func (s *Server) handleDeleteActivity(w http.ResponseWriter, r *http.Request) {
 	if tag.RowsAffected() == 0 {
 		http.Error(w, "activity not found", http.StatusNotFound)
 		return
+	}
+	// The track is gone from the tracks tiles now; the render below only bumps once it runs.
+	if err := fog.BumpMapVersion(ctx, s.pool, userID); err != nil {
+		s.log.Error("activity delete: bump map version failed", "activity_id", activityID, "err", err)
 	}
 
 	// The fix for the stale-cache risk above: re-trigger the exact same dirty-mark-and-render

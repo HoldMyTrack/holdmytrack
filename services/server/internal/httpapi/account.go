@@ -72,9 +72,12 @@ func (s *Server) saveSettings(ctx context.Context, userID, displayName, country,
 	// NULLIF, not a Go-side branch on "" — an empty display name means "unset", same as every
 	// other nullable text column this API already treats that way; an empty locale likewise
 	// means "automatic". $5 IS NULL is a locale left out of the request, kept as it was.
+	// A new timezone moves the instants a tracks tile's from/to dates stand for, so it bumps
+	// map_version (fog.BumpMapVersion) like any other change to what a tile returns.
 	_, err := s.pool.Exec(ctx, `
 		UPDATE users SET display_name = NULLIF($2, ''), country = $3, timezone = $4,
-		                 locale = CASE WHEN $5::text IS NULL THEN locale ELSE NULLIF($5, '') END
+		                 locale = CASE WHEN $5::text IS NULL THEN locale ELSE NULLIF($5, '') END,
+		                 map_version = map_version + CASE WHEN timezone = $4 THEN 0 ELSE 1 END
 		WHERE id = $1
 	`, userID, displayName, country, tz, locale)
 	return err

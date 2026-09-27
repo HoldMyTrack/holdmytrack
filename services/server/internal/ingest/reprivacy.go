@@ -77,6 +77,10 @@ func EnqueueReprivacy(ctx context.Context, tx pgx.Tx, job ReprivacyJob) error {
 	if err := markPendingTilesDirty(ctx, tx, job.UserID, job.ActivityIDs); err != nil {
 		return err
 	}
+	// Pending drops them from the tracks tiles now, not at the job's first render.
+	if err := fog.BumpMapVersion(ctx, tx, job.UserID); err != nil {
+		return err
+	}
 	payload, err := json.Marshal(job)
 	if err != nil {
 		return err

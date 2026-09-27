@@ -410,6 +410,10 @@ func EnqueueTrackEdit(ctx context.Context, pool *pgxpool.Pool, job EditJob) (boo
 	if err := markPendingTilesDirty(ctx, tx, job.UserID, []string{job.ActivityID}); err != nil {
 		return false, err
 	}
+	// Pending drops the track from the tracks tiles now, not at the job's first render.
+	if err := fog.BumpMapVersion(ctx, tx, job.UserID); err != nil {
+		return false, err
+	}
 	if _, err := tx.Exec(ctx,
 		`INSERT INTO jobs (kind, user_id, payload) VALUES ('edit_track', $1, $2)`,
 		job.UserID, payload,

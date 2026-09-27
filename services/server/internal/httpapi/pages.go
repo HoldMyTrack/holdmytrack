@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 )
@@ -97,8 +98,19 @@ func (s *Server) appShell(titleKey string) http.HandlerFunc {
 			http.Redirect(w, r, home, http.StatusSeeOther)
 			return
 		}
+		// The map's first tile requests carry this as `cv` (setTileCacheControl), so they're
+		// cacheable without a GET /v1/coverage/status round trip before the first paint. A
+		// failed read just leaves it empty: the tiles still load, uncached.
+		var mapVersion int64
+		tileVersion := ""
+		if err := s.pool.QueryRow(r.Context(), `SELECT map_version FROM users WHERE id = $1`, acct.info.userID).Scan(&mapVersion); err != nil {
+			s.log.Error("app shell: map version lookup failed", "err", err)
+		} else {
+			tileVersion = fog.TileVersion(acct.info.userID, mapVersion)
+		}
 		s.pages.RenderApp(w, web.AppPage{
-			PageData: web.PageData{Title: l.T(titleKey), Path: r.URL.Path, NoIndex: true, User: acct.user, Lang: lang},
+			PageData:    web.PageData{Title: l.T(titleKey), Path: r.URL.Path, NoIndex: true, User: acct.user, Lang: lang},
+			TileVersion: tileVersion,
 			// Only a dev server honours this, and only for a request Vite's dev proxy marked
 			// (apps/web/vite.config.ts); `vite preview` and production get the built bundle.
 			ViteDev: s.pages.Dev() && r.Header.Get(viteDevHeader) == "dev",

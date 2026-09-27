@@ -3,6 +3,7 @@ package dev.holdmytrack.android.map
 import android.os.Handler
 import android.os.Looper
 import dev.holdmytrack.android.net.HoldMyTrackApi
+import dev.holdmytrack.android.net.Session
 
 /**
  * Keeps Fog and Heatmap current after a delete or a reprocess — the web's
@@ -57,12 +58,14 @@ class CoverageWatch(private val onRefetch: () -> Unit) {
                     shownVersion = status.version
                 } else if (status.version != shown) {
                     shownVersion = status.version
+                    Session.tileVersion = status.tileVersion
                     onRefetch()
                 }
                 handler.postDelayed({ check(watching) }, POLL_MS)
                 return@coverageStatus
             }
             shownVersion = status.version
+            Session.tileVersion = status.tileVersion
             onRefetch()
             val done = onDone
             onDone = null

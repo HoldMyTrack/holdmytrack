@@ -205,9 +205,10 @@ data class PrivateLocation(val id: String, val name: String, val lon: Double, va
     }
 }
 
-/** `GET /v1/coverage/status`: a Fog/Heatmap re-render still to come, and when the account's
- *  coverage tiles were last written. */
-data class CoverageStatus(val rendering: Boolean, val version: Long)
+/** `GET /v1/coverage/status`: a Fog/Heatmap re-render still to come, the account's map version
+ *  (it moves whenever any of its tiles may have), and that version as the `cv` tile URLs carry
+ *  ([Session.tileVersion]). */
+data class CoverageStatus(val rendering: Boolean, val version: Long, val tileVersion: String)
 
 /** One day that has activity, as `GET /v1/activities/histogram` counts it; [date] is `YYYY-MM-DD`
  *  in the account's timezone. Days with none are never returned. */
@@ -678,14 +679,14 @@ object HoldMyTrackApi {
 
     /**
      * `GET /v1/coverage/status` — whether the account still has a job that changes its Fog and
-     * Heatmap tiles, and when any of them was last written (Unix ms). What the map polls after
-     * a delete or a reprocess, to know when to fetch those tiles again (`map/CoverageWatch`).
+     * Heatmap tiles, and its map version. What the map polls after a delete or a reprocess, to
+     * know when to fetch those tiles again (`map/CoverageWatch`).
      */
     fun coverageStatus(onResult: (Result<CoverageStatus>) -> Unit) {
         val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/coverage/status").build()
         call(request, { text ->
             val json = JSONObject(text)
-            CoverageStatus(json.optBoolean("rendering"), json.optLong("version"))
+            CoverageStatus(json.optBoolean("rendering"), json.optLong("version"), json.optString("tile_version"))
         }, onResult)
     }
 

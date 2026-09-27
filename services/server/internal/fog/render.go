@@ -22,7 +22,20 @@ import (
 // complete per tile, not incremental — each render gathers *every* activity intersecting a
 // tile, not just whichever one triggered the dirty flag, because a tile's mask has to
 // represent the user's entire history through it every time, not just the newest activity.
-func RenderUser(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID string) error {
+//
+// A pass that stored anything ends by bumping map_version (BumpMapVersion), a failed one
+// too — its tiles are already overwritten — so a client never keeps a cached tile past it.
+func RenderUser(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID string) (err error) {
+	rendered := false
+	defer func() {
+		if !rendered {
+			return
+		}
+		if berr := BumpMapVersion(ctx, pool, userID); berr != nil && err == nil {
+			err = fmt.Errorf("fog: bump map version: %w", berr)
+		}
+	}()
+
 	heatmapCap, err := userHeatmapCap(ctx, pool, userID)
 	if err != nil {
 		return fmt.Errorf("fog: load heatmap cap: %w", err)
@@ -35,6 +48,7 @@ func RenderUser(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, u
 
 	changed := make(map[[2]int]struct{}, len(dirty))
 	for _, t := range dirty {
+		rendered = true
 		if err := renderAndStoreTile(ctx, pool, store, userID, Zoom, t[0], t[1], heatmapCap); err != nil {
 			return fmt.Errorf("fog: render z%d/%d/%d: %w", Zoom, t[0], t[1], err)
 		}
