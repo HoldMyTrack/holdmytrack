@@ -1,6 +1,7 @@
 package dev.holdmytrack.android.map
 
 import dev.holdmytrack.android.BuildConfig
+import dev.holdmytrack.android.net.TrackMetricPoint
 import dev.holdmytrack.android.recording.RecordedPoint
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
@@ -15,6 +16,7 @@ import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.android.style.sources.RasterSource
 import org.maplibre.android.style.sources.TileSet
 import org.maplibre.android.style.sources.VectorSource
+import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
@@ -116,6 +118,13 @@ object MapOverlays {
     private const val CASING_COLOR = "#202b25"
     private const val CASING_OPACITY = 0.95f
 
+    /** The selected activity's pace or heart-rate bands (`TrackBands`), the web's `track-bands`:
+     *  one coloured line per run, over its track, under the labels. */
+    private const val BAND_SOURCE_ID = "track-bands"
+    private const val BAND_LAYER_ID = "track-bands-line"
+    private const val BAND_WIDTH = 6f
+    private const val BAND_OPACITY = 0.95f
+
     /** The track layers' ids, in paint order — what mode and recording show and hide together. */
     private val TRACK_LAYER_IDS = listOf(TRACKS_CASING_LAYER_ID, TRACKS_LAYER_ID, TRACKS_SELECTED_LAYER_ID)
 
@@ -162,7 +171,7 @@ object MapOverlays {
         FOG_LAYER_ID, HEATMAP_LAYER_ID,
         COUNTRY_FOG_LAYER_ID, COUNTRY_HEATMAP_LAYER_ID,
         REGION_FOG_LAYER_ID, REGION_HEATMAP_LAYER_ID,
-    ) + TRACK_LAYER_IDS
+    ) + TRACK_LAYER_IDS + BAND_LAYER_ID
 
     private const val LIVE_TRACK_SOURCE_ID = "live-track"
     private const val LIVE_TRACK_LAYER_ID = "live-track-line"
@@ -186,8 +195,43 @@ object MapOverlays {
         val beforeId = labelInsertionPoint(style)
         addCoverage(style, beforeId)
         addTracks(style, beforeId, range)
+        addBands(style, beforeId)
         setMode(style, mode)
     }
+
+    private fun addBands(style: Style, beforeId: String?) {
+        if (style.getSource(BAND_SOURCE_ID) == null) style.addSource(GeoJsonSource(BAND_SOURCE_ID))
+        if (style.getLayer(BAND_LAYER_ID) == null) {
+            val layer = LineLayer(BAND_LAYER_ID, BAND_SOURCE_ID).withProperties(
+                PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+                PropertyFactory.lineColor(Expression.get("color")),
+                PropertyFactory.lineWidth(BAND_WIDTH),
+                PropertyFactory.lineOpacity(BAND_OPACITY),
+            )
+            insert(style, layer, beforeId)
+        }
+    }
+
+    /**
+     * Colours [points] — the selected activity's track, `GET /v1/activities/track-metrics` —
+     * by [metric], one line per band run; an empty list clears it. The web's `setTrackBands`.
+     */
+    fun setTrackBands(style: Style, points: List<TrackMetricPoint>, metric: BandMetric) {
+        val source = style.getSourceAs<GeoJsonSource>(BAND_SOURCE_ID) ?: return
+        if (points.size < 2) {
+            source.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+            return
+        }
+        val runs = TrackBands.runs(points, metric, TrackBands.scale(points, metric))
+        val features = runs.map { run ->
+            val line = LineString.fromLngLats(points.subList(run.startIndex, run.endIndex + 1).map { Point.fromLngLat(it.lon, it.lat) })
+            Feature.fromGeometry(line).apply { addStringProperty("color", TrackBands.COLORS[run.band]) }
+        }
+        source.setGeoJson(FeatureCollection.fromFeatures(features))
+    }
+
+    fun clearTrackBands(style: Style) = setTrackBands(style, emptyList(), BandMetric.SPEED)
 
     /** Fog and Heatmap at every tier, each inserted below [beforeId]. */
     private fun addCoverage(style: Style, beforeId: String?) {
@@ -249,7 +293,9 @@ object MapOverlays {
         val visibility = old.visibility.value
         TRACK_LAYER_IDS.forEach { id -> style.getLayer(id)?.let(style::removeLayer) }
         style.removeSource(TRACKS_SOURCE_ID)
-        addTracks(style, labelInsertionPoint(style), range)
+        // Back under the bands, which stay drawn over them.
+        val beforeId = if (style.getLayer(BAND_LAYER_ID) != null) BAND_LAYER_ID else labelInsertionPoint(style)
+        addTracks(style, beforeId, range)
         TRACK_LAYER_IDS.forEach { id -> style.getLayer(id)?.setProperties(PropertyFactory.visibility(visibility)) }
     }
 
@@ -285,6 +331,7 @@ object MapOverlays {
         setVisible(style, COUNTRY_HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
         setVisible(style, REGION_HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
         TRACK_LAYER_IDS.forEach { setVisible(style, it, mode == MapMode.NORMAL) }
+        setVisible(style, BAND_LAYER_ID, mode == MapMode.NORMAL)
         setLabelOpacity(style, if (mode == MapMode.FOG) FOG_LABEL_OPACITY else 1f)
     }
 

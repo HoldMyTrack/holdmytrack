@@ -67,7 +67,7 @@ This app is the smaller of the two boxes root `docs/ARCHITECTURE.md` §1.2 draws
 | Background sync of any kind | Never, for Health Connect routes specifically — the platform constraint this app is built around, not a sequencing gap |
 | An encrypted token store | A threat model beyond "physical access to the device's own private storage" is identified — not the case today |
 | iOS client | Path 2's contract is proven out and stable against this app first (`apps/android/docs/ROADMAP.md`) |
-| Automated instrumentation tests, and unit tests beyond the Activities panel | Never formally scheduled; JUnit 4 covers only the Activities panel's pure filter and selection rules (`app/src/test`, `apps/android/docs/IMPLEMENTATION.md` §3.2), and every other check is manual, device-level, and recorded narratively in `apps/android/docs/ROADMAP.md` — see `apps/android/docs/IMPLEMENTATION.md` §9 |
+| Automated instrumentation tests, and unit tests beyond the Activities panel | Never formally scheduled; JUnit 4 covers only the Activities panel's pure filter and selection rules and the track band rules (`app/src/test`, `apps/android/docs/IMPLEMENTATION.md` §3.2), and every other check is manual, device-level, and recorded narratively in `apps/android/docs/ROADMAP.md` — see `apps/android/docs/IMPLEMENTATION.md` §9 |
 
 ---
 

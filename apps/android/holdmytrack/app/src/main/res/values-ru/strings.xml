@@ -209,6 +209,14 @@
     <string name="panel_tab_activities">Занятия</string>
     <string name="panel_tab_sync">Синхронизация</string>
     <string name="panel_sync_subtext">Всё импортированное — с телефона или из веба</string>
+    <string name="panel_metric_pace">Темп</string>
+    <string name="panel_metric_hr">Пульс</string>
+    <string name="panel_colored_by">Цвет по</string>
+    <string name="panel_bpm">%1$d уд/мин</string>
+    <string name="panel_pace">%1$d:%2$02d/%3$s</string>
+    <string name="panel_unit_m">м</string>
+    <string name="panel_unit_ft">фт</string>
+    <string name="panel_profile">Темп, пульс и высота вдоль выбранного занятия. Коснитесь и ведите, чтобы увидеть точку.</string>
     <string name="panel_loaded">Загружено: %1$s</string>
     <string name="panel_loading">Загрузка…</string>
     <string name="panel_expand">Показать список занятий</string>
