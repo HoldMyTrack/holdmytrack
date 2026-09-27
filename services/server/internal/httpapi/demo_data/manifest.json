@@ -34,5 +34,21 @@
   "2026-09-26 Brecksville Reservation trip.gpx": {
     "name": "Brecksville Reservation trip",
     "type": "driving"
+  },
+  "2026-09-27 Clague Park-2.gpx": {
+    "name": "Clague Park",
+    "type": "walking"
+  },
+  "2026-09-27 Clague Park-3.gpx": {
+    "name": "Clague Park",
+    "type": "driving"
+  },
+  "2026-09-27 Clague Park.gpx": {
+    "name": "Clague Park",
+    "type": "driving"
+  },
+  "2026-09-27 Emerald Necklace Trail.gpx": {
+    "name": "Emerald Necklace Trail",
+    "type": "Solowheel"
   }
 }
