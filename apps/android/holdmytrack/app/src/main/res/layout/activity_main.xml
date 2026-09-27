@@ -24,8 +24,9 @@
         <!-- Floating chrome over the map, one row along the top: the burger menu and the map-mode
              toggle at the start, mirroring the web client's own top-left mode control
              (apps/web/src/index.css's .map-mode-toggle), and Find my location at the end, where
-             the web has its geolocate control. MapLibre's compass, also top-end, is pushed below
-             this row (MainActivity.applyCompassMargin). The row itself takes no touches, so the
+             the web has its geolocate control. Record sits on a row of its own under Find my
+             location. MapLibre's compass, also top-end, is pushed below both
+             (MainActivity.applyCompassMargin). The row itself takes no touches, so the
              map still pans through the gap. Styled from the theme (res/values/themes.xml). -->
         <LinearLayout
             android:id="@+id/top_bar"
@@ -130,24 +131,29 @@
                     android:contentDescription="@string/locate_button"
                     app:icon="@drawable/ic_locate_fixed" />
             </FrameLayout>
-
-            <!-- One-tap GPS recording (MainActivity.onRecordTap): tap to start, tap again to
-                 pause or resume, hold for two seconds to stop (RecordButton draws the countdown
-                 ring). Up here in the chrome row since the bottom of the screen is the
-                 Activities panel's; translucent, so the map still reads through it. At the row's
-                 end, so it stays put while recording, when the rest of the row steps aside. -->
-            <dev.holdmytrack.android.recording.RecordButton
-                android:id="@+id/record_button"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_gravity="center_vertical"
-                android:layout_marginStart="@dimen/hmt_space_6"
-                android:background="@drawable/bg_record_button"
-                android:contentDescription="@string/record_button_start"
-                android:padding="@dimen/hmt_space_12"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_record_start" />
         </LinearLayout>
+
+        <!-- One-tap GPS recording (MainActivity.onRecordTap): tap to start, tap again to pause or
+             resume, hold for two seconds to stop (RecordButton draws the countdown ring). Up here
+             under the chrome row since the bottom of the screen is the Activities panel's;
+             translucent, so the map still reads through it. Its own row, centred under Find my
+             location's 56dp panel (the row's 12dp margin plus half the 8dp difference), 6dp
+             below it — the row's own gap between panels. It stays put while recording, when the
+             row above steps aside, and is hidden while an editor covers this row
+             (MainActivity.renderRecordButton). -->
+        <dev.holdmytrack.android.recording.RecordButton
+            android:id="@+id/record_button"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="end"
+            android:layout_marginTop="-6dp"
+            android:layout_marginEnd="@dimen/hmt_space_16"
+            android:layout_marginBottom="@dimen/hmt_space_12"
+            android:background="@drawable/bg_record_button"
+            android:contentDescription="@string/record_button_start"
+            android:padding="@dimen/hmt_space_12"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_record_start" />
 
         <!-- The map's notice: the map chrome's own panel, after the web's on-map banner
              (.version-banner) — a message, a smaller detail line, and one action. -->

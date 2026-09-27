@@ -154,7 +154,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 ### FR-2.5 Find my location
 
-**Description**: A button near the right end of the map's top row (the row with the menu button and the mode toggle), just before the record button (FR-5.1), that shows the user's position and moves the camera to it — the Android counterpart of the web map's geolocate control.
+**Description**: A button near the right end of the map's top row (the row with the menu button and the mode toggle), with the record button (FR-5.1) on its own row under it, that shows the user's position and moves the camera to it — the Android counterpart of the web map's geolocate control.
 
 **Behavior**:
 1. The first tap asks for location permission (the system dialog offers Precise or Approximate; either is enough). If it's refused, a message says location access is needed to show where you are, and nothing else happens.
@@ -281,7 +281,7 @@ A third way an activity can originate on this app, alongside FR-3's Health Conne
 
 ### FR-5.1 Record — one button on the map
 
-**Description**: A round, translucent record button at the right end of the map's top row (`MainActivity`) — the bottom of the screen is the Activities panel's (FR-2.7) — that records a casual, GPS-only track — a walk, hike, or drive someone would not otherwise bother tracking — in one tap, asking nothing.
+**Description**: A round, translucent record button on its own row under the right end of the map's top row, centred under Find my location (`MainActivity`) — the bottom of the screen is the Activities panel's (FR-2.7) — that records a casual, GPS-only track — a walk, hike, or drive someone would not otherwise bother tracking — in one tap, asking nothing.
 
 **Preconditions**: A session (the button is on the map, FR-2.1) and `ACCESS_FINE_LOCATION` granted to record. A demo session can record and manage rows locally; only syncing them is blocked (FR-5.2 step 8).
 
