@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- One sync history or duplicate row, after the web's .sync-tab__row: the name on the left,
-     one line, and a detail column on the right — the status, and under it a detail line when
-     there's something more to say. Filled by SyncStatusActivity. -->
+     one line, and a detail column on the right — the status, under it a detail line when
+     there's something more to say (.sync-tab__row-meta), and under that View on map
+     (.sync-tab__row-view) for a history row that became an activity. Filled by
+     SyncStatusActivity. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -47,6 +49,21 @@
             android:gravity="end"
             android:maxWidth="220dp"
             android:textColor="@color/hmt_ink_meta"
+            android:textSize="@dimen/hmt_text_2xs"
+            android:visibility="gone" />
+
+        <!-- The web's underlined accent text rather than a button, padded out to a usable
+             touch target without changing how it reads. -->
+        <TextView
+            android:id="@+id/row_action"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:minHeight="32dp"
+            android:gravity="end|center_vertical"
+            android:text="@string/status_view_on_map"
+            android:textColor="@color/hmt_accent_strong"
+            android:textFontWeight="600"
             android:textSize="@dimen/hmt_text_2xs"
             android:visibility="gone" />
     </LinearLayout>

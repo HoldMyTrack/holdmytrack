@@ -186,17 +186,29 @@
     <string name="status_title">История синхронизации</string>
     <string name="status_history">История</string>
     <string name="status_loading">Загрузка…</string>
-    <string name="status_summary_empty">Пока ничего не синхронизировано и не загружено.</string>
-    <string name="status_summary_processing">Обработано %1$d из %2$d…</string>
-    <string name="status_summary_settled">Синхронизировано или загружено занятий: %1$d.</string>
+    <string name="status_summary_empty">Пока ничего не импортировано.</string>
+    <plurals name="status_count">
+        <item quantity="one">%d занятие</item>
+        <item quantity="few">%d занятия</item>
+        <item quantity="many">%d занятий</item>
+        <item quantity="other">%d занятия</item>
+    </plurals>
+    <string name="status_in_progress">в обработке: %1$d</string>
     <string name="status_failed">Не удалось прочитать историю синхронизации: %1$s</string>
-    <string name="status_row_no_distance">расстояние не записано</string>
-    <string name="status_row_processing">обработка…</string>
-    <string name="status_no_reason">причина не указана</string>
+    <string name="status_row_processing">Обработка…</string>
+    <string name="status_row_ready">Готово</string>
+    <string name="status_row_failed">Ошибка</string>
+    <string name="status_row_failed_with">Ошибка: %1$s</string>
+    <string name="status_view_on_map">Показать на карте</string>
+    <string name="status_range">%1$d–%2$d из %3$d</string>
+    <string name="status_previous_page">Предыдущая страница</string>
+    <string name="status_next_page">Следующая страница</string>
     <string name="status_duplicates_heading">Уже записано из другого источника</string>
     <string name="status_duplicate_what">%1$s из %2$s</string>
     <string name="status_duplicate_why">уже есть из %1$s, поэтому не рисуется дважды</string>
     <string name="source_upload">загруженного файла</string>
     <string name="source_takeout">импорта Google Takeout</string>
     <string name="source_recorded">GPS-записи</string>
+    <string name="source_title_upload">Загруженный файл</string>
+    <string name="source_title_recorded">GPS-запись</string>
 </resources>

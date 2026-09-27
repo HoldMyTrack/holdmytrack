@@ -3,6 +3,7 @@ package dev.holdmytrack.android
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
@@ -262,7 +263,10 @@ class MainActivity : AppCompatActivity() {
         setMode(mode)
 
         insetSystemBars()
-        if (savedInstanceState == null) handleStopIntent(intent)
+        if (savedInstanceState == null) {
+            handleStopIntent(intent)
+            handleShowDayIntent(intent)
+        }
 
         mapView = findViewById(R.id.map_view)
         mapView.onCreate(savedInstanceState)
@@ -339,6 +343,19 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleStopIntent(intent)
+        handleShowDayIntent(intent)
+    }
+
+    /** [showDay]'s day becomes the picked range, as if chosen on the slider — so the default
+     *  re-deriving itself on the next resume doesn't take it back. Ignored when relaunched from
+     *  recents, like [handleStopIntent]: that replays a day the user has long since moved on
+     *  from. */
+    private fun handleShowDayIntent(intent: Intent) {
+        val day = intent.getStringExtra(EXTRA_SHOW_DAY) ?: return
+        if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
+        setMode(MapMode.NORMAL)
+        userChangedRange = true
+        applyRange(DateRange(day, day), fly = true)
     }
 
     /** The notification's Stop comes through here rather than straight to `RecordingService`
@@ -917,37 +934,48 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    private companion object {
-        const val TAG = "HoldMyTrack"
-        const val FRAME_PADDING_PX = 64
-        const val MAX_FRAME_ZOOM = 15.0
+    companion object {
+        /**
+         * Opens the map on one day in Normal mode, flown to that day's tracks — a history row's
+         * View on map (`SyncStatusActivity`), the web's `viewActivityOnMap`. Brings the existing
+         * map back to the front rather than stacking a second one over the screens between.
+         */
+        fun showDay(context: Context, day: String): Intent =
+            Intent(context, MainActivity::class.java)
+                .putExtra(EXTRA_SHOW_DAY, day)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+
+        private const val EXTRA_SHOW_DAY = "show_day"
+        private const val TAG = "HoldMyTrack"
+        private const val FRAME_PADDING_PX = 64
+        private const val MAX_FRAME_ZOOM = 15.0
 
         /** Where the camera flies to on a recording's first fix — street level, so the line
          *  visibly grows from the first few metres rather than being a dot on a city. */
-        const val RECORDING_ZOOM = 16.0
+        private const val RECORDING_ZOOM = 16.0
 
         /** Find my location's minimum zoom — neighbourhood level, so the dot lands in streets
          *  the user recognises; a closer zoom the user already chose is kept. */
-        const val LOCATE_ZOOM = 14.0
-        const val FRAME_DURATION_MS = 900
+        private const val LOCATE_ZOOM = 14.0
+        private const val FRAME_DURATION_MS = 900
 
         /** How long a session check may take before the map says it's checking — a fast one
          *  shouldn't flash a notice. */
-        const val CHECKING_DELAY_MS = 600L
+        private const val CHECKING_DELAY_MS = 600L
 
         /** Material's and the platform's minimum touch target. */
-        const val MIN_TOUCH_TARGET_DP = 48
-        const val MENU_PROFILE = 1
-        const val MENU_SYNC = 2
-        const val MENU_RECORDED_ACTIVITIES = 3
-        const val MENU_SETTINGS = 4
+        private const val MIN_TOUCH_TARGET_DP = 48
+        private const val MENU_PROFILE = 1
+        private const val MENU_SYNC = 2
+        private const val MENU_RECORDED_ACTIVITIES = 3
+        private const val MENU_SETTINGS = 4
 
         /** The default range's length in activity days (`docs/SPEC.md` FR-6.1). */
-        const val DEFAULT_RANGE_DAYS = 5
-        const val STATE_RANGE_FROM = "range_from"
-        const val STATE_RANGE_TO = "range_to"
-        const val STATE_RANGE_CHOSEN = "range_chosen"
-        const val STATE_LOGO_MARGIN = "logo_margin"
-        const val STATE_ATTRIBUTION_MARGIN = "attribution_margin"
+        private const val DEFAULT_RANGE_DAYS = 5
+        private const val STATE_RANGE_FROM = "range_from"
+        private const val STATE_RANGE_TO = "range_to"
+        private const val STATE_RANGE_CHOSEN = "range_chosen"
+        private const val STATE_LOGO_MARGIN = "logo_margin"
+        private const val STATE_ATTRIBUTION_MARGIN = "attribution_margin"
     }
 }

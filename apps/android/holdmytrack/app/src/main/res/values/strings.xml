@@ -180,13 +180,21 @@
     <string name="status_title">Sync history</string>
     <string name="status_history">History</string>
     <string name="status_loading">Loading…</string>
-    <string name="status_summary_empty">Nothing has been synced or uploaded yet.</string>
-    <string name="status_summary_processing">Processing %1$d of %2$d…</string>
-    <string name="status_summary_settled">%1$d activities synced or uploaded.</string>
+    <string name="status_summary_empty">Nothing imported yet.</string>
+    <plurals name="status_count">
+        <item quantity="one">%d activity</item>
+        <item quantity="other">%d activities</item>
+    </plurals>
+    <string name="status_in_progress">%1$d in progress</string>
     <string name="status_failed">Could not read the sync history: %1$s</string>
-    <string name="status_row_no_distance">no distance recorded</string>
-    <string name="status_row_processing">processing…</string>
-    <string name="status_no_reason">no reason given</string>
+    <string name="status_row_processing">Processing…</string>
+    <string name="status_row_ready">Ready</string>
+    <string name="status_row_failed">Failed</string>
+    <string name="status_row_failed_with">Failed: %1$s</string>
+    <string name="status_view_on_map">View on map</string>
+    <string name="status_range">%1$d–%2$d of %3$d</string>
+    <string name="status_previous_page">Previous page</string>
+    <string name="status_next_page">Next page</string>
     <string name="status_duplicates_heading">Already recorded from another source</string>
     <string name="status_duplicate_what">%1$s from %2$s</string>
     <string name="status_duplicate_why">already here from %1$s, so it isn\'t drawn twice</string>
@@ -195,4 +203,7 @@
     <string name="source_upload">an uploaded file</string>
     <string name="source_takeout">a Google Takeout import</string>
     <string name="source_recorded">a GPS recording</string>
+    <string name="source_title_upload">Uploaded file</string>
+    <string name="source_title_takeout" translatable="false">Google Takeout</string>
+    <string name="source_title_recorded">GPS Logger</string>
 </resources>
