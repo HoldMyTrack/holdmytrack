@@ -22,7 +22,8 @@ object SyncStatus {
  * marked [SyncStatus.QUEUED]), after which the row is deleted from the device.
  *
  * [id] is the same client-generated UUID used as `external_id` on the wire
- * (`docs/IMPLEMENTATION.md` §4.0.4) — minted once at Stop, stable through edits and retries.
+ * (`docs/IMPLEMENTATION.md` §4.0.4) — minted once at Start (it keys the recording's journal,
+ * `LiveRecordingJournal`, too), stable through edits and retries.
  */
 data class RecordedActivityRecord(
     val id: String,

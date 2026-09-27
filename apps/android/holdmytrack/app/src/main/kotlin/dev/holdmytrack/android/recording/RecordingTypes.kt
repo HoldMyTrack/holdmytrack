@@ -34,8 +34,8 @@ object RecordingTypes {
      * a synced row is deleted from the device and the store can be empty. Scoped per account
      * by [Session.email], the same key `RecordedActivityStore` uses.
      */
-    fun lastUsed(context: Context): String =
-        prefs(context).getString(KEY_LAST_TYPE_PREFIX + Session.email, null) ?: DEFAULT
+    fun lastUsed(context: Context, account: String = Session.email): String =
+        prefs(context).getString(KEY_LAST_TYPE_PREFIX + account, null) ?: DEFAULT
 
     /** Called on every Edit save; [DEFAULT] is never remembered — clearing a type back to
      *  "unknown" is a correction to one row, not a new preference. */

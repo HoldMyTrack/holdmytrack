@@ -171,6 +171,10 @@
     <string name="recording_discard">Discard</string>
     <string name="recording_discard_confirm_title">Discard this recording?</string>
     <string name="recording_discard_confirm_message">The track will be deleted from this device. This can\'t be undone.</string>
+    <string name="recording_leftover_title">Unfinished recording</string>
+    <string name="recording_leftover_message">HoldMyTrack was closed while recording. %1$s · %2$s was recorded before it stopped.</string>
+    <string name="recording_leftover_resume">Resume</string>
+    <string name="recording_leftover_save">Save</string>
     <string name="record_button_start">Start recording</string>
     <string name="record_button_pause">Pause recording. Hold to stop.</string>
     <string name="record_button_resume">Resume recording. Hold to stop.</string>

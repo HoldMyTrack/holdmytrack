@@ -181,6 +181,10 @@
     <string name="recording_discard">Удалить</string>
     <string name="recording_discard_confirm_title">Удалить эту запись?</string>
     <string name="recording_discard_confirm_message">Трек будет удалён с этого устройства. Это нельзя отменить.</string>
+    <string name="recording_leftover_title">Незавершённая запись</string>
+    <string name="recording_leftover_message">HoldMyTrack закрылся во время записи. До остановки записано %1$s · %2$s.</string>
+    <string name="recording_leftover_resume">Продолжить</string>
+    <string name="recording_leftover_save">Сохранить</string>
     <string name="record_button_start">Начать запись</string>
     <string name="record_button_pause">Приостановить запись. Удерживайте, чтобы остановить.</string>
     <string name="record_button_resume">Продолжить запись. Удерживайте, чтобы остановить.</string>
