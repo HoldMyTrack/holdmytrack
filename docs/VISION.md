@@ -36,6 +36,7 @@ To let athletes, runners, cyclists and explorers see and keep the shape of where
 * **Bring everything** — one place for data scattered across a watch, a cloud service and a folder of old exports.
 * **Exploration insight** — how much ground you've covered this year versus last, how well a neighborhood is explored, and where you go most.
 * **Gamified exploration** — "Fog of War" turns routine training into map discovery.
+* **Remember the trip** — group the activities of a hike, a holiday or an event into a Story with its own map and totals.
 * **Beautiful by default** — render quality is the differentiator, not feature count.
 * **Manual data manipulation** — stored data can be created, updated or deleted manually.
 * **Free, and honest about why** — funded by the people who use it, with the books open.
@@ -146,15 +147,18 @@ This isn't a resilience decision the way Paths 1–3 are — §4.1's provider-in
 | **In-app GPS recording** (mobile) | Convenience capture, not a fitness-tracker replacement | Start/pause/stop a GPS-only track directly in the app; feeds the same ingest pipeline as any other source |
 | **Visual Map Engine** | Interactive renderer with custom styles | Fog of War, heatmap and track/normal modes (`IMPLEMENTATION.md` §4.2, §4.2.2); curated themes; smooth (non-hexagonal) fog edges |
 | **Per-activity detail** | Pace as route context, not a coaching product | The selected activity's route colored by pace (`IMPLEMENTATION.md` §4.3.1) |
+| **Stories** | Keep a trip as one thing | Hand-picked sets of activities, each with a name, a description, joint stats (count, distance, time, a per-type breakdown) and its own map view; an activity can belong to any number of them |
 | **Activity graph** | Private, single-player motivation | A GitHub-style daily contribution grid, year by year, shadeable by count or distance (`IMPLEMENTATION.md` §4.8) |
 | **Distance & coverage trends** | See how much ground you've covered this period vs last | Weekly/monthly distance, moving-time and elevation trends |
 | **Filtering** | Slice the history | Activity type, date range, geographic bounding box, source |
-| **Export** | Free, unrestricted | Print-grade raster/vector export, story cards, animated reveals — no watermark, no tier |
+| **Export** | Free, unrestricted | Print-grade raster/vector export, animated reveals — no watermark, no tier |
 | **Privacy Controls** | Table stakes, see §7 | Private locations (user-defined privacy zones), per-map share scoping |
 
 **We don't keep your health profile, only the geographical data you trust us with.** An activity is a route: positions, times and elevation. Pace is derived from those and shown as the color of a selected track — a supporting detail on the route, not a pillar and not a training product; the pillars are the map and the exploration stats. Heart rate, cadence, power, calories and every other body signal are never read, stored or shown, whichever source an activity came from. The one place such data can still sit is inside an original upload, which is kept as-is so a track edit or a Private location change can rebuild the activity, is only ever read for its route, and is deleted with the activity. The schema carries per-point streams (`IMPLEMENTATION.md` §3.3) for the route, and no more. A pace/heart-rate/elevation profile card was built and then removed for this reason — see ADR-0017.
 
 **The activity graph is deliberately private, not a profile page.** It's the same genre of thing as Fog of War above — motivation through your own history, no comparison required — not a step toward the social features §1.1 and §5.7 explicitly hold off on. It has no follows, no feed, and nothing another user can view; it's a personal dashboard, available once accounts exist (§5.2), not a public artifact. If a shareable version is ever worth building, that's a §5.7 social-phase decision to make deliberately, not a side effect of how this one ships.
+
+**Stories are for remembering a trip, and the user decides what belongs in one.** A multi-day hike, a holiday or a race weekend is several activities spread over several days, sometimes with a drive at each end, and after the fact it disappears into the rest of the history. A Story keeps it as one thing: a name, a description, its joint totals, and a map that shows only its own tracks. Its activities are hand-picked rather than matched by a date span or a rule, because only the person who went knows which drive was part of the trip and which was the commute that week. Stories are private, like the activity graph: a way of keeping your own memories, not a profile or a feed. Sharing one means exporting an image of its map (`IMPLEMENTATION.md` §4.3.3); a link that opens a story for someone else is a §5.7 decision, for the same reason as above. A story view draws tracks only: Fog of War and Heatmap stay all-time, since a fog pyramid per story is a per-user storage cost that grows with every story made (§4.3). See ADR-0020.
 
 ### 4.3 Cost Model — running a free service
 
@@ -210,6 +214,7 @@ Sequenced so the unconditional ingest path ships first and the ones that depend 
 * Accounts and persistence for anyone who wants to keep it.
 * A private activity graph once an account exists — a GitHub-style daily contribution grid shadeable by count or distance, plus active-days and longest-streak stat cards (`IMPLEMENTATION.md` §4.8). The grid itself reuses `IMPLEMENTATION.md` §4.7's histogram query; the streak and active-day stats are small new aggregate queries of their own.
 * Free high-resolution export — a framed image of the current map, unwatermarked, rendered in the browser.
+* Stories — hand-picked, private sets of activities with their own totals and map view, for keeping a trip or an event as one thing (§4.2). A web feature first; Android follows on the same API.
 
 ### 5.3 Phase 2: Mobile
 * Android app — Health Connect. Samsung Galaxy Watch sync is unsupported (Samsung never exposes route geometry, and HoldMyTrack only ingests activities that have one). Built first of the pair regardless, so the Path 2 sync contract is designed against the more constrained platform.

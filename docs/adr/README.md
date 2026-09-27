@@ -28,6 +28,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0017](0017-no-health-data.md) | No health data: heart rate is never read or stored, and the pace/heart-rate profile card is removed |
 | [0018](0018-no-explorer-tiles.md) | No explorer tiles: Fog of War is the exploration mechanic, with no tile score |
 | [0019](0019-dark-theme.md) | A dark theme: one palette per theme for both clients, chosen per device, with a fog veil per basemap |
+| [0020](0020-stories-hand-picked-and-private.md) | Stories are hand-picked, private sets of activities, shown in Normal mode with a story-scoped date picker |
 
 ## Writing a new one
 
