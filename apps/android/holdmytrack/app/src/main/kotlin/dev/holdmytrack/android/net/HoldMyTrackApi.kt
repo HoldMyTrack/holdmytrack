@@ -129,8 +129,30 @@ data class SyncHistory(
 data class Duplicate(
     val startedAt: String,
     val activityType: String,
+    val distanceMeters: Double?,
     val source: String,
     val supersededBySource: String,
+)
+
+/**
+ * One row of `GET /v1/activities` (`docs/IMPLEMENTATION.md` §4.7) — what the map's Activities
+ * panel lists, the web's `Activity`. [startedAt] is the server's RFC 3339 instant. [name],
+ * [description], [distanceMeters] and [durationSeconds] are null when the source never set
+ * them; [bbox] (`[minLon, minLat, maxLon, maxLat]`) is null for an activity with no drawn
+ * track. [pending] is a reprocess still running (a track edit, a Private location change):
+ * the tracks tile leaves such a row out until it lands (`docs/SPEC.md` FR-5.15).
+ */
+data class Activity(
+    val id: String,
+    val startedAt: String,
+    val activityType: String,
+    val name: String?,
+    val distanceMeters: Double?,
+    val durationSeconds: Long?,
+    val description: String?,
+    val bbox: List<Double>?,
+    val pending: Boolean,
+    val edited: Boolean,
 )
 
 /** One day that has activity, as `GET /v1/activities/histogram` counts it; [date] is `YYYY-MM-DD`
@@ -313,6 +335,7 @@ object HoldMyTrackApi {
                 Duplicate(
                     startedAt = row.optString("started_at"),
                     activityType = row.optString("activity_type"),
+                    distanceMeters = row.optNullableDouble("distance_meters"),
                     source = row.optString("source"),
                     supersededBySource = row.getJSONObject("superseded_by").optString("source"),
                 )
@@ -548,31 +571,34 @@ object HoldMyTrackApi {
     }
 
     /**
-     * The bounding box of every drawn activity from [from] to [to] (`YYYY-MM-DD`, inclusive,
-     * read by the server as days in the account's timezone), or null when none has geometry —
-     * where the map flies when the user picks a new date range (`docs/SPEC.md` FR-6.6).
+     * `GET /v1/activities?from=&to=` — every activity from [from] to [to] (`YYYY-MM-DD`,
+     * inclusive, read by the server as days in the account's timezone), newest first, in one
+     * response: the list isn't paged (`docs/IMPLEMENTATION.md` §4.7). What the map's
+     * Activities panel lists.
      */
-    fun activityBounds(from: String, to: String, onResult: (Result<DoubleArray?>) -> Unit) {
+    fun activities(from: String, to: String, onResult: (Result<List<Activity>>) -> Unit) {
         val url = (BuildConfig.API_BASE_URL + API_V1 + "/activities").toHttpUrl().newBuilder()
             .addQueryParameter("from", from)
             .addQueryParameter("to", to)
             .build()
         call(Request.Builder().url(url).build(), { body ->
-            var union: DoubleArray? = null
-            forEachDrawn(body) { _, next ->
-                val current = union
-                union = if (current == null) {
-                    next
-                } else {
-                    doubleArrayOf(
-                        minOf(current[0], next[0]),
-                        minOf(current[1], next[1]),
-                        maxOf(current[2], next[2]),
-                        maxOf(current[3], next[3]),
-                    )
-                }
+            val rows = JSONObject(body).getJSONArray("activities")
+            List(rows.length()) { i ->
+                val row = rows.getJSONObject(i)
+                val box = row.optJSONArray("bbox")?.takeIf { it.length() == 4 }
+                Activity(
+                    id = row.getString("id"),
+                    startedAt = row.optString("started_at"),
+                    activityType = row.optString("activity_type"),
+                    name = row.optNullableString("name"),
+                    distanceMeters = row.optNullableDouble("distance_meters"),
+                    durationSeconds = row.optNullableDouble("duration_seconds")?.toLong(),
+                    description = row.optNullableString("description"),
+                    bbox = box?.let { b -> List(4) { b.getDouble(it) } },
+                    pending = row.optBoolean("pending"),
+                    edited = row.optBoolean("edited"),
+                )
             }
-            union
         }, onResult)
     }
 
@@ -603,7 +629,7 @@ object HoldMyTrackApi {
     /**
      * How many of the account's activities use each `activity_type` — what the recording Edit screen's
      * Type picker lists, the same per-type counts the web client's Type facet is built from.
-     * Read from the same unpaginated `GET /v1/activities` as [activityBounds], since there is
+     * Read from the same unpaginated `GET /v1/activities` as [activities], since there is
      * no dedicated facets endpoint and this list already carries every live row.
      */
     fun activityTypeCounts(onResult: (Result<Map<String, Int>>) -> Unit) {
@@ -631,6 +657,12 @@ object HoldMyTrackApi {
             action(row, DoubleArray(4) { box.getDouble(it) })
         }
     }
+
+    private fun JSONObject.optNullableString(key: String): String? =
+        if (isNull(key)) null else optString(key)
+
+    private fun JSONObject.optNullableDouble(key: String): Double? =
+        if (isNull(key)) null else optDouble(key).takeUnless { it.isNaN() }
 
     private fun credentials(email: String, password: String): RequestBody =
         JSONObject().put("email", email).put("password", password).toString().toRequestBody(JSON)

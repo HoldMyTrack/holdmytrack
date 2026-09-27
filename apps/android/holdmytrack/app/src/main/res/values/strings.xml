@@ -202,4 +202,92 @@
     <string name="source_title_upload">Uploaded file</string>
     <string name="source_title_takeout" translatable="false">Google Takeout</string>
     <string name="source_title_recorded">GPS Logger</string>
+
+    <!-- The map's Activities panel (panel/ActivitiesPanel.kt), after the web's activities.* and filters.* messages. -->
+    <string name="panel_label">Activities panel</string>
+    <string name="panel_tab_activities">Activities</string>
+    <string name="panel_loaded">%1$s loaded</string>
+    <string name="panel_loading">Loading…</string>
+    <string name="panel_expand">Show the activities list</string>
+    <string name="panel_collapse">Hide the activities list</string>
+    <string name="panel_type">Type</string>
+    <string name="panel_all_types">All types</string>
+    <string name="panel_filter_by_type">Filter by type</string>
+    <string name="panel_type_empty">No activities to filter yet.</string>
+    <string name="panel_distance">Distance</string>
+    <string name="panel_any_distance">any distance</string>
+    <string name="panel_reset_filters">Reset filters</string>
+    <string name="panel_distance_range">%1$s – %2$s %3$s</string>
+    <string name="panel_check_all">Check all activities</string>
+    <string name="panel_uncheck_all">Uncheck all activities</string>
+    <string name="panel_invert">Invert selection</string>
+    <string name="panel_hide_target">Hide %1$s from the map</string>
+    <string name="panel_show_target">Show %1$s on the map</string>
+    <string name="panel_focus_target">Focus the map on %1$s</string>
+    <string name="panel_no_target">Select an activity, or check some, first</string>
+    <string name="panel_target_one">“%1$s”</string>
+    <string name="panel_footer">%1$d selected · %2$s</string>
+    <string name="panel_none_match">No activities match the current filters.</string>
+    <string name="panel_pending">Pending</string>
+    <string name="panel_hidden">Hidden</string>
+    <string name="panel_row_check">Add %1$s to selection</string>
+    <string name="panel_row_uncheck">Remove %1$s from selection</string>
+    <string name="panel_fly_to">Fly to %1$s</string>
+    <string name="panel_duplicates_failed">Duplicates — failed to load</string>
+    <string name="panel_duplicate_from">From %1$s — replaced by the copy from %2$s.</string>
+    <string name="panel_duration_hm">%1$dh %2$dm</string>
+    <string name="panel_duration_m">%1$dm</string>
+    <string name="panel_duration_s">%1$ds</string>
+    <string name="panel_unit_km">km</string>
+    <string name="panel_unit_mi">mi</string>
+    <plurals name="panel_checked_count">
+        <item quantity="one">%1$d checked activity</item>
+        <item quantity="other">%1$d checked activities</item>
+    </plurals>
+    <plurals name="panel_duplicates_found">
+        <item quantity="one">%1$d duplicate found</item>
+        <item quantity="other">%1$d duplicates found</item>
+    </plurals>
+
+    <!-- Activity types' display names, the web's activity_type.* (RecordingTypes.label); a type without one is title-cased from its raw value. -->
+    <string name="activity_type_alpine_skiing">Alpine Skiing</string>
+    <string name="activity_type_biking">Biking</string>
+    <string name="activity_type_biking_stationary">Stationary Biking</string>
+    <string name="activity_type_cross_country_skiing">Cross-Country Skiing</string>
+    <string name="activity_type_cycling">Cycling</string>
+    <string name="activity_type_driving">Driving</string>
+    <string name="activity_type_e_biking">E-Biking</string>
+    <string name="activity_type_generic">Generic</string>
+    <string name="activity_type_golf">Golf</string>
+    <string name="activity_type_gravel_cycling">Gravel Cycling</string>
+    <string name="activity_type_hiking">Hiking</string>
+    <string name="activity_type_horseback_riding">Horseback Riding</string>
+    <string name="activity_type_ice_skating">Ice Skating</string>
+    <string name="activity_type_inline_skating">Inline Skating</string>
+    <string name="activity_type_kayaking">Kayaking</string>
+    <string name="activity_type_motorcycling">Motorcycling</string>
+    <string name="activity_type_mountain_biking">Mountain Biking</string>
+    <string name="activity_type_other_workout">Other Workout</string>
+    <string name="activity_type_paddling">Paddling</string>
+    <string name="activity_type_road_cycling">Road Cycling</string>
+    <string name="activity_type_rock_climbing">Rock Climbing</string>
+    <string name="activity_type_rowing">Rowing</string>
+    <string name="activity_type_rowing_machine">Rowing Machine</string>
+    <string name="activity_type_running">Running</string>
+    <string name="activity_type_running_treadmill">Treadmill Running</string>
+    <string name="activity_type_sailing">Sailing</string>
+    <string name="activity_type_skating">Skating</string>
+    <string name="activity_type_skiing">Skiing</string>
+    <string name="activity_type_snowboarding">Snowboarding</string>
+    <string name="activity_type_stand_up_paddleboarding">Stand Up Paddleboarding</string>
+    <string name="activity_type_surfing">Surfing</string>
+    <string name="activity_type_swimming">Swimming</string>
+    <string name="activity_type_swimming_open_water">Open Water Swimming</string>
+    <string name="activity_type_swimming_pool">Pool Swimming</string>
+    <string name="activity_type_tennis">Tennis</string>
+    <string name="activity_type_trail_running">Trail Running</string>
+    <string name="activity_type_unknown">Unknown</string>
+    <string name="activity_type_walk">Walk</string>
+    <string name="activity_type_walking">Walking</string>
+    <string name="activity_type_yoga">Yoga</string>
 </resources>

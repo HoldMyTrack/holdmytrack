@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The invert-selection glyph: ink at 60%, at 45% of that while there are no rows. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:alpha="0.27" android:color="@color/hmt_ink" android:state_enabled="false" />
+    <item android:alpha="0.6" android:color="@color/hmt_ink" />
+</selector>

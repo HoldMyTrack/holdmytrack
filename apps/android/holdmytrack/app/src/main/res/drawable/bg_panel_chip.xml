@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A toolbar action, the web's .activities-panel__edit/__delete/__visibility: a 34dp tinted
+     square with the small radius, inset in a 48dp touch target. Pressed, the stronger tint. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:inset="7dp">
+    <selector>
+        <item android:state_pressed="true">
+            <shape>
+                <solid android:color="@color/hmt_surface_tint_strong" />
+                <corners android:radius="@dimen/hmt_radius_sm" />
+            </shape>
+        </item>
+        <item>
+            <shape>
+                <solid android:color="@color/hmt_surface_tint" />
+                <corners android:radius="@dimen/hmt_radius_sm" />
+            </shape>
+        </item>
+    </selector>
+</inset>

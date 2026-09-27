@@ -1,6 +1,7 @@
 package dev.holdmytrack.android.recording
 
 import android.content.Context
+import android.content.res.Resources
 import android.graphics.Typeface
 import android.text.Editable
 import android.text.InputType
@@ -44,8 +45,8 @@ object ActivityTypePicker {
 
     fun show(context: Context, current: String, known: List<TypeCount>, onPick: (String) -> Unit) {
         val options = buildList {
-            if (current.isNotEmpty() && known.none { it.type == current }) add(option(current, null))
-            known.forEach { add(option(it.type, it.count)) }
+            if (current.isNotEmpty() && known.none { it.type == current }) add(option(context.resources, current, null))
+            known.forEach { add(option(context.resources, it.type, it.count)) }
         }
 
         val padding = context.resources.getDimensionPixelSize(R.dimen.hmt_space_16)
@@ -108,8 +109,8 @@ object ActivityTypePicker {
         list.setSelection(options.indexOfFirst { it.value == current }.coerceAtLeast(0))
     }
 
-    private fun option(type: String, count: Int?) =
-        Option(value = type, label = RecordingTypes.format(type).ifEmpty { type }, detail = count?.takeIf { it > 0 }?.toString().orEmpty())
+    private fun option(res: Resources, type: String, count: Int?) =
+        Option(value = type, label = RecordingTypes.format(res, type).ifEmpty { type }, detail = count?.takeIf { it > 0 }?.toString().orEmpty())
 
     /** `SearchPicker.tsx`'s ranking: an exact whole-label match first ("walk" → Walk before
      *  Dog Walk), then labels with a word starting with the query, then anything containing it,

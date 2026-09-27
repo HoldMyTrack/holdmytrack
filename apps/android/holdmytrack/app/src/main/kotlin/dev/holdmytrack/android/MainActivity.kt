@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.graphics.RectF
 import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
@@ -28,9 +29,12 @@ import dev.holdmytrack.android.map.DateRange
 import dev.holdmytrack.android.map.DateRangeSlider
 import dev.holdmytrack.android.map.MapMode
 import dev.holdmytrack.android.map.MapOverlays
+import dev.holdmytrack.android.net.Activity
 import dev.holdmytrack.android.net.ApiException
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
+import dev.holdmytrack.android.panel.ActivitiesPanel
+import dev.holdmytrack.android.panel.PanelState
 import dev.holdmytrack.android.recording.RecordButton
 import dev.holdmytrack.android.recording.RecordingService
 import dev.holdmytrack.android.recording.RecordingState
@@ -53,12 +57,14 @@ import java.time.LocalDate
  * menu (Profile, Sync) both float over the map top-start, rather than living in a bar of their
  * own, mirroring the web client's own on-map mode control (`apps/web/src/map/MapView.tsx`).
  *
- * Along the bottom in Normal mode, the date range the tracks are drawn for — the web's phone
- * footer (`map/DateRangeSlider`), defaulting to the five most recent activity days as the web
- * does (`docs/SPEC.md` FR-6.1).
+ * Along the bottom in Normal mode, the web's phone layout: the Activities panel
+ * (`panel/ActivitiesPanel`), a sheet listing the range's activities, on the date range the
+ * tracks are drawn for — the web's phone footer (`map/DateRangeSlider`), defaulting to the five
+ * most recent activity days as the web does (`docs/SPEC.md` FR-6.1). Tapping a track selects
+ * it in the panel, and tapping empty map clears the selection.
  *
- * Also the one place GPS recording is controlled from in the app: a record button floats
- * bottom-centre (tap to start, tap to pause/resume, hold for two seconds to stop —
+ * Also the one place GPS recording is controlled from in the app: a record button in the chrome
+ * row (tap to start, tap to pause/resume, hold for two seconds to stop —
  * `RecordingService` does the rest, and its notification offers the same controls). While a recording is in
  * progress the map shows only that recording's live track: the mode toggle and every history
  * layer are hidden (`MapOverlays.setRecording`), and the camera follows the latest fix.
@@ -94,8 +100,11 @@ class MainActivity : AppCompatActivity() {
     /** Find my location's panel — what hides while recording, so no empty panel is left. */
     private lateinit var locatePanel: View
 
-    /** The record button and, under it, the date-range footer. */
+    /** The Activities panel and, under it, the date-range footer. */
     private lateinit var bottomChrome: View
+    private lateinit var sheet: View
+    private lateinit var panel: ActivitiesPanel
+    private val panelState = PanelState()
     private lateinit var dateFooter: View
     private lateinit var dateSlider: DateRangeSlider
     private lateinit var activityDays: ActivityDays
@@ -243,6 +252,14 @@ class MainActivity : AppCompatActivity() {
 
         bottomChrome = findViewById(R.id.bottom_chrome)
         dateFooter = findViewById(R.id.date_footer)
+        sheet = findViewById(R.id.activities_sheet)
+        panel = ActivitiesPanel(
+            sheet,
+            panelState,
+            expandedHeight = ::expandedSheetHeight,
+            onMapChanged = ::applyTrackFilter,
+            onFly = ::flyToActivities,
+        )
         activityDays = ActivityDays(DateRangeSlider.WINDOW_DAYS, ::onActivityDaysChanged)
         dateSlider = DateRangeSlider(dateFooter, onPan = activityDays::panBy) { range ->
             userChangedRange = true
@@ -286,6 +303,7 @@ class MainActivity : AppCompatActivity() {
             applyCompassMargin()
             applyAttributionMargin()
             mapView.post { enlargeAttributionTarget() }
+            instance.addOnMapClickListener { point -> onMapTap(instance, point) }
             loadStyle()
         }
     }
@@ -433,10 +451,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * MapLibre's logo and attribution sit bottom-start, where the date-range footer is — and the
-     * attribution is the basemap's ODbL credit, which must stay visible (`FR-2.4`). So while
-     * the footer is up both move above it; the rest of the time they keep their own margins,
-     * which already clear the gesture bar.
+     * MapLibre's logo and attribution sit bottom-start, where the panel and the date-range
+     * footer are — and the attribution is the basemap's ODbL credit, which must stay visible
+     * (`FR-2.4`). So while those are up both move above them, above the *collapsed* panel
+     * whatever the panel's state, as the web keeps them (an expanded panel covers them, as it
+     * covers the map); the rest of the time they keep their own margins, which already clear
+     * the gesture bar.
      */
     private fun applyAttributionMargin() {
         val instance = map ?: return
@@ -446,7 +466,7 @@ class MainActivity : AppCompatActivity() {
             attributionBaseMarginBottom = settings.attributionMarginBottom
             attributionBaseCaptured = true
         }
-        val above = if (dateFooter.isVisible) bottomChrome.height - dateFooter.top else 0
+        val above = if (bottomChrome.isVisible) bottomChrome.height - sheetExtraHeight() else 0
         settings.setLogoMargins(
             settings.logoMarginLeft,
             settings.logoMarginTop,
@@ -500,12 +520,16 @@ class MainActivity : AppCompatActivity() {
         if (daysStale) {
             daysStale = false
             activityDays.reload()
+            // Sync or a recording may have changed the range's activities too, not just which
+            // days have any.
+            selectedRange?.let { loadActivities(it, fly = false) }
         }
         renderDateFooter()
 
         val loaded = style ?: return
         if (!overlaysAttached) {
             MapOverlays.attach(loaded, mode, selectedRange)
+            MapOverlays.setTrackFilter(loaded, panelState.mapHidden, panelState.focused)
             overlaysAttached = true
             if (isRecording()) MapOverlays.setRecording(loaded, true, mode)
             frameActivities()
@@ -531,34 +555,103 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Draws the tracks for [range]. Only a range the user picked moves the camera — onto that
-     * range's activities, as the web does (`docs/SPEC.md` FR-6.6) — never the default
-     * re-deriving itself after a sync.
+     * Draws the tracks for [range] and lists its activities in the panel. Only a range the
+     * user picked moves the camera — onto that range's activities, as the web does
+     * (`docs/SPEC.md` FR-6.6) — never the default re-deriving itself after a sync; and only a
+     * picked range clears the panel's selection, group, hidden set and filters, which were
+     * built against the old one.
      */
     private fun applyRange(range: DateRange, fly: Boolean) {
         selectedRange = range
         dateSlider.value = range
-        style?.takeIf { overlaysAttached }?.let { MapOverlays.setTrackRange(it, range) }
-        if (!fly) return
-        HoldMyTrackApi.activityBounds(range.from, range.to) { result ->
-            val box = result.getOrNull() ?: return@activityBounds
-            // A later pick, or a recording started since, owns the camera now.
-            if (range != selectedRange || isRecording()) return@activityBounds
-            flyTo(box)
+        if (fly) {
+            panelState.resetForNewRange()
+            applyTrackFilter()
         }
+        style?.takeIf { overlaysAttached }?.let { MapOverlays.setTrackRange(it, range) }
+        loadActivities(range, fly)
     }
 
-    /** The footer is Normal mode's alone, as on the web (Fog and Heatmap ignore the range —
-     *  `docs/SPEC.md` FR-4.2), and steps aside while recording. It waits for the session and
-     *  the first page of days, and an account with no activity at all has nothing to pick
-     *  from — the empty notice speaks for it instead. */
+    /** `GET /v1/activities` for [range], into the panel — and, with [fly], the camera onto
+     *  every drawn one. Duplicates ride along: they aren't scoped to the range, but whatever
+     *  changed the list may have produced one. */
+    private fun loadActivities(range: DateRange, fly: Boolean) {
+        panel.setLoading()
+        HoldMyTrackApi.activities(range.from, range.to) { result ->
+            // A later pick owns the list now.
+            if (range != selectedRange) return@activities
+            result.onSuccess { activities ->
+                panel.setActivities(activities)
+                // A recording started since owns the camera.
+                if (fly && !isRecording()) flyToActivities(activities.filter { !it.pending })
+            }.onFailure { failure ->
+                Log.w(TAG, "could not load the activity list", failure)
+                panel.setError(getString(R.string.map_unreachable))
+            }
+        }
+        HoldMyTrackApi.duplicates { result -> panel.setDuplicates(result.getOrNull()) }
+    }
+
+    /** The panel's hidden set, filters, Pending rows and selection, onto the track layers. */
+    private fun applyTrackFilter() {
+        val loaded = style?.takeIf { overlaysAttached } ?: return
+        MapOverlays.setTrackFilter(loaded, panelState.mapHidden, panelState.focused)
+    }
+
+    /** Frames every one of [activities] that has a track — nothing, for none. */
+    private fun flyToActivities(activities: List<Activity>) {
+        val boxes = activities.mapNotNull { it.bbox }
+        if (boxes.isEmpty()) return
+        flyTo(
+            doubleArrayOf(
+                boxes.minOf { it[0] },
+                boxes.minOf { it[1] },
+                boxes.maxOf { it[2] },
+                boxes.maxOf { it[3] },
+            ),
+        )
+    }
+
+    /**
+     * A tap on the map in Normal mode: a track under it — within 14dp, the web's touch
+     * tolerance (`docs/SPEC.md` §17), since a 2.5dp line is too thin to hit exactly — is
+     * selected in the panel and flown to; empty map clears the selection. The panel's own
+     * collapsed or expanded state is left as it was.
+     */
+    private fun onMapTap(instance: MapLibreMap, point: LatLng): Boolean {
+        if (!sheet.isVisible) return false
+        val screen = instance.projection.toScreenLocation(point)
+        val tolerance = TAP_TOLERANCE_DP * resources.displayMetrics.density
+        val box = RectF(screen.x - tolerance, screen.y - tolerance, screen.x + tolerance, screen.y + tolerance)
+        val id = instance.queryRenderedFeatures(box, MapOverlays.TRACKS_LAYER_ID)
+            .firstNotNullOfOrNull { it.getStringProperty("id") }
+        if (id != null && panelState.activities.any { it.id == id }) panel.focusFromMap(id) else panel.clearFocus()
+        return true
+    }
+
+    /** The web's `78dvh` less the footer under the sheet: most of the screen, the top of the
+     *  map still showing above it. */
+    private fun expandedSheetHeight(): Int {
+        val root = findViewById<View>(R.id.map_root)
+        val below = bottomChrome.height - sheet.bottom
+        return (root.height * EXPANDED_SHEET_FRACTION).toInt() - below
+    }
+
+    /** How much taller than its collapsed strip the panel is right now — 0 collapsed. */
+    private fun sheetExtraHeight(): Int = if (sheet.isVisible) (sheet.height - panel.peekHeight).coerceAtLeast(0) else 0
+
+    /** The panel and the footer are Normal mode's alone, as on the web (Fog and Heatmap
+     *  ignore the range and select nothing — `docs/SPEC.md` FR-4.2), and step aside while
+     *  recording. Both wait for the session; the footer also for the first page of days, and
+     *  an account with no activity at all has nothing to pick from — the empty notice speaks
+     *  for it instead. */
     private fun renderDateFooter() {
-        val visible = modeBarReady && mode == MapMode.NORMAL && !isRecording() &&
-            activityDays.ready && activityDays.earliest != null
-        dateFooter.visibility = if (visible) View.VISIBLE else View.GONE
-        (recordButton.layoutParams as MarginLayoutParams).bottomMargin =
-            resources.getDimensionPixelSize(if (visible) R.dimen.hmt_space_16 else R.dimen.hmt_space_32)
-        recordButton.requestLayout()
+        val normal = modeBarReady && mode == MapMode.NORMAL && !isRecording()
+        val footer = normal && activityDays.ready && activityDays.earliest != null
+        dateFooter.visibility = if (footer) View.VISIBLE else View.GONE
+        sheet.visibility = if (normal) View.VISIBLE else View.GONE
+        bottomChrome.visibility = if (normal) View.VISIBLE else View.GONE
+        if (!normal) panel.dismissPopups()
     }
 
     private fun isRecording() = (recorder?.state ?: RecordingState.IDLE) != RecordingState.IDLE
@@ -837,7 +930,11 @@ class MainActivity : AppCompatActivity() {
     private fun flyTo(box: DoubleArray) {
         val instance = map ?: return
         val bounds = LatLngBounds.from(box[3], box[2], box[1], box[0])
-        val fitted = instance.getCameraForLatLngBounds(bounds, IntArray(4) { FRAME_PADDING_PX }) ?: return
+        // Into the map left showing between the chrome row and the panel, not under either.
+        val top = maxOf(FRAME_PADDING_PX, findViewById<View>(R.id.top_bar).bottom)
+        val bottom = FRAME_PADDING_PX + if (bottomChrome.isVisible) bottomChrome.height else 0
+        val padding = intArrayOf(FRAME_PADDING_PX, top, FRAME_PADDING_PX, bottom)
+        val fitted = instance.getCameraForLatLngBounds(bounds, padding) ?: return
         val target = CameraPosition.Builder(fitted)
             .zoom(minOf(fitted.zoom, MAX_FRAME_ZOOM))
             .build()
@@ -950,6 +1047,12 @@ class MainActivity : AppCompatActivity() {
         private const val TAG = "HoldMyTrack"
         private const val FRAME_PADDING_PX = 64
         private const val MAX_FRAME_ZOOM = 15.0
+
+        /** How far from a tap a track still counts as tapped — the web's `TAP_TOLERANCE_PX`. */
+        private const val TAP_TOLERANCE_DP = 14
+
+        /** The expanded panel's share of the screen, the web's `78dvh`. */
+        private const val EXPANDED_SHEET_FRACTION = 0.78
 
         /** Where the camera flies to on a recording's first fix — street level, so the line
          *  visibly grows from the first few metres rather than being a dot on a city. */

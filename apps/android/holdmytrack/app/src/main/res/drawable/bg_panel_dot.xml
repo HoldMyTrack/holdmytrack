@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "A type is filtered out", on the Type trigger: the web's 6px accent dot. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="@color/hmt_accent" />
+    <size
+        android:width="6dp"
+        android:height="6dp" />
+</shape>

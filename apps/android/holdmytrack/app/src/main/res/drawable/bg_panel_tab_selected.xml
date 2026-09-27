@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The selected tab's 2dp accent underline, the web's .activities-panel__tab[aria-selected]. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:height="2dp"
+        android:gravity="bottom">
+        <shape>
+            <solid android:color="@color/hmt_accent" />
+        </shape>
+    </item>
+</layer-list>

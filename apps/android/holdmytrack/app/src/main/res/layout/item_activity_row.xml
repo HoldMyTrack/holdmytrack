@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One Activities row, after the web's .activities-panel__row: the checkbox, then the text —
+     the name or start time over "[date ·] distance · duration · type" — which is the row's own
+     tap target (select, fly to), and the Pending / Hidden badges at the end. A hairline under
+     it; selected, the accent tint and a bar down its left edge (bg_panel_row). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_panel_row"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/hmt_space_4"
+    android:paddingEnd="@dimen/hmt_space_16">
+
+    <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/activity_check"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+
+    <LinearLayout
+        android:id="@+id/activity_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:minHeight="48dp"
+        android:orientation="vertical"
+        android:gravity="center_vertical"
+        android:paddingTop="@dimen/hmt_space_10"
+        android:paddingBottom="@dimen/hmt_space_10">
+
+        <TextView
+            android:id="@+id/activity_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleSmall"
+            tools:text="Sep 24, 2026, 4:00 AM" />
+
+        <TextView
+            android:id="@+id/activity_meta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_2"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/hmt_ink_meta"
+            android:textSize="@dimen/hmt_text_xs"
+            tools:text="10.4 km · 1h 2m · Running" />
+    </LinearLayout>
+
+    <!-- One right-aligned column, so the badges share one edge whatever the text does, and a
+         row that's both stacks them together (.activities-panel__badges). -->
+    <LinearLayout
+        android:id="@+id/activity_badges"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/hmt_space_10"
+        android:gravity="end"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/activity_pending"
+            style="@style/Widget.HoldMyTrack.PanelStatusBadge"
+            android:text="@string/panel_pending" />
+
+        <TextView
+            android:id="@+id/activity_hidden"
+            style="@style/Widget.HoldMyTrack.PanelStatusBadge"
+            android:layout_marginTop="@dimen/hmt_space_2"
+            android:text="@string/panel_hidden" />
+    </LinearLayout>
+</LinearLayout>
