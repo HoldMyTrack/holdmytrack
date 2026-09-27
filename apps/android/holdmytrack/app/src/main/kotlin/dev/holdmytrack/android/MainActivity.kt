@@ -21,10 +21,12 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.holdmytrack.android.map.ActivityDays
 import dev.holdmytrack.android.map.CoverageWatch
 import dev.holdmytrack.android.map.EditPreview
@@ -47,8 +49,10 @@ import dev.holdmytrack.android.panel.PanelTab
 import dev.holdmytrack.android.panel.PrivacyTab
 import dev.holdmytrack.android.panel.PanelState
 import dev.holdmytrack.android.recording.RecordButton
+import dev.holdmytrack.android.recording.RecordingFormat
 import dev.holdmytrack.android.recording.RecordingService
 import dev.holdmytrack.android.recording.RecordingState
+import dev.holdmytrack.android.recording.db.LiveRecordingJournal
 import dev.holdmytrack.android.settings.AppLanguage
 import dev.holdmytrack.android.settings.SettingsActivity
 import org.maplibre.android.camera.CameraPosition
@@ -225,12 +229,17 @@ class MainActivity : AppCompatActivity() {
      *  fixes only pan, so the user's chosen zoom sticks. Reset when a recording ends. */
     private var followingRecording = false
 
+    /** The prompt for a recording a process death left behind, while it's up — every bind
+     *  asks again, and returning to the map mustn't stack a second one on it. */
+    private var leftoverDialog: AlertDialog? = null
+
     private val recorderConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
             val service = (binder as RecordingService.LocalBinder).service
             recorder = service
             service.onChange = ::renderRecording
             renderRecording()
+            if (service.state == RecordingState.IDLE) service.findLeftover(::offerLeftover)
         }
 
         override fun onServiceDisconnected(name: ComponentName) {
@@ -1024,6 +1033,47 @@ class MainActivity : AppCompatActivity() {
         ContextCompat.startForegroundService(this, RecordingService.intent(this, RecordingService.ACTION_START))
     }
 
+    /** A recording the process died in the middle of (`RecordingService.findLeftover`): not
+     *  cancellable, since dismissing it would only bring it back on the next bind. Resume comes
+     *  back paused; Save goes to the Save screen as a Stop would; Discard confirms first, as the
+     *  Save screen's does, since the journal is the only copy. */
+    private fun offerLeftover(leftover: LiveRecordingJournal.Leftover) {
+        if (leftoverDialog?.isShowing == true || isFinishing) return
+        leftoverDialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.recording_leftover_title)
+            .setMessage(
+                getString(
+                    R.string.recording_leftover_message,
+                    RecordingFormat.duration(leftover.movingMs),
+                    RecordingFormat.distance(resources, leftover.distanceM),
+                ),
+            )
+            .setCancelable(false)
+            .setPositiveButton(R.string.recording_leftover_resume) { _, _ ->
+                if (recorder?.resumeLeftover(leftover) != true) {
+                    Toast.makeText(this, R.string.recording_needs_location, Toast.LENGTH_LONG).show()
+                }
+            }
+            .setNeutralButton(R.string.recording_leftover_save) { _, _ -> recorder?.saveLeftover(leftover) }
+            .setNegativeButton(R.string.recording_discard) { _, _ -> confirmDiscardLeftover(leftover) }
+            .show()
+    }
+
+    private fun confirmDiscardLeftover(leftover: LiveRecordingJournal.Leftover) {
+        leftoverDialog = MaterialAlertDialogBuilder(this, R.style.ThemeOverlay_HoldMyTrack_Dialog_Destructive)
+            .setTitle(R.string.recording_discard_confirm_title)
+            .setMessage(R.string.recording_discard_confirm_message)
+            .setCancelable(false)
+            .setPositiveButton(R.string.recording_discard) { _, _ -> recorder?.discardLeftover(leftover) }
+            .setNegativeButton(android.R.string.cancel) { _, _ ->
+                // Still showing while its own button's callback runs, so the guard would
+                // otherwise keep the prompt from coming back.
+                leftoverDialog = null
+                offerLeftover(leftover)
+            }
+            .show()
+    }
+
     private fun hasLocationPermission() =
         hasPermission(Manifest.permission.ACCESS_FINE_LOCATION) || hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
 
@@ -1371,6 +1421,7 @@ class MainActivity : AppCompatActivity() {
     // A signed-out launch finishes from onCreate before the MapView exists, which skips every
     // callback above but still reaches this one.
     override fun onDestroy() {
+        leftoverDialog?.dismiss()
         if (::mapView.isInitialized) mapView.onDestroy()
         if (::dateSlider.isInitialized) dateSlider.release()
         coverageWatch.stop()

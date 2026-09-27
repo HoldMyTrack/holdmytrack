@@ -17,18 +17,25 @@ import android.location.LocationManager
 import android.os.Binder
 import android.os.IBinder
 import android.os.SystemClock
+import android.util.Log
 import android.widget.Toast
 import dev.holdmytrack.android.MainActivity
+import androidx.core.content.ContextCompat
 import dev.holdmytrack.android.R
+import dev.holdmytrack.android.net.Session
+import dev.holdmytrack.android.recording.db.LiveRecordingJournal
 import dev.holdmytrack.android.recording.db.RecordedActivityRecord
-import dev.holdmytrack.android.recording.db.RecordedActivityStore
 import dev.holdmytrack.android.recording.db.SyncStatus
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 enum class RecordingState { IDLE, RECORDING, PAUSED }
 
@@ -61,7 +68,7 @@ data class RecordingStats(
  * **Stop saves here, not in a screen**, for the same reason: Stop can come from the
  * notification. A recording shorter than [MIN_DURATION_MS] of moving time (pauses excluded),
  * or with fewer than two fixes, is dropped rather than saved. Otherwise it's inserted into
- * `RecordedActivityStore` as [SyncStatus.NOT_SYNCED] with no name or description and the
+ * `recorded_activities` as [SyncStatus.NOT_SYNCED] with no name or description and the
  * account's last-used type ([RecordingTypes.lastUsed]) — nothing is asked while recording —
  * and then `RecordingActivity`'s Save screen opens on the new row for name, type and
  * description. The row is already stored by then, so leaving that screen with Back keeps it
@@ -76,12 +83,16 @@ data class RecordingStats(
  * (`ConsentRequired`) — there is no other app's data being asked for here, HoldMyTrack is recording
  * its own. This is a foreground *service*, not a foreground-only *permission* restriction.
  *
- * **Buffering is an in-memory list, deliberately not solving crash recovery.** A low-memory
- * kill mid-recording loses whatever hasn't been saved yet — `apps/android/docs/ROADMAP.md`'s
- * own "crash/kill recovery" item names this as a real, still-open gap, not an oversight here.
- * What this class does guarantee: points are appended only while [RecordingState.RECORDING],
- * never while paused, so a paused stretch doesn't inflate distance or speed with GPS drift
- * from a stationary phone.
+ * **Every fix is also written to disk as it arrives** ([LiveRecordingJournal]), so a process
+ * death mid-recording — which takes the in-memory list and the notification with it — doesn't
+ * take the recording. The next time the map binds here and finds no recording running but a
+ * journal left over ([findLeftover]), it offers to resume ([resumeLeftover], which comes back
+ * paused, so the time the process was dead counts as neither moving time nor distance), save
+ * ([saveLeftover]) or discard ([discardLeftover]) it. Nothing restarts on its own: the service
+ * stays not sticky, since a restart from the background gets no while-in-use location access
+ * and the recording would carry on invisibly anyway. Points are appended only while
+ * [RecordingState.RECORDING], never while paused, so a paused stretch doesn't inflate distance
+ * or speed with GPS drift from a stationary phone.
  *
  * **Pause is user-initiated only** — no auto-pause. `docs/VISION.md` §1.1 explicitly disclaims
  * that as fitness-tracker sophistication this feature doesn't attempt.
@@ -100,6 +111,14 @@ class RecordingService : Service() {
     /** Set by whoever is bound and wants live redraws (state changes and new fixes); cleared
      *  on unbind. Nothing here fans out to more than one listener — only `MainActivity` binds. */
     var onChange: (() -> Unit)? = null
+
+    /** The journal's key for the recording in progress, and the `external_id` it syncs under
+     *  (`RecordedActivityRecord`) — minted at Start, so the journal and the saved row share it. */
+    private var recordingId = ""
+
+    /** Fixed at Start: the recording belongs to whoever was signed in when it began, even if
+     *  it ends up saved from a leftover while someone else is. */
+    private var account = ""
 
     private val recorded = mutableListOf<RecordedPoint>()
     private var lastFix: Location? = null
@@ -121,8 +140,8 @@ class RecordingService : Service() {
         return false
     }
 
-    /** Not sticky: a restarted service would come back with none of the points it had, so
-     *  there is nothing worth resurrecting. */
+    /** Not sticky — see the class doc: a process death is recovered from the journal, at the
+     *  user's say, not by the system restarting this in the background. */
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> if (state == RecordingState.IDLE) start() else startForeground()
@@ -141,7 +160,9 @@ class RecordingService : Service() {
      *  [ACTION_START] — a foreground service with a location type throws at `startForeground`
      *  without it. Re-checked here only so a stray start can't crash the process. */
     private fun start() {
-        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
+        if (!hasLocationPermission()) return
+        recordingId = UUID.randomUUID().toString()
+        account = Session.email
         recorded.clear()
         lastFix = null
         distanceM = 0.0
@@ -150,11 +171,75 @@ class RecordingService : Service() {
         state = RecordingState.RECORDING
 
         startForeground()
+        listenForFixes()
+        publish()
+        val id = recordingId
+        val owner = account
+        val context = applicationContext
+        journalWrite { journal ->
+            // Normally answered before this, from the map's prompt — but a leftover the prompt
+            // never got to (another account's, or a start tapped before the prompt came up)
+            // is saved as it stands rather than overwritten: the journal holds one recording.
+            journal.leftover()?.let { journal.finish(it.id, recordOf(context, it.id, it.account, it.movingMs, it.distanceM, it.points), it.account) }
+            journal.begin(id, owner)
+        }
+    }
+
+    private fun hasLocationPermission() =
+        checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+    private fun listenForFixes() {
         val manager = getSystemService(LOCATION_SERVICE) as LocationManager
         locationManager = manager
-        @Suppress("MissingPermission") // checked above
+        @Suppress("MissingPermission") // every caller checks hasLocationPermission first
         manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, MIN_UPDATE_MS, MIN_UPDATE_M, locationListener)
+    }
+
+    /**
+     * Answers [onFound] (on the main thread) with a recording a process death left in the
+     * journal, when there is one for the signed-in account and nothing is recording now —
+     * another account's waits for that account, since its Save screen would find nothing
+     * under this one. Queued behind every pending journal write, so a Stop that has only just
+     * happened is never mistaken for a leftover.
+     */
+    fun findLeftover(onFound: (LiveRecordingJournal.Leftover) -> Unit) {
+        journalWrite { journal ->
+            val leftover = journal.leftover() ?: return@journalWrite
+            withContext(Dispatchers.Main) {
+                if (state == RecordingState.IDLE && leftover.account == Session.email) onFound(leftover)
+            }
+        }
+    }
+
+    /** Picks [leftover] up where it was, paused: the gap is a pause, not distance or moving
+     *  time. False, and nothing changes, when location access has been taken away since. */
+    fun resumeLeftover(leftover: LiveRecordingJournal.Leftover): Boolean {
+        if (state != RecordingState.IDLE || !hasLocationPermission()) return false
+        recordingId = leftover.id
+        account = leftover.account
+        recorded.clear()
+        recorded += leftover.points
+        lastFix = null
+        distanceM = leftover.distanceM
+        accumulatedBeforePauseMs = leftover.movingMs
+        state = RecordingState.PAUSED
+        // Started, not just bound, so it outlives the map the way a fresh recording does;
+        // ACTION_START on a service that isn't idle only goes foreground.
+        ContextCompat.startForegroundService(this, intent(this, ACTION_START))
+        listenForFixes()
         publish()
+        return true
+    }
+
+    /** Saves [leftover] as Stop would have, Save screen included. */
+    fun saveLeftover(leftover: LiveRecordingJournal.Leftover) {
+        val context = applicationContext
+        val record = recordOf(context, leftover.id, leftover.account, leftover.movingMs, leftover.distanceM, leftover.points)
+        finish(context, leftover.id, record, leftover.account)
+    }
+
+    fun discardLeftover(leftover: LiveRecordingJournal.Leftover) {
+        journalWrite { it.finish(leftover.id, null, leftover.account) }
     }
 
     private fun toggle() {
@@ -162,6 +247,10 @@ class RecordingService : Service() {
             RecordingState.RECORDING -> {
                 state = RecordingState.PAUSED
                 accumulatedBeforePauseMs += SystemClock.elapsedRealtime() - recordingStartedAtRealtime
+                val id = recordingId
+                val movingMs = accumulatedBeforePauseMs
+                val distance = distanceM
+                journalWrite { it.updateTotals(id, movingMs, distance) }
             }
             RecordingState.PAUSED -> {
                 state = RecordingState.RECORDING
@@ -187,29 +276,32 @@ class RecordingService : Service() {
         recorded.clear()
         publish()
 
-        if (stats.elapsedMs < MIN_DURATION_MS || points.size < 2) {
-            Toast.makeText(applicationContext, R.string.recording_too_short, Toast.LENGTH_SHORT).show()
-            return
-        }
         val context = applicationContext
-        val record = RecordedActivityRecord(
-            id = UUID.randomUUID().toString(),
-            name = "",
-            description = "",
-            activityType = RecordingTypes.lastUsed(context),
-            startedAtMs = points.first().time.toEpochMilli(),
-            distanceMeters = stats.distanceM,
-            durationSeconds = stats.elapsedMs / 1000,
-            points = points,
-            syncStatus = SyncStatus.NOT_SYNCED,
-            createdAtMs = System.currentTimeMillis(),
-        )
-        // Not this service's own scope: the service is free to be destroyed the moment it
-        // stops being foreground, and the insert must still finish.
-        saveScope.launch {
-            RecordedActivityStore(context).insert(record)
-            context.startActivity(RecordingActivity.saveIntent(context, record.id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        finish(context, recordingId, recordOf(context, recordingId, account, stats.elapsedMs, stats.distanceM, points), account)
+    }
+
+    /** Moves recording [id] out of the journal — into `recorded_activities` as [record], then
+     *  the Save screen on it, or, with no [record] (too short), nowhere. */
+    private fun finish(context: Context, id: String, record: RecordedActivityRecord?, owner: String) {
+        if (record == null) {
+            Toast.makeText(context, R.string.recording_too_short, Toast.LENGTH_SHORT).show()
         }
+        journalWrite { journal ->
+            journal.finish(id, record, owner)
+            if (record != null) {
+                withContext(Dispatchers.Main) {
+                    context.startActivity(RecordingActivity.saveIntent(context, record.id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+            }
+        }
+    }
+
+    /** Journal writes go through one thread, in order, on an application-lifetime scope rather
+     *  than this service's own: the service is free to be destroyed the moment it stops being
+     *  foreground, and a Stop's save must still finish. */
+    private fun journalWrite(block: suspend (LiveRecordingJournal) -> Unit) {
+        val journal = journal(applicationContext)
+        journalScope.launch { block(journal) }
     }
 
     fun currentStats(): RecordingStats {
@@ -230,12 +322,18 @@ class RecordingService : Service() {
         if (state != RecordingState.RECORDING) return
         lastFix?.let { distanceM += it.distanceTo(location) }
         lastFix = location
-        recorded += RecordedPoint(
+        val point = RecordedPoint(
             lat = location.latitude,
             lon = location.longitude,
             elevationM = if (location.hasAltitude()) location.altitude.toFloat() else null,
             time = Instant.ofEpochMilli(location.time),
         )
+        recorded += point
+        val id = recordingId
+        val seq = recorded.size - 1
+        val movingMs = currentStats().elapsedMs
+        val distance = distanceM
+        journalWrite { it.append(id, seq, point, movingMs, distance) }
         publish()
     }
 
@@ -353,6 +451,44 @@ class RecordingService : Service() {
         private const val MIN_UPDATE_MS = 3_000L
         private const val MIN_UPDATE_M = 5f
 
-        private val saveScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        private const val TAG = "RecordingService"
+
+        /** A failed write is logged, not thrown: a full disk shouldn't take a recording down
+         *  with it, and a Stop whose save fails leaves the journal behind to offer next time. */
+        private val journalScope = CoroutineScope(
+            SupervisorJob() +
+                Executors.newSingleThreadExecutor().asCoroutineDispatcher() +
+                CoroutineExceptionHandler { _, error -> Log.e(TAG, "journal write failed", error) },
+        )
+
+        private var journalInstance: LiveRecordingJournal? = null
+
+        private fun journal(context: Context): LiveRecordingJournal =
+            journalInstance ?: LiveRecordingJournal(context).also { journalInstance = it }
+
+        /** The row Stop saves — blank name and description, the account's last-used type
+         *  ([RecordingTypes.lastUsed]) — or null for one too short to keep. */
+        private fun recordOf(
+            context: Context,
+            id: String,
+            account: String,
+            movingMs: Long,
+            distanceM: Double,
+            points: List<RecordedPoint>,
+        ): RecordedActivityRecord? {
+            if (movingMs < MIN_DURATION_MS || points.size < 2) return null
+            return RecordedActivityRecord(
+                id = id,
+                name = "",
+                description = "",
+                activityType = RecordingTypes.lastUsed(context, account),
+                startedAtMs = points.first().time.toEpochMilli(),
+                distanceMeters = distanceM,
+                durationSeconds = movingMs / 1000,
+                points = points,
+                syncStatus = SyncStatus.NOT_SYNCED,
+                createdAtMs = System.currentTimeMillis(),
+            )
+        }
     }
 }

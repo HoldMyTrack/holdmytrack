@@ -17,8 +17,15 @@ import kotlinx.coroutines.withContext
  * already prefers where a platform API covers the need (`LocationManager` over Play Services'
  * `FusedLocationProviderClient`, plain `OkHttp` over Retrofit).
  */
-private class RecordingDbHelper(context: Context) :
-    SQLiteOpenHelper(context.applicationContext, "holdmytrack-recordings.db", null, 3) {
+internal class RecordingDbHelper(context: Context) :
+    SQLiteOpenHelper(context.applicationContext, "holdmytrack-recordings.db", null, 4) {
+
+    init {
+        // `LiveRecordingJournal` writes on every GPS fix while other screens read the finished
+        // recordings — WAL lets those reads run alongside a write and keeps each fix's commit
+        // cheap.
+        setWriteAheadLoggingEnabled(true)
+    }
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -38,6 +45,35 @@ private class RecordingDbHelper(context: Context) :
             )
             """.trimIndent(),
         )
+        createJournal(db)
+    }
+
+    /** `LiveRecordingJournal`'s two tables: the recording in progress, and its points one row
+     *  each so a fix is an append rather than a rewrite of the whole track. */
+    private fun createJournal(db: SQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE $LIVE_TABLE (
+                id TEXT PRIMARY KEY,
+                account TEXT NOT NULL,
+                moving_ms INTEGER NOT NULL,
+                distance_meters REAL NOT NULL
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            CREATE TABLE $LIVE_POINTS_TABLE (
+                recording_id TEXT NOT NULL,
+                seq INTEGER NOT NULL,
+                lat REAL NOT NULL,
+                lon REAL NOT NULL,
+                elevation_m REAL,
+                time_ms INTEGER NOT NULL,
+                PRIMARY KEY (recording_id, seq)
+            )
+            """.trimIndent(),
+        )
     }
 
     // Version 2 added `account` (see RecordedActivityStore's class doc for why it was
@@ -45,18 +81,21 @@ private class RecordingDbHelper(context: Context) :
     // same "no migration tooling needed pre-launch" call the server side already makes.
     // Version 3 changed no columns: a synced row is now deleted rather than kept with a
     // `synced` status, so upgrading clears the rows that status left behind — and keeps the
-    // unsynced ones, which exist nowhere else.
+    // unsynced ones, which exist nowhere else. Version 4 added the journal's tables.
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) {
             db.execSQL("DROP TABLE IF EXISTS $TABLE")
             onCreate(db)
             return
         }
-        db.execSQL("DELETE FROM $TABLE WHERE sync_status = 'synced'")
+        if (oldVersion < 3) db.execSQL("DELETE FROM $TABLE WHERE sync_status = 'synced'")
+        if (oldVersion < 4) createJournal(db)
     }
 
     companion object {
         const val TABLE = "recorded_activities"
+        const val LIVE_TABLE = "live_recording"
+        const val LIVE_POINTS_TABLE = "live_points"
     }
 }
 
@@ -84,7 +123,7 @@ class RecordedActivityStore(context: Context) {
     private fun account() = Session.email
 
     suspend fun insert(record: RecordedActivityRecord) = withContext(Dispatchers.IO) {
-        helper.writableDatabase.insertOrThrow(RecordingDbHelper.TABLE, null, record.toContentValues())
+        helper.writableDatabase.insertOrThrow(RecordingDbHelper.TABLE, null, record.toContentValues(account()))
         Unit
     }
 
@@ -93,7 +132,7 @@ class RecordedActivityStore(context: Context) {
      *  one Save commits every field at once. */
     suspend fun update(record: RecordedActivityRecord) = withContext(Dispatchers.IO) {
         helper.writableDatabase.update(
-            RecordingDbHelper.TABLE, record.toContentValues(), "id = ? AND account = ?", arrayOf(record.id, account()),
+            RecordingDbHelper.TABLE, record.toContentValues(account()), "id = ? AND account = ?", arrayOf(record.id, account()),
         )
         Unit
     }
@@ -132,20 +171,6 @@ class RecordedActivityStore(context: Context) {
         Unit
     }
 
-    private fun RecordedActivityRecord.toContentValues() = ContentValues().apply {
-        put("id", id)
-        put("account", account())
-        put("name", name)
-        put("description", description)
-        put("activity_type", activityType)
-        put("started_at_ms", startedAtMs)
-        put("distance_meters", distanceMeters)
-        put("duration_seconds", durationSeconds)
-        put("points_json", points.toJson())
-        put("sync_status", syncStatus)
-        put("created_at_ms", createdAtMs)
-    }
-
     private fun Cursor.toRecord() = RecordedActivityRecord(
         id = getString(getColumnIndexOrThrow("id")),
         name = getString(getColumnIndexOrThrow("name")),
@@ -158,4 +183,20 @@ class RecordedActivityStore(context: Context) {
         syncStatus = getString(getColumnIndexOrThrow("sync_status")),
         createdAtMs = getLong(getColumnIndexOrThrow("created_at_ms")),
     )
+}
+
+/** One `recorded_activities` row, under [account] — the store's signed-in account, or the
+ *  journal's own when it finishes a recording made under another (`LiveRecordingJournal`). */
+internal fun RecordedActivityRecord.toContentValues(account: String) = ContentValues().apply {
+    put("id", id)
+    put("account", account)
+    put("name", name)
+    put("description", description)
+    put("activity_type", activityType)
+    put("started_at_ms", startedAtMs)
+    put("distance_meters", distanceMeters)
+    put("duration_seconds", durationSeconds)
+    put("points_json", points.toJson())
+    put("sync_status", syncStatus)
+    put("created_at_ms", createdAtMs)
 }
