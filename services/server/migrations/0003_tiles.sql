@@ -1,5 +1,4 @@
--- Rendered coverage: fog_tiles (IMPLEMENTATION.md §3.6), activity_tile_masks (§3.11) and
--- user_tiles (§3.5).
+-- Rendered coverage: fog_tiles (IMPLEMENTATION.md §3.6) and activity_tile_masks (§3.11).
 
 -- §3.6 fog_tiles -- the cached "whole history, nothing hidden" composite per tile, built by
 -- compositing activity_tile_masks.
@@ -35,14 +34,3 @@ CREATE TABLE activity_tile_masks (
 
 -- Both read paths ask "which activities touch tile (zoom, x, y)", never the reverse.
 CREATE INDEX idx_activity_tile_masks_tile ON activity_tile_masks (zoom, tile_x, tile_y);
-
--- §3.5 user_tiles -- explorer-tile scoring (§4.4). Nothing writes it yet.
-CREATE TABLE user_tiles (
-    user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    zoom              SMALLINT NOT NULL,   -- 14 (~2.4 km) and 17 (~306 m) at the equator
-    tile_x            INT NOT NULL,
-    tile_y            INT NOT NULL,
-    first_visited_at  TIMESTAMPTZ NOT NULL,
-    visit_count       INT NOT NULL DEFAULT 1,
-    PRIMARY KEY (user_id, zoom, tile_x, tile_y)
-);

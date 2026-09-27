@@ -6,7 +6,7 @@
 
 ## 3. Database Schema
 
-The schema lives in `services/server/migrations/`: `0001_users_and_auth.sql` (§3.1, §3.9, §3.10, §3.16–§3.18), `0002_activities.sql` (§3.2–§3.4, §3.7), `0003_tiles.sql` (§3.5, §3.6, §3.11), `0004_admin_boundaries.sql` (§3.12–§3.15), `0005_jobs.sql` (§3.8) and `0006_demo_customer.sql` (the Demo Customer's row and Private locations, §4.10). The 32-file history that built it was collapsed into these six on 2026-09-26, ahead of the first real user, and every database was recreated from them — so from here on a schema change is a new numbered file, never an edit to one of these.
+The schema lives in `services/server/migrations/`: `0001_users_and_auth.sql` (§3.1, §3.9, §3.10, §3.16–§3.18), `0002_activities.sql` (§3.2–§3.4, §3.7), `0003_tiles.sql` (§3.6, §3.11), `0004_admin_boundaries.sql` (§3.12–§3.15), `0005_jobs.sql` (§3.8) and `0006_demo_customer.sql` (the Demo Customer's row and Private locations, §4.10). The 32-file history that built it was collapsed into these six on 2026-09-26, ahead of the first real user, and every database was recreated from them. A second fold on 2026-09-27 took the never-used `user_tiles` table out of `0003_tiles.sql` (ADR-0018) and absorbed `0007_drop_heartrate.sql` into `0002_activities.sql`; existing databases were patched in place (`DROP TABLE user_tiles`, and the `0007` row deleted from `schema_migrations`) rather than recreated. From here on a schema change is a new numbered file, never an edit to one of these.
 
 ### 3.1 `users`
 
@@ -138,29 +138,15 @@ CREATE TABLE activity_streams (
 );
 ```
 
-`cadence`/`power_w` columns existed here at first but were never read back by any query, API response, or client — dropped as dead weight. `heartrate` followed in migration `0007_drop_heartrate.sql` (ADR-0017), deleting every stored reading: HoldMyTrack keeps no health data, only the geography (`VISION.md` §1.1), so no parser reads heart rate any more and the sync wire format no longer carries it. `elevation_m` stays — it is route data, used for elevation gain, dedupe richness (§4.6) and GPX export.
+`cadence`/`power_w` columns existed here at first but were never read back by any query, API response, or client — dropped as dead weight. `heartrate` was dropped too (ADR-0017), deleting every stored reading: HoldMyTrack keeps no health data, only the geography (`VISION.md` §1.1), so no parser reads heart rate any more and the sync wire format no longer carries it. `elevation_m` stays — it is route data, used for elevation gain, dedupe richness (§4.6) and GPX export.
 
 **This table is the single largest storage line in the product** (`VISION.md` §4.3), so it is also the first place §5.7's retention policy applies.
 
 Elevation is present whenever the source records it: an optional per-point field in GPX (`<ele>`), TCX (`AltitudeMeters`), FIT (`altitude`) and Health Connect routes (`altitude`). Heart rate that a file carries — GPX's `gpxtpx:hr` extension, TCX's `HeartRateBpm`, FIT's `heart_rate` field — is skipped by the parsers, and stays only inside the stored raw upload (§4.1), which nothing reads it out of.
 
-### 3.5 `user_tiles`
+### 3.5 `user_tiles` (removed)
 
-Explorer-tile gamification. Slippy tiles rather than H3: they align 1:1 with the MVT/raster grid, rollups are an integer shift, and z14/z17 is the vocabulary the community already uses.
-
-```sql
-CREATE TABLE user_tiles (
-    user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    zoom              SMALLINT NOT NULL,   -- 14 (~2.4 km) and 17 (~306 m) at the equator
-    tile_x            INT NOT NULL,
-    tile_y            INT NOT NULL,
-    first_visited_at  TIMESTAMPTZ NOT NULL,
-    visit_count       INT NOT NULL DEFAULT 1,
-    PRIMARY KEY (user_id, zoom, tile_x, tile_y)
-);
-```
-
-These are the gamification units. They are **not** the fog resolution — see §4.2.
+Removed — explorer-tile scoring is not part of the product; Fog of War is its exploration mechanic (ADR-0018). The number is kept so later sections keep theirs.
 
 ### 3.6 `fog_tiles`
 
@@ -488,7 +474,7 @@ The order of these steps matters.
 1. **Receive** — via any of the three paths above. Validate, check for an existing match on `(user_id, source, external_id)` as a fast path (§4.0's idempotency invariant), enqueue an `ingest` job, return. Nothing heavy happens inline. This check is an optimization, not the guarantee — see step 6.
 2. **Parse** — stream `.FIT` binary or `.GPX`/`.TCX` XML, or map a provider's JSON. **Never load a whole file into memory**: a 100-mile ride at 1 Hz is 36,000+ points across a dozen channels, and a bulk archive is thousands of those. Every parser leaves a missing timestamp as the zero `time.Time`; `ingest.go`'s `keepTimed` then drops untimed points and fails the job (`errNoTimestamps`) when none is left. Without it a timestamp-less GPX (a planned route) was persisted starting on 0001-01-01 — outside every date range the map filters by, so "View on map" could never show it.
 3. **Apply privacy** — clip the raw point list against the account's `privacy_zones` (§7) **before anything is persisted or indexed**. Privacy applied at render time leaks through any bug in the render path; privacy applied at ingest cannot.
-4. **Compute coverage from the raw points** — rasterize each *line segment*, not each point, into the coverage mask (§4.2), and mark touched `fog_tiles` rows dirty. (Upserting `user_tiles` for z14 and z17 belongs here too, but isn't built: the table exists, empty, until explorer-tile scoring is — `docs/ROADMAP.md` Phase 4.)
+4. **Compute coverage from the raw points** — rasterize each *line segment*, not each point, into the coverage mask (§4.2), and mark touched `fog_tiles` rows dirty.
 5. **Simplify for display only** — `ST_SimplifyPreserveTopology`, stored in `activities.trajectory`.
 6. **Persist** — summary metrics to `activities`, sensor arrays to `activity_streams`, and the raw ingest payload to object storage (the uploaded file for Path 3, the provider's push for Path 1, the synced point batch for Path 2), keyed by `activities.raw_payload_key`. This, not `activity_streams`, is what makes retroactive re-clipping possible (§7) — it is the only place full raw points survive past this job, since `activity_streams` stores elapsed time and sensor channels but not position. The `activities` insert is `ON CONFLICT (user_id, source, external_id) DO NOTHING`, matching `idx_activities_dedupe` (§3.3) — this, not step 1's check, is what actually enforces §4.0's idempotency invariant under concurrent duplicates.
 7. **Re-render dirty fog tiles** — as a follow-up job (§4.2).
@@ -714,9 +700,9 @@ Attribution/logo bake-in belongs on the *final* canvas in step 3, not the offscr
 
 **Not in this slice**: pace-colored segments (§4.3.1 — a single-focused-activity view, narrower than "export my map"), vector/SVG output (raster only), story cards/animated reveals (`VISION.md` §4.2's other two "Export" items, unbuilt), and full mobile-touch polish of the frame's own handles/toolbar layout (the drag/resize interaction is pointer-events-based — mouse and touch unified — from the start, but comfortable touch-target sizing and small-screen toolbar layout are deferred to the mobile-browser-support pass `docs/ROADMAP.md` Phase 3 already tracks).
 
-### 4.4 Explorer tile scoring
+### 4.4 Explorer tile scoring (removed)
 
-`user_tiles` is small — thousands of rows per user, not millions — so scoring is a direct query rather than a pipeline: total tiles, max square, max connected cluster, per-region coverage percentage. Deliberately separate from the visual fog so neither constrains the other's resolution.
+Removed with §3.5 (ADR-0018).
 
 ### 4.5 Per-activity pace, and distance trends
 
