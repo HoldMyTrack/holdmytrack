@@ -147,14 +147,5 @@
             android:layout_height="wrap_content"
             android:textIsSelectable="true"
             android:visibility="gone" />
-
-        <!-- Until the history moves into the map's panel: worth reading precisely when a sync
-             has not worked. -->
-        <Button
-            android:id="@+id/sync_history"
-            style="@style/Widget.HoldMyTrack.Button.Text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/status_history" />
     </LinearLayout>
 </ScrollView>

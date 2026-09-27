@@ -179,7 +179,6 @@
     <string name="sync_needs_history_permission">Можно синхронизировать, но только последние 30 дней. Синхронизировано по: %1$s</string>
     <string name="sync_history_hint">Health Connect отдаёт только последние 30 дней, если не разрешить доступ к прошлым данным. HoldMyTrack показывает всё, где вы побывали, так что 30 дней — это совсем маленькая карта.</string>
     <string name="sync_allow_history">Разрешить доступ к прошлым данным</string>
-    <string name="status_title">История синхронизации</string>
     <string name="status_history">История</string>
     <string name="status_loading">Загрузка…</string>
     <string name="status_summary_empty">Пока ничего не импортировано.</string>
@@ -199,9 +198,6 @@
     <string name="status_range">%1$d–%2$d из %3$d</string>
     <string name="status_previous_page">Предыдущая страница</string>
     <string name="status_next_page">Следующая страница</string>
-    <string name="status_duplicates_heading">Уже записано из другого источника</string>
-    <string name="status_duplicate_what">%1$s из %2$s</string>
-    <string name="status_duplicate_why">уже есть из %1$s, поэтому не рисуется дважды</string>
     <string name="source_upload">загруженного файла</string>
     <string name="source_takeout">импорта Google Takeout</string>
     <string name="source_recorded">GPS-записи</string>
@@ -211,6 +207,8 @@
     <!-- The map's Activities panel (panel/ActivitiesPanel.kt), after the web's activities.* and filters.* messages. -->
     <string name="panel_label">Панель занятий</string>
     <string name="panel_tab_activities">Занятия</string>
+    <string name="panel_tab_sync">Синхронизация</string>
+    <string name="panel_sync_subtext">Всё импортированное — с телефона или из веба</string>
     <string name="panel_loaded">Загружено: %1$s</string>
     <string name="panel_loading">Загрузка…</string>
     <string name="panel_expand">Показать список занятий</string>

@@ -173,7 +173,6 @@
     <string name="sync_needs_history_permission">Ready to sync, but only the last 30 days. Last synced through: %1$s</string>
     <string name="sync_history_hint">Health Connect only shares the past 30 days unless you allow access to past data. HoldMyTrack is built around the whole shape of where you have been, so 30 days is not much of a map.</string>
     <string name="sync_allow_history">Allow access to past data</string>
-    <string name="status_title">Sync history</string>
     <string name="status_history">History</string>
     <string name="status_loading">Loading…</string>
     <string name="status_summary_empty">Nothing imported yet.</string>
@@ -191,9 +190,6 @@
     <string name="status_range">%1$d–%2$d of %3$d</string>
     <string name="status_previous_page">Previous page</string>
     <string name="status_next_page">Next page</string>
-    <string name="status_duplicates_heading">Already recorded from another source</string>
-    <string name="status_duplicate_what">%1$s from %2$s</string>
-    <string name="status_duplicate_why">already here from %1$s, so it isn\'t drawn twice</string>
     <string name="source_health_connect" translatable="false">Health Connect</string>
     <string name="source_health_kit" translatable="false">HealthKit</string>
     <string name="source_upload">an uploaded file</string>
@@ -206,6 +202,8 @@
     <!-- The map's Activities panel (panel/ActivitiesPanel.kt), after the web's activities.* and filters.* messages. -->
     <string name="panel_label">Activities panel</string>
     <string name="panel_tab_activities">Activities</string>
+    <string name="panel_tab_sync">Sync</string>
+    <string name="panel_sync_subtext">Everything imported, from the phone or the web</string>
     <string name="panel_loaded">%1$s loaded</string>
     <string name="panel_loading">Loading…</string>
     <string name="panel_expand">Show the activities list</string>

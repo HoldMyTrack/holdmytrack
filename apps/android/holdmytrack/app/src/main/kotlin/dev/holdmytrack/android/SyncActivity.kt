@@ -1,6 +1,5 @@
 package dev.holdmytrack.android
 
-import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -66,7 +65,6 @@ class SyncActivity : AppCompatActivity() {
     private lateinit var primary: Button
     private lateinit var openHealthConnect: Button
     private lateinit var syncNow: Button
-    private lateinit var history: Button
 
     private var syncJob: Job? = null
 
@@ -100,11 +98,9 @@ class SyncActivity : AppCompatActivity() {
         primary = findViewById(R.id.sync_primary)
         openHealthConnect = findViewById(R.id.sync_open_health_connect)
         syncNow = findViewById(R.id.sync_now)
-        history = findViewById(R.id.sync_history)
 
         openHealthConnect.setOnClickListener { openSettings() }
         syncNow.setOnClickListener { startSync() }
-        history.setOnClickListener { startActivity(Intent(this, SyncStatusActivity::class.java)) }
     }
 
     override fun onResume() {
@@ -154,15 +150,13 @@ class SyncActivity : AppCompatActivity() {
         // (UploadPanel.tsx's readOnly prop). This is that same treatment on Android: Sync now
         // and the Health Connect section are hidden rather than left to fail. Recordings stay
         // listed — a demo account can still record, edit and delete them locally — just not
-        // checkable, and History stays visible, since reading the demo account's own (shared,
-        // seeded) history is not a mutation.
+        // checkable. (Its history is the map panel's Sync tab, which reading doesn't change.)
         if (Session.isDemo) {
             showAccountNotice(getString(R.string.sync_demo_read_only))
             recordedSection.visibility = View.VISIBLE
             recordedRows.checkable = false
             healthConnectSection.visibility = View.GONE
             syncNow.visibility = View.GONE
-            history.visibility = View.VISIBLE
             return
         }
 
@@ -171,7 +165,6 @@ class SyncActivity : AppCompatActivity() {
         recordedRows.checkable = true
         healthConnectSection.visibility = View.VISIBLE
         syncNow.visibility = View.VISIBLE
-        history.visibility = View.VISIBLE
         renderHealthConnect(readiness)
         updateSyncNow()
     }
@@ -182,7 +175,6 @@ class SyncActivity : AppCompatActivity() {
         recordedSection.visibility = View.GONE
         healthConnectSection.visibility = View.GONE
         syncNow.visibility = View.GONE
-        history.visibility = View.GONE
     }
 
     private fun showAccountNotice(text: String) {

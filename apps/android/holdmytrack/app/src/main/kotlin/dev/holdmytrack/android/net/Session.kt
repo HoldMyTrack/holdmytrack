@@ -32,6 +32,7 @@ object Session {
     private const val KEY_EMAIL_VERIFIED = "email_verified"
     private const val KEY_COUNTRY = "country"
     private const val KEY_LOCALE = "locale"
+    private const val KEY_TIMEZONE = "timezone"
 
     private lateinit var prefs: SharedPreferences
 
@@ -86,6 +87,11 @@ object Session {
      */
     val country: String get() = prefs.getString(KEY_COUNTRY, "").orEmpty()
 
+    /** The account's Timezone (an IANA name), which decides which calendar day an activity
+     *  falls on — the server's, and so the map's date range's. Empty until the first profile
+     *  that carries it. */
+    val timezone: String get() = prefs.getString(KEY_TIMEZONE, "").orEmpty()
+
     /** The account's Language, empty for automatic — see `AppLanguage`. */
     val locale: String get() = prefs.getString(KEY_LOCALE, "").orEmpty()
 
@@ -115,6 +121,7 @@ object Session {
             .putBoolean(KEY_EMAIL_VERIFIED, profile.emailVerified)
             .putString(KEY_COUNTRY, profile.country)
             .putString(KEY_LOCALE, profile.locale)
+            .putString(KEY_TIMEZONE, profile.timezone)
     }
 
     fun clear() {
@@ -126,6 +133,7 @@ object Session {
             .remove(KEY_EMAIL_VERIFIED)
             .remove(KEY_COUNTRY)
             .remove(KEY_LOCALE)
+            .remove(KEY_TIMEZONE)
             .apply()
     }
 }

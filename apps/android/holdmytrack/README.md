@@ -62,7 +62,7 @@ Everything is under `app/src/main/kotlin/dev/holdmytrack/android/`:
 - `health/ExerciseTypes.kt` — Health Connect's exercise type to HoldMyTrack's `activity_type`, normalised onto the vocabulary the other ingest paths already produce.
 - `sync/SyncCursor.kt` — the watermark. Read its comment before changing anything about it.
 - `sync/SyncRunner.kt` — one foreground sync run: read, classify, batch, post, advance.
-- `SyncStatusActivity.kt` — sync history, pending work, failure detail, and the activities cross-source deduplication took out of circulation because they were already here from another source.
+- `panel/` — the map's Activities panel, the web's phone sheet: `ActivitiesPanel.kt` (the sheet and its Activities tab), `PanelState.kt` and `ActivityFacets.kt` (its rules, unit-tested), `EditActivityWindow.kt` (Edit), `SyncTab.kt` (the sync history: pending work, failure detail, View on map).
 
 Alongside:
 
