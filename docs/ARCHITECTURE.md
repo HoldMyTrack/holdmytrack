@@ -30,45 +30,42 @@ A second constraint now shapes every decision: **the service is free and communi
 | **Admin panel in the app**, granted only from the server's CLI | Operators need to see accounts and activity ids without raw SQL on production; a flag only the server's shell can set keeps the web from ever being an escalation path, and non-admins get a 404 — [ADR-0013](adr/0013-admin-panel.md) |
 | **Localization**: in-house catalogs, the language decided by the server | Two languages and a few hundred strings don't need three i18n libraries; the server picks one language per request (account setting → `Accept-Language` → English) and the map app reads it from `<html lang>`, so the page and the app never disagree — [ADR-0014](adr/0014-localization.md) |
 
-### 1.2 Target architecture
+### 1.2 System architecture
 
 ```mermaid
-graph TD
-    Files["Path 3: File upload (.GPX/.FIT/.TCX)"]
-    Cloud["Path 1: Garmin / Wahoo / COROS"]
-    Device["Path 2: Health Connect, HealthKit"]
-
-    Web["Web App (upload + view)"]
-    Mobile["Mobile Apps (sync + view)"]
-    Api["HoldMyTrack Server (single deployable)"]
-    Worker["Workers (same binary, queue mode)"]
-    CDN["CDN"]
-    Basemap["Protomaps planet .pmtiles"]
-    Store["Object Storage (R2)"]
-    PG[("PostgreSQL + PostGIS")]
-
-    Files --> Web
-    Device --> Mobile
-    Web -->|HTTPS| Api
-    Mobile -->|HTTPS| Api
-    Cloud -->|webhook / OAuth pull| Api
-    Web --> CDN
-    Mobile --> CDN
-    CDN --> Api
-    CDN --> Basemap
-    Api --> PG
-    Api -->|enqueue| PG
-    Worker -->|dequeue| PG
-    Worker --> Store
-    Worker --> PG
-    Basemap --- Store
+flowchart LR
+    subgraph Clients
+        browser["Browser<br/>server-rendered pages + React map app<br/>file upload (Path 3)"]
+        android["Android app<br/>Kotlin · MapLibre Native<br/>Health Connect sync, GPS recording (Path 2)"]
+    end
+    subgraph VPS["One VPS — compose.prod.yml"]
+        caddy["Caddy<br/>TLS (Let's Encrypt) · serves /assets/* ·<br/>reverse-proxies everything else"]
+        api["api<br/>Go binary, serve mode<br/>/v1/* API · track + fog tiles · pages"]
+        worker["worker<br/>same binary, work mode<br/>ingest · fog/heatmap rendering"]
+        pg[("PostgreSQL 16 + PostGIS<br/>all tables + job queue")]
+    end
+    subgraph CF["Cloudflare"]
+        edge["CDN edge<br/>tiles.holdmytrack.com (proxied)"]
+        pub[("R2 public bucket<br/>planet .pmtiles · fonts · sprites<br/>per dated build prefix")]
+        priv[("R2 private bucket<br/>raw payloads · activity masks ·<br/>fog/heatmap PNGs · avatars")]
+    end
+    browser -->|"HTTPS holdmytrack.com<br/>(DNS-only, not proxied)"| caddy
+    android -->|HTTPS /v1/*| caddy
+    caddy --> api
+    api -->|queries · enqueue| pg
+    worker -->|dequeue SKIP LOCKED · writes| pg
+    api -->|put raw uploads · get PNGs, avatars| priv
+    worker -->|get raw · put masks, PNGs| priv
+    browser -->|basemap range reads| edge
+    android -->|basemap range reads| edge
+    edge --> pub
 ```
 
-Everything server-side runs as one binary in two modes (`serve` and `work`) against one database. A CDN in front of the tile, raster and basemap routes does the job Redis was originally assigned, with less to operate and nothing to pay monthly.
+Everything server-side runs as one binary in two modes (`serve` and `work`) against one database, deployed as a single-VPS sandbox at `https://holdmytrack.com` rather than Production (`docs/DEPLOY.md`, `IMPLEMENTATION.md` §5.4, §5.8).
 
-**All three paths converge on one pipeline.** They differ only in how bytes arrive; from `IMPLEMENTATION.md` §4.1 step 2 onward the code is identical. This is the property that makes three paths affordable to maintain.
+Everything the app serves — the API, track and fog tiles, and every page — comes from one origin, `holdmytrack.com`, through Caddy (ADR-0006). That origin is deliberately not proxied through Cloudflare, whose proxy caps uploads at 100 MB, below what a bulk export can reach, so the app's own tile routes don't pass through the CDN. The CDN serves only the basemap, and its free plan edge-caches only the fonts and sprites; range reads into the archive still reach R2 (`IMPLEMENTATION.md` §5.4). Postgres stores keys for object-storage items, never their bytes: `activities.raw_payload_key` and `fog_tiles.object_key`/`heatmap_object_key`, for example. Local dev reads the same planet basemap from `tiles.holdmytrack.com`, and RustFS stands in for the private bucket (`docs/DEVELOPMENT.md`).
 
-**Today's actual deployable surface is smaller than this diagram** — Path 1 (cloud connectors) and the iOS app don't exist yet (`docs/ROADMAP.md` tracks that gap), and the one live deployment, `https://holdmytrack.com`, is a single-VPS sandbox rather than Production (`docs/DEPLOY.md`, `IMPLEMENTATION.md` §5.8). This diagram is the target today's web app and Android app are one slice of, not a claim about what's live today.
+**All ingest paths converge on one pipeline.** They differ only in how bytes arrive; from `IMPLEMENTATION.md` §4.1 step 2 onward the code is identical (`IMPLEMENTATION.md` §4.0). This is the property that keeps each additional path affordable to maintain. Path 1 cloud connectors and the iOS app are not built yet (`docs/ROADMAP.md`).
 
 ### 1.3 Deliberately deferred
 
@@ -89,7 +86,7 @@ Everything server-side runs as one binary in two modes (`serve` and `work`) agai
 * **Job queue**: Postgres table with `FOR UPDATE SKIP LOCKED`. No broker until measured.
 * **Frontend (web, Phase 1)**: server-rendered pages — Go's `html/template` (`services/server/internal/web`), one layout and one header shared by every page, `<details>` menus and plain form POSTs, no JavaScript by default ([ADR-0012](adr/0012-server-rendered-pages-react-for-the-map.md)). The map page is the one React app: React 19 + TypeScript; **MapLibre GL JS**. Vite 8; no SSR framework — the map is a single WebGL page with no SEO surface of its own. Verified versions (2026-09): `maplibre-gl` 6.9.0, `pmtiles` 4.5.0, `@protomaps/basemaps` 5.7.2. MapLibre is driven directly rather than through `react-map-gl`: the layer stack is imperatively ordered. **The web app is also an ingest client** — it owns Path 3 and the no-signup demo.
 * **Mobile (Android built, iOS not started)**: native **Kotlin** (Android/Health Connect) and **Swift** (iOS/HealthKit). Both platforms' route APIs are native-only with no cross-platform escape hatch, so a wrapper framework would need native modules for the one thing that matters. **MapLibre Native** for rendering, consuming the same style document as the web client (§2.1).
-* **Basemap**: self-hosted **Protomaps**, planet-wide in the target architecture (§5.4 of `IMPLEMENTATION.md`) — today's dev/demo extract is a small regional cut, not the full planet (`docs/DEPLOY.md` covers both paths). Self-hosting is three artifacts, not one: the `.pmtiles` archive **plus** font glyph PBFs and the sprite sheet. The Protomaps examples hotlink these from `protomaps.github.io`; production must not.
+* **Basemap**: self-hosted **Protomaps**, the full planet build, served from `tiles.holdmytrack.com` to the sandbox and to local dev alike (§5.4 of `IMPLEMENTATION.md`, `docs/DEPLOY.md` §5). Self-hosting is three artifacts, not one: the `.pmtiles` archive **plus** font glyph PBFs and the sprite sheet. The Protomaps examples hotlink these from `protomaps.github.io`; production must not.
 * **Object storage**: Cloudflare **R2** in production — the basemap archive and assets, raw ingest payloads from all three paths, fog raster pyramids, avatars. Locally, **RustFS** (S3-compatible; it replaced MinIO once MinIO stopped publishing free images) stands in for it, reached via `minio-go/v7` (chosen over the AWS SDK — purpose-built for S3-compatible endpoints, far less to pull in for the put/get/remove this needs). R2 specifically, for zero egress; on a free service that is not a preference but a requirement.
 
 ### 2.1 One style document, three renderers

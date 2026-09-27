@@ -54,7 +54,7 @@ graph TD
     Tiles --> Store
 ```
 
-This app is the smaller of the two boxes root `docs/ARCHITECTURE.md` §1.2 draws as "Mobile Apps" and "Path 2: Health Connect, HealthKit" — today it is Android only, iOS does not exist yet, and it is built first specifically so the Path 2 sync contract (`POST /v1/sync/activities`'s payload shape and idempotency semantics) is designed against the more constrained of the two platforms (`apps/android/docs/ROADMAP.md`, "Where this sits in the wider plan").
+This app is the "Android app" client root `docs/ARCHITECTURE.md` §1.2 draws. iOS does not exist yet; Android was built first specifically so the Path 2 sync contract (`POST /v1/sync/activities`'s payload shape and idempotency semantics) is designed against the more constrained of the two platforms (`apps/android/docs/ROADMAP.md`, "Where this sits in the wider plan").
 
 **All three ingest paths still converge on one pipeline.** This app's contribution is entirely on the "how bytes arrive" side of that boundary (`docs/ARCHITECTURE.md` §1.2): it reads Health Connect, normalizes to the wire shape `docs/IMPLEMENTATION.md` §4.0.3 defines, and posts it. Everything from parse onward is server code this app does not touch and does not need to know about.
 

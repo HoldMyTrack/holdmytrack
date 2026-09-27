@@ -24,8 +24,6 @@ Every page is rendered by the Go server (`IMPLEMENTATION.md` §4.19) — the map
 
 `vite preview` proxies the same paths without the dev marker, so the Go server's shell loads the build (`tests/build.mjs` relies on that). Both `npm run verify:map` and `verify:build` need a Go server to sign in against and to render the pages.
 
-An `apps/web/.env.local` that points `VITE_BASEMAP_ORIGIN` at production's tile host leaves the map grey on `localhost` (that host doesn't answer cross-origin requests from it), and the map's `load` never fires — so the Export control, which appears once the map has loaded, never shows either. Run with `VITE_BASEMAP_ORIGIN=` (empty, meaning same-origin) to use the local Ohio archive; the `test` compose service already does.
-
 ### Text and translations
 
 Every piece of text a person reads is a catalog key, in English and Russian (`IMPLEMENTATION.md` §4.21). Adding text means adding it to both languages in the same change, on the surface it belongs to:
@@ -53,9 +51,9 @@ Boundaries first, so the demo's activities get their country/region matches at i
 
 To see the admin panel (`/admin`, `IMPLEMENTATION.md` §4.20), sign up a local account and make it an admin: `docker compose run --rm api set-admin you@example.com true`.
 
-### The local basemap covers Ohio only — or point dev at production's planet tiles
+### Dev uses the planet basemap from `tiles.holdmytrack.com`
 
-`apps/web/public/basemap/basemap.pmtiles` is a regional extract (roughly Ohio, z0–14, cut by `npm run basemap`), so anything outside it renders as bare background. To see the whole planet locally, add `VITE_BASEMAP_ORIGIN=https://tiles.holdmytrack.com/<YYYYMMDD>` (the dated prefix production uses, `docs/DEPLOY.md` §5) to `apps/web/.env.local` and restart `web`. That only works because the basemap bucket's CORS policy lists `http://localhost:5173` alongside the production origin — without it every tile, font and sprite request fails CORS. Each tile loaded counts as a production R2 request. `.env.local` is in `apps/web/.dockerignore`, so no image bakes it in, but the `test` service bind-mounts `apps/web` and Vite would read it from there; `compose.yaml` pins `VITE_BASEMAP_ORIGIN` (empty, same-origin) and `VITE_API_BASE_URL` on that service, and real env vars outrank every `.env` file, so `verify:map` keeps using the local extract and the local API.
+Local dev draws the same full-planet basemap the sandbox does, once `apps/web/.env.local` sets `VITE_BASEMAP_ORIGIN=https://tiles.holdmytrack.com/<YYYYMMDD>` (the dated prefix production uses, `docs/DEPLOY.md` §5). The file is gitignored, so each checkout adds that line itself; restart `web` after changing it. This works because the basemap bucket's CORS policy lists `http://localhost:5173` alongside the production origin — without it every tile, font and sprite request fails CORS. Each tile loaded counts as a production R2 request. The Playwright suites use a small regional extract instead, `apps/web/public/basemap/basemap.pmtiles` (roughly Ohio, z0–14, cut by `npm run basemap`; CI cuts and caches its own), so they never depend on or bill production. `.env.local` is in `apps/web/.dockerignore`, so no image bakes it in, but the `test` service bind-mounts `apps/web` and Vite would read it from there; `compose.yaml` pins `VITE_BASEMAP_ORIGIN` (empty, same-origin) and `VITE_API_BASE_URL` on that service, and real env vars outrank every `.env` file, so `verify:map` keeps using the local extract and the local API.
 
 ## Verification
 

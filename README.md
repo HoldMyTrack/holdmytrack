@@ -40,7 +40,7 @@ holdmytrack/
 │       ├── src/
 │       └── tests/
 └── services/
-    └── server/                  # the "HoldMyTrack Server" of docs/ARCHITECTURE.md §1.2
+    └── server/                  # the api/worker binary of docs/ARCHITECTURE.md §1.2
         ├── go.mod  go.sum
         ├── README.md            # the serve/work/migrate contract and the open decisions
         ├── Dockerfile
