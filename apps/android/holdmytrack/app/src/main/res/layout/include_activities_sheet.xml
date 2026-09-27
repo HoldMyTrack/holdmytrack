@@ -271,6 +271,18 @@
             android:contentDescription="@string/panel_no_target"
             android:src="@drawable/ic_eye" />
 
+        <ImageButton
+            android:id="@+id/panel_edit"
+            style="@style/Widget.HoldMyTrack.PanelChip"
+            android:contentDescription="@string/panel_no_target"
+            android:src="@drawable/ic_pencil" />
+
+        <ImageButton
+            android:id="@+id/panel_delete"
+            style="@style/Widget.HoldMyTrack.PanelChip"
+            android:contentDescription="@string/panel_no_target"
+            android:src="@drawable/ic_trash_2" />
+
         <View
             android:layout_width="1dp"
             android:layout_height="20dp"
@@ -285,32 +297,17 @@
             android:src="@drawable/ic_focus" />
     </LinearLayout>
 
-    <!-- The rows, and in the list's place a note while loading, when nothing matches, or when
-         the read failed (.activities-panel__note). A tap on the list's own empty space, or on
+    <!-- The rows, then a note while loading, when nothing matches, or when the read failed
+         (.activities-panel__note, item_panel_note). A tap on the list's own empty space, or on
          the note, clears the selection (ActivitiesPanel.kt). -->
-    <FrameLayout
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/panel_list"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/panel_list"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:overScrollMode="never"
-            android:scrollbars="vertical" />
-
-        <TextView
-            android:id="@+id/panel_note"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="@dimen/hmt_space_16"
-            android:textColor="@color/panel_ink_50"
-            android:textSize="@dimen/hmt_text_md"
-            android:visibility="gone"
-            tools:text="No activities match the current filters." />
-    </FrameLayout>
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:overScrollMode="never"
+        android:scrollbars="vertical" />
 
     <!-- The target's summary (.activities-panel__footer): "1 selected · 10 km". -->
     <TextView

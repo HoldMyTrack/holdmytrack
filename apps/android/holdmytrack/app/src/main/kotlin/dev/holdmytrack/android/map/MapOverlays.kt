@@ -124,6 +124,25 @@ object MapOverlays {
     private var hiddenTracks: Set<String> = emptySet()
     private var selectedTrack: String? = null
 
+    /**
+     * Bumped by [refreshTracks] and [refreshCoverage] and sent as `v` (the server ignores it),
+     * the web's `tracksVersion` and `coverageVersion`: the tiles carry no cache headers, so
+     * the same URL can be answered from MapLibre's cache with what was there before a delete
+     * or a reprocess.
+     */
+    private var tracksVersion = 0
+    private var coverageVersion = 0
+
+    /** Every Fog and Heatmap layer and the source under it — what [refreshCoverage] replaces. */
+    private val COVERAGE_LAYERS = listOf(
+        FOG_LAYER_ID to FOG_SOURCE_ID,
+        HEATMAP_LAYER_ID to HEATMAP_SOURCE_ID,
+        COUNTRY_FOG_LAYER_ID to COUNTRY_FOG_SOURCE_ID,
+        COUNTRY_HEATMAP_LAYER_ID to COUNTRY_HEATMAP_SOURCE_ID,
+        REGION_FOG_LAYER_ID to REGION_FOG_SOURCE_ID,
+        REGION_HEATMAP_LAYER_ID to REGION_HEATMAP_SOURCE_ID,
+    )
+
     /** Same dark veil colour/opacity as the raster tier's own fog_colour/fog_opacity
      *  (`internal/fog/raster.go`'s RenderFogPNG: #202b25 @ 0.82). */
     private const val FOG_FILL_COLOR = "#202b25"
@@ -165,26 +184,58 @@ object MapOverlays {
      */
     fun attach(style: Style, mode: MapMode, range: DateRange?) {
         val beforeId = labelInsertionPoint(style)
-        addRaster(style, FOG_SOURCE_ID, FOG_LAYER_ID, tileUrl("fog", "png"), beforeId, minZoom = CITY_MIN_ZOOM)
-        addRaster(style, HEATMAP_SOURCE_ID, HEATMAP_LAYER_ID, tileUrl("heatmap", "png"), beforeId, minZoom = CITY_MIN_ZOOM)
+        addCoverage(style, beforeId)
+        addTracks(style, beforeId, range)
+        setMode(style, mode)
+    }
+
+    /** Fog and Heatmap at every tier, each inserted below [beforeId]. */
+    private fun addCoverage(style: Style, beforeId: String?) {
+        addRaster(style, FOG_SOURCE_ID, FOG_LAYER_ID, coverageUrl("fog", "png"), beforeId, minZoom = CITY_MIN_ZOOM)
+        addRaster(style, HEATMAP_SOURCE_ID, HEATMAP_LAYER_ID, coverageUrl("heatmap", "png"), beforeId, minZoom = CITY_MIN_ZOOM)
         addFill(
             style, COUNTRY_FOG_SOURCE_ID, COUNTRY_FOG_LAYER_ID, COUNTRIES_SOURCE_LAYER,
-            tileUrl("country-fog", "mvt"), beforeId, 0f, COUNTRY_MAX_ZOOM, FOG_FILL_COLOR, FOG_FILL_OPACITY,
+            coverageUrl("country-fog", "mvt"), beforeId, 0f, COUNTRY_MAX_ZOOM, FOG_FILL_COLOR, FOG_FILL_OPACITY,
         )
         addFill(
             style, COUNTRY_HEATMAP_SOURCE_ID, COUNTRY_HEATMAP_LAYER_ID, COUNTRIES_SOURCE_LAYER,
-            tileUrl("country-heatmap", "mvt"), beforeId, 0f, COUNTRY_MAX_ZOOM, HEATMAP_FILL_COLOR, HEATMAP_FILL_OPACITY,
+            coverageUrl("country-heatmap", "mvt"), beforeId, 0f, COUNTRY_MAX_ZOOM, HEATMAP_FILL_COLOR, HEATMAP_FILL_OPACITY,
         )
         addFill(
             style, REGION_FOG_SOURCE_ID, REGION_FOG_LAYER_ID, REGIONS_SOURCE_LAYER,
-            tileUrl("region-fog", "mvt"), beforeId, REGION_MIN_ZOOM, REGION_MAX_ZOOM, FOG_FILL_COLOR, FOG_FILL_OPACITY,
+            coverageUrl("region-fog", "mvt"), beforeId, REGION_MIN_ZOOM, REGION_MAX_ZOOM, FOG_FILL_COLOR, FOG_FILL_OPACITY,
         )
         addFill(
             style, REGION_HEATMAP_SOURCE_ID, REGION_HEATMAP_LAYER_ID, REGIONS_SOURCE_LAYER,
-            tileUrl("region-heatmap", "mvt"), beforeId, REGION_MIN_ZOOM, REGION_MAX_ZOOM, HEATMAP_FILL_COLOR, HEATMAP_FILL_OPACITY,
+            coverageUrl("region-heatmap", "mvt"), beforeId, REGION_MIN_ZOOM, REGION_MAX_ZOOM, HEATMAP_FILL_COLOR, HEATMAP_FILL_OPACITY,
         )
-        addTracks(style, beforeId, range)
-        setMode(style, mode)
+    }
+
+    /** The tracks tiles fetched again for [range] — after a delete, or a reprocess landing. */
+    fun refreshTracks(style: Style, range: DateRange?) {
+        tracksVersion += 1
+        setTrackRange(style, range)
+    }
+
+    /**
+     * Every Fog and Heatmap tile fetched again, once the server has re-rendered them
+     * (`CoverageWatch`) — the web's `refreshFogLayers`/`refreshHeatmapLayers`. Replaced, not
+     * updated, for the same reason as [setTrackRange], each at the same place in the stack —
+     * under the tracks — and with its old visibility.
+     */
+    fun refreshCoverage(style: Style) {
+        if (style.getLayer(FOG_LAYER_ID) == null) return
+        coverageVersion += 1
+        val visibility = COVERAGE_LAYERS.associate { (layer, _) -> layer to style.getLayer(layer)?.visibility?.value }
+        COVERAGE_LAYERS.forEach { (layer, source) ->
+            style.getLayer(layer)?.let(style::removeLayer)
+            style.removeSource(source)
+        }
+        val beforeId = if (style.getLayer(TRACKS_CASING_LAYER_ID) != null) TRACKS_CASING_LAYER_ID else labelInsertionPoint(style)
+        addCoverage(style, beforeId)
+        visibility.forEach { (layer, value) ->
+            if (value != null) style.getLayer(layer)?.setProperties(PropertyFactory.visibility(value))
+        }
     }
 
     /**
@@ -366,7 +417,14 @@ object MapOverlays {
 
     private fun addTracks(style: Style, beforeId: String?, range: DateRange?) {
         if (style.getSource(TRACKS_SOURCE_ID) == null) {
-            val query = if (range == null) "" else "?from=${range.from}&to=${range.to}"
+            val params = buildList {
+                if (range != null) {
+                    add("from=${range.from}")
+                    add("to=${range.to}")
+                }
+                if (tracksVersion > 0) add("v=$tracksVersion")
+            }
+            val query = if (params.isEmpty()) "" else params.joinToString("&", prefix = "?")
             style.addSource(VectorSource(TRACKS_SOURCE_ID, tileSet(tileUrl("tracks", "mvt") + query)))
         }
         // Halo first, then every line, then the selected line, all under the labels.
@@ -408,4 +466,7 @@ object MapOverlays {
 
     private fun tileUrl(kind: String, extension: String): String =
         "${BuildConfig.API_BASE_URL}$TILES_V1/$kind/{z}/{x}/{y}.$extension"
+
+    private fun coverageUrl(kind: String, extension: String): String =
+        tileUrl(kind, extension) + if (coverageVersion > 0) "?v=$coverageVersion" else ""
 }

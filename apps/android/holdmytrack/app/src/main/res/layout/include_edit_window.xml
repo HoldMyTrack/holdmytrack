@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Edit window (panel/EditActivityWindow.kt), after the web's EditActivityWindow.tsx at phone
+     width: a card floating over the top of the map, under the chrome row (its top margin is set
+     in MainActivity), rather than a modal dialog — the web keeps it floating so its Track tab
+     can edit on the map. The title and whose it is, then Type, Name and Description, an error
+     line, and Cancel and Save. Clickable, so a touch on it never reaches the map. -->
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/edit_window"
+    style="@style/Widget.HoldMyTrack.Card"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_gravity="top"
+    android:layout_marginStart="@dimen/hmt_space_10"
+    android:layout_marginEnd="@dimen/hmt_space_10"
+    android:clickable="true"
+    android:elevation="10dp"
+    android:focusable="false"
+    android:visibility="gone"
+    app:cardElevation="10dp"
+    app:contentPadding="@dimen/hmt_space_16">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/edit_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleMedium"
+                tools:text="Edit activity" />
+
+            <TextView
+                android:id="@+id/edit_subtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_2"
+                android:textColor="@color/hmt_ink_meta"
+                android:textSize="@dimen/hmt_text_sm"
+                tools:text="Sep 24, 2026, 4:00 AM" />
+
+            <!-- Not typed into directly: a tap opens ActivityTypePicker, the recording form's own
+                 searchable list of the account's types with an "Add …" row for a new one. -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/edit_type_layout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_12"
+                android:hint="@string/edit_type"
+                app:endIconContentDescription="@string/edit_type"
+                app:endIconDrawable="@drawable/ic_chevron_down"
+                app:endIconMode="custom">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/edit_type"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:cursorVisible="false"
+                    android:focusable="false"
+                    android:inputType="none" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/edit_name_layout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_10"
+                android:hint="@string/edit_name"
+                app:counterMaxLength="200"
+                app:placeholderText="@string/edit_name_placeholder">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/edit_name"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textCapSentences"
+                    android:maxLength="200" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/edit_description_layout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_10"
+                android:hint="@string/edit_description"
+                app:placeholderText="@string/edit_description_placeholder">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/edit_description"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="top"
+                    android:inputType="textMultiLine|textCapSentences"
+                    android:maxLength="2000"
+                    android:maxLines="6"
+                    android:minLines="3" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Several activities: why Name and Description can't be set. -->
+            <TextView
+                android:id="@+id/edit_multi_note"
+                style="@style/Widget.HoldMyTrack.Hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_6"
+                android:text="@string/edit_multi_reason"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/edit_error"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_10"
+                android:accessibilityLiveRegion="polite"
+                android:textColor="@color/hmt_danger"
+                android:textSize="@dimen/hmt_text_md"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_12"
+                android:gravity="end"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/edit_cancel"
+                    style="@style/Widget.HoldMyTrack.Button.Outlined"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/edit_cancel" />
+
+                <Button
+                    android:id="@+id/edit_save"
+                    style="@style/Widget.HoldMyTrack.Button"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/hmt_space_8"
+                    android:text="@string/edit_save" />
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+</com.google.android.material.card.MaterialCardView>
