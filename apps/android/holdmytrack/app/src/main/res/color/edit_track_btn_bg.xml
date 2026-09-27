@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A Track tab action's fill, the web's .edit-track__btn: the surface tint, the accent at 20%
+     while a toggle (Delete point) is on. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:alpha="0.2" android:color="@color/hmt_accent" android:state_checked="true" />
+    <item android:color="@color/hmt_surface_tint" />
+</selector>

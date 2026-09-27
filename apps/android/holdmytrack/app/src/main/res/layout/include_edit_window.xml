@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The Edit window (panel/EditActivityWindow.kt), after the web's EditActivityWindow.tsx at phone
      width: a card floating over the top of the map, under the chrome row (its top margin is set
-     in MainActivity), rather than a modal dialog — the web keeps it floating so its Track tab
-     can edit on the map. The title and whose it is, then Type, Name and Description, an error
-     line, and Cancel and Save. Clickable, so a touch on it never reaches the map. -->
+     in MainActivity), rather than a modal dialog, so its Track tab can edit on the map. The title
+     and whose it is, the Activity and Track tabs — Type, Name and Description on one, the track
+     editor (panel/TrackEditor) on the other — then an error line, and Cancel and Save.
+     Clickable, so a touch on it never reaches the map. -->
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -46,72 +47,137 @@
                 android:textSize="@dimen/hmt_text_sm"
                 tools:text="Sep 24, 2026, 4:00 AM" />
 
-            <!-- Not typed into directly: a tap opens ActivityTypePicker, the recording form's own
-                 searchable list of the account's types with an "Add …" row for a new one. -->
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/edit_type_layout"
+            <!-- The tabs (.edit-window__tabs): the selected one underlined in the accent, the
+                 other dimmed, Track disabled — dimmer still — when it can't apply. -->
+            <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/hmt_space_12"
-                android:hint="@string/edit_type"
-                app:endIconContentDescription="@string/edit_type"
-                app:endIconDrawable="@drawable/ic_chevron_down"
-                app:endIconMode="custom">
+                android:layout_marginTop="@dimen/hmt_space_12">
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/edit_type"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:cursorVisible="false"
-                    android:focusable="false"
-                    android:inputType="none" />
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:orientation="horizontal">
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/edit_name_layout"
+                    <TextView
+                        android:id="@+id/edit_tab_activity"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_panel_tab_selected"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:minHeight="40dp"
+                        android:gravity="center_vertical"
+                        android:paddingBottom="@dimen/hmt_space_6"
+                        android:text="@string/edit_tab_activity"
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleSmall" />
+
+                    <TextView
+                        android:id="@+id/edit_tab_track"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/hmt_space_16"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:minHeight="40dp"
+                        android:gravity="center_vertical"
+                        android:paddingBottom="@dimen/hmt_space_6"
+                        android:text="@string/edit_tab_track"
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleSmall" />
+
+                    <!-- Unsaved track changes (.edit-window__tab-dot). -->
+                    <View
+                        android:id="@+id/edit_tab_track_dot"
+                        android:layout_width="6dp"
+                        android:layout_height="6dp"
+                        android:layout_gravity="center_vertical"
+                        android:layout_marginStart="@dimen/hmt_space_6"
+                        android:background="@drawable/bg_panel_dot"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_gravity="bottom"
+                    android:background="@color/hmt_hairline" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:id="@+id/edit_activity_panel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/hmt_space_10"
-                android:hint="@string/edit_name"
-                app:counterMaxLength="200"
-                app:placeholderText="@string/edit_name_placeholder">
+                android:orientation="vertical">
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/edit_name"
+                <!-- Not typed into directly: a tap opens ActivityTypePicker, the recording form's own
+                     searchable list of the account's types with an "Add …" row for a new one. -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/edit_type_layout"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="textCapSentences"
-                    android:maxLength="200" />
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_marginTop="@dimen/hmt_space_12"
+                    android:hint="@string/edit_type"
+                    app:endIconContentDescription="@string/edit_type"
+                    app:endIconDrawable="@drawable/ic_chevron_down"
+                    app:endIconMode="custom">
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/edit_description_layout"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/hmt_space_10"
-                android:hint="@string/edit_description"
-                app:placeholderText="@string/edit_description_placeholder">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/edit_type"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:cursorVisible="false"
+                        android:focusable="false"
+                        android:inputType="none" />
+                </com.google.android.material.textfield.TextInputLayout>
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/edit_description"
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/edit_name_layout"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:gravity="top"
-                    android:inputType="textMultiLine|textCapSentences"
-                    android:maxLength="2000"
-                    android:maxLines="6"
-                    android:minLines="3" />
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_marginTop="@dimen/hmt_space_10"
+                    android:hint="@string/edit_name"
+                    app:counterMaxLength="200"
+                    app:placeholderText="@string/edit_name_placeholder">
 
-            <!-- Several activities: why Name and Description can't be set. -->
-            <TextView
-                android:id="@+id/edit_multi_note"
-                style="@style/Widget.HoldMyTrack.Hint"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/hmt_space_6"
-                android:text="@string/edit_multi_reason"
-                android:visibility="gone" />
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/edit_name"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textCapSentences"
+                        android:maxLength="200" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/edit_description_layout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/hmt_space_10"
+                    android:hint="@string/edit_description"
+                    app:placeholderText="@string/edit_description_placeholder">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/edit_description"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="top"
+                        android:inputType="textMultiLine|textCapSentences"
+                        android:maxLength="2000"
+                        android:maxLines="6"
+                        android:minLines="3" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Several activities: why Name and Description can't be set. -->
+                <TextView
+                    android:id="@+id/edit_multi_note"
+                    style="@style/Widget.HoldMyTrack.Hint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/hmt_space_6"
+                    android:text="@string/edit_multi_reason"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <include layout="@layout/include_track_editor" />
 
             <TextView
                 android:id="@+id/edit_error"

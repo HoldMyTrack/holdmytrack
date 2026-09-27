@@ -256,7 +256,7 @@
     </plurals>
 
     <!-- The panel's Edit and Delete (panel/EditActivityWindow.kt), after the web's edit.* and activities.delete_* messages. -->
-    <string name="panel_edit_one">Edit %1$s: type, name and description</string>
+    <string name="panel_edit_one">Edit %1$s: type, name, description and track</string>
     <string name="panel_edit_many">Edit type for %1$s</string>
     <string name="panel_delete_target">Delete %1$s</string>
     <string name="panel_delete_one_title">Delete this activity?</string>
@@ -269,6 +269,30 @@
     <string name="panel_group_summary">%1$s (%2$s)</string>
     <string name="panel_demo_edit">Not available for demo accounts — create an account to edit activities</string>
     <string name="panel_demo_delete">Not available for demo accounts — create an account to delete activities</string>
+    <string name="edit_tab_activity">Activity</string>
+    <string name="edit_tab_track">Track</string>
+    <string name="edit_track_check_one">Check exactly one activity to edit its track</string>
+    <string name="edit_track_processing">This track is still being processed</string>
+    <string name="edit_track_no_track">No track recorded for this activity</string>
+    <string name="edit_track_chop">Chop</string>
+    <string name="edit_track_chop_title">Keep only the part between the knobs</string>
+    <string name="edit_track_cut">Cut</string>
+    <string name="edit_track_cut_title">Remove the part between the knobs and join its two ends. Hold to preview.</string>
+    <string name="edit_track_delete_point">Delete point</string>
+    <string name="edit_track_delete_point_title">Tap points on the map to delete them</string>
+    <string name="edit_track_delete_point_note">Tap a point on the map to delete it.</string>
+    <string name="edit_track_undo">Undo</string>
+    <string name="edit_track_undo_title">Undo the last change</string>
+    <string name="edit_track_reset">Reset</string>
+    <string name="edit_track_reset_title">Go back to the track as it was recorded (Undo brings the edits back)</string>
+    <string name="edit_track_range">Range</string>
+    <string name="edit_track_range_readout">%1$s – %2$s %3$s · %4$s–%5$s</string>
+    <string name="edit_track_loading">Loading points…</string>
+    <string name="edit_track_unsaved">Track, with unsaved changes</string>
+    <plurals name="edit_track_points">
+        <item quantity="one">%1$d point</item>
+        <item quantity="other">%1$d points</item>
+    </plurals>
     <string name="edit_title_one">Edit activity</string>
     <string name="edit_multi_subtitle">Only Type applies to every checked activity — see below.</string>
     <string name="edit_multi_reason">Editing multiple activities only changes their type — name and description are per-activity.</string>

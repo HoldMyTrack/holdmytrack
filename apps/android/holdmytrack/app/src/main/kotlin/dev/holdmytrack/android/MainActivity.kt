@@ -28,6 +28,8 @@ import com.google.android.material.button.MaterialButton
 import dev.holdmytrack.android.map.ActivityDays
 import dev.holdmytrack.android.map.BandMetric
 import dev.holdmytrack.android.map.CoverageWatch
+import dev.holdmytrack.android.map.EditPreview
+import dev.holdmytrack.android.map.TrackEditOverlay
 import dev.holdmytrack.android.map.DateRange
 import dev.holdmytrack.android.map.DateRangeSlider
 import dev.holdmytrack.android.map.MapMode
@@ -35,6 +37,7 @@ import dev.holdmytrack.android.map.MapOverlays
 import dev.holdmytrack.android.net.Activity
 import dev.holdmytrack.android.net.ApiException
 import dev.holdmytrack.android.net.TrackMetrics
+import dev.holdmytrack.android.net.TrackPoint
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.panel.ActivitiesPanel
@@ -145,6 +148,17 @@ class MainActivity : AppCompatActivity() {
 
     /** A Sync tab row's activity, to select once its range's list has it (`viewActivityOnMap`). */
     private var pendingFocusId: String? = null
+
+    /** The activity whose track the Edit window's Track tab is editing, while it is. */
+    private var editingTrackId: String? = null
+
+    /**
+     * Activities whose track edit was saved from here and whose reprocess hasn't been seen
+     * finishing yet — the web's `awaitingEditIdsRef`. Seeing a row go Pending and back isn't
+     * enough on its own: the job is often done before the reload that follows the save even
+     * answers, so the row is never seen Pending at all.
+     */
+    private val awaitingEditIds = HashSet<String>()
 
     /** The ids the last list showed Pending — how a reprocess finishing is noticed. */
     private var pendingIds: Set<String> = emptySet()
@@ -319,7 +333,12 @@ class MainActivity : AppCompatActivity() {
         metricHeartrate.setOnClickListener { setBandMetric(BandMetric.HEARTRATE) }
         trackProfile.onScrub = ::showTrackReadout
         editLock = findViewById(R.id.edit_lock)
-        editWindow = EditActivityWindow(findViewById(R.id.edit_window), ::onEditClosed)
+        editWindow = EditActivityWindow(
+            findViewById(R.id.edit_window),
+            onStartTrack = ::startEditTrack,
+            onDrawTrack = ::drawTrackEdit,
+            onClose = ::onEditClosed,
+        )
         onBackPressedDispatcher.addCallback(this, closeEditOnBack)
         activityDays = ActivityDays(DateRangeSlider.WINDOW_DAYS, ::onActivityDaysChanged)
         dateSlider = DateRangeSlider(dateFooter, onPan = activityDays::panBy) { range ->
@@ -665,7 +684,14 @@ class MainActivity : AppCompatActivity() {
     private fun trackPending(activities: List<Activity>) {
         val now = activities.filter { it.pending }.mapTo(HashSet()) { it.id }
         val started = now.any { it !in pendingIds }
-        val finished = pendingIds.any { it !in now }
+        var finished = pendingIds.any { it !in now }
+        // An edit saved from here counts as finished the first time a list shows it not
+        // Pending, whether or not one ever showed it Pending.
+        awaitingEditIds.filter { it !in now }.forEach { id ->
+            awaitingEditIds -= id
+            finished = true
+            if (id == panelState.focused) updateTrackMetrics(refetch = true)
+        }
         // The selected activity's reprocess landed: its metrics describe the old points.
         if (panelState.focused?.let { it in pendingIds && it !in now } == true) updateTrackMetrics(refetch = true)
         pendingIds = now
@@ -716,7 +742,28 @@ class MainActivity : AppCompatActivity() {
         renderTrackMetrics()
     }
 
-    private fun onEditClosed(saved: Boolean) {
+    /** The Track tab opened: the other tracks and the bands away, and the camera on this one,
+     *  the way a row tap flies — the web's `startEditTrack`. */
+    private fun startEditTrack(activity: Activity) {
+        editingTrackId = activity.id
+        style?.takeIf { overlaysAttached }?.let { MapOverlays.setEditingTrack(it, true, mode) }
+        // Once the Track tab has laid out, so the fit leaves room under the window as it now is.
+        findViewById<View>(R.id.edit_window).post { flyToActivities(listOf(activity)) }
+    }
+
+    /** The track editor's overlay: the points as edited, its knobs and what would go. */
+    private fun drawTrackEdit(visible: List<TrackPoint>?, lo: Int, hi: Int, preview: EditPreview) {
+        val loaded = style ?: return
+        if (visible == null) TrackEditOverlay.clear(loaded) else TrackEditOverlay.set(loaded, visible, lo, hi, preview)
+    }
+
+    private fun onEditClosed(saved: Boolean, trackApplied: Boolean) {
+        editingTrackId?.let { id ->
+            if (trackApplied) awaitingEditIds += id
+            style?.let(TrackEditOverlay::clear)
+            style?.takeIf { overlaysAttached }?.let { MapOverlays.setEditingTrack(it, false, mode) }
+        }
+        editingTrackId = null
         closeEditOnBack.isEnabled = false
         editLock.visibility = View.GONE
         panel.hold(false)
@@ -887,8 +934,14 @@ class MainActivity : AppCompatActivity() {
      */
     private fun onMapTap(instance: MapLibreMap, point: LatLng): Boolean {
         if (!sheet.isVisible) return false
-        // The Edit window's group mustn't change underneath it.
-        if (editWindow.isOpen) return true
+        // The Edit window's group mustn't change underneath it; the one thing a tap does then
+        // is Delete point's.
+        if (editWindow.isOpen) {
+            if (editWindow.trackEditor.deleteMode) {
+                TrackEditOverlay.pointAt(instance, point, resources.displayMetrics.density)?.let(editWindow.trackEditor::dropPoint)
+            }
+            return true
+        }
         val screen = instance.projection.toScreenLocation(point)
         val tolerance = TAP_TOLERANCE_DP * resources.displayMetrics.density
         val box = RectF(screen.x - tolerance, screen.y - tolerance, screen.x + tolerance, screen.y + tolerance)
@@ -1201,7 +1254,8 @@ class MainActivity : AppCompatActivity() {
         val instance = map ?: return
         val bounds = LatLngBounds.from(box[3], box[2], box[1], box[0])
         // Into the map left showing between the chrome row and the panel, not under either.
-        val top = maxOf(FRAME_PADDING_PX, findViewById<View>(R.id.top_bar).bottom)
+        val card = findViewById<View>(R.id.edit_window)
+        val top = maxOf(FRAME_PADDING_PX, findViewById<View>(R.id.top_bar).bottom, if (card.isVisible) card.bottom + FRAME_PADDING_PX / 2 else 0)
         // The panel's height it's heading to, not mid-animation: a View on map collapses it and
         // flies in the same moment, and fitting to the expanded sheet pushed the activity to
         // the top of the screen.

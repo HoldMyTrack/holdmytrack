@@ -140,6 +140,10 @@ object MapOverlays {
      * or a reprocess.
      */
     private var tracksVersion = 0
+
+    /** A track is being edited (`TrackEditOverlay`): every other track and the bands step
+     *  aside for it, as the web's `setMapMode(…, editingTrack)` has them. */
+    private var editingTrack = false
     private var coverageVersion = 0
 
     /** Every Fog and Heatmap layer and the source under it — what [refreshCoverage] replaces. */
@@ -323,6 +327,12 @@ object MapOverlays {
         (style.getLayer(TRACKS_SELECTED_LAYER_ID) as? LineLayer)?.setFilter(only)
     }
 
+    /** See [editingTrack]. */
+    fun setEditingTrack(style: Style, editing: Boolean, mode: MapMode) {
+        editingTrack = editing
+        setMode(style, mode)
+    }
+
     fun setMode(style: Style, mode: MapMode) {
         setVisible(style, FOG_LAYER_ID, mode == MapMode.FOG)
         setVisible(style, COUNTRY_FOG_LAYER_ID, mode == MapMode.FOG)
@@ -330,8 +340,8 @@ object MapOverlays {
         setVisible(style, HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
         setVisible(style, COUNTRY_HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
         setVisible(style, REGION_HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
-        TRACK_LAYER_IDS.forEach { setVisible(style, it, mode == MapMode.NORMAL) }
-        setVisible(style, BAND_LAYER_ID, mode == MapMode.NORMAL)
+        TRACK_LAYER_IDS.forEach { setVisible(style, it, mode == MapMode.NORMAL && !editingTrack) }
+        setVisible(style, BAND_LAYER_ID, mode == MapMode.NORMAL && !editingTrack)
         setLabelOpacity(style, if (mode == MapMode.FOG) FOG_LABEL_OPACITY else 1f)
     }
 
