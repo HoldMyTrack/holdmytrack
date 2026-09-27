@@ -1,5 +1,6 @@
 package dev.holdmytrack.android
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -11,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.checkbox.MaterialCheckBox
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.holdmytrack.android.health.HealthConnect
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
@@ -35,8 +37,9 @@ import kotlinx.coroutines.launch
  * onboarding lives here too, under its checkbox — Path 2's on-device half
  * (`docs/adr/0001-three-independent-ingest-paths.md`).
  *
- * Also the screen Health Connect opens as this app's permission *rationale*, which is why it
- * leads with what is read and what it is for before asking for anything. The same text serves
+ * Also the screen Health Connect opens as this app's permission *rationale*. What is read and
+ * what it is for sits behind the info button beside Health Connect's checkbox, and opens by
+ * itself when Health Connect launched this screen to ask exactly that. The same text serves
  * both purposes; a rationale that says something different from the app's own explanation
  * would be the wrong kind of surprise.
  *
@@ -99,8 +102,23 @@ class SyncActivity : AppCompatActivity() {
         openHealthConnect = findViewById(R.id.sync_open_health_connect)
         syncNow = findViewById(R.id.sync_now)
 
+        findViewById<Button>(R.id.sync_health_connect_info).setOnClickListener { showRationale() }
         openHealthConnect.setOnClickListener { openSettings() }
         syncNow.setOnClickListener { startSync() }
+
+        // Health Connect asked "why does this app want my data" — answer it straight away,
+        // rather than making the user find the info button. Only on a fresh start, so a
+        // rotation after dismissing it doesn't bring it back.
+        if (savedInstanceState == null && intent?.action in RATIONALE_ACTIONS) showRationale()
+    }
+
+    /** What is read from Health Connect and what it is for — the permission rationale. */
+    private fun showRationale() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.sync_health_connect_info)
+            .setMessage(R.string.sync_rationale)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     override fun onResume() {
@@ -188,7 +206,8 @@ class SyncActivity : AppCompatActivity() {
      * still syncs, just not as far back — and shows unticked otherwise, without touching the
      * saved choice, so finishing setup brings back whatever the user last picked. The setup
      * step itself is the section's primary button, and "Open Health Connect" stays available
-     * alongside it except where the primary already is that button.
+     * alongside it while access is still being granted, except where the primary already is
+     * that button.
      */
     private fun renderHealthConnect(readiness: HealthConnect.Readiness) {
         val syncable = readiness.isSyncable()
@@ -200,13 +219,14 @@ class SyncActivity : AppCompatActivity() {
             updateSyncNow()
         }
 
-        // Shown only where the primary button isn't already this button: in the two states
-        // that send the user to Health Connect, the primary says so, and two identical buttons
-        // stacked on each other is just a question about which one is the real one.
+        // Shown only while access is still being granted, and only where the primary button
+        // isn't already this button: in the two states that send the user to Health Connect,
+        // the primary says so, and two identical buttons stacked on each other is just a
+        // question about which one is the real one. Once READY there is nothing left to do
+        // there.
         openHealthConnect.visibility = when (readiness) {
             HealthConnect.Readiness.NEEDS_EXERCISE_PERMISSION,
             HealthConnect.Readiness.NEEDS_HISTORY_PERMISSION,
-            HealthConnect.Readiness.READY,
             -> View.VISIBLE
             else -> View.GONE
         }
@@ -424,6 +444,13 @@ class SyncActivity : AppCompatActivity() {
 
     private companion object {
         const val TAG = "HoldMyTrackSync"
+
+        /** Health Connect's rationale request, and its "see how this app used your data" link
+         *  (the manifest's `ViewPermissionUsageActivity` alias). */
+        val RATIONALE_ACTIONS = setOf(
+            "androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE",
+            Intent.ACTION_VIEW_PERMISSION_USAGE,
+        )
         val DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
     }
 }
