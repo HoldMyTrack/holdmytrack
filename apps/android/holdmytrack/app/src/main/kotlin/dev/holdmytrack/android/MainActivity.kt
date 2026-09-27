@@ -19,12 +19,14 @@ import android.widget.Button
 import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import com.google.android.material.button.MaterialButton
 import dev.holdmytrack.android.map.ActivityDays
+import dev.holdmytrack.android.map.CoverageWatch
 import dev.holdmytrack.android.map.DateRange
 import dev.holdmytrack.android.map.DateRangeSlider
 import dev.holdmytrack.android.map.MapMode
@@ -34,6 +36,8 @@ import dev.holdmytrack.android.net.ApiException
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.panel.ActivitiesPanel
+import dev.holdmytrack.android.panel.ActivityFacets
+import dev.holdmytrack.android.panel.EditActivityWindow
 import dev.holdmytrack.android.panel.PanelState
 import dev.holdmytrack.android.recording.RecordButton
 import dev.holdmytrack.android.recording.RecordingService
@@ -105,6 +109,25 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sheet: View
     private lateinit var panel: ActivitiesPanel
     private val panelState = PanelState()
+    private lateinit var editWindow: EditActivityWindow
+    private lateinit var editLock: View
+
+    /** Back closes the Edit window before it leaves the map. */
+    private val closeEditOnBack = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() = editWindow.close()
+    }
+
+    /** Fog and Heatmap fetched again once the server has re-rendered them after a delete or a
+     *  reprocess (`map/CoverageWatch`). */
+    private val coverageWatch = CoverageWatch {
+        style?.takeIf { overlaysAttached }?.let(MapOverlays::refreshCoverage)
+    }
+
+    /** The ids the last list showed Pending — how a reprocess finishing is noticed. */
+    private var pendingIds: Set<String> = emptySet()
+
+    /** Re-reads the list while any of it is Pending, the web's `EDIT_PENDING_POLL_MS`. */
+    private val pendingPoll = Runnable { selectedRange?.let { loadActivities(it, fly = false) } }
     private lateinit var dateFooter: View
     private lateinit var dateSlider: DateRangeSlider
     private lateinit var activityDays: ActivityDays
@@ -259,7 +282,12 @@ class MainActivity : AppCompatActivity() {
             expandedHeight = ::expandedSheetHeight,
             onMapChanged = ::applyTrackFilter,
             onFly = ::flyToActivities,
+            onEdit = ::openEditWindow,
+            onDeleted = ::onActivitiesDeleted,
         )
+        editLock = findViewById(R.id.edit_lock)
+        editWindow = EditActivityWindow(findViewById(R.id.edit_window), ::onEditClosed)
+        onBackPressedDispatcher.addCallback(this, closeEditOnBack)
         activityDays = ActivityDays(DateRangeSlider.WINDOW_DAYS, ::onActivityDaysChanged)
         dateSlider = DateRangeSlider(dateFooter, onPan = activityDays::panBy) { range ->
             userChangedRange = true
@@ -420,8 +448,14 @@ class MainActivity : AppCompatActivity() {
         }
         // The compass sits below the top row and any notice under it, whose heights are only
         // known once they're laid out; the attribution above the date-range footer likewise.
-        topChrome.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyCompassMargin() }
-        bottomChrome.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyAttributionMargin() }
+        topChrome.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            applyCompassMargin()
+            placeEditWindow()
+        }
+        bottomChrome.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            applyAttributionMargin()
+            placeEditLock()
+        }
     }
 
     /**
@@ -516,7 +550,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         modeBarReady = true
-        modeBar.visibility = if (isRecording()) View.GONE else View.VISIBLE
+        renderModeBar()
         if (daysStale) {
             daysStale = false
             activityDays.reload()
@@ -582,14 +616,99 @@ class MainActivity : AppCompatActivity() {
             if (range != selectedRange) return@activities
             result.onSuccess { activities ->
                 panel.setActivities(activities)
+                trackPending(activities)
                 // A recording started since owns the camera.
                 if (fly && !isRecording()) flyToActivities(activities.filter { !it.pending })
             }.onFailure { failure ->
                 Log.w(TAG, "could not load the activity list", failure)
                 panel.setError(getString(R.string.map_unreachable))
+                // A Pending row still has to be seen finishing: a dropped read doesn't end
+                // the polling, it only waits for the next one.
+                mapView.removeCallbacks(pendingPoll)
+                if (pendingIds.isNotEmpty()) mapView.postDelayed(pendingPoll, PENDING_POLL_MS)
             }
         }
         HoldMyTrackApi.duplicates { result -> panel.setDuplicates(result.getOrNull()) }
+    }
+
+    /**
+     * Pending rows (a reprocess still running — a track edit, a Private location change, from
+     * here or from another client): while any is, the list is read again every 2 seconds, and
+     * a row that starts or stops being Pending has the track tiles fetched again, and Fog and
+     * Heatmap watched until their re-render is done — the web's Pending effects in
+     * `MapView.tsx`. A finished one also changes the days that have activity.
+     */
+    private fun trackPending(activities: List<Activity>) {
+        val now = activities.filter { it.pending }.mapTo(HashSet()) { it.id }
+        val started = now.any { it !in pendingIds }
+        val finished = pendingIds.any { it !in now }
+        pendingIds = now
+        if (started || finished) {
+            style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
+            coverageWatch.watch()
+        }
+        if (finished) activityDays.reload()
+        mapView.removeCallbacks(pendingPoll)
+        if (now.isNotEmpty()) mapView.postDelayed(pendingPoll, PENDING_POLL_MS)
+    }
+
+    /** The toolbar's Edit: the window over its target, the panel held down and made inert
+     *  under it, and the mode toggle away — the window edits Normal mode's rows. */
+    private fun openEditWindow(group: List<Activity>) {
+        panel.dismissPopups()
+        panel.hold(true)
+        editWindow.open(group, ActivityFacets.typeFacets(panelState.activities, null))
+        closeEditOnBack.isEnabled = true
+        editLock.visibility = View.VISIBLE
+        placeEditWindow()
+        placeEditLock()
+        renderModeBar()
+    }
+
+    private fun onEditClosed(saved: Boolean) {
+        closeEditOnBack.isEnabled = false
+        editLock.visibility = View.GONE
+        panel.hold(false)
+        renderModeBar()
+        if (saved) selectedRange?.let { loadActivities(it, fly = false) }
+    }
+
+    /** The window sits just under the chrome row, the web's `top: 54px`. */
+    private fun placeEditWindow() {
+        if (!::editWindow.isInitialized || !editWindow.isOpen) return
+        val card = findViewById<View>(R.id.edit_window)
+        val params = card.layoutParams as MarginLayoutParams
+        val top = findViewById<View>(R.id.top_bar).bottom + resources.getDimensionPixelSize(R.dimen.hmt_space_8)
+        if (params.topMargin != top) {
+            params.topMargin = top
+            card.layoutParams = params
+        }
+    }
+
+    private fun placeEditLock() {
+        if (!::editLock.isInitialized || editLock.visibility != View.VISIBLE) return
+        val params = editLock.layoutParams
+        if (params.height != bottomChrome.height) {
+            params.height = bottomChrome.height
+            editLock.layoutParams = params
+        }
+    }
+
+    /** The toolbar's Delete finished: the tracks, the list, the days and duplicates read
+     *  again, and Fog and Heatmap watched until their re-render lands — the web's
+     *  `handleActivitiesDeleted`. Deleted ids drop out of the selection with the reload. */
+    private fun onActivitiesDeleted(ids: List<String>) {
+        if (ids.isEmpty()) return
+        style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
+        selectedRange?.let { loadActivities(it, fly = false) }
+        activityDays.reload()
+        coverageWatch.watch()
+    }
+
+    /** The mode toggle: shown once the session allows, away while recording or editing. */
+    private fun renderModeBar() {
+        if (!modeBarReady) return
+        modeBar.visibility = if (isRecording() || editWindow.isOpen) View.GONE else View.VISIBLE
     }
 
     /** The panel's hidden set, filters, Pending rows and selection, onto the track layers. */
@@ -620,6 +739,8 @@ class MainActivity : AppCompatActivity() {
      */
     private fun onMapTap(instance: MapLibreMap, point: LatLng): Boolean {
         if (!sheet.isVisible) return false
+        // The Edit window's group mustn't change underneath it.
+        if (editWindow.isOpen) return true
         val screen = instance.projection.toScreenLocation(point)
         val tolerance = TAP_TOLERANCE_DP * resources.displayMetrics.density
         val box = RectF(screen.x - tolerance, screen.y - tolerance, screen.x + tolerance, screen.y + tolerance)
@@ -740,7 +861,7 @@ class MainActivity : AppCompatActivity() {
         recordButton.setBackgroundResource(background)
         recordButton.contentDescription = getString(description)
         recordButton.holdEnabled = active
-        if (modeBarReady) modeBar.visibility = if (active) View.GONE else View.VISIBLE
+        renderModeBar()
         locatePanel.visibility = if (active) View.GONE else View.VISIBLE
         renderDateFooter()
         updateNoticeVisibility()
@@ -995,6 +1116,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onStop() {
+        if (::mapView.isInitialized) mapView.removeCallbacks(pendingPoll)
         if (recorderBound) {
             recorder?.onChange = null
             unbindService(recorderConnection)
@@ -1029,6 +1151,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         if (::mapView.isInitialized) mapView.onDestroy()
         if (::dateSlider.isInitialized) dateSlider.release()
+        coverageWatch.stop()
         super.onDestroy()
     }
 
@@ -1050,6 +1173,9 @@ class MainActivity : AppCompatActivity() {
 
         /** How far from a tap a track still counts as tapped — the web's `TAP_TOLERANCE_PX`. */
         private const val TAP_TOLERANCE_DP = 14
+
+        /** How often a list with Pending rows is read again. */
+        private const val PENDING_POLL_MS = 2_000L
 
         /** The expanded panel's share of the screen, the web's `78dvh`. */
         private const val EXPANDED_SHEET_FRACTION = 0.78

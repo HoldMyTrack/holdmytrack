@@ -155,6 +155,10 @@ data class Activity(
     val edited: Boolean,
 )
 
+/** `GET /v1/coverage/status`: a Fog/Heatmap re-render still to come, and when the account's
+ *  coverage tiles were last written. */
+data class CoverageStatus(val rendering: Boolean, val version: Long)
+
 /** One day that has activity, as `GET /v1/activities/histogram` counts it; [date] is `YYYY-MM-DD`
  *  in the account's timezone. Days with none are never returned. */
 data class ActivityDay(val date: String, val count: Int, val distanceMeters: Double)
@@ -583,23 +587,62 @@ object HoldMyTrackApi {
             .build()
         call(Request.Builder().url(url).build(), { body ->
             val rows = JSONObject(body).getJSONArray("activities")
-            List(rows.length()) { i ->
-                val row = rows.getJSONObject(i)
-                val box = row.optJSONArray("bbox")?.takeIf { it.length() == 4 }
-                Activity(
-                    id = row.getString("id"),
-                    startedAt = row.optString("started_at"),
-                    activityType = row.optString("activity_type"),
-                    name = row.optNullableString("name"),
-                    distanceMeters = row.optNullableDouble("distance_meters"),
-                    durationSeconds = row.optNullableDouble("duration_seconds")?.toLong(),
-                    description = row.optNullableString("description"),
-                    bbox = box?.let { b -> List(4) { b.getDouble(it) } },
-                    pending = row.optBoolean("pending"),
-                    edited = row.optBoolean("edited"),
-                )
-            }
+            List(rows.length()) { i -> parseActivity(rows.getJSONObject(i)) }
         }, onResult)
+    }
+
+    /**
+     * `PATCH /v1/activities/{id}` — a full replace of the three fields a person can set
+     * (`docs/IMPLEMENTATION.md` §4.7.4): an empty [name] or [description] clears it. Answers
+     * with the row as it now is. A refusal (too long, a demo account) is the server's own
+     * wording, in the app's language.
+     */
+    fun updateActivity(id: String, activityType: String, name: String, description: String, onResult: (Result<Activity>) -> Unit) {
+        val body = JSONObject()
+            .put("activity_type", activityType)
+            .put("name", name)
+            .put("description", description)
+        val request = Request.Builder()
+            .url(BuildConfig.API_BASE_URL + API_V1 + "/activities/" + id)
+            .patch(body.toString().toRequestBody(JSON))
+            .build()
+        call(request, { text -> parseActivity(JSONObject(text)) }, onResult)
+    }
+
+    /** `DELETE /v1/activities/{id}` (`docs/IMPLEMENTATION.md` §4.7.5) — the activity, its
+     *  track and its share of fog and heatmap coverage, for good. */
+    fun deleteActivity(id: String, onResult: (Result<Unit>) -> Unit) {
+        val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/activities/" + id).delete().build()
+        call(request, { }, onResult)
+    }
+
+    /**
+     * `GET /v1/coverage/status` — whether the account still has a job that changes its Fog and
+     * Heatmap tiles, and when any of them was last written (Unix ms). What the map polls after
+     * a delete or a reprocess, to know when to fetch those tiles again (`map/CoverageWatch`).
+     */
+    fun coverageStatus(onResult: (Result<CoverageStatus>) -> Unit) {
+        val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/coverage/status").build()
+        call(request, { text ->
+            val json = JSONObject(text)
+            CoverageStatus(json.optBoolean("rendering"), json.optLong("version"))
+        }, onResult)
+    }
+
+    private fun parseActivity(row: JSONObject): Activity {
+        val box = row.optJSONArray("bbox")?.takeIf { it.length() == 4 }
+        return Activity(
+            id = row.getString("id"),
+            startedAt = row.optString("started_at"),
+            activityType = row.optString("activity_type"),
+            name = row.optNullableString("name"),
+            distanceMeters = row.optNullableDouble("distance_meters"),
+            durationSeconds = row.optNullableDouble("duration_seconds")?.toLong(),
+            description = row.optNullableString("description"),
+            bbox = box?.let { b -> List(4) { b.getDouble(it) } },
+            pending = row.optBoolean("pending"),
+            edited = row.optBoolean("edited"),
+        )
     }
 
     /**

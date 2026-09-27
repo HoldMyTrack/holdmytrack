@@ -249,6 +249,41 @@
         <item quantity="other">%1$d duplicates found</item>
     </plurals>
 
+    <!-- The panel's Edit and Delete (panel/EditActivityWindow.kt), after the web's edit.* and activities.delete_* messages. -->
+    <string name="panel_edit_one">Edit %1$s: type, name and description</string>
+    <string name="panel_edit_many">Edit type for %1$s</string>
+    <string name="panel_delete_target">Delete %1$s</string>
+    <string name="panel_delete_one_title">Delete this activity?</string>
+    <string name="panel_delete_title">Delete this group?</string>
+    <string name="panel_delete_one_body">%1$s will be permanently deleted — its track, fog/heatmap coverage, and any performance records it contributed to. This can\'t be undone.</string>
+    <string name="panel_delete_many_body">%1$s will be permanently deleted — their tracks, fog/heatmap coverage, and any performance records they contributed to. This can\'t be undone.</string>
+    <string name="panel_delete_confirm">Delete</string>
+    <string name="panel_deleting">Deleting…</string>
+    <string name="panel_delete_failed">Could not delete the activity: %1$s</string>
+    <string name="panel_group_summary">%1$s (%2$s)</string>
+    <string name="panel_demo_edit">Not available for demo accounts — create an account to edit activities</string>
+    <string name="panel_demo_delete">Not available for demo accounts — create an account to delete activities</string>
+    <string name="edit_title_one">Edit activity</string>
+    <string name="edit_multi_subtitle">Only Type applies to every checked activity — see below.</string>
+    <string name="edit_multi_reason">Editing multiple activities only changes their type — name and description are per-activity.</string>
+    <string name="edit_type">Type</string>
+    <string name="edit_name">Name</string>
+    <string name="edit_name_placeholder">Optional — shown instead of the date in the Activities list</string>
+    <string name="edit_description">Description</string>
+    <string name="edit_description_placeholder">Add a note — e.g. \"Roadtrip to California with kids\"</string>
+    <string name="edit_type_required">Type is required.</string>
+    <string name="edit_type_too_long">Type must be %1$d characters or fewer.</string>
+    <string name="edit_name_too_long">Name must be %1$d characters or fewer.</string>
+    <string name="edit_description_too_long">Description must be %1$d characters or fewer.</string>
+    <string name="edit_save_failed">Could not save the activity</string>
+    <string name="edit_save">Save</string>
+    <string name="edit_saving">Saving…</string>
+    <string name="edit_cancel">Cancel</string>
+    <plurals name="edit_title_many">
+        <item quantity="one">Edit %1$d activity</item>
+        <item quantity="other">Edit %1$d activities</item>
+    </plurals>
+
     <!-- Activity types' display names, the web's activity_type.* (RecordingTypes.label); a type without one is title-cased from its raw value. -->
     <string name="activity_type_alpine_skiing">Alpine Skiing</string>
     <string name="activity_type_biking">Biking</string>

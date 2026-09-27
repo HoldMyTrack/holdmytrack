@@ -200,6 +200,9 @@
         </LinearLayout>
     </LinearLayout>
 
+    <!-- The Edit window (include_edit_window, panel/EditActivityWindow), under the chrome row. -->
+    <include layout="@layout/include_edit_window" />
+
     <!-- The bottom of the map, Normal mode's alone, the web's phone layout: the Activities panel
          (include_activities_sheet, panel/ActivitiesPanel) sitting on the date-range footer, one
          white block the width of the screen with a hairline and a shadow along its top. Gone
@@ -288,4 +291,18 @@
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
+
+    <!-- Laid over the panel and the footer while the Edit window is open, taking every touch:
+         the window edits the toolbar's target, which mustn't change underneath it, as the web
+         makes both inert then. Its height follows bottom_chrome's (MainActivity). -->
+    <View
+        android:id="@+id/edit_lock"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_gravity="bottom"
+        android:clickable="true"
+        android:elevation="9dp"
+        android:focusable="false"
+        android:importantForAccessibility="no"
+        android:visibility="gone" />
 </FrameLayout>

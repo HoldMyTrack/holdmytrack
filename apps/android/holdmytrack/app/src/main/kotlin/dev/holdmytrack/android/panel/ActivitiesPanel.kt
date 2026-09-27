@@ -14,13 +14,20 @@ import android.widget.PopupWindow
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.widget.TooltipCompat
+import androidx.recyclerview.widget.ConcatAdapter
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import androidx.appcompat.app.AlertDialog
 import com.google.android.material.checkbox.MaterialCheckBox
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.slider.RangeSlider
 import dev.holdmytrack.android.R
 import dev.holdmytrack.android.net.Activity
 import dev.holdmytrack.android.net.Duplicate
+import dev.holdmytrack.android.net.HoldMyTrackApi
+import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.recording.RecordingTypes
 import kotlin.math.abs
 
@@ -34,7 +41,8 @@ import kotlin.math.abs
  * The rules live in [PanelState]; this draws it and turns taps into state changes.
  * `MainActivity` owns the map and the fetch: it hands over each list ([setActivities]) and
  * hears about every change that touches the map through [onMapChanged] (what to hide, what's
- * selected) and [onFly] (the activities to frame).
+ * selected) and [onFly] (the activities to frame); Edit is [onEdit]'s to open, and a finished
+ * Delete is reported through [onDeleted].
  */
 class ActivitiesPanel(
     private val sheet: View,
@@ -44,6 +52,10 @@ class ActivitiesPanel(
     private val expandedHeight: () -> Int,
     private val onMapChanged: () -> Unit,
     private val onFly: (List<Activity>) -> Unit,
+    private val onEdit: (List<Activity>) -> Unit,
+    /** Every id the toolbar's Delete removed — the map, the list and the footer need
+     *  fetching again. */
+    private val onDeleted: (List<String>) -> Unit,
 ) {
     private val context = sheet.context
     private val res = context.resources
@@ -63,9 +75,10 @@ class ActivitiesPanel(
     private val checkAll: MaterialCheckBox = sheet.findViewById(R.id.panel_check_all)
     private val invert: ImageButton = sheet.findViewById(R.id.panel_invert)
     private val visibility: ImageButton = sheet.findViewById(R.id.panel_visibility)
+    private val edit: ImageButton = sheet.findViewById(R.id.panel_edit)
+    private val delete: ImageButton = sheet.findViewById(R.id.panel_delete)
     private val focus: ImageButton = sheet.findViewById(R.id.panel_focus)
     private val list: RecyclerView = sheet.findViewById(R.id.panel_list)
-    private val note: TextView = sheet.findViewById(R.id.panel_note)
     private val footer: TextView = sheet.findViewById(R.id.panel_footer)
     private val duplicatesBox: View = sheet.findViewById(R.id.panel_duplicates)
     private val duplicatesLabel: TextView = sheet.findViewById(R.id.panel_duplicates_label)
@@ -73,6 +86,7 @@ class ActivitiesPanel(
     private val duplicatesList: LinearLayout = sheet.findViewById(R.id.panel_duplicates_list)
 
     private val adapter = RowAdapter()
+    private val noteAdapter = NoteAdapter()
 
     private var loading = false
     private var error: String? = null
@@ -91,10 +105,11 @@ class ActivitiesPanel(
 
     init {
         list.layoutManager = LinearLayoutManager(context)
-        list.adapter = adapter
+        // The note — loading, nothing matching, the read failing — is the list's last item,
+        // after whatever rows there are, as the web's is.
+        list.adapter = ConcatAdapter(adapter, noteAdapter)
         list.itemAnimator = null
         clearFocusOnEmptyTap()
-        note.setOnClickListener { clearFocus() }
 
         toggle.setOnClickListener { setExpanded(!expanded) }
         // The collapsed height is the toggle row's bottom edge, whatever the font scale makes
@@ -139,6 +154,8 @@ class ActivitiesPanel(
             val hidden = state.mapHidden
             onFly(state.targets.filter { it.id !in hidden })
         }
+        edit.setOnClickListener { state.targets.takeIf { it.isNotEmpty() }?.let(onEdit) }
+        delete.setOnClickListener { confirmDelete() }
         sheet.findViewById<View>(R.id.panel_duplicates_toggle).setOnClickListener {
             duplicatesOpen = !duplicatesOpen
             renderDuplicates()
@@ -262,17 +279,14 @@ class ActivitiesPanel(
         resetFilters.visibility = if (state.hasActiveFilters) View.VISIBLE else View.GONE
         renderToolbar(listed)
 
-        adapter.rows = listed
-        note.visibility = View.VISIBLE
-        note.setTextColor(context.getColor(if (error != null && !loading) R.color.hmt_danger else R.color.panel_ink_50))
-        note.text = when {
-            loading -> res.getString(R.string.panel_loading)
-            error != null -> error
-            listed.isEmpty() -> res.getString(R.string.panel_none_match)
-            else -> {
-                note.visibility = View.GONE
-                null
-            }
+        adapter.submitList(
+            listed.map { Row(it, checked = it.id in state.checked, focused = it.id == state.focused, hidden = it.id in state.hidden) },
+        )
+        noteAdapter.note = when {
+            loading -> Note(res.getString(R.string.panel_loading), failed = false)
+            error != null -> Note(error!!, failed = true)
+            listed.isEmpty() -> Note(res.getString(R.string.panel_none_match), failed = false)
+            else -> null
         }
 
         val targets = state.targets
@@ -340,7 +354,91 @@ class ActivitiesPanel(
             targetName?.let { res.getString(if (anyHidden) R.string.panel_show_target else R.string.panel_hide_target, it) } ?: noTarget,
             enabled = targetName != null,
         )
+        // The demo account can look but not change (the server's requireNotDemo): both stay
+        // visible, disabled, saying why — as the web's do.
+        val demo = Session.isDemo
+        describe(
+            edit,
+            when {
+                demo -> res.getString(R.string.panel_demo_edit)
+                targetName == null -> noTarget
+                targets.size == 1 -> res.getString(R.string.panel_edit_one, targetName)
+                else -> res.getString(R.string.panel_edit_many, targetName)
+            },
+            enabled = !demo && targetName != null,
+        )
+        // A Pending row can't be deleted until its reprocess lands: the job would race it.
+        describe(
+            delete,
+            when {
+                demo -> res.getString(R.string.panel_demo_delete)
+                targetName == null -> noTarget
+                else -> res.getString(R.string.panel_delete_target, targetName)
+            },
+            enabled = !demo && targetName != null && targets.none { it.pending },
+        )
         describe(focus, targetName?.let { res.getString(R.string.panel_focus_target, it) } ?: noTarget, enabled = targetName != null)
+    }
+
+    /** The toolbar's name for its target, for the delete confirmation: "3 checked activities
+     *  (16 km)", or the selected row's own title and distance. */
+    private fun targetSummary(targets: List<Activity>): String {
+        val name = if (state.checked.isNotEmpty()) {
+            res.getQuantityString(R.plurals.panel_checked_count, targets.size, targets.size)
+        } else {
+            res.getString(R.string.panel_target_one, rowLabel(targets.first()))
+        }
+        return res.getString(R.string.panel_group_summary, name, PanelFormat.totalDistance(res, targets.sumOf { it.distanceMeters ?: 0.0 }))
+    }
+
+    /**
+     * Delete, over the toolbar's target, after a confirmation that says what goes with it
+     * (`docs/SPEC.md` FR-5.11). The dialog stays up while the deletes run — one at a time, as
+     * the web's are, rather than a burst racing each other's coverage re-render — and keeps a
+     * failure on screen rather than closing over it.
+     */
+    private fun confirmDelete() {
+        val targets = state.targets
+        if (targets.isEmpty()) return
+        val one = targets.size == 1
+        val summary = targetSummary(targets)
+        val dialog = MaterialAlertDialogBuilder(context, R.style.ThemeOverlay_HoldMyTrack_Dialog_Destructive)
+            .setTitle(if (one) R.string.panel_delete_one_title else R.string.panel_delete_title)
+            .setMessage(res.getString(if (one) R.string.panel_delete_one_body else R.string.panel_delete_many_body, summary))
+            .setPositiveButton(R.string.panel_delete_confirm, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { deleteNext(dialog, targets.map { it.id }, 0) }
+        }
+        dialog.show()
+    }
+
+    private fun deleteNext(dialog: AlertDialog, ids: List<String>, index: Int) {
+        val confirm = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        val cancel = dialog.getButton(AlertDialog.BUTTON_NEGATIVE)
+        if (index == ids.size) {
+            dialog.dismiss()
+            onDeleted(ids)
+            return
+        }
+        dialog.setCancelable(false)
+        confirm.isEnabled = false
+        cancel.isEnabled = false
+        confirm.setText(R.string.panel_deleting)
+        HoldMyTrackApi.deleteActivity(ids[index]) { result ->
+            result.onSuccess { deleteNext(dialog, ids, index + 1) }
+                .onFailure { failure ->
+                    // What did go is gone: report those, and say why the rest didn't.
+                    if (index > 0) onDeleted(ids.take(index))
+                    dialog.setCancelable(true)
+                    confirm.isEnabled = true
+                    cancel.isEnabled = true
+                    confirm.setText(R.string.panel_delete_confirm)
+                    dialog.setMessage(res.getString(R.string.panel_delete_failed, failure.message.orEmpty()))
+                    confirm.setOnClickListener { deleteNext(dialog, ids, index) }
+                }
+        }
     }
 
     private fun describe(button: View, text: String, enabled: Boolean) {
@@ -457,7 +555,7 @@ class ActivitiesPanel(
     /** Centres the selected row in the list — the list alone, never the sheet around it, so a
      *  collapsed sheet stays exactly as it was. */
     private fun scrollToFocused() {
-        val position = adapter.rows.indexOfFirst { it.id == state.focused }
+        val position = adapter.currentList.indexOfFirst { it.activity.id == state.focused }
         if (position < 0) return
         list.post {
             val manager = list.layoutManager as LinearLayoutManager
@@ -488,20 +586,55 @@ class ActivitiesPanel(
     private fun rowLabel(activity: Activity): String =
         activity.name?.trim()?.takeIf { it.isNotEmpty() } ?: PanelFormat.startedAt(res, activity.startedAt)
 
-    private inner class RowAdapter : RecyclerView.Adapter<RowHolder>() {
-        var rows: List<Activity> = emptyList()
-            @SuppressLint("NotifyDataSetChanged") // A whole new list, filtered or refetched.
+    private data class Note(val text: String, val failed: Boolean)
+
+    /** The list's note, as its one last item — or no item at all. A tap on it clears the
+     *  selection, like a tap on the list's empty space. */
+    private inner class NoteAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+        var note: Note? = null
             set(value) {
+                if (field == value) return
+                val had = field != null
                 field = value
-                notifyDataSetChanged()
+                when {
+                    had && value == null -> notifyItemRemoved(0)
+                    !had && value != null -> notifyItemInserted(0)
+                    value != null -> notifyItemChanged(0)
+                }
             }
 
-        override fun getItemCount() = rows.size
+        override fun getItemCount() = if (note == null) 0 else 1
 
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_panel_note, parent, false)
+            view.setOnClickListener { clearFocus() }
+            return object : RecyclerView.ViewHolder(view) {}
+        }
+
+        override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+            val current = note ?: return
+            (holder.itemView as TextView).apply {
+                text = current.text
+                setTextColor(context.getColor(if (current.failed) R.color.hmt_danger else R.color.panel_ink_50))
+            }
+        }
+    }
+
+    /** One row as drawn: the activity and its marks, so a diff rebinds only what changed —
+     *  a tick, the selection moving, a refetch — rather than every row, which also cancelled
+     *  a tap on another row landing mid-rebind. */
+    private data class Row(val activity: Activity, val checked: Boolean, val focused: Boolean, val hidden: Boolean)
+
+    private inner class RowAdapter : ListAdapter<Row, RowHolder>(
+        object : DiffUtil.ItemCallback<Row>() {
+            override fun areItemsTheSame(old: Row, new: Row) = old.activity.id == new.activity.id
+            override fun areContentsTheSame(old: Row, new: Row) = old == new
+        },
+    ) {
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
             RowHolder(LayoutInflater.from(parent.context).inflate(R.layout.item_activity_row, parent, false))
 
-        override fun onBindViewHolder(holder: RowHolder, position: Int) = holder.bind(rows[position])
+        override fun onBindViewHolder(holder: RowHolder, position: Int) = holder.bind(getItem(position))
     }
 
     private inner class RowHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -513,13 +646,14 @@ class ActivitiesPanel(
         private val pending: View = view.findViewById(R.id.activity_pending)
         private val hidden: View = view.findViewById(R.id.activity_hidden)
 
-        fun bind(activity: Activity) {
+        fun bind(row: Row) {
+            val activity = row.activity
             val label = rowLabel(activity)
             val named = activity.name?.trim()?.isNotEmpty() == true
-            val isChecked = activity.id in state.checked
-            val isHidden = activity.id in state.hidden
+            val isChecked = row.checked
+            val isHidden = row.hidden
 
-            itemView.isSelected = activity.id == state.focused
+            itemView.isSelected = row.focused
             title.text = label
             // The date moves down here once a name has taken the title.
             meta.text = buildString {
