@@ -117,10 +117,9 @@ func TestFreeDemoFilename(t *testing.T) {
 // re-ingest would drift from what the owner sees.
 func TestWriteDemoGPXRoundTrip(t *testing.T) {
 	ele := float32(187.4)
-	hr := int16(131)
 	t0 := time.Date(2026, 9, 26, 14, 3, 7, 250_000_000, time.UTC)
 	points := []parse.Point{
-		{Lat: 41.3213457891234, Lon: -81.6123456789012, Elevation: &ele, Time: t0, HeartRate: &hr},
+		{Lat: 41.3213457891234, Lon: -81.6123456789012, Elevation: &ele, Time: t0},
 		{Lat: 41.32141, Lon: -81.61229, Time: t0.Add(time.Second)},
 	}
 	var buf bytes.Buffer

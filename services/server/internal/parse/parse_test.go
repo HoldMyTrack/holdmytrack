@@ -3,6 +3,7 @@ package parse
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 const sampleGPX = `<?xml version="1.0"?>
@@ -72,9 +73,10 @@ func TestParseGPXWithExtensions(t *testing.T) {
 	if len(act.Points) != 2 {
 		t.Fatalf("want 2 points, got %d", len(act.Points))
 	}
+	// The heart-rate extension is skipped without disturbing the fields around it.
 	p := act.Points[0]
-	if p.HeartRate == nil || *p.HeartRate != 140 {
-		t.Fatalf("point 0 heart rate wrong: %+v", p)
+	if p.Lat != 39.9612 || p.Lon != -82.9988 || !p.Time.Equal(time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)) {
+		t.Fatalf("point 0 wrong: %+v", p)
 	}
 }
 
@@ -109,8 +111,8 @@ func TestParseTCX(t *testing.T) {
 	if p.Lat != 39.9612 || p.Lon != -82.9988 {
 		t.Fatalf("point 0 lat/lon wrong: %+v", p)
 	}
-	if p.HeartRate == nil || *p.HeartRate != 140 {
-		t.Fatalf("point 0 heart rate wrong: %+v", p)
+	if p.Elevation == nil || *p.Elevation != 240.1 {
+		t.Fatalf("point 0 elevation wrong: %+v", p)
 	}
 }
 
@@ -140,11 +142,8 @@ func TestParseJSON(t *testing.T) {
 	if p.Elevation == nil || *p.Elevation != 240.1 {
 		t.Fatalf("point 0 elevation wrong: %+v", p)
 	}
-	if p.HeartRate == nil || *p.HeartRate != 140 {
-		t.Fatalf("point 0 heart rate wrong: %+v", p)
-	}
-	if act.Points[1].HeartRate != nil {
-		t.Fatalf("point 1 heart rate should be absent, got %+v", act.Points[1].HeartRate)
+	if act.Points[1].Elevation != nil {
+		t.Fatalf("point 1 elevation should be absent, got %+v", act.Points[1].Elevation)
 	}
 }
 

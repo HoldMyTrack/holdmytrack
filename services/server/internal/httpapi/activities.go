@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1003,48 +1002,34 @@ func (s *Server) handleActivityTrends(w http.ResponseWriter, r *http.Request) {
 
 // trackMetricsQuery reads one activity's already-simplified display trajectory back out
 // (ST_DumpPoints, same shape simplifyXY already produces at ingest — this just reads it
-// instead of simplifying fresh) alongside its raw, full-resolution activity_streams arrays.
-// The M ordinate is epoch seconds per §3.3; converting it to elapsed seconds in Go is what
-// lets a simplified vertex's time be compared against activity_streams.elapsed_s at all,
-// since the two are on different but convertible clocks (absolute vs. activity-relative).
+// instead of simplifying fresh). The M ordinate is epoch seconds per §3.3, which is all a
+// per-vertex speed needs besides position.
 const trackMetricsQuery = `
-SELECT a.started_at, s.elapsed_s, s.heartrate, s.elevation_m,
-       array_agg(ST_X(pt.geom) ORDER BY pt.path),
+SELECT array_agg(ST_X(pt.geom) ORDER BY pt.path),
        array_agg(ST_Y(pt.geom) ORDER BY pt.path),
        array_agg(ST_M(pt.geom) ORDER BY pt.path)
 FROM activities a
-JOIN activity_streams s ON s.activity_id = a.id
 CROSS JOIN LATERAL ST_DumpPoints(a.trajectory) AS pt
 WHERE a.id = $1 AND a.user_id = $2
-GROUP BY a.id, a.started_at, s.elapsed_s, s.heartrate, s.elevation_m`
+GROUP BY a.id`
 
 type trackMetricPoint struct {
 	Lon      float64 `json:"lon"`
 	Lat      float64 `json:"lat"`
 	SpeedMps float64 `json:"speed_mps"`
-	// Cumulative distance from the first vertex, in meters — always present, unlike
-	// HeartRate/ElevationM, which are gated on complete coverage. This is what lets a
-	// consumer (TrackProfile.tsx) lay vertices out by real distance rather than by index,
-	// which would visually distort spacing wherever Douglas-Peucker kept more or fewer
-	// vertices than another stretch of the same route.
-	DistanceM  float64  `json:"distance_m"`
-	HeartRate  *float64 `json:"heartrate,omitempty"`
-	ElevationM *float64 `json:"elevation_m,omitempty"`
 }
 
 type trackMetricsResponse struct {
-	ActivityID         string             `json:"activity_id"`
-	HeartRateAvailable bool               `json:"heartrate_available"`
-	ElevationAvailable bool               `json:"elevation_available"`
-	Points             []trackMetricPoint `json:"points"`
+	ActivityID string             `json:"activity_id"`
+	Points     []trackMetricPoint `json:"points"`
 }
 
 // handleActivityTrackMetrics serves `GET /v1/activities/track-metrics/{id}` — per-simplified-
-// vertex distance, speed, and (when available) heart rate and elevation, for MapView.tsx's
-// colored zone segments and TrackProfile.tsx's straight-line pace/HR + elevation profile, both
-// for whichever single activity currently has row-click focus. Scoped to the caller's user_id
-// in the query itself, same as every other per-activity lookup here: a non-owned or
-// nonexistent id is indistinguishable from "not found," nothing new to invent.
+// vertex speed, for the pace-colored bands the web and Android clients draw over whichever
+// single activity is selected. Pace only: HoldMyTrack keeps no heart rate (VISION.md §1.1).
+// Scoped to the caller's user_id in the query itself, same as every other per-activity lookup
+// here: a non-owned or nonexistent id is indistinguishable from "not found," nothing new to
+// invent.
 func (s *Server) handleActivityTrackMetrics(w http.ResponseWriter, r *http.Request) {
 	activityID := r.PathValue("id")
 	if activityID == "" {
@@ -1052,13 +1037,9 @@ func (s *Server) handleActivityTrackMetrics(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	var startedAt time.Time
-	var elapsedSRaw []int32
-	var heartrateRaw []*int16
-	var elevationRaw []*float32
 	var lons, lats, ms []float64
 	err := s.pool.QueryRow(r.Context(), trackMetricsQuery, activityID, userIDFromContext(r.Context())).
-		Scan(&startedAt, &elapsedSRaw, &heartrateRaw, &elevationRaw, &lons, &lats, &ms)
+		Scan(&lons, &lats, &ms)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			http.Error(w, "activity not found", http.StatusNotFound)
@@ -1070,90 +1051,25 @@ func (s *Server) handleActivityTrackMetrics(w http.ResponseWriter, r *http.Reque
 	}
 
 	n := len(lons)
-	elapsedS := make([]int64, n)
-	startEpoch := startedAt.Unix()
-	for i, m := range ms {
-		elapsedS[i] = int64(m) - startEpoch
-	}
-
 	speed := make([]float64, n)
-	distance := make([]float64, n)
 	for i := 1; i < n; i++ {
-		segM := ingest.HaversineM(lats[i-1], lons[i-1], lats[i], lons[i])
-		distance[i] = distance[i-1] + segM
-		dt := float64(elapsedS[i] - elapsedS[i-1])
+		// Whole seconds, as the M ordinate's clock has always been read here.
+		dt := float64(int64(ms[i]) - int64(ms[i-1]))
 		if dt > 0 {
-			speed[i] = segM / dt
+			speed[i] = ingest.HaversineM(lats[i-1], lons[i-1], lats[i], lons[i]) / dt
 		}
 	}
 	if n > 1 {
 		speed[0] = speed[1]
 	}
 
-	// All-or-nothing: a track with silently-missing segments would misrepresent effort (or,
-	// for elevation, shape) rather than just not offering the metric at all.
-	heartRateAvailable := len(heartrateRaw) > 0
-	for _, hr := range heartrateRaw {
-		if hr == nil {
-			heartRateAvailable = false
-			break
-		}
-	}
-	elevationAvailable := len(elevationRaw) > 0
-	for _, e := range elevationRaw {
-		if e == nil {
-			elevationAvailable = false
-			break
-		}
-	}
-
 	points := make([]trackMetricPoint, n)
 	for i := range points {
-		p := trackMetricPoint{Lon: lons[i], Lat: lats[i], SpeedMps: speed[i], DistanceM: distance[i]}
-		if heartRateAvailable || elevationAvailable {
-			// Nearest raw point by elapsed time — simplified vertices don't fall on exact
-			// raw timestamps the way they fall on exact raw coordinates (matchSimplifiedTimes'
-			// own exact-match approach doesn't apply here), so this is a nearest-neighbor
-			// search rather than an exact one. Shared between heart rate and elevation since
-			// both are matched against the same raw elapsed_s array.
-			idx := nearestElapsedIndex(elapsedSRaw, elapsedS[i])
-			if heartRateAvailable && heartrateRaw[idx] != nil {
-				hr := float64(*heartrateRaw[idx])
-				p.HeartRate = &hr
-			}
-			if elevationAvailable && elevationRaw[idx] != nil {
-				elev := float64(*elevationRaw[idx])
-				p.ElevationM = &elev
-			}
-		}
-		points[i] = p
+		points[i] = trackMetricPoint{Lon: lons[i], Lat: lats[i], SpeedMps: speed[i]}
 	}
 
 	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, http.StatusOK, trackMetricsResponse{
-		ActivityID:         activityID,
-		HeartRateAvailable: heartRateAvailable,
-		ElevationAvailable: elevationAvailable,
-		Points:             points,
-	})
-}
-
-// nearestElapsedIndex finds the index in the (ascending) raw elapsed_s array closest to
-// target, via binary search rather than a linear scan — the same reasoning every other
-// per-point pass in this codebase gives for avoiding an O(n) scan when a sorted structure is
-// already in hand.
-func nearestElapsedIndex(elapsedSRaw []int32, target int64) int {
-	i := sort.Search(len(elapsedSRaw), func(i int) bool { return int64(elapsedSRaw[i]) >= target })
-	if i == 0 {
-		return 0
-	}
-	if i == len(elapsedSRaw) {
-		return i - 1
-	}
-	if target-int64(elapsedSRaw[i-1]) <= int64(elapsedSRaw[i])-target {
-		return i - 1
-	}
-	return i
+	writeJSON(w, http.StatusOK, trackMetricsResponse{ActivityID: activityID, Points: points})
 }
 
 // duplicatesQuery lists the activities cross-source deduplication took out of circulation

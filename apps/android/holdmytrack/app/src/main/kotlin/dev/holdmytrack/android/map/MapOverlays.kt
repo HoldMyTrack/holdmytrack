@@ -118,7 +118,7 @@ object MapOverlays {
     private const val CASING_COLOR = "#202b25"
     private const val CASING_OPACITY = 0.95f
 
-    /** The selected activity's pace or heart-rate bands (`TrackBands`), the web's `track-bands`:
+    /** The selected activity's pace bands (`TrackBands`), the web's `track-bands`:
      *  one coloured line per run, over its track, under the labels. */
     private const val BAND_SOURCE_ID = "track-bands"
     private const val BAND_LAYER_ID = "track-bands-line"
@@ -219,15 +219,15 @@ object MapOverlays {
 
     /**
      * Colours [points] — the selected activity's track, `GET /v1/activities/track-metrics` —
-     * by [metric], one line per band run; an empty list clears it. The web's `setTrackBands`.
+     * by pace, one line per band run; an empty list clears it. The web's `setTrackBands`.
      */
-    fun setTrackBands(style: Style, points: List<TrackMetricPoint>, metric: BandMetric) {
+    fun setTrackBands(style: Style, points: List<TrackMetricPoint>) {
         val source = style.getSourceAs<GeoJsonSource>(BAND_SOURCE_ID) ?: return
         if (points.size < 2) {
             source.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
             return
         }
-        val runs = TrackBands.runs(points, metric, TrackBands.scale(points, metric))
+        val runs = TrackBands.runs(points, TrackBands.scale(points))
         val features = runs.map { run ->
             val line = LineString.fromLngLats(points.subList(run.startIndex, run.endIndex + 1).map { Point.fromLngLat(it.lon, it.lat) })
             Feature.fromGeometry(line).apply { addStringProperty("color", TrackBands.COLORS[run.band]) }
@@ -235,7 +235,7 @@ object MapOverlays {
         source.setGeoJson(FeatureCollection.fromFeatures(features))
     }
 
-    fun clearTrackBands(style: Style) = setTrackBands(style, emptyList(), BandMetric.SPEED)
+    fun clearTrackBands(style: Style) = setTrackBands(style, emptyList())
 
     /** Fog and Heatmap at every tier, each inserted below [beforeId]. */
     private fun addCoverage(style: Style, beforeId: String?) {

@@ -20,7 +20,6 @@ import java.util.Locale
 object PanelFormat {
 
     private const val METERS_PER_MILE = 1609.344
-    private const val FEET_PER_METER = 3.28084
     private const val EM_DASH = "—"
 
     private fun locale(res: Resources): Locale = res.configuration.locales[0] ?: Locale.getDefault()
@@ -54,22 +53,6 @@ object PanelFormat {
             maximumFractionDigits = if (value < 10) 1 else 0
         }.format(value)
         return "$number ${unit(res)}"
-    }
-
-    /** The web's `formatPace`: "4:32/km" or "7:17/mi" from a speed in m/s; a dash for none. */
-    fun pace(res: Resources, metersPerSecond: Double): String {
-        if (metersPerSecond <= 0) return EM_DASH
-        val perUnit = if (RecordingFormat.imperial()) METERS_PER_MILE else 1000.0
-        val total = kotlin.math.round(perUnit / metersPerSecond).toLong()
-        return res.getString(R.string.panel_pace, total / 60, total % 60, unit(res))
-    }
-
-    /** The web's `formatElevation`: whole meters, or feet for the imperial countries. */
-    fun elevation(res: Resources, meters: Double): String {
-        val imperial = RecordingFormat.imperial()
-        val value = if (imperial) meters * FEET_PER_METER else meters
-        val number = NumberFormat.getIntegerInstance(locale(res)).format(kotlin.math.round(value))
-        return "$number " + res.getString(if (imperial) R.string.panel_unit_ft else R.string.panel_unit_m)
     }
 
     fun duration(res: Resources, seconds: Long?): String {

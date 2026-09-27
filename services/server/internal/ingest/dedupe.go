@@ -115,14 +115,14 @@ func ResolveDuplicates(
 	rows, err := pool.Query(ctx, `
 		SELECT a.id::text,
 		       a.trajectory IS NOT NULL,
-		       -- Not a plain IS NOT NULL on the column: these are arrays, and ingest always
+		       -- Not a plain IS NOT NULL on the column: it's an array, and ingest always
 		       -- writes one element per point, so a track that carried no elevation at all
 		       -- still has a non-null array full of nulls. Measured the hard way — every
-		       -- activity scored two channels and the richness comparison never decided
-		       -- anything. A channel counts only if some element actually holds a reading,
-		       -- and EXISTS stops at the first one it finds.
-		       (EXISTS (SELECT 1 FROM unnest(s.elevation_m) v WHERE v IS NOT NULL))::int
-		         + (EXISTS (SELECT 1 FROM unnest(s.heartrate) v WHERE v IS NOT NULL))::int,
+		       -- activity scored the channel and the richness comparison never decided
+		       -- anything. The channel counts only if some element actually holds a
+		       -- reading, and EXISTS stops at the first one it finds. Elevation is the only
+		       -- stream channel: HoldMyTrack keeps no heart rate (VISION.md §1.1).
+		       (EXISTS (SELECT 1 FROM unnest(s.elevation_m) v WHERE v IS NOT NULL))::int,
 		       COALESCE(s.point_count, 0),
 		       a.created_at
 		FROM activities a

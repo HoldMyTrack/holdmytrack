@@ -53,8 +53,9 @@ func (s *Server) handleTakeoutUpload(w http.ResponseWriter, r *http.Request, zr 
 	results := make([]zipEntryResult, 0)
 	for _, t := range archive.Types() {
 		// A swim with no coordinates is not something anyone can hand over as a track. These
-		// logs' own metrics (distance, calories, heart rate) are a separate, not-yet-built
-		// import path — see IMPLEMENTATION.md's Takeout section.
+		// logs' own distance and duration are a separate, not-yet-built import path — see
+		// IMPLEMENTATION.md's Takeout section; their calories and heart rate never will be
+		// (VISION.md §1.1).
 		if t.WithGPS == 0 {
 			continue
 		}

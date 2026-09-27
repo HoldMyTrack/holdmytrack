@@ -9,14 +9,14 @@ import (
 	"time"
 )
 
-// ParseTCX streams Trackpoint elements. Garmin Training Center XML nests position/altitude/
-// heart-rate under a Trackpoint.
+// ParseTCX streams Trackpoint elements. Garmin Training Center XML nests position and
+// altitude under a Trackpoint — heart rate too, which is deliberately not read (VISION.md §1.1).
 func ParseTCX(r io.Reader) (Activity, error) {
 	dec := xml.NewDecoder(r)
 	act := Activity{ActivityType: "unknown"}
 
 	var cur *Point
-	// path tracks nesting so "Value" under HeartRateBpm isn't confused with any other Value.
+	// path tracks nesting, so an element is only read inside a Trackpoint.
 	var path []string
 
 	inTrackpoint := func() bool {
@@ -72,14 +72,6 @@ func ParseTCX(r io.Reader) (Activity, error) {
 				if v, err := strconv.ParseFloat(text, 32); err == nil {
 					f := float32(v)
 					cur.Elevation = &f
-				}
-			case "Value":
-				// Only meaningful directly under HeartRateBpm in the trackpoint we're in.
-				if len(path) >= 2 && path[len(path)-2] == "HeartRateBpm" {
-					if v, err := strconv.Atoi(text); err == nil {
-						hr := int16(v)
-						cur.HeartRate = &hr
-					}
 				}
 			}
 		case xml.EndElement:

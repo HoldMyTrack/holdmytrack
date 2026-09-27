@@ -112,8 +112,8 @@ func boundaryCrossing(zones []Zone, outside, inside parse.Point) parse.Point {
 
 // interpolatePoint linearly interpolates every field a clipped endpoint needs to stay a
 // valid, orderable point in the trajectory — position and time unconditionally, elevation
-// and heart rate only when both sides have one (matching how a missing reading elsewhere in
-// the pipeline is left nil rather than defaulted to zero).
+// only when both sides have one (matching how a missing reading elsewhere in the pipeline is
+// left nil rather than defaulted to zero).
 func interpolatePoint(a, b parse.Point, t float64) parse.Point {
 	p := parse.Point{
 		Lat:  a.Lat + (b.Lat-a.Lat)*t,
@@ -123,10 +123,6 @@ func interpolatePoint(a, b parse.Point, t float64) parse.Point {
 	if a.Elevation != nil && b.Elevation != nil {
 		e := *a.Elevation + (*b.Elevation-*a.Elevation)*float32(t)
 		p.Elevation = &e
-	}
-	if a.HeartRate != nil && b.HeartRate != nil {
-		hr := int16(float64(*a.HeartRate) + (float64(*b.HeartRate)-float64(*a.HeartRate))*t)
-		p.HeartRate = &hr
 	}
 	return p
 }

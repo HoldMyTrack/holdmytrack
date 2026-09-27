@@ -3,10 +3,7 @@ package dev.holdmytrack.android.map
 import dev.holdmytrack.android.net.TrackMetricPoint
 import kotlin.math.floor
 
-/** What the selected track is coloured by: its pace (speed), or its heart rate. */
-enum class BandMetric { SPEED, HEARTRATE }
-
-/** The lowest and highest [BandMetric] value along one track — the bands are relative to the
+/** The lowest and highest speed along one track — the bands are relative to the
  *  activity itself, not to any fixed zones. */
 data class BandScale(val min: Double, val max: Double)
 
@@ -15,22 +12,18 @@ data class BandScale(val min: Double, val max: Double)
 data class BandRun(val band: Int, val startIndex: Int, val endIndex: Int)
 
 /**
- * The selected activity's pace or heart-rate bands — a port of the web's
- * `apps/web/src/map/trackBands.ts`, rule for rule (`docs/SPEC.md` FR-4.8): five colours from
- * blue (lowest) to red (highest), in the same direction for both metrics, over the activity's
- * own range of values. Shared by the map's band layer (`MapOverlays.setTrackBands`) and the
- * profile strip (`panel/TrackProfileView`), so both colour the same stretch the same.
+ * The selected activity's pace bands — a port of the web's `apps/web/src/map/trackBands.ts`,
+ * rule for rule (`docs/SPEC.md` FR-4.8): five colours from blue (slowest) to red (fastest),
+ * over the activity's own range of speeds. Drawn by the map's band layer
+ * (`MapOverlays.setTrackBands`).
  */
 object TrackBands {
 
     const val COUNT = 5
     val COLORS = listOf("#2b6cb0", "#38a169", "#d69e2e", "#dd6b20", "#c53030")
 
-    fun value(point: TrackMetricPoint, metric: BandMetric): Double? =
-        if (metric == BandMetric.SPEED) point.speedMps else point.heartrate
-
-    fun scale(points: List<TrackMetricPoint>, metric: BandMetric): BandScale {
-        val values = points.mapNotNull { value(it, metric) }
+    fun scale(points: List<TrackMetricPoint>): BandScale {
+        val values = points.map { it.speedMps }
         if (values.isEmpty()) return BandScale(0.0, 1.0)
         return BandScale(values.min(), values.max())
     }
@@ -42,14 +35,13 @@ object TrackBands {
 
     /** Point *i*'s band comes from its own value, and its run starts at point *i − 1*: the
      *  stretch leading into a point is coloured by how fast it was covered. */
-    fun runs(points: List<TrackMetricPoint>, metric: BandMetric, scale: BandScale): List<BandRun> {
+    fun runs(points: List<TrackMetricPoint>, scale: BandScale): List<BandRun> {
         val runs = mutableListOf<BandRun>()
         if (points.size < 2) return runs
         var current = -1
         var start = 0
         for (i in 1 until points.size) {
-            val v = value(points[i], metric) ?: continue
-            val band = bandIndex(v, scale)
+            val band = bandIndex(points[i].speedMps, scale)
             if (band != current) {
                 if (current != -1 && i - 1 > start) runs += BandRun(current, start, i - 1)
                 current = band

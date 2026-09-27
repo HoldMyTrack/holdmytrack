@@ -11,7 +11,7 @@ import { ensureHeatmapLayer } from './heatmap';
 import { setMapMode, type MapMode } from './mapMode';
 import { labelInsertionPoint } from './layers';
 import { type Flavor } from './style';
-import { clearTrackBands, ensureBandLayer, setTrackBands, type BandMetric } from './trackBands';
+import { clearTrackBands, ensureBandLayer, setTrackBands } from './trackBands';
 import {
   ensureTrackLayer,
   refreshTrackLayer,
@@ -33,7 +33,6 @@ import { ExportControl } from '../ui/ExportControl';
 import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
 import { dayDiff, dayInZone, todayLocal } from '../ui/dateMath';
 import type { DateRange } from '../ui/RangePicker';
-import { TrackProfile } from '../ui/TrackProfile';
 import { useUnitSystem } from '../ui/units';
 import { useActivityDays } from '../ui/useActivityDays';
 import { useActivityList } from '../ui/useActivityList';
@@ -131,13 +130,10 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // a claim about what's selected or filtered, so it gets its own Set.
   const [hiddenActivityIds, setHiddenActivityIds] = useState<Set<string>>(() => new Set());
 
-  // Colored zone segments (trackBands.ts) for whichever activity is currently row-click
-  // focused — null whenever focusedActivityId is (see the fetch effect below). bandMetric
-  // defaults to speed since every activity has it; heartrate is only offered once
-  // trackMetrics.heartrateAvailable says every point actually has one.
+  // Pace-colored segments (trackBands.ts) for whichever activity is currently row-click
+  // focused — null whenever focusedActivityId is (see the fetch effect below).
   const [trackMetrics, setTrackMetrics] = useState<ActivityTrackMetrics | null>(null);
-  const [bandMetric, setBandMetric] = useState<BandMetric>('speed');
-  // Bumped when an Edit track reprocess finishes, so the focused activity's bands/profile are
+  // Bumped when an Edit track reprocess finishes, so the focused activity's bands are
   // refetched against its new points — the fetch below is otherwise keyed on the id alone.
   const [trackMetricsVersion, setTrackMetricsVersion] = useState(0);
 
@@ -683,11 +679,11 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     if (map) setHiddenTracks(map, [...mapHiddenIds]);
   }, [map, mapHiddenIds]);
 
-  // Colored zone segments (below) key off the row-click focus directly — not the checked
+  // Pace-colored segments (below) key off the row-click focus directly — not the checked
   // group — since bands are inherently a "look at this one activity" view, the same territory
   // a row click already owns.
   //
-  // Fetches per-vertex speed/heart-rate for the focused activity — null (not stale data from
+  // Fetches per-vertex speed for the focused activity — null (not stale data from
   // whatever was focused before) the instant focus moves to a different row or clears.
   useEffect(() => {
     if (!focusedActivityId) {
@@ -696,27 +692,21 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     }
     const controller = new AbortController();
     getActivityTrackMetrics(focusedActivityId, controller.signal)
-      .then((m) => {
-        setTrackMetrics(m);
-        // Fall back to speed if the newly-focused activity doesn't have complete heart-rate
-        // coverage — carrying a stale "heartrate" selection into an activity that can't show
-        // it would otherwise silently render nothing.
-        setBandMetric((prev) => (prev === 'heartrate' && !m.heartrateAvailable ? 'speed' : prev));
-      })
+      .then(setTrackMetrics)
       .catch(() => {
         if (!controller.signal.aborted) setTrackMetrics(null);
       });
     return () => controller.abort();
   }, [focusedActivityId, trackMetricsVersion]);
 
-  // Draws (or clears) the colored zone segments themselves — separate from the fetch effect
-  // above so switching the Pace/Heart rate toggle re-renders instantly from data already in
-  // hand, no refetch. Also cleared when the focused activity itself is hidden (its eye icon,
+  // Draws (or clears) the pace-colored segments themselves — separate from the fetch effect
+  // above so a visibility change re-renders from data already in hand, no refetch. Cleared
+  // when the focused activity itself is hidden (its eye icon,
   // or a TYPE/DISTANCE filter narrowing it out) — reported live as hiding a focused activity's
   // plain track (setHiddenTracks, below) while this layer, deliberately drawn *on top* of that
   // same track (trackBands.ts's own doc comment), kept painting it regardless, since this
   // effect never checked mapHiddenIds. Re-showing it draws the band again from data already in
-  // hand, no refetch, same as the Pace/Heart rate toggle above.
+  // hand, no refetch.
   //
   // Nor while the focused activity has a track edit pending: the metrics in hand describe its
   // pre-edit points, and the bands are drawn wider than and on top of the track itself, so
@@ -728,11 +718,11 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   useEffect(() => {
     if (!map) return;
     if (trackMetrics && focusedActivityId !== null && !mapHiddenIds.has(focusedActivityId) && !focusedPending) {
-      setTrackBands(map, trackMetrics.points, bandMetric);
+      setTrackBands(map, trackMetrics.points);
     } else {
       clearTrackBands(map);
     }
-  }, [map, trackMetrics, bandMetric, focusedActivityId, mapHiddenIds, focusedPending]);
+  }, [map, trackMetrics, focusedActivityId, mapHiddenIds, focusedPending]);
 
   // The blue band's effect on the map: when the selected date range changes, the tracks
   // layer's own tile query has to change with it, or the map keeps showing activities
@@ -775,8 +765,8 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // finished upload does (unlike editing type/description, deleting changes distance/duration
   // totals and the histogram too) — plus dropping every deleted id from any local selection
   // state that could otherwise still reference it. focusedActivityId is the one that actually
-  // matters for correctness: left pointing at a now-deleted id, the colored-zone-segments/
-  // pace-profile effect would keep trying to fetch track-metrics for an activity that no
+  // matters for correctness: left pointing at a now-deleted id, the pace-colored segments
+  // effect would keep trying to fetch track-metrics for an activity that no
   // longer exists. checked/hidden are cleared too for tidiness, though a dangling id there is
   // already harmless — activities filters itself out of both the moment reloadActivities()
   // lands. Batched rather than called once per id (the header toolbar's "Delete group" can
@@ -963,10 +953,10 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       // the selection happened to change again. Same mapHiddenIds check as the live effect
       // above: a styledata while the focused activity is hidden must not repaint its band.
       if (trackMetrics && focusedActivityId !== null && !mapHiddenIds.has(focusedActivityId) && !focusedPending) {
-        setTrackBands(instance, trackMetrics.points, bandMetric);
+        setTrackBands(instance, trackMetrics.points);
       }
     },
-    [mapMode, editingTrack, mapHiddenIds, activityQuery, trackMetrics, bandMetric, focusedActivityId, focusedPending],
+    [mapMode, editingTrack, mapHiddenIds, activityQuery, trackMetrics, focusedActivityId, focusedPending],
   );
 
   useEffect(() => {
@@ -1112,38 +1102,6 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
               >
                 {t('map.mode_heatmap')}
               </button>
-            </div>
-          )}
-          {trackMetrics && !editOpen && (
-            <div className="track-metric-toggle" data-testid="track-metric-toggle">
-              {/* Only worth a toggle when there's something to toggle to — an activity with
-                  no heart-rate coverage just shows pace, with no single-option control for
-                  it. */}
-              {trackMetrics.heartrateAvailable && (
-                <div className="trends__bucket" role="group" aria-label={t('map.colored_by')}>
-                  <button
-                    type="button"
-                    className="trends__bucket-btn"
-                    aria-pressed={bandMetric === 'speed'}
-                    onClick={() => setBandMetric('speed')}
-                  >
-                    {t('map.metric_pace')}
-                  </button>
-                  <button
-                    type="button"
-                    className="trends__bucket-btn"
-                    aria-pressed={bandMetric === 'heartrate'}
-                    onClick={() => setBandMetric('heartrate')}
-                  >
-                    {t('map.metric_hr')}
-                  </button>
-                </div>
-              )}
-              <TrackProfile
-                points={trackMetrics.points}
-                metric={bandMetric}
-                elevationAvailable={trackMetrics.elevationAvailable}
-              />
             </div>
           )}
         </div>

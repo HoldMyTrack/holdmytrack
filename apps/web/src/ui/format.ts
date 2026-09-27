@@ -10,7 +10,7 @@ import { lang, t, tMaybe } from '../i18n';
  * Every metric the backend serves is nullable (IMPLEMENTATION.md §3.3), so
  * each of these takes `number | null` and renders an em dash rather than a fabricated zero.
  *
- * Every distance/pace/elevation formatter below takes a `UnitSystem` (units.ts) and returns
+ * Every distance formatter below takes a `UnitSystem` (units.ts) and returns
  * the **full string including its own unit suffix** ("12.3 km" / "7.6 mi") — never a bare
  * number a caller appends a hardcoded "km"/"m" to. That hardcoded-suffix pattern is exactly
  * what let the map's own ScaleControl drift to a hardcoded, wrong default for so long
@@ -27,9 +27,8 @@ export function unitLabel(system: UnitSystem): string {
   return system === 'imperial' ? t('unit.mi') : t('unit.km');
 }
 
-/** The short unit `formatElevation` below appends — pulled out so a caller that needs just the
- *  label (PrivateLocationsPanel.tsx's radius readout, a number shown beside a slider)
- *  isn't left duplicating the same ternary. */
+/** The short meters/feet unit — for a caller that needs just the label
+ *  (PrivateLocationsPanel.tsx's radius readout, a number shown beside a slider). */
 export function elevationUnitLabel(system: UnitSystem): string {
   return system === 'imperial' ? t('unit.ft') : t('unit.m');
 }
@@ -72,18 +71,6 @@ export function formatDistance(meters: number | null, system: UnitSystem): strin
   return `${distanceValue(meters, system)} ${unitLabel(system)}`;
 }
 
-/** "4:32/km" / "7:17/mi" — TrackProfile.tsx's per-activity pace, converted from the raw
- *  m/s speed value to the pace runners actually think in. Guards zero/negative input rather
- *  than dividing by it — a stray zero shouldn't render as an infinite pace. */
-export function formatPace(metersPerSecond: number, system: UnitSystem): string {
-  if (metersPerSecond <= 0) return EM_DASH;
-  const perUnitMeters = system === 'imperial' ? METERS_PER_MILE : 1000;
-  const totalSec = Math.round(perUnitMeters / metersPerSecond);
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
-  return `${m}:${s.toString().padStart(2, '0')}/${unitLabel(system)}`;
-}
-
 /** "3h 52m" / "43m" / "20s". */
 export function formatDuration(seconds: number | null): string {
   if (seconds === null) return EM_DASH;
@@ -104,11 +91,6 @@ export function formatDuration(seconds: number | null): string {
 export function formatTotalDistance(meters: number, system: UnitSystem): string {
   const converted = system === 'imperial' ? meters / METERS_PER_MILE : meters / 1000;
   return `${converted.toLocaleString(lang, { maximumFractionDigits: converted < 10 ? 1 : 0 })} ${unitLabel(system)}`;
-}
-
-export function formatElevation(meters: number, system: UnitSystem): string {
-  const converted = system === 'imperial' ? metersToFeet(meters) : meters;
-  return `${Math.round(converted).toLocaleString(lang)} ${elevationUnitLabel(system)}`;
 }
 
 /** "9 Sep" — the Sync tab's finished rows (SyncTab.tsx) need "which day did this

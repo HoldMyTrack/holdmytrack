@@ -4,7 +4,7 @@
 | :-- | :-- |
 | **Version** | 1.0 |
 | **Status** | Current — describes Phase 0/1 functionality as built |
-| **Last updated** | 2026-09-25 |
+| **Last updated** | 2026-09-27 |
 | **Related documents** | `VISION.md` (product scope, market rationale, phase roadmap — the authority on *what ships and why*); `ARCHITECTURE.md` (system-level shape, key decisions, the stack); `IMPLEMENTATION.md` (schema, each feature's own implementation — the authority on *how it's built*); `AGENTS.md` (repository orientation) |
 
 ## 1. Introduction
@@ -15,9 +15,9 @@ This document specifies HoldMyTrack's functional behavior as currently implement
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web and in the Android app, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, colored zone segments, the pace/heart-rate + elevation profile, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), and the interface language — English or Russian (FR-13).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web and in the Android app, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, pace-colored segments, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), and the interface language — English or Russian (FR-13).
 
-**Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), explorer-tile gamification, the rest of "Export" (story cards, animated reveals — high-resolution map export itself is built, FR-4.10 below). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace/heart-rate stay as per-activity route context (FR-4.9) rather than an analysed, all-time performance record. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
+**Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), explorer-tile gamification, the rest of "Export" (story cards, animated reveals — high-resolution map export itself is built, FR-4.10 below). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace stays as per-activity route context (FR-4.8) rather than an analysed, all-time performance record. So is any health data at all: heart rate is never read, stored or shown (ADR-0017), and the pace/heart-rate + elevation profile (FR-4.9) was built and then removed for that reason. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
 ### 1.3 Intended audience
 
@@ -27,7 +27,7 @@ Engineers implementing against or modifying this system, QA deriving test cases,
 
 | Term | Meaning |
 | :-- | :-- |
-| **Activity** | One recorded exercise session (a run, ride, hike, swim, etc.) with a start time, and usually a GPS trajectory and heart-rate data. |
+| **Activity** | One recorded outing (a run, ride, hike, walk, drive, etc.) with a start time, and usually a GPS trajectory with elevation. Never any heart-rate or other health data. |
 | **Track** | An activity's GPS trajectory, as rendered on the map. |
 | **Session** | A signed-in browser's authentication state, held as an opaque cookie. |
 | **Registered user** | An account with a real email and a password, a linked Google or Facebook identity, or any combination — created via sign-up (FR-1.1), Sign in with Google (FR-1.9) or Sign in with Facebook (FR-1.10). |
@@ -345,7 +345,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 4. The Sync tab's history shows each file's live status (uploading, with a progress percentage; then "Processing…") until the background job finishes.
 5. Once ingestion completes, the activity appears automatically in the Activities panel, the map, and every summary that reflects the current date range — no page reload is required. Its Fog-of-War/Heatmap coverage follows a few seconds later, once the background re-render finishes, also without a reload.
 
-**Outputs**: One new `Activity` per successfully ingested file, each with a parsed trajectory, distance, duration, and (where the source file provides it) heart rate/elevation data.
+**Outputs**: One new `Activity` per successfully ingested file, each with a parsed trajectory, distance, duration, and (where the source file provides it) elevation data. Heart rate and any other health data in the file are ignored — never read out of it (`VISION.md` §1.1).
 
 **Error cases**:
 - Unsupported file extension → `415 Unsupported Media Type`.
@@ -418,7 +418,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Preconditions**: Signed in on the Android app (`apps/android/holdmytrack`); Health Connect installed, with the Exercise permission granted plus the separately-granted "Access exercise routes" permission — a session with no route geometry can't be placed on the map, so it's rejected at sync time rather than persisted without one (see step 3).
 
-**Inputs**: Health Connect exercise sessions with route geometry, read **foreground-only** — `READ_EXERCISE_ROUTES` returns `ConsentRequired` in the background regardless of what's granted, a platform constraint rather than a client choice. `READ_HEALTH_DATA_HISTORY`, requested separately, extends the otherwise 30-day-only read window.
+**Inputs**: Health Connect exercise sessions with route geometry, read **foreground-only** — `READ_EXERCISE_ROUTES` returns `ConsentRequired` in the background regardless of what's granted, a platform constraint rather than a client choice. `READ_HEALTH_DATA_HISTORY`, requested separately, extends the otherwise 30-day-only read window. Only the session and its route (position, time, altitude) are read — never heart rate or any other health measurement; the app doesn't request those permissions at all (`VISION.md` §1.1).
 
 **Behavior**:
 1. User opens the Sync Source screen (the burger menu's Sync Source); the app walks through granting whichever Health Connect permissions are still missing, under a Health Connect checkbox that is ticked by default and remembered per account — Sync now includes Health Connect only while it's ticked (`apps/android/docs/SPEC.md` FR-3.5).
@@ -441,7 +441,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Behavior**:
 1. On ingest, a new activity is compared against the account's existing ones by time: two activities are the same one when their time ranges overlap for at least 80% of the longer one's duration. Activity type and distance are not compared, since sources routinely disagree on both for the same activity ("walking" vs "hiking", a few percent of distance). Two activities that only touch — back-to-back recordings with a few seconds of clock skew — or where one is a small part of the other (a short auto-detected walk inside a long hike, a day hike inside a multi-day recording) stay separate. An activity with no duration is never matched.
-2. A match is resolved by keeping the richer record (route geometry over none; more data channels, e.g. heart rate, over fewer) and marking the other `superseded_by` the winner, rather than deleting it.
+2. A match is resolved by keeping the richer record (route geometry over none; then elevation data over none) and marking the other `superseded_by` the winner, rather than deleting it.
 3. Every user-facing read — the Activities list, totals, histogram, day pages, trends, graph stats, map tiles, and both Fog of War and Heatmap composites — excludes superseded activities automatically.
 4. Deleting the kept copy of a matched pair promotes the next-richest superseded copy back to live, rather than leaving both gone.
 
@@ -498,7 +498,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 | :-- | :-- | :-- | :-- | :-- | :-- |
 | Normal | default | thin gold line | — | plain | — |
 | Hovered | pointer over the track, or over its row (FR-5.4) | the thickest line, in a darker gold, no outline | — | title underlined | doesn't move |
-| Focused | clicking the track (behavior 3) or its row's text (FR-5.5) | thicker gold line with a dark outline, fully opaque | colored zone segments over the line (FR-4.8) and the profile card (FR-4.9) | tinted background with a gold bar on its left edge; checkbox unchanged | flies to fit that one track |
+| Focused | clicking the track (behavior 3) or its row's text (FR-5.5) | thicker gold line with a dark outline, fully opaque | pace-colored segments over the line (FR-4.8) | tinted background with a gold bar on its left edge; checkbox unchanged | flies to fit that one track |
 
 Only one track is hovered and only one is focused at a time. Hovering the focused track draws the hover line inside its outline, and underlines its row title. A hidden track (FR-5.8) draws nothing in any state, and none of these states exist outside Normal mode (FR-4.2, FR-4.3). An emphasized track is not raised above other tracks where they overlap; its outline is what sets it apart.
 
@@ -552,32 +552,23 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 
 **Description**: A one-shot control moves the camera to the browser's current geolocation (via the browser's geolocation permission). It does not continuously track the device's position, and nothing about the click is recorded or sent to the server.
 
-### FR-4.8 Colored zone segments (speed / heart rate)
+### FR-4.8 Pace-colored segments
 
-**Description**: When an activity has row-click focus (FR-5.5), its track is overdrawn with colored segments reflecting speed or heart-rate change along the route, instead of the single flat color Normal mode (FR-4.1) otherwise uses.
+**Description**: When an activity has row-click focus (FR-5.5), its track is overdrawn with colored segments reflecting its pace along the route, instead of the single flat color Normal mode (FR-4.1) otherwise uses.
 
 **Preconditions**: An activity currently has row-click focus. Not shown in Fog or Heatmap mode, or when nothing is focused. Independent of the checkbox group (FR-5.6) — checking a box, including when it's the only one checked, does not show bands on its own.
 
 **Behavior**:
-1. The track is split into five colored bands (low/slow=blue through high/fast=red), each band's range computed from that activity's own minimum and maximum for the active metric — not a fixed scale shared across activities.
-2. A Pace/Heart rate toggle selects which metric is shown (the underlying data is speed; displayed as pace — minutes:seconds per km — since that's the unit runners and walkers actually read effort in). The toggle itself only appears when the activity has heart-rate data for its entire duration; an activity with any gap in coverage shows pace only, with no toggle at all — a single-option toggle would have nothing to switch between.
+1. The track is split into five colored bands (slowest=blue through fastest=red), each band's range computed from that activity's own slowest and fastest speed — not a fixed scale shared across activities.
+2. Pace is the only metric: there is no toggle and no heart-rate alternative (`VISION.md` §1.1).
 3. Focusing a different activity updates the bands to match it; clicking anywhere on the map that isn't a track (FR-4.1) clears focus and removes the bands, the same as clearing focus any other way.
-4. Exact band values are available on hover, in the pace/heart-rate + elevation profile (FR-4.9) rather than in a separate legend.
+4. There is no legend and no readout of exact values — the bands show where on the route the activity was faster or slower, relative to itself, and nothing more.
 
-**Notes**: Band boundaries follow the same simplified vertices the track's own line already renders from — a geometrically simple stretch (little directional change) can carry very few of those vertices regardless of how much its speed or heart rate actually varied there, so the bands can occasionally read coarser than the underlying data on a mostly-straight route. See `IMPLEMENTATION.md` §4.3.1 for the full account.
+**Notes**: Band boundaries follow the same simplified vertices the track's own line already renders from — a geometrically simple stretch (little directional change) can carry very few of those vertices regardless of how much its speed actually varied there, so the bands can occasionally read coarser than the underlying data on a mostly-straight route. See `IMPLEMENTATION.md` §4.3.1 for the full account.
 
-### FR-4.9 Pace/heart-rate + elevation profile
+### FR-4.9 Pace/heart-rate + elevation profile — removed
 
-**Description**: Alongside FR-4.8's colored zone segments, the same floating card shows a straight-line profile — a colored strip (the same bands as FR-4.8, laid out by distance along the route instead of geographic position) with an elevation curve beneath it, so climb and pace/heart-rate effort can be read together.
-
-**Preconditions**: Same as FR-4.8 — an activity currently has row-click focus. The elevation curve specifically requires the activity to have elevation data for its entire duration; an activity with any gap in coverage shows the colored strip alone.
-
-**Behavior**:
-1. The colored strip uses the same five bands as FR-4.8, including its toggle — one shared Pace/Heart rate selection drives both this strip and the map's own curved bands together.
-2. The x-axis for both the strip and the elevation curve is distance along the route, not vertex order, so the two stay aligned with real distance regardless of how densely the underlying simplified track's vertices happen to fall in any one stretch.
-3. Hovering the strip or the elevation curve shows a small tooltip with the distance so far, the pace-or-heart-rate value, and the elevation at that point — this is the only place exact band values are shown; there is no separate legend.
-
-**Notes**: Deliberately compact and unlabeled (no axis ticks or gridlines) — a general overlook alongside FR-4.8's toggle, not a separate detailed chart. See `IMPLEMENTATION.md` §4.3.2 for the full account.
+Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: a Pace/Heart rate toggle, a straight-line strip of the bands laid out by distance, an elevation curve, and a hover readout. HoldMyTrack keeps no heart rate, and the rest was a fitness view rather than an exploration one. The number is kept so existing citations stay valid.
 
 ### FR-4.10 Interactive frame-and-capture map export
 
@@ -596,7 +587,7 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 
 **Outputs**: On a successful capture, a PNG file download, named `holdmytrack-{date}.png`. OSM/Protomaps attribution is baked into the image's own pixels, in the bottom-right corner over a translucent backing plate — not optional or user-removable, since the basemap is an ODbL "Produced Work" and credit is a license requirement on any distributed export, not a preference (`IMPLEMENTATION.md` §5.6). A small HoldMyTrack logo and wordmark is always baked into the bottom-left corner — not user-removable either — at 70% opacity with no backing plate, its bottom edge level with the attribution plate's and scaled with it; its text is dark on light themes and light on the dark/black themes.
 
-**Notes**: This is one of three things `VISION.md` §4.2 groups under "Export" — story cards and animated reveals are not built. Colored zone segments (FR-4.8) are not reflected in a capture even when currently shown on screen — exporting a single focused activity's bands is a narrower case not covered by this slice. Vector/SVG output is not offered; raster (PNG) only. Platform preset dimensions are curated from Hootsuite's social-media-image-sizes guide; profile-picture/cover-photo sizes are excluded, since this feature frames map content, not an account avatar.
+**Notes**: This is one of three things `VISION.md` §4.2 groups under "Export" — story cards and animated reveals are not built. Pace-colored segments (FR-4.8) are not reflected in a capture even when currently shown on screen — exporting a single focused activity's bands is a narrower case not covered by this slice. Vector/SVG output is not offered; raster (PNG) only. Platform preset dimensions are curated from Hootsuite's social-media-image-sizes guide; profile-picture/cover-photo sizes are excluded, since this feature frames map content, not an account avatar.
 
 ## 7. FR-5 — Activities Panel
 
@@ -624,7 +615,7 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 
 **Description**: Clicking a row's text — or clicking that activity's track directly on the map (FR-4.1) — sets it as the single row-click *focus*: highlights it and flies the camera to fit it, so the activity spans 75% of the map along whichever axis is tighter (capped at zoom 18 for a very short track). Whichever activity was previously focused this way loses its highlight (only ever one activity is "just clicked" at a time, regardless of which surface the click came from). This is independent of FR-5.6: neither a row-text click nor a map click ever checks or unchecks any checkbox, in either direction. Clicking empty space in the Activities panel's list — below the last row, or on its "no activities" note — clears the focus, the same as clicking the map away from every track (FR-4.1 behavior 4); the checked group is untouched. While nothing is checked, the focused activity is what the header toolbar acts on (FR-5.7).
 
-**Notes**: If the clicked activity has no recorded track (e.g., a source with no GPS), no fly occurs, since there is nothing to fit the camera to. The colored zone segments (FR-4.8) shown for a single focused activity are driven by this mechanism specifically, not by FR-5.6.
+**Notes**: If the clicked activity has no recorded track (e.g., a source with no GPS), no fly occurs, since there is nothing to fit the camera to. The pace-colored segments (FR-4.8) shown for a single focused activity are driven by this mechanism specifically, not by FR-5.6.
 
 ### FR-5.6 Checkbox — build a group
 
@@ -859,7 +850,7 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 
 ### FR-10.2 Help page
 
-**Description**: A public page at `/help` that explains how HoldMyTrack works, in five sections reachable from jump links under its title: the map (the opening view, the Normal / Fog of War / Heatmap modes, and how Fog and Heatmap switch to whole states or regions, then whole countries, as the map zooms out — FR-4), the timeline (what a bar is, the selection band and how to extend, move or scroll it, and the phone slider — FR-6), getting activities in (files, `.zip` archives, Google Takeout with a link to Google's own download guide, the Android app, and what happens on a repeated or cross-source import — FR-3), exporting a map image (FR-4.10), and settings and privacy (Country, Timezone, Private locations — FR-1.7, FR-8.1 — and how to ask for an account to be deleted, which is by email to the Contacts address since there is no self-service deletion yet, and how to revoke Google's or Facebook's access on their side; its `#delete-account` anchor is the deployment's data-deletion instructions URL for Facebook, FR-1.10).
+**Description**: A public page at `/help` that explains how HoldMyTrack works, in five sections reachable from jump links under its title: the map (the opening view, the Normal / Fog of War / Heatmap modes, and how Fog and Heatmap switch to whole states or regions, then whole countries, as the map zooms out — FR-4), the timeline (what a bar is, the selection band and how to extend, move or scroll it, and the phone slider — FR-6), getting activities in (files, `.zip` archives, Google Takeout with a link to Google's own download guide, the Android app, and what happens on a repeated or cross-source import — FR-3), exporting a map image (FR-4.10), and settings and privacy (Country, Timezone, Private locations — FR-1.7, FR-8.1 — what HoldMyTrack stores and doesn't: no health data, only the route, and the original upload kept only to rebuild it (`VISION.md` §1.1; anchor `#what-we-store`) — and how to ask for an account to be deleted, which is by email to the Contacts address since there is no self-service deletion yet, and how to revoke Google's or Facebook's access on their side; its `#delete-account` anchor is the deployment's data-deletion instructions URL for Facebook, FR-1.10).
 
 **Preconditions**: None.
 
@@ -988,7 +979,7 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 6. Focusing an activity by tapping its track leaves the collapsed sheet as it was: its strip stays visible and tappable, and the focused row is scrolled into view within the list when the sheet is expanded.
 7. Every other behavior in this document (upload, all three map modes, filtering, account settings) works the same way at mobile widths as at desktop widths.
 
-**Explicitly not built** (hover-only, no touch equivalent, unlike Trends above — a continuous position read with no discrete point to tap, not a per-bar value): the colored zone segments' and pace/heart-rate + elevation profile's exact hover values (FR-4.8, FR-4.9), and the two-way map-track-hover ↔ Activities-row-underline highlight (FR-4.1, FR-5.4). Both remain mouse-only; a touchscreen user can still see the colored bands and elevation curve themselves, and can still focus/select a track by tapping it, just not read an exact value by touch alone the way a mouse hover shows one.
+**Explicitly not built** (hover-only, no touch equivalent, unlike Trends above — a continuous position read with no discrete point to tap, not a per-bar value): the two-way map-track-hover ↔ Activities-row-underline highlight (FR-4.1, FR-5.4). It remains mouse-only; a touchscreen user can still focus/select a track by tapping it.
 
 ## 18. Out-of-scope items, tracked for future revisions of this document
 
@@ -1000,4 +991,4 @@ The following are named in `VISION.md`'s roadmap but have no functional requirem
 - The rest of "Export" — story cards, animated reveals (high-resolution map export itself is built, FR-4.10)
 - Dark-theme variant of the Fog of War veil (the theme parameter is accepted but currently has no visual effect on the veil itself)
 
-Deliberately out of scope, not a "not yet" — built and then cut, not planned to return: Oura and other recovery-data sources (sleep, HRV, readiness), best-effort curves, personal bests, power curves, and training load. Also deliberately out of scope: splitting a track that passes through a Private location mid-way (FR-8.1 hides only the leading and trailing portions, by design). `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor; pace and heart rate stay as per-activity route context (FR-4.9), not an analysed, all-time performance record.
+Deliberately out of scope, not a "not yet" — built and then cut, not planned to return: Oura and other recovery-data sources (sleep, HRV, readiness), best-effort curves, personal bests, power curves, and training load. Also deliberately out of scope: splitting a track that passes through a Private location mid-way (FR-8.1 hides only the leading and trailing portions, by design). `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor; pace stays as per-activity route context (FR-4.8), not an analysed, all-time performance record, and heart rate and every other health measurement are out of scope entirely — never read, stored or shown (ADR-0017). The pace/heart-rate + elevation profile (FR-4.9) was built and then removed on those grounds.

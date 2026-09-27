@@ -32,7 +32,4 @@
     <dimen name="hmt_text_xl">16sp</dimen>
     <dimen name="hmt_text_2xl">20sp</dimen>
 
-    <!-- How far above the collapsed Activities panel the selected activity's card sits: clear of
-         MapLibre's logo and attribution, which sit bottom-left on the panel (MainActivity). -->
-    <dimen name="panel_card_above_attribution">44dp</dimen>
 </resources>

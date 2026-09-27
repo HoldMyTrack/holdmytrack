@@ -1345,38 +1345,8 @@ body {
   background: var(--fm-border-strong);
 }
 
-/* Speed/heart-rate colored zone segments (trackBands.ts) — bottom-left of the map, the one
-   corner .map-mode-toggle (top-left) and MapLibre's own zoom/geolocate controls (top-right)
-   leave free. */
-.track-metric-toggle {
-  position: absolute;
-  /* Stacked above MapLibre's own ScaleControl (useMapInstance.ts, also 'bottom-left') rather
-     than sharing its exact corner — the original bottom:10px placed both at the same
-     coordinates. */
-  bottom: 56px;
-  left: 10px;
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  /* Explicit, not auto — this card used to size itself off .track-profile__elevation's own
-     replaced-element width (an SVG with a fixed CSS height and no explicit width falls back
-     to its viewBox aspect ratio for the shrink-to-fit pass, which is what gave this column
-     its ~260px width with nothing else here setting one). That anchor vanishes the moment
-     the elevation row's height collapses to 0 for a pace-only activity
-     (`.track-profile__elevation--empty`), and with no other fixed-width child the whole card
-     fell back to whatever its narrowest live content happened to be — a ~5px sliver that
-     then resized itself on every hover as the tooltip text came and went. A real width fixes
-     the card's size independently of whichever rows happen to be empty. */
-  width: 240px;
-  gap: var(--fm-space-6);
-  padding: var(--fm-space-8);
-  border-radius: var(--fm-radius-md);
-  background: rgb(255 255 255 / 92%);
-  box-shadow: var(--fm-shadow-sm);
-}
-
 /* The Edit window (EditActivityWindow.tsx, §4.7.4/§4.7.7) — floats over the map's top-left
-   while it's open, the same white card treatment as the mode toggle and the track-metric card.
+   while it's open, the same white card treatment as the mode toggle.
    The top-left is free because the mode toggle is hidden while it's open; the top-right
    belongs to MapLibre's own zoom/locate controls. Class names are the Edit track window's,
    which it grew out of; its Track tab (TrackEditor.tsx) still uses the rest of them. */
@@ -1603,104 +1573,6 @@ body {
     right: 10px;
     width: auto;
   }
-}
-
-/* The two-way switch in the map's track-metric toggle ("Colored by" pace / heart rate,
-   MapView.tsx). Named for the Profile page's Trends chart it was first built for; that page
-   is server-rendered now, with its own copy (pages.css's .profile__toggle). */
-.trends__bucket {
-  display: flex;
-  align-items: center;
-  gap: 0;
-}
-
-.trends__bucket-btn {
-  border: 1px solid rgb(var(--fm-ink-rgb) / 20%);
-  background: var(--fm-surface);
-  padding: var(--fm-space-6) var(--fm-space-12);
-  font: inherit;
-  font-size: var(--fm-text-md);
-  color: var(--fm-ink);
-  cursor: pointer;
-}
-
-.trends__bucket-btn:first-of-type {
-  border-radius: var(--fm-radius-sm) 0 0 var(--fm-radius-sm);
-  border-right: 0;
-}
-
-.trends__bucket-btn:last-of-type {
-  border-radius: 0 var(--fm-radius-sm) var(--fm-radius-sm) 0;
-}
-
-.trends__bucket-btn[aria-pressed='true'] {
-  background: var(--fm-accent);
-  border-color: var(--fm-accent);
-  color: #fff;
-}
-
-/* The straight-line pace/HR + elevation profile (TrackProfile.tsx) — deliberately small and
-   unlabeled (no axis ticks), a general overlook alongside the toggle already in this same
-   floating card, not a separate detailed instrument. */
-.track-profile {
-  position: relative;
-  margin-top: var(--fm-space-4);
-  width: 100%;
-}
-
-.track-profile__strip {
-  display: flex;
-  height: 8px;
-  border-radius: var(--fm-radius-xs);
-  overflow: hidden;
-  cursor: crosshair;
-}
-
-.track-profile__segment {
-  height: 100%;
-}
-
-.track-profile__elevation {
-  display: block;
-  width: 100%;
-  height: 28px;
-  margin-top: var(--fm-space-2);
-  cursor: crosshair;
-}
-
-/* No elevation stream on this activity — the strip above (pace/heart-rate bands) is the
-   whole card in that case, not this otherwise-blank 28px reserved for a curve that will
-   never draw. Safe to collapse for the card's whole lifetime, unlike the tooltip row below
-   (which reserves its own height across a live hover instead): elevationAvailable can't
-   change while this card is mounted, so there's no flicker risk from doing it. */
-.track-profile__elevation--empty {
-  height: 0;
-  margin-top: 0;
-}
-
-.track-profile__elevation-fill {
-  fill: rgb(var(--fm-accent-rgb) / 15%);
-  stroke: none;
-}
-
-.track-profile__elevation-line {
-  fill: none;
-  stroke: rgb(var(--fm-ink-rgb) / 45%);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-}
-
-/* Always rendered (see TrackProfile.tsx's own comment on why) — min-height reserves its row
-   regardless of hover state, so the card's total height never changes and the strip/chart
-   the cursor is over never shifts out from under it. */
-.track-profile__tooltip {
-  display: flex;
-  gap: var(--fm-space-8);
-  margin-top: var(--fm-space-4);
-  min-height: 14px;
-  font-size: var(--fm-text-xs);
-  color: rgb(var(--fm-ink-rgb) / 70%);
-  white-space: nowrap;
 }
 
 /* The Sync tab's badge (ActivitiesPanel.tsx): this session's in-flight uploads plus every
@@ -2258,10 +2130,9 @@ body {
    One layer, isolated here rather than scattered inline through the file above — every
    rule above this point is the desktop layout, unmodified and unaffected outside this
    query. Scope is "core flows fully touch-usable," a direct decision, not full parity with
-   every desktop interaction: two hover-only features stay mouse-only on purpose —
-   TrackProfile.tsx's colored-band/elevation exact values (FR-4.9) and the map-track-hover
-   ↔ Activities-row-underline two-way highlight (FR-4.1/FR-5.4) — both are continuous-
-   position hover reads with no discrete point to tap. See functional_specification.md's
+   every desktop interaction: the map-track-hover ↔ Activities-row-underline two-way
+   highlight (FR-4.1/FR-5.4) stays mouse-only on purpose — a continuous-position hover
+   read with no discrete point to tap. See functional_specification.md's
    mobile-support note and technical_implementation_plan.md §5.9 for the full account. */
 @media (max-width: 768px) {
   /* Defensive backstop, not a fix for a specific known overflow (those are fixed at their
@@ -2304,7 +2175,7 @@ body {
   }
 
   /* Reserves the peek strip under the map, so the map's own bottom-anchored controls (the
-     scale control, attribution, `.track-metric-toggle`) end above the sheet rather than
+     scale control and attribution) end above the sheet rather than
      under it. Only while the sheet exists — it renders in Normal map mode alone. */
   .app-body:has(.activities-panel) {
     padding-bottom: var(--phone-sheet-peek);
@@ -2330,7 +2201,7 @@ body {
     border-right: none;
     border-top: 1px solid rgb(var(--fm-ink-rgb) / 10%);
     box-shadow: 0 -2px 10px rgb(var(--fm-ink-rgb) / 18%);
-    /* Above the map's own floating widgets (mode toggle/track-metric-toggle, z-index: 3)
+    /* Above the map's own floating widgets (the mode toggle, z-index: 3)
        and MapLibre's own controls, below the app header (z-index: 5). */
     z-index: 4;
     transition: height 0.15s ease;

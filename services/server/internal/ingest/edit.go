@@ -318,12 +318,12 @@ func reprocessActivity(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 			return fmt.Errorf("delete streams: %w", err)
 		}
 	} else if _, err := tx.Exec(ctx, `
-		INSERT INTO activity_streams (activity_id, point_count, elapsed_s, elevation_m, heartrate, dist_m)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO activity_streams (activity_id, point_count, elapsed_s, elevation_m, dist_m)
+		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (activity_id) DO UPDATE SET
 			point_count = EXCLUDED.point_count, elapsed_s = EXCLUDED.elapsed_s,
-			elevation_m = EXCLUDED.elevation_m, heartrate = EXCLUDED.heartrate, dist_m = EXCLUDED.dist_m
-	`, activityID, len(points), pp.elapsedS, pp.elevM, pp.hr, pp.distM); err != nil {
+			elevation_m = EXCLUDED.elevation_m, dist_m = EXCLUDED.dist_m
+	`, activityID, len(points), pp.elapsedS, pp.elevM, pp.distM); err != nil {
 		return fmt.Errorf("update streams: %w", err)
 	}
 	// Country/Region matches are insert-only (geo.MatchActivity), so a reprocess that removed
