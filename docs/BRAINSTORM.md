@@ -48,3 +48,10 @@ Normal mode fetches every activity in the selected date range in one response (`
 * Android has no date range: it requests all-time tiles and reads the unfiltered list for its opening view (`activityBounds`) and the recording Type picker's counts (`activityTypeCounts`). With the cap its map shows the 500 most recent tracks; `activityBounds` would read `total`/`limit` from the same response and show a long Toast (the map screen's existing notice style). The Type picker would count only the 500 most recent — acceptable, since it also takes free text.
 * Would make the per-user quota item in `ROADMAP.md` Phase 5 purely about storage and ingest, since viewing is bounded.
 * Verify with the demo account: all-time list returns 500 rows with `total: 611`; summary `count: 500`; an all-time z4 tile holds only those 500 ids; a two-week range is unchanged. The existing suites use an account under 500, so they should pass unchanged.
+
+### Elevation map layer
+
+A map layer that shows terrain height, so the shape of the land under your tracks — valleys, climbs, ridgelines — reads at a glance. Raised when the pace/heart-rate + elevation profile card was removed (ADR-0017): elevation stays in the data as route information, and this is the exploration-shaped way to show it, rather than a per-activity chart.
+
+* Two very different things could be meant: a basemap hillshade/contour layer from a public elevation model (the same everywhere, nothing to do with the user's data), or the user's own tracks colored by the elevation they recorded. The first is a basemap and cost question (a DEM tileset to host, `VISION.md` §4.3); the second reuses `activity_streams.elevation_m` and the band machinery pace already has.
+* Many GPS-only recordings have no elevation at all, so a track-colored version would be patchy in exactly the way the old all-or-nothing profile was.

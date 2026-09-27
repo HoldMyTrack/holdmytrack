@@ -116,11 +116,6 @@ func ParseFIT(r io.Reader) (Activity, error) {
 						e := float32(v)/5 - 500
 						p.Elevation = &e
 					}
-				case 3: // heart_rate, uint8
-					if len(raw) > 0 && raw[0] != 0xFF {
-						hr := int16(raw[0])
-						p.HeartRate = &hr
-					}
 				case 253: // timestamp, uint32 seconds since FIT epoch
 					v := def.order.Uint32(raw)
 					p.Time = time.Unix(int64(v)+fitEpoch, 0).UTC()

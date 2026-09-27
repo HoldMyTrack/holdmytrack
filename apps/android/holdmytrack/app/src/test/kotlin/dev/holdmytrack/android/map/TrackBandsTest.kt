@@ -7,13 +7,12 @@ import org.junit.Test
 class TrackBandsTest {
 
     private fun points(vararg speeds: Double) = speeds.mapIndexed { i, v ->
-        TrackMetricPoint(lon = i.toDouble(), lat = 0.0, speedMps = v, distanceM = i * 10.0, heartrate = 100.0 + v, elevationM = null)
+        TrackMetricPoint(lon = i.toDouble(), lat = 0.0, speedMps = v)
     }
 
     @Test
-    fun `the scale is the track's own lowest and highest value`() {
-        assertEquals(BandScale(1.0, 5.0), TrackBands.scale(points(3.0, 1.0, 5.0), BandMetric.SPEED))
-        assertEquals(BandScale(101.0, 105.0), TrackBands.scale(points(3.0, 1.0, 5.0), BandMetric.HEARTRATE))
+    fun `the scale is the track's own lowest and highest speed`() {
+        assertEquals(BandScale(1.0, 5.0), TrackBands.scale(points(3.0, 1.0, 5.0)))
     }
 
     @Test
@@ -33,12 +32,12 @@ class TrackBandsTest {
     @Test
     fun `runs share their boundary point and cover the whole track`() {
         val track = points(0.0, 0.0, 10.0, 10.0, 0.0)
-        val runs = TrackBands.runs(track, BandMetric.SPEED, TrackBands.scale(track, BandMetric.SPEED))
+        val runs = TrackBands.runs(track, TrackBands.scale(track))
         assertEquals(listOf(BandRun(0, 0, 1), BandRun(4, 1, 3), BandRun(0, 3, 4)), runs)
     }
 
     @Test
     fun `fewer than two points has no runs`() {
-        assertEquals(emptyList<BandRun>(), TrackBands.runs(points(1.0), BandMetric.SPEED, BandScale(0.0, 1.0)))
+        assertEquals(emptyList<BandRun>(), TrackBands.runs(points(1.0), BandScale(0.0, 1.0)))
     }
 }

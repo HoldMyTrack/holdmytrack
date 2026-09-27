@@ -130,9 +130,9 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	}
 
 	_, err = pool.Exec(ctx, `
-		INSERT INTO activity_streams (activity_id, point_count, elapsed_s, elevation_m, heartrate, dist_m)
-		VALUES ($1, $2, $3, $4, $5, $6)
-	`, activityID, len(points), pp.elapsedS, pp.elevM, pp.hr, pp.distM)
+		INSERT INTO activity_streams (activity_id, point_count, elapsed_s, elevation_m, dist_m)
+		VALUES ($1, $2, $3, $4, $5)
+	`, activityID, len(points), pp.elapsedS, pp.elevM, pp.distM)
 	if err != nil {
 		return Result{}, fmt.Errorf("ingest: persist streams: %w", err)
 	}
@@ -261,7 +261,6 @@ type preparedTrack struct {
 	simpLons, simpLats, simpTs []float64
 	elapsedS                   []int32
 	elevM                      []*float32
-	hr                         []*int16
 	distM                      []float32
 }
 
@@ -288,13 +287,11 @@ func prepareTrack(ctx context.Context, pool *pgxpool.Pool, points []parse.Point)
 
 	pp.elapsedS = make([]int32, len(points))
 	pp.elevM = make([]*float32, len(points))
-	pp.hr = make([]*int16, len(points))
 	pp.distM = make([]float32, len(points))
 	t0 := points[0].Time.Unix()
 	for i, p := range points {
 		pp.elapsedS[i] = int32(p.Time.Unix() - t0)
 		pp.elevM[i] = p.Elevation
-		pp.hr[i] = p.HeartRate
 		pp.distM[i] = float32(pp.m.distM[i])
 	}
 	return pp, nil

@@ -34,7 +34,7 @@ export function setMapMode(map: MapLibreMap, mode: MapMode, editingTrack = false
   // Tracks stay visible only in Normal — both Fog and Heatmap hide them (§4.2.2).
   setVisible(map, TRACKS_LAYER_ID, mode === 'normal' && !editingTrack);
   setVisible(map, TRACKS_CASING_LAYER_ID, mode === 'normal' && !editingTrack);
-  // FR-4.8: a focused activity's colored zone segments are a second layer over the shared
+  // FR-4.8: a focused activity's pace-colored segments are a second layer over the shared
   // tracks layer (trackBands.ts) — not covered by the tracks toggle above — so switching to
   // Fog/Heatmap has to hide it too, or it keeps rendering over the raster.
   setVisible(map, BAND_LAYER_ID, mode === 'normal' && !editingTrack);

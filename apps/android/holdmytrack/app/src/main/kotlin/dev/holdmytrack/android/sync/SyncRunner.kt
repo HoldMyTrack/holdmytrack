@@ -232,9 +232,8 @@ class SyncRunner(
      * interrupted run safe to simply repeat.
      *
      * Elevation is sent when the location carries it and omitted otherwise, rather than
-     * defaulted to zero — an unknown altitude is not sea level. Heart rate is never sent: it
-     * lives in a separate record type behind a separate permission, and HoldMyTrack declares only
-     * what it uses.
+     * defaulted to zero — an unknown altitude is not sea level. Heart rate is never read or sent:
+     * HoldMyTrack keeps no health data, only the geography (`docs/VISION.md` §1.1).
      *
      * Built off the main thread: a long ride is tens of thousands of points, and serialising
      * that is real work.

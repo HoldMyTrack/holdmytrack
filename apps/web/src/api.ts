@@ -653,20 +653,10 @@ export interface TrackMetricPoint {
   lon: number;
   lat: number;
   speedMps: number;
-  /** Cumulative distance from the first vertex, in meters — always present, unlike
-   *  heartrate/elevationM below. */
-  distanceM: number;
-  /** Only present when `heartrateAvailable` is true on the parent response — see
-   *  ActivityTrackMetrics' own doc comment. */
-  heartrate?: number;
-  /** Only present when `elevationAvailable` is true on the parent response. */
-  elevationM?: number;
 }
 
 export interface ActivityTrackMetrics {
   activityId: string;
-  heartrateAvailable: boolean;
-  elevationAvailable: boolean;
   points: TrackMetricPoint[];
 }
 
@@ -674,25 +664,18 @@ interface TrackMetricPointBody {
   lon: number;
   lat: number;
   speed_mps: number;
-  distance_m: number;
-  heartrate?: number;
-  elevation_m?: number;
 }
 
 interface ActivityTrackMetricsBody {
   activity_id: string;
-  heartrate_available: boolean;
-  elevation_available: boolean;
   points: TrackMetricPointBody[];
 }
 
 /**
- * `GET /v1/activities/track-metrics/{id}` — per-simplified-vertex distance, speed, and (when
- * available) heart rate and elevation for one activity's own track, matching the exact vertex
- * sequence its display trajectory already renders. Backs MapView.tsx's colored zone segments
- * and TrackProfile.tsx's straight-line profile, both shown only while exactly one activity has
- * row-click focus. `heartrateAvailable`/`elevationAvailable` are false for any activity with
- * even one gap in that metric's coverage — see the backend's own all-or-nothing note.
+ * `GET /v1/activities/track-metrics/{id}` — per-simplified-vertex speed for one activity's own
+ * track, matching the exact vertex sequence its display trajectory already renders. Backs
+ * MapView.tsx's pace-colored segments, shown only while exactly one activity has row-click
+ * focus.
  */
 export async function getActivityTrackMetrics(
   activityId: string,
@@ -708,16 +691,7 @@ export async function getActivityTrackMetrics(
   const body = (await res.json()) as ActivityTrackMetricsBody;
   return {
     activityId: body.activity_id,
-    heartrateAvailable: body.heartrate_available,
-    elevationAvailable: body.elevation_available,
-    points: body.points.map((p) => ({
-      lon: p.lon,
-      lat: p.lat,
-      speedMps: p.speed_mps,
-      distanceM: p.distance_m,
-      ...(p.heartrate !== undefined ? { heartrate: p.heartrate } : {}),
-      ...(p.elevation_m !== undefined ? { elevationM: p.elevation_m } : {}),
-    })),
+    points: body.points.map((p) => ({ lon: p.lon, lat: p.lat, speedMps: p.speed_mps })),
   };
 }
 

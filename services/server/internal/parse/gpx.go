@@ -42,10 +42,10 @@ func ParseGPX(r io.Reader) (Activity, error) {
 					}
 				}
 				cur = &p
-			case "ele", "time", "hr":
-				// hr is gpxtpx:TrackPointExtension's standard name. The decoder strips
-				// namespace prefixes (Name.Local), so no prefix matching is needed — and
-				// none of these names appear anywhere else inside a trkpt.
+			case "ele", "time":
+				// The decoder strips namespace prefixes (Name.Local), so no prefix matching
+				// is needed. Extensions such as gpxtpx:hr are skipped: HoldMyTrack keeps no
+				// heart rate (VISION.md §1.1).
 				if cur != nil {
 					curField = t.Name.Local
 				}
@@ -79,15 +79,10 @@ func ParseGPX(r io.Reader) (Activity, error) {
 				if ts, err := time.Parse(time.RFC3339, text); err == nil {
 					cur.Time = ts
 				}
-			case "hr":
-				if v, err := strconv.Atoi(text); err == nil {
-					hr := int16(v)
-					cur.HeartRate = &hr
-				}
 			}
 		case xml.EndElement:
 			switch t.Name.Local {
-			case "ele", "time", "hr":
+			case "ele", "time":
 				curField = ""
 			case "type":
 				inType = false

@@ -5,7 +5,7 @@ export type UnitSystem = 'metric' | 'imperial';
 /** The only three countries where everyday distance is customarily miles/feet, not km/m —
  *  everyone else on Earth uses metric for this. Liberia and Myanmar are the two commonly
  *  cited alongside the US; deliberately not a larger "mostly metric but with local quirks"
- *  list, since this only decides which unit a distance/pace/elevation number is *displayed*
+ *  list, since this only decides which unit a distance or elevation number is *displayed*
  *  in, not anything a country's own official policy needs to be litigated over. */
 const IMPERIAL_COUNTRIES = new Set(['US', 'LR', 'MM']);
 

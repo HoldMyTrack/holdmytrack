@@ -204,14 +204,8 @@
     <string name="panel_tab_activities">Activities</string>
     <string name="panel_tab_sync">Sync</string>
     <string name="panel_sync_subtext">Everything imported, from the phone or the web</string>
-    <string name="panel_metric_pace">Pace</string>
-    <string name="panel_metric_hr">Heart rate</string>
-    <string name="panel_colored_by">Colored by</string>
-    <string name="panel_bpm">%1$d bpm</string>
-    <string name="panel_pace">%1$d:%2$02d/%3$s</string>
     <string name="panel_unit_m">m</string>
     <string name="panel_unit_ft">ft</string>
-    <string name="panel_profile">Pace, heart rate and elevation along the selected activity. Touch and drag to read a point.</string>
     <string name="panel_loaded">%1$s loaded</string>
     <string name="panel_loading">Loading…</string>
     <string name="panel_expand">Show the activities list</string>

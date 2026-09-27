@@ -6,10 +6,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!--
-      Exactly two Health Connect permissions, and no more. Declaring types the product does
-      not demonstrably use is a known Play rejection cause (docs/VISION.md §7), so heart rate,
-      distance, calories and the rest stay out: HoldMyTrack ingests outdoor GPS routes, and a route
-      needs the session and its geometry, nothing else.
+      Exactly two Health Connect permissions, and no more. HoldMyTrack keeps no health data, only
+      the geography (docs/VISION.md §1.1), so heart rate, distance, calories and the rest stay
+      out: a route needs the session and its geometry, nothing else. Declaring types the product
+      does not use is also a known Play rejection cause (docs/VISION.md §7).
 
       READ_HEALTH_DATA_IN_BACKGROUND is deliberately absent. Phase 1 measured that it buys
       nothing for routes — the same 46 sessions returned 23 routes in the foreground and 0 in
