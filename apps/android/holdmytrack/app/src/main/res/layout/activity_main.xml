@@ -200,6 +200,10 @@
         </LinearLayout>
     </LinearLayout>
 
+    <!-- The selected activity's pace/heart-rate and elevation card (include_track_metrics),
+         bottom-left above the collapsed panel; under the panel when it's expanded. -->
+    <include layout="@layout/include_track_metrics" />
+
     <!-- The Edit window (include_edit_window, panel/EditActivityWindow), under the chrome row. -->
     <include layout="@layout/include_edit_window" />
 

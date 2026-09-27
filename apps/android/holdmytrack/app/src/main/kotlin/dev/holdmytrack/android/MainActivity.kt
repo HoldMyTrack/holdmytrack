@@ -26,6 +26,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import com.google.android.material.button.MaterialButton
 import dev.holdmytrack.android.map.ActivityDays
+import dev.holdmytrack.android.map.BandMetric
 import dev.holdmytrack.android.map.CoverageWatch
 import dev.holdmytrack.android.map.DateRange
 import dev.holdmytrack.android.map.DateRangeSlider
@@ -33,12 +34,15 @@ import dev.holdmytrack.android.map.MapMode
 import dev.holdmytrack.android.map.MapOverlays
 import dev.holdmytrack.android.net.Activity
 import dev.holdmytrack.android.net.ApiException
+import dev.holdmytrack.android.net.TrackMetrics
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.panel.ActivitiesPanel
 import dev.holdmytrack.android.panel.ActivityFacets
 import dev.holdmytrack.android.panel.EditActivityWindow
+import dev.holdmytrack.android.panel.PanelFormat
 import dev.holdmytrack.android.panel.PanelState
+import dev.holdmytrack.android.panel.TrackProfileView
 import dev.holdmytrack.android.recording.RecordButton
 import dev.holdmytrack.android.recording.RecordingService
 import dev.holdmytrack.android.recording.RecordingState
@@ -124,6 +128,20 @@ class MainActivity : AppCompatActivity() {
     private val coverageWatch = CoverageWatch {
         style?.takeIf { overlaysAttached }?.let(MapOverlays::refreshCoverage)
     }
+
+    /** The selected activity's profile card and what it draws (`renderTrackMetrics`). */
+    private lateinit var trackCard: View
+    private lateinit var trackProfile: TrackProfileView
+    private lateinit var trackReadout: TextView
+    private lateinit var metricToggle: View
+    private lateinit var metricPace: MaterialButton
+    private lateinit var metricHeartrate: MaterialButton
+
+    /** The selected activity's `GET /v1/activities/track-metrics`; null with nothing selected,
+     *  and while a new selection's is on its way. */
+    private var trackMetrics: TrackMetrics? = null
+    private var trackMetricsFor: String? = null
+    private var bandMetric = BandMetric.SPEED
 
     /** A Sync tab row's activity, to select once its range's list has it (`viewActivityOnMap`). */
     private var pendingFocusId: String? = null
@@ -291,6 +309,15 @@ class MainActivity : AppCompatActivity() {
             onDeleted = ::onActivitiesDeleted,
             onViewOnMap = ::viewActivityOnMap,
         )
+        trackCard = findViewById(R.id.track_card)
+        trackProfile = findViewById(R.id.track_profile)
+        trackReadout = findViewById(R.id.track_readout)
+        metricToggle = findViewById(R.id.track_metric_toggle)
+        metricPace = findViewById(R.id.track_metric_pace)
+        metricHeartrate = findViewById(R.id.track_metric_hr)
+        metricPace.setOnClickListener { setBandMetric(BandMetric.SPEED) }
+        metricHeartrate.setOnClickListener { setBandMetric(BandMetric.HEARTRATE) }
+        trackProfile.onScrub = ::showTrackReadout
         editLock = findViewById(R.id.edit_lock)
         editWindow = EditActivityWindow(findViewById(R.id.edit_window), ::onEditClosed)
         onBackPressedDispatcher.addCallback(this, closeEditOnBack)
@@ -445,6 +472,7 @@ class MainActivity : AppCompatActivity() {
         bottomChrome.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
             applyAttributionMargin()
             placeEditLock()
+            placeTrackCard()
         }
     }
 
@@ -556,6 +584,7 @@ class MainActivity : AppCompatActivity() {
             MapOverlays.attach(loaded, mode, selectedRange)
             MapOverlays.setTrackFilter(loaded, panelState.mapHidden, panelState.focused)
             overlaysAttached = true
+            renderTrackMetrics()
             if (isRecording()) MapOverlays.setRecording(loaded, true, mode)
             frameActivities()
         }
@@ -637,6 +666,8 @@ class MainActivity : AppCompatActivity() {
         val now = activities.filter { it.pending }.mapTo(HashSet()) { it.id }
         val started = now.any { it !in pendingIds }
         val finished = pendingIds.any { it !in now }
+        // The selected activity's reprocess landed: its metrics describe the old points.
+        if (panelState.focused?.let { it in pendingIds && it !in now } == true) updateTrackMetrics(refetch = true)
         pendingIds = now
         if (started || finished) {
             style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
@@ -682,6 +713,7 @@ class MainActivity : AppCompatActivity() {
         placeEditWindow()
         placeEditLock()
         renderModeBar()
+        renderTrackMetrics()
     }
 
     private fun onEditClosed(saved: Boolean) {
@@ -689,6 +721,7 @@ class MainActivity : AppCompatActivity() {
         editLock.visibility = View.GONE
         panel.hold(false)
         renderModeBar()
+        renderTrackMetrics()
         if (saved) selectedRange?.let { loadActivities(it, fly = false) }
     }
 
@@ -730,10 +763,106 @@ class MainActivity : AppCompatActivity() {
         modeBar.visibility = if (isRecording() || editWindow.isOpen) View.GONE else View.VISIBLE
     }
 
-    /** The panel's hidden set, filters, Pending rows and selection, onto the track layers. */
+    /** The panel's hidden set, filters, Pending rows and selection, onto the track layers —
+     *  and the selected activity's profile and bands with them. */
     private fun applyTrackFilter() {
+        style?.takeIf { overlaysAttached }?.let { MapOverlays.setTrackFilter(it, panelState.mapHidden, panelState.focused) }
+        updateTrackMetrics(refetch = false)
+    }
+
+    /**
+     * The selected activity's metrics — fetched when the selection moves to another activity,
+     * or again with [refetch] once its reprocess has landed (the web's `trackMetricsVersion`),
+     * and dropped the moment it clears. A new selection falls back to pace when it has no heart
+     * rate, rather than carrying a heart-rate choice into an activity that can't show one.
+     */
+    private fun updateTrackMetrics(refetch: Boolean) {
+        val focused = panelState.focused
+        if (focused == null) {
+            trackMetrics = null
+            trackMetricsFor = null
+            renderTrackMetrics()
+            return
+        }
+        if (focused == trackMetricsFor && !refetch) {
+            renderTrackMetrics()
+            return
+        }
+        trackMetricsFor = focused
+        if (!refetch) trackMetrics = null
+        renderTrackMetrics()
+        HoldMyTrackApi.trackMetrics(focused) { result ->
+            if (panelState.focused != focused) return@trackMetrics
+            val metrics = result.getOrNull()
+            trackMetrics = metrics
+            if (metrics != null && !metrics.heartrateAvailable) bandMetric = BandMetric.SPEED
+            renderTrackMetrics()
+        }
+    }
+
+    private fun setBandMetric(next: BandMetric) {
+        bandMetric = next
+        renderTrackMetrics()
+    }
+
+    /**
+     * The card while an activity is selected in Normal mode and no Edit window is over it,
+     * and its bands on the map while it's also drawn there — not hidden, filtered out or
+     * Pending, whose metrics describe the points from before its reprocess (the web's
+     * `focusedPending`).
+     */
+    private fun renderTrackMetrics() {
+        val metrics = trackMetrics
+        val showCard = metrics != null && metrics.points.size >= 2 && sheet.isVisible && !editWindow.isOpen
+        trackCard.visibility = if (showCard) View.VISIBLE else View.GONE
+        if (metrics != null) {
+            metricToggle.visibility = if (metrics.heartrateAvailable) View.VISIBLE else View.GONE
+            metricPace.isChecked = bandMetric == BandMetric.SPEED
+            metricHeartrate.isChecked = bandMetric == BandMetric.HEARTRATE
+            trackProfile.set(metrics.points, bandMetric, metrics.elevationAvailable)
+            showTrackReadout(null)
+            placeTrackCard()
+        }
         val loaded = style?.takeIf { overlaysAttached } ?: return
-        MapOverlays.setTrackFilter(loaded, panelState.mapHidden, panelState.focused)
+        val focused = panelState.focused
+        if (metrics != null && focused == metrics.activityId && focused !in panelState.mapHidden) {
+            MapOverlays.setTrackBands(loaded, metrics.points, bandMetric)
+        } else {
+            MapOverlays.clearTrackBands(loaded)
+        }
+    }
+
+    /** The point under a touch on the profile: distance, pace or heart rate, and elevation —
+     *  the web's hover readout. Empty, keeping its height, while nothing's touched. */
+    private fun showTrackReadout(point: dev.holdmytrack.android.net.TrackMetricPoint?) {
+        val metrics = trackMetrics
+        if (point == null || metrics == null) {
+            trackReadout.text = ""
+            return
+        }
+        val value = if (bandMetric == BandMetric.SPEED) {
+            PanelFormat.pace(resources, point.speedMps)
+        } else {
+            point.heartrate?.let { getString(R.string.panel_bpm, kotlin.math.round(it).toInt()) }
+        }
+        trackReadout.text = listOfNotNull(
+            PanelFormat.distance(resources, point.distanceM),
+            value,
+            point.elevationM?.let { PanelFormat.elevation(resources, it) },
+        ).joinToString("   ")
+    }
+
+    /** Bottom-left, over the collapsed panel and clear of MapLibre's logo and attribution
+     *  there — the web's card sits above its scale control the same way. */
+    private fun placeTrackCard() {
+        if (!::trackCard.isInitialized) return
+        val chrome = if (bottomChrome.isVisible) bottomChrome.height - sheetExtraHeight() else 0
+        val bottom = chrome + resources.getDimensionPixelSize(R.dimen.panel_card_above_attribution)
+        val params = trackCard.layoutParams as MarginLayoutParams
+        if (params.bottomMargin != bottom) {
+            params.bottomMargin = bottom
+            trackCard.layoutParams = params
+        }
     }
 
     /** Frames every one of [activities] that has a track — nothing, for none. */
@@ -792,6 +921,7 @@ class MainActivity : AppCompatActivity() {
         sheet.visibility = if (normal) View.VISIBLE else View.GONE
         bottomChrome.visibility = if (normal) View.VISIBLE else View.GONE
         if (!normal) panel.dismissPopups()
+        if (::trackCard.isInitialized) renderTrackMetrics()
     }
 
     private fun isRecording() = (recorder?.state ?: RecordingState.IDLE) != RecordingState.IDLE

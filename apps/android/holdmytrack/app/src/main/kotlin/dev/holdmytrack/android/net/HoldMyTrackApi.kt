@@ -155,6 +155,29 @@ data class Activity(
     val edited: Boolean,
 )
 
+/**
+ * One vertex of an activity's display track, as `GET /v1/activities/track-metrics/{id}`
+ * measures it: its speed from the vertex before, the distance so far, and — only when the
+ * response says the whole track has them — heart rate and elevation.
+ */
+data class TrackMetricPoint(
+    val lon: Double,
+    val lat: Double,
+    val speedMps: Double,
+    val distanceM: Double,
+    val heartrate: Double?,
+    val elevationM: Double?,
+)
+
+/** What the selected activity's pace/heart-rate bands and elevation profile are drawn from.
+ *  Heart rate and elevation are all or nothing: one gap, and the flag is false. */
+data class TrackMetrics(
+    val activityId: String,
+    val heartrateAvailable: Boolean,
+    val elevationAvailable: Boolean,
+    val points: List<TrackMetricPoint>,
+)
+
 /** `GET /v1/coverage/status`: a Fog/Heatmap re-render still to come, and when the account's
  *  coverage tiles were last written. */
 data class CoverageStatus(val rendering: Boolean, val version: Long)
@@ -626,6 +649,34 @@ object HoldMyTrackApi {
         call(request, { text ->
             val json = JSONObject(text)
             CoverageStatus(json.optBoolean("rendering"), json.optLong("version"))
+        }, onResult)
+    }
+
+    /** `GET /v1/activities/track-metrics/{id}` (`docs/IMPLEMENTATION.md` §4.3.1) — see
+     *  [TrackMetrics]. */
+    fun trackMetrics(id: String, onResult: (Result<TrackMetrics>) -> Unit) {
+        val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/activities/track-metrics/" + id).build()
+        call(request, { text ->
+            val json = JSONObject(text)
+            val heartrate = json.optBoolean("heartrate_available")
+            val elevation = json.optBoolean("elevation_available")
+            val rows = json.getJSONArray("points")
+            TrackMetrics(
+                activityId = json.optString("activity_id", id),
+                heartrateAvailable = heartrate,
+                elevationAvailable = elevation,
+                points = List(rows.length()) { i ->
+                    val p = rows.getJSONObject(i)
+                    TrackMetricPoint(
+                        lon = p.getDouble("lon"),
+                        lat = p.getDouble("lat"),
+                        speedMps = p.optDouble("speed_mps", 0.0),
+                        distanceM = p.optDouble("distance_m", 0.0),
+                        heartrate = if (heartrate) p.optNullableDouble("heartrate") else null,
+                        elevationM = if (elevation) p.optNullableDouble("elevation_m") else null,
+                    )
+                },
+            )
         }, onResult)
     }
 
