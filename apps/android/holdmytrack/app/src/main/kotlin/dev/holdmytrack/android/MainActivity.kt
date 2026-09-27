@@ -54,6 +54,8 @@ import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneId
 
 /**
  * The map, and everything that hangs off it: the served basemap, the session the user layers
@@ -122,6 +124,9 @@ class MainActivity : AppCompatActivity() {
     private val coverageWatch = CoverageWatch {
         style?.takeIf { overlaysAttached }?.let(MapOverlays::refreshCoverage)
     }
+
+    /** A Sync tab row's activity, to select once its range's list has it (`viewActivityOnMap`). */
+    private var pendingFocusId: String? = null
 
     /** The ids the last list showed Pending — how a reprocess finishing is noticed. */
     private var pendingIds: Set<String> = emptySet()
@@ -284,6 +289,7 @@ class MainActivity : AppCompatActivity() {
             onFly = ::flyToActivities,
             onEdit = ::openEditWindow,
             onDeleted = ::onActivitiesDeleted,
+            onViewOnMap = ::viewActivityOnMap,
         )
         editLock = findViewById(R.id.edit_lock)
         editWindow = EditActivityWindow(findViewById(R.id.edit_window), ::onEditClosed)
@@ -307,10 +313,7 @@ class MainActivity : AppCompatActivity() {
         setMode(mode)
 
         insetSystemBars()
-        if (savedInstanceState == null) {
-            handleStopIntent(intent)
-            handleShowDayIntent(intent)
-        }
+        if (savedInstanceState == null) handleStopIntent(intent)
 
         mapView = findViewById(R.id.map_view)
         mapView.onCreate(savedInstanceState)
@@ -388,19 +391,6 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleStopIntent(intent)
-        handleShowDayIntent(intent)
-    }
-
-    /** [showDay]'s day becomes the picked range, as if chosen on the slider — so the default
-     *  re-deriving itself on the next resume doesn't take it back. Ignored when relaunched from
-     *  recents, like [handleStopIntent]: that replays a day the user has long since moved on
-     *  from. */
-    private fun handleShowDayIntent(intent: Intent) {
-        val day = intent.getStringExtra(EXTRA_SHOW_DAY) ?: return
-        if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
-        setMode(MapMode.NORMAL)
-        userChangedRange = true
-        applyRange(DateRange(day, day), fly = true)
     }
 
     /** The notification's Stop comes through here rather than straight to `RecordingService`
@@ -551,6 +541,7 @@ class MainActivity : AppCompatActivity() {
 
         modeBarReady = true
         renderModeBar()
+        panel.syncTab.start()
         if (daysStale) {
             daysStale = false
             activityDays.reload()
@@ -617,6 +608,10 @@ class MainActivity : AppCompatActivity() {
             result.onSuccess { activities ->
                 panel.setActivities(activities)
                 trackPending(activities)
+                pendingFocusId?.takeIf { id -> activities.any { it.id == id } }?.let { id ->
+                    pendingFocusId = null
+                    panel.focusFromMap(id)
+                }
                 // A recording started since owns the camera.
                 if (fly && !isRecording()) flyToActivities(activities.filter { !it.pending })
             }.onFailure { failure ->
@@ -650,6 +645,30 @@ class MainActivity : AppCompatActivity() {
         if (finished) activityDays.reload()
         mapView.removeCallbacks(pendingPoll)
         if (now.isNotEmpty()) mapView.postDelayed(pendingPoll, PENDING_POLL_MS)
+    }
+
+    /**
+     * A Sync tab row's View on map — the web's `viewActivityOnMap`: Normal mode, then the
+     * activity selected and flown to, as a row tap does. When its day (in the account's
+     * timezone, the day the server files it under) is outside the range, the range becomes
+     * that one day, as if picked, and the selection waits for that range's list.
+     */
+    private fun viewActivityOnMap(activityId: String, startedAt: String) {
+        setMode(MapMode.NORMAL)
+        val zone = runCatching { ZoneId.of(Session.timezone) }.getOrDefault(ZoneId.systemDefault())
+        val day = runCatching { OffsetDateTime.parse(startedAt).atZoneSameInstant(zone).toLocalDate().toString() }
+            .getOrNull() ?: return
+        val range = selectedRange
+        if (range != null && day >= range.from && day <= range.to && panelState.activities.any { it.id == activityId }) {
+            panel.focusFromMap(activityId)
+            return
+        }
+        pendingFocusId = activityId
+        userChangedRange = true
+        panelState.resetForNewRange()
+        applyTrackFilter()
+        // The selection flies to the activity itself; the range's own fly would override it.
+        applyRange(DateRange(day, day), fly = false)
     }
 
     /** The toolbar's Edit: the window over its target, the panel held down and made inert
@@ -1053,7 +1072,11 @@ class MainActivity : AppCompatActivity() {
         val bounds = LatLngBounds.from(box[3], box[2], box[1], box[0])
         // Into the map left showing between the chrome row and the panel, not under either.
         val top = maxOf(FRAME_PADDING_PX, findViewById<View>(R.id.top_bar).bottom)
-        val bottom = FRAME_PADDING_PX + if (bottomChrome.isVisible) bottomChrome.height else 0
+        // The panel's height it's heading to, not mid-animation: a View on map collapses it and
+        // flies in the same moment, and fitting to the expanded sheet pushed the activity to
+        // the top of the screen.
+        val sheetExtra = if (panel.expanded) 0 else sheetExtraHeight()
+        val bottom = FRAME_PADDING_PX + if (bottomChrome.isVisible) bottomChrome.height - sheetExtra else 0
         val padding = intArrayOf(FRAME_PADDING_PX, top, FRAME_PADDING_PX, bottom)
         val fitted = instance.getCameraForLatLngBounds(bounds, padding) ?: return
         val target = CameraPosition.Builder(fitted)
@@ -1117,6 +1140,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         if (::mapView.isInitialized) mapView.removeCallbacks(pendingPoll)
+        if (::panel.isInitialized) panel.syncTab.stop()
         if (recorderBound) {
             recorder?.onChange = null
             unbindService(recorderConnection)
@@ -1156,17 +1180,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
-        /**
-         * Opens the map on one day in Normal mode, flown to that day's tracks — a history row's
-         * View on map (`SyncStatusActivity`), the web's `viewActivityOnMap`. Brings the existing
-         * map back to the front rather than stacking a second one over the screens between.
-         */
-        fun showDay(context: Context, day: String): Intent =
-            Intent(context, MainActivity::class.java)
-                .putExtra(EXTRA_SHOW_DAY, day)
-                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-
-        private const val EXTRA_SHOW_DAY = "show_day"
         private const val TAG = "HoldMyTrack"
         private const val FRAME_PADDING_PX = 64
         private const val MAX_FRAME_ZOOM = 15.0

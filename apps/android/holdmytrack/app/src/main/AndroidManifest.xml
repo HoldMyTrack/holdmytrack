@@ -128,13 +128,7 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".SyncStatusActivity"
-            android:exported="false"
-            android:label="@string/status_title"
-            android:theme="@style/Theme.HoldMyTrack" />
-
-        <!-- Not exported: reached only from Recorded Activities' Edit, never by another app. -->
+        <!-- Not exported: reached only from a Sync Source recording row's Edit, never by another app. -->
         <activity
             android:name=".recording.RecordingActivity"
             android:exported="false"

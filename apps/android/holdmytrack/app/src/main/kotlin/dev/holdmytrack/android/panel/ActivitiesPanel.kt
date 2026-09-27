@@ -34,9 +34,11 @@ import kotlin.math.abs
 /**
  * The map's Activities panel, as the web draws it at phone width
  * (`apps/web/src/ui/ActivitiesPanel.tsx` and index.css's phone layer): a bottom sheet over the
- * date-range footer, collapsed to its tab row and a "… loaded" line, expanded to most of the
- * screen by tapping that line. Under it: the Type dropdown and the DISTANCE slider, a toolbar
- * over the toolbar's target, the rows, the target's summary, and the duplicates disclosure.
+ * date-range footer, collapsed to its tab row and a line under it ("… loaded" on the
+ * Activities tab), expanded to most of the screen by tapping that line. The Activities tab
+ * holds the Type dropdown and the DISTANCE slider, a toolbar over the toolbar's target, the
+ * rows, the target's summary, and the duplicates disclosure; the Sync tab, the import
+ * history ([SyncTab]).
  *
  * The rules live in [PanelState]; this draws it and turns taps into state changes.
  * `MainActivity` owns the map and the fetch: it hands over each list ([setActivities]) and
@@ -56,11 +58,20 @@ class ActivitiesPanel(
     /** Every id the toolbar's Delete removed — the map, the list and the footer need
      *  fetching again. */
     private val onDeleted: (List<String>) -> Unit,
+    /** A Sync tab row's View on map, once the panel is back on its Activities tab and
+     *  collapsed: the activity, and when it started. */
+    private val onViewOnMap: (activityId: String, startedAt: String) -> Unit,
 ) {
+    private enum class Tab { ACTIVITIES, SYNC }
     private val context = sheet.context
     private val res = context.resources
 
     private val count: TextView = sheet.findViewById(R.id.panel_count)
+    private val tabActivities: View = sheet.findViewById(R.id.panel_tab_activities)
+    private val tabSync: View = sheet.findViewById(R.id.panel_tab_sync)
+    private val syncBadge: TextView = sheet.findViewById(R.id.panel_sync_badge)
+    private val activitiesContent: View = sheet.findViewById(R.id.panel_activities_content)
+    private val syncContent: View = sheet.findViewById(R.id.panel_sync_content)
     private val toggle: View = sheet.findViewById(R.id.panel_toggle)
     private val subtext: TextView = sheet.findViewById(R.id.panel_subtext)
     private val chevron: ImageView = sheet.findViewById(R.id.panel_chevron)
@@ -86,6 +97,24 @@ class ActivitiesPanel(
     private val duplicatesList: LinearLayout = sheet.findViewById(R.id.panel_duplicates_list)
 
     private val adapter = RowAdapter()
+    private var tab = Tab.ACTIVITIES
+
+    /** The Sync tab — kept reading while another tab shows, since its badge counts what's
+     *  still processing. */
+    val syncTab = SyncTab(
+        syncContent,
+        onProcessing = { n ->
+            syncBadge.text = PanelFormat.count(res, n)
+            syncBadge.visibility = if (n > 0) View.VISIBLE else View.GONE
+        },
+        onViewOnMap = { activityId, startedAt ->
+            // The sheet is expanded to show the tab, and would stay drawn over the very map
+            // the link is meant to show.
+            showTab(Tab.ACTIVITIES)
+            setExpanded(false)
+            onViewOnMap(activityId, startedAt)
+        },
+    )
     private val noteAdapter = NoteAdapter()
 
     private var loading = false
@@ -112,6 +141,8 @@ class ActivitiesPanel(
         clearFocusOnEmptyTap()
 
         toggle.setOnClickListener { setExpanded(!expanded) }
+        tabActivities.setOnClickListener { showTab(Tab.ACTIVITIES) }
+        tabSync.setOnClickListener { showTab(Tab.SYNC) }
         // The collapsed height is the toggle row's bottom edge, whatever the font scale makes
         // of the tab row above it.
         toggle.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyHeight(animate = false) }
@@ -160,6 +191,13 @@ class ActivitiesPanel(
             duplicatesOpen = !duplicatesOpen
             renderDuplicates()
         }
+        render()
+    }
+
+    private fun showTab(next: Tab) {
+        if (tab == next) return
+        tab = next
+        dismissPopups()
         render()
     }
 
@@ -262,7 +300,10 @@ class ActivitiesPanel(
     private fun render() {
         val listed = state.listed
         count.text = PanelFormat.count(res, listed.size)
-        subtext.text = if (loading && state.activities.isEmpty()) {
+        renderTabs()
+        subtext.text = if (tab == Tab.SYNC) {
+            res.getString(R.string.panel_sync_subtext)
+        } else if (loading && state.activities.isEmpty()) {
             res.getString(R.string.panel_loading)
         } else {
             // The whole range, whatever TYPE and DISTANCE narrow the rows to — the web's
@@ -296,6 +337,20 @@ class ActivitiesPanel(
             PanelFormat.totalDistance(res, targets.sumOf { it.distanceMeters ?: 0.0 }),
         )
         typePopup?.let { renderTypeRows(it.contentView) }
+    }
+
+    /** The selected tab at full strength over the accent underline, the other at 45% — the
+     *  web's `.activities-panel__tab` — and its content in the sheet. */
+    private fun renderTabs() {
+        for ((view, which) in listOf(tabActivities to Tab.ACTIVITIES, tabSync to Tab.SYNC)) {
+            val selected = tab == which
+            view.alpha = if (selected) 1f else UNSELECTED_TAB_ALPHA
+            if (selected) view.setBackgroundResource(R.drawable.bg_panel_tab_selected) else view.background = null
+            view.isSelected = selected
+            view.contentDescription = null
+        }
+        activitiesContent.visibility = if (tab == Tab.ACTIVITIES) View.VISIBLE else View.GONE
+        syncContent.visibility = if (tab == Tab.SYNC) View.VISIBLE else View.GONE
     }
 
     /** DISTANCE, the web's `DistanceFilter`: gone while the list has no spread of distances. */
@@ -696,5 +751,6 @@ class ActivitiesPanel(
         const val HIDDEN_ALPHA = 0.55f
         const val TYPE_LIST_MAX_DP = 192
         const val SNAP_METERS = 1.0
+        const val UNSELECTED_TAB_ALPHA = 0.45f
     }
 }

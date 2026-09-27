@@ -66,7 +66,7 @@ The Android counterpart to the root roadmap's Phase 3, and the pass that turns e
   - [x] **Sync Source** — the menu's Sync becomes Sync Source (`apps/android/docs/SPEC.md` FR-3.5): the recordings (formerly their own Recorded Activities menu screen, now without its filters) and Health Connect each with a checkbox, one Sync now for whatever is checked.
   - [x] **The sheet and its Activities tab** — peek/expanded bottom sheet over the date footer, rows, Type and Distance filters, the checkbox group, tap-to-select on the list and the map with a highlighted track, Show/Hide and Focus on map, duplicates at the foot of the list; the record button moves to the top chrome (`apps/android/docs/SPEC.md` FR-2.7, `apps/android/docs/IMPLEMENTATION.md` §3.2). Show/Hide came along from the next step, since the track filter it needs was built here.
   - [x] **Edit and Delete** — the toolbar's remaining actions and the edit window's Activity tab, with Pending polling and Fog/Heatmap refreshed after a delete (`apps/android/docs/SPEC.md` FR-2.7 items 9–11).
-  - [ ] **The Sync tab** — sync history moves out of `SyncStatusActivity` into the panel, with "View on map" focusing the activity.
+  - [x] **The Sync tab** — sync history moves out of `SyncStatusActivity` (deleted) into the panel, with "View on map" selecting the activity, and changing the range to its day when it's outside (`apps/android/docs/SPEC.md` FR-4.1, `apps/android/docs/IMPLEMENTATION.md` §6).
   - [ ] **Pace/heart-rate and elevation card** — band-coloured track and the profile for the selected activity.
   - [ ] **Track editing** — the edit window's Track tab: chop, cut, delete point.
   - [ ] **The Privacy tab** — private locations: list, create at map centre, drag and resize, delete.
