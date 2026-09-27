@@ -27,7 +27,13 @@ class CoverageWatch(private val onRefetch: () -> Unit) {
     /** The status `version` the map is showing; null until a watch has read one. */
     private var shownVersion: Long? = null
 
-    fun watch() {
+    /** Runs once the account has no coverage-changing job left — for a change that moves more
+     *  than coverage (a Private location reprocesses whole activities) and has no other way
+     *  of telling when the server is done. A later [watch] without one keeps it. */
+    private var onDone: (() -> Unit)? = null
+
+    fun watch(onDone: (() -> Unit)? = null) {
+        if (onDone != null) this.onDone = onDone
         generation += 1
         polls = 0
         handler.removeCallbacksAndMessages(null)
@@ -58,6 +64,9 @@ class CoverageWatch(private val onRefetch: () -> Unit) {
             }
             shownVersion = status.version
             onRefetch()
+            val done = onDone
+            onDone = null
+            done?.invoke()
         }
     }
 

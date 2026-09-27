@@ -199,6 +199,19 @@ data class TrackEdit(
 /** An activity's recorded points and the edit already applied to them, if any. */
 data class TrackPoints(val points: List<TrackPoint>, val edit: TrackEdit?)
 
+/**
+ * One of the account's Private locations (`docs/SPEC.md` FR-8.1): a circle whose contents are
+ * clipped off the ends of every track. [name] is empty when unset; [radiusM] is between
+ * [PrivateLocation.MIN_RADIUS_M] and [PrivateLocation.MAX_RADIUS_M].
+ */
+data class PrivateLocation(val id: String, val name: String, val lon: Double, val lat: Double, val radiusM: Int) {
+    companion object {
+        /** The server's own bounds (`private_locations.go`). */
+        const val MIN_RADIUS_M = 50
+        const val MAX_RADIUS_M = 2000
+    }
+}
+
 /** `GET /v1/coverage/status`: a Fog/Heatmap re-render still to come, and when the account's
  *  coverage tiles were last written. */
 data class CoverageStatus(val rendering: Boolean, val version: Long)
@@ -749,6 +762,50 @@ object HoldMyTrackApi {
         if (edit.remove.isNotEmpty()) put("remove", JSONArray(edit.remove.map { JSONArray().put(it.first).put(it.second) }))
         if (edit.drop.isNotEmpty()) put("drop", JSONArray(edit.drop))
     }
+
+    /** `GET /v1/private-locations` — every one, oldest first. */
+    fun privateLocations(onResult: (Result<List<PrivateLocation>>) -> Unit) {
+        val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/private-locations").build()
+        call(request, { text ->
+            val rows = JSONArray(text)
+            List(rows.length()) { parsePrivateLocation(rows.getJSONObject(it)) }
+        }, onResult)
+    }
+
+    /**
+     * `POST /v1/private-locations`, or with [id] `PATCH /v1/private-locations/{id}` — the
+     * whole circle either way. Answers with it as saved (the name trimmed). A refusal — a
+     * radius or place out of range, a 21st location, the demo account — is the server's own
+     * wording, in the app's language.
+     */
+    fun savePrivateLocation(
+        id: String?,
+        name: String,
+        lon: Double,
+        lat: Double,
+        radiusM: Int,
+        onResult: (Result<PrivateLocation>) -> Unit,
+    ) {
+        val body = JSONObject().put("name", name).put("lon", lon).put("lat", lat).put("radius_m", radiusM)
+            .toString().toRequestBody(JSON)
+        val url = BuildConfig.API_BASE_URL + API_V1 + "/private-locations" + (id?.let { "/$it" } ?: "")
+        val request = Request.Builder().url(url).apply { if (id == null) post(body) else patch(body) }.build()
+        call(request, { text -> parsePrivateLocation(JSONObject(text)) }, onResult)
+    }
+
+    /** `DELETE /v1/private-locations/{id}`. */
+    fun deletePrivateLocation(id: String, onResult: (Result<Unit>) -> Unit) {
+        val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/private-locations/" + id).delete().build()
+        call(request, { }, onResult)
+    }
+
+    private fun parsePrivateLocation(json: JSONObject) = PrivateLocation(
+        id = json.getString("id"),
+        name = json.optString("name"),
+        lon = json.getDouble("lon"),
+        lat = json.getDouble("lat"),
+        radiusM = json.getInt("radius_m"),
+    )
 
     private fun parseActivity(row: JSONObject): Activity {
         val box = row.optJSONArray("bbox")?.takeIf { it.length() == 4 }
