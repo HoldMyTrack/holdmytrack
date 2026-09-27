@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A 1dp divider showing the hairline behind it: Profile's stat cards are white boxes 1dp apart
+     over ink 8%, the web's .activity-graph__cards grid gap. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <size android:width="1dp" android:height="1dp" />
+    <solid android:color="@android:color/transparent" />
+</shape>

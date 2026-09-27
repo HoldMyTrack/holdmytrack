@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- After the web header's account menu (templates/header.html, user-menu): who is signed in,
-     then Sign out, on one card like the sign-in screen's. Not the web's /profile page, whose
-     year grids and trends are statistics the app doesn't have. -->
+<!-- The web header's account menu (templates/header.html, user-menu) as a card — who is signed
+     in, then Sign out — and under it the web's /profile page (templates/pages/profile.html): the
+     four all-time stat cards, one activity grid per year, and Trends. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -9,9 +9,10 @@
     android:fillViewport="true"
     android:fitsSystemWindows="true">
 
-    <FrameLayout
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="vertical"
         android:padding="@dimen/hmt_space_16">
 
         <com.google.android.material.card.MaterialCardView
@@ -75,5 +76,287 @@
                     android:layout_height="wrap_content" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-    </FrameLayout>
+
+        <!-- "Loading…" until both reads are in, then the first one's error if either failed. -->
+        <TextView
+            android:id="@+id/graph_status"
+            style="@style/Widget.HoldMyTrack.Notice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_24"
+            android:accessibilityLiveRegion="polite" />
+
+        <!-- The activity graph, .activity-graph. -->
+        <LinearLayout
+            android:id="@+id/graph"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_24"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <!-- The four all-time cards, white boxes 1dp apart over the hairline
+                 (.activity-graph__cards): two to a row, as the web's 140px minimum fits a phone. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/hmt_hairline"
+                android:divider="@drawable/gap_1"
+                android:orientation="vertical"
+                android:padding="1dp"
+                android:showDividers="middle">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:divider="@drawable/gap_1"
+                    android:orientation="horizontal"
+                    android:showDividers="middle">
+
+                    <include
+                        android:id="@+id/stat_activities"
+                        layout="@layout/item_profile_stat" />
+
+                    <include
+                        android:id="@+id/stat_distance"
+                        layout="@layout/item_profile_stat" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:divider="@drawable/gap_1"
+                    android:orientation="horizontal"
+                    android:showDividers="middle">
+
+                    <include
+                        android:id="@+id/stat_active_days"
+                        layout="@layout/item_profile_stat" />
+
+                    <include
+                        android:id="@+id/stat_streak"
+                        layout="@layout/item_profile_stat" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_24"
+                android:accessibilityHeading="true"
+                android:text="@string/profile_grid_title"
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.ProfileTitle" />
+
+            <TextView
+                style="@style/Widget.HoldMyTrack.ProfileSubtext"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_4"
+                android:text="@string/profile_grid_subtext" />
+
+            <!-- Shade by: Activities | Distance, .profile__toggle. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_12"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/shade_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="@dimen/hmt_space_8"
+                    android:importantForAccessibility="no"
+                    android:text="@string/profile_shade_by"
+                    android:textAppearance="@style/TextAppearance.HoldMyTrack.Overline" />
+
+                <com.google.android.material.button.MaterialButtonToggleGroup
+                    android:id="@+id/shade_toggle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/profile_shade_by"
+                    app:selectionRequired="true"
+                    app:singleSelection="true">
+
+                    <Button
+                        android:id="@+id/shade_count"
+                        style="@style/Widget.HoldMyTrack.Button.ProfileToggle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/profile_shade_count" />
+
+                    <Button
+                        android:id="@+id/shade_distance"
+                        style="@style/Widget.HoldMyTrack.Button.ProfileToggle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/profile_shade_distance" />
+                </com.google.android.material.button.MaterialButtonToggleGroup>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/years"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_16"
+                android:orientation="vertical" />
+
+            <!-- .profile__legend: "Shaded by …: less", the four shades, "more". -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:importantForAccessibility="no"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/legend"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="@dimen/hmt_space_6"
+                    android:textAppearance="@style/TextAppearance.HoldMyTrack.ProfileCaption" />
+
+                <View
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_marginEnd="@dimen/hmt_space_6"
+                    android:background="@drawable/bg_profile_cell"
+                    android:backgroundTint="@color/profile_level_0" />
+
+                <View
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_marginEnd="@dimen/hmt_space_6"
+                    android:background="@drawable/bg_profile_cell"
+                    android:backgroundTint="@color/profile_level_1" />
+
+                <View
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_marginEnd="@dimen/hmt_space_6"
+                    android:background="@drawable/bg_profile_cell"
+                    android:backgroundTint="@color/profile_level_2" />
+
+                <View
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_marginEnd="@dimen/hmt_space_6"
+                    android:background="@drawable/bg_profile_cell"
+                    android:backgroundTint="@color/profile_level_3" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/profile_legend_more"
+                    android:textAppearance="@style/TextAppearance.HoldMyTrack.ProfileCaption" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Trends, .trends: a hairline, the title, Week | Month, the bars and their two ends. -->
+        <LinearLayout
+            android:id="@+id/trends"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_32"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/hmt_hairline" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_24"
+                android:accessibilityHeading="true"
+                android:text="@string/profile_trends"
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.ProfileTitle" />
+
+            <TextView
+                style="@style/Widget.HoldMyTrack.ProfileSubtext"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_4"
+                android:text="@string/profile_trends_subtext" />
+
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/bucket_toggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_12"
+                app:selectionRequired="true"
+                app:singleSelection="true">
+
+                <Button
+                    android:id="@+id/bucket_week"
+                    style="@style/Widget.HoldMyTrack.Button.ProfileToggle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/profile_week" />
+
+                <Button
+                    android:id="@+id/bucket_month"
+                    style="@style/Widget.HoldMyTrack.Button.ProfileToggle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/profile_month" />
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+
+            <LinearLayout
+                android:id="@+id/trends_chart_box"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_16"
+                android:orientation="vertical">
+
+                <dev.holdmytrack.android.profile.TrendsChartView
+                    android:id="@+id/trends_chart"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/profile_trends_label" />
+
+                <!-- .trends__axis: the first and last period's start, 11sp at ink 50%. -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/hmt_space_6"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/trends_from"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.ProfileCaption" />
+
+                    <TextView
+                        android:id="@+id/trends_to"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.ProfileCaption" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/trends_detail"
+                    style="@style/Widget.HoldMyTrack.ProfileDetail"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/hmt_space_12"
+                    android:accessibilityLiveRegion="polite"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/trends_empty"
+                style="@style/Widget.HoldMyTrack.ProfileSubtext"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_16"
+                android:text="@string/profile_trends_empty"
+                android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
 </ScrollView>

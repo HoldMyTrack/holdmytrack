@@ -35,6 +35,69 @@
     <string name="signed_in_demo">Вы вошли в демо-аккаунт</string>
     <string name="checking_session">Проверяем вход…</string>
 
+    <string name="profile_card_activities">Занятия</string>
+    <string name="profile_card_distance">Расстояние</string>
+    <string name="profile_card_active_days">Активные дни</string>
+    <string name="profile_card_longest_streak">Самая длинная серия</string>
+    <string name="profile_grid_title">Сетка активности</string>
+    <string name="profile_grid_subtext">Каждый день, когда вы двигались, год за годом. Видно только вам. Нажмите на день, чтобы увидеть итоги.</string>
+    <string name="profile_shade_by">Закрашивать по</string>
+    <string name="profile_shade_count">занятиям</string>
+    <string name="profile_shade_distance">расстоянию</string>
+    <string name="profile_year_grid_label">Сетка активности за %1$d год: %2$s</string>
+    <string name="profile_legend_count">По числу занятий: меньше</string>
+    <string name="profile_legend_distance">По расстоянию: меньше</string>
+    <string name="profile_legend_more">больше</string>
+    <string name="profile_year_stats">%1$s · %2$s · %3$s · самая длинная серия: %4$s</string>
+    <string name="profile_cell_empty">%1$s: нет занятий</string>
+    <string name="profile_cell">%1$s: %2$s, %3$s</string>
+    <string name="profile_trend_bar">%1$s: %2$s · %3$s · %4$s ч в движении · набор %5$s</string>
+    <string name="profile_trends">Динамика</string>
+    <string name="profile_trends_subtext">Расстояние по времени — нажмите на столбец, чтобы увидеть подробности.</string>
+    <string name="profile_trends_label">Расстояние по периодам за последние 12 месяцев</string>
+    <string name="profile_week">Неделя</string>
+    <string name="profile_month">Месяц</string>
+    <string name="profile_trends_empty">За этот период пока ничего не записано.</string>
+    <string name="profile_loading">Загрузка…</string>
+    <string name="profile_failed">Не удалось загрузить активность: %1$s</string>
+    <plurals name="profile_activities">
+        <item quantity="one">%1$s занятие</item>
+        <item quantity="few">%1$s занятия</item>
+        <item quantity="many">%1$s занятий</item>
+        <item quantity="other">%1$s занятия</item>
+    </plurals>
+    <plurals name="profile_active_days">
+        <item quantity="one">%1$s активный день</item>
+        <item quantity="few">%1$s активных дня</item>
+        <item quantity="many">%1$s активных дней</item>
+        <item quantity="other">%1$s активного дня</item>
+    </plurals>
+    <plurals name="profile_days">
+        <item quantity="one">%1$s день</item>
+        <item quantity="few">%1$s дня</item>
+        <item quantity="many">%1$s дней</item>
+        <item quantity="other">%1$s дня</item>
+    </plurals>
+    <string-array name="profile_months">
+        <item>янв.</item>
+        <item>февр.</item>
+        <item>март</item>
+        <item>апр.</item>
+        <item>май</item>
+        <item>июнь</item>
+        <item>июль</item>
+        <item>авг.</item>
+        <item>сент.</item>
+        <item>окт.</item>
+        <item>нояб.</item>
+        <item>дек.</item>
+    </string-array>
+    <string-array name="profile_weekdays">
+        <item>Пн</item>
+        <item>Ср</item>
+        <item>Пт</item>
+    </string-array>
+
     <string name="verify_email_title">Подтвердите почту</string>
     <string name="verify_email_hint">Мы отправили ссылку для подтверждения на %1$s. Перейдите по ней, чтобы открыть доступ к аккаунту, — карта и синхронизация заработают сразу после этого.</string>
     <string name="verify_email_continue">Продолжить</string>

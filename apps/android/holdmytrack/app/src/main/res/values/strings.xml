@@ -32,6 +32,65 @@
     <string name="signed_in_demo">Signed in to the demo account</string>
     <string name="checking_session">Checking your session…</string>
 
+    <!-- Profile's activity graph and Trends, the web's /profile (services/server/internal/i18n/locales/en.json, profile.*). -->
+    <string name="profile_card_activities">Activities</string>
+    <string name="profile_card_distance">Distance</string>
+    <string name="profile_card_active_days">Active days</string>
+    <string name="profile_card_longest_streak">Longest streak</string>
+    <string name="profile_grid_title">Activity grid</string>
+    <string name="profile_grid_subtext">Every day you moved, year by year. Only you can see this. Tap a day for its totals.</string>
+    <string name="profile_shade_by">Shade by</string>
+    <string name="profile_shade_count">Activities</string>
+    <string name="profile_shade_distance">Distance</string>
+    <string name="profile_year_grid_label">%1$d activity grid: %2$s</string>
+    <string name="profile_legend_count">Shaded by activity count: less</string>
+    <string name="profile_legend_distance">Shaded by distance: less</string>
+    <string name="profile_legend_more">more</string>
+    <string name="profile_year_stats">%1$s · %2$s · %3$s · longest streak %4$s</string>
+    <string name="profile_cell_empty">%1$s: no activity</string>
+    <string name="profile_cell">%1$s: %2$s, %3$s</string>
+    <string name="profile_trend_bar">%1$s: %2$s · %3$s · %4$s h moving · %5$s gain</string>
+    <string name="profile_trends">Trends</string>
+    <string name="profile_trends_subtext">Distance over time — tap a bar for the full breakdown.</string>
+    <string name="profile_trends_label">Distance per period over the last 12 months</string>
+    <string name="profile_week">Week</string>
+    <string name="profile_month">Month</string>
+    <string name="profile_trends_empty">Nothing recorded in this window yet.</string>
+    <string name="profile_loading">Loading…</string>
+    <string name="profile_failed">Could not load your activity: %1$s</string>
+    <plurals name="profile_activities">
+        <item quantity="one">%1$s activity</item>
+        <item quantity="other">%1$s activities</item>
+    </plurals>
+    <plurals name="profile_active_days">
+        <item quantity="one">%1$s active day</item>
+        <item quantity="other">%1$s active days</item>
+    </plurals>
+    <plurals name="profile_days">
+        <item quantity="one">%1$s day</item>
+        <item quantity="other">%1$s days</item>
+    </plurals>
+    <string-array name="profile_months">
+        <item>Jan</item>
+        <item>Feb</item>
+        <item>Mar</item>
+        <item>Apr</item>
+        <item>May</item>
+        <item>Jun</item>
+        <item>Jul</item>
+        <item>Aug</item>
+        <item>Sep</item>
+        <item>Oct</item>
+        <item>Nov</item>
+        <item>Dec</item>
+    </string-array>
+    <!-- The grid's row labels, rows 1, 3 and 5: the web's weekday.short.1, .3 and .5. -->
+    <string-array name="profile_weekdays">
+        <item>Mon</item>
+        <item>Wed</item>
+        <item>Fri</item>
+    </string-array>
+
     <string name="verify_email_title">Verify your email</string>
     <string name="verify_email_hint">We sent a confirmation link to %1$s. Open it to unlock your account — your map and sync start working as soon as you do.</string>
     <string name="verify_email_continue">Continue</string>

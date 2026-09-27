@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Profile's two-way switches (.profile__toggle-btn): ink, white on the selected one. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@android:color/white" android:state_checked="true" />
+    <item android:color="@color/hmt_ink" />
+</selector>

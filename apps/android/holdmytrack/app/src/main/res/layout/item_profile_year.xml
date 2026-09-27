@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One year's block, the web's .year-grid: a hairline over it, the year in the serif over its
+     four numbers, then the grid, which scrolls sideways inside its own box (a year is wider than a
+     phone). Under it, the tapped day's totals — the web's cell tooltip, which a touch screen never
+     shows. ProfileActivity inflates one per year, most recent first. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingBottom="@dimen/hmt_space_32">
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/hmt_hairline" />
+
+    <TextView
+        android:id="@+id/year_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/hmt_space_16"
+        android:textAppearance="?attr/textAppearanceTitleLarge" />
+
+    <TextView
+        android:id="@+id/year_stats"
+        style="@style/Widget.HoldMyTrack.ProfileSubtext"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/hmt_space_2" />
+
+    <HorizontalScrollView
+        android:id="@+id/year_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/hmt_space_10"
+        android:overScrollMode="never"
+        android:scrollbars="none">
+
+        <dev.holdmytrack.android.profile.YearGridView
+            android:id="@+id/year_grid"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </HorizontalScrollView>
+
+    <TextView
+        android:id="@+id/year_detail"
+        style="@style/Widget.HoldMyTrack.ProfileDetail"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/hmt_space_12"
+        android:accessibilityLiveRegion="polite"
+        android:visibility="gone" />
+</LinearLayout>

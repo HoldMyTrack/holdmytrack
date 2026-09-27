@@ -219,6 +219,16 @@ data class ActivityDay(val date: String, val count: Int, val distanceMeters: Dou
  */
 data class ActivityDayPage(val days: List<ActivityDay>, val earliest: String?)
 
+/** One week's or month's totals, as `GET /v1/activities/trends` sums them; [periodStart] is the
+ *  bucket's first day, `YYYY-MM-DD`. Periods with nothing are never returned. */
+data class TrendPeriod(
+    val periodStart: String,
+    val count: Int,
+    val distanceMeters: Double,
+    val movingSeconds: Long,
+    val elevationGainM: Double,
+)
+
 /**
  * A request the server answered with a non-2xx status. The API writes its errors as plain
  * text (`http.Error`), so `message` is the server's own wording, shown to the user as-is
@@ -820,16 +830,52 @@ object HoldMyTrackApi {
             .addQueryParameter("days", limit.toString())
             .apply { if (before != null) addQueryParameter("before", before) }
             .build()
+        call(Request.Builder().url(url).build(), ::parseActivityDays, onResult)
+    }
+
+    /**
+     * `GET /v1/activities/histogram?from=&to=` — every day with activity in a calendar window,
+     * both ends inclusive (§4.7's calendar-window mode). Profile asks for everything up to the
+     * end of this year in one call, the same single query the web's page runs for its grids.
+     */
+    fun activityDays(from: String, to: String, onResult: (Result<ActivityDayPage>) -> Unit) {
+        val url = (BuildConfig.API_BASE_URL + API_V1 + "/activities/histogram").toHttpUrl().newBuilder()
+            .addQueryParameter("from", from)
+            .addQueryParameter("to", to)
+            .build()
+        call(Request.Builder().url(url).build(), ::parseActivityDays, onResult)
+    }
+
+    private fun parseActivityDays(body: String): ActivityDayPage {
+        val json = JSONObject(body)
+        val buckets = json.getJSONArray("buckets")
+        return ActivityDayPage(
+            days = List(buckets.length()) { i ->
+                val bucket = buckets.getJSONObject(i)
+                ActivityDay(bucket.getString("date"), bucket.optInt("count"), bucket.optDouble("distance_meters", 0.0))
+            },
+            earliest = json.optString("earliest").ifEmpty { null },
+        )
+    }
+
+    /** `GET /v1/activities/trends?bucket=week|month` over its default window, the trailing 12
+     *  months — what the web's Profile page charts. */
+    fun activityTrends(bucket: String, onResult: (Result<List<TrendPeriod>>) -> Unit) {
+        val url = (BuildConfig.API_BASE_URL + API_V1 + "/activities/trends").toHttpUrl().newBuilder()
+            .addQueryParameter("bucket", bucket)
+            .build()
         call(Request.Builder().url(url).build(), { body ->
-            val json = JSONObject(body)
-            val buckets = json.getJSONArray("buckets")
-            ActivityDayPage(
-                days = List(buckets.length()) { i ->
-                    val bucket = buckets.getJSONObject(i)
-                    ActivityDay(bucket.getString("date"), bucket.optInt("count"), bucket.optDouble("distance_meters", 0.0))
-                },
-                earliest = json.optString("earliest").ifEmpty { null },
-            )
+            val periods = JSONObject(body).optJSONArray("periods") ?: JSONArray()
+            List(periods.length()) { i ->
+                val p = periods.getJSONObject(i)
+                TrendPeriod(
+                    periodStart = p.getString("period_start"),
+                    count = p.optInt("count"),
+                    distanceMeters = p.optDouble("distance_meters", 0.0),
+                    movingSeconds = p.optLong("moving_seconds"),
+                    elevationGainM = p.optDouble("elevation_gain_m", 0.0),
+                )
+            }
         }, onResult)
     }
 
