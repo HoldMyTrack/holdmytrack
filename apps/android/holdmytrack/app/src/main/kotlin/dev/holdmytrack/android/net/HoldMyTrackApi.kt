@@ -97,22 +97,27 @@ data class SyncResult(val externalId: String, val status: String, val error: Str
 
 /**
  * One row of the sync history — an `ingest` job and, once it has produced one, the activity it
- * became. [startedAt] and [distanceMeters] are null while the job is still processing, or
- * forever if it failed: there is no activity behind it to describe.
+ * became; the web's `UploadHistoryRow`. [filename] is the job's `source_detail`: a real name for
+ * an uploaded file or a Takeout entry, a raw external id for everything else. [startedAt],
+ * [distanceMeters] and [activityId] are null while the job is still processing, or forever if
+ * it failed: there is no activity behind it to describe.
  */
 data class SyncHistoryEntry(
-    val label: String,
+    val filename: String,
+    val source: String,
     val status: String,
     val error: String,
-    val submittedAt: String,
     val startedAt: String?,
     val distanceMeters: Double?,
+    val activityId: String?,
 )
 
 /** A page of the sync history, plus the counts that describe the whole of it. */
 data class SyncHistory(
     val total: Long,
     val processing: Long,
+    val limit: Int,
+    val offset: Int,
     val entries: List<SyncHistoryEntry>,
 )
 
@@ -268,9 +273,9 @@ object HoldMyTrackApi {
      * arrived by. The sync screen and an uploaded file share one history because they are the
      * same jobs table; there is no separate notion of "a sync" to list.
      */
-    fun syncHistory(limit: Int, onResult: (Result<SyncHistory>) -> Unit) {
+    fun syncHistory(limit: Int, offset: Int, onResult: (Result<SyncHistory>) -> Unit) {
         val request = Request.Builder()
-            .url(BuildConfig.API_BASE_URL + API_V1 + "/uploads?limit=" + limit)
+            .url(BuildConfig.API_BASE_URL + API_V1 + "/uploads?limit=" + limit + "&offset=" + offset)
             .build()
         call(request, { body ->
             val json = JSONObject(body)
@@ -278,15 +283,18 @@ object HoldMyTrackApi {
             SyncHistory(
                 total = json.optLong("total"),
                 processing = json.optLong("processing"),
+                limit = json.optInt("limit", limit),
+                offset = json.optInt("offset", offset),
                 entries = List(rows.length()) { i ->
                     val row = rows.getJSONObject(i)
                     SyncHistoryEntry(
-                        label = row.optString("filename").ifBlank { row.optString("external_id") },
+                        filename = row.optString("filename").ifBlank { row.optString("external_id") },
+                        source = row.optString("source"),
                         status = row.optString("status"),
                         error = row.optString("error"),
-                        submittedAt = row.optString("submitted_at"),
                         startedAt = row.optString("started_at").ifBlank { null },
                         distanceMeters = if (row.isNull("distance_meters")) null else row.optDouble("distance_meters"),
+                        activityId = row.optString("activity_id").ifBlank { null },
                     )
                 },
             )
