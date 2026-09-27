@@ -8,9 +8,9 @@ import { isFlavor, type Flavor } from './style';
  * is deliberately not used: the theme has to live in the same hash, and mixing the
  * built-in writer with our own produces two components fighting over one string.
  *
- * Format: `#map=<zoom>/<lat>/<lon>[&theme=<flavor>]`. `theme` is an override: without it the
- * map's flavor follows the page's light/dark theme (MapView.tsx), so it is written back only
- * when the page was opened with one — a link that asks for a flavor keeps asking for it.
+ * Format: `#map=<zoom>/<lat>/<lon>[&theme=<flavor>]`. The map's flavor follows the page's
+ * light/dark theme (MapView.tsx); `theme` pins one of the other three flavors (pinnedFlavor)
+ * until the page's theme next changes, and is written back only while it does.
  */
 
 export interface ViewState {
@@ -75,7 +75,14 @@ export function replaceHash(view: ViewState, flavor?: Flavor): void {
   }
 }
 
-/** The basemap flavor that matches the page's theme when the URL doesn't name one. */
+/** The flavor a URL pins the map to: `white`, `black` or `grayscale`. `light` and `dark` pin
+ *  nothing — they are the two the page's theme already picks between, so the theme decides —
+ *  which also drops the `&theme=light` every URL carried while the flavor was URL-only. */
+export function pinnedFlavor(hash: HashState): Flavor | undefined {
+  return hash.flavor === 'light' || hash.flavor === 'dark' ? undefined : hash.flavor;
+}
+
+/** The basemap flavor that matches the page's theme when the URL doesn't pin one. */
 export function flavorForTheme(theme: 'light' | 'dark'): Flavor {
   return theme;
 }

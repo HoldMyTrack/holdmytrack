@@ -14,7 +14,7 @@ The Android map already switched to the dark basemap flavor in the phone's dark 
 
 - One dark palette, defined in `tokens.css` and carried value for value into Android's `res/values-night/colors.xml`, as the light one already was. Only colors change between the two; every scale is shared.
 - The choice is per device, not per account: System (the default, following the OS) or a pinned Light or Dark, in the web's account menu and in Android's Settings. On the web a `<head>` script applies it before first paint from localStorage; on Android, AppCompat's night mode.
-- The map's flavor follows the theme (light or dark). A `&theme=` in a web URL still overrides it, so a shared link keeps the flavor its sender chose.
+- The map's flavor follows the theme (light or dark). A web URL can still pin one of the other three flavors (`&theme=black` and so on) until the theme next changes; `&theme=light` or `dark` in a URL is ignored, since the theme already decides between those two.
 - Two fog veils, each the opposite of its basemap in lightness: the dark ink (`#202B25` at 0.82) over the light basemap, a cream mist (`#F7F4EC` at 0.6) over the dark one. The server renders the raster tier per `?theme=`, and both clients draw the Country/Region fills in the matching pair.
 
 ## Alternatives considered

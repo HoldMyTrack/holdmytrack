@@ -199,7 +199,7 @@ describe('basemap foundation', () => {
       timeout: 10_000,
     });
     const hash = await page.evaluate(() => window.location.hash);
-    assert.match(hash, /^#map=13\.00\/41\.499\d+\/-81\.694\d+&theme=light$/, hash);
+    assert.match(hash, /^#map=13\.00\/41\.499\d+\/-81\.694\d+$/, hash);
   });
 
   it('6. attribution credits both Protomaps and OpenStreetMap', async () => {
