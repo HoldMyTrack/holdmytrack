@@ -531,7 +531,7 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 
 ### FR-4.5 Base map, theming, and the opening view
 
-**Description**: The map renders a self-hosted vector base map (streets, labels) in a light or dark flavor that follows the page's light/dark theme (FR-4.12), switching live when the theme does. A URL that names a flavor (`&theme=light`, `dark`, `white`, `black` or `grayscale`) overrides the theme for as long as the page stays open and is kept in the URL, so a shared link shows the flavor its sender chose. The current camera position (center, zoom) is reflected in the URL and restored on reload, so a specific view is shareable via link.
+**Description**: The map renders a self-hosted vector base map (streets, labels) in a light or dark flavor that follows the page's light/dark theme (FR-4.12), switching live when the theme does. A URL can pin one of the three other flavors (`&theme=white`, `black` or `grayscale`), kept in the URL until the page's theme next changes, when the map goes back to following it; `&theme=light` and `&theme=dark` pin nothing and are dropped from the URL, since the theme already picks between those two. The current camera position (center, zoom) is reflected in the URL and restored on reload, so a specific view is shareable via link.
 
 **Preconditions**: Active session.
 

@@ -22,7 +22,7 @@ import {
 } from './tracks';
 import { useCoverageRefresh } from './useCoverageRefresh';
 import { useMapInstance } from './useMapInstance';
-import { flavorForTheme, parseHash, replaceHash, type HashState, type ViewState } from './viewState';
+import { flavorForTheme, parseHash, pinnedFlavor, replaceHash, type HashState, type ViewState } from './viewState';
 import { getActivityTrackMetrics, type Activity, type ActivityTrackMetrics } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
@@ -93,15 +93,24 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     return {
       hash,
       view: hash.view ?? { longitude: WORLD_VIEW.longitude, latitude: WORLD_VIEW.latitude, zoom: WORLD_VIEW.zoom },
-      flavor: hash.flavor ?? flavorForTheme(currentTheme()),
+      flavor: pinnedFlavor(hash) ?? flavorForTheme(currentTheme()),
     };
   });
 
-  // The basemap flavor: a `&theme=` in the URL pins it (a shared link shows what its sender
-  // saw); otherwise it follows the page's light/dark theme, OS preference or account-menu
-  // choice alike, and swaps live when that changes.
+  // The basemap flavor follows the page's light/dark theme, OS preference or account-menu
+  // choice alike, and swaps live when that changes. A URL can pin one of the other flavors
+  // (pinnedFlavor), but only until the theme next changes: whoever just switched the theme
+  // expects the map to follow.
   const theme = useTheme();
-  const flavor: Flavor = initial.hash.flavor ?? flavorForTheme(theme);
+  const [pinned, setPinned] = useState(() => pinnedFlavor(initial.hash));
+  const initialTheme = useRef(theme);
+  useEffect(() => {
+    if (theme !== initialTheme.current) setPinned(undefined);
+  }, [theme]);
+  const flavor: Flavor = pinned ?? flavorForTheme(theme);
+  // Read by the hash sync below, whose moveend listener outlives any one render.
+  const pinnedRef = useRef(pinned);
+  pinnedRef.current = pinned;
 
   const container = useRef<HTMLDivElement>(null);
   const [exportFlow, setExportFlow] = useState<ExportFlow>({ stage: 'idle' });
@@ -1007,14 +1016,14 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     if (!map) return;
     const sync = () => {
       const centre = map.getCenter();
-      replaceHash({ longitude: centre.lng, latitude: centre.lat, zoom: map.getZoom() }, initial.hash.flavor);
+      replaceHash({ longitude: centre.lng, latitude: centre.lat, zoom: map.getZoom() }, pinnedRef.current);
     };
     sync();
     map.on('moveend', sync);
     return () => {
       map.off('moveend', sync);
     };
-  }, [map]);
+  }, [map, pinned]);
 
   return (
     <div className="app-shell">
