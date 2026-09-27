@@ -450,6 +450,28 @@
         <item name="android:maxLines">1</item>
     </style>
 
+    <!-- A Track tab action (Chop, Cut, Delete point, Undo, Reset), the web's .edit-track__btn: a
+         tinted chip with the small radius and a 13sp semibold label, inset in a 44dp-tall
+         target. Checkable, for Delete point's on state. -->
+    <style name="Widget.HoldMyTrack.Button.EditTrack" parent="Widget.Material3.Button.UnelevatedButton">
+        <item name="shapeAppearance">@style/ShapeAppearance.HoldMyTrack.Small</item>
+        <item name="backgroundTint">@color/edit_track_btn_bg</item>
+        <item name="android:textColor">@color/edit_track_btn_text</item>
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.TitleSmall</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">44dp</item>
+        <item name="android:insetTop">4dp</item>
+        <item name="android:insetBottom">4dp</item>
+        <item name="android:paddingStart">@dimen/hmt_space_10</item>
+        <item name="android:paddingEnd">@dimen/hmt_space_10</item>
+    </style>
+
+    <!-- Reset, the quiet one of them (the web's quiet edit-track button): no fill, ink at 65%. -->
+    <style name="Widget.HoldMyTrack.Button.EditTrack.Quiet">
+        <item name="backgroundTint">@android:color/transparent</item>
+        <item name="android:textColor">@color/hmt_ink_hint</item>
+    </style>
+
     <!-- A tab's title in the Activities panel's head, the web's .activities-panel__heading-text:
          the serif, semibold, text-xl. -->
     <style name="TextAppearance.HoldMyTrack.PanelTab" parent="TextAppearance.HoldMyTrack.TitleMedium">

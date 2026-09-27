@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Edit window's Track tab (panel/TrackEditor), after the web's TrackEditor.tsx: RANGE with
+     the knobs' distances and times, a two-knob slider over the track's points — by point, not
+     distance, so a stretch of standing still gets room to be picked out — the ends and the
+     point count under it, then Chop, Cut, Delete point, Undo and Reset. While points load, or
+     when they can't be, a line says so instead. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/edit_track_panel"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="@dimen/hmt_space_12"
+    android:orientation="vertical"
+    android:visibility="gone">
+
+    <TextView
+        android:id="@+id/edit_track_note"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="@color/hmt_ink_meta"
+        android:textSize="@dimen/hmt_text_sm"
+        tools:text="Loading points…" />
+
+    <LinearLayout
+        android:id="@+id/edit_track_body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/edit_track_range"
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.PanelFilterLabel" />
+
+            <TextView
+                android:id="@+id/edit_track_readout"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/hmt_space_8"
+                android:layout_weight="1"
+                android:gravity="end"
+                android:textColor="@color/hmt_ink_meta"
+                android:textSize="@dimen/hmt_text_xs"
+                tools:text="0.4 – 7.9 km · 07:02–08:31" />
+        </LinearLayout>
+
+        <com.google.android.material.slider.RangeSlider
+            android:id="@+id/edit_track_slider"
+            style="@style/Widget.HoldMyTrack.PanelSlider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="-8dp"
+            android:layout_marginEnd="-8dp"
+            android:contentDescription="@string/edit_track_range" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="-8dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/edit_track_start"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/panel_ink_40"
+                android:textSize="@dimen/hmt_text_2xs"
+                tools:text="0.0 km" />
+
+            <TextView
+                android:id="@+id/edit_track_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/panel_ink_40"
+                android:textSize="@dimen/hmt_text_2xs"
+                tools:text="121 points" />
+
+            <TextView
+                android:id="@+id/edit_track_end"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="end"
+                android:textColor="@color/panel_ink_40"
+                android:textSize="@dimen/hmt_text_2xs"
+                tools:text="8.4 km" />
+        </LinearLayout>
+
+        <!-- One row, as the web's .edit-track__row, scrolling sideways if a language's labels
+             outgrow it. -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_8"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/edit_track_chop"
+                    style="@style/Widget.HoldMyTrack.Button.EditTrack"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/edit_track_chop" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/edit_track_cut"
+                    style="@style/Widget.HoldMyTrack.Button.EditTrack"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/hmt_space_6"
+                    android:text="@string/edit_track_cut" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/edit_track_delete_point"
+                    style="@style/Widget.HoldMyTrack.Button.EditTrack"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/hmt_space_6"
+                    android:checkable="true"
+                    android:text="@string/edit_track_delete_point" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/edit_track_undo"
+                    style="@style/Widget.HoldMyTrack.Button.EditTrack"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/hmt_space_16"
+                    android:text="@string/edit_track_undo" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/edit_track_reset"
+                    style="@style/Widget.HoldMyTrack.Button.EditTrack.Quiet"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/hmt_space_6"
+                    android:text="@string/edit_track_reset"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <TextView
+            android:id="@+id/edit_track_delete_note"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_4"
+            android:text="@string/edit_track_delete_point_note"
+            android:textColor="@color/hmt_ink_meta"
+            android:textSize="@dimen/hmt_text_sm"
+            android:visibility="gone" />
+    </LinearLayout>
+</LinearLayout>

@@ -178,6 +178,27 @@ data class TrackMetrics(
     val points: List<TrackMetricPoint>,
 )
 
+/** One recorded point of an activity, as `GET /v1/activities/track-points` returns it — its
+ *  time ([t], Unix ms) is what a track edit names it by. */
+data class TrackPoint(val lon: Double, val lat: Double, val t: Long)
+
+/**
+ * A track edit, as the server stores and replays it (`docs/IMPLEMENTATION.md` §4.7.7): a point
+ * survives when it's inside [keep] (inclusive, null for no limit), outside every [remove]
+ * range (inclusive), and not in [drop]. All times are Unix ms.
+ */
+data class TrackEdit(
+    val keep: Pair<Long, Long>? = null,
+    val remove: List<Pair<Long, Long>> = emptyList(),
+    val drop: List<Long> = emptyList(),
+) {
+    val isEmpty: Boolean
+        get() = keep == null && remove.isEmpty() && drop.isEmpty()
+}
+
+/** An activity's recorded points and the edit already applied to them, if any. */
+data class TrackPoints(val points: List<TrackPoint>, val edit: TrackEdit?)
+
 /** `GET /v1/coverage/status`: a Fog/Heatmap re-render still to come, and when the account's
  *  coverage tiles were last written. */
 data class CoverageStatus(val rendering: Boolean, val version: Long)
@@ -678,6 +699,55 @@ object HoldMyTrackApi {
                 },
             )
         }, onResult)
+    }
+
+    /** `GET /v1/activities/track-points/{id}` — the recorded points, unedited and with any
+     *  Private location already clipped off, and the saved edit. A refusal (`409`: no
+     *  recording kept, points without times) is the server's own wording. */
+    fun trackPoints(id: String, onResult: (Result<TrackPoints>) -> Unit) {
+        val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/activities/track-points/" + id).build()
+        call(request, { text ->
+            val json = JSONObject(text)
+            val rows = json.getJSONArray("points")
+            TrackPoints(
+                points = List(rows.length()) { i ->
+                    val p = rows.getJSONArray(i)
+                    TrackPoint(p.getDouble(0), p.getDouble(1), p.getLong(2))
+                },
+                edit = if (json.isNull("edit")) null else parseTrackEdit(json.getJSONObject("edit")),
+            )
+        }, onResult)
+    }
+
+    /**
+     * `POST /v1/activities/track-edit/{id}` — the whole new edit, or null (or an empty one) to
+     * go back to the track as recorded. The server answers `202` and reprocesses it in the
+     * background, the activity Pending meanwhile; `409` when a reprocess is already running.
+     */
+    fun trackEdit(id: String, edit: TrackEdit?, onResult: (Result<Unit>) -> Unit) {
+        val body = JSONObject().put("edit", edit?.let(::trackEditJson) ?: JSONObject.NULL)
+        val request = Request.Builder()
+            .url(BuildConfig.API_BASE_URL + API_V1 + "/activities/track-edit/" + id)
+            .post(body.toString().toRequestBody(JSON))
+            .build()
+        call(request, { }, onResult)
+    }
+
+    private fun parseTrackEdit(json: JSONObject): TrackEdit {
+        fun pair(a: JSONArray) = a.getLong(0) to a.getLong(1)
+        val remove = json.optJSONArray("remove")
+        val drop = json.optJSONArray("drop")
+        return TrackEdit(
+            keep = json.optJSONArray("keep")?.let(::pair),
+            remove = List(remove?.length() ?: 0) { pair(remove!!.getJSONArray(it)) },
+            drop = List(drop?.length() ?: 0) { drop!!.getLong(it) },
+        )
+    }
+
+    private fun trackEditJson(edit: TrackEdit): JSONObject = JSONObject().apply {
+        edit.keep?.let { put("keep", JSONArray().put(it.first).put(it.second)) }
+        if (edit.remove.isNotEmpty()) put("remove", JSONArray(edit.remove.map { JSONArray().put(it.first).put(it.second) }))
+        if (edit.drop.isNotEmpty()) put("drop", JSONArray(edit.drop))
     }
 
     private fun parseActivity(row: JSONObject): Activity {

@@ -265,7 +265,7 @@
     </plurals>
 
     <!-- The panel's Edit and Delete (panel/EditActivityWindow.kt), after the web's edit.* and activities.delete_* messages. -->
-    <string name="panel_edit_one">Изменить тип, название и описание: %1$s</string>
+    <string name="panel_edit_one">Изменить тип, название, описание и трек: %1$s</string>
     <string name="panel_edit_many">Изменить тип: %1$s</string>
     <string name="panel_delete_target">Удалить: %1$s</string>
     <string name="panel_delete_one_title">Удалить это занятие?</string>
@@ -278,6 +278,32 @@
     <string name="panel_group_summary">%1$s (%2$s)</string>
     <string name="panel_demo_edit">Недоступно в демо-аккаунте — создайте аккаунт, чтобы редактировать занятия</string>
     <string name="panel_demo_delete">Недоступно в демо-аккаунте — создайте аккаунт, чтобы удалять занятия</string>
+    <string name="edit_tab_activity">Занятие</string>
+    <string name="edit_tab_track">Трек</string>
+    <string name="edit_track_check_one">Отметьте ровно одно занятие, чтобы редактировать его трек</string>
+    <string name="edit_track_processing">Этот трек ещё обрабатывается</string>
+    <string name="edit_track_no_track">Для этого занятия нет записанного трека</string>
+    <string name="edit_track_chop">Обрезать</string>
+    <string name="edit_track_chop_title">Оставить только часть между ручками</string>
+    <string name="edit_track_cut">Вырезать</string>
+    <string name="edit_track_cut_title">Убрать часть между ручками и соединить концы. Удерживайте для предпросмотра.</string>
+    <string name="edit_track_delete_point">Удалить точку</string>
+    <string name="edit_track_delete_point_title">Нажимайте на точки на карте, чтобы удалять их</string>
+    <string name="edit_track_delete_point_note">Нажмите на точку на карте, чтобы удалить её.</string>
+    <string name="edit_track_undo">Отменить</string>
+    <string name="edit_track_undo_title">Отменить последнее изменение</string>
+    <string name="edit_track_reset">Сбросить</string>
+    <string name="edit_track_reset_title">Вернуть трек к записанному виду («Отменить» вернёт изменения)</string>
+    <string name="edit_track_range">Диапазон</string>
+    <string name="edit_track_range_readout">%1$s – %2$s %3$s · %4$s–%5$s</string>
+    <string name="edit_track_loading">Загрузка точек…</string>
+    <string name="edit_track_unsaved">Трек, есть несохранённые изменения</string>
+    <plurals name="edit_track_points">
+        <item quantity="one">%1$d точка</item>
+        <item quantity="few">%1$d точки</item>
+        <item quantity="many">%1$d точек</item>
+        <item quantity="other">%1$d точки</item>
+    </plurals>
     <string name="edit_title_one">Редактировать занятие</string>
     <string name="edit_multi_subtitle">Ко всем отмеченным занятиям применяется только тип — см. ниже.</string>
     <string name="edit_multi_reason">При редактировании нескольких занятий меняется только тип — название и описание у каждого занятия свои.</string>

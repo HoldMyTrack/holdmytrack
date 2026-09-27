@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A Track tab action's label: ink, faint while there's nothing it can do, the strong accent
+     while a toggle is on. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/hmt_ink_faint" android:state_enabled="false" />
+    <item android:color="@color/hmt_accent_strong" android:state_checked="true" />
+    <item android:color="@color/hmt_ink" />
+</selector>
