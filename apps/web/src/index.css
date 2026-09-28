@@ -97,6 +97,15 @@ body {
   cursor: default;
 }
 
+/* CreateStoryDialog.tsx — ConfirmDialog's card, a little wider for its two fields. */
+.create-story {
+  width: min(28rem, calc(100vw - 40px));
+}
+
+.create-story .settings-page__section {
+  margin-bottom: var(--fm-space-12);
+}
+
 /* A permanent left sidebar now (docs/UI/main-screen-v2.png), not a dropdown floating over
    the map — there is always at least one activity to show once anything's been uploaded, so
    there was nothing to gain by hiding the list behind an open/close toggle. Width is inline
@@ -539,12 +548,13 @@ body {
   white-space: nowrap;
 }
 
-/* §4.7.6's toolbar icon buttons — Show/Edit/Delete/Focus all operate on the toolbar's target:
+/* §4.7.6's toolbar icon buttons — Show/Edit/Create story/Delete/Focus all operate on the toolbar's target:
    the checked group, else the selected row (there are no per-row action icons). One shared chip look, matching the
    mockup: a soft tinted square rather than a bare icon, so the group actions read as one
    family regardless of which one is destructive. */
 .activities-panel__edit,
 .activities-panel__edit-track,
+.activities-panel__create-story,
 .activities-panel__delete,
 .activities-panel__visibility,
 .activities-panel__focus {
@@ -564,6 +574,7 @@ body {
 
 .activities-panel__edit:hover:not(:disabled),
 .activities-panel__edit-track:hover:not(:disabled),
+.activities-panel__create-story:hover:not(:disabled),
 .activities-panel__delete:hover:not(:disabled),
 .activities-panel__visibility:hover:not(:disabled) {
   background: var(--fm-surface-tint-strong);
@@ -575,6 +586,7 @@ body {
    reads before anyone hovers for the title tooltip. */
 .activities-panel__edit:disabled,
 .activities-panel__edit-track:disabled,
+.activities-panel__create-story:disabled,
 .activities-panel__delete:disabled,
 .activities-panel__visibility:disabled,
 .activities-panel__focus:disabled {
@@ -2096,6 +2108,7 @@ body {
   }
 
   .activities-panel__edit,
+  .activities-panel__create-story,
   .activities-panel__delete,
   .activities-panel__visibility,
   .activities-panel__focus {

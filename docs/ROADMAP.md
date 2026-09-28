@@ -63,7 +63,7 @@ Steps:
 - [x] Schema and API, with tests for ownership (`404`), demo read-only, and an activity delete leaving its Stories behind without it.
 - [x] The `story` filter on the activity list, the tracks tiles and the histogram, and the tile-version bump on a membership change.
 - [x] A Stories page (`/stories`, server-rendered like `/profile`, ADR-0012) reached from the account menu: every Story with its name, description, statistics and per-type breakdown, View on map and Delete (confirmed, a same-origin form POST); an empty state saying how to make one from the map.
-- [ ] "Create story" in the Activities panel's toolbar, enabled while at least one activity is checked (`SPEC.md` FR-5.6): a name and an optional description, then the new Story opens.
+- [x] "Create story" in the Activities panel's toolbar, enabled while at least one activity is checked (`SPEC.md` FR-5.6): a name and an optional description, then the new Story opens.
 - [ ] Story view on the map, as above, including the date-range picker scoped to the Story.
 - [ ] A Stories tab in the Edit window, beside Activity and Track (`SPEC.md` FR-5.10, FR-5.14): the account's Stories as checkboxes for the window's target, one activity or a group (a Story holding only part of a group shows indeterminate), committed by the window's shared Save.
 - [ ] The demo account's Story — `seed-demo-customer`'s manifest gains a list of Stories, seeding one, the Brecksville Reservation trip (the drive there, the walk, the drive back); `--reset` recreates it (`SPEC.md` FR-2.2).

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { ChevronDown, ChevronUp, Eye, EyeOff, Focus, Pencil, Trash2 } from 'lucide-react';
-import { deleteActivity, type Activity, type ActivityTotals, type DuplicateActivity } from '../api';
+import { BookPlus, ChevronDown, ChevronUp, Eye, EyeOff, Focus, Pencil, Trash2 } from 'lucide-react';
+import { deleteActivity, type Activity, type ActivityTotals, type DuplicateActivity, type Story } from '../api';
 import { ConfirmDialog } from './ConfirmDialog';
+import { CreateStoryDialog } from './CreateStoryDialog';
 import { DistanceFilter } from './DistanceFilter';
 import { PrivateLocationsPanel } from './PrivateLocationsPanel';
 import { SyncTab } from './SyncTab';
@@ -139,6 +140,9 @@ export interface ActivitiesPanelProps {
   /** The toolbar's Edit button, over the toolbar's target — MapView opens the Edit window
    *  (EditActivityWindow.tsx: Activity and Track tabs) over the map. */
   onEdit: (activities: Activity[]) => void;
+  /** A Story just made of the checked activities with the toolbar's Create story
+   *  (CreateStoryDialog.tsx) — MapView opens it. */
+  onStoryCreated: (story: Story) => void;
   /** FR-3.7's "Not yet built" gap, closed: activities cross-source dedup took out of
    *  circulation, each alongside the richer copy that superseded it — mirrors the Android
    *  app's own duplicates section (`SyncStatusActivity`). Never filtered by the date range or
@@ -189,6 +193,7 @@ export function ActivitiesPanel({
   onToggleGroupVisibility,
   onActivitiesDeleted,
   onEdit,
+  onStoryCreated,
   duplicates,
   duplicatesError,
   imports,
@@ -275,6 +280,8 @@ export function ActivitiesPanel({
   // (there's no per-row delete button), so this covers both the one-activity and many-activity
   // case uniformly. The confirm title and message below branch on targetActivities.length.
   const [deletingGroup, setDeletingGroup] = useState(false);
+  // FR-5.16's Create story dialog, over the checked group.
+  const [creatingStory, setCreatingStory] = useState(false);
 
   // Mobile-only bottom sheet (index.css's `@media (max-width: 768px)` layer) — collapsed by
   // default, same reasoning as typeFilterOpen above. Desktop CSS never reacts to the
@@ -370,6 +377,16 @@ export function ActivitiesPanel({
       ? noTarget
       : t(targetActivities.length === 1 ? 'activities.edit_one' : 'activities.edit_many', { target: targetName });
   const deleteTitle = targetName === null ? noTarget : t('activities.delete_target', { target: targetName });
+
+  // Create story takes the checked group only, never the selected row alone (FR-5.16): a Story
+  // is a set picked on purpose, and checking is how a set is picked here. Listed rows only, like
+  // every toolbar action.
+  const checkedActivities = checked.size > 0 ? targetActivities : [];
+  const storyTitle = readOnly
+    ? t('stories.demo_create')
+    : checkedActivities.length === 0
+      ? t('stories.create_none')
+      : t('stories.create_target', { target: tn('activities.checked_count', checkedActivities.length) });
   const focusTitle = targetName === null ? noTarget : t('activities.focus_target', { target: targetName });
 
   return (
@@ -616,6 +633,16 @@ export function ActivitiesPanel({
             </button>
             <button
               type="button"
+              className="activities-panel__create-story"
+              disabled={readOnly || checkedActivities.length === 0}
+              onClick={() => setCreatingStory(true)}
+              aria-label={storyTitle}
+              title={storyTitle}
+            >
+              <BookPlus size={16} />
+            </button>
+            <button
+              type="button"
               className="activities-panel__delete"
               disabled={readOnly || !hasTarget || groupHasPending}
               onClick={() => setDeletingGroup(true)}
@@ -782,6 +809,15 @@ export function ActivitiesPanel({
         </>
       )}
 
+
+      {creatingStory && (
+        <CreateStoryDialog
+          activityIds={checkedActivities.map((a) => a.id)}
+          summary={groupSummary}
+          onCreated={onStoryCreated}
+          onClose={() => setCreatingStory(false)}
+        />
+      )}
 
       {deletingGroup && (
         <ConfirmDialog

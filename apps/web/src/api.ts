@@ -809,6 +809,81 @@ export async function deletePrivateLocation(id: string): Promise<void> {
   }
 }
 
+/** A Story's joint statistics, or one activity type's share of them (`SPEC.md` FR-14.1). */
+export interface StoryTotals {
+  count: number;
+  distanceMeters: number;
+  movingSeconds: number;
+  elapsedSeconds: number;
+}
+
+/** A hand-picked, private set of the account's activities (`SPEC.md` FR-14). `description` is
+ *  `''` when unset. */
+export interface Story {
+  id: string;
+  name: string;
+  description: string;
+  /** Every member, earliest activity first. */
+  activityIds: string[];
+  stats: StoryTotals & { byType: (StoryTotals & { activityType: string })[] };
+}
+
+interface StoryTotalsBody {
+  count: number;
+  distance_meters: number;
+  moving_seconds: number;
+  elapsed_seconds: number;
+}
+
+interface StoryBody {
+  id: string;
+  name: string;
+  description: string | null;
+  activity_ids: string[];
+  stats: StoryTotalsBody & { by_type: (StoryTotalsBody & { activity_type: string })[] };
+}
+
+function toStoryTotals(body: StoryTotalsBody): StoryTotals {
+  return {
+    count: body.count,
+    distanceMeters: body.distance_meters,
+    movingSeconds: body.moving_seconds,
+    elapsedSeconds: body.elapsed_seconds,
+  };
+}
+
+function toStory(body: StoryBody): Story {
+  return {
+    id: body.id,
+    name: body.name,
+    description: body.description ?? '',
+    activityIds: body.activity_ids,
+    stats: {
+      ...toStoryTotals(body.stats),
+      byType: body.stats.by_type.map((t) => ({ ...toStoryTotals(t), activityType: t.activity_type })),
+    },
+  };
+}
+
+/** Mirrors stories.go's maxStoryNameLen/maxStoryDescriptionLen, so a limit shows before a
+ *  400 does. */
+export const STORY_MAX_NAME_LEN = 200;
+export const STORY_MAX_DESCRIPTION_LEN = 2000;
+
+/** `POST /v1/stories` — a new Story holding `activityIds` from the start, in one request. */
+export async function createStory(input: { name: string; description: string; activityIds: string[] }): Promise<Story> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/stories`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ name: input.name, description: input.description, activity_ids: input.activityIds }),
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
+  }
+  return toStory((await res.json()) as StoryBody);
+}
+
 /**
  * `GET /v1/coverage/status` — whether the account still has an unfinished job that changes its
  * Fog/Heatmap rasters (an upload not yet parsed, a track edit, a re-render). Polled after an

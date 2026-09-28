@@ -23,7 +23,7 @@ import {
 import { useCoverageRefresh } from './useCoverageRefresh';
 import { useMapInstance } from './useMapInstance';
 import { flavorForTheme, parseHash, pinnedFlavor, replaceHash, type HashState, type ViewState } from './viewState';
-import { getActivityTrackMetrics, type Activity, type ActivityTrackMetrics } from '../api';
+import { getActivityTrackMetrics, type Activity, type ActivityTrackMetrics, type Story } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
 import { ActivitiesPanel, type PanelTab } from '../ui/ActivitiesPanel';
@@ -814,6 +814,12 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     setHoveredActivityId(null);
     setEditWindowIds(group.map((a) => a.id));
   }, []);
+
+  // A Story just made with the toolbar's Create story opens at its own URL, `/?story=<id>`,
+  // keeping the camera (the hash) where it is.
+  const openCreatedStory = useCallback((story: Story) => {
+    window.location.assign(`/?story=${encodeURIComponent(story.id)}${window.location.hash}`);
+  }, []);
   // §4.7.7's track session, from the Edit window's Track tab. Flies there the same way a row
   // click does, then hands the map to TrackEditor until the window closes.
   const startEditTrack = useCallback(
@@ -1062,6 +1068,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
               onToggleGroupVisibility={toggleGroupVisibility}
               onActivitiesDeleted={handleActivitiesDeleted}
               onEdit={openEditWindow}
+              onStoryCreated={openCreatedStory}
               duplicates={duplicates.duplicates}
               duplicatesError={duplicates.error}
               imports={imports}
