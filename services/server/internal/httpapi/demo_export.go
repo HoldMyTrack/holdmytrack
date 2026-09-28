@@ -40,10 +40,14 @@ func ExportDemoActivities(ctx context.Context, pool *pgxpool.Pool, store *storag
 		return nil, err
 	}
 	manifestPath := filepath.Join(outDir, demoManifestFile)
-	manifest := map[string]demoManifestEntry{}
+	// An existing manifest's Stories are kept as they are; only activity entries are added.
+	manifest := demoManifest{Activities: map[string]demoManifestEntry{}}
 	if b, err := os.ReadFile(manifestPath); err == nil {
 		if err := json.Unmarshal(b, &manifest); err != nil {
 			return nil, fmt.Errorf("%s: %w", manifestPath, err)
+		}
+		if manifest.Activities == nil {
+			manifest.Activities = map[string]demoManifestEntry{}
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
@@ -55,7 +59,7 @@ func ExportDemoActivities(ctx context.Context, pool *pgxpool.Pool, store *storag
 		if err != nil {
 			return written, fmt.Errorf("activity %s: %w", id, err)
 		}
-		manifest[filename] = entry
+		manifest.Activities[filename] = entry
 		written = append(written, filename)
 
 		// Rewritten after every file, so a failure part-way leaves a manifest that matches

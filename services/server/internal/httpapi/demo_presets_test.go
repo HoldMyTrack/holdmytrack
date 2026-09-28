@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -25,8 +26,14 @@ func TestEmbeddedDemoDataIsSeedable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadDemoManifest(fsys, names); err != nil {
+	manifest, err := loadDemoManifest(fsys, names)
+	if err != nil {
 		t.Fatal(err)
+	}
+	// The Stories a demo visitor sees (docs/SPEC.md FR-2.2).
+	if len(manifest.Stories) != 2 || manifest.Stories[0].Name != "Brecksville Reservation trip" || len(manifest.Stories[0].Activities) != 3 ||
+		manifest.Stories[1].Name != "Emerald Necklace Trail" {
+		t.Errorf("demo stories %+v", manifest.Stories)
 	}
 }
 
@@ -55,31 +62,40 @@ func TestLoadDemoManifest(t *testing.T) {
 	files := []string{"a.gpx", "b.fit"}
 
 	got, err := loadDemoManifest(fstest.MapFS{}, files)
-	if err != nil || len(got) != 0 {
-		t.Fatalf("missing manifest: got %v, %v; want empty, nil", got, err)
+	if err != nil || len(got.Activities) != 0 || len(got.Stories) != 0 {
+		t.Fatalf("missing manifest: got %+v, %v; want empty, nil", got, err)
 	}
 
-	fsys := fstest.MapFS{"manifest.json": {Data: []byte(`{"a.gpx": {"name": "Lake loop", "type": "walking"}}`)}}
+	fsys := fstest.MapFS{"manifest.json": {Data: []byte(`{
+		"activities": {"a.gpx": {"name": "Lake loop", "type": "walking"}, "b.fit": {"description": "Along the river"}},
+		"stories": [{"name": "Weekend", "description": "Two days out", "activities": ["a.gpx", "b.fit"]}]
+	}`)}}
 	got, err = loadDemoManifest(fsys, files)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := (demoManifestEntry{Name: "Lake loop", Type: "walking"}); got["a.gpx"] != want {
-		t.Fatalf("got %+v, want %+v", got["a.gpx"], want)
+	if want := (demoManifestEntry{Name: "Lake loop", Type: "walking"}); got.Activities["a.gpx"] != want {
+		t.Fatalf("got %+v, want %+v", got.Activities["a.gpx"], want)
+	}
+	if want := (demoManifestEntry{Description: "Along the river"}); got.Activities["b.fit"] != want {
+		t.Fatalf("got %+v, want %+v", got.Activities["b.fit"], want)
+	}
+	if want := []demoManifestStory{{Name: "Weekend", Description: "Two days out", Activities: []string{"a.gpx", "b.fit"}}}; !reflect.DeepEqual(got.Stories, want) {
+		t.Fatalf("stories %+v, want %+v", got.Stories, want)
 	}
 
-	fsys["manifest.json"] = &fstest.MapFile{Data: []byte(`{"b.fit": {"description": "Along the river"}}`)}
-	got, err = loadDemoManifest(fsys, files)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := (demoManifestEntry{Description: "Along the river"}); got["b.fit"] != want {
-		t.Fatalf("got %+v, want %+v", got["b.fit"], want)
-	}
-
-	fsys["manifest.json"] = &fstest.MapFile{Data: []byte(`{"gone.gpx": {"name": "x"}}`)}
-	if _, err := loadDemoManifest(fsys, files); err == nil {
-		t.Fatal("want an error for an entry with no matching file")
+	for name, manifest := range map[string]string{
+		"an entry with no matching file":    `{"activities": {"gone.gpx": {"name": "x"}}}`,
+		"a story naming a missing file":     `{"stories": [{"name": "S", "activities": ["gone.gpx"]}]}`,
+		"a story with no name":              `{"stories": [{"name": " ", "activities": ["a.gpx"]}]}`,
+		"a story with no activities":        `{"stories": [{"name": "S", "activities": []}]}`,
+		"two stories with one name":         `{"stories": [{"name": "S", "activities": ["a.gpx"]}, {"name": "S", "activities": ["b.fit"]}]}`,
+		"a story name over the API's limit": `{"stories": [{"name": "` + strings.Repeat("x", maxStoryNameLen+1) + `", "activities": ["a.gpx"]}]}`,
+	} {
+		fsys["manifest.json"] = &fstest.MapFile{Data: []byte(manifest)}
+		if _, err := loadDemoManifest(fsys, files); err == nil {
+			t.Errorf("want an error for %s", name)
+		}
 	}
 }
 

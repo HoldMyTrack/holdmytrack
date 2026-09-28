@@ -66,7 +66,7 @@ Steps:
 - [x] "Create story" in the Activities panel's toolbar, enabled while at least one activity is checked (`SPEC.md` FR-5.6): a name and an optional description, then the new Story opens.
 - [x] Story view on the map, as above, including the date-range picker scoped to the Story.
 - [x] A Stories tab in the Edit window, beside Activity and Track (`SPEC.md` FR-5.10, FR-5.14): the account's Stories as checkboxes for the window's target, one activity or a group (a Story holding only part of a group shows indeterminate), committed by the window's shared Save.
-- [ ] The demo account's Story — `seed-demo-customer`'s manifest gains a list of Stories, seeding one, the Brecksville Reservation trip (the drive there, the walk, the drive back); `--reset` recreates it (`SPEC.md` FR-2.2).
+- [x] The demo account's Stories — `seed-demo-customer`'s manifest gains a list of Stories, seeding two: the Brecksville Reservation trip (the drive there, the walk, the drive back) and the Emerald Necklace Trail (its first day, "Day #1"); `--reset` recreates them (`SPEC.md` FR-2.2).
 - [ ] English and Russian strings (ADR-0014).
 - [ ] `SPEC.md` FR-14 and `IMPLEMENTATION.md` §3.19 and §4.23 as each piece lands; drop Stories from `SPEC.md` §1.2 and §19's not-yet-built lists.
 

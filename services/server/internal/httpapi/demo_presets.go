@@ -14,8 +14,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 )
@@ -35,9 +37,24 @@ const DemoCustomerUserID = "22222222-2222-2222-2222-222222222222"
 //go:embed demo_data
 var demoData embed.FS
 
-// demoManifestFile is demo_data/'s one non-activity file: per-file overrides a raw file
-// can't carry itself. Not every file needs an entry.
+// demoManifestFile is demo_data/'s one non-activity file: what the raw files can't carry
+// themselves — per-file overrides (not every file needs one) and the account's Stories.
 const demoManifestFile = "manifest.json"
+
+// demoManifest is manifest.json: Activities keyed by filename, and Stories naming their
+// activities by filename too.
+type demoManifest struct {
+	Activities map[string]demoManifestEntry `json:"activities"`
+	Stories    []demoManifestStory          `json:"stories,omitempty"`
+}
+
+// demoManifestStory is one Story the seed gives the account (§4.23): a name, a description,
+// and its activities by filename. Stories are matched by name on a re-run.
+type demoManifestStory struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description,omitempty"`
+	Activities  []string `json:"activities"`
+}
 
 // demoManifestEntry is one file's overrides. Name is the activity's display name — no file
 // parser sets parse.Activity.Name, so without it the seeded row gets the generic
@@ -51,28 +68,52 @@ type demoManifestEntry struct {
 	Description string `json:"description,omitempty"`
 }
 
-// loadDemoManifest reads demo_data/manifest.json, keyed by filename. A missing manifest is an
-// empty one; a manifest naming a file that isn't there fails, since that's a typo or a file
-// deleted without its entry, and would otherwise pass silently.
-func loadDemoManifest(fsys fs.FS, files []string) (map[string]demoManifestEntry, error) {
+// loadDemoManifest reads demo_data/manifest.json. A missing manifest is an empty one; a
+// manifest naming a file that isn't there fails — an activity entry or a Story's activity
+// alike — since that's a typo or a file deleted without its entry, and would otherwise pass
+// silently. So does a Story the API itself would refuse: no name, a name or description over
+// the limit, two Stories with one name (a re-run couldn't tell them apart), or no activities.
+func loadDemoManifest(fsys fs.FS, files []string) (demoManifest, error) {
+	manifest := demoManifest{Activities: map[string]demoManifestEntry{}}
 	b, err := fs.ReadFile(fsys, demoManifestFile)
 	if errors.Is(err, fs.ErrNotExist) {
-		return map[string]demoManifestEntry{}, nil
+		return manifest, nil
 	}
 	if err != nil {
-		return nil, err
+		return demoManifest{}, err
 	}
-	var manifest map[string]demoManifestEntry
 	if err := json.Unmarshal(b, &manifest); err != nil {
-		return nil, fmt.Errorf("%s: %w", demoManifestFile, err)
+		return demoManifest{}, fmt.Errorf("%s: %w", demoManifestFile, err)
+	}
+	if manifest.Activities == nil {
+		manifest.Activities = map[string]demoManifestEntry{}
 	}
 	present := make(map[string]bool, len(files))
 	for _, f := range files {
 		present[f] = true
 	}
-	for f := range manifest {
+	for f := range manifest.Activities {
 		if !present[f] {
-			return nil, fmt.Errorf("%s: entry %q has no matching file", demoManifestFile, f)
+			return demoManifest{}, fmt.Errorf("%s: entry %q has no matching file", demoManifestFile, f)
+		}
+	}
+	names := map[string]bool{}
+	for _, st := range manifest.Stories {
+		switch {
+		case strings.TrimSpace(st.Name) == "" || len([]rune(st.Name)) > maxStoryNameLen:
+			return demoManifest{}, fmt.Errorf("%s: story name %q must be 1–%d characters", demoManifestFile, st.Name, maxStoryNameLen)
+		case len([]rune(st.Description)) > maxStoryDescriptionLen:
+			return demoManifest{}, fmt.Errorf("%s: story %q: description over %d characters", demoManifestFile, st.Name, maxStoryDescriptionLen)
+		case names[st.Name]:
+			return demoManifest{}, fmt.Errorf("%s: two stories named %q", demoManifestFile, st.Name)
+		case len(st.Activities) == 0:
+			return demoManifest{}, fmt.Errorf("%s: story %q has no activities", demoManifestFile, st.Name)
+		}
+		names[st.Name] = true
+		for _, f := range st.Activities {
+			if !present[f] {
+				return demoManifest{}, fmt.Errorf("%s: story %q: activity %q has no matching file", demoManifestFile, st.Name, f)
+			}
 		}
 	}
 	return manifest, nil
@@ -134,6 +175,8 @@ func SeedDemoCustomer(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 	}
 
 	var ingested, skipped, failed int
+	// Each file's activity, for the Stories below.
+	activityIDs := make(map[string]string, len(names))
 	for _, filename := range names {
 		b, err := fs.ReadFile(fsys, filename)
 		if err != nil {
@@ -151,7 +194,7 @@ func SeedDemoCustomer(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 			continue
 		}
 
-		entry := manifest[filename]
+		entry := manifest.Activities[filename]
 		job := ingest.Job{
 			UserID:        DemoCustomerUserID,
 			Source:        "demo-customer-history",
@@ -171,6 +214,7 @@ func SeedDemoCustomer(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 		} else {
 			skipped++
 		}
+		activityIDs[filename] = result.ActivityID
 
 		// Applied after every ingest.Process call, whether it persisted a new row or found
 		// one already there (ON CONFLICT DO NOTHING still returns the existing row's id) — so
@@ -187,11 +231,72 @@ func SeedDemoCustomer(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 		}
 	}
 
-	log.Info("demo customer seed: done", "ingested", ingested, "already_present", skipped, "failed", failed, "total", len(names))
+	if failed == 0 {
+		if err := seedDemoStories(ctx, pool, DemoCustomerUserID, manifest.Stories, activityIDs); err != nil {
+			return fmt.Errorf("seed demo customer: %w", err)
+		}
+	}
+
+	log.Info("demo customer seed: done", "ingested", ingested, "already_present", skipped, "failed", failed, "total", len(names), "stories", len(manifest.Stories))
 	if failed > 0 {
 		return fmt.Errorf("seed demo customer: %d of %d files failed", failed, len(names))
 	}
 	return nil
+}
+
+// seedDemoStories gives the account (the Demo Customer, but a parameter so tests can use their
+// own) the manifest's Stories, each matched by name: created if
+// it isn't there, and otherwise given the manifest's description and exactly its activities —
+// so a plain re-run fixes a Story that drifted, as it does an activity's name. A Story the
+// manifest doesn't name is left alone; --reset is what removes those. One transaction, and one
+// tile-version bump if any Story's activities changed (§4.2.6): the tracks tiles take a
+// `story` filter.
+func seedDemoStories(ctx context.Context, pool *pgxpool.Pool, userID string, stories []demoManifestStory, activityIDs map[string]string) error {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("stories: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
+	changed := false
+	for _, st := range stories {
+		ids := make([]string, 0, len(st.Activities))
+		for _, f := range st.Activities {
+			ids = append(ids, activityIDs[f])
+		}
+		var storyID string
+		err := tx.QueryRow(ctx, `SELECT id FROM stories WHERE user_id = $1 AND name = $2 ORDER BY created_at LIMIT 1`,
+			userID, st.Name).Scan(&storyID)
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			err = tx.QueryRow(ctx, `INSERT INTO stories (user_id, name, description) VALUES ($1, $2, NULLIF($3, '')) RETURNING id`,
+				userID, st.Name, st.Description).Scan(&storyID)
+		case err == nil:
+			_, err = tx.Exec(ctx, `UPDATE stories SET description = NULLIF($2, ''), updated_at = NOW() WHERE id = $1 AND description IS DISTINCT FROM NULLIF($2, '')`,
+				storyID, st.Description)
+		}
+		if err != nil {
+			return fmt.Errorf("story %q: %w", st.Name, err)
+		}
+		removed, err := tx.Exec(ctx, `DELETE FROM story_activities WHERE story_id = $1 AND NOT activity_id = ANY($2::uuid[])`, storyID, ids)
+		if err != nil {
+			return fmt.Errorf("story %q: %w", st.Name, err)
+		}
+		added, err := tx.Exec(ctx, `
+			INSERT INTO story_activities (story_id, activity_id) SELECT $1, unnest($2::uuid[])
+			ON CONFLICT DO NOTHING`, storyID, ids)
+		if err != nil {
+			return fmt.Errorf("story %q: %w", st.Name, err)
+		}
+		if removed.RowsAffected() > 0 || added.RowsAffected() > 0 {
+			changed = true
+		}
+	}
+	if changed {
+		if err := fog.BumpMapVersion(ctx, tx, userID); err != nil {
+			return fmt.Errorf("stories: %w", err)
+		}
+	}
+	return tx.Commit(ctx)
 }
 
 // resetDemoCustomer deletes every activity the demo account has, with everything derived from
@@ -248,6 +353,8 @@ func resetDemoCustomer(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 	for _, q := range []string{
 		`DELETE FROM jobs WHERE user_id = $1 AND state = 'pending'`,
 		`DELETE FROM activities WHERE user_id = $1`,
+		// Its Stories too: the seed recreates the manifest's, and nothing else should survive.
+		`DELETE FROM stories WHERE user_id = $1`,
 		`DELETE FROM fog_tiles WHERE user_id = $1`,
 		// Its tiles are about to be rendered from scratch; nothing cached before this is its.
 		`UPDATE users SET heatmap_cap = DEFAULT, map_version = map_version + 1 WHERE id = $1`,

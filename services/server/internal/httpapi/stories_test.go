@@ -291,3 +291,74 @@ func TestActivityListNamesStories(t *testing.T) {
 		t.Errorf("PATCH row stories: %v", row.Stories)
 	}
 }
+
+// The demo seed's Stories (seedDemoStories): created by name, then held to the manifest on
+// every re-run — its description and exactly its activities — with the tile version bumped only
+// when a Story's activities actually changed.
+func TestSeedDemoStories(t *testing.T) {
+	d := newDBTest(t)
+	acct := d.newAccount(false)
+	ctx := context.Background()
+	a := d.newActivity(acct, testActivity{activityType: "driving", durationSecs: 60})
+	b := d.newActivity(acct, testActivity{activityType: "walking", durationSecs: 60})
+	c := d.newActivity(acct, testActivity{activityType: "cycling", durationSecs: 60})
+	ids := map[string]string{"a.gpx": a, "b.gpx": b, "c.gpx": c}
+	manifest := []demoManifestStory{
+		{Name: "Trip", Description: "Weekend", Activities: []string{"a.gpx", "b.gpx"}},
+		{Name: "Trail", Activities: []string{"c.gpx"}},
+	}
+	version := func() int64 {
+		var v int64
+		if err := d.pool.QueryRow(ctx, `SELECT map_version FROM users WHERE id = $1`, acct.id).Scan(&v); err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+	stories := func() map[string]story {
+		var list storiesResponse
+		d.decode(d.do(acct, "GET", "/v1/stories", nil), http.StatusOK, &list)
+		out := map[string]story{}
+		for _, s := range list.Stories {
+			out[s.Name] = s
+		}
+		return out
+	}
+
+	v0 := version()
+	if err := seedDemoStories(ctx, d.pool, acct.id, manifest, ids); err != nil {
+		t.Fatal(err)
+	}
+	got := stories()
+	if len(got) != 2 || len(got["Trip"].ActivityIDs) != 2 || *got["Trip"].Description != "Weekend" ||
+		got["Trail"].Description != nil || !slices.Equal(got["Trail"].ActivityIDs, []string{c}) {
+		t.Fatalf("first seed: %+v", got)
+	}
+	if version() == v0 {
+		t.Errorf("creating Stories with activities didn't bump the tile version")
+	}
+
+	// A re-run over an unchanged account changes nothing, and bumps nothing.
+	v1 := version()
+	if err := seedDemoStories(ctx, d.pool, acct.id, manifest, ids); err != nil {
+		t.Fatal(err)
+	}
+	if again := stories(); len(again) != 2 || again["Trip"].ID != got["Trip"].ID || version() != v1 {
+		t.Errorf("re-run: %+v, version %d → %d", again, v1, version())
+	}
+
+	// Drift — an extra activity, a lost one, another description — is put back.
+	d.decode(d.do(acct, "POST", "/v1/stories/"+got["Trip"].ID+"/activities", map[string]any{"activity_ids": []string{c}}), http.StatusOK, nil)
+	d.decode(d.do(acct, "DELETE", "/v1/stories/"+got["Trip"].ID+"/activities", map[string]any{"activity_ids": []string{a}}), http.StatusOK, nil)
+	d.decode(d.do(acct, "PATCH", "/v1/stories/"+got["Trip"].ID, map[string]any{"name": "Trip", "description": "Edited"}), http.StatusOK, nil)
+	if err := seedDemoStories(ctx, d.pool, acct.id, manifest, ids); err != nil {
+		t.Fatal(err)
+	}
+	fixed := stories()["Trip"]
+	held := slices.Clone(fixed.ActivityIDs)
+	slices.Sort(held)
+	want := []string{a, b}
+	slices.Sort(want)
+	if !slices.Equal(held, want) || *fixed.Description != "Weekend" {
+		t.Errorf("drift not fixed: %+v", fixed)
+	}
+}

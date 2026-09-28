@@ -1,54 +1,74 @@
 {
-  "2026-07-11 Bonnie Park Picnic Area.gpx": {
-    "name": "Bonnie Park Picnic Area",
-    "type": "cycling"
+  "activities": {
+    "2026-07-11 Bonnie Park Picnic Area.gpx": {
+      "name": "Bonnie Park Picnic Area",
+      "type": "cycling"
+    },
+    "2026-09-05 Big Creek Reservation.gpx": {
+      "name": "Big Creek Reservation",
+      "type": "walking"
+    },
+    "2026-09-07 Andrew s Nature Play Area.gpx": {
+      "name": "Andrew's Nature Play Area",
+      "type": "walking"
+    },
+    "2026-09-11 Lakefront Reservation.gpx": {
+      "name": "Lakefront Reservation",
+      "type": "walking"
+    },
+    "2026-09-13 Solon Community Park.gpx": {
+      "name": "Solon Community Park",
+      "type": "walking"
+    },
+    "2026-09-19 Radlick Park.gpx": {
+      "name": "Radlick Park",
+      "type": "walking"
+    },
+    "2026-09-26 Brecksville Reservation trip-2.gpx": {
+      "name": "Brecksville Reservation trip",
+      "type": "walking"
+    },
+    "2026-09-26 Brecksville Reservation trip-3.gpx": {
+      "name": "Brecksville Reservation trip",
+      "type": "driving"
+    },
+    "2026-09-26 Brecksville Reservation trip.gpx": {
+      "name": "Brecksville Reservation trip",
+      "type": "driving"
+    },
+    "2026-09-27 Clague Park-2.gpx": {
+      "name": "Clague Park",
+      "type": "walking"
+    },
+    "2026-09-27 Clague Park-3.gpx": {
+      "name": "Clague Park",
+      "type": "driving"
+    },
+    "2026-09-27 Clague Park.gpx": {
+      "name": "Clague Park",
+      "type": "driving"
+    },
+    "2026-09-27 Emerald Necklace Trail.gpx": {
+      "name": "Day #1",
+      "type": "Solowheel"
+    }
   },
-  "2026-09-05 Big Creek Reservation.gpx": {
-    "name": "Big Creek Reservation",
-    "type": "walking"
-  },
-  "2026-09-07 Andrew s Nature Play Area.gpx": {
-    "name": "Andrew's Nature Play Area",
-    "type": "walking"
-  },
-  "2026-09-11 Lakefront Reservation.gpx": {
-    "name": "Lakefront Reservation",
-    "type": "walking"
-  },
-  "2026-09-13 Solon Community Park.gpx": {
-    "name": "Solon Community Park",
-    "type": "walking"
-  },
-  "2026-09-19 Radlick Park.gpx": {
-    "name": "Radlick Park",
-    "type": "walking"
-  },
-  "2026-09-26 Brecksville Reservation trip-2.gpx": {
-    "name": "Brecksville Reservation trip",
-    "type": "walking"
-  },
-  "2026-09-26 Brecksville Reservation trip-3.gpx": {
-    "name": "Brecksville Reservation trip",
-    "type": "driving"
-  },
-  "2026-09-26 Brecksville Reservation trip.gpx": {
-    "name": "Brecksville Reservation trip",
-    "type": "driving"
-  },
-  "2026-09-27 Clague Park-2.gpx": {
-    "name": "Clague Park",
-    "type": "walking"
-  },
-  "2026-09-27 Clague Park-3.gpx": {
-    "name": "Clague Park",
-    "type": "driving"
-  },
-  "2026-09-27 Clague Park.gpx": {
-    "name": "Clague Park",
-    "type": "driving"
-  },
-  "2026-09-27 Emerald Necklace Trail.gpx": {
-    "name": "Emerald Necklace Trail",
-    "type": "Solowheel"
-  }
+  "stories": [
+    {
+      "name": "Brecksville Reservation trip",
+      "description": "Weekend family vacation.",
+      "activities": [
+        "2026-09-26 Brecksville Reservation trip.gpx",
+        "2026-09-26 Brecksville Reservation trip-2.gpx",
+        "2026-09-26 Brecksville Reservation trip-3.gpx"
+      ]
+    },
+    {
+      "name": "Emerald Necklace Trail",
+      "description": "I decided to ride over the whole trail from start to finish.",
+      "activities": [
+        "2026-09-27 Emerald Necklace Trail.gpx"
+      ]
+    }
+  ]
 }
