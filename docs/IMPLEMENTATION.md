@@ -869,6 +869,8 @@ Two more things the screen needs that a list endpoint alone doesn't cover. They 
 
 The Activities panel has two filters: TYPE rows (with per-type counts) and a DISTANCE dual-handle slider bounded by the range's real minimum and maximum. **Built, entirely client-side** (`apps/web/src/ui/activityFacets.ts`), over the same unpaginated list response the panel already holds for the current date range — no new endpoint, no new query parameters. Narrowing either updates what the panel renders, what the map draws (unioned into the same track-hiding filter the eye icon uses), and the ACTIVITIES badge's count; it does not change the "km loaded" subtext, which still describes the whole date range regardless of either filter. "Reset filters" clears both instantly, since there is nothing to refetch. TYPE labels are humanized for display (`snake_case` spaced out and title-cased) but never remapped to a fixed vocabulary — `activity_type` "is not a controlled vocabulary" below still holds; formatting is not normalizing.
 
+The slider is two `<input type="range">` with `step="any"`: distances are meters with centimeters (a 16,093.44 m ride), and the default step of 1, counted from the minimum, can't land on the maximum — a knob dragged back to the end stopped short of the longest activity and kept it filtered out. `nextDistanceFilter` turns a knob's move into the next filter, the knobs never crossing, and returns null — no filter — once both are back at the bounds (`tests/activityFacets.test.mjs`).
+
 TYPE rows are real checkboxes in a scrolling list (§4.7.6), not a fixed category list — rows show only values actually present in the current range's own data, never a hardcoded vocabulary.
 
 #### 4.7.2 `activity_type` is not a controlled vocabulary

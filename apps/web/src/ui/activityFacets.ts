@@ -30,6 +30,22 @@ export function distanceBounds(activities: Activity[]): DistanceRange | null {
   return Number.isFinite(min) ? { min, max } : null;
 }
 
+/**
+ * The Distance slider's filter after one knob moved to `value`: the other knob held, the two
+ * never crossing, and null — no filter, "any distance" — once both are back at the bounds, so
+ * a knob dragged away and back leaves nothing filtered out.
+ */
+export function nextDistanceFilter(
+  bounds: DistanceRange,
+  current: DistanceRange,
+  knob: 'min' | 'max',
+  value: number,
+): DistanceRange | null {
+  const next =
+    knob === 'min' ? { min: Math.min(value, current.max), max: current.max } : { min: current.min, max: Math.max(value, current.min) };
+  return next.min <= bounds.min && next.max >= bounds.max ? null : next;
+}
+
 /** A row with no recorded distance can't be said to lie inside a distance band — same
  *  nullability stance format.ts and the backend already take on this field. */
 export function passesDistance(activity: Activity, filter: DistanceRange | null): boolean {

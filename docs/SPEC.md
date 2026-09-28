@@ -639,6 +639,8 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 
 **Description**: The user can narrow the visible activities to a minimum/maximum distance range via a slider, bounded by the shortest and longest activity in the current date range. Same scope as FR-5.2 (client-side, narrows the same things, doesn't affect the range total). Standalone and always visible, between the panel's subtext line and the header toolbar — not folded into the Type dropdown or hidden behind any toggle.
 
+**Behavior**: Each knob reaches the exact shortest and longest distance at its end of the track, so the activities at either end are inside the filter there. With both knobs back at their ends there is no distance filter: the readout says "any distance" and nothing is filtered out by distance.
+
 ### FR-5.4 Row hover preview
 
 **Description**: Hovering a row (anywhere on it) previews that activity's track on the map — drawn thicker, FR-4.1's Hovered state — with no camera movement. The preview clears the instant the pointer leaves the row. This works in both directions: hovering an activity's track directly on the map previews it the same way, and additionally underlines that row's title in the Activities panel — so either surface can be used to identify which row an unlabeled track on the map belongs to, not only the reverse.
