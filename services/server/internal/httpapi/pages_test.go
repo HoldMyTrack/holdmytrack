@@ -53,8 +53,8 @@ func TestPagesRenderSignedOut(t *testing.T) {
 		if !strings.Contains(body, `href="`+tc.path+`" aria-current="page"`) {
 			t.Errorf("%s: Info menu doesn't mark the current page", tc.path)
 		}
-		// Signed out: a Sign in link, no account menu and no Sign out form.
-		if !strings.Contains(body, ">Sign in</a>") || strings.Contains(body, `action="/logout"`) {
+		// Signed out: a Sign in link, no account menu, no Sign out form and no Stories.
+		if !strings.Contains(body, ">Sign in</a>") || strings.Contains(body, `action="/logout"`) || strings.Contains(body, `href="/stories"`) {
 			t.Errorf("%s: signed-out header wrong", tc.path)
 		}
 		if hasNoIndex := strings.Contains(body, `name="robots" content="noindex"`); hasNoIndex != tc.noIndex {

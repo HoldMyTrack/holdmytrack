@@ -906,11 +906,11 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 **Description**: Every page shares one header — the map and Profile included — and every page other than those two shares one footer.
 
 **Behavior**:
-1. The header shows the logo, wordmark and tagline (the brand links to `/`), then Donate (FR-11.1), an "Info" menu listing About, Help and Contacts with the current page marked, and the account area.
-2. Signed out, the account area is a "Sign in" link to `/signin`. With a session (real or demo), it is an account menu showing the account's avatar (or a generic icon) that opens to the account's email (a demo session shows its display name instead, followed by "Create your own account", FR-2.3), then "Profile" (`/profile`), "Stories" (`/stories`, FR-14.6), "Settings" (`/settings`), "Admin" (`/admin`, an admin only — FR-12.1) and "Sign out".
+1. The header shows the logo, wordmark and tagline (the brand links to `/`), then Donate (FR-11.1), with a session a "Stories" link to `/stories` (FR-14.6, marked while on it), an "Info" menu listing About, Help and Contacts with the current page marked, and the account area.
+2. Signed out, the account area is a "Sign in" link to `/signin`. With a session (real or demo), it is an account menu showing the account's avatar (or a generic icon) that opens to the account's email (a demo session shows its display name instead, followed by "Create your own account", FR-2.3), then "Profile" (`/profile`), "Settings" (`/settings`), "Admin" (`/admin`, an admin only — FR-12.1) and "Sign out".
 3. Both menus open and close without JavaScript.
 4. "Sign out" submits `POST /logout`, which ends the session the same way `POST /v1/auth/logout` does and redirects to `/`. The request is refused (`403`) unless its `Origin` header — or, without one, its `Referer` — is the app's own origin.
-5. On a phone-width screen (≤768px) the tagline is hidden and Donate shows its heart alone; the Info and account menus stay.
+5. On a phone-width screen (≤768px) the tagline is hidden and Donate shows its heart alone; Stories, the Info menu and the account menu stay. Narrower than 360px, the wordmark is hidden too, leaving the logo.
 6. The footer links to the map (`/`), About, Help, Contacts and the GitHub repository.
 7. With a session, pages are sent with `Cache-Control: no-store`, since the header names the signed-in account. Without one, the front page, About, Help and Contacts are the same for every visitor and are sent `Cache-Control: public, max-age=300` with `Vary: Cookie`, so a copy cached before signing in is never reused after.
 8. An address no page answers gets a "Page not found" page (`404`) with the same header; under `/v1/` and `/tiles/` it's a plain `404`, not a page.
@@ -1050,7 +1050,7 @@ A Story is a hand-picked, private set of the account's activities — a hike, a 
 
 ### FR-14.6 The Stories page
 
-**Description**: A private page at `/stories`, reached from the header's account menu (FR-10.4), listing the account's Stories.
+**Description**: A private page at `/stories`, reached from the header's "Stories" link (FR-10.4), listing the account's Stories.
 
 **Preconditions**: Signed in, past email verification and first-run Settings (FR-1.8, FR-1.7) — as on every signed-in page, anyone else is sent there, or to sign-in.
 

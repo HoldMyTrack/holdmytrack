@@ -54,8 +54,8 @@ func TestStoriesPage(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(body, "No stories yet.") {
 		t.Fatalf("empty: status %d, empty state missing", rec.Code)
 	}
-	if !strings.Contains(body, `href="/stories"`) {
-		t.Errorf("the account menu has no Stories item")
+	if !strings.Contains(body, `<a class="header-link" href="/stories" aria-current="page">Stories</a>`) {
+		t.Errorf("the header has no Stories link marked current")
 	}
 
 	walk := d.newActivity(me, testActivity{activityType: "walking", distanceMeters: 3000, movingSeconds: intPtr(1800), durationSecs: 2000})

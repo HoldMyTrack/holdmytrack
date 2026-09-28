@@ -1,6 +1,7 @@
 {{/* The header every page shares (ADR-0012), the React app's shell included — brand,
-     tagline, Donate, the Info menu, the account menu. Its styles are static/header.css, which
-     the app's shell loads alone and every other page alongside pages.css. The two menus are
+     tagline, Donate, Stories (signed in), the Info menu, the account menu. Its styles are
+     static/header.css, which the app's shell loads alone and every other page alongside
+     pages.css. The two menus are
      <details> dropdowns: they open and close with no script. Sign out is a form POST to /logout
      (pages.go), not a link, so a GET from another site can't end someone's session.
      Signed out, the account menu is a Sign in link. */}}
@@ -17,6 +18,8 @@
       <svg class="donate-button__icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /></svg>
       <span class="donate-button__label">{{t "header.donate"}}</span>
     </a>
+    {{/* Stories need an account, so signed out there's nothing to link to. */}}
+    {{if .User}}<a class="header-link" href="/stories"{{if eq .Path "/stories"}} aria-current="page"{{end}}>{{t "header.stories"}}</a>{{end}}
     <details class="header-menu info-menu">
       <summary class="info-menu__trigger">{{t "header.info"}}<svg class="info-menu__caret" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></summary>
       <div class="header-menu__dropdown" role="menu">
@@ -32,7 +35,6 @@
         <div class="header-menu__label">{{with .Label}}{{.}}{{else}}{{t "header.demo_account"}}{{end}}</div>
         {{if .IsDemo}}<a role="menuitem" class="header-menu__item header-menu__item--accent" href="/signup">{{t "header.create_account"}}</a>{{end}}
         <a role="menuitem" class="header-menu__item" href="/profile">{{t "header.profile"}}</a>
-        <a role="menuitem" class="header-menu__item" href="/stories">{{t "header.stories"}}</a>
         <a role="menuitem" class="header-menu__item" href="/settings">{{t "header.settings"}}</a>
         {{if .IsAdmin}}<a role="menuitem" class="header-menu__item" href="/admin">{{t "header.admin"}}</a>{{end}}
         <form method="post" action="/logout">
