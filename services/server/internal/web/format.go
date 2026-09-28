@@ -65,6 +65,18 @@ func FormatHours(l *i18n.Localizer, seconds int64) string {
 	return l.Int(int64(math.Round(float64(seconds) / 3600)))
 }
 
+// LocalTime is the wall-clock date and time at `at` in zone: "Sep 28, 14:05" / "28 сент.,
+// 14:05" — what Settings' Timezone field shows under itself, and the same shape the page's
+// script renders with Intl.DateTimeFormat. "" for a zone Go can't load.
+func LocalTime(l *i18n.Localizer, at time.Time, zone string) string {
+	loc, err := time.LoadLocation(zone)
+	if err != nil || zone == "" {
+		return ""
+	}
+	t := at.In(loc)
+	return ShortDate(l, t.Format("2006-01-02")) + ", " + t.Format("15:04")
+}
+
 // ShortDate is "Sep 8" / "8 сент." for a YYYY-MM-DD day.
 func ShortDate(l *i18n.Localizer, day string) string {
 	t, err := time.Parse("2006-01-02", day)

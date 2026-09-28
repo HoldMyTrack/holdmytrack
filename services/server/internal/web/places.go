@@ -15,16 +15,21 @@ type Country struct {
 }
 
 // TimezoneOption is one entry of the Settings page's Timezone list: the IANA id the account
-// stores, and a label to show — "New York · GMT−05:00".
+// stores, and a label to show — "(GMT−05:00) - New York", the offset first so a list sorted
+// by it reads as a column.
 type TimezoneOption struct {
 	ID    string
 	Label string
+	// offset is seconds east of GMT as of TimezoneGroups' `at`; hasOffset is false only for a
+	// saved zone Go can't load, which sorts last.
+	offset    int
+	hasOffset bool
 }
 
 // TimezoneGroup is one <optgroup>: every zone under one top-level region ("America",
-// "Europe", …), sorted by place so a native <select>'s type-to-find lands on a city by its
-// name. The picker this replaced sorted by offset instead; with a plain <select>, typing
-// "Ber" finding Berlin is worth more than the order.
+// "Europe", …), sorted by today's GMT offset, west to east, then by place among zones that
+// share one. A native <select>'s type-to-find still lands on a city by its name — it matches
+// the start of a label wherever the option sits.
 type TimezoneGroup struct {
 	Region  string
 	Options []TimezoneOption
@@ -58,18 +63,28 @@ func TimezoneGroups(at time.Time, current string) []TimezoneGroup {
 	byRegion := map[string][]TimezoneOption{}
 	for _, id := range ids {
 		region, place := splitZone(id)
-		label := place
+		opt := TimezoneOption{ID: id, Label: place}
 		if loc, err := time.LoadLocation(id); err == nil {
-			_, offset := at.In(loc).Zone()
-			label += " · " + formatOffset(offset)
+			_, opt.offset = at.In(loc).Zone()
+			opt.hasOffset = true
+			opt.Label = "(" + formatOffset(opt.offset) + ") - " + place
 		} else if id != current {
 			continue
 		}
-		byRegion[region] = append(byRegion[region], TimezoneOption{ID: id, Label: label})
+		byRegion[region] = append(byRegion[region], opt)
 	}
 	groups := make([]TimezoneGroup, 0, len(byRegion))
 	for region, opts := range byRegion {
-		sort.Slice(opts, func(i, j int) bool { return opts[i].Label < opts[j].Label })
+		sort.Slice(opts, func(i, j int) bool {
+			a, b := opts[i], opts[j]
+			if a.hasOffset != b.hasOffset {
+				return a.hasOffset
+			}
+			if a.offset != b.offset {
+				return a.offset < b.offset
+			}
+			return a.Label < b.Label
+		})
 		groups = append(groups, TimezoneGroup{Region: region, Options: opts})
 	}
 	sort.Slice(groups, func(i, j int) bool { return groups[i].Region < groups[j].Region })

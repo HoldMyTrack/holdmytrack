@@ -44,18 +44,39 @@
 
       <label class="settings__section">
         <span class="settings__label">{{t "settings.country"}}</span>
-        <select class="settings__input" name="country" required>
+        <select class="settings__input" name="country" required data-search-picker data-search-label="{{t "settings.country_search"}}" data-no-matches="{{t "settings.country_no_matches" "query" "{query}"}}">
           <option value="" {{if eq .Country ""}}selected{{end}} disabled>{{t "settings.country_choose"}}</option>
-          {{$country := .Country}}{{range .Countries}}<option value="{{.Code}}" {{if eq .Code $country}}selected{{end}}>{{.Name}}</option>{{end}}
+          {{$country := .Country}}{{range .Countries}}<option value="{{.Code}}" data-detail="{{.Code}}" data-exact="{{.Code}}" {{if eq .Code $country}}selected{{end}}>{{.Name}}</option>{{end}}
         </select>
         <span class="settings__hint">{{if eq .Country ""}}{{t "settings.required"}} {{end}}{{t "settings.country_hint"}}</span>
       </label>
 
       <label class="settings__section">
         <span class="settings__label">{{t "settings.timezone"}}</span>
-        <select class="settings__input" name="timezone" required>
-          {{$tz := .Timezone}}{{range .Timezones}}<optgroup label="{{t (printf "tz.region.%s" .Region)}}">{{range .Options}}<option value="{{.ID}}" {{if eq .ID $tz}}selected{{end}}>{{.Label}}</option>{{end}}</optgroup>{{end}}
+        <select class="settings__input" name="timezone" id="timezone" required data-search-picker data-search-label="{{t "settings.timezone_search"}}" data-no-matches="{{t "settings.timezone_no_matches" "query" "{query}"}}">
+          {{$tz := .Timezone}}{{range .Timezones}}<optgroup label="{{t (printf "tz.region.%s" .Region)}}">{{range .Options}}<option value="{{.ID}}" data-keywords="{{.ID}}" {{if eq .ID $tz}}selected{{end}}>{{.Label}}</option>{{end}}</optgroup>{{end}}
         </select>
+        {{/* Rendered for the saved zone; the script re-renders it for whichever zone is picked,
+             and once a minute, in the same shape as web.LocalTime. */}}
+        <span class="settings__local-time" id="timezone-local-time" data-template="{{t "settings.timezone_local_time" "time" "{time}"}}" {{if not .LocalTime}}hidden{{end}}>{{with .LocalTime}}{{t "settings.timezone_local_time" "time" .}}{{end}}</span>
+        <script>
+          (function () {
+            var select = document.getElementById('timezone');
+            var out = document.getElementById('timezone-local-time');
+            function render() {
+              try {
+                var time = new Intl.DateTimeFormat(document.documentElement.lang || undefined, { timeZone: select.value, month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date());
+                out.textContent = out.dataset.template.replace('{time}', time);
+                out.hidden = false;
+              } catch (e) {
+                out.hidden = true;
+              }
+            }
+            select.addEventListener('change', render);
+            render();
+            setInterval(render, 30000);
+          })();
+        </script>
         <span class="settings__hint">{{t "settings.timezone_hint"}}</span>
       </label>
 
@@ -85,6 +106,7 @@
     </span>
     <p class="settings__hint">{{t "settings.theme_hint"}}</p>
   </section>
+  <script src="{{asset "search-picker.js"}}" defer></script>
   <script src="{{asset "theme.js"}}" defer></script>
 </main>
 {{end}}{{end}}

@@ -31,6 +31,9 @@ type settingsForm struct {
 	Countries []web.Country
 	Timezones []web.TimezoneGroup
 	Languages []web.Country
+	// LocalTime is the current date and time in Timezone, shown under the field ("" when it
+	// can't be computed); the page's script keeps it current as the selection changes.
+	LocalTime string
 	// Error belongs to the Name/Country/Timezone/Language form, AvatarError to the avatar's;
 	// Notice is a PRG confirmation (?saved, ?avatar, ?avatar-removed).
 	Error       string
@@ -61,7 +64,9 @@ func (s *Server) renderSettings(w http.ResponseWriter, r *http.Request, status i
 	lang := pageLang(acct, r)
 	l := i18n.Get(lang)
 	form.Countries = web.CountriesIn(lang)
-	form.Timezones = web.TimezoneGroups(time.Now(), form.Timezone)
+	now := time.Now()
+	form.Timezones = web.TimezoneGroups(now, form.Timezone)
+	form.LocalTime = web.LocalTime(l, now, web.CurrentTimezoneName(form.Timezone))
 	for _, code := range i18n.Supported {
 		form.Languages = append(form.Languages, web.Country{Code: code, Name: i18n.Names[code]})
 	}
