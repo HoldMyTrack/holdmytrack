@@ -365,6 +365,8 @@ export interface Activity {
   pending: boolean;
   /** The track carries a user edit, so "Reset to original track" has something to undo. */
   edited: boolean;
+  /** The Stories it's in, newest first — the Activities panel's Story badge. */
+  stories: { id: string; name: string }[];
 }
 
 /** GeoJSON bbox ordering, which is also what MapLibre's fitBounds takes as a flat array. */
@@ -390,6 +392,7 @@ interface ActivityRowBody {
   bbox: number[] | null;
   pending: boolean;
   edited: boolean;
+  stories: { id: string; name: string }[];
 }
 
 interface ActivitiesBody {
@@ -420,6 +423,7 @@ function toActivity(a: ActivityRowBody): Activity {
     bbox: a.bbox && a.bbox.length === 4 ? ([...a.bbox] as BBox) : null,
     pending: a.pending,
     edited: a.edited,
+    stories: a.stories ?? [],
   };
 }
 

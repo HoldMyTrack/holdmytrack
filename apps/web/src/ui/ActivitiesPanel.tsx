@@ -186,6 +186,7 @@ export interface ActivitiesPanelProps {
 export type PanelTab = 'activities' | 'sync' | 'private';
 
 export interface StoryView {
+  id: string;
   /** null while it loads, and when it couldn't be (`error`). */
   story: Story | null;
   error: string | null;
@@ -793,6 +794,9 @@ export function ActivitiesPanel({
               const isHovered = hoveredId === activity.id;
               const isHidden = hiddenIds.has(activity.id);
               const isPending = activity.pending;
+              // The Stories it's in, but not the one on screen: in a Story view every row is in
+              // that one, so only its other Stories are worth a badge.
+              const otherStories = activity.stories.filter((s) => s.id !== storyView?.id);
               // A user-entered name (§4.7's revised decision) leads; started_at is the fallback
               // for a row that has none — never the reverse, so an activity's date doesn't
               // disappear from the list just because it also has a name (shown in the meta line
@@ -851,10 +855,20 @@ export function ActivitiesPanel({
                       {formatActivityType(activity.activityType)}
                     </span>
                   </button>
-                  {(isPending || isHidden) && (
+                  {(isPending || isHidden || otherStories.length > 0) && (
                     // One right-aligned group, so the badges share one right edge whatever the
                     // text beside them does, and a row that's both stacks them there together.
                     <span className="activities-panel__badges">
+                      {otherStories.length > 0 && (
+                        <span
+                          className="activities-panel__hidden-badge activities-panel__story-badge"
+                          title={tn(storyView ? 'activities.in_other_stories' : 'activities.in_stories', otherStories.length, {
+                            names: otherStories.map((s) => s.name).join(', '),
+                          })}
+                        >
+                          {tn('activities.story_badge', otherStories.length)}
+                        </span>
+                      )}
                       {isPending && (
                         <span className="activities-panel__hidden-badge" title={t('activities.pending_title')}>
                           {t('activities.pending')}

@@ -79,6 +79,14 @@ func parseStoryParam(q url.Values) (*string, error) {
 	return &v, nil
 }
 
+// activityStoriesColumn is the Stories an activity is in (§4.23), newest first, as a JSON array
+// of {id, name} — one indexed lookup per row (idx_story_activities_activity). A Story only ever
+// holds its owner's activities, so it needs no user filter of its own.
+const activityStoriesColumn = `COALESCE((
+         SELECT json_agg(json_build_object('id', s.id, 'name', s.name) ORDER BY s.created_at DESC, s.id DESC)
+         FROM story_activities sa JOIN stories s ON s.id = sa.story_id
+         WHERE sa.activity_id = activities.id), '[]'::json)`
+
 // listActivitiesQuery is §4.7's list, with §4.3's "$n IS NULL OR ..." optional-filter
 // treatment. No pagination: the client that used to page through this (ActivitiesPanel)
 // renders every matching row on the map and computes stats and type/distance facets across
@@ -97,7 +105,8 @@ func parseStoryParam(q url.Values) (*string, error) {
 const listActivitiesQuery = `
 SELECT id, started_at, activity_type, name, distance_meters, duration_seconds, description,
        ST_XMin(trajectory), ST_YMin(trajectory), ST_XMax(trajectory), ST_YMax(trajectory),
-       edit_pending, track_edit IS NOT NULL
+       edit_pending, track_edit IS NOT NULL,
+       ` + activityStoriesColumn + `
 FROM activities
 WHERE user_id = $1
   AND superseded_by IS NULL
@@ -140,6 +149,14 @@ type activityRow struct {
 	// a user edit, which is what makes "Reset to original track" meaningful.
 	Pending bool `json:"pending"`
 	Edited  bool `json:"edited"`
+	// Stories are the Stories it's in, newest first — the Activities panel's Story badge.
+	Stories []storyRef `json:"stories"`
+}
+
+// storyRef names a Story an activity is in.
+type storyRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 // rowScanner is the common surface of pgx.Row (QueryRow) and pgx.Rows (Query's iteration) —
@@ -156,7 +173,7 @@ func scanActivityRow(row rowScanner) (activityRow, error) {
 	// either has a trajectory or doesn't, but pgx has no reason to know that.
 	var minLon, minLat, maxLon, maxLat *float64
 	if err := row.Scan(&a.ID, &a.StartedAt, &a.ActivityType, &a.Name, &a.DistanceMeters, &a.DurationSeconds, &a.Description,
-		&minLon, &minLat, &maxLon, &maxLat, &a.Pending, &a.Edited); err != nil {
+		&minLon, &minLat, &maxLon, &maxLat, &a.Pending, &a.Edited, &a.Stories); err != nil {
 		return activityRow{}, err
 	}
 	if minLon != nil && minLat != nil && maxLon != nil && maxLat != nil {
@@ -230,7 +247,8 @@ const maxActivityNameLen = 200
 const activityByIDQuery = `
 SELECT id, started_at, activity_type, name, distance_meters, duration_seconds, description,
        ST_XMin(trajectory), ST_YMin(trajectory), ST_XMax(trajectory), ST_YMax(trajectory),
-       edit_pending, track_edit IS NOT NULL
+       edit_pending, track_edit IS NOT NULL,
+       ` + activityStoriesColumn + `
 FROM activities
 WHERE id = $1 AND user_id = $2`
 

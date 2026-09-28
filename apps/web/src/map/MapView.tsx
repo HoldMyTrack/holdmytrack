@@ -949,6 +949,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       storyId === null
         ? null
         : {
+            id: storyId,
             story: storyState.story,
             error: storyState.error,
             onExit: () => exitStory(),

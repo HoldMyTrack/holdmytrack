@@ -589,6 +589,13 @@ body {
   white-space: nowrap;
 }
 
+/* Story sits beside Pending and Hidden, in the accent: it says where an activity belongs, not
+   a state it's in. */
+.activities-panel__story-badge {
+  color: var(--fm-accent);
+  background: rgb(var(--fm-accent-rgb) / 12%);
+}
+
 /* The reverse direction of the hover above: hovering this activity's *track on the map*
    (not the row itself) also underlines the title, via MapView's shared hoveredActivityId
    state rather than a real `:hover` here — the pointer isn't over this row at all. */

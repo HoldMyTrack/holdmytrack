@@ -258,3 +258,36 @@ func TestActivityDeleteLeavesStories(t *testing.T) {
 		t.Errorf("Story left empty: %+v", got)
 	}
 }
+
+// Each row of the activity list names the Stories it's in, newest first — the Activities
+// panel's Story badge — and an activity in none has an empty list, not null.
+func TestActivityListNamesStories(t *testing.T) {
+	d := newDBTest(t)
+	me := d.newAccount(false)
+	inTwo := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60})
+	inNone := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60,
+		startedAt: time.Date(2026, 5, 2, 10, 0, 0, 0, time.UTC)})
+	var older, newer story
+	d.decode(d.do(me, "POST", "/v1/stories", map[string]any{"name": "Older", "activity_ids": []string{inTwo}}), http.StatusCreated, &older)
+	d.decode(d.do(me, "POST", "/v1/stories", map[string]any{"name": "Newer", "activity_ids": []string{inTwo}}), http.StatusCreated, &newer)
+
+	var resp activitiesResponse
+	d.decode(d.do(me, "GET", "/v1/activities", nil), http.StatusOK, &resp)
+	got := map[string][]storyRef{}
+	for _, a := range resp.Activities {
+		got[a.ID] = a.Stories
+	}
+	if want := []storyRef{{newer.ID, "Newer"}, {older.ID, "Older"}}; !slices.Equal(got[inTwo], want) {
+		t.Errorf("stories of the activity in two: %v, want %v", got[inTwo], want)
+	}
+	if s, ok := got[inNone]; !ok || s == nil || len(s) != 0 {
+		t.Errorf("stories of the activity in none: %v (present %v), want []", s, ok)
+	}
+
+	// PATCH answers with the same row.
+	var row activityRow
+	d.decode(d.do(me, "PATCH", "/v1/activities/"+inTwo, map[string]any{"activity_type": "hiking"}), http.StatusOK, &row)
+	if len(row.Stories) != 2 {
+		t.Errorf("PATCH row stories: %v", row.Stories)
+	}
+}
