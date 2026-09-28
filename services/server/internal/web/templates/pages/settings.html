@@ -72,5 +72,19 @@
       <button type="submit" class="settings__submit">{{if .Onboarding}}{{t "settings.save_continue"}}{{else}}{{t "settings.save"}}{{end}}</button>
     </fieldset>
   </form>
+
+  {{/* Not part of the form above: the theme belongs to this browser, not the account, so a
+       click applies it at once (static/theme.js) and a demo session can use it too. Hidden
+       until that script shows it, since without it the buttons would do nothing. */}}
+  <section class="settings__section settings__theme" aria-labelledby="settings-theme" data-theme-control hidden>
+    <h2 class="settings__label" id="settings-theme">{{t "settings.theme"}}</h2>
+    <span class="theme-toggle" role="group" aria-labelledby="settings-theme">
+      <button type="button" class="theme-toggle__btn" data-theme-choice="system" aria-pressed="false">{{t "settings.theme_system"}}</button>
+      <button type="button" class="theme-toggle__btn" data-theme-choice="light" aria-pressed="false">{{t "settings.theme_light"}}</button>
+      <button type="button" class="theme-toggle__btn" data-theme-choice="dark" aria-pressed="false">{{t "settings.theme_dark"}}</button>
+    </span>
+    <p class="settings__hint">{{t "settings.theme_hint"}}</p>
+  </section>
+  <script src="{{asset "theme.js"}}" defer></script>
 </main>
 {{end}}{{end}}
