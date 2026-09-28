@@ -70,6 +70,26 @@ Steps:
 - [ ] English and Russian strings (ADR-0014).
 - [ ] `SPEC.md` FR-14 and `IMPLEMENTATION.md` §3.19 and §4.23 as each piece lands; drop Stories from `SPEC.md` §1.2 and §18's not-yet-built lists.
 
+### Spots — planned
+
+Outdoor places from OpenStreetMap on the map — Playground, Dog park, Monument, Mesmerizing view and History — behind one "Show POI" toggle, each marked visited once one of the user's activities spends five minutes inside it (`VISION.md` §1.1, §4.2, [ADR-0021](adr/0021-spots-from-osm-visits-from-tracks.md) for why OSM in bulk, why a five-minute stay, and why no live location). Web first; Android follows on the same tiles (`apps/android/docs/ROADMAP.md`). Design, to be written up in `IMPLEMENTATION.md` as it's built:
+
+- **Schema** — `spots` (`id`, `category`, `name`, `address` nullable, `geom` a polygon, `osm_type`, `osm_id`, with a GiST index) and `spot_visits` (`user_id`, `spot_id`, `activity_id`, `visited_at`, `dwell_seconds`; cascading from `spots` and from `activities`, so deleting an activity takes its visits with it). Several million places, roughly 1 GB.
+- **Import, once** — an `import-spots <file>` CLI subcommand, like `seed-demo-customer`, reading an extract made off-box with `osmium tags-filter` over the planet file for the five categories' tags (the 1 vCPU / 2 GB server can't filter the planet itself). A place's area is its OSM outline, or a 50 m circle around a point; its address is built from its `addr:*` tags when it has them. The import then queues one backfill job that matches every existing activity.
+- **Matching** — in the ingest job and every reprocess (`IMPLEMENTATION.md` §4.1; track edits and Private-location changes): `ST_Intersects(trajectory, spots.geom)` finds candidate places, and the time between consecutive stream points inside each one is summed; five minutes or more writes a visit. A reprocess replaces that activity's visits. The points are already clipped by Private locations, so a place inside one is never visited.
+- **Tiles** — `/tiles/v1/spots/{z}/{x}/{y}.mvt`, served from zoom 14 up, with a per-user `visited` flag: the user comes from the session, never a parameter, and the tiles are cached by the account's tile version (`IMPLEMENTATION.md` §4.2.6), which processing an activity already bumps.
+- **Map** — a "Show POI" toggle, the same in Normal, Fog of War and Heatmap, remembered per browser: a category icon for a place not yet visited, a filled one for a visited place. Clicking one opens a popup with its name, category and visited state, **Copy address** (the address, or its coordinates when OSM has none) and **Navigate** (an external navigator at its coordinates — Google Maps on the web). A demo account sees places and its own visits like any other.
+
+Steps:
+
+- [ ] Schema and `import-spots`, with the off-box extract recipe written into `docs/DEPLOY.md`.
+- [ ] Five-minute matching in ingest and reprocess, and the backfill job, with tests for a stay just under and just over five minutes, a drive past, a point-mapped place's 50 m circle, and a place inside a Private location.
+- [ ] The spots tiles endpoint.
+- [ ] The "Show POI" toggle and the category and visited icons on the web map.
+- [ ] The popup, with Copy address and Navigate.
+- [ ] English and Russian strings (ADR-0014).
+- [ ] `SPEC.md` FR-15 and the matching `IMPLEMENTATION.md` sections as each piece lands; drop Spots from `SPEC.md` §1.2 and §18's not-yet-built lists.
+
 ---
 
 ## Phase 2 — Mobile

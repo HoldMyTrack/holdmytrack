@@ -22,6 +22,8 @@ Worth stating early, because the shorthand for this product is "a free Strava" a
 
 What is left is an aggregator and a map for exploring where you've been — not an analytics platform and not a coach. That is a smaller product than Strava and a more defensible one: it competes on the axis Strava is weakest on rather than the axis where Strava has a decade of network effects.
 
+**One forward-looking exception: Spots.** Everything above looks back at where someone has been. Spots (§4.2) also suggests where to go next — a playground, a dog park, a viewpoint — and that is deliberately as far as discovery goes: outdoor places from OpenStreetMap only, not a "things to do" app, with no venues, reviews, ratings or check-ins. Whether a place has been visited comes from tracks the user already has, never from live tracking, so HoldMyTrack still begins where the recording ends.
+
 ---
 
 ## 2. Company Description & Vision
@@ -36,6 +38,7 @@ To let athletes, runners, cyclists and explorers see and keep the shape of where
 * **Bring everything** — one place for data scattered across a watch, a cloud service and a folder of old exports.
 * **Exploration insight** — how much ground you've covered this year versus last, how well a neighborhood is explored, and where you go most.
 * **Gamified exploration** — "Fog of War" turns routine training into map discovery.
+* **Find somewhere to go** — playgrounds, dog parks, monuments, viewpoints and historic sites on the map, and which of them your history already covers.
 * **Remember the trip** — group the activities of a hike, a holiday or an event into a Story with its own map and totals.
 * **Beautiful by default** — render quality is the differentiator, not feature count.
 * **Manual data manipulation** — stored data can be created, updated or deleted manually.
@@ -148,6 +151,7 @@ This isn't a resilience decision the way Paths 1–3 are — §4.1's provider-in
 | **Visual Map Engine** | Interactive renderer with custom styles | Fog of War, heatmap and track/normal modes (`IMPLEMENTATION.md` §4.2, §4.2.2); curated themes; smooth (non-hexagonal) fog edges |
 | **Per-activity detail** | Pace as route context, not a coaching product | The selected activity's route colored by pace (`IMPLEMENTATION.md` §4.3.1) |
 | **Stories** | Keep a trip as one thing | Hand-picked sets of activities, each with a name, a description, joint stats (count, distance, time, a per-type breakdown) and its own map view; an activity can belong to any number of them |
+| **Spots** | Where to go next, and where you already have been | Outdoor places from OpenStreetMap in five categories (Playground, Dog park, Monument, Mesmerizing view, History) behind one "Show POI" map toggle; a spot counts as visited after five minutes inside it on any activity; Copy address and Navigate in an external navigator |
 | **Activity graph** | Private, single-player motivation | A GitHub-style daily contribution grid, year by year, shadeable by count or distance (`IMPLEMENTATION.md` §4.8) |
 | **Distance & coverage trends** | See how much ground you've covered this period vs last | Weekly/monthly distance, moving-time and elevation trends |
 | **Filtering** | Slice the history | Activity type, date range, geographic bounding box, source |
@@ -160,6 +164,8 @@ This isn't a resilience decision the way Paths 1–3 are — §4.1's provider-in
 
 **Stories are for remembering a trip, and the user decides what belongs in one.** A multi-day hike, a holiday or a race weekend is several activities spread over several days, sometimes with a drive at each end, and after the fact it disappears into the rest of the history. A Story keeps it as one thing: a name, a description, its joint totals, and a map that shows only its own tracks. Its activities are hand-picked rather than matched by a date span or a rule, because only the person who went knows which drive was part of the trip and which was the commute that week. Stories are private, like the activity graph: a way of keeping your own memories, not a profile or a feed. Sharing one means exporting an image of its map (`IMPLEMENTATION.md` §4.3.3); a link that opens a story for someone else is a §5.7 decision, for the same reason as above. A story view draws tracks only: Fog of War and Heatmap stay all-time, since a fog pyramid per story is a per-user storage cost that grows with every story made (§4.3). See ADR-0020.
 
+**Spots are OpenStreetMap's places, and a visit is five minutes spent inside one.** The places come from a bulk import of OSM, not a curated list: hand-picking places for the whole planet, or moderating users' suggestions, is staff time, and §6.3 names one maintainer's time as the model's main risk. Only categories OSM tags cleanly are imported — `leisure=playground`, `leisure=dog_park`, `historic=monument`/`memorial`, `tourism=viewpoint`, and `historic=castle`/`ruins`/`fort`/`archaeological_site` for History — because a looser tag ("architecture", any `historic=*`) buries the map in boundary stones and plaques. A visit is worked out from the user's own tracks, from whichever source, with no GPS running in the background and no "are you here?" prompt: an activity whose points add up to five minutes inside a spot's area (its OSM outline, or a 50 m circle around a point) visits it. Five minutes, not a touch, so driving past a monument or clipping a park's corner doesn't count — and because it's computed from history, the whole back catalogue lights up the day the places arrive. Spots are one map layer with one toggle, the same in every mode, showing visited and unvisited places alike; they don't change the fog, which stays a record of where the tracks went. See ADR-0021.
+
 ### 4.3 Cost Model — running a free service
 
 The critical section for a product with no revenue. Costs must be *bounded by design*, not managed after the fact.
@@ -170,6 +176,7 @@ The critical section for a product with no revenue. Costs must be *bounded by de
 | Basemap tile reads | **Usage** | Every tile read is a billed Class B GET. The one basemap cost that grows; a CDN in front is what keeps it flat |
 | Activity storage | **Users × history** | Per-point streams are the bulk. Grows monotonically and never shrinks on its own |
 | Fog raster storage | **Users** | A few MB per user; cheap, but per-user and permanent |
+| Spots | Fixed | Several million OSM places, roughly 1 GB in Postgres; matching them is one indexed query per activity processed |
 | Compute | Users | One application server + Postgres/PostGIS to start |
 | Garmin licence | Fixed, if applicable | §4.1. The only line that could be large, fixed, and unavoidable |
 | Compliance | Fixed | DPA/DPIA work, EU-region hosting (§7) |
@@ -215,6 +222,7 @@ Sequenced so the unconditional ingest path ships first and the ones that depend 
 * A private activity graph once an account exists — a GitHub-style daily contribution grid shadeable by count or distance, plus active-days and longest-streak stat cards (`IMPLEMENTATION.md` §4.8). The grid itself reuses `IMPLEMENTATION.md` §4.7's histogram query; the streak and active-day stats are small new aggregate queries of their own.
 * Free high-resolution export — a framed image of the current map, unwatermarked, rendered in the browser.
 * Stories — hand-picked, private sets of activities with their own totals and map view, for keeping a trip or an event as one thing (§4.2). A web feature first; Android follows on the same API.
+* Spots — outdoor places from OpenStreetMap behind one map toggle, visited once an activity spends five minutes inside one (§4.2). A web feature first; Android follows on the same tiles.
 
 ### 5.3 Phase 2: Mobile
 * Android app — Health Connect. Samsung Galaxy Watch sync is unsupported (Samsung never exposes route geometry, and HoldMyTrack only ingests activities that have one). Built first of the pair regardless, so the Path 2 sync contract is designed against the more constrained platform.
@@ -279,6 +287,8 @@ Non-negotiable. A Fog of War map is a precise map of where a person lives — th
 * **Legal basis** — HoldMyTrack processes no health data (§1.1): heart rate or other body data that happens to sit inside an original upload stays in that file and is never read out of it. A precise location history is sensitive personal data regardless: explicit consent, a DPIA before launch, a documented retention policy, working export and deletion, EU-region hosting for EU users. **Being free changes none of this.** There is no small-project exemption, and the compliance burden is one of the few fixed costs a donation model has to carry regardless of scale.
 * **Deauthorization deletion** — Garmin, Wahoo and COROS require deletion of synced data when a user disconnects. Build it with the first connector, not after.
 * **Health Connect declarations** — Android health data types must be declared in the Play Console with justified use. Requesting more types than the product demonstrably uses is a known rejection cause. HoldMyTrack requests exercise sessions and their routes (plus the history window over them) and no health measurement at all.
+* **Spot visits are private** — derived from tracks after Private locations have clipped them, so a playground inside one is never marked visited, and visible only to the account itself.
+* **OpenStreetMap's licence** — Spots is an unmodified OSM extract: the map already credits OSM contributors, and the data stays available under the ODbL by pointing to OSM itself.
 * **No data sales, ever, stated in the privacy policy.** For a free product this is the question every user will ask, and the answer needs to be a written commitment rather than a reassuring tone.
 
 ---
