@@ -41,15 +41,15 @@
       "type": "driving"
     },
     "2026-09-27 Clague Park-2.gpx": {
-      "name": "Clague Park",
+      "name": "Clague Park walk",
       "type": "walking"
     },
     "2026-09-27 Clague Park-3.gpx": {
-      "name": "Clague Park",
+      "name": "Clague Park – homeward drive",
       "type": "driving"
     },
     "2026-09-27 Clague Park.gpx": {
-      "name": "Clague Park",
+      "name": "Clague Park – outbound drive",
       "type": "driving"
     }
   },
@@ -65,7 +65,7 @@
     },
     {
       "name": "Emerald Necklace Trail",
-      "description": "I decided to ride over the whole trail from start to finish.",
+      "description": "I decided to ride the whole trail from start to finish.",
       "activities": [
         "2026-07-01 Emerald Necklace Trail.gpx"
       ]
