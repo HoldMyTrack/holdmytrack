@@ -38,10 +38,10 @@ const CLICK_TOLERANCE_PX = 4;
 // box above missed a track under the finger most of the time — and a miss clears the focus.
 const TAP_TOLERANCE_PX = 14;
 
-/** Only `from`/`to` — `types` stays a client-side-only filter (activityFacets.ts,
+/** `from`/`to` and a Story (FR-14.4) — `types` stays a client-side-only filter (activityFacets.ts,
  *  setHiddenTracks below), matching DISTANCE, which has no server-side equivalent at all;
  *  keeping both narrowed the same way is simpler than half server-side, half client-side. */
-type TrackDateRange = Pick<ActivityQuery, 'from' | 'to'>;
+type TrackDateRange = Pick<ActivityQuery, 'from' | 'to' | 'story'>;
 
 /**
  * Bumped by every refreshTrackLayer, and sent as `v` (the handler ignores it) so each refresh
@@ -65,6 +65,7 @@ function trackTileURL(range: TrackDateRange): string {
   const params = new URLSearchParams();
   if (range.from) params.set('from', range.from);
   if (range.to) params.set('to', range.to);
+  if (range.story) params.set('story', range.story);
   if (getTileVersion()) params.set('cv', getTileVersion());
   if (tracksVersion > 0) params.set('v', String(tracksVersion));
   const qs = params.toString();

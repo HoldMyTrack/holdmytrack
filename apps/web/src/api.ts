@@ -375,6 +375,8 @@ export interface ActivityQuery {
   from?: string;
   to?: string;
   types?: string[];
+  /** One Story's activities only (`SPEC.md` FR-14.4). */
+  story?: string;
 }
 
 interface ActivityRowBody {
@@ -399,6 +401,7 @@ function activityQueryString(query: ActivityQuery): string {
   if (query.from) params.set('from', query.from);
   if (query.to) params.set('to', query.to);
   if (query.types?.length) params.set('types', query.types.join(','));
+  if (query.story) params.set('story', query.story);
   const qs = params.toString();
   return qs ? `?${qs}` : '';
 }
@@ -617,13 +620,16 @@ export interface DayPageQuery {
   limit: number;
   /** Return the `limit` most recent days strictly before this one; omit for the newest. */
   before?: string;
+  /** One Story's days only, `earliest` its first (`SPEC.md` FR-14.4). */
+  story?: string;
 }
 
 /**
  * `GET /v1/activities/histogram?days=&before=` — §4.7's activity-day pagination mode.
  *
  * Never takes the type/distance filter: this is the whole timeline a selected sub-range is
- * highlighted against, not a view of the current one. It pages by *days that have activity*
+ * highlighted against, not a view of the current one — except `story`: inside a Story, the
+ * Story is the whole timeline (FR-14.4). It pages by *days that have activity*
  * rather than by calendar window because that is what the strip draws — one bar per such
  * day, packed — so a page is exactly `limit` bars however sparse the underlying history is.
  * The endpoint's other mode (`from`/`to`, a real calendar window) has no reader here; §4.8's
@@ -632,6 +638,7 @@ export interface DayPageQuery {
 export async function getActivityDayPage(query: DayPageQuery, signal?: AbortSignal): Promise<ActivityDayPage> {
   const params = new URLSearchParams({ days: String(query.limit) });
   if (query.before) params.set('before', query.before);
+  if (query.story) params.set('story', query.story);
   const res = await fetch(`${API_BASE_URL}${API_V1}/activities/histogram?${params.toString()}`, {
     ...(signal ? { signal } : {}),
     credentials: 'include',
@@ -869,6 +876,51 @@ function toStory(body: StoryBody): Story {
  *  400 does. */
 export const STORY_MAX_NAME_LEN = 200;
 export const STORY_MAX_DESCRIPTION_LEN = 2000;
+
+/** Thrown by `getStory` for a Story that doesn't exist or isn't this account's — the two are
+ *  one `404` on purpose (`SPEC.md` FR-14.5). */
+export class StoryNotFoundError extends Error {}
+
+/** `GET /v1/stories/{id}`. */
+export async function getStory(id: string, signal?: AbortSignal): Promise<Story> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/stories/${encodeURIComponent(id)}`, {
+    ...(signal ? { signal } : {}),
+    credentials: 'include',
+  });
+  if (res.status === 404) throw new StoryNotFoundError(t('stories.not_found'));
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
+  }
+  return toStory((await res.json()) as StoryBody);
+}
+
+/** `PATCH /v1/stories/{id}` — name and description, both every time. */
+export async function updateStory(id: string, input: { name: string; description: string }): Promise<Story> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/stories/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ name: input.name, description: input.description }),
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
+  }
+  return toStory((await res.json()) as StoryBody);
+}
+
+/** `DELETE /v1/stories/{id}/activities` — takes them out of the Story; the activities stay. */
+export async function removeStoryActivities(id: string, activityIds: string[]): Promise<Story> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/stories/${encodeURIComponent(id)}/activities`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ activity_ids: activityIds }),
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
+  }
+  return toStory((await res.json()) as StoryBody);
+}
 
 /** `POST /v1/stories` — a new Story holding `activityIds` from the start, in one request. */
 export async function createStory(input: { name: string; description: string; activityIds: string[] }): Promise<Story> {
