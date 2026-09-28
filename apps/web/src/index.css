@@ -1547,6 +1547,40 @@ body {
   color: rgb(var(--fm-ink-rgb) / 60%);
 }
 
+/* EditStoriesTab.tsx — one row per Story: its checkbox, its name, how many activities it holds. */
+.edit-stories {
+  display: flex;
+  flex-direction: column;
+  max-height: 16rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.edit-stories__row {
+  display: flex;
+  align-items: center;
+  gap: var(--fm-space-10);
+  padding: var(--fm-space-6) 0;
+  font-size: var(--fm-text-md);
+  cursor: pointer;
+}
+
+.edit-stories__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edit-stories__count {
+  flex: none;
+  font-size: var(--fm-text-sm);
+  color: rgb(var(--fm-ink-rgb) / 55%);
+}
+
 .edit-track__error {
   margin: 0;
   font-size: var(--fm-text-sm);

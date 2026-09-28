@@ -28,7 +28,7 @@ import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
 import { ActivitiesPanel, type PanelTab, type StoryView } from '../ui/ActivitiesPanel';
 import { ActivityHistogram } from '../ui/ActivityHistogram';
-import { EditActivityWindow } from '../ui/EditActivityWindow';
+import { EditActivityWindow, type EditWindowResult } from '../ui/EditActivityWindow';
 import { ExportControl } from '../ui/ExportControl';
 import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
 import { dayDiff, dayInZone, todayLocal } from '../ui/dateMath';
@@ -972,7 +972,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // enough on its own.
   const awaitingEditIdsRef = useRef<Set<string>>(new Set());
   const closeEditWindow = useCallback(
-    ({ saved, trackApplied }: { saved: boolean; trackApplied: boolean }) => {
+    ({ saved, trackApplied, storiesChanged }: EditWindowResult) => {
       if (trackApplied && editingActivityId !== null) awaitingEditIdsRef.current.add(editingActivityId);
       setEditWindowIds(null);
       setEditingActivityId(null);
@@ -982,8 +982,15 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
         // A new type moves an activity between the Story's per-type rows.
         storyState.reload();
       }
+      // The Stories tab may have taken an activity out of (or put one into) the Story on
+      // screen: its tracks, totals and bars follow, as after Remove from story.
+      if (storiesChanged && storyId !== null) {
+        if (map) refreshTrackLayer(map, activityQuery);
+        reloadTotals();
+        reloadHistogram();
+      }
     },
-    [editingActivityId, reloadActivities, storyState.reload],
+    [editingActivityId, reloadActivities, storyState.reload, storyId, map, activityQuery, reloadTotals, reloadHistogram],
   );
   // A saved or deleted Private location reprocesses every activity it could clip. The list
   // reload shows those rows Pending right away, and the Pending poll below refreshes the map

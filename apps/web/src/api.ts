@@ -908,6 +908,32 @@ export async function updateStory(id: string, input: { name: string; description
   return toStory((await res.json()) as StoryBody);
 }
 
+/** `GET /v1/stories` — every Story of the account, newest first. */
+export async function listStories(signal?: AbortSignal): Promise<Story[]> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/stories`, {
+    ...(signal ? { signal } : {}),
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
+  }
+  return ((await res.json()) as { stories: StoryBody[] }).stories.map(toStory);
+}
+
+/** `POST /v1/stories/{id}/activities` — puts them in the Story; any already there stay as they are. */
+export async function addStoryActivities(id: string, activityIds: string[]): Promise<Story> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/stories/${encodeURIComponent(id)}/activities`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ activity_ids: activityIds }),
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
+  }
+  return toStory((await res.json()) as StoryBody);
+}
+
 /** `DELETE /v1/stories/{id}/activities` — takes them out of the Story; the activities stay. */
 export async function removeStoryActivities(id: string, activityIds: string[]): Promise<Story> {
   const res = await fetch(`${API_BASE_URL}${API_V1}/stories/${encodeURIComponent(id)}/activities`, {
