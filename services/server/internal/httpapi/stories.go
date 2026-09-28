@@ -9,11 +9,18 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
 )
 
 // Stories (IMPLEMENTATION.md §4.23, ADR-0020) — hand-picked, private sets of activities, each
 // with a name, a description and joint statistics. Stored in stories and story_activities
 // (§3.19). Another account's Story answers exactly like a missing one, `404`, on every route.
+//
+// Every change to which activities a Story holds bumps the account's tile version
+// (fog.BumpMapVersion, §4.2.6) in the same transaction: the tracks tiles take a `story`
+// filter, so a cached `?story=` tile would otherwise keep showing the old membership. A
+// rename or a new description changes no tile and doesn't bump.
 
 const (
 	maxStoryNameLen        = 200
@@ -186,10 +193,15 @@ func (s *Server) handleCreateStory(w http.ResponseWriter, r *http.Request) {
 		`, userID, req.Name, req.Description).Scan(&id); err != nil {
 			return err
 		}
-		if _, err := addStoryActivities(r.Context(), tx, userID, id, ids); err != nil {
+		added, err := addStoryActivities(r.Context(), tx, userID, id, ids)
+		if err != nil {
 			return err
 		}
-		var err error
+		if added {
+			if err := fog.BumpMapVersion(r.Context(), tx, userID); err != nil {
+				return err
+			}
+		}
 		created, err = s.loadStory(r.Context(), tx, userID, id)
 		return err
 	})
@@ -240,11 +252,25 @@ func (s *Server) handleDeleteStory(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	tag, err := s.pool.Exec(r.Context(), `DELETE FROM stories WHERE id = $1 AND user_id = $2`,
-		id, userIDFromContext(r.Context()))
-	if err == nil && tag.RowsAffected() == 0 {
-		err = errStoryNotFound
-	}
+	userID := userIDFromContext(r.Context())
+	err := s.inTx(r.Context(), func(tx pgx.Tx) error {
+		// RETURNING reads the statement's own snapshot, before the cascade removes the
+		// memberships, so it says whether the Story held anything.
+		var hadActivities bool
+		if err := tx.QueryRow(r.Context(), `
+			DELETE FROM stories WHERE id = $1 AND user_id = $2
+			RETURNING EXISTS (SELECT 1 FROM story_activities WHERE story_id = $1)
+		`, id, userID).Scan(&hadActivities); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return errStoryNotFound
+			}
+			return err
+		}
+		if hadActivities {
+			return fog.BumpMapVersion(r.Context(), tx, userID)
+		}
+		return nil
+	})
 	if s.writeStoryError(w, err) {
 		return
 	}
@@ -270,8 +296,8 @@ func (s *Server) handleRemoveStoryActivities(w http.ResponseWriter, r *http.Requ
 }
 
 // changeStoryActivities is the two membership routes' shared shape: lock the caller's Story
-// (a 404 when it isn't theirs), apply change, and bump updated_at when change reports that
-// the membership actually changed.
+// (a 404 when it isn't theirs), apply change, and bump updated_at and the tile version when
+// change reports that the membership actually changed.
 func (s *Server) changeStoryActivities(w http.ResponseWriter, r *http.Request,
 	change func(ctx context.Context, tx pgx.Tx, userID, storyID string, ids []string) (bool, error)) {
 	storyID, ok := storyIDFromPath(w, r)
@@ -306,6 +332,9 @@ func (s *Server) changeStoryActivities(w http.ResponseWriter, r *http.Request,
 		}
 		if changed {
 			if _, err := tx.Exec(ctx, `UPDATE stories SET updated_at = NOW() WHERE id = $1`, storyID); err != nil {
+				return err
+			}
+			if err := fog.BumpMapVersion(ctx, tx, userID); err != nil {
 				return err
 			}
 		}

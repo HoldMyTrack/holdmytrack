@@ -1029,7 +1029,20 @@ A Story is a hand-picked, private set of the account's activities — a hike, a 
 - `activity_ids` empty, over 10,000 ids, or holding an id that isn't a UUID → `400`.
 - Adding an activity that isn't the account's own → `404`, and none of the request's activities are added.
 
-### FR-14.4 Privacy and the demo
+### FR-14.4 The `story` filter
+
+**Description**: One Story's activities, through the endpoints that already draw and count the account's history.
+
+**Behavior**:
+1. `story=<id>` narrows the activity list (`GET /v1/activities`), its summary (`GET /v1/activities/summary`) and the tracks tiles (`GET /tiles/v1/tracks/{z}/{x}/{y}.mvt`) to the Story's activities, combined with the `from`/`to` and `types` they already take.
+2. It narrows the date-range histogram (`GET /v1/activities/histogram`, both its `days` and its `from`/`to` mode) the same way, and `earliest` becomes the Story's first activity day. The histogram otherwise ignores the list's filters (FR-6); inside a Story, the Story is all there is.
+3. Another account's Story, or an empty one, matches nothing: an empty list, zero totals, no bars, no tracks.
+4. Adding or removing a Story's activities, creating a Story with activities and deleting one that has any all change the account's tile version, so no tile cached before the change is reused for the Story. Renaming doesn't.
+
+**Error cases**:
+- `story` that isn't a UUID → `400`.
+
+### FR-14.5 Privacy and the demo
 
 **Behavior**:
 1. A Story is visible only to its own account. Another account's Story, a Story that doesn't exist and an id that isn't a UUID are all `404` on every endpoint, indistinguishable from each other; the list holds only the account's own Stories.

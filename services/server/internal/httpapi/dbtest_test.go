@@ -113,6 +113,8 @@ type testActivity struct {
 	durationSecs   int
 	startedAt      time.Time
 	supersededBy   string
+	// at, when set, gives the activity a short track starting at this [lon, lat].
+	at *[2]float64
 }
 
 func (d *dbTest) newActivity(owner account, a testActivity) string {
@@ -120,11 +122,17 @@ func (d *dbTest) newActivity(owner account, a testActivity) string {
 	if a.startedAt.IsZero() {
 		a.startedAt = time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
 	}
+	var track *string
+	if a.at != nil {
+		lon, lat, m := a.at[0], a.at[1], a.startedAt.Unix()
+		wkt := fmt.Sprintf("LINESTRINGM(%f %f %d, %f %f %d)", lon, lat, m, lon+0.001, lat+0.001, m+60)
+		track = &wkt
+	}
 	var id string
 	if err := d.pool.QueryRow(context.Background(), `
-		INSERT INTO activities (user_id, source, activity_type, distance_meters, moving_seconds, duration_seconds, started_at, superseded_by)
-		VALUES ($1, 'upload', $2, $3, $4, $5, $6, NULLIF($7, '')::uuid) RETURNING id
-	`, owner.id, a.activityType, a.distanceMeters, a.movingSeconds, a.durationSecs, a.startedAt, a.supersededBy).Scan(&id); err != nil {
+		INSERT INTO activities (user_id, source, activity_type, distance_meters, moving_seconds, duration_seconds, started_at, superseded_by, trajectory)
+		VALUES ($1, 'upload', $2, $3, $4, $5, $6, NULLIF($7, '')::uuid, ST_GeomFromText($8, 4326)) RETURNING id
+	`, owner.id, a.activityType, a.distanceMeters, a.movingSeconds, a.durationSecs, a.startedAt, a.supersededBy, track).Scan(&id); err != nil {
 		d.t.Fatalf("create activity: %v", err)
 	}
 	return id

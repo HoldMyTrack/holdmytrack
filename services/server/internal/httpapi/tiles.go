@@ -7,7 +7,7 @@ import (
 )
 
 // tracksQuery is IMPLEMENTATION.md §4.3 verbatim, with three changes: user_id
-// is the authenticated caller (userIDFromContext — requireAuth, server.go), from/to/types
+// is the authenticated caller (userIDFromContext — requireAuth, server.go), from/to/types/story
 // each become "$n IS NULL OR ..." so an absent query param means "no filter" instead of
 // requiring the caller to pass an explicit wide-open range, and a Pending activity
 // (edit_pending, §4.7.7) is left out — its trajectory is the pre-reprocess one, and it comes
@@ -30,6 +30,7 @@ FROM (
       AND ($5::timestamptz IS NULL OR started_at >= $5)
       AND ($6::timestamptz IS NULL OR started_at <= $6)
       AND ($7::text[] IS NULL OR activity_type = ANY($7))
+      AND ($8::uuid IS NULL OR activities.id IN (SELECT activity_id FROM story_activities WHERE story_id = $8))
 ) t;`
 
 const dateLayout = "2006-01-02"
@@ -51,7 +52,7 @@ func (s *Server) handleTracksTile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The same from/to/types shape §4.7's listing endpoints parse — one parser, so the
+	// The same from/to/types/story shape §4.7's listing endpoints parse — one parser, so the
 	// "absent means no restriction" convention can't drift between the map and the list.
 	filter, err := parseActivityFilter(r.URL.Query(), locationFromContext(r.Context()))
 	if err != nil {
@@ -60,7 +61,7 @@ func (s *Server) handleTracksTile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var tile []byte
-	err = s.pool.QueryRow(r.Context(), tracksQuery, z, x, y, userIDFromContext(r.Context()), filter.From, filter.To, filter.Types).Scan(&tile)
+	err = s.pool.QueryRow(r.Context(), tracksQuery, z, x, y, userIDFromContext(r.Context()), filter.From, filter.To, filter.Types, filter.Story).Scan(&tile)
 	if err != nil {
 		s.log.Error("tracks tile query failed", "err", err, "z", z, "x", x, "y", y)
 		http.Error(w, "internal error", http.StatusInternalServerError)

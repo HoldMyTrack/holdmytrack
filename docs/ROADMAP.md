@@ -61,7 +61,7 @@ A Story is a hand-picked, private set of activities — a hike, a holiday, a rac
 Steps:
 
 - [x] Schema and API, with tests for ownership (`404`), demo read-only, and an activity delete leaving its Stories behind without it.
-- [ ] The `story` filter on the activity list, the tracks tiles and the histogram, and the tile-version bump on a membership change.
+- [x] The `story` filter on the activity list, the tracks tiles and the histogram, and the tile-version bump on a membership change.
 - [ ] A Stories page (`/stories`, server-rendered like `/profile`, ADR-0012) reached from the account menu: every Story with its name, description, statistics and per-type breakdown, View on map and Delete (confirmed, a same-origin form POST); an empty state saying how to make one from the map.
 - [ ] "Create story" in the Activities panel's toolbar, enabled while at least one activity is checked (`SPEC.md` FR-5.6): a name and an optional description, then the new Story opens.
 - [ ] Story view on the map, as above, including the date-range picker scoped to the Story.

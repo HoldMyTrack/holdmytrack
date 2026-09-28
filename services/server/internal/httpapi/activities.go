@@ -16,14 +16,18 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 )
 
-// activityFilter is the from/to/types filter shape shared by §4.3's tracks tiles and all
-// three of §4.7's listing endpoints. Every field is optional and a nil field means "no
+// activityFilter is the from/to/types/story filter shape shared by §4.3's tracks tiles and
+// all three of §4.7's listing endpoints. Every field is optional and a nil field means "no
 // restriction" — the convention both sections specify, so a caller that wants everything
 // sends nothing rather than an explicit wide-open range.
 type activityFilter struct {
 	From  *time.Time
 	To    *time.Time
 	Types []string
+	// Story narrows to one Story's activities (§4.23). No ownership check is needed: the
+	// queries are already scoped to the caller's own activities, and a Story only ever holds
+	// its owner's, so another account's Story matches nothing — the same as an empty one.
+	Story *string
 }
 
 // parseActivityFilter reads that filter off a query string, interpreting a bare `from`/`to`
@@ -55,7 +59,24 @@ func parseActivityFilter(q url.Values, loc *time.Location) (activityFilter, erro
 	if v := q.Get("types"); v != "" {
 		f.Types = strings.Split(v, ",")
 	}
+	story, err := parseStoryParam(q)
+	if err != nil {
+		return activityFilter{}, err
+	}
+	f.Story = story
 	return f, nil
+}
+
+// parseStoryParam reads the optional `story` Story id, nil when absent.
+func parseStoryParam(q url.Values) (*string, error) {
+	v := q.Get("story")
+	if v == "" {
+		return nil, nil
+	}
+	if !uuidPattern.MatchString(v) {
+		return nil, errors.New(`invalid "story", want a Story id`)
+	}
+	return &v, nil
 }
 
 // listActivitiesQuery is §4.7's list, with §4.3's "$n IS NULL OR ..." optional-filter
@@ -83,6 +104,7 @@ WHERE user_id = $1
   AND ($2::timestamptz IS NULL OR started_at >= $2)
   AND ($3::timestamptz IS NULL OR started_at <= $3)
   AND ($4::text[] IS NULL OR activity_type = ANY($4))
+  AND ($5::uuid IS NULL OR activities.id IN (SELECT activity_id FROM story_activities WHERE story_id = $5))
 ORDER BY started_at DESC, id DESC`
 
 // activityRow is one row of the list. The field set is exactly what the Activities panel
@@ -159,7 +181,7 @@ func (s *Server) handleListActivities(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := s.pool.Query(r.Context(), listActivitiesQuery, userIDFromContext(r.Context()), filter.From, filter.To, filter.Types)
+	rows, err := s.pool.Query(r.Context(), listActivitiesQuery, userIDFromContext(r.Context()), filter.From, filter.To, filter.Types, filter.Story)
 	if err != nil {
 		s.log.Error("activity list query failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -473,7 +495,8 @@ WHERE user_id = $1
   AND superseded_by IS NULL
   AND ($2::timestamptz IS NULL OR started_at >= $2)
   AND ($3::timestamptz IS NULL OR started_at <= $3)
-  AND ($4::text[] IS NULL OR activity_type = ANY($4))`
+  AND ($4::text[] IS NULL OR activity_type = ANY($4))
+  AND ($5::uuid IS NULL OR activities.id IN (SELECT activity_id FROM story_activities WHERE story_id = $5))`
 
 type activitySummaryResponse struct {
 	Count           int64   `json:"count"`
@@ -494,7 +517,7 @@ func (s *Server) handleActivitySummary(w http.ResponseWriter, r *http.Request) {
 
 	var resp activitySummaryResponse
 	if err := s.pool.QueryRow(r.Context(), activitySummaryQuery,
-		userIDFromContext(r.Context()), filter.From, filter.To, filter.Types,
+		userIDFromContext(r.Context()), filter.From, filter.To, filter.Types, filter.Story,
 	).Scan(&resp.Count, &resp.DistanceMeters, &resp.DurationSeconds, &resp.ElevationGainM); err != nil {
 		s.log.Error("activity summary query failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -517,9 +540,10 @@ const histogramWindowMonths = 12
 const maxHistogramDays = 366
 
 // activityHistogramQuery is §4.7's per-bucket aggregate over a calendar window.
-// Deliberately unfiltered beyond the window and the user: this chart is the backdrop a
-// selected sub-range is highlighted against, so narrowing it by the same filter as the list
-// would defeat its purpose.
+// Deliberately unfiltered beyond the window, the user and the optional Story ($5): this chart
+// is the backdrop a selected sub-range is highlighted against, so narrowing it by the same
+// type filter as the list would defeat its purpose. A Story is different — inside one, the
+// picker's whole world is the Story's activities (§4.23).
 //
 // Days with no activity are simply absent from the result rather than returned as zeroes —
 // GROUP BY produces no row for them, and a client that has the window's start and end can
@@ -538,6 +562,7 @@ WHERE user_id = $1
   AND superseded_by IS NULL
   AND started_at >= $2
   AND started_at < $3
+  AND ($5::uuid IS NULL OR activities.id IN (SELECT activity_id FROM story_activities WHERE story_id = $5))
 GROUP BY day
 ORDER BY day`
 
@@ -563,6 +588,7 @@ FROM activities
 WHERE user_id = $1
   AND superseded_by IS NULL
   AND ($2::timestamptz IS NULL OR started_at < $2)
+  AND ($5::uuid IS NULL OR activities.id IN (SELECT activity_id FROM story_activities WHERE story_id = $5))
 GROUP BY day
 ORDER BY day DESC
 LIMIT $3`
@@ -594,7 +620,9 @@ type activityHistogramResponse struct {
 // handleActivityHistogram serves §4.7's `GET /v1/activities/histogram` in two modes, both
 // returning the same body. The filter is deliberately not applied (no `types`) in either —
 // this chart is the backdrop a selected sub-range highlights against, and narrowing it the
-// same way as the list would defeat that.
+// same way as the list would defeat that. `story` is the exception: both modes, and
+// `earliest`, then cover only that Story's activities, since inside a Story the picker spans
+// the Story alone (§4.23).
 //
 //   - `?days=N[&before=YYYY-MM-DD]` — activity-day pagination: the N most recent distinct
 //     days-with-activity, or the N most recent strictly before `before`. This is what the
@@ -610,17 +638,21 @@ func (s *Server) handleActivityHistogram(w http.ResponseWriter, r *http.Request)
 	q := r.URL.Query()
 	loc := locationFromContext(r.Context())
 	tz := timezoneFromContext(r.Context())
+	story, err := parseStoryParam(q)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	var (
 		buckets []histogramBucket
 		from    string
 		to      string
-		err     error
 	)
 	if q.Get("days") != "" {
-		buckets, err = s.activityDayPage(r, q, loc, tz)
+		buckets, err = s.activityDayPage(r, q, loc, tz, story)
 	} else {
-		buckets, from, to, err = s.activityCalendarWindow(r, q, loc, tz)
+		buckets, from, to, err = s.activityCalendarWindow(r, q, loc, tz, story)
 	}
 	if err != nil {
 		s.writeHistogramError(w, err)
@@ -630,7 +662,7 @@ func (s *Server) handleActivityHistogram(w http.ResponseWriter, r *http.Request)
 		from, to = buckets[0].Date, buckets[len(buckets)-1].Date
 	}
 
-	earliest, err := s.earliestActivity(r.Context(), userIDFromContext(r.Context()))
+	earliest, err := s.earliestActivity(r.Context(), userIDFromContext(r.Context()), story)
 	if err != nil {
 		s.log.Error("activity earliest-date query failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -646,21 +678,25 @@ func (s *Server) handleActivityHistogram(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// earliestActivity is when the account's first activity started, nil when it has none —
-// the histogram's `earliest`, and how far back the Profile page's year grids go.
-func (s *Server) earliestActivity(ctx context.Context, userID string) (*time.Time, error) {
+// earliestActivity is when the account's first activity started — or the Story's, when story
+// is set — nil when there is none: the histogram's `earliest`, and how far back the Profile
+// page's year grids go.
+func (s *Server) earliestActivity(ctx context.Context, userID string, story *string) (*time.Time, error) {
 	var earliest *time.Time
 	err := s.pool.QueryRow(ctx,
-		`SELECT MIN(started_at) FROM activities WHERE user_id = $1 AND superseded_by IS NULL`, userID,
+		`SELECT MIN(started_at) FROM activities
+		 WHERE user_id = $1 AND superseded_by IS NULL
+		   AND ($2::uuid IS NULL OR activities.id IN (SELECT activity_id FROM story_activities WHERE story_id = $2))`,
+		userID, story,
 	).Scan(&earliest)
 	return earliest, err
 }
 
 // dailyTotals is the histogram's calendar-window query for [first, end): one bucket per local
-// day with activity, ascending — the JSON endpoint's `?from=&to=` mode and the Profile page's
-// year grids both read it.
-func (s *Server) dailyTotals(ctx context.Context, userID string, first, end time.Time, tz string) ([]histogramBucket, error) {
-	return s.scanHistogramBuckets(ctx, activityHistogramQuery, userID, first, end, tz)
+// day with activity, ascending, over one Story's activities when story is set — the JSON
+// endpoint's `?from=&to=` mode and the Profile page's year grids both read it.
+func (s *Server) dailyTotals(ctx context.Context, userID string, first, end time.Time, tz string, story *string) ([]histogramBucket, error) {
+	return s.scanHistogramBuckets(ctx, activityHistogramQuery, userID, first, end, tz, story)
 }
 
 // badRequest marks an error as the client's fault, so the two mode helpers can return plain
@@ -680,7 +716,7 @@ func (s *Server) writeHistogramError(w http.ResponseWriter, err error) {
 // activityDayPage is the `?days=N&before=` mode. Buckets come back newest-first from the
 // LIMIT and are reversed here, so every response this endpoint sends is in ascending date
 // order regardless of which mode produced it — a client should not have to check.
-func (s *Server) activityDayPage(r *http.Request, q url.Values, loc *time.Location, tz string) ([]histogramBucket, error) {
+func (s *Server) activityDayPage(r *http.Request, q url.Values, loc *time.Location, tz string, story *string) ([]histogramBucket, error) {
 	limit, err := strconv.Atoi(q.Get("days"))
 	if err != nil || limit < 1 {
 		return nil, badRequest{errors.New(`invalid "days", want a positive integer`)}
@@ -700,7 +736,7 @@ func (s *Server) activityDayPage(r *http.Request, q url.Values, loc *time.Locati
 		before = &t
 	}
 
-	buckets, err := s.scanHistogramBuckets(r.Context(), activityDayPageQuery, userIDFromContext(r.Context()), before, limit, tz)
+	buckets, err := s.scanHistogramBuckets(r.Context(), activityDayPageQuery, userIDFromContext(r.Context()), before, limit, tz, story)
 	if err != nil {
 		return nil, err
 	}
@@ -713,7 +749,7 @@ func (s *Server) activityDayPage(r *http.Request, q url.Values, loc *time.Locati
 // activityCalendarWindow is the original `?from=&to=` mode, unchanged in behaviour: one
 // bucket per day that has activity within the window, and the window itself echoed back so
 // the caller can lay out the days that have none.
-func (s *Server) activityCalendarWindow(r *http.Request, q url.Values, loc *time.Location, tz string) ([]histogramBucket, string, string, error) {
+func (s *Server) activityCalendarWindow(r *http.Request, q url.Values, loc *time.Location, tz string, story *string) ([]histogramBucket, string, string, error) {
 	today := time.Now().In(loc)
 	today = time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, loc)
 
@@ -738,7 +774,7 @@ func (s *Server) activityCalendarWindow(r *http.Request, q url.Values, loc *time
 	}
 	end := last.AddDate(0, 0, 1) // exclusive upper bound for the query
 
-	buckets, err := s.dailyTotals(r.Context(), userIDFromContext(r.Context()), first, end, tz)
+	buckets, err := s.dailyTotals(r.Context(), userIDFromContext(r.Context()), first, end, tz, story)
 	if err != nil {
 		return nil, "", "", err
 	}
