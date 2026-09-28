@@ -1,7 +1,6 @@
-// The account menu's System/Light/Dark control (templates/header.html). The choice lives in
-// localStorage (hmt_theme; absent = System) and on <html data-theme>, which tokens.css reads;
-// templates/theme.html applies it before first paint on every page. A change fires
-// `hmt:themechange` on document so the map (apps/web's useTheme) can swap its basemap too.
+// The Settings page's System/Light/Dark control (templates/pages/settings.html). The choice
+// lives in localStorage (hmt_theme; absent = System) and on <html data-theme>, which
+// tokens.css reads; templates/theme.html applies it before first paint on every page.
 (function () {
   var control = document.querySelector('[data-theme-control]');
   if (!control) return;
@@ -32,7 +31,6 @@
     if (choice === 'system') delete document.documentElement.dataset.theme;
     else document.documentElement.dataset.theme = choice;
     show(choice);
-    document.dispatchEvent(new Event('hmt:themechange'));
   });
 
   show(stored());

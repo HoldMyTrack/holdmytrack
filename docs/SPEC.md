@@ -167,7 +167,7 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 
 ### FR-1.7 Account settings
 
-**Description**: A signed-in user (real or demo — FR-2) edits their own profile: Avatar, Name, Country, Timezone, and Language. A page at `/settings`, reached from the header's account menu, separate from the activity graph (FR-7) — and, for a real account that has never saved it, shown automatically in place of the map (behavior 5). Private locations (FR-8.1) aren't edited here; they live on the map's Privacy tab.
+**Description**: A signed-in user (real or demo — FR-2) edits their own profile: Avatar, Name, Country, Timezone, and Language — and, on the same page, this browser's Theme (behavior 8). A page at `/settings`, reached from the header's account menu, separate from the activity graph (FR-7) — and, for a real account that has never saved it, shown automatically in place of the map (behavior 5). Private locations (FR-8.1) aren't edited here; they live on the map's Privacy tab.
 
 **Name** is an optional display label, not an identifier: it isn't unique, two accounts may share one, and nothing signs in with it — the email address identifies an account. Nothing outside this page displays it yet.
 
@@ -184,6 +184,7 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 6. **A demo account** sees the page with every field and button disabled and a note that the shared demo account can't be changed, linking to "Create your own account" (FR-2.3); a save or avatar change submitted anyway is refused (`403`).
 
 7. **A native client** reads the lists this page offers from `GET /v1/account/settings/options` — every Country (code and name in the request's language), every Timezone grouped by region (with the region's name in that language, and the account's own zone always included), and every Language — and saves through the API endpoints above. The Android app's Settings screen is built on it (`apps/android/docs/SPEC.md` FR-1.5).
+8. **Theme** (FR-4.12): below Save, a System / Light / Dark toggle. It belongs to the browser, not the account — not part of Save, not disabled for a demo — and a click applies it at once.
 
 **Outputs**: The account's current Avatar, Name, Country, Timezone, and Language (`locale` in `GET /v1/auth/me`, `""` for automatic), always reflecting the last successful save (or the account's defaults, if never changed) — reloading the app never reverts to something stale.
 
@@ -609,16 +610,16 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 
 **Description**: Every page and the Android app draw in a light or a dark palette. By default they follow the device's own light/dark setting; the user can instead pin this device to Light or Dark.
 
-**Preconditions**: None to follow the device setting; an active session to change it on the web (the control is in the account menu).
+**Preconditions**: None to follow the device setting; an active session to change it on the web (the control is on the Settings page, FR-1.7).
 
 **Behavior**:
-1. On the web, the account menu has a Theme control: System (the default), Light, Dark. A choice applies at once, without a reload, to the page, the header and the map, and is kept by this browser only — not on the account, and not on the user's other devices.
+1. On the web, the Settings page has a Theme control: System (the default), Light, Dark. A choice applies at once, without a reload, and is kept by this browser only — not on the account, and not on the user's other devices; every page opened afterwards, the map included, draws in it.
 2. In the Android app, Settings has the same three-way Theme control, applied at once and kept on the phone only.
 3. With System chosen, a change of the device's own setting applies while the page or app is open.
 4. The map follows the theme: the light basemap flavor in the light theme, the dark flavor in the dark one (FR-4.5), with Fog of War's veil switching to match (FR-4.2).
 5. A page opened with a saved dark choice draws dark from its first frame, never flashing light first.
 
-**Notes**: A signed-out visitor gets the device setting; the control is only in the signed-in account menu. `IMPLEMENTATION.md` §4.18 covers the two palettes.
+**Notes**: A signed-out visitor gets the device setting; the control is only on the signed-in Settings page. `IMPLEMENTATION.md` §4.18 covers the two palettes.
 
 ## 7. FR-5 — Activities Panel
 
