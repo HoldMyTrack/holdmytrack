@@ -18,7 +18,7 @@ Checkboxes are the source of truth for progress; re-check them against the three
 
 ## Phase 1 — MVP
 
-**Shipped and deployable.** Every feature in `SPEC.md`'s FR-1 through FR-11 — auth and account management, the no-signup demo, activity upload/ingestion (file, `.zip`, Google Takeout), Normal/Fog of War/Heatmap map modes with pace-colored segments and high-res export, the Activities panel and its filters, track editing, Private locations, the date-range picker, the per-account activity graph, per-activity pace/heart-rate, distance trends, the public About and Help pages, and the Donate link — is built and documented there; not re-enumerated here.
+**Shipped and deployable.** Every feature in `SPEC.md`'s FR-1 through FR-14 — auth and account management, the no-signup demo, activity upload/ingestion (file, `.zip`, Google Takeout), Normal/Fog of War/Heatmap map modes with pace-colored segments and high-res export, the Activities panel and its filters, track editing, Private locations, the date-range picker, the per-account activity graph, per-activity pace, distance trends, the public About and Help pages, the Donate link, the admin panel, English and Russian, and Stories on the web — is built and documented there; not re-enumerated here.
 
 ### Production deployment — a sandbox is live at `holdmytrack.com`, not yet Production
 
@@ -48,27 +48,6 @@ Sign in with Facebook is built (`SPEC.md` FR-1.10) and the Meta app exists, but 
 
 - [ ] Get a business document for the "Holdmytrack" business portfolio. Meta accepts one of: an IRS 147C letter (EIN confirmation), a business bank statement, a business tax document, or a "Doing Business As" (DBA) filing. The name on it must match the portfolio's. A sole-proprietor EIN with "HoldMyTrack" as its trade name, or a county/state DBA filing, are the cheapest routes; so may be whatever legal standing the Open Collective fiscal host above gives the project. Check the legal and tax implications before filing just for this.
 - [ ] Complete Business Verification with it, connect the Meta app to the verified portfolio and publish it (`docs/DEPLOY.md` §4 step 6), then set `FACEBOOK_APP_ID`/`FACEBOOK_APP_SECRET` in the server's `.env.prod` and recreate `api`.
-
-### Stories — planned
-
-A Story is a hand-picked, private set of activities — a hike, a holiday, a race weekend — with a name, a description, joint statistics and a map view of its own; an activity can be in any number of Stories (`VISION.md` §4.2, [ADR-0020](adr/0020-stories-hand-picked-and-private.md) for why hand-picked, private, and Normal mode only). Web first; the API is shaped for Android to follow (`apps/android/docs/ROADMAP.md`). Design, to be written up in `IMPLEMENTATION.md` as it's built:
-
-- **Schema** — `stories` (`id`, `user_id` → `users` on delete cascade, `name` 1–200 characters, `description` up to 2000, `created_at`, `updated_at`) and `story_activities` (`story_id` → `stories` and `activity_id` → `activities`, both on delete cascade, primary key on the pair), in `0008_stories.sql`. The cascade from `activities` is what takes a deleted activity out of every Story; a Story left empty stays, and deleting a Story deletes no activity.
-- **API** — `GET`/`POST /v1/stories`, `GET`/`PATCH`/`DELETE /v1/stories/{id}`, and `POST`/`DELETE /v1/stories/{id}/activities` with `{activity_ids}`. Another account's Story is a `404`, the same as a missing one; a demo account's writes are rejected like every other write (`SPEC.md` FR-2.1). A Story's joint statistics — count, distance, moving and elapsed time, and the same per activity type — cover its activities with no date bound (`IMPLEMENTATION.md` §4.23).
-- **One more filter, not a second map path** — `parseActivityFilter` (`services/server/internal/httpapi/activities.go`) takes `story=<id>`, which narrows the activity list, the tracks tiles (`IMPLEMENTATION.md` §4.3) and the histogram behind the date-range picker, alongside the `from`/`to` and `types` they already take. A membership change bumps the account's tile version (`IMPLEMENTATION.md` §4.2.6), since it changes what a Story's tiles hold.
-- **Story view** (`/?story=<id>`) — the Activities panel becomes "Story: <name>", its header showing the whole Story's statistics and per-type breakdown, a pencil to edit the name and description, and Exit story, which restores the date range from before. The date-range picker works as it does outside a Story (`SPEC.md` FR-6), but over the Story's activities only: its span is the Story's first to last activity day, its bars count only them, and it opens on the whole Story. The list, the panel's totals and the drawn tracks follow its selection. Type/Distance filters, focus, hide, Edit and export work unchanged; the toolbar gains Remove from story for its target. Normal mode only — Fog of War and Heatmap stay all-time.
-
-Steps:
-
-- [x] Schema and API, with tests for ownership (`404`), demo read-only, and an activity delete leaving its Stories behind without it.
-- [x] The `story` filter on the activity list, the tracks tiles and the histogram, and the tile-version bump on a membership change.
-- [x] A Stories page (`/stories`, server-rendered like `/profile`, ADR-0012) reached from the account menu: every Story with its name, description, statistics and per-type breakdown, View on map and Delete (confirmed, a same-origin form POST); an empty state saying how to make one from the map.
-- [x] "Create story" in the Activities panel's toolbar, enabled while at least one activity is checked (`SPEC.md` FR-5.6): a name and an optional description, then the new Story opens.
-- [x] Story view on the map, as above, including the date-range picker scoped to the Story.
-- [x] A Stories tab in the Edit window, beside Activity and Track (`SPEC.md` FR-5.10, FR-5.14): the account's Stories as checkboxes for the window's target, one activity or a group (a Story holding only part of a group shows indeterminate), committed by the window's shared Save.
-- [x] The demo account's Stories — `seed-demo-customer`'s manifest gains a list of Stories, seeding two: the Brecksville Reservation trip (the drive there, the walk, the drive back) and the Emerald Necklace Trail (its first day, "Day #1"); `--reset` recreates them (`SPEC.md` FR-2.2).
-- [ ] English and Russian strings (ADR-0014).
-- [ ] `SPEC.md` FR-14 and `IMPLEMENTATION.md` §3.19 and §4.23 as each piece lands; drop Stories from `SPEC.md` §1.2 and §19's not-yet-built lists.
 
 ### Spots — planned
 

@@ -126,11 +126,12 @@ This phase is independent of Phases 5/6 above and can proceed in parallel with e
 
 ## Phase 8: Stories
 
-Stories — hand-picked, private sets of activities with their own totals and map view — are planned on the web first (root `docs/ROADMAP.md` Phase 1, "Stories", [ADR-0020](../../../docs/adr/0020-stories-hand-picked-and-private.md)). This phase brings them to the app once the web ships, against the same `/v1/stories` API and the same `story` filter on the activity list, tracks tiles and histogram, with no Android-only server work.
+Stories — hand-picked, private sets of activities with their own totals and map view ([ADR-0020](../../../docs/adr/0020-stories-hand-picked-and-private.md)) — have shipped on the web (root `docs/SPEC.md` FR-14, FR-5.16, FR-5.17; `docs/IMPLEMENTATION.md` §4.23). This phase brings them to the app against the same `/v1/stories` API, the same `story` filter on the activity list, tracks tiles and histogram, and the `stories` each activity row already carries, with no Android-only server work.
 
 - [ ] **A Story view in the Activities panel** — the web's Story panel ported to the sheet: the Story's statistics and per-type breakdown, the date-range footer scoped to the Story's activities (`apps/android/docs/SPEC.md` FR-2.6), Remove from story, and a way back to the normal view.
 - [ ] **A list of Stories** reached from the menu, opening one on the map.
 - [ ] **Create story and add to a Story** — from the checked activities, and a Stories section in the Edit screen, matching the web's Stories tab.
+- [ ] **The Story badge** on an activity's row, from the row's `stories` (root `docs/SPEC.md` FR-5.1).
 
 ---
 
