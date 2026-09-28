@@ -32,6 +32,7 @@
         <div class="header-menu__label">{{with .Label}}{{.}}{{else}}{{t "header.demo_account"}}{{end}}</div>
         {{if .IsDemo}}<a role="menuitem" class="header-menu__item header-menu__item--accent" href="/signup">{{t "header.create_account"}}</a>{{end}}
         <a role="menuitem" class="header-menu__item" href="/profile">{{t "header.profile"}}</a>
+        <a role="menuitem" class="header-menu__item" href="/stories">{{t "header.stories"}}</a>
         <a role="menuitem" class="header-menu__item" href="/settings">{{t "header.settings"}}</a>
         {{if .IsAdmin}}<a role="menuitem" class="header-menu__item" href="/admin">{{t "header.admin"}}</a>{{end}}
         <form method="post" action="/logout">

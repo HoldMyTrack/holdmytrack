@@ -252,12 +252,20 @@ func (s *Server) handleDeleteStory(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	userID := userIDFromContext(r.Context())
-	err := s.inTx(r.Context(), func(tx pgx.Tx) error {
+	if s.writeStoryError(w, s.deleteStory(r.Context(), userIDFromContext(r.Context()), id)) {
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// deleteStory deletes userID's Story, errStoryNotFound when it isn't theirs — the API's
+// DELETE and the Stories page's form both end here.
+func (s *Server) deleteStory(ctx context.Context, userID, id string) error {
+	return s.inTx(ctx, func(tx pgx.Tx) error {
 		// RETURNING reads the statement's own snapshot, before the cascade removes the
 		// memberships, so it says whether the Story held anything.
 		var hadActivities bool
-		if err := tx.QueryRow(r.Context(), `
+		if err := tx.QueryRow(ctx, `
 			DELETE FROM stories WHERE id = $1 AND user_id = $2
 			RETURNING EXISTS (SELECT 1 FROM story_activities WHERE story_id = $1)
 		`, id, userID).Scan(&hadActivities); err != nil {
@@ -267,14 +275,10 @@ func (s *Server) handleDeleteStory(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		if hadActivities {
-			return fog.BumpMapVersion(r.Context(), tx, userID)
+			return fog.BumpMapVersion(ctx, tx, userID)
 		}
 		return nil
 	})
-	if s.writeStoryError(w, err) {
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
 }
 
 // handleAddStoryActivities serves `POST /v1/stories/{id}/activities` with `{activity_ids}`,

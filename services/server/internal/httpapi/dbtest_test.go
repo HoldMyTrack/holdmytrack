@@ -72,7 +72,8 @@ func emptyS3(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, `<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>test</Name><IsTruncated>false</IsTruncated></ListBucketResult>`)
 }
 
-// account is a verified account (or a demo one) with a live session.
+// account is a verified account (or a demo one) with a live session, past first-run Settings
+// (a Country, metric).
 type account struct {
 	id, session string
 }
@@ -88,7 +89,7 @@ func (d *dbTest) newAccount(demo bool) account {
 	var a account
 	email := fmt.Sprintf("test-%d@holdmytrack.invalid", time.Now().UnixNano())
 	if err := d.pool.QueryRow(ctx,
-		`INSERT INTO users (email, email_verified, demo_expires_at) VALUES ($1, true, $2) RETURNING id`,
+		`INSERT INTO users (email, email_verified, demo_expires_at, country) VALUES ($1, true, $2, 'DE') RETURNING id`,
 		email, demoExpires).Scan(&a.id); err != nil {
 		d.t.Fatalf("create account: %v", err)
 	}

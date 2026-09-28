@@ -15,9 +15,9 @@ This document specifies HoldMyTrack's functional behavior as currently implement
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web and in the Android app, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, pace-colored segments, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), the interface language — English or Russian (FR-13), and the Stories API (FR-14).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web and in the Android app, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, pace-colored segments, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), the interface language — English or Russian (FR-13), and the Stories API and page (FR-14).
 
-**Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), the rest of "Export" (animated reveals — high-resolution map export itself is built, FR-4.10 below), Stories' screens on the web and Android (hand-picked, private sets of activities with their own totals and map view — `VISION.md` §4.2, ADR-0020; their API is FR-14), and Spots (outdoor places from OpenStreetMap on the map, visited after five minutes inside one — ADR-0021). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace stays as per-activity route context (FR-4.8) rather than an analysed, all-time performance record. So is any health data at all: heart rate is never read, stored or shown (ADR-0017), and the pace/heart-rate + elevation profile (FR-4.9) was built and then removed for that reason. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
+**Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), the rest of "Export" (animated reveals — high-resolution map export itself is built, FR-4.10 below), the rest of Stories — making one from the map, its map view, and Android (hand-picked, private sets of activities with their own totals and map view — `VISION.md` §4.2, ADR-0020; the API and the web's Stories page are FR-14), and Spots (outdoor places from OpenStreetMap on the map, visited after five minutes inside one — ADR-0021). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace stays as per-activity route context (FR-4.8) rather than an analysed, all-time performance record. So is any health data at all: heart rate is never read, stored or shown (ADR-0017), and the pace/heart-rate + elevation profile (FR-4.9) was built and then removed for that reason. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
 ### 1.3 Intended audience
 
@@ -907,7 +907,7 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 
 **Behavior**:
 1. The header shows the logo, wordmark and tagline (the brand links to `/`), then Donate (FR-11.1), an "Info" menu listing About, Help and Contacts with the current page marked, and the account area.
-2. Signed out, the account area is a "Sign in" link to `/signin`. With a session (real or demo), it is an account menu showing the account's avatar (or a generic icon) that opens to the account's email (a demo session shows its display name instead, followed by "Create your own account", FR-2.3), then "Profile" (`/profile`), "Settings" (`/settings`), "Admin" (`/admin`, an admin only — FR-12.1) and "Sign out".
+2. Signed out, the account area is a "Sign in" link to `/signin`. With a session (real or demo), it is an account menu showing the account's avatar (or a generic icon) that opens to the account's email (a demo session shows its display name instead, followed by "Create your own account", FR-2.3), then "Profile" (`/profile`), "Stories" (`/stories`, FR-14.6), "Settings" (`/settings`), "Admin" (`/admin`, an admin only — FR-12.1) and "Sign out".
 3. Both menus open and close without JavaScript.
 4. "Sign out" submits `POST /logout`, which ends the session the same way `POST /v1/auth/logout` does and redirects to `/`. The request is refused (`403`) unless its `Origin` header — or, without one, its `Referer` — is the app's own origin.
 5. On a phone-width screen (≤768px) the tagline is hidden and Donate shows its heart alone; the Info and account menus stay.
@@ -987,7 +987,7 @@ A read-only view of every account and every account's activities, for the people
 
 ## 16. FR-14 — Stories
 
-A Story is a hand-picked, private set of the account's activities — a hike, a holiday, a race weekend — with a name, an optional description and joint statistics (`VISION.md` §4.2, ADR-0020). An activity can be in any number of Stories. This section covers the API; the web and Android screens for Stories aren't built yet.
+A Story is a hand-picked, private set of the account's activities — a hike, a holiday, a race weekend — with a name, an optional description and joint statistics (`VISION.md` §4.2, ADR-0020). An activity can be in any number of Stories. This section covers the API and the web's Stories page (FR-14.6); making a Story from the map, the map's Story view and Android aren't built yet.
 
 | Endpoint | Purpose |
 | :-- | :-- |
@@ -1048,6 +1048,24 @@ A Story is a hand-picked, private set of the account's activities — a hike, a 
 1. A Story is visible only to its own account. Another account's Story, a Story that doesn't exist and an id that isn't a UUID are all `404` on every endpoint, indistinguishable from each other; the list holds only the account's own Stories.
 2. A demo session reads the Demo Customer's Stories like any other account, and every write — create, rename, delete, add, remove — is refused with `403` `demo_read_only`, as for every other write (FR-2.1).
 
+### FR-14.6 The Stories page
+
+**Description**: A private page at `/stories`, reached from the header's account menu (FR-10.4), listing the account's Stories.
+
+**Preconditions**: Signed in, past email verification and first-run Settings (FR-1.8, FR-1.7) — as on every signed-in page, anyone else is sent there, or to sign-in.
+
+**Behavior**:
+1. Every Story, newest first, as a card: its name, its description when it has one, a line with its activity count, distance and moving time (FR-14.1), and the same per activity type, the most frequent first — each type by its display name, in the page's language (FR-13.1). Distances follow the account's units (FR-1.7). A Story with no activities says so instead.
+2. "View on map" opens the map's Story view, `/?story=<id>`.
+3. "Delete" opens a confirmation beside it — "Delete “<name>”? Its activities stay." — with a "Delete story" button. It deletes the Story (FR-14.2) and reloads the page with "Story deleted." It needs no script.
+4. With no Stories, the page says how to make one: check activities in the map's Activities panel, then choose Create story.
+5. A demo session sees the Demo Customer's Stories with Delete disabled.
+
+**Error cases**:
+- Deleting another account's Story, or one that doesn't exist → the "Page not found" page (`404`); nothing is deleted.
+- A delete submitted from another site → `403`; nothing is deleted.
+- A delete from a demo session → `403`, the page again with "Demo accounts can't add, edit, or delete activities — create an account to save your own data."
+
 ## 17. Non-Functional Requirements (summary)
 
 This section summarizes cross-cutting behavior specified elsewhere in this document, for convenience — it does not introduce new requirements.
@@ -1085,7 +1103,7 @@ The following are named in `VISION.md`'s roadmap but have no functional requirem
 - Path 1 cloud-provider connectors (Garmin, Wahoo, COROS)
 - Path 2 on-device sync's iOS half (Apple HealthKit — Android's Health Connect half is FR-3.6)
 - The rest of "Export" — animated reveals (high-resolution map export itself is built, FR-4.10)
-- Stories' screens — hand-picked, private sets of activities, each with a name, a description, joint statistics and a map view of its own (`VISION.md` §4.2, ADR-0020, `ROADMAP.md` Phase 1); their API is FR-14
+- The rest of Stories — making one from the map, its map view, and Android — hand-picked, private sets of activities, each with a name, a description, joint statistics and a map view of its own (`VISION.md` §4.2, ADR-0020, `ROADMAP.md` Phase 1); the API and the web's Stories page are FR-14
 - Spots — outdoor places from OpenStreetMap behind one "Show POI" map toggle, each visited once an activity spends five minutes inside it (`VISION.md` §4.2, ADR-0021, `ROADMAP.md` Phase 1)
 - Dark-theme variant of the Fog of War veil (the theme parameter is accepted but currently has no visual effect on the veil itself)
 

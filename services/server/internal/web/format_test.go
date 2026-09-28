@@ -26,6 +26,14 @@ func TestFormat(t *testing.T) {
 		FormatTotalDistance(ru, 1234567, false): "1\u00a0235 км",
 		FormatElevation(ru, 1000, true):         "3\u00a0281 фт",
 		ShortDate(ru, "2026-09-08"):             "8 сент.",
+		FormatDuration(en, 8100):                "2h 15m",
+		FormatDuration(en, 600):                 "10m",
+		FormatDuration(en, 42):                  "42s",
+		FormatDuration(ru, 8100):                "2 ч 15 мин",
+		ActivityType(en, "walking"):             "Walking",
+		ActivityType(ru, "Walking"):             "Ходьба",
+		ActivityType(en, "dog_walk"):            "Dog Walk",
+		ActivityType(ru, "Solowheel"):           "Solowheel",
 	} {
 		if got != want {
 			t.Errorf("got %q, want %q", got, want)

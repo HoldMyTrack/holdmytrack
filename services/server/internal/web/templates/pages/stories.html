@@ -1,0 +1,49 @@
+{{define "content"}}{{with .Page}}
+<main class="page-main stories">
+  <a class="settings__back" href="/">{{t "common.back_to_map"}}</a>
+  <h1 class="settings__title">{{t "stories.title"}}</h1>
+  <p class="settings__intro">{{t "stories.intro"}}</p>
+  {{with .Notice}}<p class="settings__notice" role="status">{{.}}</p>{{end}}
+  {{with .Error}}<p class="settings__error" role="alert">{{.}}</p>{{end}}
+
+  {{if .Stories}}
+  {{$demo := .IsDemo}}
+  <ul class="stories__list">
+    {{range .Stories}}
+    <li class="story-card">
+      <h2 class="story-card__name">{{.Name}}</h2>
+      {{with .Description}}<p class="story-card__description">{{.}}</p>{{end}}
+      {{if .Stats}}
+      <p class="story-card__stats">{{.Stats}}</p>
+      <table class="story-card__types" aria-label="{{t "stories.by_type"}}">
+        <tbody>
+          {{range .Types}}<tr><th scope="row">{{.Label}}</th><td>{{.Stats}}</td></tr>{{end}}
+        </tbody>
+      </table>
+      {{else}}
+      <p class="story-card__stats">{{t "stories.no_activities"}}</p>
+      {{end}}
+      <div class="story-card__actions">
+        <a class="settings__button" href="{{.MapHref}}">{{t "stories.view_on_map"}}</a>
+        {{if $demo}}
+        <button type="button" class="settings__button" disabled>{{t "stories.delete"}}</button>
+        {{else}}
+        {{/* Asking first without script: the summary opens the confirmation, which holds the
+             form that actually deletes. */}}
+        <details class="story-card__delete">
+          <summary class="settings__button">{{t "stories.delete"}}</summary>
+          <form method="post" action="/stories/{{.ID}}/delete" class="story-card__confirm">
+            <span>{{t "stories.delete_confirm" "name" .Name}}</span>
+            <button type="submit" class="settings__button story-card__confirm-button">{{t "stories.delete_button"}}</button>
+          </form>
+        </details>
+        {{end}}
+      </div>
+    </li>
+    {{end}}
+  </ul>
+  {{else}}
+  <p class="stories__empty">{{t "stories.empty"}}</p>
+  {{end}}
+</main>
+{{end}}{{end}}
