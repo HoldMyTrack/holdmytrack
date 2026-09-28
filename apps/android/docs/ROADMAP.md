@@ -131,3 +131,12 @@ Stories — hand-picked, private sets of activities with their own totals and ma
 - [ ] **A Story view in the Activities panel** — the web's Story panel ported to the sheet: the Story's statistics and per-type breakdown, the date-range footer scoped to the Story's activities (`apps/android/docs/SPEC.md` FR-2.6), Remove from story, and a way back to the normal view.
 - [ ] **A list of Stories** reached from the menu, opening one on the map.
 - [ ] **Create story and add to a Story** — from the checked activities, and a Stories section in the Edit screen, matching the web's Stories tab.
+
+---
+
+## Phase 9: Spots
+
+Spots — outdoor places from OpenStreetMap, each marked visited once an activity spends five minutes inside it — are planned on the web first (root `docs/ROADMAP.md` Phase 1, "Spots", [ADR-0021](../../../docs/adr/0021-spots-from-osm-visits-from-tracks.md)). This phase brings them to the map here once the web ships, on the same `/tiles/v1/spots` tiles, with no Android-only server work. There is no geofencing and no background location: a visit comes from a synced track, whether Health Connect's or the app's own recording, matched on the server like any other.
+
+- [ ] **The "Show POI" toggle** in the map chrome, with the web's category and visited icons, in every map mode.
+- [ ] **The popup** — name, category, visited state, Copy address, and Navigate as a `geo:` intent to whichever navigation app is installed.

@@ -29,6 +29,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0018](0018-no-explorer-tiles.md) | No explorer tiles: Fog of War is the exploration mechanic, with no tile score |
 | [0019](0019-dark-theme.md) | A dark theme: one palette per theme for both clients, chosen per device, with a fog veil per basemap |
 | [0020](0020-stories-hand-picked-and-private.md) | Stories are hand-picked, private sets of activities, shown in Normal mode with a story-scoped date picker |
+| [0021](0021-spots-from-osm-visits-from-tracks.md) | Spots are bulk-imported from OpenStreetMap, and a visit is five minutes inside one, worked out from tracks |
 
 ## Writing a new one
 

@@ -6,14 +6,6 @@ Once an idea here is decided, it moves out: accepted work goes to `docs/ROADMAP.
 
 ---
 
-### Outdoor POI Discovery
-
-A category-filterable map of outdoor points of interest — playgrounds, dog parks, notable architecture, monuments and history sites, and wild/nature spots such as waterfalls, viewpoints and mountains — with a per-user "visited" state shown alongside Fog of War once the user confirms presence at a place. Strictly outdoor, deliberately excluding restaurants, bars, cinemas and other indoor venues, so it stays the outdoor-activity product `VISION.md` §1 defines rather than becoming the general "things to do" app §1.1 already holds HoldMyTrack apart from. Raised alongside `VISION.md` §5.7/§5.8's social phase for the same reason: it depends on Phase 1 (§5.2) proving real adoption, and on confidence that a community-reported moderation model keeps a curated POI dataset trustworthy at whatever scale exists by then — a curated global dataset is an ongoing content-maintenance obligation, not a one-time build, the same "staff cost, not server cost" risk §5.6 names for social, applied to data quality instead of trust-and-safety.
-
-* Seed data comes from OpenStreetMap's existing POI tagging — the self-hosted basemap already carries a `pois` layer with OSM category tags, unused by app code today — rather than a from-scratch survey; ongoing accuracy relies on a user-facing "report this place" action, not paid moderation, consistent with `VISION.md` §6's no-staff-cost funding model.
-* The "are you at this place?" visited-confirmation prompt would be checked only while the app is open in the foreground — on launch or while viewing the map — not via background geofencing, matching the mobile apps' deliberate no-background-location design.
-* Visited POIs would render as a separate, discrete-point layer over the map, not a change to Fog of War's continuous, GPS-track-derived coverage computation (`IMPLEMENTATION.md` §4.2).
-
 ### Place names on the map in the reader's language
 
 The map's labels (cities, countries, streets) are whatever `@protomaps/basemaps` picks, which is mostly each place's local name, while the interface around it is in English or Russian (FR-13). Protomaps' layers take a `lang` option and fall back to the local name where OSM has no translation.
