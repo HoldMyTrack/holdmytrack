@@ -964,7 +964,7 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * A tap on the map in Normal mode: a track under it — within 14dp, the web's touch
-     * tolerance (`docs/SPEC.md` §17), since a 2.5dp line is too thin to hit exactly — is
+     * tolerance (`docs/SPEC.md` §18), since a 2.5dp line is too thin to hit exactly — is
      * selected in the panel and flown to; empty map clears the selection. The panel's own
      * collapsed or expanded state is left as it was.
      */

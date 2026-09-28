@@ -4,7 +4,7 @@
 | :-- | :-- |
 | **Version** | 1.0 |
 | **Status** | Current — describes Phase 0/1 functionality as built |
-| **Last updated** | 2026-09-27 |
+| **Last updated** | 2026-09-28 |
 | **Related documents** | `VISION.md` (product scope, market rationale, phase roadmap — the authority on *what ships and why*); `ARCHITECTURE.md` (system-level shape, key decisions, the stack); `IMPLEMENTATION.md` (schema, each feature's own implementation — the authority on *how it's built*); `AGENTS.md` (repository orientation) |
 
 ## 1. Introduction
@@ -15,9 +15,9 @@ This document specifies HoldMyTrack's functional behavior as currently implement
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web and in the Android app, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, pace-colored segments, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), and the interface language — English or Russian (FR-13).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web and in the Android app, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, pace-colored segments, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), the interface language — English or Russian (FR-13), and the Stories API (FR-14).
 
-**Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), the rest of "Export" (animated reveals — high-resolution map export itself is built, FR-4.10 below), Stories (hand-picked, private sets of activities with their own totals and map view — `VISION.md` §4.2, ADR-0020), and Spots (outdoor places from OpenStreetMap on the map, visited after five minutes inside one — ADR-0021). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace stays as per-activity route context (FR-4.8) rather than an analysed, all-time performance record. So is any health data at all: heart rate is never read, stored or shown (ADR-0017), and the pace/heart-rate + elevation profile (FR-4.9) was built and then removed for that reason. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
+**Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), the rest of "Export" (animated reveals — high-resolution map export itself is built, FR-4.10 below), Stories' screens on the web and Android (hand-picked, private sets of activities with their own totals and map view — `VISION.md` §4.2, ADR-0020; their API is FR-14), and Spots (outdoor places from OpenStreetMap on the map, visited after five minutes inside one — ADR-0021). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace stays as per-activity route context (FR-4.8) rather than an analysed, all-time performance record. So is any health data at all: heart rate is never read, stored or shown (ADR-0017), and the pace/heart-rate + elevation profile (FR-4.9) was built and then removed for that reason. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
 ### 1.3 Intended audience
 
@@ -401,7 +401,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 2. The history is one paginated list (5 per page) of every job ever recorded for this account, newest first, each showing: a title (the filename for an uploaded file; the source name — "Health Connect," "GPS Logger" — for a synced one, since a synced job's own filename is a platform-assigned id with nothing human-readable in it), status ("Processing…" / "Ready" / "Failed"), and — once ready — the activity's date and distance. Files still uploading are listed above it with a progress percentage.
 3. While anything is still processing, the history refreshes automatically (polled every 1.5 seconds) until every row settles to "Ready" or "Failed" — no manual refresh needed. Polling and uploads carry on while the Activities tab is showing, or the panel is hidden in Fog of War/Heatmap mode, since a job finishing still has to reach the map.
 4. For a demo session, the drop zone is replaced by a note that importing isn't available for demo accounts.
-5. A "View on map" action appears on every finished (`"Ready"`) row. Clicking it switches the panel back to the Activities tab, focuses that activity exactly as clicking its row in the Activities panel would (FR-5.5) — track bolded, camera flown to fit it — and, if the activity's own date — its day in the account's timezone, the same day the date range is read in — falls outside the currently selected date range (FR-6), first narrows the selected range to just that one day (the same mechanism a manual single-day pick already uses — FR-6.5) before focusing, rather than focusing something the Activities panel isn't currently showing at all. On a phone (§17) the expanded bottom sheet collapses, so the focused track is visible.
+5. A "View on map" action appears on every finished (`"Ready"`) row. Clicking it switches the panel back to the Activities tab, focuses that activity exactly as clicking its row in the Activities panel would (FR-5.5) — track bolded, camera flown to fit it — and, if the activity's own date — its day in the account's timezone, the same day the date range is read in — falls outside the currently selected date range (FR-6), first narrows the selected range to just that one day (the same mechanism a manual single-day pick already uses — FR-6.5) before focusing, rather than focusing something the Activities panel isn't currently showing at all. On a phone (§18) the expanded bottom sheet collapses, so the focused track is visible.
 
 **Outputs**: `GET /v1/uploads?limit=&offset=&source=` returns the current page, the total count (scoped to `source` when given), and how many are still processing (always the global count, unscoped, for the badge). `source` is an optional comma-separated filter (e.g. `upload,takeout`); the Sync tab omits it, for the combined view. Each row also carries `source` and, once the job has produced one, the resulting activity's own `id` — what the "View on map" action targets.
 
@@ -862,7 +862,7 @@ Hovering a day shows its date, activity count and distance. The page needs a ses
 
 **Outputs**: `{bucket, from, to, periods: [{period_start, count, distance_meters, moving_seconds, elevation_gain_m}, ...]}`.
 
-**Notes**: "Moving time" falls back to elapsed time for any activity ingested before moving- time detection existed — those activities have no moving-time figure of their own, so this bucket-level total uses whichever one each activity actually has, rather than a bucket going silently short. Best-effort curves and personal bests (formerly FR-9.2/FR-9.3) were built and then cut — deliberately out of scope, see §1.2 and §14.
+**Notes**: "Moving time" falls back to elapsed time for any activity ingested before moving- time detection existed — those activities have no moving-time figure of their own, so this bucket-level total uses whichever one each activity actually has, rather than a bucket going silently short. Best-effort curves and personal bests (formerly FR-9.2/FR-9.3) were built and then cut — deliberately out of scope, see §1.2 and §19.
 
 ## 12. FR-10 — Public pages: About, Help, Contacts
 
@@ -985,7 +985,57 @@ A read-only view of every account and every account's activities, for the people
 
 **Not translated**: activity names and descriptions people type, place names on the map, activity types outside the common set (shown as recorded), and the reason a `.zip` entry was skipped.
 
-## 16. Non-Functional Requirements (summary)
+## 16. FR-14 — Stories
+
+A Story is a hand-picked, private set of the account's activities — a hike, a holiday, a race weekend — with a name, an optional description and joint statistics (`VISION.md` §4.2, ADR-0020). An activity can be in any number of Stories. This section covers the API; the web and Android screens for Stories aren't built yet.
+
+| Endpoint | Purpose |
+| :-- | :-- |
+| `GET /v1/stories` | Every Story of the account, newest first |
+| `POST /v1/stories` | Create one, optionally with its first activities |
+| `GET /v1/stories/{id}` | One Story |
+| `PATCH /v1/stories/{id}` | Rename it, or change its description |
+| `DELETE /v1/stories/{id}` | Delete it |
+| `POST /v1/stories/{id}/activities` | Add activities, `{activity_ids}` |
+| `DELETE /v1/stories/{id}/activities` | Remove activities, `{activity_ids}` |
+
+### FR-14.1 A Story
+
+**Description**: What every Story endpoint but `DELETE /v1/stories/{id}` answers with — the list as `{stories: [...]}`.
+
+**Outputs**: `id`, `name`, `description` (`null` when none), `created_at`, `updated_at`, `activity_ids` (every member, earliest activity first) and `stats`: `count`, `distance_meters`, `moving_seconds` and `elapsed_seconds` over the Story's activities, with no date bound, and the same four per activity type in `by_type`, the most frequent type first. Like every other total (FR-3.7), `stats` leaves out a duplicate superseded by another copy, though it stays in `activity_ids`. An activity with no moving time of its own counts its elapsed time as moving, as in Trends (FR-9.1).
+
+### FR-14.2 Create, rename and delete
+
+**Behavior**:
+1. `POST /v1/stories` takes `name`, `description` and, optionally, `activity_ids` — the Story's first activities, added in the same request — and answers `201` with the new Story.
+2. `PATCH /v1/stories/{id}` takes `name` and `description`, both sent every time: an empty description clears it.
+3. Name and description are trimmed. The name is required, up to 200 characters; the description up to 2000.
+4. `DELETE /v1/stories/{id}` answers `204`. The Story's activities stay.
+5. Renaming, a new description, and a change to the Story's activities (FR-14.3) move `updated_at`.
+
+**Error cases**:
+- A blank name, or a name or description over its limit → `400` with a message in the request's language (FR-13.1).
+- `activity_ids` naming an activity that isn't the account's own → `404`, and nothing is created.
+
+### FR-14.3 Add and remove activities
+
+**Behavior**:
+1. `POST /v1/stories/{id}/activities` with `{activity_ids}` adds them; one already in the Story stays as it is. It answers with the updated Story.
+2. `DELETE /v1/stories/{id}/activities` with `{activity_ids}` removes them; an id not in the Story is ignored. The activities themselves stay. It answers with the updated Story.
+3. Deleting an activity (FR-5.11) takes it out of every Story holding it. A Story left with no activities stays, with zero statistics.
+
+**Error cases**:
+- `activity_ids` empty, over 10,000 ids, or holding an id that isn't a UUID → `400`.
+- Adding an activity that isn't the account's own → `404`, and none of the request's activities are added.
+
+### FR-14.4 Privacy and the demo
+
+**Behavior**:
+1. A Story is visible only to its own account. Another account's Story, a Story that doesn't exist and an id that isn't a UUID are all `404` on every endpoint, indistinguishable from each other; the list holds only the account's own Stories.
+2. A demo session reads the Demo Customer's Stories like any other account, and every write — create, rename, delete, add, remove — is refused with `403` `demo_read_only`, as for every other write (FR-2.1).
+
+## 17. Non-Functional Requirements (summary)
 
 This section summarizes cross-cutting behavior specified elsewhere in this document, for convenience — it does not introduce new requirements.
 
@@ -998,7 +1048,7 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 | **No reload required** | Every list/summary this document describes updates itself automatically as background processing completes (FR-3.1, FR-3.4) — a manual page reload is never required to see current data. |
 | **Idempotency** | Re-submitting the same activity content (FR-3.5) or the same password-reset token (FR-1.6) never has an effect beyond the first time. |
 
-## 17. Mobile Browser Support
+## 18. Mobile Browser Support
 
 **Known issue**: The behavior below is what was designed and implemented, but the actual mobile experience has been reported directly as unusable, not just rough. Four causes a phone has and desktop emulation doesn't were found and fixed (items 4–6 below); the behavior is still unverified on a real device, so treat it as unconfirmed until it is — see `docs/ROADMAP.md`'s "Mobile browser support" item (Phase 3).
 
@@ -1015,14 +1065,14 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 
 **Explicitly not built** (hover-only, no touch equivalent, unlike Trends above — a continuous position read with no discrete point to tap, not a per-bar value): the two-way map-track-hover ↔ Activities-row-underline highlight (FR-4.1, FR-5.4). It remains mouse-only; a touchscreen user can still focus/select a track by tapping it.
 
-## 18. Out-of-scope items, tracked for future revisions of this document
+## 19. Out-of-scope items, tracked for future revisions of this document
 
 The following are named in `VISION.md`'s roadmap but have no functional requirements in this document because they are not yet built:
 
 - Path 1 cloud-provider connectors (Garmin, Wahoo, COROS)
 - Path 2 on-device sync's iOS half (Apple HealthKit — Android's Health Connect half is FR-3.6)
 - The rest of "Export" — animated reveals (high-resolution map export itself is built, FR-4.10)
-- Stories — hand-picked, private sets of activities, each with a name, a description, joint statistics and a map view of its own (`VISION.md` §4.2, ADR-0020, `ROADMAP.md` Phase 1)
+- Stories' screens — hand-picked, private sets of activities, each with a name, a description, joint statistics and a map view of its own (`VISION.md` §4.2, ADR-0020, `ROADMAP.md` Phase 1); their API is FR-14
 - Spots — outdoor places from OpenStreetMap behind one "Show POI" map toggle, each visited once an activity spends five minutes inside it (`VISION.md` §4.2, ADR-0021, `ROADMAP.md` Phase 1)
 - Dark-theme variant of the Fog of War veil (the theme parameter is accepted but currently has no visual effect on the veil itself)
 

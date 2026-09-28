@@ -14,7 +14,7 @@ import java.time.format.DateTimeFormatter
 /**
  * The map's date-range control — the Android counterpart of the web's phone footer,
  * `apps/web/src/ui/DateRangeSlider.tsx`, and the same design: Earlier · a two-knob track ·
- * Later, with the selected dates under it (`docs/SPEC.md` §17 item 2).
+ * Later, with the selected dates under it (`docs/SPEC.md` §18 item 2).
  *
  * **Activity days, not calendar days.** The track is a window of [WINDOW_DAYS] consecutive
  * days that have activity ([ActivityDays]); the days between take no room.

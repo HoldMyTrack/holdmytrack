@@ -6,7 +6,7 @@
 
 ## 3. Database Schema
 
-The schema lives in `services/server/migrations/`: `0001_users_and_auth.sql` (§3.1, §3.9, §3.10, §3.16–§3.18), `0002_activities.sql` (§3.2–§3.4, §3.7), `0003_tiles.sql` (§3.6, §3.11), `0004_admin_boundaries.sql` (§3.12–§3.15), `0005_jobs.sql` (§3.8), `0006_demo_customer.sql` (the Demo Customer's row and Private locations, §4.10) and `0007_map_version.sql` (`users.map_version`, §4.2.6). The 32-file history that built it was collapsed into these six on 2026-09-26, ahead of the first real user, and every database was recreated from them. A second fold on 2026-09-27 took the never-used `user_tiles` table out of `0003_tiles.sql` (ADR-0018) and absorbed `0007_drop_heartrate.sql` into `0002_activities.sql`; existing databases were patched in place (`DROP TABLE user_tiles`, and the `0007` row deleted from `schema_migrations`) rather than recreated. From here on a schema change is a new numbered file, never an edit to one of these.
+The schema lives in `services/server/migrations/`: `0001_users_and_auth.sql` (§3.1, §3.9, §3.10, §3.16–§3.18), `0002_activities.sql` (§3.2–§3.4, §3.7), `0003_tiles.sql` (§3.6, §3.11), `0004_admin_boundaries.sql` (§3.12–§3.15), `0005_jobs.sql` (§3.8), `0006_demo_customer.sql` (the Demo Customer's row and Private locations, §4.10), `0007_map_version.sql` (`users.map_version`, §4.2.6) and `0008_stories.sql` (§3.19). The 32-file history that built it was collapsed into these six on 2026-09-26, ahead of the first real user, and every database was recreated from them. A second fold on 2026-09-27 took the never-used `user_tiles` table out of `0003_tiles.sql` (ADR-0018) and absorbed `0007_drop_heartrate.sql` into `0002_activities.sql`; existing databases were patched in place (`DROP TABLE user_tiles`, and the `0007` row deleted from `schema_migrations`) rather than recreated. From here on a schema change is a new numbered file, never an edit to one of these.
 
 ### 3.1 `users`
 
@@ -362,6 +362,27 @@ CREATE TABLE auth_handoffs (
     user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     challenge  TEXT NOT NULL,
     expires_at TIMESTAMPTZ NOT NULL
+);
+```
+
+### 3.19 `stories` / `story_activities`
+
+Stories (§4.23, FR-14, ADR-0020) — `migrations/0008_stories.sql`. A Story is the account's own, cascade-deleted with the user; `name` is 1–200 characters (a `CHECK`, behind the handler's own validation), `description` `NULL` when never set. `updated_at` moves on a rename, a new description or a membership change. `story_activities` is the membership, cascading from both sides: deleting an activity takes it out of every Story, a Story left empty stays, and deleting a Story deletes no activity. The primary key serves "a Story's activities"; `idx_story_activities_activity` serves the activity-delete cascade.
+
+```sql
+CREATE TABLE stories (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name         VARCHAR(200) NOT NULL CHECK (char_length(name) BETWEEN 1 AND 200),
+    description  VARCHAR(2000),
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE story_activities (
+    story_id     UUID NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+    activity_id  UUID NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+    PRIMARY KEY (story_id, activity_id)
 );
 ```
 
@@ -1249,6 +1270,18 @@ The app then posts `{code, verifier}` to `POST /v1/auth/handoff` (`handleAuthHan
 
 **Tested**: `facebook_auth_test.go` — the dialog redirect and path-scoped cookie, 404 when unconfigured, every callback failure's redirect and the cookie's deletion, the token and `/me` requests (token in the header, correct `appsecret_proof`), invalid and missing email; `pages_test.go` — the buttons with both providers configured, none with neither, and the three error messages. `oauth_test.go` covers the app round trip: the challenge stored in the cookie and malformed ones refused, failures sent back to `holdmytrack://oauth` (and to the web page without a cookie, or with a three-part one), and malformed handoff requests refused. `google_idtoken_test.go` signs tokens with generated RSA keys behind an `httptest` certs endpoint: valid, another key's signature, `alg: none`, `HS256`, a payload swapped after signing, a wrong audience, and a rotated key picked up only after the refetch gap; plus `GET /v1/auth/providers`. `resolveFacebookUser`, `resolveGoogleUser` and the handoff table's SQL have no automated test (this package has no database harness); they were checked by hand against Postgres — for the handoff: a valid code signs in once, and a replay, a wrong verifier or an expired code get the `401`.
 
+### 4.23 Stories (FR-14, ADR-0020)
+
+**API built; the web and Android screens are not yet** (`docs/ROADMAP.md`). `internal/httpapi/stories.go`, over §3.19's two tables. Reads are `requireVerified`, so a demo session sees the Demo Customer's Stories; every write is `requireNotDemo`.
+
+**Ownership.** Every query is scoped by `user_id`, so another account's Story matches no row and answers `404` exactly like a missing one; a path id that isn't a UUID is `404` before any query. Adding activities (`addStoryActivities`) reads the caller's own rows among `activity_ids` `FOR KEY SHARE` and fails with `404` unless it found every one, so nothing is added from a request naming someone else's activity. The row lock also makes a concurrent activity delete wait for the commit rather than fail the insert's foreign key. Creating with `activity_ids` runs the insert and the membership in one transaction, so a rejected id creates no Story.
+
+**Membership changes** (`changeStoryActivities`) lock the Story row `FOR UPDATE`, apply the insert (`ON CONFLICT DO NOTHING`) or delete, and bump `updated_at` only when a row actually changed. `activity_ids` is deduplicated case-insensitively and capped at 10,000 (`maxStoryActivityIDs`) — "Create story" sends every checked activity, which with select-all can be a whole history.
+
+**Reading** (`loadStories`) takes three queries, whatever the number of Stories: the Stories, newest first; their members, earliest activity first; and `storyStatsQuery`, count, distance, moving and elapsed time grouped by Story and activity type, which Go sums into each Story's totals. Like every total (§4.6) the statistics skip superseded duplicates, which stay in `activity_ids`; moving time falls back to `duration_seconds` per activity, as in `activityTrendsQuery`. `GET /v1/stories/{id}` and every write's response go through the same function with the id set — a write reads back inside its own transaction.
+
+**Tested**: `stories_test.go`, against a real database (`dbtest_test.go`, `docs/DEVELOPMENT.md`) — create, add, rename, remove, list and delete with the statistics and ordering; validation; every route `404` for another account's Story, a missing one and a malformed id, and all-or-nothing rejection of someone else's activity; demo reads and `403`s; and an activity delete through `DELETE /v1/activities/{id}` leaving both a Story that still has another activity and one left empty.
+
 ## 5. Engineering Risks & Mitigations
 
 ### 5.1 Ingest path risk, per path
@@ -1336,7 +1369,7 @@ New, and specific to being free (`VISION.md` §4.3, §6.3). Costs scale with use
 
 ### 5.9 Mobile browser support
 
-**Built, fixed for what emulation can't show, still unverified on a real device.** The layout decisions below exist in code and were deliberately designed, not guessed at — but the real mobile experience was reported directly as unusable, not merely rough. Four real-device causes were then found by reading the code for what Playwright's phone emulation doesn't do, and fixed (**Real-device fixes** below); whether that was all of it needs an actual phone (`docs/ROADMAP.md`'s Phase 3 "Mobile browser support" item). No mobile mockup ever existed for this — this section, not a design doc, was meant to be the record of the actual layout decisions, and still is for whoever picks this back up. Investigated directly before building: zero `@media` queries existed anywhere in `index.css`; the Activities panel was a permanent, fixed-width (260–560px, drag-resizable) sidebar; roughly seven interaction sites were hover-only with no touch equivalent; `RangePicker.tsx`'s drag handles were 14px wide (`touch-action: none` was already set, so mechanically draggable, just tight for a fingertip); `Header.tsx`'s Donate/Upload/Export controls were plain text buttons with no icon fallback for a narrow screen. **Decided directly with the user, not assumed:** the Activities panel becomes a collapsible bottom sheet (not a separate Map/List tab screen), and scope is "core flows fully touch-usable," not full parity with every hover-dependent FR — the map-track-hover ↔ Activities-row-underline highlight (FR-4.1/FR-5.4) stays mouse-only (so did the profile card's exact values, FR-4.9, until the card was removed), documented in `SPEC.md` §17 as a deliberate boundary, not a gap discovered later.
+**Built, fixed for what emulation can't show, still unverified on a real device.** The layout decisions below exist in code and were deliberately designed, not guessed at — but the real mobile experience was reported directly as unusable, not merely rough. Four real-device causes were then found by reading the code for what Playwright's phone emulation doesn't do, and fixed (**Real-device fixes** below); whether that was all of it needs an actual phone (`docs/ROADMAP.md`'s Phase 3 "Mobile browser support" item). No mobile mockup ever existed for this — this section, not a design doc, was meant to be the record of the actual layout decisions, and still is for whoever picks this back up. Investigated directly before building: zero `@media` queries existed anywhere in `index.css`; the Activities panel was a permanent, fixed-width (260–560px, drag-resizable) sidebar; roughly seven interaction sites were hover-only with no touch equivalent; `RangePicker.tsx`'s drag handles were 14px wide (`touch-action: none` was already set, so mechanically draggable, just tight for a fingertip); `Header.tsx`'s Donate/Upload/Export controls were plain text buttons with no icon fallback for a narrow screen. **Decided directly with the user, not assumed:** the Activities panel becomes a collapsible bottom sheet (not a separate Map/List tab screen), and scope is "core flows fully touch-usable," not full parity with every hover-dependent FR — the map-track-hover ↔ Activities-row-underline highlight (FR-4.1/FR-5.4) stays mouse-only (so did the profile card's exact values, FR-4.9, until the card was removed), documented in `SPEC.md` §18 as a deliberate boundary, not a gap discovered later.
 
 **One new `@media (max-width: 768px)` layer**, isolated at the end of `index.css` — every rule above it is the desktop layout, unmodified and confirmed unaffected (the existing desktop-viewport `verify:map`/`verify:build` suites were re-run unmodified specifically to prove this, not just assumed from the media query's isolation).
 

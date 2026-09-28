@@ -239,7 +239,7 @@ class ActivitiesPanel(
     }
 
     /** A track tapped on the map: selects it, as a row tap does, and scrolls its row to the
-     *  middle of the list — without expanding a collapsed sheet (`docs/SPEC.md` §17). */
+     *  middle of the list — without expanding a collapsed sheet (`docs/SPEC.md` §18). */
     fun focusFromMap(id: String) {
         select(id)
         scrollToFocused()
