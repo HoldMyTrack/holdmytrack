@@ -2,6 +2,7 @@ package web
 
 import (
 	"testing"
+	"time"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 )
@@ -50,5 +51,19 @@ func TestCountriesIn(t *testing.T) {
 	}
 	if names["DE"] != "Германия" || CountriesIn("xx")[0] != Countries[0] {
 		t.Errorf("DE = %q", names["DE"])
+	}
+}
+
+func TestLocalTime(t *testing.T) {
+	at := time.Date(2026, time.September, 28, 3, 5, 0, 0, time.UTC)
+	for _, c := range []struct{ lang, zone, want string }{
+		{"en", "America/New_York", "Sep 27, 23:05"},
+		{"en", "Asia/Kolkata", "Sep 28, 08:35"},
+		{"en", "Not/AZone", ""},
+		{"en", "", ""},
+	} {
+		if got := LocalTime(i18n.Get(c.lang), at, c.zone); got != c.want {
+			t.Errorf("LocalTime(%s, %s) = %q, want %q", c.lang, c.zone, got, c.want)
+		}
 	}
 }

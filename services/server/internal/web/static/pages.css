@@ -414,6 +414,11 @@ code {
   color: rgb(var(--fm-ink-rgb) / 60%);
 }
 
+.settings__local-time {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
 .settings__avatar-row {
   display: flex;
   align-items: flex-start;

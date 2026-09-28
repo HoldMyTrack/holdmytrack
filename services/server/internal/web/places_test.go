@@ -32,12 +32,12 @@ func TestTimezoneGroups(t *testing.T) {
 		return "", TimezoneOption{}, false
 	}
 	for id, want := range map[string]struct{ region, label string }{
-		"America/New_York": {"America", "New York · GMT−05:00"},
+		"America/New_York": {"America", "(GMT−05:00) - New York"},
 		// IANA's current names, not CLDR's older spellings (Asia/Calcutta, Europe/Kiev).
-		"Asia/Kolkata":                   {"Asia", "Kolkata · GMT+05:30"},
-		"Europe/Kyiv":                    {"Europe", "Kyiv · GMT+02:00"},
-		"America/Argentina/Buenos_Aires": {"America", "Buenos Aires, Argentina · GMT−03:00"},
-		"UTC":                            {"Other", "UTC · GMT+00:00"},
+		"Asia/Kolkata":                   {"Asia", "(GMT+05:30) - Kolkata"},
+		"Europe/Kyiv":                    {"Europe", "(GMT+02:00) - Kyiv"},
+		"America/Argentina/Buenos_Aires": {"America", "(GMT−03:00) - Buenos Aires, Argentina"},
+		"UTC":                            {"Other", "(GMT+00:00) - UTC"},
 	} {
 		region, opt, ok := find(groups, id)
 		if !ok || region != want.region || opt.Label != want.label {
@@ -45,13 +45,21 @@ func TestTimezoneGroups(t *testing.T) {
 		}
 	}
 	// Offsets are the given day's: New York is on daylight time in July.
-	if _, opt, _ := find(TimezoneGroups(time.Date(2026, time.July, 15, 12, 0, 0, 0, time.UTC), ""), "America/New_York"); !strings.HasSuffix(opt.Label, "GMT−04:00") {
+	if _, opt, _ := find(TimezoneGroups(time.Date(2026, time.July, 15, 12, 0, 0, 0, time.UTC), ""), "America/New_York"); !strings.HasPrefix(opt.Label, "(GMT−04:00)") {
 		t.Errorf("July New York label %q", opt.Label)
 	}
-	// Sorted by region, then by place within one.
+	// Sorted by region, then by offset within one, then by place among equal offsets.
 	for i := 1; i < len(groups); i++ {
 		if groups[i-1].Region >= groups[i].Region {
 			t.Fatalf("regions out of order: %q before %q", groups[i-1].Region, groups[i].Region)
+		}
+	}
+	for _, g := range groups {
+		for i := 1; i < len(g.Options); i++ {
+			a, b := g.Options[i-1], g.Options[i]
+			if a.offset > b.offset || a.offset == b.offset && a.Label > b.Label {
+				t.Fatalf("%s out of order: %q before %q", g.Region, a.Label, b.Label)
+			}
 		}
 	}
 	for _, old := range []string{"Asia/Calcutta", "Europe/Kiev", "America/Buenos_Aires", "Pacific/Truk"} {
