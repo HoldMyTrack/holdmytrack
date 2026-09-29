@@ -36,6 +36,7 @@ import dev.holdmytrack.android.map.DateRangeSlider
 import dev.holdmytrack.android.map.MapMode
 import dev.holdmytrack.android.map.MapOverlays
 import dev.holdmytrack.android.map.MapPaths
+import dev.holdmytrack.android.map.MapSatellite
 import dev.holdmytrack.android.net.Activity
 import dev.holdmytrack.android.net.ApiException
 import dev.holdmytrack.android.net.TrackMetrics
@@ -115,6 +116,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var modeBar: View
     private lateinit var modeButtons: Map<MapMode, MaterialButton>
     private lateinit var pathsToggle: MaterialButton
+    private lateinit var satelliteToggle: MaterialButton
     private lateinit var recordButton: RecordButton
     private lateinit var locateButton: MaterialButton
 
@@ -324,6 +326,9 @@ class MainActivity : AppCompatActivity() {
         pathsToggle = findViewById(R.id.paths_toggle)
         pathsToggle.isChecked = MapPaths.isOn(this)
         pathsToggle.setOnClickListener { setPaths(!MapPaths.isOn(this)) }
+        satelliteToggle = findViewById(R.id.satellite_toggle)
+        satelliteToggle.isChecked = MapSatellite.isOn(this)
+        satelliteToggle.setOnClickListener { setSatellite(!MapSatellite.isOn(this)) }
         menuButton.setOnClickListener { showMenu(it) }
 
         recordButton = findViewById(R.id.record_button)
@@ -483,6 +488,9 @@ class MainActivity : AppCompatActivity() {
             hideNotice(Notice.MAP_FAILED)
             // The served style ships the path layers hidden; a fresh style needs the saved choice.
             MapPaths.apply(loaded, MapPaths.isOn(this))
+            // Only a deployment with imagery serves it; without, there is no switch to show.
+            satelliteToggle.isVisible = MapSatellite.isAvailable(loaded)
+            MapSatellite.apply(loaded, MapSatellite.isOn(this))
             MapOverlays.attachLiveTrack(loaded)
             syncSession()
             renderRecording()
@@ -660,7 +668,7 @@ class MainActivity : AppCompatActivity() {
 
         val loaded = style ?: return
         if (!overlaysAttached) {
-            MapOverlays.attach(loaded, mode, selectedRange, isNight(), storyId)
+            MapOverlays.attach(loaded, mode, selectedRange, darkBase(loaded), storyId)
             MapOverlays.setTrackFilter(loaded, panelState.mapHidden, panelState.focused)
             overlaysAttached = true
             renderTrackMetrics()
@@ -1389,6 +1397,19 @@ class MainActivity : AppCompatActivity() {
         pathsToggle.isChecked = on
         style?.let { MapPaths.apply(it, on) }
     }
+
+    private fun setSatellite(on: Boolean) {
+        MapSatellite.set(this, on)
+        satelliteToggle.isChecked = on
+        val loaded = style ?: return
+        MapSatellite.apply(loaded, on)
+        if (overlaysAttached) MapOverlays.setDarkVeil(loaded, darkBase(loaded))
+    }
+
+    /** Whether the basemap reads dark — the dark flavor, or satellite imagery over either —
+     *  which picks Fog's veil (`MapOverlays.setDarkVeil`), the web's `isDarkBase`. */
+    private fun darkBase(style: Style): Boolean =
+        isNight() || (MapSatellite.isOn(this) && MapSatellite.isAvailable(style))
 
     /**
      * Moves the camera onto the account's most recent activity, once per session — the web's

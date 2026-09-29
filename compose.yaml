@@ -136,6 +136,13 @@ services:
       # same "empty is a working default" stance as SMTP_HOST. Dev needs GOOGLE_REDIRECT_URL
       # pointed at the API's own origin (http://localhost:8080/v1/auth/google/callback), since
       # here Vite and the API are two origins; see .env.example.
+      # Satellite imagery (docs/SPEC.md FR-4.14) in the style document native clients fetch —
+      # off unless SATELLITE_TILES is set, like GOOGLE_CLIENT_ID. The web client reads its own
+      # VITE_SATELLITE_* from apps/web/.env.local; see .env.example.
+      SATELLITE_TILES: ${SATELLITE_TILES:-}
+      SATELLITE_TILE_SIZE: ${SATELLITE_TILE_SIZE:-512}
+      SATELLITE_MAXZOOM: ${SATELLITE_MAXZOOM:-18}
+      SATELLITE_ATTRIBUTION: ${SATELLITE_ATTRIBUTION:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-}

@@ -1564,6 +1564,13 @@ body {
   border: 0;
 }
 
+/* The Base map choice (FR-4.14) above everything, set off from the overlays by a rule. */
+.overlays-menu__group--basemap {
+  margin-bottom: var(--fm-space-8);
+  padding-bottom: var(--fm-space-8);
+  border-bottom: 1px solid var(--fm-border);
+}
+
 /* The master All, over both groups, set off from them by a rule. */
 .overlays-menu__item--all {
   margin-bottom: var(--fm-space-8);
@@ -1597,7 +1604,8 @@ body {
   cursor: pointer;
 }
 
-.overlays-menu__item input[type='checkbox'] {
+.overlays-menu__item input[type='checkbox'],
+.overlays-menu__item input[type='radio'] {
   flex: none;
   accent-color: var(--fm-accent);
 }

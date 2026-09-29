@@ -12,6 +12,10 @@
  * read it from a CDN (`VITE_BASEMAP_ORIGIN`, `config.ts`'s `basemapOrigin()`). The server
  * substitutes its own configured origin per request.
  *
+ * The satellite imagery source is a placeholder for the same reason, and more so: its tile URL
+ * carries a deployment's own key. The server fills it from `SATELLITE_*`, or strips the source,
+ * its layer and the hidden-layer list when a deployment configures no imagery (mapstyle.go).
+ *
  * Usage: node scripts/build-style.mjs [--check]
  *   --check regenerates in memory and fails if the committed files differ, so drift between
  *   style.ts and the served document is caught here rather than on a client.
@@ -42,6 +46,14 @@ const { buildStyle, FLAVORS } = await import('../src/map/style.ts');
 /** Must match originPlaceholder in services/server/internal/mapstyle/mapstyle.go. */
 const ORIGIN_PLACEHOLDER = '__HOLDMYTRACK_BASEMAP_ORIGIN__';
 
+/** Must match satelliteTilesPlaceholder and satelliteAttributionPlaceholder in mapstyle.go. */
+const SATELLITE_PLACEHOLDER = {
+  tiles: '__HOLDMYTRACK_SATELLITE_TILES__',
+  tileSize: 512,
+  maxzoom: 18,
+  attribution: '__HOLDMYTRACK_SATELLITE_ATTRIBUTION__',
+};
+
 const here = dirname(fileURLToPath(import.meta.url));
 const outDir = resolvePath(here, '../../../services/server/internal/mapstyle/styles');
 const check = process.argv.includes('--check');
@@ -50,7 +62,7 @@ let drifted = false;
 await mkdir(outDir, { recursive: true });
 
 for (const flavor of FLAVORS) {
-  const style = buildStyle({ flavor, origin: ORIGIN_PLACEHOLDER });
+  const style = buildStyle({ flavor, origin: ORIGIN_PLACEHOLDER, satellite: SATELLITE_PLACEHOLDER });
   const json = `${JSON.stringify(style, null, 2)}\n`;
   const path = join(outDir, `${flavor}.json`);
 

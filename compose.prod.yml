@@ -76,6 +76,13 @@ services:
       # resolves the basemap against — the same value the web bundle bakes in, so both
       # clients read one archive. Empty falls back to APP_BASE_URL (config.go).
       BASEMAP_ORIGIN: ${VITE_BASEMAP_ORIGIN:-}
+      # Satellite imagery (docs/SPEC.md FR-4.14, docs/DEPLOY.md) — optional; empty leaves the
+      # satellite source out of the style document, and native clients show no switch. The
+      # same values the web bundle bakes in, so both clients read one provider.
+      SATELLITE_TILES: ${VITE_SATELLITE_TILES:-}
+      SATELLITE_TILE_SIZE: ${VITE_SATELLITE_TILE_SIZE:-512}
+      SATELLITE_MAXZOOM: ${VITE_SATELLITE_MAXZOOM:-18}
+      SATELLITE_ATTRIBUTION: ${VITE_SATELLITE_ATTRIBUTION:-}
       # Sign in with Google (docs/SPEC.md FR-1.9, docs/DEPLOY.md) — optional; empty turns it
       # off. The redirect URL defaults to APP_BASE_URL + /v1/auth/google/callback (config.go),
       # which is right here because Caddy serves the app and the API from one origin.
@@ -127,6 +134,11 @@ services:
       # just a restart.
       args:
         VITE_BASEMAP_ORIGIN: ${VITE_BASEMAP_ORIGIN:-}
+        # Satellite imagery, also build-time: empty hides the Satellite switch.
+        VITE_SATELLITE_TILES: ${VITE_SATELLITE_TILES:-}
+        VITE_SATELLITE_TILE_SIZE: ${VITE_SATELLITE_TILE_SIZE:-512}
+        VITE_SATELLITE_MAXZOOM: ${VITE_SATELLITE_MAXZOOM:-18}
+        VITE_SATELLITE_ATTRIBUTION: ${VITE_SATELLITE_ATTRIBUTION:-}
         # Same GIT_SHA as the api service's build args, below — baked into the bundle so
         # VersionBanner.tsx can compare its own build against /healthz's version field.
         GIT_SHA: ${GIT_SHA:-unknown}

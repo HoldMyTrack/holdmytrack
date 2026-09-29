@@ -269,4 +269,61 @@ describe('basemap foundation', () => {
     await page.locator('#overlay-bike-paths').uncheck();
     assert.deepEqual(await visibility(ALL), ALL.map(() => 'none'), 'hidden again once unticked');
   });
+
+  // Satellite mode (docs/SPEC.md FR-4.14) exists only when the dev server was started with
+  // VITE_SATELLITE_TILES: without it the style has no imagery and the menu no Base map section,
+  // which is what CI checks; with it, the switch itself.
+  it('9. Base map: Satellite shows imagery under roads and labels, remembered across reload, or is absent unconfigured', async () => {
+    const menu = page.getByTestId('map-overlays');
+    const openMenu = async () => {
+      const trigger = menu.getByRole('button').first();
+      if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+    };
+    const hasImagery = await page.evaluate(() => Boolean(window.__holdmytrack.getLayer('satellite')));
+    await openMenu();
+    if (!hasImagery) {
+      assert.equal(await page.locator('#overlay-basemap-satellite').count(), 0, 'no Base map section without imagery');
+      return;
+    }
+
+    const visibility = (ids) =>
+      page.evaluate((ids) => ids.map((id) => window.__holdmytrack.getLayoutProperty(id, 'visibility') ?? 'visible'), ids);
+    const FILLS = ['background', 'earth', 'water', 'buildings'];
+    // Drawn over the imagery in either mode: the hybrid.
+    const KEPT = ['roads_major', 'places_locality'];
+
+    // Imagery tiles fetched from the configured host once it's on — the raster has no features
+    // to query, so the responses are the evidence it drew.
+    const host = await page.evaluate(() => new URL(window.__holdmytrack.getStyle().sources.satellite.tiles[0]).host);
+    let imageryTiles = 0;
+    const countImagery = (res) => {
+      if (res.status() === 200 && new URL(res.url()).host === host) imageryTiles += 1;
+    };
+    page.on('response', countImagery);
+
+    assert.deepEqual(await visibility(['satellite']), ['none'], 'imagery off until chosen');
+    await page.locator('#overlay-basemap-satellite').check();
+    assert.deepEqual(await visibility(['satellite']), ['visible'], 'imagery on');
+    assert.deepEqual(await visibility(FILLS), FILLS.map(() => 'none'), 'fills hidden over it');
+    assert.deepEqual(await visibility(KEPT), KEPT.map(() => 'visible'), 'roads and labels kept');
+    const roadOpacity = () =>
+      page.evaluate(() => ['roads_major', 'roads_minor', 'roads_rail'].map((id) => window.__holdmytrack.getPaintProperty(id, 'line-opacity')));
+    assert.deepEqual(await roadOpacity(), [0.4, 0.4, 0.5], 'roads see-through over the imagery, rail as it was');
+    const order = await page.evaluate(() => window.__holdmytrack.getStyle().layers.map((l) => l.id));
+    assert.ok(order.indexOf('satellite') < order.indexOf('roads_major'), 'imagery under the roads');
+    await styleLoaded();
+    await page.waitForFunction(() => window.__holdmytrack.areTilesLoaded(), undefined, { timeout: 30_000 });
+    page.off('response', countImagery);
+    assert.ok(imageryTiles > 0, `imagery tiles fetched (${imageryTiles})`);
+    await page.screenshot({ path: new URL('columbus-satellite.png', SHOTS).pathname });
+
+    await page.reload();
+    await styleLoaded();
+    assert.deepEqual(await visibility(['satellite']), ['visible'], 'remembered across reload');
+    await openMenu();
+    await page.locator('#overlay-basemap-map').check();
+    assert.deepEqual(await visibility(['satellite']), ['none'], 'imagery off again');
+    assert.deepEqual(await visibility(FILLS), FILLS.map(() => 'visible'), 'fills back');
+    assert.deepEqual(await roadOpacity(), [undefined, undefined, 0.5], 'roads opaque again');
+  });
 });

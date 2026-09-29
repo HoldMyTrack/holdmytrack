@@ -59,6 +59,20 @@ Moving to a newer build repeats steps 3–5 under a new prefix. The old prefix s
 
 A deployment without R2 can serve the archive same-origin instead: leave `VITE_BASEMAP_ORIGIN` empty and uncomment `compose.prod.yml`'s `web` volume line, pointing it at the archive on the host. That needs the whole archive on the VPS's own disk.
 
+**Satellite imagery (optional).** Leave `VITE_SATELLITE_TILES` empty to run without it; the map then has no Satellite choice (`docs/SPEC.md` FR-4.14). holdmytrack.com uses MapTiler Satellite on MapTiler's Free plan: 100k tile requests a month, non-commercial, and past that the imagery pauses until the next month instead of billing (ADR-0022). To turn it on:
+
+1. Create a MapTiler Cloud account (cloud.maptiler.com) on the Free plan, with no payment method, so nothing can be billed.
+2. Under **API keys**, create a key for HoldMyTrack and, under **Allowed HTTP origins**, add `https://<your-domain>` (plus `http://localhost:5173` if local dev should use it). The key ends up in the web bundle and the served style, readable by anyone, so the origin restriction is what keeps other sites from spending the quota. Android requests carry no browser origin: check that the Android app still loads the imagery with the restriction on, and give it its own key if it doesn't.
+3. Set in `.env.prod`:
+   ```
+   VITE_SATELLITE_TILES=https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}.jpg?key=<key>
+   VITE_SATELLITE_TILE_SIZE=512
+   VITE_SATELLITE_MAXZOOM=18
+   VITE_SATELLITE_ATTRIBUTION=<a href="https://www.maptiler.com/copyright/">© MapTiler</a>
+   ```
+   Keep the tile size at 512, MapTiler's own: at 256 the map would fetch four times as many tiles for the same view, all counted against the quota. These are *build*-time values for the web bundle, like `VITE_BASEMAP_ORIGIN`, and `compose.prod.yml` also passes them to `api` as `SATELLITE_*` for the Android app's style document. Changing them needs `docker compose -f compose.prod.yml build web` and an `up -d`.
+4. Check the usage page in MapTiler Cloud during the first weeks. Switching to another provider later (Esri World Imagery, MapTiler's paid Flex plan) only means changing these four values: the template, its tile size (Esri's are 256), its deepest zoom and its credit.
+
 ## 6. Bring it up
 
 ```
@@ -132,6 +146,7 @@ GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-f
 - `curl https://<your-domain>/healthz` should return `200`.
 - Open the domain in a browser, sign up, upload a `.gpx` file, confirm it appears on the map — this exercises the full path: Caddy → `api` → Postgres → R2 (raw payload) → `worker` → R2 (fog/heatmap tiles) → back through Caddy to the browser.
 - Switch to Fog, then zoom out below city zoom: any country the account has an activity in should render clear against the veil. If the whole world stays uniformly fogged (and Heatmap shows no country/region highlight either), `admin_countries`/`admin_regions` are empty — run step 6's `seed-admin-boundaries`, then hard-refresh; the tiles are queried live, so nothing else needs rebuilding.
+- If satellite imagery is configured, open Overlays, choose Satellite, and confirm the imagery shows under the roads and labels with MapTiler's credit in the attribution. A map that loses its land and water but shows no imagery means the tile requests are refused: check the browser's network tab for a `403` (the key, or its allowed origins) and `curl https://<your-domain>/v1/map/style/light` for a `satellite` source with your URL.
 - If Google sign-in is configured, click "Continue with Google" and confirm you land on the map signed in. A `redirect_uri_mismatch` page from Google means the authorized redirect URI in step 4 doesn't match `APP_BASE_URL` + `/v1/auth/google/callback` exactly; landing back on the sign-in screen with "Couldn't sign in with Google" means the callback failed, and `docker compose -f compose.prod.yml logs api | grep "google sign-in"` says why.
 - If sign-in silently fails (redirected straight back to the sign-in screen after submitting), the most likely cause is `APP_BASE_URL` not actually being `https://` while the browser is on a plain `http://` connection, or vice versa — see step 4's note on the `Secure` cookie flag.
 

@@ -6,6 +6,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 )
 
 // Config is everything serve/work/migrate need to reach Postgres and the object store.
@@ -37,6 +38,16 @@ type Config struct {
 	// serves it from there. Set it only for a deployment reading the archive from object
 	// storage or a CDN. Only read by `serve`.
 	BasemapOrigin string
+	// Satellite* are the deployment's satellite imagery (docs/SPEC.md FR-4.14, ADR-0022), which
+	// the served style document hands native clients: an XYZ tile template with the provider's
+	// key in it, the deepest zoom it serves, and the credit its terms require. Mirrors the web
+	// client's VITE_SATELLITE_* (apps/web/src/map/config.ts's satelliteSource), and compose.prod.yml
+	// passes the same values to both. An empty SatelliteTiles means no imagery: the style has no
+	// satellite source and clients show no switch. Only read by `serve`.
+	SatelliteTiles       string
+	SatelliteTileSize    int
+	SatelliteMaxZoom     int
+	SatelliteAttribution string
 	// SkipEmailVerification bypasses docs/ROADMAP.md's email-verification gate entirely —
 	// every new signup is created already verified, and no verification email is sent. Off
 	// by default; compose.yaml's `test` profile is the one place this is turned on, since
@@ -89,6 +100,16 @@ func Load() (Config, error) {
 		// vars that must agree are two env vars that can disagree.
 		c.BasemapOrigin = c.AppBaseURL
 	}
+	c.SatelliteTiles = env("SATELLITE_TILES", "")
+	c.SatelliteAttribution = env("SATELLITE_ATTRIBUTION", "")
+	// MapTiler Satellite's tile size and deepest level, the web client's defaults too.
+	var err error
+	if c.SatelliteTileSize, err = positiveInt("SATELLITE_TILE_SIZE", 512); err != nil {
+		return c, err
+	}
+	if c.SatelliteMaxZoom, err = positiveInt("SATELLITE_MAXZOOM", 18); err != nil {
+		return c, err
+	}
 	c.WebDevDir = env("WEB_DEV_DIR", "")
 	c.GoogleClientID = env("GOOGLE_CLIENT_ID", "")
 	c.GoogleClientSecret = env("GOOGLE_CLIENT_SECRET", "")
@@ -121,6 +142,18 @@ func Load() (Config, error) {
 		return c, fmt.Errorf("config: S3_ENDPOINT is required")
 	}
 	return c, nil
+}
+
+func positiveInt(key string, def int) (int, error) {
+	v, ok := os.LookupEnv(key)
+	if !ok || v == "" {
+		return def, nil
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return 0, fmt.Errorf("config: %s must be a positive integer, got %q", key, v)
+	}
+	return n, nil
 }
 
 func env(key, def string) string {

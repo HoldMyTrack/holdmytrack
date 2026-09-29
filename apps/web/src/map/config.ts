@@ -1,3 +1,5 @@
+import type { SatelliteSource } from './style';
+
 /**
  * Where the self-hosted basemap assets live, and the region the archive covers.
  *
@@ -55,4 +57,32 @@ export function browserOrigin(): string {
 export function basemapOrigin(): string {
   const configured = import.meta.env.VITE_BASEMAP_ORIGIN as string | undefined;
   return configured ? configured.replace(/\/$/, '') : browserOrigin();
+}
+
+/** The imagery's tile size and deepest zoom when `VITE_SATELLITE_TILE_SIZE` and
+ *  `VITE_SATELLITE_MAXZOOM` are unset: MapTiler Satellite's. */
+const DEFAULT_SATELLITE_TILE_SIZE = 512;
+const DEFAULT_SATELLITE_MAXZOOM = 18;
+
+/**
+ * The deployment's satellite imagery (docs/SPEC.md FR-4.14), from build-time
+ * `VITE_SATELLITE_TILES` (an XYZ template, key included) and `VITE_SATELLITE_ATTRIBUTION`. Null
+ * when no template is set, and then the style has no satellite source and the Overlays menu no
+ * Satellite switch: imagery is metered per tile, so a deployment opts in rather than out
+ * (ADR-0022). The API serves native clients the same values as `SATELLITE_*` (compose.prod.yml).
+ */
+export function satelliteSource(): SatelliteSource | null {
+  const tiles = import.meta.env.VITE_SATELLITE_TILES as string | undefined;
+  if (!tiles) return null;
+  return {
+    tiles,
+    tileSize: positiveOr(import.meta.env.VITE_SATELLITE_TILE_SIZE, DEFAULT_SATELLITE_TILE_SIZE),
+    maxzoom: positiveOr(import.meta.env.VITE_SATELLITE_MAXZOOM, DEFAULT_SATELLITE_MAXZOOM),
+    attribution: (import.meta.env.VITE_SATELLITE_ATTRIBUTION as string | undefined) ?? '',
+  };
+}
+
+function positiveOr(value: unknown, fallback: number): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
 }

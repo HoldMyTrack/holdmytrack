@@ -9,7 +9,7 @@ import {
 import { registerPmtilesProtocol } from './protocol';
 import { configureMapLibreWorker } from './worker';
 import { buildStyle, type Flavor } from './style';
-import { basemapOrigin } from './config';
+import { basemapOrigin, satelliteSource } from './config';
 import type { ViewState } from './viewState';
 import { API_BASE_URL } from '../api';
 import { t } from '../i18n';
@@ -30,6 +30,9 @@ export interface UseMapInstanceOptions {
   container: React.RefObject<HTMLDivElement | null>;
   initialView: ViewState;
   initialFlavor: Flavor;
+  /** Whether satellite imagery (FR-4.14) is on at first paint, read once like initialFlavor,
+   *  so a saved choice doesn't flash the vector map first. */
+  initialSatellite: boolean;
   /** ScaleControl's own unit — the one piece of map chrome that reads a distance number
    *  directly, so it has to track the account's Country setting (units.ts) the same way
    *  every other distance display in the app now does. Read on every render (not captured
@@ -42,6 +45,7 @@ export function useMapInstance({
   container,
   initialView,
   initialFlavor,
+  initialSatellite,
   scaleUnit,
 }: UseMapInstanceOptions): MapLibreMap | null {
   const [map, setMap] = useState<MapLibreMap | null>(null);
@@ -49,7 +53,7 @@ export function useMapInstance({
 
   // Captured once so the effect below can keep an empty dependency list without
   // lying about what it reads.
-  const initial = useRef({ view: initialView, flavor: initialFlavor });
+  const initial = useRef({ view: initialView, flavor: initialFlavor, satellite: initialSatellite });
 
   useEffect(() => {
     if (!container.current) return;
@@ -62,7 +66,12 @@ export function useMapInstance({
     let cancelled = false;
     const instance = new MapLibreMap({
       container: container.current,
-      style: buildStyle({ flavor: initial.current.flavor, origin: basemapOrigin() }),
+      style: buildStyle({
+        flavor: initial.current.flavor,
+        origin: basemapOrigin(),
+        satellite: satelliteSource(),
+        satelliteOn: initial.current.satellite,
+      }),
       center: [initial.current.view.longitude, initial.current.view.latitude],
       zoom: initial.current.view.zoom,
       // We render our own, positioned with the rest of the UI.

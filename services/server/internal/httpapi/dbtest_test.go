@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/db"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mapstyle"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 )
@@ -58,7 +59,7 @@ func newDBTest(t *testing.T) *dbTest {
 	if err != nil {
 		t.Fatalf("templates: %v", err)
 	}
-	srv := New(pool, store, slog.New(slog.DiscardHandler), nil, "https://app.example", "", "test", false, GoogleOAuthConfig{}, FacebookOAuthConfig{}, pages)
+	srv := New(pool, store, slog.New(slog.DiscardHandler), nil, "https://app.example", "", mapstyle.Satellite{}, "test", false, GoogleOAuthConfig{}, FacebookOAuthConfig{}, pages)
 	return &dbTest{t: t, pool: pool, srv: srv}
 }
 

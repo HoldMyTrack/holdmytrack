@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { flyToBBox, flyToView, unionBBox } from './bbox';
-import { basemapOrigin, WORLD_VIEW } from './config';
+import { basemapOrigin, satelliteSource, WORLD_VIEW } from './config';
 import { countryView } from './countryView';
 import { exportFramedImage } from './exportMap';
 import type { ExportPreset } from './exportPresets';
@@ -11,9 +11,10 @@ import { ensureHeatmapLayer } from './heatmap';
 import { setMapMode, type MapMode } from './mapMode';
 import { loadOverlays, saveOverlays, type Overlays } from './overlays';
 import { setPathsVisible } from './paths';
+import { setSatelliteVisible } from './satellite';
 import { ensureSpotsLayer, setSpotClickHandler, setSpotsVisible, type Spot, type SpotCategory } from './spots';
 import { labelInsertionPoint } from './layers';
-import { buildStyle, isDarkFlavor, type Flavor } from './style';
+import { buildStyle, isDarkBase, type Flavor } from './style';
 import { clearTrackBands, ensureBandLayer, setTrackBands } from './trackBands';
 import {
   ensureTrackLayer,
@@ -151,8 +152,8 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // Normal is what already rendered before fog existed — it needed no new work to count
   // as a "mode" (IMPLEMENTATION.md §4.2.2).
   const [mapMode, setMapModeState] = useState<MapMode>('normal');
-  // The Overlays menu (OverlaysMenu.tsx): Trails, Tracks, Bike paths and each Spots category, over any
-  // mode, remembered per browser (overlays.ts).
+  // The Overlays menu (OverlaysMenu.tsx): the Base map, then Trails, Tracks, Bike paths and each
+  // Spots category, over any mode, remembered per browser (overlays.ts).
   const [overlays, setOverlays] = useState<Overlays>(loadOverlays);
   const changeOverlays = useCallback((next: Overlays) => {
     saveOverlays(next);
@@ -162,6 +163,9 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     () => ({ trails: overlays.trails, tracks: overlays.tracks, bikePaths: overlays.bikePaths }),
     [overlays.trails, overlays.tracks, overlays.bikePaths],
   );
+  // Satellite imagery (FR-4.14): only when the deployment configures some, whatever was saved.
+  const satelliteAvailable = satelliteSource() !== null;
+  const satellite = satelliteAvailable && overlays.satellite;
   // The spot whose popup is open (SpotPopup, FR-15.3) — null when none is.
   const [openSpot, setOpenSpot] = useState<Spot | null>(null);
 
@@ -463,6 +467,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     container,
     initialView: initial.view,
     initialFlavor: initial.flavor,
+    initialSatellite: satellite,
     scaleUnit: unitSystem,
   });
 
@@ -502,7 +507,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     try {
       const blob = await exportFramedImage(
         map,
-        { flavor, mode: mapMode, activityQuery, hiddenIds: [...mapHiddenIds], paths },
+        { flavor, mode: mapMode, activityQuery, hiddenIds: [...mapHiddenIds], paths, satellite },
         {
           ...geometry,
           ...(preset !== 'custom' && { target: { widthPx: preset.widthPx, heightPx: preset.heightPx } }),
@@ -525,7 +530,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       // discard the frame the user just positioned, forcing them to redo it from scratch.
       setExportFlow((flow) => (flow.stage === 'capturing' ? { stage: 'framing', preset: flow.preset, geometry: flow.geometry } : flow));
     }
-  }, [exportFlow, map, flavor, mapMode, activityQuery, mapHiddenIds, paths]);
+  }, [exportFlow, map, flavor, mapMode, activityQuery, mapHiddenIds, paths, satellite]);
 
   const handleExportCancel = useCallback(() => {
     setExportFlow({ stage: 'idle' });
@@ -1160,7 +1165,8 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       // it. setMapMode has to run again after this: addLayer always starts a fresh layer
       // hidden (fog.ts/heatmap.ts), so a styledata mid-non-Normal-mode would otherwise
       // silently drop back to Normal.
-      ensureFogLayer(instance, beforeId, isDarkFlavor(flavor));
+      // Satellite imagery reads dark, so it takes the dark flavors' veil (style.ts's isDarkBase).
+      ensureFogLayer(instance, beforeId, isDarkBase(flavor, satellite));
       ensureHeatmapLayer(instance, beforeId);
       ensureTrackLayer(instance, beforeId, activityQuery);
       // After tracks, so it paints on top and fully overlays the one track it applies to —
@@ -1170,8 +1176,10 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       // Spots last, above everything including the basemap's labels (spots.ts).
       ensureSpotsLayer(instance, spotsShown);
       setMapMode(instance, mapMode, editingTrack);
-      // A style swap brings the path layers back at the style's default (hidden).
+      // A style swap brings the path layers back at the style's default (hidden), and the
+      // imagery back at whatever the swap's buildStyle was given.
       setPathsVisible(instance, paths);
+      setSatelliteVisible(instance, satellite);
       // Same reasoning as setMapMode just above: addLayer always starts the tracks layer
       // with no filter, so a styledata that recreates it would otherwise silently un-hide
       // everything the eye icon/TYPE/DISTANCE filters had hidden. Both setMapMode and
@@ -1187,7 +1195,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
         setTrackBands(instance, trackMetrics.points);
       }
     },
-    [flavor, mapMode, editingTrack, paths, spotsShown, mapHiddenIds, activityQuery, trackMetrics, focusedActivityId, focusedPending],
+    [flavor, satellite, mapMode, editingTrack, paths, spotsShown, mapHiddenIds, activityQuery, trackMetrics, focusedActivityId, focusedPending],
   );
 
   useEffect(() => {
@@ -1215,7 +1223,10 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   useEffect(() => {
     if (!map || appliedFlavor.current === flavor) return;
     appliedFlavor.current = flavor;
-    map.setStyle(buildStyle({ flavor, origin: basemapOrigin() }), { diff: false });
+    map.setStyle(buildStyle({ flavor, origin: basemapOrigin(), satellite: satelliteSource(), satelliteOn: satellite }), {
+      diff: false,
+    });
+    // Only a flavor change swaps the style; the Base map switch flips layers in place (below).
   }, [map, flavor]);
 
   // Mode changes outside of a styledata event (the toggle itself, not a theme swap) still
@@ -1229,6 +1240,11 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     if (!map) return;
     setPathsVisible(map, paths);
   }, [map, paths]);
+
+  useEffect(() => {
+    if (!map) return;
+    setSatelliteVisible(map, satellite);
+  }, [map, satellite]);
 
   // Keep the hash current. `moveend` rather than `move`: one rewrite per gesture,
   // not one per animation frame.
@@ -1356,7 +1372,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
                 </button>
               </div>
               {/* Its own group: layers switched on and off over any mode, not a fourth mode. */}
-              <OverlaysMenu overlays={overlays} onChange={changeOverlays} />
+              <OverlaysMenu overlays={overlays} satelliteAvailable={satelliteAvailable} onChange={changeOverlays} />
             </div>
           )}
           {map && !editOpen && <ShowInArea map={map} categories={spotsShown} />}

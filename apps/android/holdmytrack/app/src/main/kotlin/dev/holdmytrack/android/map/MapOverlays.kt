@@ -208,7 +208,8 @@ object MapOverlays {
      * (`docs/SPEC.md` FR-4.2, FR-4.3). The Activities panel's TYPE/DISTANCE filters, hidden
      * set and selection are applied on the client, as layer filters ([setTrackFilter]).
      *
-     * [dark] says the style is the dark basemap flavor, so Fog gets the cream veil; [story] is
+     * [dark] says the basemap reads dark — the dark flavor, or satellite imagery — so Fog gets
+     * the cream veil ([setDarkVeil]); [story] is
      * the open Story, or null ([setTrackStory]).
      */
     fun attach(style: Style, mode: MapMode, range: DateRange?, dark: Boolean, story: String?) {
@@ -278,6 +279,18 @@ object MapOverlays {
             style, REGION_HEATMAP_SOURCE_ID, REGION_HEATMAP_LAYER_ID, REGIONS_SOURCE_LAYER,
             coverageUrl("region-heatmap", "mvt"), beforeId, REGION_MIN_ZOOM, REGION_MAX_ZOOM, HEATMAP_FILL_COLOR, HEATMAP_FILL_OPACITY,
         )
+    }
+
+    /**
+     * Switches Fog to the other veil when the basemap under it changes lightness without a
+     * style reload — satellite imagery (`MapSatellite`) reads dark, so it takes the dark
+     * flavor's cream veil, like the web's `isDarkBase`. Re-adds the coverage layers the way
+     * [refreshCoverage] does, since their colors and tile URLs are fixed when added.
+     */
+    fun setDarkVeil(style: Style, dark: Boolean) {
+        if (darkVeil == dark) return
+        darkVeil = dark
+        refreshCoverage(style)
     }
 
     /** The tracks tiles fetched again for [range] — after a delete, or a reprocess landing. */

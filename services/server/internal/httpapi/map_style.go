@@ -23,10 +23,14 @@ import (
 // Android 11.8.0 / iOS 6.10.0). So one document serves both: no native client needs the
 // archive re-exposed as `{z}/{x}/{y}`, confirmed on a physical Android device reading this
 // endpoint's own output (apps/android/docs/ARCHITECTURE.md §2.1).
+//
+// The satellite imagery source (docs/SPEC.md FR-4.14) is filled from SATELLITE_* the same way,
+// or left out when the deployment configures none — which is how a client knows to show no
+// Satellite switch.
 func (s *Server) handleMapStyle(w http.ResponseWriter, r *http.Request) {
 	flavor := strings.TrimSuffix(r.PathValue("flavor"), ".json")
 
-	doc, err := mapstyle.Document(flavor, s.basemapOrigin)
+	doc, err := mapstyle.Document(flavor, s.basemapOrigin, s.satellite)
 	if errors.Is(err, mapstyle.ErrUnknownFlavor) {
 		// Name the valid set rather than a bare 404 — the caller is a client developer
 		// wiring this up, and the flavor list is not discoverable from anywhere else.

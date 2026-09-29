@@ -24,6 +24,7 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/geo"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/httpapi"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mail"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mapstyle"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/spots"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
@@ -101,7 +102,9 @@ func main() {
 			log.Error("page templates", "err", err)
 			os.Exit(1)
 		}
-		srv := httpapi.New(pool, store, log, mailer, cfg.AppBaseURL, cfg.BasemapOrigin, gitSHA, cfg.SkipEmailVerification, httpapi.GoogleOAuthConfig{
+		srv := httpapi.New(pool, store, log, mailer, cfg.AppBaseURL, cfg.BasemapOrigin, mapstyle.Satellite{
+			Tiles: cfg.SatelliteTiles, TileSize: cfg.SatelliteTileSize, MaxZoom: cfg.SatelliteMaxZoom, Attribution: cfg.SatelliteAttribution,
+		}, gitSHA, cfg.SkipEmailVerification, httpapi.GoogleOAuthConfig{
 			ClientID: cfg.GoogleClientID, ClientSecret: cfg.GoogleClientSecret, RedirectURL: cfg.GoogleRedirectURL,
 		}, httpapi.FacebookOAuthConfig{
 			AppID: cfg.FacebookAppID, AppSecret: cfg.FacebookAppSecret, RedirectURL: cfg.FacebookRedirectURL,

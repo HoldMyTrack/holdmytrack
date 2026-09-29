@@ -3,6 +3,7 @@ package mapstyle
 import (
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -30,7 +31,7 @@ func TestFlavorsMatchWebClient(t *testing.T) {
 func TestDocumentSubstitutesOrigin(t *testing.T) {
 	const origin = "https://cdn.example.com"
 	for _, flavor := range Flavors() {
-		doc, err := Document(flavor, origin)
+		doc, err := Document(flavor, origin, Satellite{})
 		if err != nil {
 			t.Fatalf("Document(%q): %v", flavor, err)
 		}
@@ -79,11 +80,11 @@ func TestDocumentSubstitutesOrigin(t *testing.T) {
 }
 
 func TestDocumentTrimsTrailingSlash(t *testing.T) {
-	with, err := Document("light", "https://cdn.example.com/")
+	with, err := Document("light", "https://cdn.example.com/", Satellite{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	without, err := Document("light", "https://cdn.example.com")
+	without, err := Document("light", "https://cdn.example.com", Satellite{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,18 +95,134 @@ func TestDocumentTrimsTrailingSlash(t *testing.T) {
 }
 
 func TestDocumentUnknownFlavor(t *testing.T) {
-	if _, err := Document("neon", "https://example.com"); !errors.Is(err, ErrUnknownFlavor) {
+	if _, err := Document("neon", "https://example.com", Satellite{}); !errors.Is(err, ErrUnknownFlavor) {
 		t.Errorf("err = %v, want ErrUnknownFlavor so the handler can answer 404", err)
 	}
 }
 
 func TestETagVariesWithOrigin(t *testing.T) {
-	a, _ := Document("light", "https://a.example.com")
-	b, _ := Document("light", "https://b.example.com")
+	a, _ := Document("light", "https://a.example.com", Satellite{})
+	b, _ := Document("light", "https://b.example.com", Satellite{})
 	if ETag(a) == ETag(b) {
 		t.Error("same ETag for different origins — a client would cache the wrong asset URLs")
 	}
 	if ETag(a) != ETag(a) {
 		t.Error("ETag is not stable for identical input")
+	}
+}
+
+// satelliteStyle decodes just what the satellite tests look at.
+type satelliteStyle struct {
+	Sources  map[string]map[string]any `json:"sources"`
+	Metadata *struct {
+		Hides       []string `json:"holdmytrack:satellite-hides"`
+		Dims        []string `json:"holdmytrack:satellite-dims"`
+		RoadOpacity float64  `json:"holdmytrack:satellite-road-opacity"`
+	} `json:"metadata"`
+	Layers []struct {
+		ID     string         `json:"id"`
+		Type   string         `json:"type"`
+		Layout map[string]any `json:"layout"`
+	} `json:"layers"`
+}
+
+func decodeSatellite(t *testing.T, doc []byte) satelliteStyle {
+	t.Helper()
+	var s satelliteStyle
+	if err := json.Unmarshal(doc, &s); err != nil {
+		t.Fatalf("not valid JSON: %v", err)
+	}
+	return s
+}
+
+func TestDocumentFillsSatellite(t *testing.T) {
+	sat := Satellite{
+		Tiles:       `https://tiles.example.com/sat/{z}/{x}/{y}.jpg?key=k&"quoted"`,
+		TileSize:    512,
+		MaxZoom:     18,
+		Attribution: `<a href="https://example.com">© Imagery "Co"</a>`,
+	}
+	for _, flavor := range Flavors() {
+		doc, err := Document(flavor, "https://cdn.example.com", sat)
+		if err != nil {
+			t.Fatalf("Document(%q): %v", flavor, err)
+		}
+		for _, placeholder := range []string{satelliteTilesPlaceholder, satelliteAttributionPlaceholder, originPlaceholder} {
+			if strings.Contains(string(doc), placeholder) {
+				t.Errorf("%s: %s survived", flavor, placeholder)
+			}
+		}
+		s := decodeSatellite(t, doc)
+		src := s.Sources["satellite"]
+		// Arbitrary text in the URL and credit comes back intact: the source is encoded, not
+		// spliced in as a string.
+		if tiles, _ := src["tiles"].([]any); len(tiles) != 1 || tiles[0] != sat.Tiles {
+			t.Errorf("%s: tiles = %v, want [%q]", flavor, src["tiles"], sat.Tiles)
+		}
+		if src["type"] != "raster" || src["tileSize"] != float64(512) || src["maxzoom"] != float64(18) {
+			t.Errorf("%s: source = %v", flavor, src)
+		}
+		if src["attribution"] != sat.Attribution {
+			t.Errorf("%s: attribution = %v, want %q", flavor, src["attribution"], sat.Attribution)
+		}
+		// Hidden by default, right above the background; the metadata names what it hides.
+		if len(s.Layers) < 2 || s.Layers[0].Type != "background" || s.Layers[1].ID != "satellite" {
+			t.Fatalf("%s: satellite is not the layer right above the background", flavor)
+		}
+		if s.Layers[1].Layout["visibility"] != "none" {
+			t.Errorf("%s: satellite starts %v, want hidden", flavor, s.Layers[1].Layout["visibility"])
+		}
+		if s.Metadata == nil {
+			t.Fatalf("%s: no metadata", flavor)
+		}
+		if m := s.Metadata; !slices.Contains(m.Hides, "background") || !slices.Contains(m.Hides, "water") {
+			t.Errorf("%s: satellite-hides = %v, want the background and fills", flavor, m.Hides)
+		}
+		if m := s.Metadata; !slices.Contains(m.Dims, "roads_major") || slices.Contains(m.Dims, "roads_rail") {
+			t.Errorf("%s: satellite-dims = %v, want the roads but not rail", flavor, m.Dims)
+		}
+		if s.Metadata.RoadOpacity != 0.4 {
+			t.Errorf("%s: satellite-road-opacity = %v, want 0.4", flavor, s.Metadata.RoadOpacity)
+		}
+		if _, ok := s.Sources["protomaps"]; !ok {
+			t.Errorf("%s: lost the basemap source", flavor)
+		}
+	}
+}
+
+func TestDocumentStripsSatelliteUnconfigured(t *testing.T) {
+	for _, flavor := range Flavors() {
+		doc, err := Document(flavor, "https://cdn.example.com", Satellite{})
+		if err != nil {
+			t.Fatalf("Document(%q): %v", flavor, err)
+		}
+		if strings.Contains(string(doc), "__HOLDMYTRACK_SATELLITE") {
+			t.Errorf("%s: a satellite placeholder survived", flavor)
+		}
+		s := decodeSatellite(t, doc)
+		if _, ok := s.Sources["satellite"]; ok {
+			t.Errorf("%s: satellite source served with no imagery configured", flavor)
+		}
+		if s.Metadata != nil {
+			t.Errorf("%s: metadata = %v, want none", flavor, s.Metadata)
+		}
+		for _, l := range s.Layers {
+			if l.ID == "satellite" {
+				t.Errorf("%s: satellite layer served with no imagery configured", flavor)
+			}
+		}
+		// Only the imagery goes: every other layer is still there.
+		with, _ := Document(flavor, "https://cdn.example.com", Satellite{Tiles: "https://t/{z}/{x}/{y}", TileSize: 256, MaxZoom: 19})
+		if got, want := len(s.Layers), len(decodeSatellite(t, with).Layers)-1; got != want {
+			t.Errorf("%s: %d layers without imagery, want %d", flavor, got, want)
+		}
+	}
+}
+
+func TestETagVariesWithSatellite(t *testing.T) {
+	a, _ := Document("light", "https://a.example.com", Satellite{})
+	b, _ := Document("light", "https://a.example.com", Satellite{Tiles: "https://t/{z}/{x}/{y}", TileSize: 512, MaxZoom: 18})
+	if ETag(a) == ETag(b) {
+		t.Error("same ETag with and without imagery — a client would keep a style missing the switch")
 	}
 }

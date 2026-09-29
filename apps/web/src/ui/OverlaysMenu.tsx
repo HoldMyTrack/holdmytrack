@@ -7,6 +7,9 @@ import type { MessageKey } from '../i18n/en';
 
 export interface OverlaysMenuProps {
   overlays: Overlays;
+  /** Whether the deployment configures satellite imagery; without it there is no Base map
+   *  section (FR-4.14). */
+  satelliteAvailable: boolean;
   onChange: (next: Overlays) => void;
 }
 
@@ -19,14 +22,16 @@ const CATEGORY_LABELS: Record<SpotCategory, MessageKey> = {
 };
 
 /**
- * The Overlays dropdown beside the map-mode toggle (IMPLEMENTATION.md §4.24, §4.25): layers
+ * The Overlays dropdown beside the map-mode toggle (IMPLEMENTATION.md §4.24, §4.25, §4.26): first
+ * the Base map, Map or Satellite (FR-4.14), when the deployment has imagery; then layers
  * switched on and off over any mode, in two groups — Routes (Trails, Tracks, Bike paths, FR-4.13) and
  * Points of interest (each Spots category, FR-15.2) — under one All that switches every one of
- * them, and each group's own All. The same open/close rules as the
+ * them, and each group's own All. The Base map is a choice between two, not an overlay, so All
+ * leaves it and the count leaves it out. The same open/close rules as the
  * Activities panel's Type dropdown: the button toggles it, and a press outside or Escape closes
  * it. The button shows how many overlays are on.
  */
-export function OverlaysMenu({ overlays, onChange }: OverlaysMenuProps) {
+export function OverlaysMenu({ overlays, satelliteAvailable, onChange }: OverlaysMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -74,6 +79,13 @@ export function OverlaysMenu({ overlays, onChange }: OverlaysMenuProps) {
     </label>
   );
 
+  const basemapOption = (id: string, label: string, checked: boolean, onSelect: () => void) => (
+    <label htmlFor={id} className="overlays-menu__item">
+      <input id={id} type="radio" name="overlay-basemap" checked={checked} onChange={onSelect} />
+      <span>{label}</span>
+    </label>
+  );
+
   return (
     <div className="map-mode-toggle overlays-menu" ref={ref} data-testid="map-overlays">
       <button
@@ -90,11 +102,27 @@ export function OverlaysMenu({ overlays, onChange }: OverlaysMenuProps) {
       </button>
       {open && (
         <div className="overlays-menu__panel" role="dialog" aria-label={t('map.overlays')}>
+          {satelliteAvailable && (
+            <fieldset className="overlays-menu__group overlays-menu__group--basemap">
+              <legend>{t('overlays.basemap')}</legend>
+              {basemapOption('overlay-basemap-map', t('overlays.basemap_map'), !overlays.satellite, () =>
+                onChange({ ...overlays, satellite: false }),
+              )}
+              {basemapOption('overlay-basemap-satellite', t('overlays.basemap_satellite'), overlays.satellite, () =>
+                onChange({ ...overlays, satellite: true }),
+              )}
+            </fieldset>
+          )}
           {item(
             'overlay-all',
             t('overlays.all'),
             count === total,
-            () => onChange(count === total ? NO_OVERLAYS : { trails: true, tracks: true, bikePaths: true, spots: [...SPOT_CATEGORIES] }),
+            () =>
+              onChange(
+                count === total
+                  ? { ...NO_OVERLAYS, satellite: overlays.satellite }
+                  : { satellite: overlays.satellite, trails: true, tracks: true, bikePaths: true, spots: [...SPOT_CATEGORIES] },
+              ),
             count > 0,
             true,
           )}
