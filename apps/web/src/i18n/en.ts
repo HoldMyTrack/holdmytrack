@@ -116,6 +116,7 @@ export const en = {
   'edit.title_many.other': 'Edit {n} activities',
   'edit.title_one': 'Edit activity',
   'edit.type_required': 'Type is required.',
+  'edit.type_mixed': 'Mixed types — pick one to set it for all',
   'edit.type_too_long': 'Type must be {max} characters or fewer.',
   'picker.add_type': 'Add “{type}”',
   'picker.new': 'new',

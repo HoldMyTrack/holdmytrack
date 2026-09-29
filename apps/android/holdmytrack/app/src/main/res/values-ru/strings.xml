@@ -379,6 +379,7 @@
     <string name="edit_name_placeholder">Необязательно — показывается вместо даты в списке занятий</string>
     <string name="edit_description">Описание</string>
     <string name="edit_description_placeholder">Добавьте заметку — например, «Поездка к морю с детьми»</string>
+    <string name="edit_type_mixed">Разные типы — выберите один, чтобы задать его всем</string>
     <string name="edit_type_required">Укажите тип.</string>
     <string name="edit_type_too_long">Тип должен быть не длиннее %1$d символов.</string>
     <string name="edit_name_too_long">Название должно быть не длиннее %1$d символов.</string>

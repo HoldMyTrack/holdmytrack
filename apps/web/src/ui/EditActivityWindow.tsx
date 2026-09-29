@@ -89,10 +89,11 @@ export function EditActivityWindow({ map, activities, knownTypes, trackUnavailab
   const single = activities.length === 1 ? activities[0]! : null;
   const [tab, setTab] = useState<Tab>('activity');
   const [trackStarted, setTrackStarted] = useState(false);
-  // Seeded from the first checked activity when several are being edited at once — there's no
-  // single "current" type across a mixed group, and the field is there to set one value going
-  // forward for all of them, not to summarize what they currently are.
-  const [activityType, setActivityType] = useState(activities[0]!.activityType);
+  // A group whose activities share one type starts on it; a mixed group starts empty ("Mixed
+  // types"), and stays that way unless a type is picked — empty keeps each activity's own, so a
+  // Save made for the Stories tab alone never retypes anything.
+  const mixedTypes = activities.some((a) => a.activityType !== activities[0]!.activityType);
+  const [activityType, setActivityType] = useState(mixedTypes ? '' : activities[0]!.activityType);
   const [name, setName] = useState(single?.name ?? '');
   const [description, setDescription] = useState(single?.description ?? '');
   const [trackPending, setTrackPending] = useState<{ edit: TrackEdit | null } | null>(null);
@@ -158,7 +159,7 @@ export function EditActivityWindow({ map, activities, knownTypes, trackUnavailab
   async function save() {
     const trimmedType = activityType.trim();
     const trimmedName = name.trim();
-    const invalid = !trimmedType
+    const invalid = !trimmedType && !mixedTypes
       ? t('edit.type_required')
       : trimmedType.length > MAX_ACTIVITY_TYPE_LEN
         ? t('edit.type_too_long', { max: MAX_ACTIVITY_TYPE_LEN })
@@ -174,7 +175,7 @@ export function EditActivityWindow({ map, activities, knownTypes, trackUnavailab
     }
     const fieldsChanged = single
       ? trimmedType !== single.activityType || trimmedName !== (single.name ?? '') || description !== (single.description ?? '')
-      : activities.some((a) => a.activityType !== trimmedType);
+      : trimmedType !== '' && activities.some((a) => a.activityType !== trimmedType);
 
     setSaving(true);
     setError(null);
@@ -277,6 +278,7 @@ export function EditActivityWindow({ map, activities, knownTypes, trackUnavailab
             known={knownTypes}
             labelledBy="edit-activity-type-label"
             maxLength={MAX_ACTIVITY_TYPE_LEN}
+            emptyLabel={t('edit.type_mixed')}
           />
         </div>
 
