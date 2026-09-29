@@ -7,7 +7,6 @@ import { Binoculars, Castle, createLucideIcon, Dog, Landmark, type LucideProps }
 import { API_BASE_URL, TILES_V1 } from '../api';
 import { versionedTileURL } from './coverageVersion';
 import { PATHS_MIN_ZOOM } from './style';
-import { CITY_MIN_ZOOM } from './zoomTiers';
 
 /**
  * The Spots layers (IMPLEMENTATION.md §4.25, ADR-0021): outdoor places from OpenStreetMap, each an
@@ -47,10 +46,10 @@ const SPOTS_AREA_SOURCE_LAYER = 'spot_areas';
  *  overzooming, the way the tracks tiles do past z14. */
 export const SPOTS_MIN_ZOOM = PATHS_MIN_ZOOM;
 
-/** The lowest zoom "Show in this area" (ShowInArea.tsx) offers places at: the City tier's, where
- *  a screen is about a metro area. Below it a view spans a state or more, where the dense
+/** The lowest zoom "Show in this area" (ShowInArea.tsx) offers places at, where a screen is
+ *  about a metro area (~100 km across). Below it a view spans a state or more, where the dense
  *  categories run into the request's cap and the rest are too small to tell apart. */
-export const SPOTS_IN_AREA_MIN_ZOOM = CITY_MIN_ZOOM;
+export const SPOTS_IN_AREA_MIN_ZOOM = 10;
 const SPOTS_MAX_ZOOM = 14;
 
 const SPOTS_TILE_URL = `${API_BASE_URL}${TILES_V1}/spots/{z}/{x}/{y}.mvt`;

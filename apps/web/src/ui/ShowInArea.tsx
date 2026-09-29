@@ -20,7 +20,7 @@ interface Loaded {
 
 /**
  * "Show in this area" (IMPLEMENTATION.md §4.25, SPEC.md FR-15.5): the Spots tiles start at
- * SPOTS_MIN_ZOOM, and between the City tier's zoom (SPOTS_IN_AREA_MIN_ZOOM) and there a view
+ * SPOTS_MIN_ZOOM, and between SPOTS_IN_AREA_MIN_ZOOM (a metro area in view) and there a view
  * holds too many places to load on every pan. So there the places load on request, for the
  * visible map and the chosen categories, and stay drawn until the next request. Once the map has moved, or a
  * category was switched on since, the button comes back to load the new view; until then a
