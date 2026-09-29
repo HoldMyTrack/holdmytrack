@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A spot's popup, the web's .spot-popup card: the surface, the medium radius. Its shadow is
+     the view's elevation. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/hmt_surface" />
+    <corners android:radius="@dimen/hmt_radius_md" />
+</shape>

@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A spot's popup (map/SpotPopup, docs/SPEC.md FR-15.3), the web's .spot-popup: the name (or
+     the category), a line of category, memorial type and date, the description and the
+     inscription — each scrolling past six lines — the address, then Copy address and
+     Wikipedia. Each part is gone when OSM has none. Placed over the spot by SpotPopup. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/spot_popup"
+    android:layout_width="272dp"
+    android:layout_height="wrap_content"
+    android:layout_gravity="top|start"
+    android:background="@drawable/bg_spot_popup"
+    android:clickable="true"
+    android:elevation="6dp"
+    android:focusable="false"
+    android:orientation="vertical"
+    android:paddingStart="@dimen/hmt_space_16"
+    android:paddingTop="@dimen/hmt_space_12"
+    android:paddingEnd="@dimen/hmt_space_4"
+    android:paddingBottom="@dimen/hmt_space_12"
+    android:visibility="gone">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/spot_popup_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:layout_weight="1"
+            android:textColor="@color/hmt_ink"
+            android:textSize="@dimen/hmt_text_md"
+            android:textStyle="bold"
+            tools:text="Soldiers' and Sailors' Monument" />
+
+        <Button
+            android:id="@+id/spot_popup_close"
+            style="@style/Widget.HoldMyTrack.Button.RowIcon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="-12dp"
+            android:contentDescription="@string/spots_close"
+            app:icon="@drawable/ic_x"
+            app:iconSize="18dp"
+            app:iconTint="@color/hmt_ink_muted" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="-12dp"
+        android:layout_marginEnd="@dimen/hmt_space_12"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/spot_popup_meta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_2"
+            android:textColor="@color/hmt_ink_muted"
+            android:textSize="@dimen/hmt_text_sm"
+            tools:text="Monument · War memorial · Since 1894" />
+
+        <TextView
+            android:id="@+id/spot_popup_description"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_6"
+            android:maxLines="6"
+            android:scrollbars="vertical"
+            android:textColor="@color/hmt_ink_secondary"
+            android:textSize="@dimen/hmt_text_sm" />
+
+        <TextView
+            android:id="@+id/spot_popup_inscription"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_6"
+            android:background="@drawable/bg_spot_inscription"
+            android:maxLines="6"
+            android:paddingStart="@dimen/hmt_space_8"
+            android:paddingEnd="0dp"
+            android:scrollbars="vertical"
+            android:textColor="@color/hmt_ink_secondary"
+            android:textSize="@dimen/hmt_text_sm"
+            android:textStyle="italic" />
+
+        <TextView
+            android:id="@+id/spot_popup_address"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_6"
+            android:textColor="@color/hmt_ink_secondary"
+            android:textSize="@dimen/hmt_text_sm" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_4"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/spot_popup_copy"
+                style="@style/Widget.HoldMyTrack.Button.SpotAction"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/spots_copy_address"
+                app:icon="@drawable/ic_copy" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/spot_popup_wikipedia"
+                style="@style/Widget.HoldMyTrack.Button.SpotAction"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/hmt_space_8"
+                android:text="@string/spots_wikipedia"
+                app:icon="@drawable/ic_book_open" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

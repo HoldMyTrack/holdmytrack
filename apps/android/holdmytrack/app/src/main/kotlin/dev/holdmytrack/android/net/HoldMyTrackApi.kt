@@ -242,6 +242,29 @@ data class PrivateLocation(val id: String, val name: String, val lon: Double, va
  *  ([Session.tileVersion]). */
 data class CoverageStatus(val rendering: Boolean, val version: Long, val tileVersion: String)
 
+/**
+ * One Spots place (`docs/SPEC.md` FR-15), as a tile's `spots` feature or `GET /v1/spots` carries
+ * it: [category] is the wire name (`playground`, `dog_park`, `monument`, `viewpoint`,
+ * `history`), [lon]/[lat] its anchor, and each text null when OSM has none. [wikipedia] is OSM's
+ * tag in its "lang:Article title" form, the only one the server keeps.
+ */
+data class Spot(
+    val id: Long,
+    val category: String,
+    val name: String?,
+    val address: String?,
+    val description: String?,
+    val inscription: String?,
+    val memorial: String?,
+    val startDate: String?,
+    val wikipedia: String?,
+    val lon: Double,
+    val lat: Double,
+)
+
+/** `GET /v1/spots`: the places in a box, up to the server's cap, and how many there are in all. */
+data class SpotsInArea(val spots: List<Spot>, val total: Int)
+
 /** One day that has activity, as `GET /v1/activities/histogram` counts it; [date] is `YYYY-MM-DD`
  *  in the account's timezone. Days with none are never returned. */
 data class ActivityDay(val date: String, val count: Int, val distanceMeters: Double)
@@ -721,6 +744,41 @@ object HoldMyTrackApi {
             val json = JSONObject(text)
             CoverageStatus(json.optBoolean("rendering"), json.optLong("version"), json.optString("tile_version"))
         }, onResult)
+    }
+
+    /** `GET /v1/spots` (`docs/IMPLEMENTATION.md` §4.25) — [categories]' places whose anchor is
+     *  inside the box, named first, up to the server's 2,000. */
+    fun spotsInArea(
+        west: Double, south: Double, east: Double, north: Double,
+        categories: List<String>,
+        onResult: (Result<SpotsInArea>) -> Unit,
+    ) {
+        val url = (BuildConfig.API_BASE_URL + API_V1 + "/spots").toHttpUrl().newBuilder()
+            .addQueryParameter("bbox", listOf(west, south, east, north).joinToString(",") { "%.5f".format(java.util.Locale.ROOT, it) })
+            .addQueryParameter("categories", categories.joinToString(","))
+            .build()
+        call(Request.Builder().url(url).build(), { text ->
+            val json = JSONObject(text)
+            val rows = json.optJSONArray("spots") ?: JSONArray()
+            SpotsInArea(List(rows.length()) { parseSpot(rows.getJSONObject(it)) }, json.optInt("total"))
+        }, onResult)
+    }
+
+    private fun parseSpot(json: JSONObject): Spot {
+        fun text(key: String) = json.optString(key).takeIf { it.isNotEmpty() }
+        return Spot(
+            id = json.optLong("id"),
+            category = json.optString("category"),
+            name = text("name"),
+            address = text("address"),
+            description = text("description"),
+            inscription = text("inscription"),
+            memorial = text("memorial"),
+            startDate = text("start_date"),
+            wikipedia = text("wikipedia"),
+            lon = json.optDouble("lon"),
+            lat = json.optDouble("lat"),
+        )
     }
 
     /** `GET /v1/activities/track-metrics/{id}` (`docs/IMPLEMENTATION.md` §4.3.1) — see

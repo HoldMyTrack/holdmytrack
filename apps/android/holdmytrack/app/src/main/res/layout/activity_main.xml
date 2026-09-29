@@ -10,6 +10,9 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <!-- A spot's popup (map/SpotPopup): over the map, under all of its chrome. -->
+    <include layout="@layout/view_spot_popup" />
+
     <!-- The top of the map: the chrome row, and under it the one notice the map can show —
          checking the session, the server unreachable, the map failing to load, or nothing on
          it yet (MainActivity.showNotice). Neither takes touches outside its own panels, so the
@@ -191,6 +194,21 @@
                     android:textStyle="bold"
                     android:visibility="gone" />
             </FrameLayout>
+
+            <!-- "Show in this area" (map/ShowInArea): centred between Layers and Record, wrapping
+                 to a second line rather than running under either. Gone outside zoom 10–13 and
+                 with no place ticked. -->
+            <TextView
+                android:id="@+id/show_in_area"
+                style="@style/Widget.HoldMyTrack.ShowInArea"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal|top"
+                android:layout_marginStart="72dp"
+                android:layout_marginTop="@dimen/hmt_space_10"
+                android:layout_marginEnd="72dp"
+                android:accessibilityLiveRegion="polite"
+                android:visibility="gone" />
 
             <!-- One-tap GPS recording (MainActivity.onRecordTap): tap to start, tap again to pause or
                  resume, hold for two seconds to stop (RecordButton draws the countdown ring). Up here

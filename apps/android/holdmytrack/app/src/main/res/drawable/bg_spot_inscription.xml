@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A spot's inscription, the web's .spot-popup__inscription: a quote's 2dp accent rule down
+     its start edge. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:gravity="start|fill_vertical"
+        android:width="2dp">
+        <shape>
+            <solid android:color="@color/hmt_accent" />
+        </shape>
+    </item>
+</layer-list>

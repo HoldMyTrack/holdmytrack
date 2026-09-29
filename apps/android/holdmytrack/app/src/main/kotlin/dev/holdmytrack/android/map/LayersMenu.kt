@@ -16,12 +16,12 @@ import dev.holdmytrack.android.R
 /**
  * The Layers button under the burger and the menu it opens — the web's `OverlaysMenu`
  * (`docs/SPEC.md` FR-4.13, FR-4.14): the Base map, Map or Satellite, when the served style
- * carries imagery; then Paths — Trails, Tracks and Bike paths, each switched on and off over any
- * mode. The web's Points of interest group has no Android counterpart yet.
+ * carries imagery; then Paths — Trails, Tracks and Bike paths — and Points of interest, one
+ * entry per [MapSpots.Category], each switched on and off over any mode.
  *
- * The button is an icon, filled like the active map mode while any path is on, with a badge on
- * its corner counting them; the Base map is a choice between two, not an overlay, so neither
- * counts it. A tap on the button toggles the
+ * The button is an icon, filled like the active map mode while any path or place is on, with a
+ * badge on its corner counting them; the Base map is a choice between two, not an overlay, so
+ * neither counts it. A tap on the button toggles the
  * menu, and a tap outside it or Back closes it, like the Activities panel's Type dropdown.
  */
 class LayersMenu(
@@ -29,8 +29,10 @@ class LayersMenu(
     private val count: TextView,
     private val paths: () -> MapPaths.Paths,
     private val satellite: () -> Boolean,
+    private val spots: () -> List<MapSpots.Category>,
     private val onPaths: (MapPaths.Paths) -> Unit,
     private val onSatellite: (Boolean) -> Unit,
+    private val onSpots: (List<MapSpots.Category>) -> Unit,
 ) {
     private val res = button.resources
     private var popup: PopupWindow? = null
@@ -59,7 +61,7 @@ class LayersMenu(
 
     /** The filled look and the badge, from the saved choice. */
     fun render() {
-        val on = paths().count
+        val on = paths().count + spots().size
         button.isChecked = on > 0
         count.isVisible = on > 0
         count.text = on.toString()
@@ -96,6 +98,17 @@ class LayersMenu(
         bind(R.id.layers_tracks, current.tracks) { p, on -> p.copy(tracks = on) }
         bind(R.id.layers_bike_paths, current.bikePaths) { p, on -> p.copy(bikePaths = on) }
 
+        for ((category, id) in SPOT_BOXES) {
+            content.findViewById<CheckBox>(id).apply {
+                isChecked = category in spots()
+                setOnCheckedChangeListener { _, on ->
+                    val before = spots()
+                    onSpots(MapSpots.Category.entries.filter { if (it == category) on else it in before })
+                    render()
+                }
+            }
+        }
+
         // The Tracks explanation: shown and hidden again by its info button, without ticking the
         // box; it closes with the menu, since each opening inflates the menu afresh.
         val info = content.findViewById<TextView>(R.id.layers_tracks_info)
@@ -118,6 +131,14 @@ class LayersMenu(
     }
 
     private companion object {
+        val SPOT_BOXES = listOf(
+            MapSpots.Category.PLAYGROUND to R.id.layers_spots_playground,
+            MapSpots.Category.DOG_PARK to R.id.layers_spots_dog_park,
+            MapSpots.Category.MONUMENT to R.id.layers_spots_monument,
+            MapSpots.Category.VIEWPOINT to R.id.layers_spots_viewpoint,
+            MapSpots.Category.HISTORY to R.id.layers_spots_history,
+        )
+
         const val REOPEN_GUARD_MS = 300L
         const val MENU_WIDTH_DP = 224
     }

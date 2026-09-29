@@ -118,6 +118,34 @@
     <string name="layers_tracks_info">Грунтовые, полевые и лесные дороги: без покрытия, шириной с машину.</string>
     <string name="layers_tracks_info_label">Что такое грунтовки?</string>
     <string name="layers_bike_paths">Велодорожки</string>
+    <string name="layers_places">Интересные места</string>
+    <string name="layers_playgrounds">Детские площадки</string>
+    <string name="layers_dog_parks">Площадки для собак</string>
+    <string name="layers_monuments">Памятники</string>
+    <string name="layers_viewpoints">Завораживающие виды</string>
+    <string name="layers_history">Исторические места</string>
+
+    <string name="spots_category_playground">Детская площадка</string>
+    <string name="spots_category_dog_park">Площадка для собак</string>
+    <string name="spots_category_monument">Памятник</string>
+    <string name="spots_category_viewpoint">Завораживающий вид</string>
+    <string name="spots_category_history">История</string>
+    <string name="spots_since">С %1$s</string>
+    <string name="spots_copy_address">Скопировать адрес</string>
+    <string name="spots_copied">Скопировано</string>
+    <string name="spots_wikipedia">Википедия</string>
+    <string name="spots_close">Закрыть</string>
+    <string name="spots_in_area">Показать в этой области</string>
+    <string name="spots_in_area_loading">Загружаем места…</string>
+    <string name="spots_in_area_failed">Не удалось загрузить места — попробуйте ещё раз</string>
+    <string name="spots_in_area_none">В этой области мест нет</string>
+    <string name="spots_in_area_truncated">Показано %1$s из %2$s мест — приблизьте карту, чтобы увидеть остальные</string>
+    <plurals name="spots_in_area_count">
+        <item quantity="one">%s место в этой области</item>
+        <item quantity="few">%s места в этой области</item>
+        <item quantity="many">%s мест в этой области</item>
+        <item quantity="other">%s места в этой области</item>
+    </plurals>
 
     <string name="menu_button">Меню</string>
     <string name="locate_button">Моё местоположение</string>
