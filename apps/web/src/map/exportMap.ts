@@ -57,7 +57,7 @@ export interface ExportViewState {
   mode: MapMode;
   activityQuery: ActivityQuery;
   hiddenIds: string[];
-  /** The Overlays menu's Trails and Bike paths (overlays.ts), so the image shows what the
+  /** The Layers menu's Trails and Bike paths (overlays.ts), so the image shows what the
    *  screen does. */
   paths: PathOverlays;
   /** The Base map switch (FR-4.14): satellite imagery, when the deployment has any. */

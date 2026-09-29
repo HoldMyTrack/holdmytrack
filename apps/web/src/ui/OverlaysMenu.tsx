@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { NO_OVERLAYS, type Overlays } from '../map/overlays';
-import { ChevronDown, Layers } from 'lucide-react';
+import type { Overlays } from '../map/overlays';
+import { ChevronDown, Info, Layers } from 'lucide-react';
 import { SPOT_CATEGORIES, type SpotCategory } from '../map/spots';
 import { t } from '../i18n';
 import type { MessageKey } from '../i18n/en';
@@ -22,18 +22,23 @@ const CATEGORY_LABELS: Record<SpotCategory, MessageKey> = {
 };
 
 /**
- * The Overlays dropdown beside the map-mode toggle (IMPLEMENTATION.md §4.24, §4.25, §4.26): first
- * the Base map, Map or Satellite (FR-4.14), when the deployment has imagery; then layers
- * switched on and off over any mode, in two groups — Routes (Trails, Tracks, Bike paths, FR-4.13) and
- * Points of interest (each Spots category, FR-15.2) — under one All that switches every one of
- * them, and each group's own All. The Base map is a choice between two, not an overlay, so All
- * leaves it and the count leaves it out. The same open/close rules as the
- * Activities panel's Type dropdown: the button toggles it, and a press outside or Escape closes
- * it. The button shows how many overlays are on.
+ * The Layers dropdown beside the map-mode toggle (IMPLEMENTATION.md §4.24, §4.25, §4.26), in three
+ * groups: the Base map, Map or Satellite (FR-4.14), when the deployment has imagery; then layers
+ * switched on and off over any mode — Paths (Trails, Tracks, Bike paths, FR-4.13) and Points of
+ * interest (each Spots category, FR-15.2). The same open/close rules as the Activities panel's
+ * Type dropdown: the button toggles it, and a press outside or Escape closes it. The button shows
+ * how many overlays are on; the Base map is a choice between two, not an overlay, so the count
+ * leaves it out.
  */
 export function OverlaysMenu({ overlays, satelliteAvailable, onChange }: OverlaysMenuProps) {
   const [open, setOpen] = useState(false);
+  // The Tracks entry's explanation, opened by its info button; closes with the menu.
+  const [tracksInfo, setTracksInfo] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) setTracksInfo(false);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -58,23 +63,11 @@ export function OverlaysMenu({ overlays, satelliteAvailable, onChange }: Overlay
       spots: SPOT_CATEGORIES.filter((c) => (c === category ? !on : overlays.spots.includes(c))),
     });
   };
-  const allSpots = overlays.spots.length === SPOT_CATEGORIES.length;
   const count = Number(overlays.trails) + Number(overlays.tracks) + Number(overlays.bikePaths) + overlays.spots.length;
-  const total = 3 + SPOT_CATEGORIES.length;
 
-  // An All box is ticked when every entry under it is, half-ticked when some are; clicking it
-  // turns them all on, or all off when they already were.
-  const item = (id: string, label: string, checked: boolean, onToggle: () => void, some = false, all = false) => (
-    <label key={id} htmlFor={id} className={all ? 'overlays-menu__item overlays-menu__item--all' : 'overlays-menu__item'}>
-      <input
-        id={id}
-        type="checkbox"
-        checked={checked}
-        ref={(input) => {
-          if (input) input.indeterminate = some && !checked;
-        }}
-        onChange={onToggle}
-      />
+  const item = (id: string, label: string, checked: boolean, onToggle: () => void) => (
+    <label key={id} htmlFor={id} className="overlays-menu__item">
+      <input id={id} type="checkbox" checked={checked} onChange={onToggle} />
       <span>{label}</span>
     </label>
   );
@@ -103,7 +96,7 @@ export function OverlaysMenu({ overlays, satelliteAvailable, onChange }: Overlay
       {open && (
         <div className="overlays-menu__panel" role="dialog" aria-label={t('map.overlays')}>
           {satelliteAvailable && (
-            <fieldset className="overlays-menu__group overlays-menu__group--basemap">
+            <fieldset className="overlays-menu__group">
               <legend>{t('overlays.basemap')}</legend>
               {basemapOption('overlay-basemap-map', t('overlays.basemap_map'), !overlays.satellite, () =>
                 onChange({ ...overlays, satellite: false }),
@@ -113,36 +106,33 @@ export function OverlaysMenu({ overlays, satelliteAvailable, onChange }: Overlay
               )}
             </fieldset>
           )}
-          {item(
-            'overlay-all',
-            t('overlays.all'),
-            count === total,
-            () =>
-              onChange(
-                count === total
-                  ? { ...NO_OVERLAYS, satellite: overlays.satellite }
-                  : { satellite: overlays.satellite, trails: true, tracks: true, bikePaths: true, spots: [...SPOT_CATEGORIES] },
-              ),
-            count > 0,
-            true,
-          )}
           <fieldset className="overlays-menu__group">
-            <legend>{t('overlays.routes')}</legend>
+            <legend>{t('overlays.paths')}</legend>
             {item('overlay-trails', t('overlays.trails'), overlays.trails, () => onChange({ ...overlays, trails: !overlays.trails }))}
-            {item('overlay-tracks', t('overlays.tracks'), overlays.tracks, () => onChange({ ...overlays, tracks: !overlays.tracks }))}
+            <div className="overlays-menu__row">
+              {item('overlay-tracks', t('overlays.tracks'), overlays.tracks, () => onChange({ ...overlays, tracks: !overlays.tracks }))}
+              <button
+                type="button"
+                className="overlays-menu__info"
+                aria-label={t('overlays.tracks_info_label')}
+                aria-expanded={tracksInfo}
+                aria-controls="overlay-tracks-info"
+                onClick={() => setTracksInfo((shown) => !shown)}
+              >
+                <Info size={14} aria-hidden="true" />
+              </button>
+            </div>
+            {tracksInfo && (
+              <p id="overlay-tracks-info" className="overlays-menu__hint" role="note">
+                {t('overlays.tracks_info')}
+              </p>
+            )}
             {item('overlay-bike-paths', t('overlays.bike_paths'), overlays.bikePaths, () =>
               onChange({ ...overlays, bikePaths: !overlays.bikePaths }),
             )}
           </fieldset>
           <fieldset className="overlays-menu__group">
             <legend>{t('overlays.places')}</legend>
-            {item(
-              'overlay-spots-all',
-              t('overlays.all_places'),
-              allSpots,
-              () => onChange({ ...overlays, spots: allSpots ? [] : [...SPOT_CATEGORIES] }),
-              overlays.spots.length > 0,
-            )}
             {SPOT_CATEGORIES.map((category) =>
               item(`overlay-spots-${category}`, t(CATEGORY_LABELS[category]), overlays.spots.includes(category), () =>
                 toggleCategory(category),

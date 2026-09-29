@@ -158,11 +158,16 @@ export const PATH_LAYER_IDS = [
   'paths_bridges_track',
 ] as const;
 
-/** The three kinds the web's Overlays menu shows separately (overlays.ts). Android toggles all
+/** The three kinds the web's Layers menu shows separately (overlays.ts). Android toggles all
  *  six together. */
 export const TRAIL_LAYER_IDS = ['paths_trail', 'paths_bridges_trail'] as const;
 export const TRACK_LAYER_IDS = ['paths_track', 'paths_bridges_track'] as const;
 export const BIKE_PATH_LAYER_IDS = ['paths_cycleway', 'paths_bridges_cycleway'] as const;
+
+/** The zoom every path layer starts at: the first the basemap carries trails and cycleways
+ *  at (below it, the roads layer has only tracks). Points of interest start at the same zoom
+ *  (spots.ts's SPOTS_MIN_ZOOM), so the two come and go together. */
+export const PATHS_MIN_ZOOM = 13;
 
 /** Which path layers are showing. */
 export interface PathOverlays {
@@ -205,14 +210,14 @@ function pathLayers(flavor: Flavor, bridges: boolean, visible: PathOverlays): Li
       type: 'line',
       source: BASEMAP_SOURCE,
       'source-layer': 'roads',
-      minzoom: 13,
+      minzoom: PATHS_MIN_ZOOM,
       filter: filter(['==', 'kind_detail', TRACK_DETAIL]),
       layout: { visibility: visibility(visible.tracks) },
       paint: {
         'line-color': colors.track,
         // Longer dashes and a wider line than a trail: a road a vehicle fits on.
         'line-dasharray': [3, 1.5],
-        'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], 13, 1, 18, 3.5],
+        'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], PATHS_MIN_ZOOM, 1, 18, 3.5],
       },
     },
     {
@@ -220,13 +225,13 @@ function pathLayers(flavor: Flavor, bridges: boolean, visible: PathOverlays): Li
       type: 'line',
       source: BASEMAP_SOURCE,
       'source-layer': 'roads',
-      minzoom: 13,
+      minzoom: PATHS_MIN_ZOOM,
       filter: filter(['in', 'kind_detail', ...TRAIL_DETAILS]),
       layout: { visibility: visibility(visible.trails) },
       paint: {
         'line-color': colors.trail,
         'line-dasharray': [2, 1],
-        'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], 13, 0.8, 18, 3],
+        'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], PATHS_MIN_ZOOM, 0.8, 18, 3],
       },
     },
     {
@@ -234,12 +239,12 @@ function pathLayers(flavor: Flavor, bridges: boolean, visible: PathOverlays): Li
       type: 'line',
       source: BASEMAP_SOURCE,
       'source-layer': 'roads',
-      minzoom: 12,
+      minzoom: PATHS_MIN_ZOOM,
       filter: filter(['==', 'kind_detail', 'cycleway']),
       layout: { visibility: visibility(visible.bikePaths), 'line-cap': 'round' },
       paint: {
         'line-color': colors.cycleway,
-        'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], 12, 1, 18, 4],
+        'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], PATHS_MIN_ZOOM, 1, 18, 4],
       },
     },
   ];

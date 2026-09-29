@@ -2,7 +2,7 @@ import type { SpotCategory } from './spots';
 import { SPOT_CATEGORIES } from './spots';
 
 /**
- * What the Overlays menu (OverlaysMenu.tsx) has switched on: satellite imagery (FR-4.14), the
+ * What the Layers menu (OverlaysMenu.tsx) has switched on: satellite imagery (FR-4.14), the
  * three kinds of path (FR-4.13) and each Spots category (FR-15.2). A per-browser view
  * preference, kept in localStorage like the theme, not on the account; everything off until
  * turned on.

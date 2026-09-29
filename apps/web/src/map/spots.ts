@@ -6,11 +6,11 @@ import type { FeatureCollection, Point } from 'geojson';
 import { Binoculars, Castle, createLucideIcon, Dog, Landmark, type LucideProps } from 'lucide-react';
 import { API_BASE_URL, TILES_V1 } from '../api';
 import { versionedTileURL } from './coverageVersion';
-import { REGION_MIN_ZOOM } from './zoomTiers';
+import { PATHS_MIN_ZOOM } from './style';
 
 /**
  * The Spots layers (IMPLEMENTATION.md §4.25, ADR-0021): outdoor places from OpenStreetMap, each an
- * icon over its area, drawn in every map mode for the categories the Overlays menu has on. The tiles come from
+ * icon over its area, drawn in every map mode for the categories the Layers menu has on. The tiles come from
  * `/tiles/v1/spots`, cached under the account's tile version like every other map tile
  * (coverageVersion.ts).
  *
@@ -41,16 +41,22 @@ const SPOTS_SOURCE_LAYER = 'spots';
 const SPOTS_AREA_SOURCE_LAYER = 'spot_areas';
 
 /** The server sends nothing below the first (internal/httpapi's spotsMinZoom) — "Show in this
- *  area" covers the zooms down to Region's. Past the second, its tiles serve every zoom above by
+ *  area" covers the zooms down to Region's. It's the paths' zoom (style.ts's PATHS_MIN_ZOOM), so
+ *  places and paths appear together. Past the second, its tiles serve every zoom above by
  *  overzooming, the way the tracks tiles do past z14. */
-export const SPOTS_MIN_ZOOM = 12;
+export const SPOTS_MIN_ZOOM = PATHS_MIN_ZOOM;
+
+/** The lowest zoom "Show in this area" (ShowInArea.tsx) offers places at, where a screen is
+ *  about a metro area (~100 km across). Below it a view spans a state or more, where the dense
+ *  categories run into the request's cap and the rest are too small to tell apart. */
+export const SPOTS_IN_AREA_MIN_ZOOM = 10;
 const SPOTS_MAX_ZOOM = 14;
 
 const SPOTS_TILE_URL = `${API_BASE_URL}${TILES_V1}/spots/{z}/{x}/{y}.mvt`;
 
 export type SpotCategory = 'playground' | 'dog_park' | 'monument' | 'viewpoint' | 'history';
 
-/** Every category, in the order the Overlays menu lists them. */
+/** Every category, in the order the Layers menu lists them. */
 export const SPOT_CATEGORIES: readonly SpotCategory[] = ['playground', 'dog_park', 'monument', 'viewpoint', 'history'];
 
 /** Lucide has no seesaw, so this one is drawn in its grid and stroke: a plank tilted over an
@@ -214,7 +220,7 @@ export function ensureSpotsLayer(map: MapLibreMap, categories: readonly SpotCate
   }
   addAreaLayers(map);
   for (const [id, source, sourceLayer, minzoom, maxzoom] of [
-    [SPOTS_IN_AREA_LAYER_ID, SPOTS_IN_AREA_SOURCE_ID, undefined, REGION_MIN_ZOOM, SPOTS_MIN_ZOOM],
+    [SPOTS_IN_AREA_LAYER_ID, SPOTS_IN_AREA_SOURCE_ID, undefined, SPOTS_IN_AREA_MIN_ZOOM, SPOTS_MIN_ZOOM],
     [SPOTS_LAYER_ID, SPOTS_SOURCE_ID, SPOTS_SOURCE_LAYER, SPOTS_MIN_ZOOM, 24],
   ] as const) {
     if (map.getLayer(id)) continue;
@@ -291,7 +297,7 @@ function addAreaLayers(map: MapLibreMap): void {
 }
 
 /**
- * Shows the chosen categories (the Overlays menu, overlays.ts) and hides the rest — a filter on
+ * Shows the chosen categories (the Layers menu, overlays.ts) and hides the rest — a filter on
  * every layer, and every layer hidden when none is chosen. Diffs first, like mapMode.ts's
  * setVisible: a bare setLayoutProperty or setFilter would start the styledata loop its comment
  * describes.

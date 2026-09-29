@@ -67,7 +67,7 @@ const DEFAULT_SATELLITE_MAXZOOM = 18;
 /**
  * The deployment's satellite imagery (docs/SPEC.md FR-4.14), from build-time
  * `VITE_SATELLITE_TILES` (an XYZ template, key included) and `VITE_SATELLITE_ATTRIBUTION`. Null
- * when no template is set, and then the style has no satellite source and the Overlays menu no
+ * when no template is set, and then the style has no satellite source and the Layers menu no
  * Satellite switch: imagery is metered per tile, so a deployment opts in rather than out
  * (ADR-0022). The API serves native clients the same values as `SATELLITE_*` (compose.prod.yml).
  */

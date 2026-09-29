@@ -223,7 +223,7 @@ describe('basemap foundation', () => {
     assert.ok(true);
   });
 
-  it('8. Overlays menu: trails, tracks and bike paths off by default, each shown on its own, remembered across reload', async () => {
+  it('8. Layers menu: trails, tracks and bike paths off by default, each shown on its own, remembered across reload', async () => {
     const TRAILS = ['paths_trail', 'paths_bridges_trail'];
     const TRACKS = ['paths_track', 'paths_bridges_track'];
     const BIKES = ['paths_cycleway', 'paths_bridges_cycleway'];
@@ -268,6 +268,13 @@ describe('basemap foundation', () => {
     await page.locator('#overlay-tracks').uncheck();
     await page.locator('#overlay-bike-paths').uncheck();
     assert.deepEqual(await visibility(ALL), ALL.map(() => 'none'), 'hidden again once unticked');
+
+    // Tracks explains itself behind an info button, without ticking the box.
+    await page.locator('.overlays-menu__info').click();
+    assert.ok(await page.locator('#overlay-tracks-info').isVisible(), 'tracks explanation shown');
+    assert.equal(await page.locator('#overlay-tracks').isChecked(), false, 'info button leaves the box alone');
+    assert.equal(await page.locator('#overlay-all, #overlay-spots-all').count(), 0, 'no All checkboxes');
+    await page.screenshot({ path: new URL('layers-menu.png', SHOTS).pathname });
   });
 
   // Satellite mode (docs/SPEC.md FR-4.14) exists only when the dev server was started with
@@ -325,5 +332,29 @@ describe('basemap foundation', () => {
     assert.deepEqual(await visibility(['satellite']), ['none'], 'imagery off again');
     assert.deepEqual(await visibility(FILLS), FILLS.map(() => 'visible'), 'fills back');
     assert.deepEqual(await roadOpacity(), [undefined, undefined, 0.5], 'roads opaque again');
+  });
+
+  // Points of interest (docs/SPEC.md FR-15.2, FR-15.5): nothing below zoom 10, "Show in this area"
+  // from 10 until the tiles take over at 13, where the paths start too.
+  it('10. Show in this area offered only between zoom 10 and 13', async () => {
+    const menu = page.getByTestId('map-overlays');
+    const trigger = menu.getByRole('button').first();
+    if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+    await page.locator('#overlay-spots-playground').check();
+    await trigger.click();
+    const offeredAt = async (zoom) => {
+      await page.evaluate((zoom) => window.__holdmytrack.jumpTo({ center: [-82.9988, 39.9612], zoom }), zoom);
+      await page.waitForTimeout(300);
+      return page.getByTestId('show-in-area').isVisible();
+    };
+    assert.equal(await offeredAt(9.9), false, 'not below zoom 10');
+    assert.equal(await offeredAt(10), true, 'offered at zoom 10');
+    assert.equal(await offeredAt(12.5), true, 'offered at zoom 12.5');
+    assert.equal(await offeredAt(13), false, 'the tiles take over at zoom 13');
+    const minzoom = await page.evaluate(() => window.__holdmytrack.getLayer('paths_trail').minzoom);
+    assert.equal(minzoom, 13, 'paths start where the tiles do');
+
+    if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+    await page.locator('#overlay-spots-playground').uncheck();
   });
 });
