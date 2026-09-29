@@ -274,6 +274,14 @@
         <item name="android:padding">@dimen/hmt_space_12</item>
     </style>
 
+    <!-- A MapIcon button that is also on or off (Layers): checked, it takes the mode buttons'
+         filled look, the panel's ink behind the icon in the panel's own color. -->
+    <style name="Widget.HoldMyTrack.Button.MapIcon.Toggle">
+        <item name="backgroundTint">@color/map_mode_bg</item>
+        <item name="iconTint">@color/map_mode_text</item>
+        <item name="android:checkable">true</item>
+    </style>
+
     <!-- The title is named directly: the Material 3 action bar's own title style is a fixed
          style rather than the theme's TitleLarge role, so it would otherwise stay in the
          system face. -->
@@ -414,6 +422,31 @@
         <item name="iconTint">@color/hmt_ink</item>
         <item name="android:minWidth">48dp</item>
         <item name="android:minHeight">48dp</item>
+    </style>
+
+    <!-- A group's heading in the Layers menu (popup_layers), the web's .overlays-menu__group
+         legend: small, semibold, uppercase, muted. -->
+    <style name="Widget.HoldMyTrack.LayersLegend" parent="">
+        <item name="android:paddingStart">@dimen/hmt_space_2</item>
+        <item name="android:paddingEnd">@dimen/hmt_space_2</item>
+        <item name="android:paddingBottom">@dimen/hmt_space_4</item>
+        <item name="android:textSize">@dimen/hmt_text_xs</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.04</item>
+        <item name="android:textColor">@color/hmt_ink_muted</item>
+    </style>
+
+    <!-- One Layers menu entry (.overlays-menu__item): the whole row is the checkbox or radio
+         button's own 48dp target, its label in the body size. -->
+    <style name="Widget.HoldMyTrack.LayersOption.Check" parent="Widget.Material3.CompoundButton.CheckBox">
+        <item name="android:textSize">@dimen/hmt_text_md</item>
+        <item name="android:textColor">@color/hmt_ink</item>
+    </style>
+
+    <style name="Widget.HoldMyTrack.LayersOption.Radio" parent="Widget.Material3.CompoundButton.RadioButton">
+        <item name="android:textSize">@dimen/hmt_text_md</item>
+        <item name="android:textColor">@color/hmt_ink</item>
     </style>
 
     <!-- The Activities panel's toolbar actions (Show/Hide, Edit, Delete), after the web's

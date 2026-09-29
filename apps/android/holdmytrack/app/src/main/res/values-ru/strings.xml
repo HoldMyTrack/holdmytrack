@@ -108,8 +108,16 @@
     <string name="mode_normal">Обычный</string>
     <string name="mode_fog">Туман</string>
     <string name="mode_heatmap">Тепловая</string>
-    <string name="paths_toggle">Тропы и велодорожки</string>
-    <string name="satellite_toggle">Спутник</string>
+    <string name="layers_button">Слои</string>
+    <string name="layers_basemap">Подложка</string>
+    <string name="layers_basemap_map">Карта</string>
+    <string name="layers_basemap_satellite">Спутник</string>
+    <string name="layers_paths">Тропы и дорожки</string>
+    <string name="layers_trails">Тропы</string>
+    <string name="layers_tracks">Грунтовки</string>
+    <string name="layers_tracks_info">Грунтовые, полевые и лесные дороги: без покрытия, шириной с машину.</string>
+    <string name="layers_tracks_info_label">Что такое грунтовки?</string>
+    <string name="layers_bike_paths">Велодорожки</string>
 
     <string name="menu_button">Меню</string>
     <string name="locate_button">Моё местоположение</string>

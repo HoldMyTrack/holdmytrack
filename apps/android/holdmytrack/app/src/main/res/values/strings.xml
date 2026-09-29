@@ -101,8 +101,16 @@
     <string name="mode_normal">Normal</string>
     <string name="mode_fog">Fog</string>
     <string name="mode_heatmap">Heatmap</string>
-    <string name="paths_toggle">Trails &amp; bike paths</string>
-    <string name="satellite_toggle">Satellite</string>
+    <string name="layers_button">Layers</string>
+    <string name="layers_basemap">Base map</string>
+    <string name="layers_basemap_map">Map</string>
+    <string name="layers_basemap_satellite">Satellite</string>
+    <string name="layers_paths">Paths</string>
+    <string name="layers_trails">Trails</string>
+    <string name="layers_tracks">Tracks</string>
+    <string name="layers_tracks_info">Dirt, farm and forest roads: unpaved tracks wide enough for a vehicle.</string>
+    <string name="layers_tracks_info_label">What are tracks?</string>
+    <string name="layers_bike_paths">Bike paths</string>
 
     <string name="menu_button">Menu</string>
     <string name="locate_button">Find my location</string>

@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Layers menu (.overlays-menu__panel), opened by the Layers button beside the map-mode
+     toggle (map/LayersMenu): Base map, Map or Satellite, when the served style carries imagery;
+     then Paths, each switched on and off over any mode. The web's third group, Points of
+     interest, has no Android counterpart yet. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="224dp"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_panel_popup"
+    android:elevation="8dp"
+    android:orientation="vertical"
+    android:padding="@dimen/hmt_space_8">
+
+    <LinearLayout
+        android:id="@+id/layers_basemap_group"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            style="@style/Widget.HoldMyTrack.LayersLegend"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/layers_basemap" />
+
+        <RadioGroup
+            android:id="@+id/layers_basemap"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <com.google.android.material.radiobutton.MaterialRadioButton
+                android:id="@+id/layers_basemap_map"
+                style="@style/Widget.HoldMyTrack.LayersOption.Radio"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/layers_basemap_map" />
+
+            <com.google.android.material.radiobutton.MaterialRadioButton
+                android:id="@+id/layers_basemap_satellite"
+                style="@style/Widget.HoldMyTrack.LayersOption.Radio"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/layers_basemap_satellite" />
+        </RadioGroup>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="@dimen/hmt_space_8"
+            android:layout_marginBottom="@dimen/hmt_space_8"
+            android:background="@color/hmt_border" />
+    </LinearLayout>
+
+    <TextView
+        style="@style/Widget.HoldMyTrack.LayersLegend"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/layers_paths" />
+
+    <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/layers_trails"
+        style="@style/Widget.HoldMyTrack.LayersOption.Check"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/layers_trails" />
+
+    <!-- Tracks, with an info button beside it that shows what tracks are under the entry; the
+         checkbox keeps the rest of the row. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <com.google.android.material.checkbox.MaterialCheckBox
+            android:id="@+id/layers_tracks"
+            style="@style/Widget.HoldMyTrack.LayersOption.Check"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/layers_tracks" />
+
+        <Button
+            android:id="@+id/layers_tracks_info_button"
+            style="@style/Widget.HoldMyTrack.Button.RowIcon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/layers_tracks_info_label"
+            app:icon="@drawable/ic_info"
+            app:iconSize="16dp"
+            app:iconTint="@color/hmt_ink_muted" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/layers_tracks_info"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/hmt_space_32"
+        android:layout_marginEnd="@dimen/hmt_space_2"
+        android:layout_marginBottom="@dimen/hmt_space_4"
+        android:background="@drawable/bg_layers_hint"
+        android:paddingStart="@dimen/hmt_space_8"
+        android:paddingTop="@dimen/hmt_space_4"
+        android:paddingEnd="@dimen/hmt_space_8"
+        android:paddingBottom="@dimen/hmt_space_4"
+        android:text="@string/layers_tracks_info"
+        android:textColor="@color/hmt_ink_muted"
+        android:textSize="@dimen/hmt_text_sm"
+        android:visibility="gone" />
+
+    <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/layers_bike_paths"
+        style="@style/Widget.HoldMyTrack.LayersOption.Check"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/layers_bike_paths" />
+</LinearLayout>
