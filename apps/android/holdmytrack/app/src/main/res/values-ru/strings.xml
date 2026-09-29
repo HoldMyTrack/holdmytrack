@@ -108,6 +108,7 @@
     <string name="mode_normal">Обычный</string>
     <string name="mode_fog">Туман</string>
     <string name="mode_heatmap">Тепловая</string>
+    <string name="paths_toggle">Тропы и велодорожки</string>
 
     <string name="menu_button">Меню</string>
     <string name="locate_button">Моё местоположение</string>

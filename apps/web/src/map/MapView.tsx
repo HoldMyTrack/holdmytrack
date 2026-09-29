@@ -9,6 +9,7 @@ import type { ExportPreset } from './exportPresets';
 import { ensureFogLayer } from './fog';
 import { ensureHeatmapLayer } from './heatmap';
 import { setMapMode, type MapMode } from './mapMode';
+import { loadShowPaths, saveShowPaths, setPathsVisible } from './paths';
 import { labelInsertionPoint } from './layers';
 import { buildStyle, isDarkFlavor, type Flavor } from './style';
 import { clearTrackBands, ensureBandLayer, setTrackBands } from './trackBands';
@@ -145,6 +146,11 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // Normal is what already rendered before fog existed — it needed no new work to count
   // as a "mode" (IMPLEMENTATION.md §4.2.2).
   const [mapMode, setMapModeState] = useState<MapMode>('normal');
+  const [showPaths, setShowPaths] = useState(loadShowPaths);
+  const toggleShowPaths = useCallback(() => {
+    saveShowPaths(!showPaths);
+    setShowPaths(!showPaths);
+  }, [showPaths]);
 
   const today = useMemo(() => todayLocal(), []);
 
@@ -481,7 +487,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     try {
       const blob = await exportFramedImage(
         map,
-        { flavor, mode: mapMode, activityQuery, hiddenIds: [...mapHiddenIds] },
+        { flavor, mode: mapMode, activityQuery, hiddenIds: [...mapHiddenIds], showPaths },
         {
           ...geometry,
           ...(preset !== 'custom' && { target: { widthPx: preset.widthPx, heightPx: preset.heightPx } }),
@@ -504,7 +510,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       // discard the frame the user just positioned, forcing them to redo it from scratch.
       setExportFlow((flow) => (flow.stage === 'capturing' ? { stage: 'framing', preset: flow.preset, geometry: flow.geometry } : flow));
     }
-  }, [exportFlow, map, flavor, mapMode, activityQuery, mapHiddenIds]);
+  }, [exportFlow, map, flavor, mapMode, activityQuery, mapHiddenIds, showPaths]);
 
   const handleExportCancel = useCallback(() => {
     setExportFlow({ stage: 'idle' });
@@ -1138,6 +1144,8 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       // change to the shared one.
       ensureBandLayer(instance, beforeId);
       setMapMode(instance, mapMode, editingTrack);
+      // A style swap brings the path layers back at the style's default (hidden).
+      setPathsVisible(instance, showPaths);
       // Same reasoning as setMapMode just above: addLayer always starts the tracks layer
       // with no filter, so a styledata that recreates it would otherwise silently un-hide
       // everything the eye icon/TYPE/DISTANCE filters had hidden. Both setMapMode and
@@ -1153,7 +1161,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
         setTrackBands(instance, trackMetrics.points);
       }
     },
-    [flavor, mapMode, editingTrack, mapHiddenIds, activityQuery, trackMetrics, focusedActivityId, focusedPending],
+    [flavor, mapMode, editingTrack, showPaths, mapHiddenIds, activityQuery, trackMetrics, focusedActivityId, focusedPending],
   );
 
   useEffect(() => {
@@ -1190,6 +1198,11 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     if (!map) return;
     setMapMode(map, mapMode, editingTrack);
   }, [map, mapMode, editingTrack]);
+
+  useEffect(() => {
+    if (!map) return;
+    setPathsVisible(map, showPaths);
+  }, [map, showPaths]);
 
   // Keep the hash current. `moveend` rather than `move`: one rewrite per gesture,
   // not one per animation frame.
@@ -1287,33 +1300,46 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
             />
           )}
           {!editOpen && (
-            <div className="map-mode-toggle" role="group" aria-label={t('map.mode')} data-testid="map-mode-toggle">
-              <button
-                type="button"
-                className={mapMode === 'normal' ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
-                aria-pressed={mapMode === 'normal'}
-                onClick={() => changeMapMode('normal')}
-              >
-                {t('map.mode_normal')}
-              </button>
-              {/* Normal on one side, the two coverage views on the other: two levels of choice. */}
-              <span className="map-mode-toggle__divider" aria-hidden="true" />
-              <button
-                type="button"
-                className={mapMode === 'fog' ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
-                aria-pressed={mapMode === 'fog'}
-                onClick={() => changeMapMode('fog')}
-              >
-                {t('map.mode_fog')}
-              </button>
-              <button
-                type="button"
-                className={mapMode === 'heatmap' ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
-                aria-pressed={mapMode === 'heatmap'}
-                onClick={() => changeMapMode('heatmap')}
-              >
-                {t('map.mode_heatmap')}
-              </button>
+            <div className="map-toggles">
+              <div className="map-mode-toggle" role="group" aria-label={t('map.mode')} data-testid="map-mode-toggle">
+                <button
+                  type="button"
+                  className={mapMode === 'normal' ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
+                  aria-pressed={mapMode === 'normal'}
+                  onClick={() => changeMapMode('normal')}
+                >
+                  {t('map.mode_normal')}
+                </button>
+                {/* Normal on one side, the two coverage views on the other: two levels of choice. */}
+                <span className="map-mode-toggle__divider" aria-hidden="true" />
+                <button
+                  type="button"
+                  className={mapMode === 'fog' ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
+                  aria-pressed={mapMode === 'fog'}
+                  onClick={() => changeMapMode('fog')}
+                >
+                  {t('map.mode_fog')}
+                </button>
+                <button
+                  type="button"
+                  className={mapMode === 'heatmap' ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
+                  aria-pressed={mapMode === 'heatmap'}
+                  onClick={() => changeMapMode('heatmap')}
+                >
+                  {t('map.mode_heatmap')}
+                </button>
+              </div>
+              {/* Its own group: a layer switched on and off over any mode, not a fourth mode. */}
+              <div className="map-mode-toggle" data-testid="map-paths-toggle">
+                <button
+                  type="button"
+                  className={showPaths ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
+                  aria-pressed={showPaths}
+                  onClick={toggleShowPaths}
+                >
+                  {t('map.paths')}
+                </button>
+              </div>
             </div>
           )}
         </div>

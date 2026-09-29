@@ -194,6 +194,7 @@ export const ru: Record<MessageKey, string> & Record<string, string> = {
   'map.mode': 'Режим карты',
   'map.mode_fog': 'Туман',
   'map.mode_heatmap': 'Тепловая карта',
+  'map.paths': 'Тропы и велодорожки',
   'map.mode_normal': 'Обычный',
   'export.cancel': 'Отменить экспорт',
   'export.capture': 'Сохранить снимок',

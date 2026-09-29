@@ -222,4 +222,34 @@ describe('basemap foundation', () => {
     );
     assert.ok(true);
   });
+
+  it('8. Trails & bike paths toggle: off by default, draws the paths, remembered across reload', async () => {
+    const PATH_LAYERS = ['paths_cycleway', 'paths_trail', 'paths_bridges_cycleway', 'paths_bridges_trail'];
+    const visibility = () =>
+      page.evaluate((ids) => ids.map((id) => window.__holdmytrack.getLayoutProperty(id, 'visibility')), PATH_LAYERS);
+    const toggle = page.getByTestId('map-paths-toggle').getByRole('button');
+
+    assert.deepEqual(await visibility(), PATH_LAYERS.map(() => 'none'), 'hidden until turned on');
+    assert.equal(await toggle.getAttribute('aria-pressed'), 'false');
+
+    // The Olentangy Trail, Columbus: cycleways and footpaths in the extract at z14.
+    await page.evaluate(() => window.__holdmytrack.jumpTo({ center: [-83.02, 39.99], zoom: 14 }));
+    await toggle.click();
+    assert.deepEqual(await visibility(), PATH_LAYERS.map(() => 'visible'), 'shown once turned on');
+    await styleLoaded();
+    await page.waitForFunction(() => window.__holdmytrack.areTilesLoaded(), undefined, { timeout: 30_000 });
+    const rendered = await page.evaluate(() => ({
+      cycleway: window.__holdmytrack.queryRenderedFeatures({ layers: ['paths_cycleway'] }).length,
+      trail: window.__holdmytrack.queryRenderedFeatures({ layers: ['paths_trail'] }).length,
+    }));
+    assert.ok(rendered.cycleway > 0, `cycleways drawn (${rendered.cycleway})`);
+    assert.ok(rendered.trail > 0, `trails drawn (${rendered.trail})`);
+    await page.screenshot({ path: new URL('columbus-paths-light.png', SHOTS).pathname });
+
+    await page.reload();
+    await styleLoaded();
+    assert.deepEqual(await visibility(), PATH_LAYERS.map(() => 'visible'), 'remembered across reload');
+    await toggle.click();
+    assert.deepEqual(await visibility(), PATH_LAYERS.map(() => 'none'), 'hidden again once turned off');
+  });
 });
