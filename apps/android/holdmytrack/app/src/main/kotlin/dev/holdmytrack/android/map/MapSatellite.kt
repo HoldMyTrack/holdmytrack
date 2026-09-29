@@ -7,9 +7,9 @@ import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
 
 /**
- * The map's Satellite toggle (`docs/SPEC.md` FR-4.14): shows the served style's imagery layer,
- * hides the basemap's background and area fills over it and draws the roads see-through, so
- * roads, boundaries and labels stay on top — the web's Base map switch. The served style has the
+ * The Layers menu's Base map choice, Map or Satellite (`docs/SPEC.md` FR-4.14, [LayersMenu]):
+ * Satellite shows the served style's imagery layer, hides the basemap's background and area fills
+ * over it and draws the roads see-through, so roads, boundaries and labels stay on top. The served style has the
  * imagery only when the deployment configures some ([isAvailable]); which fills to hide, which
  * roads to dim and how far all come from the style's own metadata, so they're defined once, in
  * apps/web/src/map/style.ts. A per-device choice, off

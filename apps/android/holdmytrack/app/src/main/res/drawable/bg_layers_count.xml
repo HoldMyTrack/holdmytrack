@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Layers button's count badge: an accent pill over the icon's corner. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/hmt_accent" />
+    <corners android:radius="999dp" />
+</shape>

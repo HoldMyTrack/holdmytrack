@@ -40,6 +40,7 @@ import dev.holdmytrack.android.map.DateRange
 import dev.holdmytrack.android.map.DateRangeSlider
 import dev.holdmytrack.android.map.MapMode
 import dev.holdmytrack.android.map.MapOverlays
+import dev.holdmytrack.android.map.LayersMenu
 import dev.holdmytrack.android.map.MapPaths
 import dev.holdmytrack.android.map.MapSatellite
 import dev.holdmytrack.android.net.Activity
@@ -121,10 +122,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var menuButton: Button
     private lateinit var modeBar: View
     private lateinit var modeButtons: Map<MapMode, MaterialButton>
-    private lateinit var pathsToggle: MaterialButton
-    private lateinit var satelliteToggle: MaterialButton
+    private lateinit var layersMenu: LayersMenu
     private lateinit var recordButton: RecordButton
-    private lateinit var recordRow: View
+    private lateinit var secondRow: View
+    private lateinit var layersPanel: View
     private lateinit var recordingStatus: View
     private lateinit var recordingStatusDot: View
     private lateinit var recordingStatusTime: Chronometer
@@ -348,19 +349,22 @@ class MainActivity : AppCompatActivity() {
             button.minWidth = minTouchTargetPx()
             button.minimumWidth = minTouchTargetPx()
         }
-        pathsToggle = findViewById(R.id.paths_toggle)
-        pathsToggle.isChecked = MapPaths.isOn(this)
-        pathsToggle.setOnClickListener { setPaths(!MapPaths.isOn(this)) }
-        satelliteToggle = findViewById(R.id.satellite_toggle)
-        satelliteToggle.isChecked = MapSatellite.isOn(this)
-        satelliteToggle.setOnClickListener { setSatellite(!MapSatellite.isOn(this)) }
+        layersPanel = findViewById(R.id.layers_panel)
+        layersMenu = LayersMenu(
+            button = findViewById(R.id.layers_button),
+            count = findViewById(R.id.layers_count),
+            paths = { MapPaths.get(this) },
+            satellite = { MapSatellite.isOn(this) },
+            onPaths = ::setPaths,
+            onSatellite = ::setSatellite,
+        )
         menuButton.setOnClickListener { showMenu(it) }
 
         recordButton = findViewById(R.id.record_button)
         recordButton.setOnClickListener { onRecordTap() }
         recordButton.onHoldComplete = ::stopRecording
         recordButton.onHoldProgress = ::renderHoldProgress
-        recordRow = findViewById(R.id.record_row)
+        secondRow = findViewById(R.id.second_row)
         recordingStatus = findViewById(R.id.recording_status)
         recordingStatusDot = findViewById(R.id.recording_status_dot)
         recordingStatusTime = findViewById(R.id.recording_status_time)
@@ -523,9 +527,9 @@ class MainActivity : AppCompatActivity() {
             style = loaded
             hideNotice(Notice.MAP_FAILED)
             // The served style ships the path layers hidden; a fresh style needs the saved choice.
-            MapPaths.apply(loaded, MapPaths.isOn(this))
-            // Only a deployment with imagery serves it; without, there is no switch to show.
-            satelliteToggle.isVisible = MapSatellite.isAvailable(loaded)
+            MapPaths.apply(loaded, MapPaths.get(this))
+            // Only a deployment with imagery serves it; without, the Layers menu has no Base map.
+            layersMenu.satelliteAvailable = MapSatellite.isAvailable(loaded)
             MapSatellite.apply(loaded, MapSatellite.isOn(this))
             MapOverlays.attachLiveTrack(loaded)
             syncSession()
@@ -641,7 +645,7 @@ class MainActivity : AppCompatActivity() {
         // laid out, below the status bar at least.
         val belowTopBar = maxOf(
             findViewById<View>(R.id.top_bar).bottom,
-            if (recordRow.isVisible) recordRow.bottom else 0,
+            if (secondRow.isVisible) secondRow.bottom else 0,
             if (notice.isVisible) notice.bottom else 0,
         )
         settings.setCompassMargins(
@@ -1045,17 +1049,21 @@ class MainActivity : AppCompatActivity() {
         panel.storiesTab.reloadOpen()
     }
 
-    /** The mode toggle: shown once the session allows, away while recording or editing. */
+    /** The mode toggle: shown once the session allows, away while recording or editing. Layers
+     *  shows once the session allows too, and stays while recording: the base map and the
+     *  paths are about where the recording is going, not about the modes. */
     private fun renderModeBar() {
         if (!modeBarReady) return
         modeBar.visibility = if (isRecording() || editWindow.isOpen) View.GONE else View.VISIBLE
+        layersPanel.visibility = View.VISIBLE
     }
 
-    /** Record, on its own row under the chrome row: away while the Edit window or the Private
-     *  location editor is open, since both open over that row. */
+    /** Layers and Record, on the second row under the chrome row: away while the Edit window or
+     *  the Private location editor is open, since both open over that row. */
     private fun renderRecordButton() {
         val editing = editWindow.isOpen || (::privacyTab.isInitialized && privacyTab.isEditing)
-        recordRow.visibility = if (editing) View.GONE else View.VISIBLE
+        secondRow.visibility = if (editing) View.GONE else View.VISIBLE
+        if (editing) layersMenu.dismiss()
     }
 
     /** The panel's hidden set, filters, Pending rows and selection, onto the track layers —
@@ -1533,15 +1541,13 @@ class MainActivity : AppCompatActivity() {
         renderDateFooter()
     }
 
-    private fun setPaths(on: Boolean) {
-        MapPaths.set(this, on)
-        pathsToggle.isChecked = on
-        style?.let { MapPaths.apply(it, on) }
+    private fun setPaths(paths: MapPaths.Paths) {
+        MapPaths.set(this, paths)
+        style?.let { MapPaths.apply(it, paths) }
     }
 
     private fun setSatellite(on: Boolean) {
         MapSatellite.set(this, on)
-        satelliteToggle.isChecked = on
         val loaded = style ?: return
         MapSatellite.apply(loaded, on)
         if (overlaysAttached) MapOverlays.setDarkVeil(loaded, darkBase(loaded))
@@ -1702,6 +1708,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         leftoverDialog?.dismiss()
         stopDialog?.dismiss()
+        if (::layersMenu.isInitialized) layersMenu.dismiss()
         if (::mapView.isInitialized) mapView.onDestroy()
         if (::dateSlider.isInitialized) dateSlider.release()
         coverageWatch.stop()

@@ -147,7 +147,7 @@ export interface BuildStyleOptions {
  * style draws them all through `roads_other` as one hairline grey from z14, which reads as no
  * paths at all. These draw cycleways and trails over that same geometry from lower zoom, so
  * hiding them just falls back to the stock look. The Android app toggles the same ids by
- * name (`MapPaths.LAYER_IDS`), so they are part of the served style's contract.
+ * name (`MapPaths`), so they are part of the served style's contract.
  */
 export const PATH_LAYER_IDS = [
   'paths_cycleway',
@@ -158,8 +158,7 @@ export const PATH_LAYER_IDS = [
   'paths_bridges_track',
 ] as const;
 
-/** The three kinds the web's Layers menu shows separately (overlays.ts). Android toggles all
- *  six together. */
+/** The three kinds the Layers menu shows separately (overlays.ts, and Android's `MapPaths`). */
 export const TRAIL_LAYER_IDS = ['paths_trail', 'paths_bridges_trail'] as const;
 export const TRACK_LAYER_IDS = ['paths_track', 'paths_bridges_track'] as const;
 export const BIKE_PATH_LAYER_IDS = ['paths_cycleway', 'paths_bridges_cycleway'] as const;
