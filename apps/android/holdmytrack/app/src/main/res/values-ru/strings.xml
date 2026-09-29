@@ -196,6 +196,12 @@
     <string name="record_button_pause">Приостановить запись. Удерживайте, чтобы остановить.</string>
     <string name="record_button_resume">Продолжить запись. Удерживайте, чтобы остановить.</string>
     <string name="record_hold_to_stop">Удерживайте, чтобы остановить запись</string>
+    <string name="recording_status_waiting">Ожидание GPS…</string>
+    <string name="recording_status_paused">Пауза · %1$s</string>
+    <string name="recording_status_holding">Удерживайте, чтобы остановить…</string>
+    <string name="recording_stop_confirm_title">Остановить запись?</string>
+    <string name="recording_stop_confirm_message">Уже записано: %1$s · %2$s.</string>
+    <string name="recording_keep">Продолжить запись</string>
     <string name="recording_notification_channel">Запись GPS</string>
     <string name="recording_notification_title">Идёт запись</string>
     <string name="recording_notification_title_paused">Пауза · %1$s</string>

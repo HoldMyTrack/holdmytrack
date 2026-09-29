@@ -75,7 +75,8 @@ data class RecordingStats(
  * as saved here; Save screen's Discard is the only way it goes. The notification's Stop is
  * routed through `MainActivity` rather than straight here, so an app window is in the
  * foreground for that screen to open over (a service can't start an activity from the
- * background).
+ * background), and so it can be confirmed there first — one tap in the shade is easy to make
+ * by mistake.
  *
  * **Foreground-only in the Path 2 sense doesn't apply here.** `docs/adr/
  * 0007-in-app-gps-recording-submits-directly.md` is explicit: Phase 3's foreground-only sync

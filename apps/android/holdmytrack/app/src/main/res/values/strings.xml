@@ -186,6 +186,12 @@
     <string name="record_button_pause">Pause recording. Hold to stop.</string>
     <string name="record_button_resume">Resume recording. Hold to stop.</string>
     <string name="record_hold_to_stop">Hold to stop recording</string>
+    <string name="recording_status_waiting">Waiting for GPS…</string>
+    <string name="recording_status_paused">Paused · %1$s</string>
+    <string name="recording_status_holding">Keep holding to stop…</string>
+    <string name="recording_stop_confirm_title">Stop recording?</string>
+    <string name="recording_stop_confirm_message">%1$s · %2$s recorded so far.</string>
+    <string name="recording_keep">Keep recording</string>
     <string name="recording_notification_channel">GPS recording</string>
     <string name="recording_notification_title">Recording</string>
     <string name="recording_notification_title_paused">Paused · %1$s</string>
