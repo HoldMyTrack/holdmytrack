@@ -623,13 +623,13 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 
 ### FR-4.13 Trails and bike paths
 
-**Description**: The base map's cycleways and walking/hiking paths drawn as lines of their own, standing out from the streets, where otherwise they are barely visible hairlines. On the web they are three entries of the Layers menu under Paths — **Trails**, **Tracks** and **Bike paths**; the Android app has one Trails & bike paths toggle for all three.
+**Description**: The base map's cycleways and walking/hiking paths drawn as lines of their own, standing out from the streets, where otherwise they are barely visible hairlines. They are three entries of the Layers menu under Paths — **Trails**, **Tracks** and **Bike paths**.
 
-**Preconditions**: Active session. The Layers menu (web) or the toggle (Android) is beside the map-mode toggle (FR-4.1–FR-4.3) and is hidden while the Edit window is open (FR-5.10), like that toggle. The Layers button opens a panel of three groups: Base map (FR-4.14), then checkboxes under Paths and Points of interest (FR-15.2). The button shows how many paths and places are on; a press outside the panel or Escape closes it. Tracks has an info button beside it that shows, under the entry, what tracks are — dirt, farm and forest roads, unpaved and wide enough for a vehicle — and hides it again on a second press; it doesn't tick the box.
+**Preconditions**: Active session. The Layers menu is beside the map-mode toggle (FR-4.1–FR-4.3) — in the Android app, an icon button under the menu button — and is hidden while the Edit window is open (FR-5.10), like that toggle. The Layers button opens a panel of three groups: Base map (FR-4.14), then checkboxes under Paths and Points of interest (FR-15.2); the Android app's menu has no Points of interest group. The button shows how many paths and places are on; a press on the button again or outside the panel, or Escape (Back on Android), closes it. Tracks has an info button beside it that shows, under the entry, what tracks are — dirt, farm and forest roads, unpaved and wide enough for a vehicle — and hides it again on a second press; it doesn't tick the box.
 
 **Behavior**:
 1. Off by default. All three start at zoom 13, the zoom points of interest start at too (FR-15.2), so paths and places appear and disappear together. Bike paths draws cycleways as a solid blue line, Trails draws paths, footways and bridleways as a dashed green line, and Tracks draws OSM's `highway=track` — dirt, farm and forest roads — as a longer-dashed, slightly wider brown line, under the trails; each on its own, both widening as the map zooms in. The monochrome flavors (FR-4.5) draw all three in greys, telling them apart by the dash and width.
-2. The choice is kept by this browser (or, in the Android app, this phone) only, not on the account, and applies again on the next visit. A browser that had the former single web toggle on starts with all three on, and one whose saved choice predates Tracks shows tracks whenever it shows trails.
+2. The choice is kept by this browser (or, in the Android app, this phone) only, not on the account, and applies again on the next visit. A browser that had the former single web toggle on, or a phone that had the former Trails & bike paths toggle on, starts with all three on, and one whose saved choice predates Tracks shows tracks whenever it shows trails.
 3. It is independent of the map mode: it works over Normal, Fog and Heatmap alike, and survives a theme change (FR-4.12).
 4. An export (FR-4.10) draws each kind of path when it's on and leaves it out when it's off.
 
@@ -637,9 +637,9 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 
 ### FR-4.14 Satellite mode
 
-**Description**: Satellite imagery as a second base map, with the vector base map's roads, boundaries and labels drawn over it. On the web it is the **Base map** choice at the top of the Layers menu, **Map** or **Satellite**; the Android app has a **Satellite** toggle after Trails & bike paths.
+**Description**: Satellite imagery as a second base map, with the vector base map's roads, boundaries and labels drawn over it. It is the **Base map** choice at the top of the Layers menu (FR-4.13), **Map** or **Satellite**.
 
-**Preconditions**: Active session. The deployment configures imagery (`IMPLEMENTATION.md` §4.26); without it there is no Base map section and no Satellite toggle, and a saved Satellite choice shows the vector map.
+**Preconditions**: Active session. The deployment configures imagery (`IMPLEMENTATION.md` §4.26); without it there is no Base map section, and a saved Satellite choice shows the vector map.
 
 **Behavior**:
 1. Map by default. Choosing Satellite shows the imagery in place of the base map's background, land, water, landuse and building fills; roads stay on top at 40% opacity, so the ground shows through them; boundaries and place labels stay as they are, and so do tracks, Fog, Heatmap, trails and bike paths (FR-4.13) and Spots (FR-15). Choosing Map puts the fills back.
