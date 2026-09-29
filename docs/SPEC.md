@@ -628,7 +628,7 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 **Preconditions**: Active session. The Layers menu (web) or the toggle (Android) is beside the map-mode toggle (FR-4.1–FR-4.3) and is hidden while the Edit window is open (FR-5.10), like that toggle. The Layers button opens a panel of three groups: Base map (FR-4.14), then checkboxes under Paths and Points of interest (FR-15.2). The button shows how many paths and places are on; a press outside the panel or Escape closes it. Tracks has an info button beside it that shows, under the entry, what tracks are — dirt, farm and forest roads, unpaved and wide enough for a vehicle — and hides it again on a second press; it doesn't tick the box.
 
 **Behavior**:
-1. Off by default. Bike paths draws cycleways as a solid blue line from zoom 12, Trails draws paths, footways and bridleways as a dashed green line from zoom 13, and Tracks draws OSM's `highway=track` — dirt, farm and forest roads — as a longer-dashed, slightly wider brown line from zoom 13, under the trails; each on its own, both widening as the map zooms in. The monochrome flavors (FR-4.5) draw all three in greys, telling them apart by the dash and width.
+1. Off by default. All three start at zoom 13, the zoom points of interest start at too (FR-15.2), so paths and places appear and disappear together. Bike paths draws cycleways as a solid blue line, Trails draws paths, footways and bridleways as a dashed green line, and Tracks draws OSM's `highway=track` — dirt, farm and forest roads — as a longer-dashed, slightly wider brown line, under the trails; each on its own, both widening as the map zooms in. The monochrome flavors (FR-4.5) draw all three in greys, telling them apart by the dash and width.
 2. The choice is kept by this browser (or, in the Android app, this phone) only, not on the account, and applies again on the next visit. A browser that had the former single web toggle on starts with all three on, and one whose saved choice predates Tracks shows tracks whenever it shows trails.
 3. It is independent of the map mode: it works over Normal, Fog and Heatmap alike, and survives a theme change (FR-4.12).
 4. An export (FR-4.10) draws each kind of path when it's on and leaves it out when it's off.
@@ -1155,8 +1155,8 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 
 **Behavior**:
 1. The Layers menu's Points of interest group (FR-4.13 describes the menu) has one checkbox per category — Playgrounds, Dog parks, Monuments, Mesmerizing views, Historic sites. Each works the same over Normal, Fog and Heatmap. All start off; each browser remembers its choice, and one that had the former Show POI toggle on starts with every category on.
-2. From zoom 12 up, each place in a ticked category is a round badge — its category's icon in ink on white, ringed in gold — at a point on its area, loaded as the map moves. Between zoom 5 and 12 places show only on request (FR-15.5); below zoom 5, none. Every place is drawn, however close to others. Playground's icon is a seesaw.
-3. From zoom 12 up, under each badge its area is shaded faintly in gold: the place's outline from OpenStreetMap, edged with a solid line, or — for a place mapped only as a point — its 30 m circle, edged with a dashed line. Clicking an area does nothing, and a track under it can still be clicked.
+2. From zoom 13 up — where the paths (FR-4.13) start too — each place in a ticked category is a round badge — its category's icon in ink on white, ringed in gold — at a point on its area, loaded as the map moves. Between zoom 5 and 13 places show only on request (FR-15.5); below zoom 5, none. Every place is drawn, however close to others. Playground's icon is a seesaw.
+3. From zoom 13 up, under each badge its area is shaded faintly in gold: the place's outline from OpenStreetMap, edged with a solid line, or — for a place mapped only as a point — its 30 m circle, edged with a dashed line. Clicking an area does nothing, and a track under it can still be clicked.
 4. Badges and areas are drawn over everything else, the Fog veil and map labels included, and Fog doesn't dim them.
 5. They hide during an Edit track session (FR-5.14) and come back after it.
 
@@ -1170,13 +1170,13 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 
 ### FR-15.5 Show in this area
 
-**Description**: Between zoom 5 (the Region tier's, FR-4.2) and zoom 12 a view holds too many places to load on every pan, so they load when asked, for the visible map.
+**Description**: Between zoom 5 (the Region tier's, FR-4.2) and zoom 13 a view holds too many places to load on every pan, so they load when asked, for the visible map.
 
 **Behavior**:
-1. With at least one category ticked and the map between zoom 5 and 12, a **Show in this area** button shows over the map, under the toggles. Outside that range, or with no category ticked, it doesn't.
+1. With at least one category ticked and the map between zoom 5 and 13, a **Show in this area** button shows over the map, under the toggles. Outside that range, or with no category ticked, it doesn't.
 2. Pressing it loads the ticked categories' places inside the visible map and draws their badges (no areas). They stay drawn until the next press; unticking a category hides its places at once.
 3. Until the map moves or another category is ticked, a line replaces the button: how many places the area has ("912 places in this area"), "No places in this area", or, when there were more than 2,000, "Showing 2,000 of N places — zoom in for the rest". The 2,000 are the named places first, spread evenly over the area. After a move or a newly ticked category, the button comes back.
-4. A badge from it opens the same popup (FR-15.3). From zoom 12 up the tiles' badges take over and these aren't drawn.
+4. A badge from it opens the same popup (FR-15.3). From zoom 13 up the tiles' badges take over and these aren't drawn.
 5. If the request fails, the button reads "Couldn't load places — try again".
 
 **Inputs** (`GET /v1/spots`): `bbox` — `west,south,east,north` in degrees, west below east and south below north (clamped to the world); `categories` — one or more of `playground`, `dog_park`, `monument`, `viewpoint`, `history`, comma-separated.
@@ -1191,7 +1191,7 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 
 **Inputs**: `z`, `x`, `y`; `cv`, the tile version (FR-4.11).
 
-**Outputs**: A vector tile with two layers. `spots`: a point per place whose anchor falls in the tile, with `id`, `category` (`playground`, `dog_park`, `monument`, `viewpoint` or `history`), `lon`, `lat`, and `name`, `address`, `description`, `inscription`, `memorial`, `start_date` and `wikipedia`, each absent when the place has none. `spot_areas`: each place's area that reaches into the tile, clipped to it, with `id`, `category` and `circle` (`true` for the 30 m circle of a place mapped as a point). Below zoom 12, an empty tile.
+**Outputs**: A vector tile with two layers. `spots`: a point per place whose anchor falls in the tile, with `id`, `category` (`playground`, `dog_park`, `monument`, `viewpoint` or `history`), `lon`, `lat`, and `name`, `address`, `description`, `inscription`, `memorial`, `start_date` and `wikipedia`, each absent when the place has none. `spot_areas`: each place's area that reaches into the tile, clipped to it, with `id`, `category` and `circle` (`true` for the 30 m circle of a place mapped as a point). Below zoom 13, an empty tile.
 
 **Behavior**:
 1. The same places for every account, behind the session like every other map tile, and cached like them (FR-4.11). Loading places moves every account's tile version.
