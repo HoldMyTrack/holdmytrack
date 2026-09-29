@@ -57,6 +57,8 @@ export interface ExportViewState {
   mode: MapMode;
   activityQuery: ActivityQuery;
   hiddenIds: string[];
+  /** The Trails & bike paths toggle (paths.ts), so the image shows what the screen does. */
+  showPaths: boolean;
 }
 
 export interface ExportFrameCapture {
@@ -292,7 +294,7 @@ async function renderOffscreen(
 
   const instance = new MapLibreMap({
     container,
-    style: buildStyle({ flavor: state.flavor, origin: basemapOrigin() }),
+    style: buildStyle({ flavor: state.flavor, origin: basemapOrigin(), showPaths: state.showPaths }),
     center: [view.center.lng, view.center.lat],
     zoom: liveMap.getZoom(),
     pixelRatio: view.pixelRatio,

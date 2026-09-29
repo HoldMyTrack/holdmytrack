@@ -111,6 +111,24 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/hmt_space_2"
                         android:text="@string/mode_heatmap" />
+
+                    <!-- Trails & bike paths (MapPaths): a layer switched on over any mode, not a
+                         fourth mode, so a divider sets it apart. -->
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="@dimen/hmt_space_4"
+                        android:layout_marginTop="@dimen/hmt_space_8"
+                        android:layout_marginEnd="@dimen/hmt_space_4"
+                        android:layout_marginBottom="@dimen/hmt_space_8"
+                        android:background="@color/hmt_border_strong" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/paths_toggle"
+                        style="@style/Widget.HoldMyTrack.Button.MapMode"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/paths_toggle" />
                 </LinearLayout>
             </HorizontalScrollView>
 

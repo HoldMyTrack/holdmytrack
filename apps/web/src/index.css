@@ -1467,12 +1467,23 @@ body {
   pointer-events: none;
 }
 
-.map-mode-toggle {
+/* The mode toggle and the Trails & bike paths toggle, side by side, wrapping on a narrow map. */
+.map-toggles {
   position: absolute;
   top: 10px;
   left: 10px;
+  right: 60px;
   z-index: 3;
   display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--fm-space-8);
+  pointer-events: none;
+}
+
+.map-mode-toggle {
+  display: flex;
+  pointer-events: auto;
   gap: var(--fm-space-2);
   padding: var(--fm-space-4);
   border-radius: var(--fm-radius-md);
@@ -1495,7 +1506,10 @@ body {
   background: rgb(var(--fm-ink-rgb) / 7%);
 }
 
-.map-mode-toggle__btn--active {
+/* :hover too, or the hover rule above (more specific) washes out the active button under the
+   cursor right after it's clicked. */
+.map-mode-toggle__btn--active,
+.map-mode-toggle__btn--active:hover {
   background: var(--fm-ink);
   color: var(--fm-on-accent);
 }

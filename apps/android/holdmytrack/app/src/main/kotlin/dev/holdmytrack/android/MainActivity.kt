@@ -35,6 +35,7 @@ import dev.holdmytrack.android.map.DateRange
 import dev.holdmytrack.android.map.DateRangeSlider
 import dev.holdmytrack.android.map.MapMode
 import dev.holdmytrack.android.map.MapOverlays
+import dev.holdmytrack.android.map.MapPaths
 import dev.holdmytrack.android.net.Activity
 import dev.holdmytrack.android.net.ApiException
 import dev.holdmytrack.android.net.TrackMetrics
@@ -113,6 +114,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var menuButton: Button
     private lateinit var modeBar: View
     private lateinit var modeButtons: Map<MapMode, MaterialButton>
+    private lateinit var pathsToggle: MaterialButton
     private lateinit var recordButton: RecordButton
     private lateinit var locateButton: MaterialButton
 
@@ -319,6 +321,9 @@ class MainActivity : AppCompatActivity() {
             button.minWidth = minTouchTargetPx()
             button.minimumWidth = minTouchTargetPx()
         }
+        pathsToggle = findViewById(R.id.paths_toggle)
+        pathsToggle.isChecked = MapPaths.isOn(this)
+        pathsToggle.setOnClickListener { setPaths(!MapPaths.isOn(this)) }
         menuButton.setOnClickListener { showMenu(it) }
 
         recordButton = findViewById(R.id.record_button)
@@ -476,6 +481,8 @@ class MainActivity : AppCompatActivity() {
         instance.setStyle(Style.Builder().fromUri(styleUrl())) { loaded ->
             style = loaded
             hideNotice(Notice.MAP_FAILED)
+            // The served style ships the path layers hidden; a fresh style needs the saved choice.
+            MapPaths.apply(loaded, MapPaths.isOn(this))
             MapOverlays.attachLiveTrack(loaded)
             syncSession()
             renderRecording()
@@ -1375,6 +1382,12 @@ class MainActivity : AppCompatActivity() {
         }
         style?.takeIf { overlaysAttached }?.let { MapOverlays.setMode(it, next) }
         renderDateFooter()
+    }
+
+    private fun setPaths(on: Boolean) {
+        MapPaths.set(this, on)
+        pathsToggle.isChecked = on
+        style?.let { MapPaths.apply(it, on) }
     }
 
     /**

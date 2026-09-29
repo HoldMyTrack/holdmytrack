@@ -101,6 +101,7 @@
     <string name="mode_normal">Normal</string>
     <string name="mode_fog">Fog</string>
     <string name="mode_heatmap">Heatmap</string>
+    <string name="paths_toggle">Trails &amp; bike paths</string>
 
     <string name="menu_button">Menu</string>
     <string name="locate_button">Find my location</string>

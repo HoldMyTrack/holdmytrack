@@ -167,6 +167,7 @@ export const en = {
   'map.mode': 'Map mode',
   'map.mode_fog': 'Fog',
   'map.mode_heatmap': 'Heatmap',
+  'map.paths': 'Trails & bike paths',
   'map.mode_normal': 'Normal',
   'export.cancel': 'Cancel export',
   'export.capture': 'Capture export',

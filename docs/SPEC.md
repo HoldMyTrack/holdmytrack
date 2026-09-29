@@ -621,6 +621,20 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 
 **Notes**: A signed-out visitor gets the device setting; the control is only on the signed-in Settings page. `IMPLEMENTATION.md` §4.18 covers the two palettes.
 
+### FR-4.13 Trails and bike paths
+
+**Description**: A Trails & bike paths toggle on the map draws the base map's cycleways and walking/hiking paths as lines of their own, standing out from the streets, where otherwise they are barely visible hairlines.
+
+**Preconditions**: Active session. The toggle is beside the map-mode toggle (FR-4.1–FR-4.3) and is hidden while the Edit window is open (FR-5.10), like that toggle.
+
+**Behavior**:
+1. Off by default. Turning it on draws cycleways as a solid blue line from zoom 12, and paths, footways, bridleways and tracks as a dashed green line from zoom 13, both widening as the map zooms in. The monochrome flavors (FR-4.5) draw both in greys, telling them apart by the dash.
+2. The choice is kept by this browser (or, in the Android app, this phone) only, not on the account, and applies again on the next visit.
+3. It is independent of the map mode: it works over Normal, Fog and Heatmap alike, and survives a theme change (FR-4.12).
+4. An export (FR-4.10) draws the paths when the toggle is on and leaves them out when it is off.
+
+**Notes**: It shows what OpenStreetMap tags as a path and is already in the base map, nothing more. Sidewalks, crossings, steps and pedestrian areas keep the base map's own faint styling, since in a city they would bury the real paths. Bike lanes painted on a street, and named routes such as long-distance cycle or hiking networks, are not in the base map and are not shown.
+
 ## 7. FR-5 — Activities Panel
 
 ### FR-5.1 Activity list
