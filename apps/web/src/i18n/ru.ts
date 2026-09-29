@@ -133,6 +133,7 @@ export const ru: Record<MessageKey, string> & Record<string, string> = {
   'edit.title_many.other': 'Редактировать {n} занятия',
   'edit.title_one': 'Редактировать занятие',
   'edit.type_required': 'Укажите тип.',
+  'edit.type_mixed': 'Разные типы — выберите один, чтобы задать его всем',
   'edit.type_too_long': 'Тип должен быть не длиннее {max} символов.',
   'picker.add_type': 'Добавить «{type}»',
   'picker.new': 'новый',

@@ -92,8 +92,13 @@ class EditActivityWindow(
     private var activities: List<Activity> = emptyList()
     private var known: List<TypeCount> = emptyList()
 
-    /** The raw `activity_type` the Type field holds — the field itself shows its label. */
+    /** The raw `activity_type` the Type field holds — the field itself shows its label. Empty
+     *  for a group of mixed types until one is picked: empty keeps each activity's own, so a
+     *  Save made for the Stories tab alone never retypes anything. */
     private var activityType = ""
+
+    /** The group's activities don't all share one type. */
+    private var mixedTypes = false
     private var saving = false
 
     /** Set once the fields are written, so a Save retried after a failure doesn't write them
@@ -243,7 +248,8 @@ class EditActivityWindow(
         storiesError = null
         storyChanges = StoryChanges(group.map { it.id })
         storiesSaved.clear()
-        activityType = group.first().activityType
+        mixedTypes = group.any { it.activityType != group.first().activityType }
+        activityType = if (mixedTypes) "" else group.first().activityType
         title.text = if (single != null) {
             res.getString(R.string.edit_title_one)
         } else {
@@ -254,7 +260,10 @@ class EditActivityWindow(
         } else {
             res.getString(R.string.edit_multi_subtitle)
         }
-        typeField.setText(RecordingTypes.format(res, activityType))
+        typeField.setText(if (activityType.isEmpty()) "" else RecordingTypes.format(res, activityType))
+        // "Mixed types" stands in the empty field, shown without focus, until a type is picked.
+        typeLayout.isExpandedHintEnabled = !mixedTypes
+        typeLayout.placeholderText = if (mixedTypes) res.getString(R.string.edit_type_mixed) else null
         nameField.setText(single?.name.orEmpty())
         descriptionField.setText(single?.description.orEmpty())
         nameLayout.isEnabled = single != null
@@ -299,7 +308,7 @@ class EditActivityWindow(
         val name = nameField.text?.toString().orEmpty().trim()
         val description = descriptionField.text?.toString().orEmpty()
         val invalid = when {
-            type.isEmpty() -> res.getString(R.string.edit_type_required)
+            type.isEmpty() && !mixedTypes -> res.getString(R.string.edit_type_required)
             type.length > MAX_TYPE -> res.getString(R.string.edit_type_too_long, MAX_TYPE)
             name.length > MAX_NAME -> res.getString(R.string.edit_name_too_long, MAX_NAME)
             description.length > MAX_DESCRIPTION -> res.getString(R.string.edit_description_too_long, MAX_DESCRIPTION)
@@ -313,7 +322,7 @@ class EditActivityWindow(
         val changed = if (single != null) {
             type != single.activityType || name != single.name.orEmpty() || description != single.description.orEmpty()
         } else {
-            activities.any { it.activityType != type }
+            type.isNotEmpty() && activities.any { it.activityType != type }
         }
         if (!changed || fieldsSaved) {
             saveStories()

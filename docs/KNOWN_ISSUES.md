@@ -6,13 +6,6 @@ This file stays lean and current-only. Once an entry is fixed, its root-cause/fi
 
 ---
 
-### Saving a mixed group in the Edit window gives every activity the first one's type
-
-`SPEC.md` FR-5.10 has a group's Edit window set one type for all of them, but its Type field starts on the first activity's type, and Save counts any activity whose type differs from the field as a change (`EditActivityWindow.tsx`'s `activities.some((a) => a.activityType !== trimmedType)`, and the same test in the Android app's `panel/EditActivityWindow`). So Save on a group of mixed types — to change only its Stories (FR-5.17), with the Type field never touched — also retypes every activity to the first one's. Found on the Android emulator: saving a Walking and a Hiking activity's Stories made both Hiking.
-
-- [ ] Write the type only when the user picked one — start a mixed group's field empty or marked "mixed", or remember whether the picker was used — on both clients.
-- [ ] Check a mixed group whose Stories alone change keeps each activity's type, on the web and in the app.
-
 ### Trends leaves out empty weeks and months, so its bars don't show the 12 months `SPEC.md` FR-9 describes
 
 FR-9 behavior 3 says the Profile page renders the trailing 12 months as one bar per bucket. `activityTrendsQuery` (`services/server/internal/httpapi/activities.go`) groups only the account's activities, so a week or month with none never comes back, and both clients draw one bar per period returned (`buildTrendBars`, `profile/TrendsChartView`). A history with two active weeks draws two bars filling the whole chart, each half its width, with nothing to show the other 50 weeks were empty; the axis's two dates are the first and last active period, not the window's ends. Found on the Android emulator against a local stack while porting the page; the web's `/profile` draws the same two bars.

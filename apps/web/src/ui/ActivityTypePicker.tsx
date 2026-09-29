@@ -13,6 +13,8 @@ export interface ActivityTypePickerProps {
   known: TypeFacet[];
   labelledBy: string;
   maxLength: number;
+  /** What the closed picker shows while `value` is `''` — a mixed group's "Mixed types". */
+  emptyLabel?: string;
 }
 
 function typeOption(type: string, count?: number): PickerOption {
@@ -33,7 +35,7 @@ function typeOption(type: string, count?: number): PickerOption {
  * carried by an activity whose type no other loaded activity shares) still appears in the
  * list, so the current choice is always there to see.
  */
-export function ActivityTypePicker({ value, onChange, known, labelledBy, maxLength }: ActivityTypePickerProps) {
+export function ActivityTypePicker({ value, onChange, known, labelledBy, maxLength, emptyLabel }: ActivityTypePickerProps) {
   const options = useMemo(() => {
     const list = known.map((f) => typeOption(f.type, f.count));
     if (value && !known.some((f) => f.type === value)) list.unshift(typeOption(value));
@@ -55,6 +57,7 @@ export function ActivityTypePicker({ value, onChange, known, labelledBy, maxLeng
       searchLabel={t('picker.search_type')}
       noMatches={(query) => t('picker.no_type_matches', { query })}
       placeholder={t('picker.search_type')}
+      {...(emptyLabel !== undefined && { emptyLabel })}
       createOption={createOption}
     />
   );
