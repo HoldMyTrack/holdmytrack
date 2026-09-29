@@ -62,7 +62,7 @@ A deployment without R2 can serve the archive same-origin instead: leave `VITE_B
 **Satellite imagery (optional).** Leave `VITE_SATELLITE_TILES` empty to run without it; the map then has no Satellite choice (`docs/SPEC.md` FR-4.14). holdmytrack.com uses MapTiler Satellite on MapTiler's Free plan: 100k tile requests a month, non-commercial, and past that the imagery pauses until the next month instead of billing (ADR-0022). To turn it on:
 
 1. Create a MapTiler Cloud account (cloud.maptiler.com) on the Free plan, with no payment method, so nothing can be billed.
-2. Under **API keys**, create a key for HoldMyTrack and, under **Allowed HTTP origins**, add `https://<your-domain>` (plus `http://localhost:5173` if local dev should use it). The key ends up in the web bundle and the served style, readable by anyone, so the origin restriction is what keeps other sites from spending the quota. Android requests carry no browser origin: check that the Android app still loads the imagery with the restriction on, and give it its own key if it doesn't.
+2. Under **API keys**, create a key for HoldMyTrack and, under **Allowed HTTP origins**, add `https://<your-domain>` (plus `http://localhost:5173` if local dev should use it). The key ends up in the web bundle and the served style, readable by anyone, so the origin restriction is what keeps other sites from spending the quota. The Android app has no browser to send an origin, so it sends the deployment's own (`Origin: https://<your-domain>`) on every request that leaves the API, and the same key serves it.
 3. Set in `.env.prod`:
    ```
    VITE_SATELLITE_TILES=https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}.jpg?key=<key>
