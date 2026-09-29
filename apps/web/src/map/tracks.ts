@@ -1,6 +1,7 @@
 import type { FilterSpecification, Map as MapLibreMap, VectorTileSource } from 'maplibre-gl';
 import { API_BASE_URL, TILES_V1, type ActivityQuery } from '../api';
 import { getTileVersion } from './coverageVersion';
+import { spotAt } from './spots';
 
 /**
  * The live tracks MVT layer (IMPLEMENTATION.md §4.3). Unlike the basemap —
@@ -244,6 +245,9 @@ function attachTrackInteractivity(map: MapLibreMap): void {
     // real during the brief window between a styledata-triggered setStyle and reattachOverlays
     // re-adding this layer.
     if (!map.getLayer(TRACKS_LAYER_ID)) return;
+    // A spot's icon sits on top of the tracks; a click on one opens its popup (spots.ts) and
+    // means nothing to the track underneath.
+    if (spotAt(map, e.point)) return;
     const { x, y } = e.point;
     const tolerance = isTouch(e.originalEvent) ? TAP_TOLERANCE_PX : CLICK_TOLERANCE_PX;
     const box: [[number, number], [number, number]] = [

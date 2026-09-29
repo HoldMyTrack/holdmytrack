@@ -24,6 +24,7 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/geo"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/httpapi"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mail"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/spots"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/worker"
@@ -38,7 +39,7 @@ func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: holdmytrack <serve|work|migrate|seed-demo-customer|export-demo-activities|seed-admin-boundaries|set-admin>")
+		fmt.Fprintln(os.Stderr, "usage: holdmytrack <serve|work|migrate|seed-demo-customer|export-demo-activities|seed-admin-boundaries|import-spots|set-admin>")
 		os.Exit(2)
 	}
 
@@ -191,6 +192,28 @@ func main() {
 		}
 		log.Info("seed-admin-boundaries: done")
 
+	case "import-spots":
+		// One-time (upserted — safe to re-run) load of the Spots places from an OpenStreetMap
+		// extract made off-box (docs/DEPLOY.md), then one queued `match_spots` job that matches
+		// every existing activity against them. See internal/spots.Import's doc comment.
+		if len(os.Args) != 3 {
+			fmt.Fprintln(os.Stderr, "usage: holdmytrack import-spots <file.geojsonseq>")
+			os.Exit(2)
+		}
+		f, err := os.Open(os.Args[2])
+		if err != nil {
+			log.Error("import-spots", "err", err)
+			os.Exit(1)
+		}
+		log.Info("import-spots: starting", "file", os.Args[2])
+		stats, err := spots.Import(ctx, pool, log, f)
+		f.Close()
+		if err != nil {
+			log.Error("import-spots", "err", err, "imported", stats.Imported)
+			os.Exit(1)
+		}
+		log.Info("import-spots: done; match_spots queued", "imported", stats.Imported, "skipped", stats.Skipped)
+
 	case "set-admin":
 		// Grants or revokes the admin panel (/admin, FR-12) — deliberately a shell-only
 		// operation: nothing on the web can make an account an admin.
@@ -206,7 +229,7 @@ func main() {
 		log.Info("set-admin: done", "email", os.Args[2], "admin", admin)
 
 	default:
-		fmt.Fprintf(os.Stderr, "unknown subcommand %q; want serve, work, migrate, seed-demo-customer, export-demo-activities, seed-admin-boundaries, or set-admin\n", os.Args[1])
+		fmt.Fprintf(os.Stderr, "unknown subcommand %q; want serve, work, migrate, seed-demo-customer, export-demo-activities, seed-admin-boundaries, import-spots, or set-admin\n", os.Args[1])
 		os.Exit(2)
 	}
 }

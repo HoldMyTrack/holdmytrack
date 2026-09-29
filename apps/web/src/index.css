@@ -1522,6 +1522,93 @@ body {
   background: var(--fm-border-strong);
 }
 
+/* A spot's popup (SpotPopup.tsx, FR-15.3) — MapLibre's own popup, restyled as the app's cards. */
+.spot-popup .maplibregl-popup-content {
+  padding: var(--fm-space-12) var(--fm-space-16);
+  border-radius: var(--fm-radius-md);
+  background: var(--fm-surface);
+  color: var(--fm-ink);
+  box-shadow: var(--fm-shadow-md);
+  font-family: var(--fm-font-sans);
+}
+
+.spot-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.spot-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.spot-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+  border-bottom-color: var(--fm-surface);
+}
+
+.spot-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.spot-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.spot-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+  border-top-color: var(--fm-surface);
+}
+
+.spot-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: var(--fm-surface);
+}
+
+.spot-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: var(--fm-surface);
+}
+
+.spot-popup .maplibregl-popup-close-button {
+  padding: 0 var(--fm-space-6);
+  font-size: var(--fm-text-lg);
+  color: var(--fm-ink-muted);
+}
+
+.spot-popup__title {
+  padding-right: var(--fm-space-16); /* clear of the close button */
+  font-size: var(--fm-text-md);
+  font-weight: var(--fm-weight-semibold);
+}
+
+.spot-popup__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fm-space-4) var(--fm-space-8);
+  margin-top: var(--fm-space-2);
+  font-size: var(--fm-text-sm);
+  color: var(--fm-ink-muted);
+}
+
+.spot-popup__state--visited {
+  color: var(--fm-accent-strong);
+  font-weight: var(--fm-weight-semibold);
+}
+
+.spot-popup__address {
+  margin-top: var(--fm-space-6);
+  font-size: var(--fm-text-sm);
+  color: var(--fm-ink-secondary);
+}
+
+.spot-popup__actions {
+  display: flex;
+  gap: var(--fm-space-8);
+  margin-top: var(--fm-space-12);
+}
+
+.spot-popup__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fm-space-6);
+  padding: var(--fm-space-6) var(--fm-space-10);
+  border: 1px solid var(--fm-border-strong);
+  border-radius: var(--fm-radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: var(--fm-text-sm);
+  color: var(--fm-ink);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.spot-popup__btn:hover {
+  background: rgb(var(--fm-ink-rgb) / 7%);
+}
+
 /* The Edit window (EditActivityWindow.tsx, §4.7.4/§4.7.7) — floats over the map's top-left
    while it's open, the same white card treatment as the mode toggle.
    The top-left is free because the mode toggle is hidden while it's open; the top-right

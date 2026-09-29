@@ -18,7 +18,7 @@ Checkboxes are the source of truth for progress; re-check them against the three
 
 ## Phase 1 — MVP
 
-**Shipped and deployable.** Every feature in `SPEC.md`'s FR-1 through FR-14 — auth and account management, the no-signup demo, activity upload/ingestion (file, `.zip`, Google Takeout), Normal/Fog of War/Heatmap map modes with pace-colored segments and high-res export, the Activities panel and its filters, track editing, Private locations, the date-range picker, the per-account activity graph, per-activity pace, distance trends, the public About and Help pages, the Donate link, the admin panel, English and Russian, and Stories on the web and in the Android app — is built and documented there; not re-enumerated here.
+**Shipped and deployable.** Every feature in `SPEC.md`'s FR-1 through FR-15 — auth and account management, the no-signup demo, activity upload/ingestion (file, `.zip`, Google Takeout), Normal/Fog of War/Heatmap map modes with pace-colored segments and high-res export, the Activities panel and its filters, track editing, Private locations, the date-range picker, the per-account activity graph, per-activity pace, distance trends, the public About and Help pages, the Donate link, the admin panel, English and Russian, and Stories on the web and in the Android app, and Spots on the web — is built and documented there; not re-enumerated here.
 
 ### Production deployment — a sandbox is live at `holdmytrack.com`, not yet Production
 
@@ -31,6 +31,7 @@ Checkboxes are the source of truth for progress; re-check them against the three
 - [x] Resolve the on-box build constraint — resized to 50 GB disk (2026-09-22), which together with `58e2e60`'s single shared server-image build is enough for `docs/DEPLOY.md`'s in-place `up -d --build` to actually run; no need for the off-box-build-and-ship alternative.
 - [x] `docs/DEPLOY.md` §8's verification holds on this box — `/healthz` answers `ok` with the deployed build's SHA, and real Health Connect history synced since the move shows on the map, which goes through the whole path: `api` saves each raw payload to the `holdmytrack-data` R2 bucket, then `worker` processes it and writes fog/heatmap tiles back to R2.
 - [x] CDN in front of the basemap `.pmtiles` archive (`VISION.md` §4.3) — the planet archive, fonts and sprites are served through Cloudflare from the public R2 bucket's custom domain `tiles.holdmytrack.com` (`IMPLEMENTATION.md` §5.4 covers what the free plan does and doesn't edge-cache).
+- [ ] Load the Spots places on `holdmytrack.com` — the planet extract made off-box and `import-spots` (`docs/DEPLOY.md` §6); until then Show POI (`SPEC.md` FR-15) shows no places there.
 - [ ] Backups (Postgres, object storage) and a restore drill — **the most urgent of these gaps now that real personal data (synced Health Connect history) is starting to land on this box**, not just disposable dev fixtures. Also the gate for auto-deploy on merge: CI (`.github/workflows/ci.yml`) deliberately only checks, since deploying every merge onto the one uncopied copy of real synced health data, with no restore path if a bad deploy corrupts something, is a bigger risk than the manual deploy step it would replace.
 - [ ] Host hardening — a firewall allowing only 22/80/443, key-only SSH with password login disabled, unattended security updates, and `.env.prod` readable only by the deploying user.
 - [ ] Bound Docker's container logs — the default `json-file` driver never rotates, so `api`/`worker`/Caddy logs grow without limit on a 50 GB disk; set `max-size`/`max-file` in `/etc/docker/daemon.json` or per service in `compose.prod.yml`.
@@ -48,26 +49,6 @@ Sign in with Facebook is built (`SPEC.md` FR-1.10) and the Meta app exists, but 
 
 - [ ] Get a business document for the "Holdmytrack" business portfolio. Meta accepts one of: an IRS 147C letter (EIN confirmation), a business bank statement, a business tax document, or a "Doing Business As" (DBA) filing. The name on it must match the portfolio's. A sole-proprietor EIN with "HoldMyTrack" as its trade name, or a county/state DBA filing, are the cheapest routes; so may be whatever legal standing the Open Collective fiscal host above gives the project. Check the legal and tax implications before filing just for this.
 - [ ] Complete Business Verification with it, connect the Meta app to the verified portfolio and publish it (`docs/DEPLOY.md` §4 step 6), then set `FACEBOOK_APP_ID`/`FACEBOOK_APP_SECRET` in the server's `.env.prod` and recreate `api`.
-
-### Spots — planned
-
-Outdoor places from OpenStreetMap on the map — Playground, Dog park, Monument, Mesmerizing view and History — behind one "Show POI" toggle, each marked visited once one of the user's activities spends five minutes inside it (`VISION.md` §1.1, §4.2, [ADR-0021](adr/0021-spots-from-osm-visits-from-tracks.md) for why OSM in bulk, why a five-minute stay, and why no live location). Web first; Android follows on the same tiles (`apps/android/docs/ROADMAP.md`). Design, to be written up in `IMPLEMENTATION.md` as it's built:
-
-- **Schema** — `spots` (`id`, `category`, `name`, `address` nullable, `geom` a polygon, `osm_type`, `osm_id`, with a GiST index) and `spot_visits` (`user_id`, `spot_id`, `activity_id`, `visited_at`, `dwell_seconds`; cascading from `spots` and from `activities`, so deleting an activity takes its visits with it). Several million places, roughly 1 GB.
-- **Import, once** — an `import-spots <file>` CLI subcommand, like `seed-demo-customer`, reading an extract made off-box with `osmium tags-filter` over the planet file for the five categories' tags (the 1 vCPU / 2 GB server can't filter the planet itself). A place's area is its OSM outline, or a 50 m circle around a point; its address is built from its `addr:*` tags when it has them. The import then queues one backfill job that matches every existing activity.
-- **Matching** — in the ingest job and every reprocess (`IMPLEMENTATION.md` §4.1; track edits and Private-location changes): `ST_Intersects(trajectory, spots.geom)` finds candidate places, and the time between consecutive stream points inside each one is summed; five minutes or more writes a visit. A reprocess replaces that activity's visits. The points are already clipped by Private locations, so a place inside one is never visited.
-- **Tiles** — `/tiles/v1/spots/{z}/{x}/{y}.mvt`, served from zoom 14 up, with a per-user `visited` flag: the user comes from the session, never a parameter, and the tiles are cached by the account's tile version (`IMPLEMENTATION.md` §4.2.6), which processing an activity already bumps.
-- **Map** — a "Show POI" toggle, the same in Normal, Fog of War and Heatmap, remembered per browser: a category icon for a place not yet visited, a filled one for a visited place. Clicking one opens a popup with its name, category and visited state, **Copy address** (the address, or its coordinates when OSM has none) and **Navigate** (an external navigator at its coordinates — Google Maps on the web). A demo account sees places and its own visits like any other.
-
-Steps:
-
-- [ ] Schema and `import-spots`, with the off-box extract recipe written into `docs/DEPLOY.md`.
-- [ ] Five-minute matching in ingest and reprocess, and the backfill job, with tests for a stay just under and just over five minutes, a drive past, a point-mapped place's 50 m circle, and a place inside a Private location.
-- [ ] The spots tiles endpoint.
-- [ ] The "Show POI" toggle and the category and visited icons on the web map.
-- [ ] The popup, with Copy address and Navigate.
-- [ ] English and Russian strings (ADR-0014).
-- [ ] `SPEC.md` FR-15 and the matching `IMPLEMENTATION.md` sections as each piece lands; drop Spots from `SPEC.md` §1.2 and §19's not-yet-built lists.
 
 ---
 
@@ -106,7 +87,7 @@ The shipped UI so far is functional scaffolding, not a finished product. Partly 
   - [x] Profile as a page (`/profile`), the year grids and trends rendered server-side (`IMPLEMENTATION.md` §4.8).
 - [x] Localization — English and Russian across the server's pages, emails and messages, the map app and Android, with a Language setting that falls back to the browser's ([ADR-0014](adr/0014-localization.md), `IMPLEMENTATION.md` §4.21, `SPEC.md` FR-13). Left: running the Android app in Russian on a real device, a native speaker's review of the Russian, and `KNOWN_ISSUES.md`'s two entries (a Cyrillic heading font, and the server messages still in English).
 - [ ] An animation/transition pass — micro-interactions (hover, focus, panel open/close, loading states) that are currently almost entirely absent.
-- [ ] Mobile browser support, folded into this same pass rather than treated separately — the phone layout exists (`index.css`'s `@media (max-width: 768px)` layer, `IMPLEMENTATION.md` §5.9, `SPEC.md` §18) and was reported directly as unusable on a real phone; four causes emulation can't show have since been fixed (§5.9's **Real-device fixes**), but nothing has been checked on an actual device yet.
+- [ ] Mobile browser support, folded into this same pass rather than treated separately — the phone layout exists (`index.css`'s `@media (max-width: 768px)` layer, `IMPLEMENTATION.md` §5.9, `SPEC.md` §19) and was reported directly as unusable on a real phone; four causes emulation can't show have since been fixed (§5.9's **Real-device fixes**), but nothing has been checked on an actual device yet.
   - [ ] Walk the core flows on a real iPhone (Safari) and Android phone (Chrome) — sign in, the three map modes, tap a track, expand and collapse the sheet, the date slider, edit an activity's name — and record any symptom concretely (device, browser, screen, what happened), not as "unusable".
 - [ ] Design freeze: once this pass lands, declare the visual design final and communicate it as such — the explicit milestone this phase produces, not an open-ended polish effort.
 

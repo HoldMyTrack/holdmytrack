@@ -4,6 +4,7 @@ import { getCoverageStatus } from '../api';
 import { setTileVersion } from './coverageVersion';
 import { refreshFogLayers } from './fog';
 import { refreshHeatmapLayers } from './heatmap';
+import { refreshSpotsLayer } from './spots';
 
 /** How often the coverage status is re-read while a re-render is outstanding. */
 const POLL_MS = 2000;
@@ -18,7 +19,7 @@ const MAX_POLLS = 90;
  *
  * The returned `watch()` starts polling `GET /v1/coverage/status` and, once the account has
  * no coverage-changing job left, takes its tile version (coverageVersion.ts) and refetches
- * every Fog/Heatmap source. Each call restarts the watch rather than joining one already running: a second
+ * every Fog/Heatmap source, and the Spots source, whose visited marks change with them. Each call restarts the watch rather than joining one already running: a second
  * upload or delete can enqueue its jobs just after an in-flight read already came back
  * "done", and restarting is what guarantees that read isn't the last word.
  *
@@ -48,6 +49,8 @@ export function useCoverageRefresh(map: MapLibreMap | null): (onDone?: () => voi
       setTileVersion(tileVersion);
       refreshFogLayers(map);
       refreshHeatmapLayers(map);
+      // A processed activity's Spots visits land with the same render (IMPLEMENTATION.md §4.25).
+      refreshSpotsLayer(map);
     };
     const check = () => {
       getCoverageStatus(controller.signal)

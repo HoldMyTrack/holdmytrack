@@ -1,5 +1,6 @@
 // Package worker is cmd/holdmytrack work: dequeues jobs with FOR UPDATE SKIP LOCKED
-// (IMPLEMENTATION.md §3.8, §4.1) and runs internal/ingest for `ingest` and `edit_track` jobs.
+// (IMPLEMENTATION.md §3.8, §4.1) and runs internal/ingest for `ingest`, `edit_track`,
+// `reprivacy` and `match_spots` jobs, and internal/fog for `render_fog`.
 // No broker, per §1.1 — this poll loop against idx_jobs_runnable is the whole queue.
 package worker
 
@@ -118,7 +119,7 @@ func claimAndRunOne(ctx context.Context, pool *pgxpool.Pool, store *storage.Stor
 		return false, fmt.Errorf("worker: commit claim: %w", err)
 	}
 
-	runErr := runJob(ctx, pool, store, j)
+	runErr := runJob(ctx, pool, store, log, j)
 
 	if runErr != nil {
 		log.Error("job failed", "job_id", j.id, "kind", j.kind, "err", runErr)
@@ -146,7 +147,7 @@ func claimAndRunOne(ctx context.Context, pool *pgxpool.Pool, store *storage.Stor
 	return true, nil
 }
 
-func runJob(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, j job) error {
+func runJob(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, j job) error {
 	switch j.kind {
 	case "ingest":
 		var ij ingest.Job
@@ -179,6 +180,9 @@ func runJob(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, j job
 			return fmt.Errorf("unmarshal reprivacy job: %w", err)
 		}
 		return ingest.ProcessReprivacy(ctx, pool, store, j.id, rj)
+	case "match_spots":
+		// Queued once by the Spots import (spots.Import); its payload carries nothing.
+		return ingest.BackfillSpotVisits(ctx, pool, store, log)
 	default:
 		return fmt.Errorf("unhandled job kind %q (export / provider_sync / retention are out of scope for this task)", j.kind)
 	}

@@ -10,6 +10,8 @@ import { ensureFogLayer } from './fog';
 import { ensureHeatmapLayer } from './heatmap';
 import { setMapMode, type MapMode } from './mapMode';
 import { loadShowPaths, saveShowPaths, setPathsVisible } from './paths';
+import { readShowPoi, writeShowPoi } from './showPoi';
+import { ensureSpotsLayer, setSpotClickHandler, setSpotsVisible, type Spot } from './spots';
 import { labelInsertionPoint } from './layers';
 import { buildStyle, isDarkFlavor, type Flavor } from './style';
 import { clearTrackBands, ensureBandLayer, setTrackBands } from './trackBands';
@@ -32,6 +34,7 @@ import { ActivityHistogram } from '../ui/ActivityHistogram';
 import { EditActivityWindow, type EditWindowResult } from '../ui/EditActivityWindow';
 import { ExportControl } from '../ui/ExportControl';
 import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
+import { SpotPopup } from '../ui/SpotPopup';
 import { dayDiff, dayInZone, todayLocal } from '../ui/dateMath';
 import type { DateRange } from '../ui/RangePicker';
 import { useUnitSystem } from '../ui/units';
@@ -151,6 +154,10 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     saveShowPaths(!showPaths);
     setShowPaths(!showPaths);
   }, [showPaths]);
+  // Show POI (FR-15.2): the Spots layer, in every mode, remembered per browser (showPoi.ts).
+  const [showPoi, setShowPoi] = useState(readShowPoi);
+  // The spot whose popup is open (SpotPopup, FR-15.3) — null when none is.
+  const [openSpot, setOpenSpot] = useState<Spot | null>(null);
 
   const today = useMemo(() => todayLocal(), []);
 
@@ -194,6 +201,8 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // the window closes. While it's set, every other track is hidden and TrackEditor owns the map.
   const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
   const editingTrack = editingActivityId !== null;
+  // Spots step aside during a track session, like every other track: TrackEditor owns the map.
+  const spotsShown = showPoi && !editingTrack;
 
   // The Activities panel's tab — here rather than in the panel so `/?private-locations` can open
   // onto Privacy (FR-8.1) and `/?story=` onto Stories (FR-14.6), and so the tab outlives the
@@ -748,6 +757,21 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     );
   }, [focusActivity, clearFocus, editOpen]);
 
+  // A click on a spot opens its popup; hiding the layer closes it.
+  useEffect(() => {
+    setSpotClickHandler(setOpenSpot);
+  }, []);
+  useEffect(() => {
+    if (map) setSpotsVisible(map, spotsShown);
+    if (!spotsShown) setOpenSpot(null);
+  }, [map, spotsShown]);
+  const toggleShowPoi = useCallback(() => {
+    setShowPoi((show) => {
+      writeShowPoi(!show);
+      return !show;
+    });
+  }, []);
+
   // The one track bold on the map is the focused (selected) one, however it got that way — a
   // row's own text or a direct click on the map (both focusActivity, via the handler just
   // above). A checked row isn't bolded: the checkbox only builds the toolbar's group, and a map
@@ -1143,6 +1167,8 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       // see trackBands.ts's own doc comment for why this is a second layer rather than a
       // change to the shared one.
       ensureBandLayer(instance, beforeId);
+      // Spots last, above everything including the basemap's labels (spots.ts).
+      ensureSpotsLayer(instance, spotsShown);
       setMapMode(instance, mapMode, editingTrack);
       // A style swap brings the path layers back at the style's default (hidden).
       setPathsVisible(instance, showPaths);
@@ -1161,7 +1187,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
         setTrackBands(instance, trackMetrics.points);
       }
     },
-    [flavor, mapMode, editingTrack, showPaths, mapHiddenIds, activityQuery, trackMetrics, focusedActivityId, focusedPending],
+    [flavor, mapMode, editingTrack, showPaths, spotsShown, mapHiddenIds, activityQuery, trackMetrics, focusedActivityId, focusedPending],
   );
 
   useEffect(() => {
@@ -1339,9 +1365,20 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
                 >
                   {t('map.paths')}
                 </button>
+                <button
+                  type="button"
+                  className={showPoi ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
+                  aria-pressed={showPoi}
+                  title={t('map.show_poi_hint')}
+                  onClick={toggleShowPoi}
+                  data-testid="show-poi"
+                >
+                  {t('map.show_poi')}
+                </button>
               </div>
             </div>
           )}
+          {map && openSpot && <SpotPopup map={map} spot={openSpot} onClose={() => setOpenSpot(null)} />}
         </div>
       </div>
 

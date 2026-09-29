@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Not yet built (`ROADMAP.md` Phase 1, "Spots").
+Accepted. Built on the web (`SPEC.md` FR-15, `IMPLEMENTATION.md` §4.25); Android follows (`apps/android/docs/ROADMAP.md`).
 
 ## Context
 
