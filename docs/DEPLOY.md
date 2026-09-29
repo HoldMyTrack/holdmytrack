@@ -109,7 +109,7 @@ docker compose -f compose.prod.yml --env-file .env.prod run --rm api set-admin y
 
 `false` in place of `true` revokes it. This is the only way to grant or revoke admin; nothing on the web can.
 
-Spots (`SPEC.md` FR-15) needs its places loaded once; until then the Overlays menu's points of interest show none. The extract is made **off the server**: filtering the planet file takes more memory and disk than this box has. On any machine with [osmium-tool](https://osmcode.org/osmium-tool/), about 100 GB of free disk and the current [planet file](https://planet.openstreetmap.org/pbf/):
+Spots (`SPEC.md` FR-15) needs its places loaded once; until then the Layers menu's points of interest show none. The extract is made **off the server**: filtering the planet file takes more memory and disk than this box has. On any machine with [osmium-tool](https://osmcode.org/osmium-tool/), about 100 GB of free disk and the current [planet file](https://planet.openstreetmap.org/pbf/):
 
 ```
 osmium tags-filter planet-latest.osm.pbf \

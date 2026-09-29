@@ -151,7 +151,7 @@ This isn't a resilience decision the way Paths 1–3 are — §4.1's provider-in
 | **Visual Map Engine** | Interactive renderer with custom styles | Fog of War, heatmap and track/normal modes (`IMPLEMENTATION.md` §4.2, §4.2.2); curated themes; smooth (non-hexagonal) fog edges |
 | **Per-activity detail** | Pace as route context, not a coaching product | The selected activity's route colored by pace (`IMPLEMENTATION.md` §4.3.1) |
 | **Stories** | Keep a trip as one thing | Hand-picked sets of activities, each with a name, a description, joint stats (count, distance, time, a per-type breakdown) and its own map view; an activity can belong to any number of them |
-| **Spots** | Where to go next, and where you already have been | Outdoor places from OpenStreetMap in five categories (Playground, Dog park, Monument, Mesmerizing view, History) each switched on in the map's Overlays menu; a spot counts as visited after five minutes inside it on any activity; OSM's description, inscription and Wikipedia article, and Copy address |
+| **Spots** | Where to go next, and where you already have been | Outdoor places from OpenStreetMap in five categories (Playground, Dog park, Monument, Mesmerizing view, History) each switched on in the map's Layers menu; a spot counts as visited after five minutes inside it on any activity; OSM's description, inscription and Wikipedia article, and Copy address |
 | **Activity graph** | Private, single-player motivation | A GitHub-style daily contribution grid, year by year, shadeable by count or distance (`IMPLEMENTATION.md` §4.8) |
 | **Distance & coverage trends** | See how much ground you've covered this period vs last | Weekly/monthly distance, moving-time and elevation trends |
 | **Filtering** | Slice the history | Activity type, date range, geographic bounding box, source |
@@ -222,7 +222,7 @@ Sequenced so the unconditional ingest path ships first and the ones that depend 
 * A private activity graph once an account exists — a GitHub-style daily contribution grid shadeable by count or distance, plus active-days and longest-streak stat cards (`IMPLEMENTATION.md` §4.8). The grid itself reuses `IMPLEMENTATION.md` §4.7's histogram query; the streak and active-day stats are small new aggregate queries of their own.
 * Free high-resolution export — a framed image of the current map, unwatermarked, rendered in the browser.
 * Stories — hand-picked, private sets of activities with their own totals and map view, for keeping a trip or an event as one thing (§4.2). A web feature first; Android follows on the same API.
-* Spots — outdoor places from OpenStreetMap in the map's Overlays menu, visited once an activity spends five minutes inside one (§4.2). A web feature first; Android follows on the same tiles.
+* Spots — outdoor places from OpenStreetMap in the map's Layers menu, visited once an activity spends five minutes inside one (§4.2). A web feature first; Android follows on the same tiles.
 
 ### 5.3 Phase 2: Mobile
 * Android app — Health Connect. Samsung Galaxy Watch sync is unsupported (Samsung never exposes route geometry, and HoldMyTrack only ingests activities that have one). Built first of the pair regardless, so the Path 2 sync contract is designed against the more constrained platform.

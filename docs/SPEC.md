@@ -623,9 +623,9 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 
 ### FR-4.13 Trails and bike paths
 
-**Description**: The base map's cycleways and walking/hiking paths drawn as lines of their own, standing out from the streets, where otherwise they are barely visible hairlines. On the web they are three entries of the Overlays menu under Routes — **Trails**, **Tracks: dirt, farm and forest roads**, and **Bike paths**; the Android app has one Trails & bike paths toggle for all three.
+**Description**: The base map's cycleways and walking/hiking paths drawn as lines of their own, standing out from the streets, where otherwise they are barely visible hairlines. On the web they are three entries of the Layers menu under Paths — **Trails**, **Tracks** and **Bike paths**; the Android app has one Trails & bike paths toggle for all three.
 
-**Preconditions**: Active session. The Overlays menu (web) or the toggle (Android) is beside the map-mode toggle (FR-4.1–FR-4.3) and is hidden while the Edit window is open (FR-5.10), like that toggle. The Overlays button opens a panel with the Base map choice first (FR-4.14), then checkboxes in two groups, Routes and Points of interest (FR-15.2), under an **All overlays** checkbox, and shows how many overlays are on; a press outside it or Escape closes it. All overlays is ticked when every overlay is on and half-ticked when some are; clicking it turns every one on, or every one off when they all already were.
+**Preconditions**: Active session. The Layers menu (web) or the toggle (Android) is beside the map-mode toggle (FR-4.1–FR-4.3) and is hidden while the Edit window is open (FR-5.10), like that toggle. The Layers button opens a panel of three groups: Base map (FR-4.14), then checkboxes under Paths and Points of interest (FR-15.2). The button shows how many paths and places are on; a press outside the panel or Escape closes it. Tracks has an info button beside it that shows, under the entry, what tracks are — dirt, farm and forest roads, unpaved and wide enough for a vehicle — and hides it again on a second press; it doesn't tick the box.
 
 **Behavior**:
 1. Off by default. Bike paths draws cycleways as a solid blue line from zoom 12, Trails draws paths, footways and bridleways as a dashed green line from zoom 13, and Tracks draws OSM's `highway=track` — dirt, farm and forest roads — as a longer-dashed, slightly wider brown line from zoom 13, under the trails; each on its own, both widening as the map zooms in. The monochrome flavors (FR-4.5) draw all three in greys, telling them apart by the dash and width.
@@ -637,7 +637,7 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 
 ### FR-4.14 Satellite mode
 
-**Description**: Satellite imagery as a second base map, with the vector base map's roads, boundaries and labels drawn over it. On the web it is the **Base map** choice at the top of the Overlays menu, **Map** or **Satellite**; the Android app has a **Satellite** toggle after Trails & bike paths.
+**Description**: Satellite imagery as a second base map, with the vector base map's roads, boundaries and labels drawn over it. On the web it is the **Base map** choice at the top of the Layers menu, **Map** or **Satellite**; the Android app has a **Satellite** toggle after Trails & bike paths.
 
 **Preconditions**: Active session. The deployment configures imagery (`IMPLEMENTATION.md` §4.26); without it there is no Base map section and no Satellite toggle, and a saved Satellite choice shows the vector map.
 
@@ -645,7 +645,7 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 1. Map by default. Choosing Satellite shows the imagery in place of the base map's background, land, water, landuse and building fills; roads stay on top at 40% opacity, so the ground shows through them; boundaries and place labels stay as they are, and so do tracks, Fog, Heatmap, trails and bike paths (FR-4.13) and Spots (FR-15). Choosing Map puts the fills back.
 2. Switching doesn't reload the map: camera, mode and overlays stay as they were.
 3. It is independent of the map mode and survives a theme change (FR-4.12). Over imagery, Fog uses the cream veil the dark theme's base map has, whatever the theme.
-4. The choice is kept by this browser (or, in the Android app, this phone) only, not on the account, and applies again on the next visit. All overlays (FR-4.13) leaves it as it is, and the Overlays button's count doesn't include it.
+4. The choice is kept by this browser (or, in the Android app, this phone) only, not on the account, and applies again on the next visit. The Layers button's count (FR-4.13) doesn't include it.
 5. The imagery provider's credit appears in the map's attribution while the imagery is on.
 6. An export (FR-4.10) with Satellite on draws the imagery, with the provider's credit baked in after OSM's and the watermark in its light colors.
 
@@ -1151,10 +1151,10 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 
 ### FR-15.2 Points of interest
 
-**Description**: The places on the map, one Overlays entry per category.
+**Description**: The places on the map, one Layers entry per category.
 
 **Behavior**:
-1. The Overlays menu's Points of interest group (FR-4.13 describes the menu) has one checkbox per category — Playgrounds, Dog parks, Monuments, Mesmerizing views, Historic sites — and **All**, which ticks every category, or clears them when all are already ticked, and is half-ticked when some are. Each works the same over Normal, Fog and Heatmap. All start off; each browser remembers its choice, and one that had the former Show POI toggle on starts with every category on.
+1. The Layers menu's Points of interest group (FR-4.13 describes the menu) has one checkbox per category — Playgrounds, Dog parks, Monuments, Mesmerizing views, Historic sites. Each works the same over Normal, Fog and Heatmap. All start off; each browser remembers its choice, and one that had the former Show POI toggle on starts with every category on.
 2. From zoom 12 up, each place in a ticked category is a round badge — its category's icon in ink on white, ringed in gold — at a point on its area, loaded as the map moves. Between zoom 5 and 12 places show only on request (FR-15.5); below zoom 5, none. Every place is drawn, however close to others. Playground's icon is a seesaw.
 3. From zoom 12 up, under each badge its area is shaded faintly in gold: the place's outline from OpenStreetMap, edged with a solid line, or — for a place mapped only as a point — its 30 m circle, edged with a dashed line. Clicking an area does nothing, and a track under it can still be clicked.
 4. Badges and areas are drawn over everything else, the Fog veil and map labels included, and Fog doesn't dim them.
