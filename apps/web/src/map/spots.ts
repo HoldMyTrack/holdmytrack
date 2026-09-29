@@ -7,7 +7,7 @@ import { Binoculars, Castle, createLucideIcon, Dog, Landmark, type LucideProps }
 import { API_BASE_URL, TILES_V1 } from '../api';
 import { versionedTileURL } from './coverageVersion';
 import { PATHS_MIN_ZOOM } from './style';
-import { REGION_MIN_ZOOM } from './zoomTiers';
+import { CITY_MIN_ZOOM } from './zoomTiers';
 
 /**
  * The Spots layers (IMPLEMENTATION.md §4.25, ADR-0021): outdoor places from OpenStreetMap, each an
@@ -46,6 +46,11 @@ const SPOTS_AREA_SOURCE_LAYER = 'spot_areas';
  *  places and paths appear together. Past the second, its tiles serve every zoom above by
  *  overzooming, the way the tracks tiles do past z14. */
 export const SPOTS_MIN_ZOOM = PATHS_MIN_ZOOM;
+
+/** The lowest zoom "Show in this area" (ShowInArea.tsx) offers places at: the City tier's, where
+ *  a screen is about a metro area. Below it a view spans a state or more, where the dense
+ *  categories run into the request's cap and the rest are too small to tell apart. */
+export const SPOTS_IN_AREA_MIN_ZOOM = CITY_MIN_ZOOM;
 const SPOTS_MAX_ZOOM = 14;
 
 const SPOTS_TILE_URL = `${API_BASE_URL}${TILES_V1}/spots/{z}/{x}/{y}.mvt`;
@@ -216,7 +221,7 @@ export function ensureSpotsLayer(map: MapLibreMap, categories: readonly SpotCate
   }
   addAreaLayers(map);
   for (const [id, source, sourceLayer, minzoom, maxzoom] of [
-    [SPOTS_IN_AREA_LAYER_ID, SPOTS_IN_AREA_SOURCE_ID, undefined, REGION_MIN_ZOOM, SPOTS_MIN_ZOOM],
+    [SPOTS_IN_AREA_LAYER_ID, SPOTS_IN_AREA_SOURCE_ID, undefined, SPOTS_IN_AREA_MIN_ZOOM, SPOTS_MIN_ZOOM],
     [SPOTS_LAYER_ID, SPOTS_SOURCE_ID, SPOTS_SOURCE_LAYER, SPOTS_MIN_ZOOM, 24],
   ] as const) {
     if (map.getLayer(id)) continue;

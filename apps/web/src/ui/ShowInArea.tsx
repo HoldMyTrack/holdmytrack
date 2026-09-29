@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { MapPin } from 'lucide-react';
 import { getSpotsInArea } from '../api';
-import { setSpotsInArea, SPOTS_MIN_ZOOM, type SpotCategory } from '../map/spots';
-import { REGION_MIN_ZOOM } from '../map/zoomTiers';
+import { setSpotsInArea, SPOTS_IN_AREA_MIN_ZOOM, SPOTS_MIN_ZOOM, type SpotCategory } from '../map/spots';
 import { t, tn } from '../i18n';
 
 export interface ShowInAreaProps {
@@ -21,9 +20,9 @@ interface Loaded {
 
 /**
  * "Show in this area" (IMPLEMENTATION.md §4.25, SPEC.md FR-15.5): the Spots tiles start at
- * SPOTS_MIN_ZOOM, and between Region's zoom (REGION_MIN_ZOOM) and there a view holds too many
- * places to load on every pan. So there the places load on request, for the visible map and the
- * chosen categories, and stay drawn until the next request. Once the map has moved, or a
+ * SPOTS_MIN_ZOOM, and between the City tier's zoom (SPOTS_IN_AREA_MIN_ZOOM) and there a view
+ * holds too many places to load on every pan. So there the places load on request, for the
+ * visible map and the chosen categories, and stay drawn until the next request. Once the map has moved, or a
  * category was switched on since, the button comes back to load the new view; until then a
  * line says what the last load found. Hidden outside that zoom range and with no category on.
  */
@@ -47,7 +46,7 @@ export function ShowInArea({ map, categories }: ShowInAreaProps) {
     };
   }, [map]);
 
-  const inRange = categories.length > 0 && zoom >= REGION_MIN_ZOOM && zoom < SPOTS_MIN_ZOOM;
+  const inRange = categories.length > 0 && zoom >= SPOTS_IN_AREA_MIN_ZOOM && zoom < SPOTS_MIN_ZOOM;
   if (!inRange) return null;
 
   const load = () => {
