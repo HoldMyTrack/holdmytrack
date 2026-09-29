@@ -65,9 +65,20 @@ func TestParseFeature(t *testing.T) {
 			ok:   true, typ: "node", id: 42, category: "viewpoint", placeName: "Lookout",
 		},
 		{
-			name: "an area from a way",
+			name: "a way exported as itself",
 			line: `{"type":"Feature","id":"w7","geometry":{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,0]]]},"properties":{"leisure":"playground"}}`,
 			ok:   true, typ: "way", id: 7, category: "playground",
+		},
+		{
+			// osmium's area ids: a way's id times two, a relation's times two plus one.
+			name: "an area built from a way",
+			line: `{"type":"Feature","id":"a14","geometry":{"type":"MultiPolygon","coordinates":[[[[0,0],[1,0],[1,1],[0,0]]]]},"properties":{"leisure":"playground"}}`,
+			ok:   true, typ: "way", id: 7, category: "playground",
+		},
+		{
+			name: "an area built from a relation",
+			line: `{"type":"Feature","id":"a19","geometry":{"type":"MultiPolygon","coordinates":[[[[0,0],[1,0],[1,1],[0,0]]]]},"properties":{"historic":"ruins"}}`,
+			ok:   true, typ: "relation", id: 9, category: "history",
 		},
 		{
 			name: "the id as attributes instead",

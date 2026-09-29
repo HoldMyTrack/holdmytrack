@@ -30,8 +30,8 @@ type ImportStats struct {
 // version, since every account's spots tiles just changed.
 //
 // r is a GeoJSON Text Sequence as `osmium export -f geojsonseq -u type_id` writes it (the
-// recipe is docs/DEPLOY.md's): one feature per line, its OSM tags as properties, its id "n123",
-// "w123" or "r123". Upserted by that id, so re-running it on the same or a newer extract
+// recipe is docs/DEPLOY.md's): one feature per line, its OSM tags as properties, its id "n123" for a
+// node or "a246" for an area (parseOSMID). Upserted by the OSM object that id stands for, so re-running it on the same or a newer extract
 // updates the places already there rather than duplicating them.
 //
 // Registered as the `import-spots` subcommand (cmd/holdmytrack/main.go).
@@ -215,19 +215,27 @@ func join(sep string, words ...string) string {
 
 var osmTypes = map[byte]string{'n': "node", 'w': "way", 'r': "relation"}
 
-// parseOSMID reads osmium's type_id feature id: "n123", "w123" or "r123". An area built from a
-// way or a relation keeps its original object's type and id.
+// parseOSMID reads osmium's type_id feature id: "n123" for a node, and "a246" for an area. An
+// area's number is osmium's area id — its way's id times two, or its relation's times two plus
+// one — so it maps back to the OSM object it was built from. "w123" and "r123" (a way or a
+// relation exported as itself) are read too.
 func parseOSMID(id any) (string, int64, bool) {
 	s, ok := id.(string)
 	if !ok || len(s) < 2 {
 		return "", 0, false
 	}
-	typ, ok := osmTypes[s[0]]
-	if !ok {
-		return "", 0, false
-	}
 	n, err := strconv.ParseInt(s[1:], 10, 64)
 	if err != nil || n <= 0 {
+		return "", 0, false
+	}
+	if s[0] == 'a' {
+		if n%2 == 0 {
+			return "way", n / 2, true
+		}
+		return "relation", n / 2, true
+	}
+	typ, ok := osmTypes[s[0]]
+	if !ok {
 		return "", 0, false
 	}
 	return typ, n, true
