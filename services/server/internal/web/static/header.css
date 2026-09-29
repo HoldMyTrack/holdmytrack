@@ -167,6 +167,8 @@
   margin: 0;
 }
 
+/* Stories, a plain link that looks like the Info menu's trigger beside it. */
+.header-link,
 .info-menu__trigger {
   display: inline-flex;
   align-items: center;
@@ -178,6 +180,12 @@
   color: var(--fm-ink);
 }
 
+.header-link {
+  text-decoration: none;
+}
+
+.header-link:hover,
+.header-link[aria-current='page'],
 .info-menu__trigger:hover,
 .info-menu[open] .info-menu__trigger {
   background: rgb(var(--fm-ink-rgb) / 6%);
@@ -253,7 +261,13 @@
   }
 
   .page-header__actions {
-    gap: 6px;
+    gap: 2px;
+  }
+
+  /* Stories, Info and the avatar must still fit beside the brand on a 320px screen. */
+  .header-link,
+  .info-menu__trigger {
+    padding: 6px;
   }
 
   .page-header__brand {
@@ -273,5 +287,13 @@
 
   .donate-button {
     padding: 6px 8px;
+  }
+}
+
+/* Narrower than the common 360px phone, the wordmark gives way to the nav; the logo is still
+   the link back to the map. */
+@media (max-width: 359px) {
+  .page-header__wordmark {
+    display: none;
   }
 }

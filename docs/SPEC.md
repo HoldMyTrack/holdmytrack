@@ -4,7 +4,7 @@
 | :-- | :-- |
 | **Version** | 1.0 |
 | **Status** | Current — describes Phase 0/1 functionality as built |
-| **Last updated** | 2026-09-27 |
+| **Last updated** | 2026-09-28 |
 | **Related documents** | `VISION.md` (product scope, market rationale, phase roadmap — the authority on *what ships and why*); `ARCHITECTURE.md` (system-level shape, key decisions, the stack); `IMPLEMENTATION.md` (schema, each feature's own implementation — the authority on *how it's built*); `AGENTS.md` (repository orientation) |
 
 ## 1. Introduction
@@ -15,9 +15,9 @@ This document specifies HoldMyTrack's functional behavior as currently implement
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web and in the Android app, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, pace-colored segments, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), and the interface language — English or Russian (FR-13).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web and in the Android app, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, pace-colored segments, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), the interface language — English or Russian (FR-13), and Stories on the web (FR-14).
 
-**Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), the rest of "Export" (animated reveals — high-resolution map export itself is built, FR-4.10 below), Stories (hand-picked, private sets of activities with their own totals and map view — `VISION.md` §4.2, ADR-0020), and Spots (outdoor places from OpenStreetMap on the map, visited after five minutes inside one — ADR-0021). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace stays as per-activity route context (FR-4.8) rather than an analysed, all-time performance record. So is any health data at all: heart rate is never read, stored or shown (ADR-0017), and the pace/heart-rate + elevation profile (FR-4.9) was built and then removed for that reason. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
+**Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), the rest of "Export" (animated reveals — high-resolution map export itself is built, FR-4.10 below), and Spots (outdoor places from OpenStreetMap on the map, visited after five minutes inside one — ADR-0021). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace stays as per-activity route context (FR-4.8) rather than an analysed, all-time performance record. So is any health data at all: heart rate is never read, stored or shown (ADR-0017), and the pace/heart-rate + elevation profile (FR-4.9) was built and then removed for that reason. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
 ### 1.3 Intended audience
 
@@ -305,7 +305,7 @@ A new account made this way is unverified, like one made on the web; the Android
 
 **Description**: Unlike a demo account under the earlier per-visitor design, the shared Demo Customer account (FR-2.1) and its activity history are not created or deleted per visit — only each visitor's own *session* is temporary.
 
-**Behavior**: The Demo Customer account is seeded once, out of band, via a `seed-demo-customer` CLI subcommand run at deploy time (not from any HTTP request) — re-running it is safe and only fills in anything missing. Because a plain re-run never changes or removes an activity already seeded, `seed-demo-customer --reset` first deletes every activity the account has (and everything derived from them: fog/heatmap tiles, stored files) and then seeds from scratch, so the account ends up matching the shipped history exactly — the step for a deployment whose demo history has changed. The shipped history is a set of activity files committed to the repository; an `export-demo-activities <out-dir> <activity-id>...` subcommand writes chosen activities from a deployment into that set as GPX, one file per activity (named by start date and activity name, with a numeric suffix on a clash), holding exactly the track its owner sees — after their Private locations and track edits, never the original upload — plus a manifest recording each one's name, activity type and description, which the seed applies. The export only reads the deployment. Its `demo_expires_at` is set to a fixed far-future timestamp rather than left null, which is what keeps it read-only (FR-2.1) without ever matching the background purge sweep's `< NOW()` condition, so the account and its data are never deleted. Each visitor's own *session* still expires 24 hours after `POST /v1/auth/demo` was called, same as any other session — a visitor who stays past that just calls it again for a fresh session against the same account.
+**Behavior**: The Demo Customer account is seeded once, out of band, via a `seed-demo-customer` CLI subcommand run at deploy time (not from any HTTP request) — re-running it is safe and only fills in anything missing. Because a plain re-run never changes or removes an activity already seeded, `seed-demo-customer --reset` first deletes every activity the account has (and everything derived from them: fog/heatmap tiles, stored files) and then seeds from scratch, so the account ends up matching the shipped history exactly — the step for a deployment whose demo history has changed. The shipped history is a set of activity files committed to the repository; an `export-demo-activities <out-dir> <activity-id>...` subcommand writes chosen activities from a deployment into that set as GPX, one file per activity (named by start date and activity name, with a numeric suffix on a clash), holding exactly the track its owner sees — after their Private locations and track edits, never the original upload — plus a manifest recording each one's name, activity type and description, which the seed applies. The manifest also lists the account's Stories (FR-14) — each a name, a description and its activities by file — which the seed creates, and on a re-run holds to the manifest (description and exactly those activities); `--reset` deletes the account's Stories with its activities. The shipped history has two: "Brecksville Reservation trip" (the drive there, the walk, the drive back) and "Emerald Necklace Trail" (its first day's ride, "Day #1"). The export only reads the deployment, and keeps the manifest's Stories as they are. Its `demo_expires_at` is set to a fixed far-future timestamp rather than left null, which is what keeps it read-only (FR-2.1) without ever matching the background purge sweep's `< NOW()` condition, so the account and its data are never deleted. Each visitor's own *session* still expires 24 hours after `POST /v1/auth/demo` was called, same as any other session — a visitor who stays past that just calls it again for a fresh session against the same account.
 
 **Notes**: This replaces an earlier design where each demo visitor got their own new, ephemeral account seeded with two small fixed presets, deleted 24 hours later by the same background sweep. That per-visitor purge sweep still exists (`internal/worker/demo_purge.go`) and still runs, but has nothing left to act on under the current design — it would only matter again if a future change reintroduced per-visitor demo accounts.
 
@@ -401,7 +401,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 2. The history is one paginated list (5 per page) of every job ever recorded for this account, newest first, each showing: a title (the filename for an uploaded file; the source name — "Health Connect," "GPS Logger" — for a synced one, since a synced job's own filename is a platform-assigned id with nothing human-readable in it), status ("Processing…" / "Ready" / "Failed"), and — once ready — the activity's date and distance. Files still uploading are listed above it with a progress percentage.
 3. While anything is still processing, the history refreshes automatically (polled every 1.5 seconds) until every row settles to "Ready" or "Failed" — no manual refresh needed. Polling and uploads carry on while the Activities tab is showing, or the panel is hidden in Fog of War/Heatmap mode, since a job finishing still has to reach the map.
 4. For a demo session, the drop zone is replaced by a note that importing isn't available for demo accounts.
-5. A "View on map" action appears on every finished (`"Ready"`) row. Clicking it switches the panel back to the Activities tab, focuses that activity exactly as clicking its row in the Activities panel would (FR-5.5) — track bolded, camera flown to fit it — and, if the activity's own date — its day in the account's timezone, the same day the date range is read in — falls outside the currently selected date range (FR-6), first narrows the selected range to just that one day (the same mechanism a manual single-day pick already uses — FR-6.5) before focusing, rather than focusing something the Activities panel isn't currently showing at all. On a phone (§17) the expanded bottom sheet collapses, so the focused track is visible.
+5. A "View on map" action appears on every finished (`"Ready"`) row. Clicking it switches the panel back to the Activities tab, focuses that activity exactly as clicking its row in the Activities panel would (FR-5.5) — track bolded, camera flown to fit it — and, if the activity's own date — its day in the account's timezone, the same day the date range is read in — falls outside the currently selected date range (FR-6), first narrows the selected range to just that one day (the same mechanism a manual single-day pick already uses — FR-6.5) before focusing, rather than focusing something the Activities panel isn't currently showing at all. On a phone (§18) the expanded bottom sheet collapses, so the focused track is visible.
 
 **Outputs**: `GET /v1/uploads?limit=&offset=&source=` returns the current page, the total count (scoped to `source` when given), and how many are still processing (always the global count, unscoped, for the badge). `source` is an optional comma-separated filter (e.g. `upload,takeout`); the Sync tab omits it, for the combined view. Each row also carries `source` and, once the job has produced one, the resulting activity's own `id` — what the "View on map" action targets.
 
@@ -629,6 +629,8 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 
 **Behavior**: Each row's primary line is the activity's own name if one has been set (FR-5.10), or its start date/time otherwise — an activity has a name only once a person has typed one in via FR-5.10's edit dialog, never from parsing a source file. A row whose primary line is a name still shows its date/time as part of the row's secondary line, alongside distance, duration, and type — a row's only other elements are its checkbox and this text; there is no separate per-row column or icon of any kind, and no per-row action controls (edit/delete/hide are reached via FR-5.6's checkbox plus the header toolbar, not from the row itself). Regardless of what a row displays, **the list itself is always ordered by start date/time, newest first** — a name never affects sort order. The list is not paginated — every matching activity is shown at once. The panel also shows a running count of matching activities and total distance for the range (independent of the TYPE/DISTANCE filters, which narrow the visible rows without changing this total).
 
+**Story badge**: A row whose activity is in a Story (FR-14) carries a badge beside the Pending and Hidden ones (FR-5.15), in the accent color: "Story" for one, "2 stories" for more, its tooltip naming them — "In a story: Brecksville Reservation". In the Story view (FR-14.7) the Story on screen doesn't count, since every row is in it: a row there is badged only for its other Stories ("Also in: …"). `GET /v1/activities` carries each row's Stories, newest first, as `stories` (`[{id, name}]`, empty for none).
+
 ### FR-5.2 TYPE filter
 
 **Description**: The user can narrow the visible activities to one or more activity types (e.g., "Run," "Ride"), via a Type dropdown on the panel's filter row, beside the Distance slider (FR-5.3).
@@ -681,10 +683,10 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 
 **Preconditions**: Active session; the caller owns the activity.
 
-**Inputs**: The Edit window's **Activity** tab, reached via the header toolbar's Edit icon over its target (FR-5.7) — the checked group, else the focused activity — there is no per-row edit control. The same window's **Track** tab is FR-5.14. Editing exactly one activity accepts a new type (required, 1–50 characters), a name (optional, up to 200 characters), and a description (optional, up to 2000 characters). Editing more than one activity at once accepts only a new type — the Name and Description fields are disabled, since there is nothing consistent to set across several different activities' names/descriptions in one request.
+**Inputs**: The Edit window's **Activity** tab, reached via the header toolbar's Edit icon over its target (FR-5.7) — the checked group, else the focused activity — there is no per-row edit control. The same window's **Track** tab is FR-5.14, its **Stories** tab FR-5.17. Editing exactly one activity accepts a new type (required, 1–50 characters), a name (optional, up to 200 characters), and a description (optional, up to 2000 characters). Editing more than one activity at once accepts only a new type — the Name and Description fields are disabled, since there is nothing consistent to set across several different activities' names/descriptions in one request.
 
 **Behavior**:
-1. Clicking the toolbar's Edit icon opens the Edit window over its target over the top-left of the map, on its Activity tab; the map doesn't move. It has two tabs, **Activity** and **Track** (FR-5.14), and one **Save** and one **Cancel** shared by both: switching tabs keeps whatever is unsaved in either. While it's open the Activities panel, the date-range picker and the map-mode toggle are inert, and clicking a track on the map does nothing. With exactly one activity in the target, it is pre-filled with that activity's current type, name, and description, all three editable. With more than one, only the type field is editable, seeded from the first of them; the Name and Description fields render disabled with an explanation of why.
+1. Clicking the toolbar's Edit icon opens the Edit window over its target over the top-left of the map, on its Activity tab; the map doesn't move. It has three tabs, **Activity**, **Track** (FR-5.14) and **Stories** (FR-5.17), and one **Save** and one **Cancel** shared by all three: switching tabs keeps whatever is unsaved in any. While it's open the Activities panel, the date-range picker and the map-mode toggle are inert, and clicking a track on the map does nothing. With exactly one activity in the target, it is pre-filled with that activity's current type, name, and description, all three editable. With more than one, only the type field is editable, seeded from the first of them; the Name and Description fields render disabled with an explanation of why.
 2. The type field is plain free text — the same "whatever the source reports, not a controlled vocabulary" rule FR-5.2's TYPE filter already follows (`IMPLEMENTATION.md` §4.7.2) applies equally to a manual rename. The field is a searchable picker, like Settings' Country and Timezone (FR-1.7): opening it shows this account's existing types, each with how many activities use it, and typing filters that list. It is only a convenience — nothing is enforced against it: whenever the typed text doesn't exactly match an existing type (ignoring case), the list also offers an "Add" row for that text, and picking it saves the value exactly as typed, even one nobody has used before. The name field is always plain free text, with no source to ever populate it automatically — an activity has a name only once a person types one in here (`IMPLEMENTATION.md` §4.7).
 3. Save commits the fields in one request per activity — only when at least one of them differs from what's saved. For a single activity, all three fields commit together. For a group, each activity's own request carries the new shared type alongside that activity's own existing name and description unchanged — a group edit never touches Name or Description, even though the underlying request is a full replace. Save then applies the Track tab's edit if there is one (FR-5.14 behavior 5) and closes the window. If the fields save but the track edit fails, the window stays open showing the error; saving again retries only the track edit. Cancel, or Escape, discards every unsaved change on both tabs and closes the window.
 4. Once saved: each affected row's displayed type updates immediately; the new/renamed type becomes (or remains) a real entry in FR-5.2's TYPE filter with a live count; a single-activity edit's row shows the name in place of its start date/time if one is set, or the start date/time as before if the name is cleared (FR-5.1); and its description becomes visible as a hover tooltip on the row — not a second visible line. **The Activities panel's sort order never changes**: rows stay ordered by start date/time (FR-5.1) regardless of what a row displays or whether it has a name at all.
@@ -770,6 +772,32 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 3. Leaving Pending brings the activity back everywhere — its track at once, Fog of War and Heatmap once their re-render lands (FR-5.14 behavior 7) — without moving the camera.
 
 **Notes**: An activity entirely inside Private locations (FR-8.1 behavior 3) is Normal with no geometry — nothing to draw or count — rather than a fourth state; superseded duplicates (FR-3.7) are never listed at all.
+
+### FR-5.16 Create story
+
+**Description**: A book-with-a-plus icon in the Activities panel's header toolbar, between Edit and Delete, makes a Story (FR-14) of the checked activities.
+
+**Preconditions**: A real account (a demo session sees the icon disabled, its tooltip saying the demo can't make stories); at least one listed activity checked (FR-5.6). Unlike the toolbar's other actions it never takes the selected row alone (FR-5.7's target): a Story is a set picked on purpose, and checking is how a set is picked. With nothing checked the icon is disabled, its tooltip saying to check activities first; with some, the tooltip names them — "Create a story from 3 checked activities".
+
+**Behavior**:
+1. The icon opens a Create story dialog over the map naming what it's made of — "A story of 3 checked activities (58 km). Only you can see it." — with Name (required, up to 200 characters) and Description (optional, up to 2000).
+2. "Create story" stays disabled until Name has something besides spaces; Enter in Name does the same as clicking it. Cancel, Escape or a click outside closes the dialog with nothing made.
+3. Creating makes the Story with those activities in one step (FR-14.2) and opens it in the Story view (FR-14.7).
+
+**Error cases**: A request that fails keeps the dialog open with the server's message under the fields, the fields as typed.
+
+### FR-5.17 Stories tab
+
+**Description**: The Edit window's third tab (FR-5.10) puts the window's activities — one, or the checked group — into Stories (FR-14) and takes them out.
+
+**Preconditions**: As FR-5.10: a real account, the Edit window open over the toolbar's target.
+
+**Behavior**:
+1. The tab lists every Story of the account, newest first, each with a checkbox and how many activities it holds, under "Tick a story to put this activity in it, clear one to take it out" (or "all 3 activities" for a group). It loads when the window opens. With no Stories, it says how to make one (FR-5.16).
+2. A Story's box is ticked when it holds every one of the window's activities, indeterminate when it holds some of them (its tooltip says so), and clear when it holds none.
+3. Clicking a clear or indeterminate box ticks it; clicking a ticked box clears it. A box can't be set back to indeterminate by a click — Cancel discards every change. The tab carries a dot while any box differs from what's saved.
+4. Save commits each changed Story in one request: ticked puts all the window's activities in it (any already there stay), cleared takes them all out (FR-14.3); the activities themselves never change. The fields (FR-5.10) are written first, then the Stories, then a track edit (FR-5.14). If a later request fails, the window stays open with the error, and Save again skips what was already written.
+5. In the Story view (FR-14.7), taking an activity out of the Story on screen drops it from the list, bars, tracks and header as Save closes the window; putting one in brings it in.
 
 ## 8. FR-6 — Date Range Picker
 
@@ -862,7 +890,7 @@ Hovering a day shows its date, activity count and distance. The page needs a ses
 
 **Outputs**: `{bucket, from, to, periods: [{period_start, count, distance_meters, moving_seconds, elevation_gain_m}, ...]}`.
 
-**Notes**: "Moving time" falls back to elapsed time for any activity ingested before moving- time detection existed — those activities have no moving-time figure of their own, so this bucket-level total uses whichever one each activity actually has, rather than a bucket going silently short. Best-effort curves and personal bests (formerly FR-9.2/FR-9.3) were built and then cut — deliberately out of scope, see §1.2 and §14.
+**Notes**: "Moving time" falls back to elapsed time for any activity ingested before moving- time detection existed — those activities have no moving-time figure of their own, so this bucket-level total uses whichever one each activity actually has, rather than a bucket going silently short. Best-effort curves and personal bests (formerly FR-9.2/FR-9.3) were built and then cut — deliberately out of scope, see §1.2 and §19.
 
 ## 12. FR-10 — Public pages: About, Help, Contacts
 
@@ -884,7 +912,7 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 
 ### FR-10.2 Help page
 
-**Description**: A public page at `/help` that explains how HoldMyTrack works, in five sections reachable from jump links under its title: the map (the opening view, the Normal / Fog of War / Heatmap modes, and how Fog and Heatmap switch to whole states or regions, then whole countries, as the map zooms out — FR-4), the timeline (what a bar is, the selection band and how to extend, move or scroll it, and the phone slider — FR-6), getting activities in (files, `.zip` archives, Google Takeout with a link to Google's own download guide, the Android app, and what happens on a repeated or cross-source import — FR-3), exporting a map image (FR-4.10), and settings and privacy (Country, Timezone, Private locations — FR-1.7, FR-8.1 — what HoldMyTrack stores and doesn't: no health data, only the route, and the original upload kept only to rebuild it (`VISION.md` §1.1; anchor `#what-we-store`) — and how to ask for an account to be deleted, which is by email to the Contacts address since there is no self-service deletion yet, and how to revoke Google's or Facebook's access on their side; its `#delete-account` anchor is the deployment's data-deletion instructions URL for Facebook, FR-1.10).
+**Description**: A public page at `/help` that explains how HoldMyTrack works, in six sections reachable from jump links under its title: the map (the opening view, the Normal / Fog of War / Heatmap modes, and how Fog and Heatmap switch to whole states or regions, then whole countries, as the map zooms out — FR-4), the timeline (what a bar is, the selection band and how to extend, move or scroll it, and the phone slider — FR-6), Stories (making one, adding and removing activities, the Stories page and the Story view, the badge — FR-14, FR-5.16, FR-5.17), getting activities in (files, `.zip` archives, Google Takeout with a link to Google's own download guide, the Android app, and what happens on a repeated or cross-source import — FR-3), exporting a map image (FR-4.10), and settings and privacy (Country, Timezone, Private locations — FR-1.7, FR-8.1 — what HoldMyTrack stores and doesn't: no health data, only the route, and the original upload kept only to rebuild it (`VISION.md` §1.1; anchor `#what-we-store`) — and how to ask for an account to be deleted, which is by email to the Contacts address since there is no self-service deletion yet, and how to revoke Google's or Facebook's access on their side; its `#delete-account` anchor is the deployment's data-deletion instructions URL for Facebook, FR-1.10).
 
 **Preconditions**: None.
 
@@ -906,11 +934,11 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 **Description**: Every page shares one header — the map and Profile included — and every page other than those two shares one footer.
 
 **Behavior**:
-1. The header shows the logo, wordmark and tagline (the brand links to `/`), then Donate (FR-11.1), an "Info" menu listing About, Help and Contacts with the current page marked, and the account area.
+1. The header shows the logo, wordmark and tagline (the brand links to `/`), then Donate (FR-11.1), with a session a "Stories" link to `/stories` (FR-14.6, marked while on it), an "Info" menu listing About, Help and Contacts with the current page marked, and the account area.
 2. Signed out, the account area is a "Sign in" link to `/signin`. With a session (real or demo), it is an account menu showing the account's avatar (or a generic icon) that opens to the account's email (a demo session shows its display name instead, followed by "Create your own account", FR-2.3), then "Profile" (`/profile`), "Settings" (`/settings`), "Admin" (`/admin`, an admin only — FR-12.1) and "Sign out".
 3. Both menus open and close without JavaScript.
 4. "Sign out" submits `POST /logout`, which ends the session the same way `POST /v1/auth/logout` does and redirects to `/`. The request is refused (`403`) unless its `Origin` header — or, without one, its `Referer` — is the app's own origin.
-5. On a phone-width screen (≤768px) the tagline is hidden and Donate shows its heart alone; the Info and account menus stay.
+5. On a phone-width screen (≤768px) the tagline is hidden and Donate shows its heart alone; Stories, the Info menu and the account menu stay. Narrower than 360px, the wordmark is hidden too, leaving the logo.
 6. The footer links to the map (`/`), About, Help, Contacts and the GitHub repository.
 7. With a session, pages are sent with `Cache-Control: no-store`, since the header names the signed-in account. Without one, the front page, About, Help and Contacts are the same for every visitor and are sent `Cache-Control: public, max-age=300` with `Vary: Cookie`, so a copy cached before signing in is never reused after.
 8. An address no page answers gets a "Page not found" page (`404`) with the same header; under `/v1/` and `/tiles/` it's a plain `404`, not a page.
@@ -985,7 +1013,106 @@ A read-only view of every account and every account's activities, for the people
 
 **Not translated**: activity names and descriptions people type, place names on the map, activity types outside the common set (shown as recorded), and the reason a `.zip` entry was skipped.
 
-## 16. Non-Functional Requirements (summary)
+## 16. FR-14 — Stories
+
+A Story is a hand-picked, private set of the account's activities — a hike, a holiday, a race weekend — with a name, an optional description and joint statistics (`VISION.md` §4.2, ADR-0020). An activity can be in any number of Stories. This section covers the API, the web's Stories page (FR-14.6) and the map's Story view (FR-14.7); a Story is made from the map with Create story (FR-5.16), activities go in and out of Stories from the Edit window (FR-5.17), and a row's Story badge is FR-5.1.
+
+| Endpoint | Purpose |
+| :-- | :-- |
+| `GET /v1/stories` | Every Story of the account, newest first |
+| `POST /v1/stories` | Create one, optionally with its first activities |
+| `GET /v1/stories/{id}` | One Story |
+| `PATCH /v1/stories/{id}` | Rename it, or change its description |
+| `DELETE /v1/stories/{id}` | Delete it |
+| `POST /v1/stories/{id}/activities` | Add activities, `{activity_ids}` |
+| `DELETE /v1/stories/{id}/activities` | Remove activities, `{activity_ids}` |
+
+### FR-14.1 A Story
+
+**Description**: What every Story endpoint but `DELETE /v1/stories/{id}` answers with — the list as `{stories: [...]}`.
+
+**Outputs**: `id`, `name`, `description` (`null` when none), `created_at`, `updated_at`, `activity_ids` (every member, earliest activity first) and `stats`: `count`, `distance_meters`, `moving_seconds` and `elapsed_seconds` over the Story's activities, with no date bound, and the same four per activity type in `by_type`, the most frequent type first. Like every other total (FR-3.7), `stats` leaves out a duplicate superseded by another copy, though it stays in `activity_ids`. An activity with no moving time of its own counts its elapsed time as moving, as in Trends (FR-9.1).
+
+### FR-14.2 Create, rename and delete
+
+**Behavior**:
+1. `POST /v1/stories` takes `name`, `description` and, optionally, `activity_ids` — the Story's first activities, added in the same request — and answers `201` with the new Story.
+2. `PATCH /v1/stories/{id}` takes `name` and `description`, both sent every time: an empty description clears it.
+3. Name and description are trimmed. The name is required, up to 200 characters; the description up to 2000.
+4. `DELETE /v1/stories/{id}` answers `204`. The Story's activities stay.
+5. Renaming, a new description, and a change to the Story's activities (FR-14.3) move `updated_at`.
+
+**Error cases**:
+- A blank name, or a name or description over its limit → `400` with a message in the request's language (FR-13.1).
+- `activity_ids` naming an activity that isn't the account's own → `404`, and nothing is created.
+
+### FR-14.3 Add and remove activities
+
+**Behavior**:
+1. `POST /v1/stories/{id}/activities` with `{activity_ids}` adds them; one already in the Story stays as it is. It answers with the updated Story.
+2. `DELETE /v1/stories/{id}/activities` with `{activity_ids}` removes them; an id not in the Story is ignored. The activities themselves stay. It answers with the updated Story.
+3. Deleting an activity (FR-5.11) takes it out of every Story holding it. A Story left with no activities stays, with zero statistics.
+
+**Error cases**:
+- `activity_ids` empty, over 10,000 ids, or holding an id that isn't a UUID → `400`.
+- Adding an activity that isn't the account's own → `404`, and none of the request's activities are added.
+
+### FR-14.4 The `story` filter
+
+**Description**: One Story's activities, through the endpoints that already draw and count the account's history.
+
+**Behavior**:
+1. `story=<id>` narrows the activity list (`GET /v1/activities`), its summary (`GET /v1/activities/summary`) and the tracks tiles (`GET /tiles/v1/tracks/{z}/{x}/{y}.mvt`) to the Story's activities, combined with the `from`/`to` and `types` they already take.
+2. It narrows the date-range histogram (`GET /v1/activities/histogram`, both its `days` and its `from`/`to` mode) the same way, and `earliest` becomes the Story's first activity day. The histogram otherwise ignores the list's filters (FR-6); inside a Story, the Story is all there is.
+3. Another account's Story, or an empty one, matches nothing: an empty list, zero totals, no bars, no tracks.
+4. Adding or removing a Story's activities, creating a Story with activities and deleting one that has any all change the account's tile version, so no tile cached before the change is reused for the Story. Renaming doesn't.
+
+**Error cases**:
+- `story` that isn't a UUID → `400`.
+
+### FR-14.5 Privacy and the demo
+
+**Behavior**:
+1. A Story is visible only to its own account. Another account's Story, a Story that doesn't exist and an id that isn't a UUID are all `404` on every endpoint, indistinguishable from each other; the list holds only the account's own Stories.
+2. A demo session reads the Demo Customer's Stories like any other account, and every write — create, rename, delete, add, remove — is refused with `403` `demo_read_only`, as for every other write (FR-2.1).
+
+### FR-14.6 The Stories page
+
+**Description**: A private page at `/stories`, reached from the header's "Stories" link (FR-10.4), listing the account's Stories.
+
+**Preconditions**: Signed in, past email verification and first-run Settings (FR-1.8, FR-1.7) — as on every signed-in page, anyone else is sent there, or to sign-in.
+
+**Behavior**:
+1. Every Story, newest first, as a card: its name, its description when it has one, a line with its activity count, distance and moving time (FR-14.1), and the same per activity type, the most frequent first — each type by its display name, in the page's language (FR-13.1). Distances follow the account's units (FR-1.7). A Story with no activities says so instead.
+2. "View on map" opens the map's Story view, `/?story=<id>`.
+3. "Delete" opens a confirmation beside it — "Delete “<name>”? Its activities stay." — with a "Delete story" button. It deletes the Story (FR-14.2) and reloads the page with "Story deleted." It needs no script.
+4. With no Stories, the page says how to make one: check activities in the map's Activities panel, then choose Create story.
+5. A demo session sees the Demo Customer's Stories with Delete disabled.
+
+**Error cases**:
+- Deleting another account's Story, or one that doesn't exist → the "Page not found" page (`404`); nothing is deleted.
+- A delete submitted from another site → `403`; nothing is deleted.
+- A delete from a demo session → `403`, the page again with "Demo accounts can't add, edit, or delete activities — create an account to save your own data."
+
+### FR-14.7 The Story view
+
+**Description**: The map showing one Story's activities alone, at `/?story=<id>` — opened by "View on map" on the Stories page (FR-14.6), by Create story (FR-5.16), or by that URL itself.
+
+**Behavior**:
+1. The Activities panel's tabs give way to the Story's header: "Story: <name>", a pencil, Exit story, the description when there is one, and the whole Story's statistics with a row per activity type (FR-14.1) — the whole Story whatever range is selected; a Story with no activities says so. Sync and Privacy aren't reachable until Exit story.
+2. The date-range picker (FR-6) works as outside a Story, over the Story's activities only: its bars are their days, it spans the Story's first to last activity day, and it opens on the whole Story. The list, the panel's totals, the drawn tracks and an exported image (FR-4.10) follow its selection.
+3. Opened from the map (Create story, Back or Forward), the camera fits the Story's drawn tracks. Opened by URL, a camera in the URL wins; without one the camera fits the Story.
+4. Type and Distance filters, focus, checkboxes, Show/hide, Edit, Create story and Delete work as outside a Story (FR-5). Entering or leaving a Story starts them afresh, as a new range does (FR-6.6).
+5. The toolbar gains Remove from story (a book with a minus), over its target (FR-5.7): the activities leave the Story — not the account — and the list, bars, tracks, totals and header update.
+6. The pencil opens Edit story, the Create story dialog's Name and Description filled in, with Save (FR-14.2).
+7. Exit story returns to the map outside the Story, with the date range from before it; a page opened straight into a Story exits onto the usual default range (FR-6.1). The camera stays.
+8. The URL carries the Story, so a refresh or a shared link reopens it, and Back and Forward move between it and the map outside it.
+9. Normal mode only: Fog of War and Heatmap stay all-time (FR-4.2, FR-4.3), and returning to Normal returns to the Story.
+10. A demo session sees its Stories the same way, with the pencil and Remove from story disabled.
+
+**Error cases**: A Story that doesn't exist or isn't the account's shows "This story doesn't exist, or isn't yours." in the header with Exit story, and no activities.
+
+## 17. Non-Functional Requirements (summary)
 
 This section summarizes cross-cutting behavior specified elsewhere in this document, for convenience — it does not introduce new requirements.
 
@@ -998,7 +1125,7 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 | **No reload required** | Every list/summary this document describes updates itself automatically as background processing completes (FR-3.1, FR-3.4) — a manual page reload is never required to see current data. |
 | **Idempotency** | Re-submitting the same activity content (FR-3.5) or the same password-reset token (FR-1.6) never has an effect beyond the first time. |
 
-## 17. Mobile Browser Support
+## 18. Mobile Browser Support
 
 **Known issue**: The behavior below is what was designed and implemented, but the actual mobile experience has been reported directly as unusable, not just rough. Four causes a phone has and desktop emulation doesn't were found and fixed (items 4–6 below); the behavior is still unverified on a real device, so treat it as unconfirmed until it is — see `docs/ROADMAP.md`'s "Mobile browser support" item (Phase 3).
 
@@ -1015,14 +1142,13 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 
 **Explicitly not built** (hover-only, no touch equivalent, unlike Trends above — a continuous position read with no discrete point to tap, not a per-bar value): the two-way map-track-hover ↔ Activities-row-underline highlight (FR-4.1, FR-5.4). It remains mouse-only; a touchscreen user can still focus/select a track by tapping it.
 
-## 18. Out-of-scope items, tracked for future revisions of this document
+## 19. Out-of-scope items, tracked for future revisions of this document
 
 The following are named in `VISION.md`'s roadmap but have no functional requirements in this document because they are not yet built:
 
 - Path 1 cloud-provider connectors (Garmin, Wahoo, COROS)
 - Path 2 on-device sync's iOS half (Apple HealthKit — Android's Health Connect half is FR-3.6)
 - The rest of "Export" — animated reveals (high-resolution map export itself is built, FR-4.10)
-- Stories — hand-picked, private sets of activities, each with a name, a description, joint statistics and a map view of its own (`VISION.md` §4.2, ADR-0020, `ROADMAP.md` Phase 1)
 - Spots — outdoor places from OpenStreetMap behind one "Show POI" map toggle, each visited once an activity spends five minutes inside it (`VISION.md` §4.2, ADR-0021, `ROADMAP.md` Phase 1)
 - Dark-theme variant of the Fog of War veil (the theme parameter is accepted but currently has no visual effect on the veil itself)
 

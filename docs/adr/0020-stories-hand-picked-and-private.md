@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Not yet built (`ROADMAP.md` Phase 1, "Stories").
+Accepted.
 
 ## Context
 

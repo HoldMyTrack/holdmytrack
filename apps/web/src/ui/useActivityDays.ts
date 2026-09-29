@@ -26,6 +26,9 @@ import { getActivityDayPage, type HistogramBucket } from '../api';
  * Nothing here touches the selected range. Panning changes which bars are on screen and that
  * is all; the selection is MapView's state and paging back to a user's very first activity
  * leaves it exactly as it was.
+ *
+ * Given a Story (FR-14.4), every page is that Story's days alone, and `earliest`/`latest` are
+ * its first and last — a new Story starts over from its own newest end.
  */
 
 /** How many bars the strip shows at once, before RangePicker.tsx's own width measurement
@@ -52,6 +55,12 @@ export interface ActivityDaysState {
   /** This user's first activity's UTC day, or null until the first page lands — and
    *  permanently null for a user who has no activities at all. */
   earliest: string | null;
+  /** The most recent day with activity, or null until the first page lands (or when there
+   *  is none) — inside a Story, its last day. */
+  latest: string | null;
+  /** The Story the days are for (null for the whole history), once its first page has landed —
+   *  lets a caller tell the new Story's days from the previous ones still on screen. */
+  loadedStory: string | null;
   /** True once a first page has come back, however empty. Distinct from `earliest`, which a
    *  user with no history never gets, so a caller waiting to resolve its own default
    *  selection (MapView's is the 5 most recent activity-days) has something that actually
@@ -79,9 +88,10 @@ export interface ActivityDaysState {
   generation: number;
 }
 
-export function useActivityDays(): ActivityDaysState {
+export function useActivityDays(story: string | null = null): ActivityDaysState {
   const [days, setDays] = useState<HistogramBucket[]>([]);
   const [earliest, setEarliest] = useState<string | null>(null);
+  const [loadedStory, setLoadedStory] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Date of the leftmost visible bar. null means "pinned to the newest end", which is both
@@ -105,10 +115,11 @@ export function useActivityDays(): ActivityDaysState {
 
   useEffect(() => {
     const controller = new AbortController();
-    getActivityDayPage({ limit: pageSize() }, controller.signal)
+    getActivityDayPage({ limit: pageSize(), ...(story ? { story } : {}) }, controller.signal)
       .then((page) => {
         setDays(page.days);
         setEarliest(page.earliest);
+        setLoadedStory(story);
         setAnchor(null);
         setError(null);
         setReady(true);
@@ -118,7 +129,7 @@ export function useActivityDays(): ActivityDaysState {
         setError(err instanceof Error ? err.message : String(err));
       });
     return () => controller.abort();
-  }, [nonce]);
+  }, [nonce, story]);
 
   const maxStart = Math.max(0, days.length - barsPerView);
   // The anchor resolved against the current array. `>=` rather than an exact match so an
@@ -139,7 +150,7 @@ export function useActivityDays(): ActivityDaysState {
     const oldest = days[0]?.date;
     if (!oldest || extending.current) return;
     extending.current = true;
-    getActivityDayPage({ limit: pageSize(), before: oldest })
+    getActivityDayPage({ limit: pageSize(), before: oldest, ...(story ? { story } : {}) })
       .then((page) => {
         setDays((prev) => (prev[0]?.date === oldest ? [...page.days, ...prev] : prev));
         setEarliest(page.earliest);
@@ -149,7 +160,7 @@ export function useActivityDays(): ActivityDaysState {
       .finally(() => {
         extending.current = false;
       });
-  }, [days]);
+  }, [days, story]);
 
   // Start loading more history once the view is within one bar-per-view's width of the
   // loaded edge — one full click's worth, so Earlier normally lands on bars that are already
@@ -190,6 +201,9 @@ export function useActivityDays(): ActivityDaysState {
   return {
     visibleDays,
     earliest,
+    // The newest day is the last one loaded: paging only ever prepends.
+    latest: days[days.length - 1]?.date ?? null,
+    loadedStory,
     ready,
     error,
     pageStep: barsPerView,

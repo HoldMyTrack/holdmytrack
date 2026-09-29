@@ -1,8 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { ChevronDown, ChevronUp, Eye, EyeOff, Focus, Pencil, Trash2 } from 'lucide-react';
-import { deleteActivity, type Activity, type ActivityTotals, type DuplicateActivity } from '../api';
+import { BookMinus, BookPlus, ChevronDown, ChevronUp, Eye, EyeOff, Focus, Pencil, Trash2 } from 'lucide-react';
+import {
+  deleteActivity,
+  removeStoryActivities,
+  type Activity,
+  type ActivityTotals,
+  type DuplicateActivity,
+  type Story,
+  type StoryTotals,
+} from '../api';
 import { ConfirmDialog } from './ConfirmDialog';
+import { StoryDialog } from './StoryDialog';
 import { DistanceFilter } from './DistanceFilter';
 import { PrivateLocationsPanel } from './PrivateLocationsPanel';
 import { SyncTab } from './SyncTab';
@@ -15,7 +24,7 @@ import {
   formatStartedAt,
   formatTotalDistance,
 } from './format';
-import { useUnitSystem } from './units';
+import { useUnitSystem, type UnitSystem } from './units';
 import type { ImportsState } from './useImports';
 import { lang, t, tn } from '../i18n';
 
@@ -64,6 +73,16 @@ import { lang, t, tn } from '../i18n';
  *  - The toolbar's Show/hide button toggles whether the target's tracks paint on the map at
  *    all, independent of all three of the above; a hidden activity's row dims in place.
  */
+/** A Story's numbers, or one type's share of them, in one line — "3 activities · 58 km · 3h 26m
+ *  moving", as the Stories page words it too. */
+function storyStatsLine(totals: StoryTotals, system: UnitSystem): string {
+  return t('stories.stats', {
+    activities: tn('activities.count', totals.count),
+    distance: formatTotalDistance(totals.distanceMeters, system),
+    moving: formatDuration(totals.movingSeconds),
+  });
+}
+
 /** A row's primary line: its user-entered name (§4.7's revised decision) when it has one, else
  *  its start date/time — also how the toolbar names a single selected activity. */
 function rowLabel(activity: Activity): string {
@@ -139,6 +158,12 @@ export interface ActivitiesPanelProps {
   /** The toolbar's Edit button, over the toolbar's target — MapView opens the Edit window
    *  (EditActivityWindow.tsx: Activity and Track tabs) over the map. */
   onEdit: (activities: Activity[]) => void;
+  /** A Story just made of the checked activities with the toolbar's Create story
+   *  (StoryDialog.tsx) — MapView opens it. */
+  onStoryCreated: (story: Story) => void;
+  /** The Story view (FR-14.7), null outside one. The tabs give way to the Story's own header,
+   *  and the toolbar gains Remove from story; MapView keeps `tab` on Activities meanwhile. */
+  storyView: StoryView | null;
   /** FR-3.7's "Not yet built" gap, closed: activities cross-source dedup took out of
    *  circulation, each alongside the richer copy that superseded it — mirrors the Android
    *  app's own duplicates section (`SyncStatusActivity`). Never filtered by the date range or
@@ -159,6 +184,18 @@ export interface ActivitiesPanelProps {
 }
 
 export type PanelTab = 'activities' | 'sync' | 'private';
+
+export interface StoryView {
+  id: string;
+  /** null while it loads, and when it couldn't be (`error`). */
+  story: Story | null;
+  error: string | null;
+  onExit: () => void;
+  /** Renamed or re-described with the pencil — the Story as the server returned it. */
+  onEdited: (story: Story) => void;
+  /** Activities taken out with Remove from story — they stay, just not in the Story. */
+  onRemoved: (ids: string[], story: Story) => void;
+}
 
 export function ActivitiesPanel({
   readOnly = false,
@@ -189,6 +226,8 @@ export function ActivitiesPanel({
   onToggleGroupVisibility,
   onActivitiesDeleted,
   onEdit,
+  onStoryCreated,
+  storyView,
   duplicates,
   duplicatesError,
   imports,
@@ -275,6 +314,12 @@ export function ActivitiesPanel({
   // (there's no per-row delete button), so this covers both the one-activity and many-activity
   // case uniformly. The confirm title and message below branch on targetActivities.length.
   const [deletingGroup, setDeletingGroup] = useState(false);
+  // FR-5.16's Create story dialog, over the checked group.
+  const [creatingStory, setCreatingStory] = useState(false);
+  // The Story view's pencil (FR-14.7), and Remove from story's request and its failure.
+  const [editingStory, setEditingStory] = useState(false);
+  const [removingFromStory, setRemovingFromStory] = useState(false);
+  const [storyActionError, setStoryActionError] = useState<string | null>(null);
 
   // Mobile-only bottom sheet (index.css's `@media (max-width: 768px)` layer) — collapsed by
   // default, same reasoning as typeFilterOpen above. Desktop CSS never reacts to the
@@ -370,7 +415,37 @@ export function ActivitiesPanel({
       ? noTarget
       : t(targetActivities.length === 1 ? 'activities.edit_one' : 'activities.edit_many', { target: targetName });
   const deleteTitle = targetName === null ? noTarget : t('activities.delete_target', { target: targetName });
+
+  // Create story takes the checked group only, never the selected row alone (FR-5.16): a Story
+  // is a set picked on purpose, and checking is how a set is picked here. Listed rows only, like
+  // every toolbar action.
+  const checkedActivities = checked.size > 0 ? targetActivities : [];
+  const storyTitle = readOnly
+    ? t('stories.demo_create')
+    : checkedActivities.length === 0
+      ? t('stories.create_none')
+      : t('stories.create_target', { target: tn('activities.checked_count', checkedActivities.length) });
   const focusTitle = targetName === null ? noTarget : t('activities.focus_target', { target: targetName });
+  const removeTitle = readOnly
+    ? t('stories.demo_remove')
+    : targetName === null
+      ? noTarget
+      : t('stories.remove_target', { target: targetName });
+
+  const story = storyView?.story ?? null;
+  async function removeFromStory() {
+    if (!story) return;
+    const ids = targetActivities.map((a) => a.id);
+    setRemovingFromStory(true);
+    setStoryActionError(null);
+    try {
+      storyView?.onRemoved(ids, await removeStoryActivities(story.id, ids));
+    } catch (err) {
+      setStoryActionError(err instanceof Error ? err.message : t('common.something_wrong'));
+    } finally {
+      setRemovingFromStory(false);
+    }
+  }
 
   return (
     <div
@@ -395,6 +470,46 @@ export function ActivitiesPanel({
         onPointerUp={onResizePointerUp}
         onPointerCancel={onResizePointerUp}
       />
+      {storyView ? (
+        <div className="story-head" data-testid="story-head">
+          <div className="story-head__row">
+            <h2 className="story-head__title">
+              {story ? t('stories.view_title', { name: story.name }) : (storyView.error ?? t('common.loading'))}
+            </h2>
+            <button
+              type="button"
+              className="activities-panel__edit"
+              disabled={readOnly || !story}
+              onClick={() => setEditingStory(true)}
+              aria-label={readOnly ? t('stories.demo_edit') : t('stories.edit')}
+              title={readOnly ? t('stories.demo_edit') : t('stories.edit')}
+            >
+              <Pencil size={16} />
+            </button>
+            <button type="button" className="story-head__exit" data-testid="story-exit" onClick={storyView.onExit}>
+              {t('stories.exit')}
+            </button>
+          </div>
+          {story && story.description !== '' && <p className="story-head__description">{story.description}</p>}
+          {story && story.stats.count > 0 && (
+            <>
+              <p className="story-head__stats">{storyStatsLine(story.stats, system)}</p>
+              <table className="story-head__types" aria-label={t('stories.by_type')}>
+                <tbody>
+                  {story.stats.byType.map((type) => (
+                    <tr key={type.activityType}>
+                      <th scope="row">{formatActivityType(type.activityType)}</th>
+                      <td>{storyStatsLine(type, system)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+          {story && story.stats.count === 0 && <p className="story-head__stats">{t('stories.no_activities')}</p>}
+          {storyActionError && <p className="settings-page__error">{storyActionError}</p>}
+        </div>
+      ) : (
       <div className="activities-panel__head" role="tablist" aria-label={t('activities.panel')}>
         <button
           type="button"
@@ -431,6 +546,7 @@ export function ActivitiesPanel({
           <span className="activities-panel__heading-text">{t('private.tab')}</span>
         </button>
       </div>
+      )}
       {/* A <button>, not a <p> — on mobile this is the bottom sheet's own peek-strip tap
           target (expand/collapse), styled identically to the old plain text on desktop
           (index.css keeps `cursor: default` there) so clicking it is a harmless, invisible
@@ -616,6 +732,28 @@ export function ActivitiesPanel({
             </button>
             <button
               type="button"
+              className="activities-panel__create-story"
+              disabled={readOnly || checkedActivities.length === 0}
+              onClick={() => setCreatingStory(true)}
+              aria-label={storyTitle}
+              title={storyTitle}
+            >
+              <BookPlus size={16} />
+            </button>
+            {storyView && (
+              <button
+                type="button"
+                className="activities-panel__remove-from-story"
+                disabled={readOnly || !hasTarget || !story || removingFromStory}
+                onClick={() => void removeFromStory()}
+                aria-label={removeTitle}
+                title={removeTitle}
+              >
+                <BookMinus size={16} />
+              </button>
+            )}
+            <button
+              type="button"
               className="activities-panel__delete"
               disabled={readOnly || !hasTarget || groupHasPending}
               onClick={() => setDeletingGroup(true)}
@@ -656,6 +794,9 @@ export function ActivitiesPanel({
               const isHovered = hoveredId === activity.id;
               const isHidden = hiddenIds.has(activity.id);
               const isPending = activity.pending;
+              // The Stories it's in, but not the one on screen: in a Story view every row is in
+              // that one, so only its other Stories are worth a badge.
+              const otherStories = activity.stories.filter((s) => s.id !== storyView?.id);
               // A user-entered name (§4.7's revised decision) leads; started_at is the fallback
               // for a row that has none — never the reverse, so an activity's date doesn't
               // disappear from the list just because it also has a name (shown in the meta line
@@ -714,10 +855,20 @@ export function ActivitiesPanel({
                       {formatActivityType(activity.activityType)}
                     </span>
                   </button>
-                  {(isPending || isHidden) && (
+                  {(isPending || isHidden || otherStories.length > 0) && (
                     // One right-aligned group, so the badges share one right edge whatever the
                     // text beside them does, and a row that's both stacks them there together.
                     <span className="activities-panel__badges">
+                      {otherStories.length > 0 && (
+                        <span
+                          className="activities-panel__hidden-badge activities-panel__story-badge"
+                          title={tn(storyView ? 'activities.in_other_stories' : 'activities.in_stories', otherStories.length, {
+                            names: otherStories.map((s) => s.name).join(', '),
+                          })}
+                        >
+                          {tn('activities.story_badge', otherStories.length)}
+                        </span>
+                      )}
                       {isPending && (
                         <span className="activities-panel__hidden-badge" title={t('activities.pending_title')}>
                           {t('activities.pending')}
@@ -750,7 +901,7 @@ export function ActivitiesPanel({
               two different reasons — it failed, or cross-source dedup already had it from
               somewhere else — and only the second is not a fault. Hidden entirely when there's
               nothing to say, the same as Android's own duplicatesHeading. */}
-          {(duplicates.length > 0 || duplicatesError) && (
+          {!storyView && (duplicates.length > 0 || duplicatesError) && (
             <div className="activities-panel__duplicates" ref={duplicatesRef}>
               <button
                 type="button"
@@ -782,6 +933,20 @@ export function ActivitiesPanel({
         </>
       )}
 
+
+      {creatingStory && (
+        <StoryDialog
+          mode="create"
+          activityIds={checkedActivities.map((a) => a.id)}
+          summary={groupSummary}
+          onSaved={onStoryCreated}
+          onClose={() => setCreatingStory(false)}
+        />
+      )}
+
+      {editingStory && story && storyView && (
+        <StoryDialog mode="edit" story={story} onSaved={storyView.onEdited} onClose={() => setEditingStory(false)} />
+      )}
 
       {deletingGroup && (
         <ConfirmDialog

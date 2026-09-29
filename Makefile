@@ -6,9 +6,12 @@ COMPOSE := docker compose
 TEST    := $(COMPOSE) --profile test run --rm test
 # A throwaway Go toolchain for services/server's unit tests, so `make test` needs Docker and
 # nothing else, like every other target here. Named volumes keep the module and build
-# caches between runs.
+# caches between runs. It shares compose's db container's network namespace, so the
+# database tests reach their holdmytrack_test database at localhost:5432.
 GO      := docker run --rm -v $(CURDIR)/services/server:/src -w /src \
              -v holdmytrack-go-mod:/go/pkg/mod -v holdmytrack-go-build:/root/.cache/go-build \
+             --network container:$$($(COMPOSE) ps -q db) \
+             -e TEST_DATABASE_URL=postgres://holdmytrack:holdmytrack@localhost:5432/holdmytrack_test \
              golang:1.25-bookworm
 
 .DEFAULT_GOAL := help
@@ -38,7 +41,9 @@ typecheck: ## tsc --noEmit
 basemap: ## Re-cut the .pmtiles extract (pmtiles is baked into the dev image)
 	$(COMPOSE) run --rm web npm run basemap
 
-test-go: ## Go unit tests (services/server)
+test-go: ## Go unit tests (services/server), the database ones against compose's db
+	$(COMPOSE) up -d --wait db
+	$(COMPOSE) exec -T db sh -c 'createdb -U holdmytrack holdmytrack_test 2>/dev/null || true'
 	$(GO) go test ./...
 
 # verify:style compares against services/server/internal/mapstyle/styles, which the web

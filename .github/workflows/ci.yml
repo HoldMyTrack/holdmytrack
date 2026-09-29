@@ -19,6 +19,21 @@ jobs:
     defaults:
       run:
         working-directory: services/server
+    # The tests that need Postgres+PostGIS (internal/httpapi's dbtest_test.go) skip without
+    # TEST_DATABASE_URL; this gives them one.
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: holdmytrack
+          POSTGRES_PASSWORD: holdmytrack
+          POSTGRES_DB: holdmytrack_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U holdmytrack"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://holdmytrack:holdmytrack@localhost:5432/holdmytrack_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5

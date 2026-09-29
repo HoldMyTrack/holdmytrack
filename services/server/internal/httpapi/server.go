@@ -153,6 +153,13 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(route("POST", "/private-locations"), s.requireNotDemo(s.handleCreatePrivateLocation))
 	s.mux.HandleFunc(route("PATCH", "/private-locations/{id}"), s.requireNotDemo(s.handleUpdatePrivateLocation))
 	s.mux.HandleFunc(route("DELETE", "/private-locations/{id}"), s.requireNotDemo(s.handleDeletePrivateLocation))
+	s.mux.HandleFunc(route("GET", "/stories"), s.requireVerified(s.handleListStories))
+	s.mux.HandleFunc(route("POST", "/stories"), s.requireNotDemo(s.handleCreateStory))
+	s.mux.HandleFunc(route("GET", "/stories/{id}"), s.requireVerified(s.handleGetStory))
+	s.mux.HandleFunc(route("PATCH", "/stories/{id}"), s.requireNotDemo(s.handleUpdateStory))
+	s.mux.HandleFunc(route("DELETE", "/stories/{id}"), s.requireNotDemo(s.handleDeleteStory))
+	s.mux.HandleFunc(route("POST", "/stories/{id}/activities"), s.requireNotDemo(s.handleAddStoryActivities))
+	s.mux.HandleFunc(route("DELETE", "/stories/{id}/activities"), s.requireNotDemo(s.handleRemoveStoryActivities))
 	s.mux.HandleFunc(route("GET", "/uploads"), s.requireVerified(s.handleListUploads))
 	s.mux.HandleFunc(route("GET", "/coverage/status"), s.requireVerified(s.handleCoverageStatus))
 	s.mux.HandleFunc(route("POST", "/sync/activities"), s.requireNotDemo(s.handleSyncActivities))
@@ -208,7 +215,9 @@ func (s *Server) registerPages() {
 	s.mux.HandleFunc("POST /settings/avatar", s.sameOrigin(s.handleSettingsAvatarForm))
 	s.mux.HandleFunc("POST /settings/avatar/remove", s.sameOrigin(s.handleSettingsAvatarRemoveForm))
 	s.mux.HandleFunc("GET /profile", s.handleProfilePage) // profile_page.go
-	s.mux.HandleFunc("GET /admin", s.handleAdminPage)     // admin_pages.go
+	s.mux.HandleFunc("GET /stories", s.handleStoriesPage) // stories_page.go
+	s.mux.HandleFunc("POST /stories/{id}/delete", s.sameOrigin(s.handleStoryDeleteForm))
+	s.mux.HandleFunc("GET /admin", s.handleAdminPage) // admin_pages.go
 	s.mux.HandleFunc("GET /admin/users/{id}", s.handleAdminUserPage)
 	// The React app — the map (pages.go's appShell). `/{$}` is the root alone; "/" below is
 	// everything else nothing more specific claims.

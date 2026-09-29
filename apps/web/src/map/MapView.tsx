@@ -23,12 +23,12 @@ import {
 import { useCoverageRefresh } from './useCoverageRefresh';
 import { useMapInstance } from './useMapInstance';
 import { flavorForTheme, parseHash, pinnedFlavor, replaceHash, type HashState, type ViewState } from './viewState';
-import { getActivityTrackMetrics, type Activity, type ActivityTrackMetrics } from '../api';
+import { getActivityTrackMetrics, type Activity, type ActivityTrackMetrics, type Story } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
-import { ActivitiesPanel, type PanelTab } from '../ui/ActivitiesPanel';
+import { ActivitiesPanel, type PanelTab, type StoryView } from '../ui/ActivitiesPanel';
 import { ActivityHistogram } from '../ui/ActivityHistogram';
-import { EditActivityWindow } from '../ui/EditActivityWindow';
+import { EditActivityWindow, type EditWindowResult } from '../ui/EditActivityWindow';
 import { ExportControl } from '../ui/ExportControl';
 import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
 import { dayDiff, dayInZone, todayLocal } from '../ui/dateMath';
@@ -39,12 +39,29 @@ import { useActivityList } from '../ui/useActivityList';
 import { useActivityTotals } from '../ui/useActivityTotals';
 import { useDuplicates } from '../ui/useDuplicates';
 import { useImports } from '../ui/useImports';
+import { useStory } from '../ui/useStory';
 import { currentTheme, useTheme } from '../ui/useTheme';
 import { t } from '../i18n';
 
 /** How often the list is re-read while an Edit track reprocess is pending — the job is one
  *  activity's worth of ingest, so a few seconds is the right order of magnitude. */
 const EDIT_PENDING_POLL_MS = 2000;
+
+/** The Story the URL opens, `/?story=<id>` (FR-14.7) — kept in the URL, unlike
+ *  `?private-locations`, so a refresh or a shared link comes back to it. */
+function storyParam(): string | null {
+  return new URLSearchParams(window.location.search).get('story') || null;
+}
+
+/** The current URL with `?story=` set to id, or taken off for null — the hash (the camera)
+ *  and any other parameter kept. */
+function urlWithStory(id: string | null): string {
+  const params = new URLSearchParams(window.location.search);
+  if (id === null) params.delete('story');
+  else params.set('story', id);
+  const qs = params.toString();
+  return window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash;
+}
 
 export interface MapViewProps {
   /** Mount with the Activities panel on its Privacy tab — `/?private-locations` (App.tsx). */
@@ -174,6 +191,19 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // render.
   const [selectedRange, setSelectedRangeState] = useState<DateRange | null>(null);
 
+  // The Story view (FR-14.7): while a Story is open, the list, the totals, the drawn tracks and
+  // the range picker's bars are that Story's activities alone. Entered from the URL, from Create
+  // story, or by Back/Forward; left with Exit story, which puts back the range from before it.
+  const [storyId, setStoryId] = useState<string | null>(storyParam);
+  const storyState = useStory(storyId);
+  // The range (and whether the user had picked it) to restore on Exit story — null when the
+  // page opened straight into a Story, which then exits onto the usual default range.
+  const beforeStoryRef = useRef<{ range: DateRange | null; userChanged: boolean } | null>(null);
+  // Set on entering a Story, until its whole span is selected (the effect further down) —
+  // `fly` says whether to fit the camera to it then: yes when entered from the map, no on page
+  // load, where the first list's own fly (or the URL's camera) already decides.
+  const storyRangePendingRef = useRef<{ fly: boolean } | null>(storyId !== null ? { fly: false } : null);
+
   // TYPE/DISTANCE facets — pure client-side filters over
   // whatever the current date range already fetched, per activityFacets.ts.
   const [excludedTypes, setExcludedTypes] = useState<Set<string>>(() => new Set());
@@ -271,8 +301,11 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   }, []);
 
   const activityQuery = useMemo(
-    () => (selectedRange ? { from: selectedRange.from, to: selectedRange.to } : {}),
-    [selectedRange],
+    () => ({
+      ...(selectedRange ? { from: selectedRange.from, to: selectedRange.to } : {}),
+      ...(storyId !== null ? { story: storyId } : {}),
+    }),
+    [selectedRange, storyId],
   );
 
   // Fetched once here rather than in each consumer: the header badge, the panel subtext and
@@ -293,6 +326,8 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   const {
     visibleDays,
     earliest,
+    latest,
+    loadedStory,
     ready: daysReady,
     pageStep,
     canPanEarlier,
@@ -301,7 +336,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     reload: reloadHistogram,
     generation: historyGeneration,
     setBarsPerView,
-  } = useActivityDays();
+  } = useActivityDays(storyId);
 
   // Defaults to the 5 most recent activity-days, not all-time: an all-time default spans
   // every loaded bar on first paint, which leaves the selection band pinned to both edges
@@ -331,12 +366,25 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // from the list, and the window can't outlive its activities (below), so it kept closing
   // itself until the whole zip had finished. `editOpen` is a dependency so the default
   // catches up on whatever landed meanwhile the moment the window closes.
+  //
+  // Not inside a Story, which opens on its whole span instead (below); and not until the days in
+  // hand are the whole history's again after leaving one.
   useEffect(() => {
-    if (userChangedRangeRef.current || !daysReady || editOpen) return;
+    if (userChangedRangeRef.current || !daysReady || editOpen || storyId !== null || loadedStory !== null) return;
     const recentDays = visibleDays.slice(-5);
     setSelectedRangeState({ from: recentDays[0]?.date ?? earliest ?? today, to: today });
     // visibleDays deliberately isn't a dependency — see the comment above.
-  }, [daysReady, earliest, historyGeneration, today, editOpen]);
+  }, [daysReady, earliest, historyGeneration, today, editOpen, storyId, loadedStory]);
+
+  // A Story opens on the whole of it: its first activity's day to its last (FR-14.7), once the
+  // picker's days are that Story's. An empty Story has no days, and gets today.
+  useEffect(() => {
+    const pending = storyRangePendingRef.current;
+    if (pending === null || storyId === null || !daysReady || loadedStory !== storyId || editOpen) return;
+    storyRangePendingRef.current = null;
+    flyToNextRangeRef.current = pending.fly;
+    setSelectedRangeState({ from: earliest ?? today, to: latest ?? today });
+  }, [storyId, daysReady, loadedStory, earliest, latest, today, editOpen]);
 
   // The histogram header's own stats — deliberately not totals.count/distanceMeters, which
   // ActivitiesPanel's subtext already shows; repeating them in the histogram too would just
@@ -614,13 +662,17 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     if (activitiesLoadedKey === flownRangeKeyRef.current) return;
     flownRangeKeyRef.current = activitiesLoadedKey;
     if (!hasFlownToActivitiesRef.current) {
+      const drawn = activities.filter((a) => a.bbox !== null && !a.pending);
+      // A Story with nothing to draw (an empty one, or one that doesn't exist) leaves this for
+      // the history Exit story goes back to.
+      if (storyId !== null && drawn.length === 0) return;
       // The first list, even an empty one: an account with no history yet gets the fallback
       // view below, and its first upload doesn't fly either.
       hasFlownToActivitiesRef.current = true;
-      const drawn = activities.filter((a) => a.bbox !== null && !a.pending);
       if (initial.hash.view == null && drawn.length > 0) {
+        // Inside a Story, the whole of it — it's a trip, not a history to start at the end of.
         const mostRecent = drawn.reduce((latest, a) => (a.startedAt > latest.startedAt ? a : latest));
-        fitToSelection([mostRecent]);
+        fitToSelection(storyId !== null ? drawn : [mostRecent]);
       }
       return;
     }
@@ -629,7 +681,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     const visible = activities.filter((a) => !mapHiddenIdsRef.current.has(a.id));
     const flyBounds = unionBBox(visible.flatMap((a) => (a.bbox ? [a.bbox] : [])));
     if (flyBounds) flyToBBox(map, flyBounds);
-  }, [map, activities, activitiesLoadedKey, fitToSelection]);
+  }, [map, activities, activitiesLoadedKey, fitToSelection, storyId]);
 
   // The counterpart for an account with genuinely zero history (docs/ROADMAP.md's same "Fly
   // to the most recent activity" item, its zero-history fallback): the effect above never
@@ -646,10 +698,11 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     if (!map || hasFlownToFallbackRef.current) return;
     if (initial.hash.view != null) return;
     if (activities.length > 0) return;
-    if (!daysReady || earliest != null) return;
+    // Only the whole history's days say it's genuinely empty — not an empty Story's.
+    if (!daysReady || earliest != null || storyId !== null || loadedStory !== null) return;
     hasFlownToFallbackRef.current = true;
     flyToView(map, countryView(user.country) ?? WORLD_VIEW);
-  }, [map, activities, daysReady, earliest, user.country]);
+  }, [map, activities, daysReady, earliest, user.country, storyId, loadedStory]);
 
   // Clicking a track directly on the map is the row-text "focus" behavior, not the checkbox's
   // — it bolds just that one track, replacing whichever was focused before, and flies to it,
@@ -767,11 +820,12 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     reloadActivities();
     reloadTotals();
     reloadHistogram();
+    storyState.reload();
     // A finished upload/sync is also the one thing that can produce a new duplicate.
     duplicates.refresh();
     // Deletes come through here too (handleActivitiesDeleted), so this covers both.
     watchCoverage();
-  }, [map, activityQuery, reloadActivities, reloadTotals, reloadHistogram, duplicates.refresh, watchCoverage]);
+  }, [map, activityQuery, reloadActivities, reloadTotals, reloadHistogram, storyState.reload, duplicates.refresh, watchCoverage]);
 
   // The Sync tab's upload queue and history — held here rather than in the tab, so an upload
   // and its polling survive the panel unmounting (Fog/Heatmap) or showing the other tab.
@@ -814,6 +868,96 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     setHoveredActivityId(null);
     setEditWindowIds(group.map((a) => a.id));
   }, []);
+
+  // Into and out of the Story view. Both start the list's state afresh, as a new range does
+  // (changeSelectedRange): the rows are a different set. `push` is false when Back/Forward
+  // already moved the URL.
+  const resetListState = useCallback(() => {
+    setCheckedActivityIds(new Set());
+    setFocusedActivityId(null);
+    setHiddenActivityIds(new Set());
+    setExcludedTypes(new Set());
+    setDistanceFilter(null);
+  }, []);
+  const enterStory = useCallback(
+    (id: string, push = true) => {
+      // Opening a second Story from inside one (Create story there) still exits to the range
+      // from before the first.
+      if (storyId === null) beforeStoryRef.current = { range: selectedRange, userChanged: userChangedRangeRef.current };
+      storyRangePendingRef.current = { fly: true };
+      resetListState();
+      setStoryId(id);
+      if (push) window.history.pushState(null, '', urlWithStory(id));
+    },
+    [storyId, selectedRange, resetListState],
+  );
+  const exitStory = useCallback(
+    (push = true) => {
+      const before = beforeStoryRef.current;
+      beforeStoryRef.current = null;
+      storyRangePendingRef.current = null;
+      resetListState();
+      setStoryId(null);
+      // The range from before, or — for a page that opened in the Story — the default the
+      // effect above derives once the whole history's days are back. The camera stays.
+      userChangedRangeRef.current = before?.userChanged ?? false;
+      flyToNextRangeRef.current = false;
+      setSelectedRangeState(before?.range ?? null);
+      if (push) window.history.pushState(null, '', urlWithStory(null));
+    },
+    [resetListState],
+  );
+  // Back and Forward between a Story and the map outside it.
+  const storyNavRef = useRef({ storyId, enterStory, exitStory });
+  storyNavRef.current = { storyId, enterStory, exitStory };
+  useEffect(() => {
+    const onPopState = () => {
+      const { storyId: current, enterStory: enter, exitStory: exit } = storyNavRef.current;
+      const next = storyParam();
+      if (next === current) return;
+      if (next === null) exit(false);
+      else enter(next, false);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  // A Story just made with the toolbar's Create story opens straight away.
+  const openCreatedStory = useCallback((story: Story) => enterStory(story.id), [enterStory]);
+
+  // Remove from story (FR-14.7): the Story as the server now has it, and the list, totals, bars
+  // and tracks without those activities. Like a delete, they leave every selection too.
+  const handleRemovedFromStory = useCallback(
+    (ids: string[], story: Story) => {
+      storyState.set(story);
+      if (map) refreshTrackLayer(map, activityQuery);
+      reloadActivities();
+      reloadTotals();
+      reloadHistogram();
+      const removed = new Set(ids);
+      const without = (current: Set<string>) =>
+        [...removed].some((id) => current.has(id)) ? new Set([...current].filter((id) => !removed.has(id))) : current;
+      setFocusedActivityId((current) => (current !== null && removed.has(current) ? null : current));
+      setCheckedActivityIds(without);
+      setHiddenActivityIds(without);
+    },
+    [storyState.set, map, activityQuery, reloadActivities, reloadTotals, reloadHistogram],
+  );
+
+  const storyView: StoryView | null = useMemo(
+    () =>
+      storyId === null
+        ? null
+        : {
+            id: storyId,
+            story: storyState.story,
+            error: storyState.error,
+            onExit: () => exitStory(),
+            onEdited: storyState.set,
+            onRemoved: handleRemovedFromStory,
+          },
+    [storyId, storyState.story, storyState.error, storyState.set, exitStory, handleRemovedFromStory],
+  );
   // §4.7.7's track session, from the Edit window's Track tab. Flies there the same way a row
   // click does, then hands the map to TrackEditor until the window closes.
   const startEditTrack = useCallback(
@@ -829,14 +973,25 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // enough on its own.
   const awaitingEditIdsRef = useRef<Set<string>>(new Set());
   const closeEditWindow = useCallback(
-    ({ saved, trackApplied }: { saved: boolean; trackApplied: boolean }) => {
+    ({ saved, trackApplied, storiesChanged }: EditWindowResult) => {
       if (trackApplied && editingActivityId !== null) awaitingEditIdsRef.current.add(editingActivityId);
       setEditWindowIds(null);
       setEditingActivityId(null);
       // A track edit leaves the row Pending — the effects below poll until the reprocess lands.
-      if (saved) reloadActivities();
+      if (saved) {
+        reloadActivities();
+        // A new type moves an activity between the Story's per-type rows.
+        storyState.reload();
+      }
+      // The Stories tab may have taken an activity out of (or put one into) the Story on
+      // screen: its tracks, totals and bars follow, as after Remove from story.
+      if (storiesChanged && storyId !== null) {
+        if (map) refreshTrackLayer(map, activityQuery);
+        reloadTotals();
+        reloadHistogram();
+      }
     },
-    [editingActivityId, reloadActivities],
+    [editingActivityId, reloadActivities, storyState.reload, storyId, map, activityQuery, reloadTotals, reloadHistogram],
   );
   // A saved or deleted Private location reprocesses every activity it could clip. The list
   // reload shows those rows Pending right away, and the Pending poll below refreshes the map
@@ -849,9 +1004,10 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       reloadActivities();
       reloadTotals();
       reloadHistogram();
+      storyState.reload();
       setTrackMetricsVersion((v) => v + 1);
     });
-  }, [map, activityQuery, reloadActivities, reloadTotals, reloadHistogram, watchCoverage]);
+  }, [map, activityQuery, reloadActivities, reloadTotals, reloadHistogram, storyState.reload, watchCoverage]);
   const editWindowActivities = useMemo(() => {
     if (editWindowIds === null) return null;
     const group = activities.filter((a) => editWindowIds.includes(a.id));
@@ -928,8 +1084,9 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     watchCoverage();
     reloadTotals();
     reloadHistogram();
+    storyState.reload();
     setTrackMetricsVersion((v) => v + 1);
-  }, [pendingIds, map, activityQuery, reloadTotals, reloadHistogram, watchCoverage]);
+  }, [pendingIds, map, activityQuery, reloadTotals, reloadHistogram, storyState.reload, watchCoverage]);
 
   /**
    * Re-attach anything that is not part of the basemap style.
@@ -1062,11 +1219,13 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
               onToggleGroupVisibility={toggleGroupVisibility}
               onActivitiesDeleted={handleActivitiesDeleted}
               onEdit={openEditWindow}
+              onStoryCreated={openCreatedStory}
+              storyView={storyView}
               duplicates={duplicates.duplicates}
               duplicatesError={duplicates.error}
               imports={imports}
               onViewOnMap={viewActivityOnMap}
-              tab={panelTab}
+              tab={storyId !== null ? 'activities' : panelTab}
               onTabChange={setPanelTab}
               map={map}
               onPrivateLocationsChanged={handlePrivateLocationsChanged}

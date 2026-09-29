@@ -3,6 +3,7 @@ package web
 import (
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
@@ -84,4 +85,32 @@ func ShortDate(l *i18n.Localizer, day string) string {
 		return day
 	}
 	return l.T("date.short", "day", strconv.Itoa(t.Day()), "month", l.T("month.short."+strconv.Itoa(int(t.Month()))))
+}
+
+// FormatDuration is "2h 15m" / "2 ч 15 мин", minutes below an hour and seconds below a
+// minute — format.ts's formatDuration.
+func FormatDuration(l *i18n.Localizer, seconds int64) string {
+	h, m := seconds/3600, seconds%3600/60
+	switch {
+	case h > 0:
+		return l.T("duration.hm", "h", strconv.FormatInt(h, 10), "m", strconv.FormatInt(m, 10))
+	case m > 0:
+		return l.T("duration.m", "m", strconv.FormatInt(m, 10))
+	}
+	return l.T("duration.s", "s", strconv.FormatInt(seconds, 10))
+}
+
+// ActivityType is an activity_type's display name: the catalog's for a common type, else the
+// raw value with underscores spaced out and each word capitalized — format.ts's
+// formatActivityType, which explains why that isn't a mapping to a fixed vocabulary.
+func ActivityType(l *i18n.Localizer, activityType string) string {
+	key := "activity_type." + strings.ToLower(activityType)
+	if msg := l.T(key); msg != key {
+		return msg
+	}
+	words := strings.FieldsFunc(activityType, func(r rune) bool { return r == '_' })
+	for i, w := range words {
+		words[i] = strings.ToUpper(w[:1]) + w[1:]
+	}
+	return strings.Join(words, " ")
 }

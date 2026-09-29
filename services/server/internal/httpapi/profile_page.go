@@ -112,7 +112,7 @@ func (s *Server) buildProfile(ctx context.Context, l *i18n.Localizer, acct *page
 	currentYear := now.Year()
 
 	firstYear := currentYear
-	earliest, err := s.earliestActivity(ctx, userID)
+	earliest, err := s.earliestActivity(ctx, userID, nil)
 	if err != nil {
 		return profileView{}, err
 	}
@@ -121,7 +121,7 @@ func (s *Server) buildProfile(ctx context.Context, l *i18n.Localizer, acct *page
 	}
 	days, err := s.dailyTotals(ctx, userID,
 		time.Date(firstYear, time.January, 1, 0, 0, 0, 0, loc),
-		time.Date(currentYear+1, time.January, 1, 0, 0, 0, 0, loc), tz)
+		time.Date(currentYear+1, time.January, 1, 0, 0, 0, 0, loc), tz, nil)
 	if err != nil {
 		return profileView{}, err
 	}

@@ -97,6 +97,15 @@ body {
   cursor: default;
 }
 
+/* StoryDialog.tsx — ConfirmDialog's card, a little wider for its two fields. */
+.story-dialog {
+  width: min(28rem, calc(100vw - 40px));
+}
+
+.story-dialog .settings-page__section {
+  margin-bottom: var(--fm-space-12);
+}
+
 /* A permanent left sidebar now (docs/UI/main-screen-v2.png), not a dropdown floating over
    the map — there is always at least one activity to show once anything's been uploaded, so
    there was nothing to gain by hiding the list behind an open/close toggle. Width is inline
@@ -148,6 +157,81 @@ body {
   padding: var(--fm-space-12) var(--fm-space-16) 0;
   margin-bottom: var(--fm-space-8);
   border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 8%);
+}
+
+/* The Story view's header (FR-14.7), in the tabs' place: "Story: <name>" with the pencil and
+   Exit story on one line, then the description, the whole Story's numbers and a row per type. */
+.story-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fm-space-6);
+  padding: var(--fm-space-12) var(--fm-space-16);
+  margin-bottom: var(--fm-space-8);
+  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 8%);
+}
+
+.story-head__row {
+  display: flex;
+  align-items: center;
+  gap: var(--fm-space-8);
+}
+
+.story-head__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--fm-font-serif);
+  font-size: var(--fm-text-xl);
+  font-weight: var(--fm-weight-semibold);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.story-head__exit {
+  flex: none;
+  border: 1px solid rgb(var(--fm-ink-rgb) / 18%);
+  border-radius: var(--fm-radius-sm);
+  padding: var(--fm-space-6) var(--fm-space-10);
+  background: var(--fm-surface);
+  color: var(--fm-ink);
+  font: inherit;
+  font-size: var(--fm-text-md);
+  font-weight: var(--fm-weight-semibold);
+  cursor: pointer;
+}
+
+.story-head__exit:hover {
+  background: var(--fm-surface-tint);
+}
+
+.story-head__description {
+  margin: 0;
+  font-size: var(--fm-text-md);
+  color: var(--fm-ink-secondary);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.story-head__stats {
+  margin: 0;
+  font-size: var(--fm-text-md);
+  font-weight: var(--fm-weight-semibold);
+}
+
+.story-head__types {
+  border-collapse: collapse;
+  font-size: var(--fm-text-sm);
+  color: rgb(var(--fm-ink-rgb) / 70%);
+}
+
+.story-head__types th {
+  padding: 1px var(--fm-space-12) 1px 0;
+  font-weight: var(--fm-weight-regular);
+  text-align: left;
+}
+
+.story-head__types td {
+  padding: 1px 0;
 }
 
 .activities-panel__tab {
@@ -505,6 +589,13 @@ body {
   white-space: nowrap;
 }
 
+/* Story sits beside Pending and Hidden, in the accent: it says where an activity belongs, not
+   a state it's in. */
+.activities-panel__story-badge {
+  color: var(--fm-accent);
+  background: rgb(var(--fm-accent-rgb) / 12%);
+}
+
 /* The reverse direction of the hover above: hovering this activity's *track on the map*
    (not the row itself) also underlines the title, via MapView's shared hoveredActivityId
    state rather than a real `:hover` here — the pointer isn't over this row at all. */
@@ -539,12 +630,14 @@ body {
   white-space: nowrap;
 }
 
-/* §4.7.6's toolbar icon buttons — Show/Edit/Delete/Focus all operate on the toolbar's target:
+/* §4.7.6's toolbar icon buttons — Show/Edit/Create story/Delete/Focus all operate on the toolbar's target:
    the checked group, else the selected row (there are no per-row action icons). One shared chip look, matching the
    mockup: a soft tinted square rather than a bare icon, so the group actions read as one
    family regardless of which one is destructive. */
 .activities-panel__edit,
 .activities-panel__edit-track,
+.activities-panel__create-story,
+.activities-panel__remove-from-story,
 .activities-panel__delete,
 .activities-panel__visibility,
 .activities-panel__focus {
@@ -564,6 +657,8 @@ body {
 
 .activities-panel__edit:hover:not(:disabled),
 .activities-panel__edit-track:hover:not(:disabled),
+.activities-panel__create-story:hover:not(:disabled),
+.activities-panel__remove-from-story:hover:not(:disabled),
 .activities-panel__delete:hover:not(:disabled),
 .activities-panel__visibility:hover:not(:disabled) {
   background: var(--fm-surface-tint-strong);
@@ -575,6 +670,8 @@ body {
    reads before anyone hovers for the title tooltip. */
 .activities-panel__edit:disabled,
 .activities-panel__edit-track:disabled,
+.activities-panel__create-story:disabled,
+.activities-panel__remove-from-story:disabled,
 .activities-panel__delete:disabled,
 .activities-panel__visibility:disabled,
 .activities-panel__focus:disabled {
@@ -1457,6 +1554,40 @@ body {
   color: rgb(var(--fm-ink-rgb) / 60%);
 }
 
+/* EditStoriesTab.tsx — one row per Story: its checkbox, its name, how many activities it holds. */
+.edit-stories {
+  display: flex;
+  flex-direction: column;
+  max-height: 16rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.edit-stories__row {
+  display: flex;
+  align-items: center;
+  gap: var(--fm-space-10);
+  padding: var(--fm-space-6) 0;
+  font-size: var(--fm-text-md);
+  cursor: pointer;
+}
+
+.edit-stories__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edit-stories__count {
+  flex: none;
+  font-size: var(--fm-text-sm);
+  color: rgb(var(--fm-ink-rgb) / 55%);
+}
+
 .edit-track__error {
   margin: 0;
   font-size: var(--fm-text-sm);
@@ -2096,6 +2227,8 @@ body {
   }
 
   .activities-panel__edit,
+  .activities-panel__create-story,
+  .activities-panel__remove-from-story,
   .activities-panel__delete,
   .activities-panel__visibility,
   .activities-panel__focus {
