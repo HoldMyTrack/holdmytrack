@@ -1155,7 +1155,7 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 
 **Behavior**:
 1. The Layers menu's Points of interest group (FR-4.13 describes the menu) has one checkbox per category — Playgrounds, Dog parks, Monuments, Mesmerizing views, Historic sites. Each works the same over Normal, Fog and Heatmap. All start off; each browser remembers its choice, and one that had the former Show POI toggle on starts with every category on.
-2. From zoom 13 up — where the paths (FR-4.13) start too — each place in a ticked category is a round badge — its category's icon in ink on white, ringed in gold — at a point on its area, loaded as the map moves. Between zoom 8 and 13 places show only on request (FR-15.5); below zoom 8, none. Every place is drawn, however close to others. Playground's icon is a seesaw.
+2. From zoom 13 up — where the paths (FR-4.13) start too — each place in a ticked category is a round badge — its category's icon in ink on white, ringed in gold — at a point on its area, loaded as the map moves. Between zoom 10 and 13 places show only on request (FR-15.5); below zoom 10, none. Every place is drawn, however close to others. Playground's icon is a seesaw.
 3. From zoom 13 up, under each badge its area is shaded faintly in gold: the place's outline from OpenStreetMap, edged with a solid line, or — for a place mapped only as a point — its 30 m circle, edged with a dashed line. Clicking an area does nothing, and a track under it can still be clicked.
 4. Badges and areas are drawn over everything else, the Fog veil and map labels included, and Fog doesn't dim them.
 5. They hide during an Edit track session (FR-5.14) and come back after it.
@@ -1170,10 +1170,10 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 
 ### FR-15.5 Show in this area
 
-**Description**: Between zoom 8 (the City tier's, FR-4.2) and zoom 13 a view holds too many places to load on every pan, so they load when asked, for the visible map.
+**Description**: Between zoom 10 (a metro area in view) and zoom 13 a view holds too many places to load on every pan, so they load when asked, for the visible map.
 
 **Behavior**:
-1. With at least one category ticked and the map between zoom 8 and 13, a **Show in this area** button shows over the map, under the toggles. Outside that range, or with no category ticked, it doesn't.
+1. With at least one category ticked and the map between zoom 10 and 13, a **Show in this area** button shows over the map, under the toggles. Outside that range, or with no category ticked, it doesn't.
 2. Pressing it loads the ticked categories' places inside the visible map and draws their badges (no areas). They stay drawn until the next press; unticking a category hides its places at once.
 3. Until the map moves or another category is ticked, a line replaces the button: how many places the area has ("912 places in this area"), "No places in this area", or, when there were more than 2,000, "Showing 2,000 of N places — zoom in for the rest". The 2,000 are the named places first, spread evenly over the area. After a move or a newly ticked category, the button comes back.
 4. A badge from it opens the same popup (FR-15.3). From zoom 13 up the tiles' badges take over and these aren't drawn.
