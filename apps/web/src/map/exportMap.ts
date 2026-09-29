@@ -1,13 +1,13 @@
 import { Map as MapLibreMap } from 'maplibre-gl';
 import { API_BASE_URL, type ActivityQuery } from '../api';
 import logoUrl from '../assets/logo.png';
-import { basemapOrigin } from './config';
+import { basemapOrigin, satelliteSource } from './config';
 import { customOutputSize } from './exportPresets';
 import { ensureFogLayer } from './fog';
 import { ensureHeatmapLayer } from './heatmap';
 import { labelInsertionPoint } from './layers';
 import { setMapMode, type MapMode } from './mapMode';
-import { ATTRIBUTION_TEXT, buildStyle, isDarkFlavor, type Flavor, type PathOverlays } from './style';
+import { ATTRIBUTION_TEXT, buildStyle, isDarkBase, type Flavor, type PathOverlays } from './style';
 import { ensureTrackLayer, setHiddenTracks } from './tracks';
 
 /**
@@ -60,6 +60,8 @@ export interface ExportViewState {
   /** The Overlays menu's Trails and Bike paths (overlays.ts), so the image shows what the
    *  screen does. */
   paths: PathOverlays;
+  /** The Base map switch (FR-4.14): satellite imagery, when the deployment has any. */
+  satellite: boolean;
 }
 
 export interface ExportFrameCapture {
@@ -106,8 +108,8 @@ export async function exportFramedImage(
     // pixel off after rounding (and a preset frame's ratio can differ from its target by a
     // rounding pixel too), and attribution must go onto a 2D canvas regardless.
     const finalCanvas = scaleCanvas(canvas, outWidth, outHeight);
-    const stripBottom = drawAttribution(finalCanvas);
-    await drawWatermark(finalCanvas, stripBottom, state.flavor);
+    const stripBottom = drawAttribution(finalCanvas, attributionText(state.satellite));
+    await drawWatermark(finalCanvas, stripBottom, isDarkBase(state.flavor, state.satellite));
 
     const blob = await new Promise<Blob | null>((resolve) => {
       finalCanvas.toBlob(resolve, 'image/png');
@@ -129,8 +131,15 @@ function scaleCanvas(source: HTMLCanvasElement, widthPx: number, heightPx: numbe
   return out;
 }
 
+/** `ATTRIBUTION_TEXT`, plus the imagery provider's credit when the image shows its imagery —
+ *  its terms require it on every image as much as ODbL requires OSM's (FR-4.14). */
+function attributionText(satellite: boolean): string {
+  const imagery = satellite ? satelliteSource()?.attribution.replace(/<[^>]+>/g, '').trim() : '';
+  return imagery ? `${ATTRIBUTION_TEXT} · ${imagery}` : ATTRIBUTION_TEXT;
+}
+
 /**
- * Bakes `style.ts`'s own `ATTRIBUTION_TEXT` into the bottom-right corner of `canvas` in place
+ * Bakes `style.ts`'s own `ATTRIBUTION_TEXT` (and the imagery's credit, `attributionText`) into the bottom-right corner of `canvas` in place
  * — not optional or togglable, since the basemap is an ODbL "Produced Work" and OSM/Protomaps
  * credit is a license requirement, not a preference (`style.ts`'s own comment on
  * `ATTRIBUTION`). The live map shows the same text via MapLibre's DOM-based
@@ -146,7 +155,7 @@ function scaleCanvas(source: HTMLCanvasElement, widthPx: number, heightPx: numbe
  * with the same `stripMetrics` sizing so the two scale together and keep the same corner margin.
  * Returns the plate's bottom edge, so the watermark can end on exactly the same line.
  */
-function drawAttribution(canvas: HTMLCanvasElement): number {
+function drawAttribution(canvas: HTMLCanvasElement, text: string): number {
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('export: could not create attribution canvas context');
 
@@ -158,7 +167,7 @@ function drawAttribution(canvas: HTMLCanvasElement): number {
   ctx.textAlign = 'right';
   ctx.textBaseline = 'alphabetic';
 
-  const metrics = ctx.measureText(ATTRIBUTION_TEXT);
+  const metrics = ctx.measureText(text);
   // Falls back to font-relative approximations of ascent/descent — actualBoundingBox* is
   // widely supported (every browser this app otherwise targets), but degrading gracefully
   // here costs nothing and keeps the plate from vanishing entirely if it's ever missing.
@@ -177,7 +186,7 @@ function drawAttribution(canvas: HTMLCanvasElement): number {
   );
 
   ctx.fillStyle = '#ffffff';
-  ctx.fillText(ATTRIBUTION_TEXT, baselineX - padX, baselineY);
+  ctx.fillText(text, baselineX - padX, baselineY);
   return baselineY + descent + padY;
 }
 
@@ -202,8 +211,8 @@ function stripMetrics(canvas: HTMLCanvasElement): { fontPx: number; margin: numb
  * The wordmark copies the page header's brand (services/server/internal/web/templates/
  * header.html): "HoldMy" regular, "Track" bold, in the header's
  * serif font. Unlike attribution it has no backing plate, just `WATERMARK_ALPHA` overall, so
- * its colors follow the basemap flavor instead: the header's own dark ink/amber on light
- * flavors, light counterparts on `dark`/`black`.
+ * its colors follow the basemap instead: the header's own dark ink/amber on light flavors,
+ * light counterparts on `dark`/`black` and satellite imagery (`isDarkBase`).
  *
  * The logo is the same bundled `logo.png` the header uses, so it's same-origin and drawing it
  * doesn't taint the canvas `toBlob()` reads. The serif font is awaited first because canvas
@@ -211,7 +220,7 @@ function stripMetrics(canvas: HTMLCanvasElement): { fontPx: number; margin: numb
  * yet. Neither wait can fail the export: a font that never loads falls back to `serif`, and a
  * logo that fails to decode leaves the wordmark on its own.
  */
-async function drawWatermark(canvas: HTMLCanvasElement, bottomY: number, flavor: Flavor): Promise<void> {
+async function drawWatermark(canvas: HTMLCanvasElement, bottomY: number, dark: boolean): Promise<void> {
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('export: could not create watermark canvas context');
 
@@ -233,7 +242,6 @@ async function drawWatermark(canvas: HTMLCanvasElement, bottomY: number, flavor:
 
   const logoW = logo ? (logo.naturalWidth / logo.naturalHeight) * logoH : 0;
   const midY = bottomY - Math.max(logoH, fontPx) / 2;
-  const dark = isDarkFlavor(flavor);
 
   ctx.save();
   ctx.globalAlpha = WATERMARK_ALPHA;
@@ -295,7 +303,13 @@ async function renderOffscreen(
 
   const instance = new MapLibreMap({
     container,
-    style: buildStyle({ flavor: state.flavor, origin: basemapOrigin(), paths: state.paths }),
+    style: buildStyle({
+      flavor: state.flavor,
+      origin: basemapOrigin(),
+      paths: state.paths,
+      satellite: satelliteSource(),
+      satelliteOn: state.satellite,
+    }),
     center: [view.center.lng, view.center.lat],
     zoom: liveMap.getZoom(),
     pixelRatio: view.pixelRatio,
@@ -326,7 +340,7 @@ async function renderOffscreen(
     });
 
     const beforeId = labelInsertionPoint(instance);
-    ensureFogLayer(instance, beforeId, isDarkFlavor(state.flavor));
+    ensureFogLayer(instance, beforeId, isDarkBase(state.flavor, state.satellite));
     ensureHeatmapLayer(instance, beforeId);
     ensureTrackLayer(instance, beforeId, state.activityQuery);
     setMapMode(instance, state.mode);
