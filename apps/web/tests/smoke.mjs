@@ -334,9 +334,9 @@ describe('basemap foundation', () => {
     assert.deepEqual(await roadOpacity(), [undefined, undefined, 0.5], 'roads opaque again');
   });
 
-  // Points of interest (docs/SPEC.md FR-15.2, FR-15.5): nothing below zoom 8, "Show in this area"
-  // from 8 until the tiles take over at 13, where the paths start too.
-  it('10. Show in this area offered only between zoom 8 and 13', async () => {
+  // Points of interest (docs/SPEC.md FR-15.2, FR-15.5): nothing below zoom 10, "Show in this area"
+  // from 10 until the tiles take over at 13, where the paths start too.
+  it('10. Show in this area offered only between zoom 10 and 13', async () => {
     const menu = page.getByTestId('map-overlays');
     const trigger = menu.getByRole('button').first();
     if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
@@ -347,8 +347,8 @@ describe('basemap foundation', () => {
       await page.waitForTimeout(300);
       return page.getByTestId('show-in-area').isVisible();
     };
-    assert.equal(await offeredAt(7), false, 'not at zoom 7');
-    assert.equal(await offeredAt(8), true, 'offered at zoom 8');
+    assert.equal(await offeredAt(9.9), false, 'not below zoom 10');
+    assert.equal(await offeredAt(10), true, 'offered at zoom 10');
     assert.equal(await offeredAt(12.5), true, 'offered at zoom 12.5');
     assert.equal(await offeredAt(13), false, 'the tiles take over at zoom 13');
     const minzoom = await page.evaluate(() => window.__holdmytrack.getLayer('paths_trail').minzoom);
