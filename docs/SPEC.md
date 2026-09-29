@@ -642,7 +642,7 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 **Preconditions**: Active session. The deployment configures imagery (`IMPLEMENTATION.md` §4.26); without it there is no Base map section and no Satellite toggle, and a saved Satellite choice shows the vector map.
 
 **Behavior**:
-1. Map by default. Choosing Satellite shows the imagery in place of the base map's background, land, water, landuse and building fills; roads, boundaries and place labels stay on top, and so do tracks, Fog, Heatmap, trails and bike paths (FR-4.13) and Spots (FR-15). Choosing Map puts the fills back.
+1. Map by default. Choosing Satellite shows the imagery in place of the base map's background, land, water, landuse and building fills; roads stay on top at 40% opacity, so the ground shows through them; boundaries and place labels stay as they are, and so do tracks, Fog, Heatmap, trails and bike paths (FR-4.13) and Spots (FR-15). Choosing Map puts the fills back.
 2. Switching doesn't reload the map: camera, mode and overlays stay as they were.
 3. It is independent of the map mode and survives a theme change (FR-4.12). Over imagery, Fog uses the cream veil the dark theme's base map has, whatever the theme.
 4. The choice is kept by this browser (or, in the Android app, this phone) only, not on the account, and applies again on the next visit. All overlays (FR-4.13) leaves it as it is, and the Overlays button's count doesn't include it.
