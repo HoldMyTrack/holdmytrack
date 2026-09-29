@@ -11,7 +11,7 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/tilemath"
 )
 
-// The spots tiles (§4.25) carry the places and their areas from zoom 12 up, with OSM's text.
+// The spots tiles (§4.25) carry the places and their areas from zoom 13 up, with OSM's text.
 func TestSpotsTile(t *testing.T) {
 	d := newDBTest(t)
 	ctx := context.Background()
@@ -44,11 +44,11 @@ func TestSpotsTile(t *testing.T) {
 			t.Errorf("the z14 tile doesn't carry %q", want)
 		}
 	}
-	if !bytes.Contains(tile(12), []byte(name)) {
-		t.Errorf("the z12 tile doesn't carry the spot")
+	if !bytes.Contains(tile(13), []byte(name)) {
+		t.Errorf("the z13 tile doesn't carry the spot")
 	}
-	if n := len(tile(11)); n != 0 {
-		t.Errorf("the z11 tile has %d bytes; spots start at z12", n)
+	if n := len(tile(12)); n != 0 {
+		t.Errorf("the z12 tile has %d bytes; spots start at z13", n)
 	}
 
 	if rec := d.do(account{}, "GET", "/tiles/v1/spots/14/0/0.mvt", nil); rec.Code != http.StatusUnauthorized {
