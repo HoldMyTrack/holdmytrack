@@ -68,7 +68,7 @@ Digital fitness tracking continues to grow, and the major platforms remain focus
 | **Wandrer.earth** | % of streets covered | ~$3–8/mo | Data-first, not visual |
 | **Squadrats** | z14/z17 tile gamification | Free / cheap | Game only, no artifact |
 | **CityStrides** | Street completion for runners | Free tier + sub | Running-only; sparse visuals |
-| **Fog of World** | The fog mechanic itself | One-time | Requires its own tracking; fog over *satellite* imagery, which we deliberately do not match |
+| **Fog of World** | The fog mechanic itself | One-time | Requires its own tracking; fog over *satellite* imagery, which we offer only as an optional base map with a capped cost |
 | **Runalyze / Intervals.icu** | Free, deep performance analysis | Free / donation | Analysis-first, visually plain; the closest model for our funding approach |
 
 **Three honest observations about this table.**
@@ -81,7 +81,7 @@ Third, **the tile games (Statshunters, VeloViewer, Squadrats) are a mechanic Hol
 
 **Implication for strategy:** feature parity is achievable in weeks and is not defensible. The defensible assets are render quality, breadth of ingest, and being genuinely free.
 
-**A deliberate visual trade-off.** Fog of World and similar apps draw fog over satellite imagery, and much of their appeal is the texture the reveal exposes — rooftops, tree canopy, water. HoldMyTrack renders over a self-hosted *vector* basemap instead. Imagery would mean a metered tile provider billed per request, on pan/zoom traffic that earns nothing — an unacceptable cost for a free product. The consequence is real and should be owned rather than discovered late: the reveal will look different, and differentiation has to be carried by render quality and typography. Measured reference numbers are in `IMPLEMENTATION.md` §4.2.1.
+**A deliberate visual trade-off.** Fog of World and similar apps draw fog over satellite imagery, and much of their appeal is the texture the reveal exposes — rooftops, tree canopy, water. HoldMyTrack renders over a self-hosted *vector* basemap by default. Imagery means a metered tile provider billed per request, on pan/zoom traffic that earns nothing, so it is never the default and never an open-ended bill: it is an optional Satellite base map, switched on per deployment, on a plan whose quota pauses the imagery rather than billing past it (ADR-0022). The consequence should be owned rather than discovered late: the default reveal looks different, and differentiation has to be carried by render quality and typography. Measured reference numbers are in `IMPLEMENTATION.md` §4.2.1.
 
 ---
 

@@ -532,7 +532,7 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 
 ### FR-4.5 Base map, theming, and the opening view
 
-**Description**: The map renders a self-hosted vector base map (streets, labels) in a light or dark flavor that follows the page's light/dark theme (FR-4.12), switching live when the theme does. A URL can pin one of the three other flavors (`&theme=white`, `black` or `grayscale`), kept in the URL until the page's theme next changes, when the map goes back to following it; `&theme=light` and `&theme=dark` pin nothing and are dropped from the URL, since the theme already picks between those two. The current camera position (center, zoom) is reflected in the URL and restored on reload, so a specific view is shareable via link.
+**Description**: The map renders a self-hosted vector base map (streets, labels) in a light or dark flavor that follows the page's light/dark theme (FR-4.12), switching live when the theme does. Where the deployment configures imagery, Satellite can be shown under its roads and labels instead (FR-4.14). A URL can pin one of the three other flavors (`&theme=white`, `black` or `grayscale`), kept in the URL until the page's theme next changes, when the map goes back to following it; `&theme=light` and `&theme=dark` pin nothing and are dropped from the URL, since the theme already picks between those two. The current camera position (center, zoom) is reflected in the URL and restored on reload, so a specific view is shareable via link.
 
 **Preconditions**: Active session.
 
@@ -586,7 +586,7 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 6. While a capture is generating, the Capture button shows a busy state; a failure (e.g. a timeout waiting for tiles to load at export resolution) is reported inline, near the buttons, and the frame stays in place rather than being discarded — the user is not forced to reposition it and retry from scratch.
 7. Escape, or the frame's own Close button, puts the frame away and returns to the normal map view with nothing captured. A successful capture also puts it away.
 
-**Outputs**: On a successful capture, a PNG file download, named `holdmytrack-{date}.png`. OSM/Protomaps attribution is baked into the image's own pixels, in the bottom-right corner over a translucent backing plate — not optional or user-removable, since the basemap is an ODbL "Produced Work" and credit is a license requirement on any distributed export, not a preference (`IMPLEMENTATION.md` §5.6). A small HoldMyTrack logo and wordmark is always baked into the bottom-left corner — not user-removable either — at 70% opacity with no backing plate, its bottom edge level with the attribution plate's and scaled with it; its text is dark on light themes and light on the dark/black themes.
+**Outputs**: On a successful capture, a PNG file download, named `holdmytrack-{date}.png`. OSM/Protomaps attribution is baked into the image's own pixels, in the bottom-right corner over a translucent backing plate — not optional or user-removable, since the basemap is an ODbL "Produced Work" and credit is a license requirement on any distributed export, not a preference (`IMPLEMENTATION.md` §5.6). With Satellite on (FR-4.14), the imagery provider's credit follows OSM's on the same line. A small HoldMyTrack logo and wordmark is always baked into the bottom-left corner — not user-removable either — at 70% opacity with no backing plate, its bottom edge level with the attribution plate's and scaled with it; its text is dark on light themes and light on the dark/black themes and over satellite imagery.
 
 **Notes**: This is one of two things `VISION.md` §4.2 groups under "Export" — animated reveals are not built. Pace-colored segments (FR-4.8) are not reflected in a capture even when currently shown on screen — exporting a single focused activity's bands is a narrower case not covered by this slice. Vector/SVG output is not offered; raster (PNG) only. Platform preset dimensions are curated from Hootsuite's social-media-image-sizes guide; profile-picture/cover-photo sizes are excluded, since this feature frames map content, not an account avatar.
 
@@ -625,7 +625,7 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 
 **Description**: The base map's cycleways and walking/hiking paths drawn as lines of their own, standing out from the streets, where otherwise they are barely visible hairlines. On the web they are three entries of the Overlays menu under Routes — **Trails**, **Tracks: dirt, farm and forest roads**, and **Bike paths**; the Android app has one Trails & bike paths toggle for all three.
 
-**Preconditions**: Active session. The Overlays menu (web) or the toggle (Android) is beside the map-mode toggle (FR-4.1–FR-4.3) and is hidden while the Edit window is open (FR-5.10), like that toggle. The Overlays button opens a panel of checkboxes in two groups, Routes and Points of interest (FR-15.2), under an **All overlays** checkbox, and shows how many overlays are on; a press outside it or Escape closes it. All overlays is ticked when every overlay is on and half-ticked when some are; clicking it turns every one on, or every one off when they all already were.
+**Preconditions**: Active session. The Overlays menu (web) or the toggle (Android) is beside the map-mode toggle (FR-4.1–FR-4.3) and is hidden while the Edit window is open (FR-5.10), like that toggle. The Overlays button opens a panel with the Base map choice first (FR-4.14), then checkboxes in two groups, Routes and Points of interest (FR-15.2), under an **All overlays** checkbox, and shows how many overlays are on; a press outside it or Escape closes it. All overlays is ticked when every overlay is on and half-ticked when some are; clicking it turns every one on, or every one off when they all already were.
 
 **Behavior**:
 1. Off by default. Bike paths draws cycleways as a solid blue line from zoom 12, Trails draws paths, footways and bridleways as a dashed green line from zoom 13, and Tracks draws OSM's `highway=track` — dirt, farm and forest roads — as a longer-dashed, slightly wider brown line from zoom 13, under the trails; each on its own, both widening as the map zooms in. The monochrome flavors (FR-4.5) draw all three in greys, telling them apart by the dash and width.
@@ -634,6 +634,22 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 4. An export (FR-4.10) draws each kind of path when it's on and leaves it out when it's off.
 
 **Notes**: It shows what OpenStreetMap tags as a path and is already in the base map, nothing more. Sidewalks, crossings, steps and pedestrian areas keep the base map's own faint styling, since in a city they would bury the real paths. Bike lanes painted on a street, and named routes such as long-distance cycle or hiking networks, are not in the base map and are not shown.
+
+### FR-4.14 Satellite mode
+
+**Description**: Satellite imagery as a second base map, with the vector base map's roads, boundaries and labels drawn over it. On the web it is the **Base map** choice at the top of the Overlays menu, **Map** or **Satellite**; the Android app has a **Satellite** toggle after Trails & bike paths.
+
+**Preconditions**: Active session. The deployment configures imagery (`IMPLEMENTATION.md` §4.26); without it there is no Base map section and no Satellite toggle, and a saved Satellite choice shows the vector map.
+
+**Behavior**:
+1. Map by default. Choosing Satellite shows the imagery in place of the base map's background, land, water, landuse and building fills; roads, boundaries and place labels stay on top, and so do tracks, Fog, Heatmap, trails and bike paths (FR-4.13) and Spots (FR-15). Choosing Map puts the fills back.
+2. Switching doesn't reload the map: camera, mode and overlays stay as they were.
+3. It is independent of the map mode and survives a theme change (FR-4.12). Over imagery, Fog uses the cream veil the dark theme's base map has, whatever the theme.
+4. The choice is kept by this browser (or, in the Android app, this phone) only, not on the account, and applies again on the next visit. All overlays (FR-4.13) leaves it as it is, and the Overlays button's count doesn't include it.
+5. The imagery provider's credit appears in the map's attribution while the imagery is on.
+6. An export (FR-4.10) with Satellite on draws the imagery, with the provider's credit baked in after OSM's and the watermark in its light colors.
+
+**Notes**: The imagery is fetched from a metered provider (ADR-0022). On a quota-capped plan such as MapTiler's Free plan, the imagery stops loading once the month's quota is used up and returns the next month; the roads and labels still draw.
 
 ## 7. FR-5 — Activities Panel
 
