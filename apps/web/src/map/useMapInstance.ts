@@ -10,6 +10,7 @@ import { registerPmtilesProtocol } from './protocol';
 import { configureMapLibreWorker } from './worker';
 import { buildStyle, type Flavor } from './style';
 import { basemapOrigin, satelliteSource } from './config';
+import { withApiCredentials } from './requestCredentials';
 import type { ViewState } from './viewState';
 import { API_BASE_URL } from '../api';
 import { t } from '../i18n';
@@ -79,12 +80,8 @@ export function useMapInstance({
       // Nothing in Phase 1 benefits from a globe, and a flat map keeps the
       // later fog raster and print export in one predictable projection.
       maxPitch: 0,
-      // Tracks/fog/heatmap tiles now require an authenticated session (requireAuth,
-      // server.go) — MapLibre's own tile fetches otherwise carry no cookie at all, since
-      // they don't go through api.ts's fetch wrapper. Scoped to just this app's own API
-      // origin so the basemap's pmtiles archive, fonts and sprites (a different origin,
-      // and not resources auth applies to anyway) aren't sent credentials they don't need.
-      transformRequest: (url) => (url.startsWith(API_BASE_URL) ? { url, credentials: 'include' } : { url }),
+      // The session cookie for the API's own tiles, and nothing else (requestCredentials.ts).
+      transformRequest: withApiCredentials(API_BASE_URL, window.location.href),
       // MapLibre's own controls' labels (zoom, locate, the scale bar's units) in the page's
       // language; keys MapLibre has but this app's controls never show stay its English.
       locale: {

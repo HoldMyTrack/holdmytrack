@@ -2,6 +2,7 @@ import { Map as MapLibreMap } from 'maplibre-gl';
 import { API_BASE_URL, type ActivityQuery } from '../api';
 import logoUrl from '../assets/logo.png';
 import { basemapOrigin, satelliteSource } from './config';
+import { withApiCredentials } from './requestCredentials';
 import { customOutputSize } from './exportPresets';
 import { ensureFogLayer } from './fog';
 import { ensureHeatmapLayer } from './heatmap';
@@ -320,7 +321,7 @@ async function renderOffscreen(
     // Same credentialed-tile wiring useMapInstance.ts's live map already has — tracks/fog/
     // heatmap tiles need the session cookie, which MapLibre's own fetches don't carry by
     // default (they bypass api.ts entirely).
-    transformRequest: (url) => (url.startsWith(API_BASE_URL) ? { url, credentials: 'include' } : { url }),
+    transformRequest: withApiCredentials(API_BASE_URL, window.location.href),
     // The one thing the live map deliberately doesn't set — see this module's own doc
     // comment for why it's confined to this temporary instance instead. Nested under
     // canvasContextAttributes, not a top-level MapOptions field, in this maplibre-gl version
