@@ -1910,9 +1910,16 @@ body {
   border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 6%);
 }
 
-.sync-tab__row-name {
+/* The name, and under it a finished row's date and distance (.sync-tab__row-meta). */
+.sync-tab__row-main {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fm-space-2);
+}
+
+.sync-tab__row-name {
   font-size: var(--fm-text-md);
   font-weight: var(--fm-weight-semibold);
   color: var(--fm-ink);

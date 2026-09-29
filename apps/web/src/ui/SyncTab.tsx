@@ -154,8 +154,15 @@ export function SyncTab({ imports, readOnly, onViewOnMap }: SyncTabProps) {
         )}
         {page?.uploads.map((u) => (
           <li key={u.externalId} className="sync-tab__row">
-            <span className="sync-tab__row-name" title={rowTitle(u)}>
-              {rowTitle(u)}
+            <span className="sync-tab__row-main">
+              <span className="sync-tab__row-name" title={rowTitle(u)}>
+                {rowTitle(u)}
+              </span>
+              {u.status === 'done' && u.startedAt && u.distanceMeters !== undefined && (
+                <span className="sync-tab__row-meta">
+                  {formatShortDate(u.startedAt)} · {formatDistance(u.distanceMeters, system)}
+                </span>
+              )}
             </span>
             <span className="sync-tab__row-size" />
             <span className="sync-tab__row-detail">
@@ -166,11 +173,6 @@ export function SyncTab({ imports, readOnly, onViewOnMap }: SyncTabProps) {
               {u.status === 'done' && (
                 <>
                   <span className="sync-tab__row-status sync-tab__row-status--ready">{t('sync.ready')}</span>
-                  {u.startedAt && u.distanceMeters !== undefined && (
-                    <span className="sync-tab__row-meta">
-                      {formatShortDate(u.startedAt)} · {formatDistance(u.distanceMeters, system)}
-                    </span>
-                  )}
                   {u.activityId && u.startedAt && (
                     <button
                       type="button"

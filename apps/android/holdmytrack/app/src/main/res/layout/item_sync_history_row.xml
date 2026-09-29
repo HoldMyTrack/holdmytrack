@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One sync history row, after the web's .sync-tab__row: the name on the left,
-     one line, and a detail column on the right — the status, under it a detail line when
-     there's something more to say (.sync-tab__row-meta), and under that View on map
-     (.sync-tab__row-view) for a row that became an activity. Filled by panel/SyncTab. -->
+<!-- One sync history row, after the web's .sync-tab__row: on the left the name, one line,
+     and under it a finished row's date and distance (.sync-tab__row-meta); on the right the
+     status, and under it View on map (.sync-tab__row-view) for a row that became an activity.
+     Filled by panel/SyncTab. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -12,14 +12,29 @@
     android:paddingTop="@dimen/hmt_space_8"
     android:paddingBottom="@dimen/hmt_space_8">
 
-    <TextView
-        android:id="@+id/row_name"
+    <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:textAppearance="?attr/textAppearanceTitleSmall" />
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/row_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+        <TextView
+            android:id="@+id/row_detail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_2"
+            android:textColor="@color/hmt_ink_meta"
+            android:textSize="@dimen/hmt_text_2xs"
+            android:visibility="gone" />
+    </LinearLayout>
 
     <!-- Capped, so a long failure reason wraps in its own column instead of pushing the name
          off the row — the web's max-width: 60%, as a width in dp. -->
@@ -39,17 +54,6 @@
             android:textAppearance="?attr/textAppearanceLabelSmall"
             android:textColor="@color/hmt_ink_meta"
             android:textFontWeight="400" />
-
-        <TextView
-            android:id="@+id/row_detail"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/hmt_space_2"
-            android:gravity="end"
-            android:maxWidth="220dp"
-            android:textColor="@color/hmt_ink_meta"
-            android:textSize="@dimen/hmt_text_2xs"
-            android:visibility="gone" />
 
         <!-- The web's underlined accent text rather than a button, padded out to a usable
              touch target without changing how it reads. -->

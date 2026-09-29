@@ -139,8 +139,8 @@ class SyncTab(
     /**
      * One row, as the web's SyncTab draws it: a file's own name, or for anything synced the
      * source it came from — a synced row's `filename` is a raw external id, never meant to be
-     * read. At the other end the status, then for a finished row "9 Sep · 34.7 km" and View on
-     * map.
+     * read — with "9 Sep · 34.7 km" under it once finished. At the other end the status, and
+     * View on map.
      */
     private fun addRow(entry: SyncHistoryEntry) {
         val title = when (entry.source) {
