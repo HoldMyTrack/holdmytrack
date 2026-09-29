@@ -424,6 +424,39 @@
         <item name="android:minHeight">48dp</item>
     </style>
 
+    <!-- A spot popup's action (Copy address, Wikipedia), the web's .spot-popup__btn: the
+         outlined button at the small text size, its 15dp icon before the label, 48dp tall to
+         touch with the outline drawn 36dp. -->
+    <style name="Widget.HoldMyTrack.Button.SpotAction" parent="Widget.HoldMyTrack.Button.Outlined">
+        <item name="android:textSize">@dimen/hmt_text_sm</item>
+        <item name="iconSize">15dp</item>
+        <item name="iconPadding">@dimen/hmt_space_6</item>
+        <item name="iconTint">@color/hmt_ink</item>
+        <item name="android:paddingStart">@dimen/hmt_space_10</item>
+        <item name="android:paddingEnd">@dimen/hmt_space_10</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:insetTop">6dp</item>
+        <item name="android:insetBottom">6dp</item>
+    </style>
+
+    <!-- "Show in this area" (map/ShowInArea), the web's .show-in-area: a surface pill centred
+         under the chrome, its map-pin before the label; semibold as a button, regular and
+         secondary as the line saying what loaded. -->
+    <style name="Widget.HoldMyTrack.ShowInArea" parent="">
+        <item name="android:background">@drawable/bg_show_in_area</item>
+        <item name="android:elevation">3dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:minHeight">36dp</item>
+        <item name="android:paddingStart">@dimen/hmt_space_12</item>
+        <item name="android:paddingEnd">@dimen/hmt_space_12</item>
+        <item name="android:paddingTop">@dimen/hmt_space_6</item>
+        <item name="android:paddingBottom">@dimen/hmt_space_6</item>
+        <item name="android:drawablePadding">@dimen/hmt_space_6</item>
+        <item name="android:textSize">@dimen/hmt_text_sm</item>
+        <item name="android:textColor">@color/hmt_ink</item>
+    </style>
+
     <!-- A group's heading in the Layers menu (popup_layers), the web's .overlays-menu__group
          legend: small, semibold, uppercase, muted. -->
     <style name="Widget.HoldMyTrack.LayersLegend" parent="">

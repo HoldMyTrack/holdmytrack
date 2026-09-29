@@ -389,11 +389,12 @@ object MapOverlays {
      * Basemap labels stay above the veil so they're legible, but at full strength they read
      * brighter than the fog itself and pull the eye off what's actually been cleared — so Fog
      * mode mutes them, as the web does (`apps/web/src/map/mapMode.ts`). Every symbol layer on
-     * the map is the basemap's own (no overlay adds one), and the served style never sets
-     * text-/icon-opacity, so 1 restores exactly its default.
+     * the map is the basemap's own except the Spots badges ([MapSpots.BADGE_LAYER_IDS]), which
+     * Fog must not dim, and the served style never sets text-/icon-opacity, so 1 restores
+     * exactly its default.
      */
     private fun setLabelOpacity(style: Style, opacity: Float) {
-        style.layers.filterIsInstance<SymbolLayer>().forEach {
+        style.layers.filterIsInstance<SymbolLayer>().filter { it.id !in MapSpots.BADGE_LAYER_IDS }.forEach {
             it.setProperties(PropertyFactory.textOpacity(opacity), PropertyFactory.iconOpacity(opacity))
         }
     }

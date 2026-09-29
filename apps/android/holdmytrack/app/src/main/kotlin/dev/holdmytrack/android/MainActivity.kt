@@ -43,6 +43,9 @@ import dev.holdmytrack.android.map.MapOverlays
 import dev.holdmytrack.android.map.LayersMenu
 import dev.holdmytrack.android.map.MapPaths
 import dev.holdmytrack.android.map.MapSatellite
+import dev.holdmytrack.android.map.MapSpots
+import dev.holdmytrack.android.map.ShowInArea
+import dev.holdmytrack.android.map.SpotPopup
 import dev.holdmytrack.android.net.Activity
 import dev.holdmytrack.android.net.ApiException
 import dev.holdmytrack.android.net.TrackMetrics
@@ -123,6 +126,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var modeBar: View
     private lateinit var modeButtons: Map<MapMode, MaterialButton>
     private lateinit var layersMenu: LayersMenu
+    private lateinit var spotPopup: SpotPopup
+    /** Created with the map instance it reads the camera of. */
+    private var showInArea: ShowInArea? = null
     private lateinit var recordButton: RecordButton
     private lateinit var secondRow: View
     private lateinit var layersPanel: View
@@ -355,9 +361,12 @@ class MainActivity : AppCompatActivity() {
             count = findViewById(R.id.layers_count),
             paths = { MapPaths.get(this) },
             satellite = { MapSatellite.isOn(this) },
+            spots = { MapSpots.get(this) },
             onPaths = ::setPaths,
             onSatellite = ::setSatellite,
+            onSpots = ::setSpots,
         )
+        spotPopup = SpotPopup(findViewById(R.id.spot_popup)) { topChrome.bottom }
         menuButton.setOnClickListener { showMenu(it) }
 
         recordButton = findViewById(R.id.record_button)
@@ -471,6 +480,11 @@ class MainActivity : AppCompatActivity() {
             applyAttributionMargin()
             mapView.post { enlargeAttributionTarget() }
             instance.addOnMapClickListener { point -> onMapTap(instance, point) }
+            instance.addOnCameraMoveListener { spotPopup.place() }
+            showInArea = ShowInArea(findViewById(R.id.show_in_area), instance) { spots ->
+                MapSpots.setInArea(style?.takeIf { overlaysAttached }, spots)
+            }.apply { setCategories(MapSpots.get(this@MainActivity)) }
+            instance.addOnCameraIdleListener { showInArea?.onCameraIdle() }
             loadStyle()
         }
     }
@@ -738,6 +752,8 @@ class MainActivity : AppCompatActivity() {
         if (!overlaysAttached) {
             MapOverlays.attach(loaded, mode, selectedRange, darkBase(loaded), storyId)
             MapOverlays.setTrackFilter(loaded, panelState.mapHidden, panelState.focused)
+            // Last, so the places are over everything else, labels included.
+            MapSpots.attach(loaded, this, MapSpots.get(this))
             overlaysAttached = true
             renderTrackMetrics()
             // A new style has none of the circles; draw them again if the tab has the map.
@@ -762,6 +778,8 @@ class MainActivity : AppCompatActivity() {
             style?.takeIf { overlaysAttached }?.let {
                 MapOverlays.refreshCoverage(it)
                 MapOverlays.refreshTracks(it, selectedRange)
+                // Loading places bumps the version too.
+                MapSpots.refresh(it)
             }
         }
     }
@@ -959,7 +977,11 @@ class MainActivity : AppCompatActivity() {
      *  the way a row tap flies — the web's `startEditTrack`. */
     private fun startEditTrack(activity: Activity) {
         editingTrackId = activity.id
-        style?.takeIf { overlaysAttached }?.let { MapOverlays.setEditingTrack(it, true, mode) }
+        style?.takeIf { overlaysAttached }?.let {
+            MapOverlays.setEditingTrack(it, true, mode)
+            MapSpots.setEditing(it, true)
+        }
+        spotPopup.close()
         // Once the Track tab has laid out, so the fit leaves room under the window as it now is.
         findViewById<View>(R.id.edit_window).post { flyToActivities(listOf(activity)) }
     }
@@ -974,7 +996,10 @@ class MainActivity : AppCompatActivity() {
         editingTrackId?.let { id ->
             if (trackApplied) awaitingEditIds += id
             style?.let(TrackEditOverlay::clear)
-            style?.takeIf { overlaysAttached }?.let { MapOverlays.setEditingTrack(it, false, mode) }
+            style?.takeIf { overlaysAttached }?.let {
+                MapOverlays.setEditingTrack(it, false, mode)
+                MapSpots.setEditing(it, false)
+            }
         }
         editingTrackId = null
         closeEditOnBack.isEnabled = false
@@ -1137,6 +1162,16 @@ class MainActivity : AppCompatActivity() {
      * collapsed or expanded state is left as it was.
      */
     private fun onMapTap(instance: MapLibreMap, point: LatLng): Boolean {
+        // A spot's badge first, in every mode: it opens the spot's popup, and a tap anywhere
+        // else closes it. Not while the Privacy tab or the Edit window has the map.
+        if (!privacyShowing && !editWindow.isOpen) {
+            val spot = MapSpots.spotAt(instance, instance.projection.toScreenLocation(point), resources.displayMetrics.density)
+            if (spot != null) {
+                spotPopup.show(instance, spot)
+                return true
+            }
+            spotPopup.close()
+        }
         if (!sheet.isVisible) return false
         // The Privacy tab has the map to itself while it shows.
         if (privacyShowing) {
@@ -1539,6 +1574,14 @@ class MainActivity : AppCompatActivity() {
         }
         style?.takeIf { overlaysAttached }?.let { MapOverlays.setMode(it, next) }
         renderDateFooter()
+    }
+
+    /** The Layers menu's Points of interest. Unticking the open popup's category closes it. */
+    private fun setSpots(categories: List<MapSpots.Category>) {
+        MapSpots.set(this, categories)
+        style?.takeIf { overlaysAttached }?.let { MapSpots.setCategories(it, categories) }
+        spotPopup.spot?.let { open -> if (categories.none { it.wire == open.category }) spotPopup.close() }
+        showInArea?.setCategories(categories)
     }
 
     private fun setPaths(paths: MapPaths.Paths) {

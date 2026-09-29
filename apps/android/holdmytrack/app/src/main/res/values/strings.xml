@@ -111,6 +111,32 @@
     <string name="layers_tracks_info">Dirt, farm and forest roads: unpaved tracks wide enough for a vehicle.</string>
     <string name="layers_tracks_info_label">What are tracks?</string>
     <string name="layers_bike_paths">Bike paths</string>
+    <string name="layers_places">Points of interest</string>
+    <string name="layers_playgrounds">Playgrounds</string>
+    <string name="layers_dog_parks">Dog parks</string>
+    <string name="layers_monuments">Monuments</string>
+    <string name="layers_viewpoints">Mesmerizing views</string>
+    <string name="layers_history">Historic sites</string>
+
+    <string name="spots_category_playground">Playground</string>
+    <string name="spots_category_dog_park">Dog park</string>
+    <string name="spots_category_monument">Monument</string>
+    <string name="spots_category_viewpoint">Mesmerizing view</string>
+    <string name="spots_category_history">History</string>
+    <string name="spots_since">Since %1$s</string>
+    <string name="spots_copy_address">Copy address</string>
+    <string name="spots_copied">Copied</string>
+    <string name="spots_wikipedia">Wikipedia</string>
+    <string name="spots_close">Close</string>
+    <string name="spots_in_area">Show in this area</string>
+    <string name="spots_in_area_loading">Loading places…</string>
+    <string name="spots_in_area_failed">Couldn\'t load places — try again</string>
+    <string name="spots_in_area_none">No places in this area</string>
+    <string name="spots_in_area_truncated">Showing %1$s of %2$s places — zoom in for the rest</string>
+    <plurals name="spots_in_area_count">
+        <item quantity="one">%s place in this area</item>
+        <item quantity="other">%s places in this area</item>
+    </plurals>
 
     <string name="menu_button">Menu</string>
     <string name="locate_button">Find my location</string>
