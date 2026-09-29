@@ -174,11 +174,6 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 		return Result{}, fmt.Errorf("ingest: match admin boundaries: %w", err)
 	}
 
-	// Spots visits (§4.25): five minutes inside a spot, from the same full-resolution points.
-	if err := matchSpots(ctx, pool, job.UserID, activityID, points); err != nil {
-		return Result{}, fmt.Errorf("ingest: match spots: %w", err)
-	}
-
 	if err := EnqueueRenderFog(ctx, pool, job.UserID); err != nil {
 		return Result{}, fmt.Errorf("ingest: enqueue render_fog: %w", err)
 	}

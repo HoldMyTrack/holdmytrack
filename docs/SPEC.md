@@ -15,9 +15,9 @@ This document specifies HoldMyTrack's functional behavior as currently implement
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web and in the Android app, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, pace-colored segments, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), the interface language — English or Russian (FR-13), Stories on the web and in the Android app (FR-14), and Spots on the web (FR-15).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web and in the Android app, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, pace-colored segments, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date-range picker, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), the interface language — English or Russian (FR-13), Stories on the web and in the Android app (FR-14), and Spots' places on the web (FR-15).
 
-**Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), the rest of "Export" (animated reveals — high-resolution map export itself is built, FR-4.10 below), and Spots in the Android app (the web's is FR-15). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace stays as per-activity route context (FR-4.8) rather than an analysed, all-time performance record. So is any health data at all: heart rate is never read, stored or shown (ADR-0017), and the pace/heart-rate + elevation profile (FR-4.9) was built and then removed for that reason. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
+**Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), the rest of "Export" (animated reveals — high-resolution map export itself is built, FR-4.10 below), Spots in the Android app (the web's is FR-15), and marking a Spots place visited (ADR-0021). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace stays as per-activity route context (FR-4.8) rather than an analysed, all-time performance record. So is any health data at all: heart rate is never read, stored or shown (ADR-0017), and the pace/heart-rate + elevation profile (FR-4.9) was built and then removed for that reason. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
 ### 1.3 Intended audience
 
@@ -623,15 +623,15 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 
 ### FR-4.13 Trails and bike paths
 
-**Description**: A Trails & bike paths toggle on the map draws the base map's cycleways and walking/hiking paths as lines of their own, standing out from the streets, where otherwise they are barely visible hairlines.
+**Description**: The base map's cycleways and walking/hiking paths drawn as lines of their own, standing out from the streets, where otherwise they are barely visible hairlines. On the web they are three entries of the Overlays menu under Routes — **Trails**, **Tracks: dirt, farm and forest roads**, and **Bike paths**; the Android app has one Trails & bike paths toggle for all three.
 
-**Preconditions**: Active session. The toggle is beside the map-mode toggle (FR-4.1–FR-4.3) and is hidden while the Edit window is open (FR-5.10), like that toggle.
+**Preconditions**: Active session. The Overlays menu (web) or the toggle (Android) is beside the map-mode toggle (FR-4.1–FR-4.3) and is hidden while the Edit window is open (FR-5.10), like that toggle. The Overlays button opens a panel of checkboxes in two groups, Routes and Points of interest (FR-15.2), under an **All overlays** checkbox, and shows how many overlays are on; a press outside it or Escape closes it. All overlays is ticked when every overlay is on and half-ticked when some are; clicking it turns every one on, or every one off when they all already were.
 
 **Behavior**:
-1. Off by default. Turning it on draws cycleways as a solid blue line from zoom 12, and paths, footways, bridleways and tracks as a dashed green line from zoom 13, both widening as the map zooms in. The monochrome flavors (FR-4.5) draw both in greys, telling them apart by the dash.
-2. The choice is kept by this browser (or, in the Android app, this phone) only, not on the account, and applies again on the next visit.
+1. Off by default. Bike paths draws cycleways as a solid blue line from zoom 12, Trails draws paths, footways and bridleways as a dashed green line from zoom 13, and Tracks draws OSM's `highway=track` — dirt, farm and forest roads — as a longer-dashed, slightly wider brown line from zoom 13, under the trails; each on its own, both widening as the map zooms in. The monochrome flavors (FR-4.5) draw all three in greys, telling them apart by the dash and width.
+2. The choice is kept by this browser (or, in the Android app, this phone) only, not on the account, and applies again on the next visit. A browser that had the former single web toggle on starts with all three on, and one whose saved choice predates Tracks shows tracks whenever it shows trails.
 3. It is independent of the map mode: it works over Normal, Fog and Heatmap alike, and survives a theme change (FR-4.12).
-4. An export (FR-4.10) draws the paths when the toggle is on and leaves them out when it is off.
+4. An export (FR-4.10) draws each kind of path when it's on and leaves it out when it's off.
 
 **Notes**: It shows what OpenStreetMap tags as a path and is already in the base map, nothing more. Sidewalks, crossings, steps and pedestrian areas keep the base map's own faint styling, since in a city they would bury the real paths. Bike lanes painted on a street, and named routes such as long-distance cycle or hiking networks, are not in the base map and are not shown.
 
@@ -1116,57 +1116,72 @@ A Story is a hand-picked, private set of the account's activities — a hike, a 
 
 ## 17. FR-15 — Spots
 
-Outdoor places from OpenStreetMap on the map, in five categories, each marked visited once one of the account's activities spends five minutes inside it (`VISION.md` §4.2, ADR-0021). Built on the web; the places are loaded by the operator (FR-15.1), not by users.
+Outdoor places from OpenStreetMap on the map, in five categories, with what OSM says about each (`VISION.md` §4.2, ADR-0021). Built on the web; the places are loaded by the operator (FR-15.1), not by users. Places aren't yet marked visited — `ROADMAP.md` Phase 1.
 
 | Endpoint | Purpose |
 | :-- | :-- |
-| `GET /tiles/v1/spots/{z}/{x}/{y}.mvt` | The places in one tile, with the caller's visited flag |
+| `GET /tiles/v1/spots/{z}/{x}/{y}.mvt` | The places in one tile, and their areas |
+| `GET /v1/spots` | The places in a box — "Show in this area" (FR-15.5) |
 
-### FR-15.1 Places and visits
+### FR-15.1 Places
 
-**Description**: What a place is, and when an activity visits one.
+**Description**: What a place is, and where it comes from.
 
 **Behavior**:
 1. A place is an OpenStreetMap feature in one of five categories: **Playground** (`leisure=playground`), **Dog park** (`leisure=dog_park`), **Monument** (`historic=monument` or `memorial`), **Mesmerizing view** (`tourism=viewpoint`) and **History** (`historic=castle`, `ruins`, `fort` or `archaeological_site`). A feature tagged for two is the first of History, Monument, Mesmerizing view, Dog park, Playground.
-2. A place has OSM's name, if any, and an address built from its `addr:*` tags — `addr:full`, or a house number, street (or `addr:place`), city and postcode — when it has at least a street or place.
-3. A place's area is its OSM outline, or a 50 m circle around a place mapped as a single point.
-4. The operator loads the places with `holdmytrack import-spots <file>`, from an extract made off the server (`docs/DEPLOY.md` §6). Loading the same place again updates it rather than adding a second one. Every existing activity is then matched against the places, in the background.
-5. An activity visits a place when the time between its consecutive points that are both inside the place's area adds up to five minutes or more over the whole activity. Two shorter stays count together; the time spent outside between them doesn't. Driving past or running along a place's edge isn't a visit.
-6. Visits are worked out from the points the map shows: after Private locations (FR-8.1) and any track edit (FR-5.14). A point inside one of the account's Private locations never counts, even where the track only passes through the location — a place inside one is never visited.
-7. Visits are worked out again whenever the activity is: after an upload or sync, an Edit track, and a Private location change. Deleting the activity (FR-5.11) removes its visits. An activity with no timestamps isn't accepted at all (FR-3.1), so every activity can visit places.
-8. A place is visited for the account when any of its activities visited it, except a duplicate superseded by another copy (FR-3.7). There is no way to mark or unmark a visit by hand.
+2. A place has, each only when OSM has it: a name; an address built from its `addr:*` tags — `addr:full`, or a house number, street (or `addr:place`), city and postcode — when it has at least a street or place; a description; an inscription; a memorial type (a statue, a plaque, a war memorial…); a start date as OSM writes it (a year, a date, "~1850"); and a Wikipedia article, from a `wikipedia` tag in OSM's "language:Title" form (any other form is left out).
+3. A place's area is its OSM outline, or a 30 m circle around a place mapped as a single point.
+4. The operator loads the places with `holdmytrack import-spots <file>`, from an extract made off the server (`docs/DEPLOY.md` §6). Loading the same place again updates it rather than adding a second one; a place missing from a newer extract stays.
 
-### FR-15.2 Show POI
+### FR-15.2 Points of interest
 
-**Description**: The places on the map, behind one toggle.
+**Description**: The places on the map, one Overlays entry per category.
 
 **Behavior**:
-1. **Show POI** sits beside the map-mode toggle, after Trails & bike paths (FR-4.13), and is hidden while the Edit window is open (FR-5.10), like both. It works the same over Normal, Fog and Heatmap. It starts off, and each browser remembers its last state.
-2. While it's on, from zoom 14 up, each place is a round badge with its category's icon at a point on its area: the icon on white for a place not yet visited, white on a filled gold badge for a visited one. Below zoom 14 no places are shown. Every place is drawn, however close to others, not-yet-visited ones on top.
-3. Badges are drawn over everything else, the Fog veil and map labels included, and Fog doesn't dim them.
-4. The badges hide during an Edit track session (FR-5.14) and come back after it.
-5. A newly processed activity's visits show once the map's coverage refreshes after it (FR-4.11).
+1. The Overlays menu's Points of interest group (FR-4.13 describes the menu) has one checkbox per category — Playgrounds, Dog parks, Monuments, Mesmerizing views, Historic sites — and **All**, which ticks every category, or clears them when all are already ticked, and is half-ticked when some are. Each works the same over Normal, Fog and Heatmap. All start off; each browser remembers its choice, and one that had the former Show POI toggle on starts with every category on.
+2. From zoom 12 up, each place in a ticked category is a round badge — its category's icon in ink on white, ringed in gold — at a point on its area, loaded as the map moves. Between zoom 5 and 12 places show only on request (FR-15.5); below zoom 5, none. Every place is drawn, however close to others. Playground's icon is a seesaw.
+3. From zoom 12 up, under each badge its area is shaded faintly in gold: the place's outline from OpenStreetMap, edged with a solid line, or — for a place mapped only as a point — its 30 m circle, edged with a dashed line. Clicking an area does nothing, and a track under it can still be clicked.
+4. Badges and areas are drawn over everything else, the Fog veil and map labels included, and Fog doesn't dim them.
+5. They hide during an Edit track session (FR-5.14) and come back after it.
 
 ### FR-15.3 The popup
 
 **Behavior**:
-1. Clicking a badge opens a popup at the place: its name (or its category, when OSM has no name), its category, **Visited** or **Not visited yet**, and its address when it has one. Only one popup is open at a time.
+1. Clicking a badge opens a popup at the place: its name (or its category, when OSM has no name), then — each only when the place has it — its category (when the name is the title), its memorial type, "Since" its start date, its description, its inscription (quoted, keeping its line breaks) and its address. A long description or inscription scrolls within the popup. Only one popup is open at a time.
 2. **Copy address** copies the address, or the place's coordinates as `latitude, longitude` when it has none, and shows **Copied** for a moment.
-3. **Navigate** opens Google Maps directions to the place's coordinates in a new tab.
-4. Clicking a badge doesn't select or unfocus a track under it (FR-4.1). The popup closes with its × button, a click elsewhere on the map, or turning Show POI off.
+3. **Wikipedia**, shown only for a place with an article, opens that article on that language's Wikipedia in a new tab.
+4. Clicking a badge doesn't select or unfocus a track under it (FR-4.1). The popup closes with its × button, a click elsewhere on the map, or unticking its category.
+
+### FR-15.5 Show in this area
+
+**Description**: Between zoom 5 (the Region tier's, FR-4.2) and zoom 12 a view holds too many places to load on every pan, so they load when asked, for the visible map.
+
+**Behavior**:
+1. With at least one category ticked and the map between zoom 5 and 12, a **Show in this area** button shows over the map, under the toggles. Outside that range, or with no category ticked, it doesn't.
+2. Pressing it loads the ticked categories' places inside the visible map and draws their badges (no areas). They stay drawn until the next press; unticking a category hides its places at once.
+3. Until the map moves or another category is ticked, a line replaces the button: how many places the area has ("912 places in this area"), "No places in this area", or, when there were more than 2,000, "Showing 2,000 of N places — zoom in for the rest". The 2,000 are the named places first, spread evenly over the area. After a move or a newly ticked category, the button comes back.
+4. A badge from it opens the same popup (FR-15.3). From zoom 12 up the tiles' badges take over and these aren't drawn.
+5. If the request fails, the button reads "Couldn't load places — try again".
+
+**Inputs** (`GET /v1/spots`): `bbox` — `west,south,east,north` in degrees, west below east and south below north (clamped to the world); `categories` — one or more of `playground`, `dog_park`, `monument`, `viewpoint`, `history`, comma-separated.
+
+**Outputs**: `{spots, total}`: `spots`, up to 2,000 places whose anchor is inside the box, each with `id`, `category`, `lon`, `lat` and the text fields of FR-15.4's `spots` layer (absent when none); `total`, how many the box holds in those categories.
+
+**Error cases**:
+- A missing or malformed `bbox`, a box with west at or past east (the antimeridian), or a missing or unknown category → `400`.
+- No session → `401`.
 
 ### FR-15.4 The tiles
 
 **Inputs**: `z`, `x`, `y`; `cv`, the tile version (FR-4.11).
 
-**Outputs**: A vector tile with one `spots` layer: a point per place whose anchor falls in the tile, with `id`, `category` (`playground`, `dog_park`, `monument`, `viewpoint` or `history`), `name` and `address` (absent when none), `lon`, `lat` and `visited`. Below zoom 14, an empty tile.
+**Outputs**: A vector tile with two layers. `spots`: a point per place whose anchor falls in the tile, with `id`, `category` (`playground`, `dog_park`, `monument`, `viewpoint` or `history`), `lon`, `lat`, and `name`, `address`, `description`, `inscription`, `memorial`, `start_date` and `wikipedia`, each absent when the place has none. `spot_areas`: each place's area that reaches into the tile, clipped to it, with `id`, `category` and `circle` (`true` for the 30 m circle of a place mapped as a point). Below zoom 12, an empty tile.
 
 **Behavior**:
-1. `visited` is the caller's own: the account comes from the session, never from a parameter.
-2. Cached like every other per-user tile (FR-4.11). The account's tile version moves when a processed activity's render lands, and every account's moves when places are loaded or the background match finishes.
+1. The same places for every account, behind the session like every other map tile, and cached like them (FR-4.11). Loading places moves every account's tile version.
 
 **Error cases**:
-- No session → `401`. A demo session sees the places and the Demo Customer's own visits.
+- No session → `401`. A demo session sees the places too.
 - Non-numeric coordinates → `400`.
 
 ## 18. Non-Functional Requirements (summary)
@@ -1207,6 +1222,7 @@ The following are named in `VISION.md`'s roadmap but have no functional requirem
 - Path 2 on-device sync's iOS half (Apple HealthKit — Android's Health Connect half is FR-3.6)
 - The rest of "Export" — animated reveals (high-resolution map export itself is built, FR-4.10)
 - Spots in the Android app (the web's is FR-15; `apps/android/docs/ROADMAP.md`)
+- Marking a Spots place visited once an activity spends five minutes inside it (ADR-0021, `ROADMAP.md` Phase 1)
 - Dark-theme variant of the Fog of War veil (the theme parameter is accepted but currently has no visual effect on the veil itself)
 
 Deliberately out of scope, not a "not yet" — built and then cut, not planned to return: Oura and other recovery-data sources (sleep, HRV, readiness), best-effort curves, personal bests, power curves, and training load. Also deliberately out of scope, never built: explorer-tile scoring — Fog of War is the exploration mechanic (ADR-0018). And splitting a track that passes through a Private location mid-way (FR-8.1 hides only the leading and trailing portions, by design). `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor; pace stays as per-activity route context (FR-4.8), not an analysed, all-time performance record, and heart rate and every other health measurement are out of scope entirely — never read, stored or shown (ADR-0017). The pace/heart-rate + elevation profile (FR-4.9) was built and then removed on those grounds.

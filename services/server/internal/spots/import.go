@@ -1,3 +1,5 @@
+// Package spots is Spots (IMPLEMENTATION.md §3.20, §4.25, ADR-0021): outdoor places imported
+// once from OpenStreetMap, shown on the map behind the Show POI toggle.
 package spots
 
 import (
@@ -9,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -25,14 +28,13 @@ type ImportStats struct {
 	Skipped  int // features with no category, no usable id or no geometry
 }
 
-// Import upserts every place in r into spots, then queues the `match_spots` backfill job that
-// matches every existing activity against them (BackfillJob), and bumps every account's tile
-// version, since every account's spots tiles just changed.
+// Import upserts every place in r into spots, then bumps every account's tile version, since
+// every account's spots tiles just changed.
 //
 // r is a GeoJSON Text Sequence as `osmium export -f geojsonseq -u type_id` writes it (the
-// recipe is docs/DEPLOY.md's): one feature per line, its OSM tags as properties, its id "n123" for a
-// node or "a246" for an area (parseOSMID). Upserted by the OSM object that id stands for, so re-running it on the same or a newer extract
-// updates the places already there rather than duplicating them.
+// recipe is docs/DEPLOY.md's): one feature per line, its OSM tags as properties, its id "n123" for a node or "a246" for an
+// area (parseOSMID). Upserted by the OSM object that id stands for, so re-running it on the same
+// or a newer extract updates the places already there rather than duplicating them.
 //
 // Registered as the `import-spots` subcommand (cmd/holdmytrack/main.go).
 func Import(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger, r io.Reader) (ImportStats, error) {
@@ -86,38 +88,44 @@ func Import(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger, r io.Read
 		return stats, err
 	}
 
-	if err := EnqueueBackfill(ctx, pool); err != nil {
-		return stats, fmt.Errorf("spots: enqueue backfill: %w", err)
-	}
 	if _, err := pool.Exec(ctx, `UPDATE users SET map_version = map_version + 1`); err != nil {
 		return stats, fmt.Errorf("spots: bump tile versions: %w", err)
 	}
 	return stats, nil
 }
 
-// BackfillJob is the `match_spots` job's payload: nothing, since it matches every activity.
-type BackfillJob struct{}
-
-// EnqueueBackfill queues one `match_spots` job, unless one is already waiting to start — a
-// second import landing before the first backfill ran needs no second pass.
-func EnqueueBackfill(ctx context.Context, pool *pgxpool.Pool) error {
-	_, err := pool.Exec(ctx, `
-		INSERT INTO jobs (kind, payload)
-		SELECT 'match_spots', '{}'::jsonb
-		WHERE NOT EXISTS (
-			SELECT 1 FROM jobs WHERE kind = 'match_spots' AND state = 'pending' AND locked_at IS NULL
-		)
-	`)
-	return err
-}
-
-// place is one feature, ready to insert.
+// place is one feature, ready to insert. The text fields are "" when OSM has none.
 type place struct {
 	category, name, address string
+	text                    Text
 	geometry                string // GeoJSON
 	osmType                 string
 	osmID                   int64
 }
+
+// Text is what OSM says about a place, each field as tagged, trimmed: `description`, a
+// memorial's `inscription` and `memorial` type, `start_date`, and `wikipedia` ("lang:Title").
+type Text struct {
+	Description, Inscription, Memorial, StartDate, Wikipedia string
+}
+
+// PlaceText reads a place's Text from its tags. A `wikipedia` value that isn't "lang:Title" —
+// a bare title, or a full URL — is left out: the popup builds its link from the language.
+func PlaceText(tags map[string]string) Text {
+	t := Text{
+		Description: strings.TrimSpace(tags["description"]),
+		Inscription: strings.TrimSpace(tags["inscription"]),
+		Memorial:    strings.TrimSpace(tags["memorial"]),
+		StartDate:   strings.TrimSpace(tags["start_date"]),
+	}
+	if w := strings.TrimSpace(tags["wikipedia"]); wikipediaTag.MatchString(w) {
+		t.Wikipedia = w
+	}
+	return t
+}
+
+// wikipediaTag is OSM's `wikipedia=lang:Title` form: a language code, a colon, a title.
+var wikipediaTag = regexp.MustCompile(`^[a-z]{2,3}(-[a-z]+)?:[^:/][^/]*$`)
 
 type feature struct {
 	ID         any             `json:"id"`
@@ -154,6 +162,7 @@ func parseFeature(raw []byte) (place, bool, error) {
 		category: category,
 		name:     strings.TrimSpace(tags["name"]),
 		address:  Address(tags),
+		text:     PlaceText(tags),
 		geometry: string(f.Geometry),
 		osmType:  osmType,
 		osmID:    osmID,
@@ -250,42 +259,58 @@ func parseOSMAttributes(props map[string]any) (string, int64, bool) {
 	return typ, int64(id), true
 }
 
+// pointRadiusM is the radius of the circle standing in for the area of a place OSM maps as a
+// single point: roughly a small playground or a memorial with the ground around it.
+const pointRadiusM = 30
+
 // upsertPlaces inserts one batch and reports how many rows it wrote. The geometry becomes the
 // spot's area: an outline as it is (made valid, polygons only), anything else — a point, or the
-// odd place mapped as a line — a 50 m circle around a point on it. A feature whose outline
+// odd place mapped as a line — a pointRadiusM circle around a point on it. A feature whose outline
 // doesn't survive ST_MakeValid is dropped. DISTINCT ON because one batch can't upsert the same
 // row twice.
 func upsertPlaces(ctx context.Context, pool *pgxpool.Pool, batch []place) (int, error) {
-	categories := make([]string, len(batch))
-	names := make([]string, len(batch))
-	addresses := make([]string, len(batch))
-	geometries := make([]string, len(batch))
-	osmTypes := make([]string, len(batch))
-	osmIDs := make([]int64, len(batch))
+	n := len(batch)
+	categories, names, addresses := make([]string, n), make([]string, n), make([]string, n)
+	descriptions, inscriptions, memorials := make([]string, n), make([]string, n), make([]string, n)
+	startDates, wikipedias := make([]string, n), make([]string, n)
+	geometries, osmTypes, osmIDs := make([]string, n), make([]string, n), make([]int64, n)
 	for i, p := range batch {
 		categories[i], names[i], addresses[i] = p.category, p.name, p.address
+		descriptions[i], inscriptions[i], memorials[i] = p.text.Description, p.text.Inscription, p.text.Memorial
+		startDates[i], wikipedias[i] = p.text.StartDate, p.text.Wikipedia
 		geometries[i], osmTypes[i], osmIDs[i] = p.geometry, p.osmType, p.osmID
 	}
 	tag, err := pool.Exec(ctx, `
-		INSERT INTO spots (category, name, address, geom, osm_type, osm_id)
-		SELECT DISTINCT ON (osm_type, osm_id) category, name, address, area, osm_type, osm_id
+		INSERT INTO spots (category, name, address, description, inscription, memorial, start_date,
+		                   wikipedia, geom, osm_type, osm_id)
+		SELECT DISTINCT ON (osm_type, osm_id)
+		       category, name, address, description, inscription, memorial, start_date,
+		       wikipedia, area, osm_type, osm_id
 		FROM (
 			SELECT r.category, NULLIF(r.name, '') AS name, NULLIF(r.address, '') AS address,
+			       NULLIF(r.description, '') AS description, NULLIF(r.inscription, '') AS inscription,
+			       NULLIF(r.memorial, '') AS memorial, NULLIF(r.start_date, '') AS start_date,
+			       NULLIF(r.wikipedia, '') AS wikipedia,
 			       r.osm_type, r.osm_id,
 			       CASE WHEN ST_Dimension(g) = 2
 			            THEN ST_Multi(ST_CollectionExtract(ST_MakeValid(g), 3))
-			            ELSE ST_Multi(ST_Buffer(ST_PointOnSurface(g)::geography, 50)::geometry)
+			            ELSE ST_Multi(ST_Buffer(ST_PointOnSurface(g)::geography, $12)::geometry)
 			       END AS area
-			FROM unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::bigint[])
-			         AS r(category, name, address, geojson, osm_type, osm_id)
+			FROM unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[],
+			            $7::text[], $8::text[], $9::text[], $10::text[], $11::bigint[])
+			         AS r(category, name, address, description, inscription, memorial, start_date,
+			              wikipedia, geojson, osm_type, osm_id)
 			CROSS JOIN LATERAL (SELECT ST_SetSRID(ST_GeomFromGeoJSON(r.geojson), 4326) AS g) geo
 		) rows
 		WHERE NOT ST_IsEmpty(area)
 		ORDER BY osm_type, osm_id
 		ON CONFLICT (osm_type, osm_id) DO UPDATE SET
-			category = EXCLUDED.category, name = EXCLUDED.name,
-			address = EXCLUDED.address, geom = EXCLUDED.geom
-	`, categories, names, addresses, geometries, osmTypes, osmIDs)
+			category = EXCLUDED.category, name = EXCLUDED.name, address = EXCLUDED.address,
+			description = EXCLUDED.description, inscription = EXCLUDED.inscription,
+			memorial = EXCLUDED.memorial, start_date = EXCLUDED.start_date,
+			wikipedia = EXCLUDED.wikipedia, geom = EXCLUDED.geom
+	`, categories, names, addresses, descriptions, inscriptions, memorials, startDates, wikipedias,
+		geometries, osmTypes, osmIDs, float64(pointRadiusM))
 	if err != nil {
 		return 0, fmt.Errorf("spots: upsert places: %w", err)
 	}

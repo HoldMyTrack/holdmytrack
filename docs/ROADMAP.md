@@ -31,7 +31,7 @@ Checkboxes are the source of truth for progress; re-check them against the three
 - [x] Resolve the on-box build constraint — resized to 50 GB disk (2026-09-22), which together with `58e2e60`'s single shared server-image build is enough for `docs/DEPLOY.md`'s in-place `up -d --build` to actually run; no need for the off-box-build-and-ship alternative.
 - [x] `docs/DEPLOY.md` §8's verification holds on this box — `/healthz` answers `ok` with the deployed build's SHA, and real Health Connect history synced since the move shows on the map, which goes through the whole path: `api` saves each raw payload to the `holdmytrack-data` R2 bucket, then `worker` processes it and writes fog/heatmap tiles back to R2.
 - [x] CDN in front of the basemap `.pmtiles` archive (`VISION.md` §4.3) — the planet archive, fonts and sprites are served through Cloudflare from the public R2 bucket's custom domain `tiles.holdmytrack.com` (`IMPLEMENTATION.md` §5.4 covers what the free plan does and doesn't edge-cache).
-- [ ] Load the Spots places on `holdmytrack.com` — the planet extract made off-box and `import-spots` (`docs/DEPLOY.md` §6); until then Show POI (`SPEC.md` FR-15) shows no places there.
+- [ ] Load the Spots places on `holdmytrack.com` — the planet extract made off-box and `import-spots` (`docs/DEPLOY.md` §6); until then the Overlays menu's points of interest (`SPEC.md` FR-15) show no places there.
 - [ ] Backups (Postgres, object storage) and a restore drill — **the most urgent of these gaps now that real personal data (synced Health Connect history) is starting to land on this box**, not just disposable dev fixtures. Also the gate for auto-deploy on merge: CI (`.github/workflows/ci.yml`) deliberately only checks, since deploying every merge onto the one uncopied copy of real synced health data, with no restore path if a bad deploy corrupts something, is a bigger risk than the manual deploy step it would replace.
 - [ ] Host hardening — a firewall allowing only 22/80/443, key-only SSH with password login disabled, unattended security updates, and `.env.prod` readable only by the deploying user.
 - [ ] Bound Docker's container logs — the default `json-file` driver never rotates, so `api`/`worker`/Caddy logs grow without limit on a 50 GB disk; set `max-size`/`max-file` in `/etc/docker/daemon.json` or per service in `compose.prod.yml`.
@@ -42,6 +42,13 @@ Checkboxes are the source of truth for progress; re-check them against the three
 
 - [ ] Stand up the funding page (Open Collective, public ledger — `VISION.md` §6.1) before any public launch, not retrofitted after The app side is built (`IMPLEMENTATION.md` §4.16); what's left: create the `holdmytrack` collective on opencollective.com and apply to Open Source Collective as fiscal host, then once approved set the slug — `apps/web/src/funding.ts`'s `OPEN_COLLECTIVE_SLUG` and `services/server/internal/web/web.go`'s `OpenCollectiveSlug` — and replace the About page template's "donations are not open yet" line with a link to it.
 - [ ] Post concept renders to r/running, r/cycling, r/Garmin, r/Strava, r/FogOfWorld (`VISION.md` §5.1, §8.1) — validate "free forever, funded by users" as credible before building further.
+
+### Spots visits — planned
+
+Spots' places are on the web map (`SPEC.md` FR-15); marking one visited isn't built. ADR-0021 has the design and why: an activity visits a place when its points add up to five minutes inside the place's area, worked out from tracks on the server, after Private locations and track edits.
+
+- [ ] A `spot_visits` table, matching in the ingest job and every reprocess (a track edit, a Private location change), and a backfill job over existing activities after an import — with tests for a stay just under and just over five minutes, a drive past, a point-mapped place's circle, and a place inside a Private location a track passes through.
+- [ ] A per-account `visited` flag in the spots tiles, a filled badge for a visited place, and the visited state in the popup.
 
 ### Sign in with Facebook — built, not live
 

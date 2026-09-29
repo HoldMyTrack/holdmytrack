@@ -114,3 +114,19 @@ func TestParseFeature(t *testing.T) {
 		}
 	}
 }
+
+func TestPlaceText(t *testing.T) {
+	got := PlaceText(map[string]string{
+		"description": " A bronze statue. ", "inscription": "To the fallen", "memorial": "war_memorial",
+		"start_date": "1919", "wikipedia": "en:Soldiers' and Sailors' Monument (Cleveland)",
+	})
+	want := Text{"A bronze statue.", "To the fallen", "war_memorial", "1919", "en:Soldiers' and Sailors' Monument (Cleveland)"}
+	if got != want {
+		t.Errorf("PlaceText = %+v, want %+v", got, want)
+	}
+	for _, w := range []string{"Soldiers' Monument", "https://en.wikipedia.org/wiki/X", "en:", ""} {
+		if got := PlaceText(map[string]string{"wikipedia": w}).Wikipedia; got != "" {
+			t.Errorf("wikipedia %q kept as %q; only lang:Title is", w, got)
+		}
+	}
+}

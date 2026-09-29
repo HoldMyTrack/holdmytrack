@@ -1321,6 +1321,58 @@
       }
     },
     {
+      "id": "paths_track",
+      "type": "line",
+      "source": "protomaps",
+      "source-layer": "roads",
+      "minzoom": 13,
+      "filter": [
+        "all",
+        [
+          "!has",
+          "is_tunnel"
+        ],
+        [
+          "!has",
+          "is_bridge"
+        ],
+        [
+          "==",
+          "kind",
+          "path"
+        ],
+        [
+          "==",
+          "kind_detail",
+          "track"
+        ]
+      ],
+      "layout": {
+        "visibility": "none"
+      },
+      "paint": {
+        "line-color": "#c9955e",
+        "line-dasharray": [
+          3,
+          1.5
+        ],
+        "line-width": [
+          "interpolate",
+          [
+            "exponential",
+            1.6
+          ],
+          [
+            "zoom"
+          ],
+          13,
+          1,
+          18,
+          3.5
+        ]
+      }
+    },
+    {
       "id": "paths_trail",
       "type": "line",
       "source": "protomaps",
@@ -1346,8 +1398,7 @@
           "kind_detail",
           "path",
           "footway",
-          "bridleway",
-          "track"
+          "bridleway"
         ]
       ],
       "layout": {
@@ -2109,6 +2160,54 @@
       }
     },
     {
+      "id": "paths_bridges_track",
+      "type": "line",
+      "source": "protomaps",
+      "source-layer": "roads",
+      "minzoom": 13,
+      "filter": [
+        "all",
+        [
+          "has",
+          "is_bridge"
+        ],
+        [
+          "==",
+          "kind",
+          "path"
+        ],
+        [
+          "==",
+          "kind_detail",
+          "track"
+        ]
+      ],
+      "layout": {
+        "visibility": "none"
+      },
+      "paint": {
+        "line-color": "#c9955e",
+        "line-dasharray": [
+          3,
+          1.5
+        ],
+        "line-width": [
+          "interpolate",
+          [
+            "exponential",
+            1.6
+          ],
+          [
+            "zoom"
+          ],
+          13,
+          1,
+          18,
+          3.5
+        ]
+      }
+    },
+    {
       "id": "paths_bridges_trail",
       "type": "line",
       "source": "protomaps",
@@ -2130,8 +2229,7 @@
           "kind_detail",
           "path",
           "footway",
-          "bridleway",
-          "track"
+          "bridleway"
         ]
       ],
       "layout": {

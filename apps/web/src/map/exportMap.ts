@@ -7,7 +7,7 @@ import { ensureFogLayer } from './fog';
 import { ensureHeatmapLayer } from './heatmap';
 import { labelInsertionPoint } from './layers';
 import { setMapMode, type MapMode } from './mapMode';
-import { ATTRIBUTION_TEXT, buildStyle, isDarkFlavor, type Flavor } from './style';
+import { ATTRIBUTION_TEXT, buildStyle, isDarkFlavor, type Flavor, type PathOverlays } from './style';
 import { ensureTrackLayer, setHiddenTracks } from './tracks';
 
 /**
@@ -57,8 +57,9 @@ export interface ExportViewState {
   mode: MapMode;
   activityQuery: ActivityQuery;
   hiddenIds: string[];
-  /** The Trails & bike paths toggle (paths.ts), so the image shows what the screen does. */
-  showPaths: boolean;
+  /** The Overlays menu's Trails and Bike paths (overlays.ts), so the image shows what the
+   *  screen does. */
+  paths: PathOverlays;
 }
 
 export interface ExportFrameCapture {
@@ -294,7 +295,7 @@ async function renderOffscreen(
 
   const instance = new MapLibreMap({
     container,
-    style: buildStyle({ flavor: state.flavor, origin: basemapOrigin(), showPaths: state.showPaths }),
+    style: buildStyle({ flavor: state.flavor, origin: basemapOrigin(), paths: state.paths }),
     center: [view.center.lng, view.center.lat],
     zoom: liveMap.getZoom(),
     pixelRatio: view.pixelRatio,

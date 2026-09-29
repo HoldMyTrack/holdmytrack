@@ -1522,6 +1522,129 @@ body {
   background: var(--fm-border-strong);
 }
 
+/* The Overlays dropdown (OverlaysMenu.tsx): a toggle group whose one button opens a panel of
+   checkboxes, laid out like the Activities panel's Type dropdown. */
+.overlays-menu {
+  position: relative;
+}
+
+.overlays-menu .map-mode-toggle__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fm-space-6);
+}
+
+.overlays-menu__count {
+  min-width: 1.4em;
+  padding: 0 var(--fm-space-4);
+  border-radius: var(--fm-radius-pill);
+  background: rgb(var(--fm-surface-rgb) / 25%);
+  font-size: var(--fm-text-xs);
+  font-weight: var(--fm-weight-semibold);
+  text-align: center;
+}
+
+.overlays-menu__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 3;
+  width: 14rem;
+  max-width: calc(100vw - 32px);
+  border: 1px solid var(--fm-border-panel);
+  border-radius: var(--fm-radius-lg);
+  background: var(--fm-surface);
+  box-shadow: var(--fm-shadow-lg);
+  padding: var(--fm-space-8);
+}
+
+.overlays-menu__group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* The master All, over both groups, set off from them by a rule. */
+.overlays-menu__item--all {
+  margin-bottom: var(--fm-space-8);
+  padding-bottom: var(--fm-space-8);
+  border-bottom: 1px solid var(--fm-border);
+  font-weight: var(--fm-weight-semibold);
+}
+
+.overlays-menu__group + .overlays-menu__group {
+  margin-top: var(--fm-space-8);
+  padding-top: var(--fm-space-8);
+  border-top: 1px solid var(--fm-border);
+}
+
+.overlays-menu__group legend {
+  padding: 0 var(--fm-space-2) var(--fm-space-4);
+  font-size: var(--fm-text-xs);
+  font-weight: var(--fm-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fm-ink-muted);
+}
+
+.overlays-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--fm-space-8);
+  padding: var(--fm-space-4) var(--fm-space-2);
+  font-size: var(--fm-text-md);
+  color: var(--fm-ink);
+  cursor: pointer;
+}
+
+.overlays-menu__item input[type='checkbox'] {
+  flex: none;
+  accent-color: var(--fm-accent);
+}
+
+/* "Show in this area" (ShowInArea.tsx): a pill centered over the map, under the toggles. */
+.show-in-area {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  z-index: 2;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+}
+
+.show-in-area__btn,
+.show-in-area__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fm-space-6);
+  padding: var(--fm-space-6) var(--fm-space-12);
+  border: 0;
+  border-radius: var(--fm-radius-pill);
+  background: var(--fm-surface);
+  box-shadow: var(--fm-shadow-md);
+  font: inherit;
+  font-size: var(--fm-text-sm);
+  color: var(--fm-ink);
+}
+
+.show-in-area__btn {
+  cursor: pointer;
+  font-weight: var(--fm-weight-semibold);
+}
+
+.show-in-area__btn:hover:not(:disabled) {
+  background: var(--fm-surface-tint);
+}
+
+.show-in-area__btn:disabled {
+  cursor: progress;
+  color: var(--fm-ink-muted);
+}
+
+.show-in-area__status {
+  color: var(--fm-ink-secondary);
+}
+
 /* A spot's popup (SpotPopup.tsx, FR-15.3) — MapLibre's own popup, restyled as the app's cards. */
 .spot-popup .maplibregl-popup-content {
   padding: var(--fm-space-12) var(--fm-space-16);
@@ -1573,9 +1696,24 @@ body {
   color: var(--fm-ink-muted);
 }
 
-.spot-popup__state--visited {
-  color: var(--fm-accent-strong);
-  font-weight: var(--fm-weight-semibold);
+.spot-popup__description {
+  max-height: 9em; /* a long one scrolls rather than stretching the popup over the map */
+  margin: var(--fm-space-6) 0 0;
+  overflow-y: auto;
+  font-size: var(--fm-text-sm);
+  color: var(--fm-ink-secondary);
+}
+
+.spot-popup__inscription {
+  max-height: 9em;
+  margin: var(--fm-space-6) 0 0;
+  padding-left: var(--fm-space-8);
+  overflow-y: auto;
+  border-left: 2px solid var(--fm-accent);
+  font-size: var(--fm-text-sm);
+  font-style: italic;
+  color: var(--fm-ink-secondary);
+  white-space: pre-line; /* inscriptions keep their line breaks */
 }
 
 .spot-popup__address {

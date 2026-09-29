@@ -220,7 +220,7 @@ var errFewPointsAfterEdit = errors.New("fewer than 2 points survive the edit")
 
 // reprocessActivity re-derives one activity from its raw payload: parse, clip against the
 // account's current Private locations, apply a track edit, then update metrics, trajectory,
-// streams, masks, regions and Spots visits, and mark every tile it touched before or after dirty. It neither
+// streams, masks and regions, and mark every tile it touched before or after dirty. It neither
 // renders those tiles nor clears edit_pending — its callers decide when (§4.7.7's edit_track
 // does both straight away; a `reprivacy` job once for the whole batch).
 //
@@ -356,10 +356,6 @@ func reprocessActivity(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 		if err := geo.MatchActivity(ctx, pool, activityID); err != nil {
 			return fmt.Errorf("match admin boundaries: %w", err)
 		}
-	}
-	// Replaced whole, from the new points; none at all when the track is now hidden.
-	if err := matchSpots(ctx, pool, userID, activityID, points); err != nil {
-		return fmt.Errorf("match spots: %w", err)
 	}
 
 	// Old ∪ new: a tile the reprocess cut the track out of needs recompositing just as much as

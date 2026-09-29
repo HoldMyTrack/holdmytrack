@@ -194,8 +194,7 @@ func main() {
 
 	case "import-spots":
 		// One-time (upserted — safe to re-run) load of the Spots places from an OpenStreetMap
-		// extract made off-box (docs/DEPLOY.md), then one queued `match_spots` job that matches
-		// every existing activity against them. See internal/spots.Import's doc comment.
+		// extract made off-box (docs/DEPLOY.md). See internal/spots.Import's doc comment.
 		if len(os.Args) != 3 {
 			fmt.Fprintln(os.Stderr, "usage: holdmytrack import-spots <file.geojsonseq>")
 			os.Exit(2)
@@ -212,7 +211,7 @@ func main() {
 			log.Error("import-spots", "err", err, "imported", stats.Imported)
 			os.Exit(1)
 		}
-		log.Info("import-spots: done; match_spots queued", "imported", stats.Imported, "skipped", stats.Skipped)
+		log.Info("import-spots: done", "imported", stats.Imported, "skipped", stats.Skipped)
 
 	case "set-admin":
 		// Grants or revokes the admin panel (/admin, FR-12) — deliberately a shell-only

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Built on the web (`SPEC.md` FR-15, `IMPLEMENTATION.md` §4.25); Android follows (`apps/android/docs/ROADMAP.md`).
+Accepted. The places are built on the web (`SPEC.md` FR-15, `IMPLEMENTATION.md` §4.25), with a 30 m circle rather than 50 m for a place mapped as a point; visits are not built yet (`ROADMAP.md` Phase 1). Android follows (`apps/android/docs/ROADMAP.md`).
 
 ## Context
 

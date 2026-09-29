@@ -95,7 +95,7 @@ docker compose -f compose.prod.yml --env-file .env.prod run --rm api set-admin y
 
 `false` in place of `true` revokes it. This is the only way to grant or revoke admin; nothing on the web can.
 
-Spots (`SPEC.md` FR-15) needs its places loaded once; until then Show POI shows none. The extract is made **off the server**: filtering the planet file takes more memory and disk than this box has. On any machine with [osmium-tool](https://osmcode.org/osmium-tool/), about 100 GB of free disk and the current [planet file](https://planet.openstreetmap.org/pbf/):
+Spots (`SPEC.md` FR-15) needs its places loaded once; until then the Overlays menu's points of interest show none. The extract is made **off the server**: filtering the planet file takes more memory and disk than this box has. On any machine with [osmium-tool](https://osmcode.org/osmium-tool/), about 100 GB of free disk and the current [planet file](https://planet.openstreetmap.org/pbf/):
 
 ```
 osmium tags-filter planet-latest.osm.pbf \
@@ -113,7 +113,7 @@ mkdir -p /tmp/spots && chmod 755 /tmp/spots   # put spots.geojsonseq here, world
 docker compose -f compose.prod.yml --env-file .env.prod run --rm -v /tmp/spots:/data:ro api import-spots /data/spots.geojsonseq
 ```
 
-It upserts every place by its OSM id, so a re-run with a newer extract updates the places already there (it doesn't remove ones the newer extract lacks). It then queues one `match_spots` job, which the running `worker` picks up to match every existing activity against the places (`IMPLEMENTATION.md` §4.25).
+It upserts every place by its OSM id, so a re-run with a newer extract updates the places already there (it doesn't remove ones the newer extract lacks). It then moves every account's tile version, so browsers fetch the new places (`IMPLEMENTATION.md` §4.25).
 
 ## 7. Maintenance mode
 
