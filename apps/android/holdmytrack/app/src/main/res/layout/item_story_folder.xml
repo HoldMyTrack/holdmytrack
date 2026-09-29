@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One Story on the Stories tab, after the web's .stories-tab__folder: the triangle and the
+     name, which is the folder's own tap target (open it), then the pencil and the bin — always
+     shown, as the web shows them at phone width. A hairline over it. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_list_top"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/hmt_space_10"
+    android:paddingEnd="@dimen/hmt_space_8">
+
+    <LinearLayout
+        android:id="@+id/story_toggle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:minHeight="48dp"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/hmt_space_6"
+        android:paddingEnd="@dimen/hmt_space_6">
+
+        <ImageView
+            android:id="@+id/story_chevron"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_play_filled"
+            app:tint="@color/panel_ink_50" />
+
+        <TextView
+            android:id="@+id/story_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/hmt_space_8"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.HoldMyTrack.PanelTab"
+            android:textFontWeight="600"
+            android:textSize="@dimen/hmt_text_lg"
+            tools:text="Brecksville Reservation trip" />
+    </LinearLayout>
+
+    <ImageButton
+        android:id="@+id/story_edit"
+        style="@style/Widget.HoldMyTrack.PanelChip"
+        android:contentDescription="@string/story_edit"
+        android:src="@drawable/ic_pencil" />
+
+    <ImageButton
+        android:id="@+id/story_delete"
+        style="@style/Widget.HoldMyTrack.PanelChip"
+        android:contentDescription="@string/story_delete"
+        android:src="@drawable/ic_trash_2" />
+</LinearLayout>

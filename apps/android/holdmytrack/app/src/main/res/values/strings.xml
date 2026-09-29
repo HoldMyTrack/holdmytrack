@@ -357,8 +357,8 @@
         <item quantity="other">%1$d points</item>
     </plurals>
     <string name="edit_title_one">Edit activity</string>
-    <string name="edit_multi_subtitle">Only Type applies to every checked activity — see below.</string>
-    <string name="edit_multi_reason">Editing multiple activities only changes their type — name and description are per-activity.</string>
+    <string name="edit_multi_subtitle">Type and Stories apply to every checked activity; name and description are per-activity.</string>
+    <string name="edit_multi_reason">Editing multiple activities changes their type and Stories — name and description are per-activity.</string>
     <string name="edit_type">Type</string>
     <string name="edit_name">Name</string>
     <string name="edit_name_placeholder">Optional — shown instead of the date in the Activities list</string>
@@ -394,6 +394,68 @@
     <string name="private_delete_body">Activities that start or end inside it will show those parts again once they\'re reprocessed.</string>
     <string name="private_delete_label">Delete %1$s</string>
     <string name="private_delete_failed">Could not delete it: %1$s</string>
+
+    <!-- Stories (panel/StoriesTab.kt, panel/StoryDialog.kt, the Edit window's Stories tab and the
+         rows' Story badge), after the web's stories.* messages. -->
+    <string name="panel_tab_stories">Stories</string>
+    <string name="story_subtext">Hand-picked sets of your activities. Only you can see them.</string>
+    <string name="story_empty">No stories yet. On the Activities tab, check the activities you want, then choose Create story.</string>
+    <string name="story_no_activities">No activities in this story.</string>
+    <string name="story_not_found">This story doesn\'t exist, or isn\'t yours.</string>
+    <string name="story_load_failed">Could not load your stories</string>
+    <string name="story_open">Open</string>
+    <string name="story_folded">Folded</string>
+    <string name="story_edit">Edit name and description</string>
+    <string name="story_demo_edit">Not available for demo accounts — create an account to edit stories</string>
+    <string name="story_delete">Delete story</string>
+    <string name="story_demo_delete">Not available for demo accounts — create an account to delete stories</string>
+    <string name="story_delete_title">Delete story</string>
+    <string name="story_delete_confirm">Delete “%1$s”? Its activities stay.</string>
+    <string name="story_delete_button">Delete story</string>
+    <string name="story_delete_failed">Could not delete the story: %1$s</string>
+    <string name="story_create_target">Create a story from %1$s</string>
+    <string name="story_create_none">Check activities to make a story of them</string>
+    <string name="story_demo_create">Not available for demo accounts — create an account to make stories</string>
+    <string name="story_create_title">Create story</string>
+    <string name="story_create_body">A story of %1$s. Only you can see it.</string>
+    <string name="story_name">Name</string>
+    <string name="story_name_placeholder">A hike, a holiday, a race weekend</string>
+    <string name="story_description">Description</string>
+    <string name="story_description_placeholder">Optional</string>
+    <string name="story_create_confirm">Create story</string>
+    <string name="story_creating">Creating…</string>
+    <string name="story_edit_title">Edit story</string>
+    <string name="story_save_failed">Could not save the story</string>
+    <string name="story_stats">%1$s · %2$s · %3$s moving</string>
+    <string name="story_by_type">By activity type</string>
+    <plurals name="story_activity_count">
+        <item quantity="one">%1$d activity</item>
+        <item quantity="other">%1$d activities</item>
+    </plurals>
+    <string name="panel_story_badge_one">Story</string>
+    <plurals name="panel_story_badge">
+        <item quantity="one">%1$d story</item>
+        <item quantity="other">%1$d stories</item>
+    </plurals>
+    <string name="panel_in_story">In a story: %1$s</string>
+    <plurals name="panel_in_stories">
+        <item quantity="one">In %1$d story: %2$s</item>
+        <item quantity="other">In %1$d stories: %2$s</item>
+    </plurals>
+    <string name="panel_in_other_story">Also in: %1$s</string>
+    <plurals name="panel_in_other_stories">
+        <item quantity="one">Also in %1$d other story: %2$s</item>
+        <item quantity="other">Also in %1$d other stories: %2$s</item>
+    </plurals>
+    <string name="edit_tab_stories">Stories</string>
+    <string name="edit_stories_hint_one">Tick a story to put this activity in it, clear one to take it out.</string>
+    <plurals name="edit_stories_hint">
+        <item quantity="one">Tick a story to put all %1$d activity in it, clear one to take it out.</item>
+        <item quantity="other">Tick a story to put all %1$d activities in it, clear one to take them all out.</item>
+    </plurals>
+    <string name="edit_stories_some">Holds some of these activities</string>
+    <string name="edit_stories_empty">No stories yet. Check activities in the list and choose Create story to make one.</string>
+    <string name="edit_stories_unsaved">Stories, with unsaved changes</string>
 
     <!-- Activity types' display names, the web's activity_type.* (RecordingTypes.label); a type without one is title-cased from its raw value. -->
     <string name="activity_type_alpine_skiing">Alpine Skiing</string>

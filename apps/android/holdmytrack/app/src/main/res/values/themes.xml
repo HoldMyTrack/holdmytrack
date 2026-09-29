@@ -452,6 +452,12 @@
         <item name="android:maxLines">1</item>
     </style>
 
+    <!-- A row's Story badge (.activities-panel__story-badge): the accent on the accent at 12%. -->
+    <style name="Widget.HoldMyTrack.PanelStatusBadge.Story">
+        <item name="android:background">@drawable/bg_panel_story_badge</item>
+        <item name="android:textColor">@color/hmt_accent</item>
+    </style>
+
     <!-- A Track tab action (Chop, Cut, Delete point, Undo, Reset), the web's .edit-track__btn: a
          tinted chip with the small radius and a 13sp semibold label, inset in a 44dp-tall
          target. Checkable, for Delete point's on state. -->

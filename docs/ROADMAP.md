@@ -18,7 +18,7 @@ Checkboxes are the source of truth for progress; re-check them against the three
 
 ## Phase 1 — MVP
 
-**Shipped and deployable.** Every feature in `SPEC.md`'s FR-1 through FR-14 — auth and account management, the no-signup demo, activity upload/ingestion (file, `.zip`, Google Takeout), Normal/Fog of War/Heatmap map modes with pace-colored segments and high-res export, the Activities panel and its filters, track editing, Private locations, the date-range picker, the per-account activity graph, per-activity pace, distance trends, the public About and Help pages, the Donate link, the admin panel, English and Russian, and Stories on the web — is built and documented there; not re-enumerated here.
+**Shipped and deployable.** Every feature in `SPEC.md`'s FR-1 through FR-14 — auth and account management, the no-signup demo, activity upload/ingestion (file, `.zip`, Google Takeout), Normal/Fog of War/Heatmap map modes with pace-colored segments and high-res export, the Activities panel and its filters, track editing, Private locations, the date-range picker, the per-account activity graph, per-activity pace, distance trends, the public About and Help pages, the Donate link, the admin panel, English and Russian, and Stories on the web and in the Android app — is built and documented there; not re-enumerated here.
 
 ### Production deployment — a sandbox is live at `holdmytrack.com`, not yet Production
 

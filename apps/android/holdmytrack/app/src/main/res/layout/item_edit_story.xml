@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One Story on the Edit window's Stories tab (.edit-stories__row): its checkbox — ticked,
+     partly ticked or clear, panel/StoryMembership.kt — its name and how many activities it
+     holds. The whole row is the checkbox's tap target. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center_vertical"
+    android:minHeight="48dp"
+    android:orientation="horizontal">
+
+    <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/edit_story_check"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="-6dp"
+        android:clickable="false"
+        android:focusable="false"
+        android:importantForAccessibility="no" />
+
+    <TextView
+        android:id="@+id/edit_story_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/hmt_ink"
+        android:textSize="@dimen/hmt_text_md"
+        tools:text="Brecksville Reservation trip" />
+
+    <TextView
+        android:id="@+id/edit_story_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/hmt_space_8"
+        android:textColor="@color/hmt_ink_meta"
+        android:textSize="@dimen/hmt_text_sm"
+        tools:text="3 activities" />
+</LinearLayout>

@@ -153,6 +153,38 @@ data class Activity(
     val bbox: List<Double>?,
     val pending: Boolean,
     val edited: Boolean,
+    /** The Stories it's in, newest first — what its row's Story badge names. */
+    val stories: List<StoryRef> = emptyList(),
+)
+
+/** One of an activity's Stories, as a row of `GET /v1/activities` names it (`docs/SPEC.md`
+ *  FR-5.1). */
+data class StoryRef(val id: String, val name: String)
+
+/**
+ * A Story's numbers, or one activity type's share of them (`docs/SPEC.md` FR-14.1): [count]
+ * activities, their distance and moving time. [activityType] is empty for the whole Story.
+ */
+data class StoryTotals(
+    val activityType: String,
+    val count: Int,
+    val distanceMeters: Double,
+    val movingSeconds: Long,
+)
+
+/**
+ * A Story — a hand-picked set of the account's activities (`docs/SPEC.md` FR-14.1), the web's
+ * `Story`. [description] is empty when none is set; [activityIds] is every member, earliest
+ * activity first; [stats] covers the whole Story, whatever the date range, and [byType] the
+ * same per activity type, the most frequent first.
+ */
+data class Story(
+    val id: String,
+    val name: String,
+    val description: String,
+    val activityIds: List<String>,
+    val stats: StoryTotals,
+    val byType: List<StoryTotals>,
 )
 
 /**
@@ -639,12 +671,13 @@ object HoldMyTrackApi {
      * `GET /v1/activities?from=&to=` — every activity from [from] to [to] (`YYYY-MM-DD`,
      * inclusive, read by the server as days in the account's timezone), newest first, in one
      * response: the list isn't paged (`docs/IMPLEMENTATION.md` §4.7). What the map's
-     * Activities panel lists.
+     * Activities panel lists. With [story], only that Story's (`docs/SPEC.md` FR-14.4).
      */
-    fun activities(from: String, to: String, onResult: (Result<List<Activity>>) -> Unit) {
+    fun activities(from: String, to: String, story: String?, onResult: (Result<List<Activity>>) -> Unit) {
         val url = (BuildConfig.API_BASE_URL + API_V1 + "/activities").toHttpUrl().newBuilder()
             .addQueryParameter("from", from)
             .addQueryParameter("to", to)
+            .apply { if (story != null) addQueryParameter("story", story) }
             .build()
         call(Request.Builder().url(url).build(), { body ->
             val rows = JSONObject(body).getJSONArray("activities")
@@ -804,8 +837,86 @@ object HoldMyTrackApi {
         radiusM = json.getInt("radius_m"),
     )
 
+    /** `GET /v1/stories` — every Story of the account, newest first (`docs/SPEC.md` FR-14). */
+    fun stories(onResult: (Result<List<Story>>) -> Unit) {
+        val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/stories").build()
+        call(request, { text ->
+            val rows = JSONObject(text).optJSONArray("stories") ?: JSONArray()
+            List(rows.length()) { parseStory(rows.getJSONObject(it)) }
+        }, onResult)
+    }
+
+    /** `GET /v1/stories/{id}` — one Story. A `404` ([ApiException]) is one that doesn't exist
+     *  or isn't this account's, which the server doesn't tell apart (FR-14.5). */
+    fun story(id: String, onResult: (Result<Story>) -> Unit) {
+        val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/stories/" + id).build()
+        call(request, { text -> parseStory(JSONObject(text)) }, onResult)
+    }
+
+    /** `POST /v1/stories` — a new Story with [activityIds] in it, in one step (FR-14.2). A
+     *  refusal (a blank or long name, a demo account) is the server's own wording. */
+    fun createStory(name: String, description: String, activityIds: Collection<String>, onResult: (Result<Story>) -> Unit) {
+        val body = JSONObject()
+            .put("name", name)
+            .put("description", description)
+            .put("activity_ids", JSONArray(activityIds))
+        val request = Request.Builder()
+            .url(BuildConfig.API_BASE_URL + API_V1 + "/stories")
+            .post(body.toString().toRequestBody(JSON))
+            .build()
+        call(request, { text -> parseStory(JSONObject(text)) }, onResult)
+    }
+
+    /** `PATCH /v1/stories/{id}` — both fields every time: an empty [description] clears it. */
+    fun updateStory(id: String, name: String, description: String, onResult: (Result<Story>) -> Unit) {
+        val body = JSONObject().put("name", name).put("description", description)
+        val request = Request.Builder()
+            .url(BuildConfig.API_BASE_URL + API_V1 + "/stories/" + id)
+            .patch(body.toString().toRequestBody(JSON))
+            .build()
+        call(request, { text -> parseStory(JSONObject(text)) }, onResult)
+    }
+
+    /** `DELETE /v1/stories/{id}` — the Story alone; its activities stay. */
+    fun deleteStory(id: String, onResult: (Result<Unit>) -> Unit) {
+        val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/stories/" + id).delete().build()
+        call(request, { }, onResult)
+    }
+
+    /** `POST` ([add]) or `DELETE /v1/stories/{id}/activities` with [activityIds] (FR-14.3): puts
+     *  them in the Story, or takes them out. Answers with the Story as it now is. */
+    fun changeStoryActivities(id: String, activityIds: Collection<String>, add: Boolean, onResult: (Result<Story>) -> Unit) {
+        val body = JSONObject().put("activity_ids", JSONArray(activityIds)).toString().toRequestBody(JSON)
+        val request = Request.Builder()
+            .url(BuildConfig.API_BASE_URL + API_V1 + "/stories/" + id + "/activities")
+            .apply { if (add) post(body) else delete(body) }
+            .build()
+        call(request, { text -> parseStory(JSONObject(text)) }, onResult)
+    }
+
+    private fun parseStory(json: JSONObject): Story {
+        fun totals(t: JSONObject) = StoryTotals(
+            activityType = t.optString("activity_type"),
+            count = t.optInt("count"),
+            distanceMeters = t.optDouble("distance_meters", 0.0),
+            movingSeconds = t.optLong("moving_seconds"),
+        )
+        val stats = json.optJSONObject("stats") ?: JSONObject()
+        val byType = stats.optJSONArray("by_type") ?: JSONArray()
+        val ids = json.optJSONArray("activity_ids") ?: JSONArray()
+        return Story(
+            id = json.getString("id"),
+            name = json.optString("name"),
+            description = json.optNullableString("description").orEmpty(),
+            activityIds = List(ids.length()) { ids.getString(it) },
+            stats = totals(stats),
+            byType = List(byType.length()) { totals(byType.getJSONObject(it)) },
+        )
+    }
+
     private fun parseActivity(row: JSONObject): Activity {
         val box = row.optJSONArray("bbox")?.takeIf { it.length() == 4 }
+        val stories = row.optJSONArray("stories") ?: JSONArray()
         return Activity(
             id = row.getString("id"),
             startedAt = row.optString("started_at"),
@@ -817,6 +928,9 @@ object HoldMyTrackApi {
             bbox = box?.let { b -> List(4) { b.getDouble(it) } },
             pending = row.optBoolean("pending"),
             edited = row.optBoolean("edited"),
+            stories = List(stories.length()) { i ->
+                stories.getJSONObject(i).let { StoryRef(it.getString("id"), it.optString("name")) }
+            },
         )
     }
 
@@ -824,12 +938,14 @@ object HoldMyTrackApi {
      * `GET /v1/activities/histogram?days=&before=` — one page of the days that have activity
      * (`docs/IMPLEMENTATION.md` §4.7's activity-day pagination mode): the [limit] most recent,
      * or the [limit] most recent strictly before [before]. What the map's date-range slider
-     * (`map/ActivityDays.kt`) pages through, as the web's does.
+     * (`map/ActivityDays.kt`) pages through, as the web's does. With [story], only that
+     * Story's days, and `earliest` its first (`docs/SPEC.md` FR-14.4).
      */
-    fun activityDayPage(limit: Int, before: String?, onResult: (Result<ActivityDayPage>) -> Unit) {
+    fun activityDayPage(limit: Int, before: String?, story: String?, onResult: (Result<ActivityDayPage>) -> Unit) {
         val url = (BuildConfig.API_BASE_URL + API_V1 + "/activities/histogram").toHttpUrl().newBuilder()
             .addQueryParameter("days", limit.toString())
             .apply { if (before != null) addQueryParameter("before", before) }
+            .apply { if (story != null) addQueryParameter("story", story) }
             .build()
         call(Request.Builder().url(url).build(), ::parseActivityDays, onResult)
     }

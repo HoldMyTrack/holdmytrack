@@ -25,96 +25,116 @@
         android:layout_height="wrap_content">
 
         <!-- The tabs (.activities-panel__tab): the selected one at full strength with the accent
-             underline, the other dimmed. -->
-        <LinearLayout
+             underline, the others dimmed. They scroll sideways when the four don't fit (Russian
+             on a narrow phone), as the web's tab strip does. -->
+        <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:paddingStart="@dimen/hmt_space_16"
-            android:paddingTop="@dimen/hmt_space_12"
-            android:paddingEnd="@dimen/hmt_space_16">
+            android:overScrollMode="never"
+            android:scrollbars="none">
 
             <LinearLayout
-                android:id="@+id/panel_tab_activities"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:background="@drawable/bg_panel_tab_selected"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingBottom="@dimen/hmt_space_6">
+                android:paddingStart="@dimen/hmt_space_16"
+                android:paddingTop="@dimen/hmt_space_12"
+                android:paddingEnd="@dimen/hmt_space_16">
 
-                <TextView
+                <LinearLayout
+                    android:id="@+id/panel_tab_activities"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/panel_tab_activities"
+                    android:background="@drawable/bg_panel_tab_selected"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingBottom="@dimen/hmt_space_6">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/panel_tab_activities"
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.PanelTab" />
+
+                    <TextView
+                        android:id="@+id/panel_count"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/hmt_space_8"
+                        android:background="@drawable/bg_panel_badge"
+                        android:paddingStart="@dimen/hmt_space_8"
+                        android:paddingTop="1dp"
+                        android:paddingEnd="@dimen/hmt_space_8"
+                        android:paddingBottom="1dp"
+                        android:textColor="@color/hmt_accent_strong"
+                        android:textFontWeight="700"
+                        android:textSize="@dimen/hmt_text_sm"
+                        tools:text="5" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/panel_tab_stories"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/hmt_space_20"
+                    android:alpha="0.45"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingBottom="@dimen/hmt_space_6"
+                    android:text="@string/panel_tab_stories"
                     android:textAppearance="@style/TextAppearance.HoldMyTrack.PanelTab" />
 
-                <TextView
-                    android:id="@+id/panel_count"
+                <LinearLayout
+                    android:id="@+id/panel_tab_sync"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/hmt_space_8"
-                    android:background="@drawable/bg_panel_badge"
-                    android:paddingStart="@dimen/hmt_space_8"
-                    android:paddingTop="1dp"
-                    android:paddingEnd="@dimen/hmt_space_8"
-                    android:paddingBottom="1dp"
-                    android:textColor="@color/hmt_accent_strong"
-                    android:textFontWeight="700"
-                    android:textSize="@dimen/hmt_text_sm"
-                    tools:text="5" />
-            </LinearLayout>
+                    android:layout_marginStart="@dimen/hmt_space_20"
+                    android:alpha="0.45"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingBottom="@dimen/hmt_space_6">
 
-            <LinearLayout
-                android:id="@+id/panel_tab_sync"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/hmt_space_20"
-                android:alpha="0.45"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingBottom="@dimen/hmt_space_6">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/panel_tab_sync"
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.PanelTab" />
+
+                    <TextView
+                        android:id="@+id/panel_sync_badge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="16dp"
+                        android:layout_marginStart="@dimen/hmt_space_8"
+                        android:background="@drawable/bg_panel_sync_badge"
+                        android:gravity="center"
+                        android:minWidth="16dp"
+                        android:paddingStart="@dimen/hmt_space_4"
+                        android:paddingEnd="@dimen/hmt_space_4"
+                        android:textColor="@color/hmt_on_accent"
+                        android:textFontWeight="700"
+                        android:textSize="@dimen/hmt_text_2xs"
+                        android:visibility="gone"
+                        tools:text="2"
+                        tools:visibility="visible" />
+                </LinearLayout>
 
                 <TextView
+                    android:id="@+id/panel_tab_privacy"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/panel_tab_sync"
+                    android:layout_marginStart="@dimen/hmt_space_20"
+                    android:alpha="0.45"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingBottom="@dimen/hmt_space_6"
+                    android:text="@string/panel_tab_privacy"
                     android:textAppearance="@style/TextAppearance.HoldMyTrack.PanelTab" />
-
-                <TextView
-                    android:id="@+id/panel_sync_badge"
-                    android:layout_width="wrap_content"
-                    android:layout_height="16dp"
-                    android:layout_marginStart="@dimen/hmt_space_8"
-                    android:background="@drawable/bg_panel_sync_badge"
-                    android:gravity="center"
-                    android:minWidth="16dp"
-                    android:paddingStart="@dimen/hmt_space_4"
-                    android:paddingEnd="@dimen/hmt_space_4"
-                    android:textColor="@color/hmt_on_accent"
-                    android:textFontWeight="700"
-                    android:textSize="@dimen/hmt_text_2xs"
-                    android:visibility="gone"
-                    tools:text="2"
-                    tools:visibility="visible" />
             </LinearLayout>
-
-            <TextView
-                android:id="@+id/panel_tab_privacy"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/hmt_space_20"
-                android:alpha="0.45"
-                android:clickable="true"
-                android:focusable="true"
-                android:paddingBottom="@dimen/hmt_space_6"
-                android:text="@string/panel_tab_privacy"
-                android:textAppearance="@style/TextAppearance.HoldMyTrack.PanelTab" />
-        </LinearLayout>
+        </HorizontalScrollView>
 
         <View
             android:layout_width="match_parent"
@@ -156,7 +176,7 @@
             app:tint="@color/panel_ink_40" />
     </LinearLayout>
 
-    <!-- The two tabs' contents, one showing at a time. -->
+    <!-- The tabs' contents, one showing at a time. -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -350,6 +370,12 @@
                     android:src="@drawable/ic_pencil" />
 
                 <ImageButton
+                    android:id="@+id/panel_create_story"
+                    style="@style/Widget.HoldMyTrack.PanelChip"
+                    android:contentDescription="@string/story_create_none"
+                    android:src="@drawable/ic_book_plus" />
+
+                <ImageButton
                     android:id="@+id/panel_delete"
                     style="@style/Widget.HoldMyTrack.PanelChip"
                     android:contentDescription="@string/panel_no_target"
@@ -445,6 +471,57 @@
                     android:paddingEnd="@dimen/hmt_space_16"
                     android:paddingBottom="@dimen/hmt_space_10"
                     android:visibility="gone" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- The Stories tab (apps/web/src/ui/StoriesTab.tsx): every Story as a folder, the open
+             one's description and rows under it, then the open Story's statistics as the
+             footer (.stories-tab__stats). Filled by panel/StoriesTab. -->
+        <LinearLayout
+            android:id="@+id/panel_stories_content"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/stories_list"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:overScrollMode="never"
+                android:scrollbars="vertical" />
+
+            <LinearLayout
+                android:id="@+id/stories_stats"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:accessibilityLiveRegion="polite"
+                android:background="@drawable/bg_list_top"
+                android:orientation="vertical"
+                android:paddingStart="@dimen/hmt_space_16"
+                android:paddingTop="@dimen/hmt_space_12"
+                android:paddingEnd="@dimen/hmt_space_16"
+                android:paddingBottom="@dimen/hmt_space_12"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/stories_stats_line"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/hmt_ink"
+                    android:textFontWeight="600"
+                    android:textSize="@dimen/hmt_text_md"
+                    tools:text="3 activities · 58 km · 3h 26m moving" />
+
+                <!-- Per activity type (.stories-tab__types): its name, then its own line. -->
+                <TableLayout
+                    android:id="@+id/stories_types"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/hmt_space_4"
+                    android:contentDescription="@string/story_by_type"
+                    android:shrinkColumns="1" />
             </LinearLayout>
         </LinearLayout>
 
