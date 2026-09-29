@@ -651,6 +651,26 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 
 **Notes**: The imagery is fetched from a metered provider (ADR-0022). On a quota-capped plan such as MapTiler's Free plan, the imagery stops loading once the month's quota is used up and returns the next month; the roads and labels still draw.
 
+### FR-4.15 Zoom levels at a glance
+
+**Description**: What the map draws at each zoom level, in one place. Each requirement it summarizes remains the authority for its own feature: tracks FR-4.1, Fog FR-4.2, Heatmap FR-4.3, paths FR-4.13, satellite FR-4.14, points of interest FR-15.2 and FR-15.5. Paths and points of interest show only for what is ticked in the Layers menu; with nothing ticked they draw at no zoom.
+
+| Zoom | A 1280 px-wide view spans | Tracks (Normal) | Fog and Heatmap | Paths (ticked) | Points of interest (ticked) |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| 0–3 | A continent to the world | — | Whole countries | — | — |
+| 4 | Several countries (~6,000 km) | Drawn | Whole countries | — | — |
+| 5–7 | A country to a state (~3,000–800 km) | Drawn | States and regions | — | — |
+| 8–9 | A state to a region (~400–200 km) | Drawn | Street level | — | — |
+| 10–12 | A metro area to a city (~100–25 km) | Drawn | Street level | — | On request: **Show in this area** |
+| 13 and up | A few neighbourhoods or less (~12 km and less) | Drawn | Street level | Drawn | Drawn, loaded as the map moves |
+
+**Behavior**:
+1. Each band starts at its first zoom and runs up to, not including, the next band's: zoom 7.9 is still States and regions, and zoom 12.9 still offers Show in this area.
+2. Zoomed in far enough, the map runs out of stored detail and enlarges the most detailed level it has instead: tracks, Fog, Heatmap and points of interest past zoom 14, the base map past zoom 15, and satellite imagery (FR-4.14) past the deployment's deepest level (zoom 18 on holdmytrack.com). Lines, labels and badges — the base map, tracks, paths and points of interest — stay sharp when enlarged, though a track's shape gets no more detailed; Fog, Heatmap and satellite imagery are pictures and grow softer.
+3. The Android app follows the same bands for tracks, Fog, Heatmap and paths. It has no points of interest yet.
+
+**Notes**: The widths are at the equator; further from it the same zoom spans less ground (at Ohio's latitude, about a quarter less).
+
 ## 7. FR-5 — Activities Panel
 
 ### FR-5.1 Activity list
