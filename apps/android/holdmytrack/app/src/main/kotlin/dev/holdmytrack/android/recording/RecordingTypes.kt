@@ -9,7 +9,7 @@ import dev.holdmytrack.android.recording.db.RecordedActivityRecord
 /**
  * The activity-type field is free text — a custom type is the whole point — but the Type
  * picker (`ActivityTypePicker`) still lists these five even on an account that has never used
- * them (`apps/android/docs/ROADMAP.md` Phase 7's own walk/hike/run/ride/drive default set), so
+ * them (`apps/android/docs/IMPLEMENTATION.md` §7.6's walk/hike/run/ride/drive default set), so
  * most recordings stay on the shared vocabulary `health/ExerciseTypes.kt` already uses, rather
  * than fragmenting the Activities panel's TYPE facet or cross-source deduplication
  * (`docs/IMPLEMENTATION.md` §4.6) with one-off spellings. Values are the exact wire strings
