@@ -14,6 +14,7 @@ import java.time.OffsetDateTime
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.Dispatcher
+import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
@@ -332,7 +333,32 @@ object HoldMyTrackApi {
         .dispatcher(Dispatcher().apply { maxRequestsPerHost = 20 })
         .addInterceptor(BearerInterceptor)
         .addInterceptor(LanguageInterceptor)
+        .addInterceptor(OriginInterceptor)
         .build()
+
+    /**
+     * Sends `Origin: <the API's origin>` on every request that leaves it, as the web client's
+     * browser does on its cross-origin fetches. The satellite imagery's key (root
+     * `docs/DEPLOY.md` §5) is restricted to the deployment's origin, and without an Origin
+     * MapTiler refuses the app's tiles with a `403`. It gives nothing away: the key is already
+     * public in the web bundle and the style document, and the restriction is there to stop other
+     * websites spending the quota, which a native client setting a header doesn't. A request that
+     * already carries an Origin is left as it is.
+     */
+    private object OriginInterceptor : Interceptor {
+        private val origin = BuildConfig.API_BASE_URL.toHttpUrl().let { url ->
+            val port = if (url.port == HttpUrl.defaultPort(url.scheme)) "" else ":${url.port}"
+            "${url.scheme}://${url.host}$port"
+        }
+
+        override fun intercept(chain: Interceptor.Chain): Response {
+            val request = chain.request()
+            if (request.url.toString().startsWith(BuildConfig.API_BASE_URL) || request.header("Origin") != null) {
+                return chain.proceed(request)
+            }
+            return chain.proceed(request.newBuilder().header("Origin", origin).build())
+        }
+    }
 
     /**
      * Sends the app's language as Accept-Language on HoldMyTrack's own requests, so the
