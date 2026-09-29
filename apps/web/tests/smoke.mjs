@@ -223,7 +223,7 @@ describe('basemap foundation', () => {
     assert.ok(true);
   });
 
-  it('8. Overlays menu: trails, tracks and bike paths off by default, each shown on its own, remembered across reload', async () => {
+  it('8. Layers menu: trails, tracks and bike paths off by default, each shown on its own, remembered across reload', async () => {
     const TRAILS = ['paths_trail', 'paths_bridges_trail'];
     const TRACKS = ['paths_track', 'paths_bridges_track'];
     const BIKES = ['paths_cycleway', 'paths_bridges_cycleway'];
@@ -268,6 +268,13 @@ describe('basemap foundation', () => {
     await page.locator('#overlay-tracks').uncheck();
     await page.locator('#overlay-bike-paths').uncheck();
     assert.deepEqual(await visibility(ALL), ALL.map(() => 'none'), 'hidden again once unticked');
+
+    // Tracks explains itself behind an info button, without ticking the box.
+    await page.locator('.overlays-menu__info').click();
+    assert.ok(await page.locator('#overlay-tracks-info').isVisible(), 'tracks explanation shown');
+    assert.equal(await page.locator('#overlay-tracks').isChecked(), false, 'info button leaves the box alone');
+    assert.equal(await page.locator('#overlay-all, #overlay-spots-all').count(), 0, 'no All checkboxes');
+    await page.screenshot({ path: new URL('layers-menu.png', SHOTS).pathname });
   });
 
   // Satellite mode (docs/SPEC.md FR-4.14) exists only when the dev server was started with
