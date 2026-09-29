@@ -1,5 +1,11 @@
 import { layers, namedFlavor } from '@protomaps/basemaps';
-import type { FilterSpecification, LayerSpecification, LineLayerSpecification, StyleSpecification } from 'maplibre-gl';
+import type {
+  FilterSpecification,
+  LayerSpecification,
+  LineLayerSpecification,
+  RasterSourceSpecification,
+  StyleSpecification,
+} from 'maplibre-gl';
 import { GLYPHS_PATH, PMTILES_PATH, SPRITE_BASE_PATH } from './config';
 
 /**
@@ -27,8 +33,52 @@ export function isDarkFlavor(flavor: Flavor): boolean {
   return flavor === 'dark' || flavor === 'black';
 }
 
+/** The flavors drawn light-on-dark, or satellite imagery under any flavor: it reads dark, so it
+ *  gets the same fog veil and watermark colors a dark flavor does (docs/SPEC.md FR-4.14). */
+export function isDarkBase(flavor: Flavor, satellite: boolean): boolean {
+  return satellite || isDarkFlavor(flavor);
+}
+
 /** The source id every basemap layer is bound to; fog and track layers will not reuse it. */
 export const BASEMAP_SOURCE = 'protomaps';
+
+/**
+ * Satellite mode (docs/SPEC.md FR-4.14): a raster imagery source under the vector basemap's
+ * roads, boundaries and labels. The imagery is a deployment's choice, not the style's — a tile
+ * URL template carrying its own key, and the credit its terms require — so it is an option here
+ * and absent from the style entirely when a deployment configures none.
+ */
+export interface SatelliteSource {
+  /** An XYZ template, `{z}/{x}/{y}`, key included. */
+  tiles: string;
+  /** The provider's tile edge in pixels. MapTiler's are 512: declaring them 256 would draw each
+   *  one at half size and fetch four times as many, all counted against the quota. */
+  tileSize: number;
+  /** The deepest zoom the provider serves; MapLibre overzooms past it. */
+  maxzoom: number;
+  /** HTML, like `ATTRIBUTION`: shown by the attribution control and baked into exports. */
+  attribution: string;
+}
+
+/** The source and layer id of the imagery. Android toggles it by name (`MapSatellite`). */
+export const SATELLITE_SOURCE = 'satellite';
+export const SATELLITE_LAYER_ID = 'satellite';
+
+/** The style `metadata` key listing the layers satellite mode hides, for clients that toggle it
+ *  from the served document rather than from this module (Android's `MapSatellite`). */
+export const SATELLITE_HIDES_METADATA = 'holdmytrack:satellite-hides';
+
+/**
+ * The layers satellite mode hides so the imagery shows through: the basemap's background and
+ * area fills (earth, water, landuse, landcover, buildings). Roads, boundaries and labels stay —
+ * that is the hybrid. Derived from layer type rather than listed by id, so a
+ * `@protomaps/basemaps` upgrade that adds a fill doesn't paint over the imagery.
+ */
+export function satelliteHiddenLayerIds(style: readonly LayerSpecification[]): string[] {
+  return style
+    .filter((layer) => layer.type === 'background' || (layer.type === 'fill' && layer.source === BASEMAP_SOURCE))
+    .map((layer) => layer.id);
+}
 
 /**
  * Mandatory attribution, not decoration: the Protomaps basemap is an ODbL
@@ -57,6 +107,10 @@ export interface BuildStyleOptions {
    *  (`BIKE_PATH_LAYER_IDS`). Both off by default, so the served style documents look the same
    *  as the stock basemap to a client that never flips them. */
   paths?: PathOverlays;
+  /** The deployment's imagery, or none: then the style has no satellite source at all. */
+  satellite?: SatelliteSource | null;
+  /** Whether satellite mode starts on. Ignored without `satellite`. */
+  satelliteOn?: boolean;
 }
 
 /**
@@ -182,9 +236,13 @@ export function buildStyle(options: BuildStyleOptions): StyleSpecification {
     glyphsPath = GLYPHS_PATH,
     spriteBasePath = SPRITE_BASE_PATH,
     paths = { trails: false, tracks: false, bikePaths: false },
+    satellite = null,
+    satelliteOn = false,
   } = options;
 
   const base = origin.replace(/\/$/, '');
+  const vector = withPathLayers(layers(BASEMAP_SOURCE, namedFlavor(flavor), { lang }), flavor, paths);
+  const hidden = satellite ? satelliteHiddenLayerIds(vector) : [];
 
   return {
     version: 8,
@@ -201,7 +259,36 @@ export function buildStyle(options: BuildStyleOptions): StyleSpecification {
         url: `pmtiles://${base}${pmtilesPath}`,
         attribution: ATTRIBUTION,
       },
+      ...(satellite && { [SATELLITE_SOURCE]: satelliteSourceSpec(satellite) }),
     },
-    layers: withPathLayers(layers(BASEMAP_SOURCE, namedFlavor(flavor), { lang }), flavor, paths),
+    ...(satellite && { metadata: { [SATELLITE_HIDES_METADATA]: hidden } }),
+    layers: satellite ? withSatelliteLayer(vector, hidden, satelliteOn) : vector,
   };
+}
+
+function satelliteSourceSpec(satellite: SatelliteSource): RasterSourceSpecification {
+  return {
+    type: 'raster',
+    tiles: [satellite.tiles],
+    tileSize: satellite.tileSize,
+    maxzoom: satellite.maxzoom,
+    attribution: satellite.attribution,
+  };
+}
+
+/** The imagery right above the background, so everything the vector basemap draws after it —
+ *  and every overlay inserted at the first symbol layer — stacks over it. */
+function withSatelliteLayer(base: LayerSpecification[], hidden: string[], on: boolean): LayerSpecification[] {
+  const imagery: LayerSpecification = {
+    id: SATELLITE_LAYER_ID,
+    type: 'raster',
+    source: SATELLITE_SOURCE,
+    layout: { visibility: on ? 'visible' : 'none' },
+  };
+  const hide = new Set(on ? hidden : []);
+  const layers = base.map((layer) =>
+    hide.has(layer.id) ? ({ ...layer, layout: { ...layer.layout, visibility: 'none' } } as LayerSpecification) : layer,
+  );
+  const at = layers.findIndex((layer) => layer.type === 'background') + 1;
+  return [...layers.slice(0, at), imagery, ...layers.slice(at)];
 }

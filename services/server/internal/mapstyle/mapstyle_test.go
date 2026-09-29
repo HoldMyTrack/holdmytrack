@@ -30,7 +30,7 @@ func TestFlavorsMatchWebClient(t *testing.T) {
 func TestDocumentSubstitutesOrigin(t *testing.T) {
 	const origin = "https://cdn.example.com"
 	for _, flavor := range Flavors() {
-		doc, err := Document(flavor, origin)
+		doc, err := Document(flavor, origin, Satellite{})
 		if err != nil {
 			t.Fatalf("Document(%q): %v", flavor, err)
 		}
@@ -79,11 +79,11 @@ func TestDocumentSubstitutesOrigin(t *testing.T) {
 }
 
 func TestDocumentTrimsTrailingSlash(t *testing.T) {
-	with, err := Document("light", "https://cdn.example.com/")
+	with, err := Document("light", "https://cdn.example.com/", Satellite{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	without, err := Document("light", "https://cdn.example.com")
+	without, err := Document("light", "https://cdn.example.com", Satellite{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,14 +94,14 @@ func TestDocumentTrimsTrailingSlash(t *testing.T) {
 }
 
 func TestDocumentUnknownFlavor(t *testing.T) {
-	if _, err := Document("neon", "https://example.com"); !errors.Is(err, ErrUnknownFlavor) {
+	if _, err := Document("neon", "https://example.com", Satellite{}); !errors.Is(err, ErrUnknownFlavor) {
 		t.Errorf("err = %v, want ErrUnknownFlavor so the handler can answer 404", err)
 	}
 }
 
 func TestETagVariesWithOrigin(t *testing.T) {
-	a, _ := Document("light", "https://a.example.com")
-	b, _ := Document("light", "https://b.example.com")
+	a, _ := Document("light", "https://a.example.com", Satellite{})
+	b, _ := Document("light", "https://b.example.com", Satellite{})
 	if ETag(a) == ETag(b) {
 		t.Error("same ETag for different origins — a client would cache the wrong asset URLs")
 	}

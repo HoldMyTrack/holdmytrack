@@ -20,6 +20,7 @@ import (
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"path"
@@ -36,6 +37,29 @@ var styles embed.FS
 // app's own origin, a production deployment may resolve them against a CDN. Must match
 // ORIGIN_PLACEHOLDER in apps/web/scripts/build-style.mjs.
 const originPlaceholder = "__HOLDMYTRACK_BASEMAP_ORIGIN__"
+
+// The satellite imagery source is generated with placeholders in place of a real tile URL and
+// credit (docs/SPEC.md FR-4.14): the URL carries a deployment's own key, and a deployment may
+// configure no imagery at all. Must match SATELLITE_PLACEHOLDER in build-style.mjs.
+const (
+	satelliteTilesPlaceholder       = "__HOLDMYTRACK_SATELLITE_TILES__"
+	satelliteAttributionPlaceholder = "__HOLDMYTRACK_SATELLITE_ATTRIBUTION__"
+)
+
+// The ids style.ts gives the imagery: SATELLITE_SOURCE and SATELLITE_LAYER_ID.
+const (
+	satelliteSource = "satellite"
+	satelliteLayer  = "satellite"
+)
+
+// Satellite is a deployment's imagery, mirroring style.ts's SatelliteSource. A zero Tiles means
+// none: Document then leaves the satellite source out, and clients show no switch for it.
+type Satellite struct {
+	Tiles       string // XYZ template, key included
+	TileSize    int    // pixels; MapTiler's are 512
+	MaxZoom     int
+	Attribution string // HTML, shown by the client's attribution control
+}
 
 // ErrUnknownFlavor is returned for a flavor with no embedded document, so the caller can
 // answer 404 rather than 500 — an unknown flavor is a bad request path, not a server fault.
@@ -79,15 +103,77 @@ func Flavors() []string {
 	return out
 }
 
-// Document returns the style for one flavor with basemap asset URLs resolved against origin.
-// origin is an absolute origin with no trailing slash, e.g. "https://map.example.com".
-func Document(flavor, origin string) ([]byte, error) {
+// Document returns the style for one flavor with basemap asset URLs resolved against origin
+// and the satellite source filled from sat, or removed when sat configures none. origin is an
+// absolute origin with no trailing slash, e.g. "https://map.example.com".
+func Document(flavor, origin string, sat Satellite) ([]byte, error) {
 	load()
 	b, ok := rendered[flavor]
 	if !ok {
 		return nil, fmt.Errorf("%w: %q", ErrUnknownFlavor, flavor)
 	}
-	return bytes.ReplaceAll(b, []byte(originPlaceholder), []byte(strings.TrimRight(origin, "/"))), nil
+	b = bytes.ReplaceAll(b, []byte(originPlaceholder), []byte(strings.TrimRight(origin, "/")))
+	return withSatellite(b, sat)
+}
+
+// withSatellite replaces the generated placeholder source with sat, or drops the source, its
+// layer and the metadata listing what it hides. It edits the document structurally rather than
+// by string replacement: the tile URL and credit are arbitrary text that needs JSON escaping,
+// and removing a layer is not a substitution at all. Layers other than the satellite one pass
+// through as raw JSON, untouched.
+func withSatellite(doc []byte, sat Satellite) ([]byte, error) {
+	var style map[string]json.RawMessage
+	err := json.Unmarshal(doc, &style)
+	if err != nil {
+		return nil, fmt.Errorf("mapstyle: %w", err)
+	}
+	var sources map[string]json.RawMessage
+	if err := json.Unmarshal(style["sources"], &sources); err != nil {
+		return nil, fmt.Errorf("mapstyle: sources: %w", err)
+	}
+	if _, ok := sources[satelliteSource]; !ok {
+		return doc, nil
+	}
+
+	if sat.Tiles != "" {
+		if sources[satelliteSource], err = json.Marshal(map[string]any{
+			"type":        "raster",
+			"tiles":       []string{sat.Tiles},
+			"tileSize":    sat.TileSize,
+			"maxzoom":     sat.MaxZoom,
+			"attribution": sat.Attribution,
+		}); err != nil {
+			return nil, err
+		}
+	} else {
+		// metadata holds only the hidden-layer list (style.ts), meaningless without the layer.
+		delete(sources, satelliteSource)
+		delete(style, "metadata")
+		var layers []json.RawMessage
+		if err := json.Unmarshal(style["layers"], &layers); err != nil {
+			return nil, fmt.Errorf("mapstyle: layers: %w", err)
+		}
+		kept := layers[:0]
+		for _, l := range layers {
+			var head struct {
+				ID string `json:"id"`
+			}
+			if err := json.Unmarshal(l, &head); err != nil {
+				return nil, fmt.Errorf("mapstyle: layer: %w", err)
+			}
+			if head.ID != satelliteLayer {
+				kept = append(kept, l)
+			}
+		}
+		if style["layers"], err = json.Marshal(kept); err != nil {
+			return nil, err
+		}
+	}
+
+	if style["sources"], err = json.Marshal(sources); err != nil {
+		return nil, err
+	}
+	return json.Marshal(style)
 }
 
 // ETag is a strong validator over the document's actual bytes. The style changes only when

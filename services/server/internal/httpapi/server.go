@@ -25,6 +25,7 @@ import (
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mail"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mapstyle"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 )
@@ -87,6 +88,7 @@ type Server struct {
 	mailer                mail.Sender
 	appBaseURL            string
 	basemapOrigin         string
+	satellite             mapstyle.Satellite
 	version               string
 	skipEmailVerification bool
 	google                googleOAuth
@@ -94,10 +96,10 @@ type Server struct {
 	pages                 *web.Renderer
 }
 
-func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail.Sender, appBaseURL, basemapOrigin, version string, skipEmailVerification bool, google GoogleOAuthConfig, facebook FacebookOAuthConfig, pages *web.Renderer) *Server {
+func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail.Sender, appBaseURL, basemapOrigin string, satellite mapstyle.Satellite, version string, skipEmailVerification bool, google GoogleOAuthConfig, facebook FacebookOAuthConfig, pages *web.Renderer) *Server {
 	s := &Server{
 		pool: pool, store: store, log: log, mux: http.NewServeMux(), mailer: mailer,
-		appBaseURL: appBaseURL, basemapOrigin: basemapOrigin, version: version,
+		appBaseURL: appBaseURL, basemapOrigin: basemapOrigin, satellite: satellite, version: version,
 		skipEmailVerification: skipEmailVerification,
 		google:                newGoogleOAuth(google),
 		facebook:              newFacebookOAuth(facebook),

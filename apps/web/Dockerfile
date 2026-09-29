@@ -45,6 +45,12 @@ CMD ["npm", "run", "verify:map"]
 # DEPLOY.md for both.
 FROM base AS build
 ARG VITE_BASEMAP_ORIGIN=""
+# Satellite imagery (docs/SPEC.md FR-4.14): an XYZ template with the provider's key, its tile
+# size, deepest zoom and credit. An empty template hides the Satellite switch.
+ARG VITE_SATELLITE_TILES=""
+ARG VITE_SATELLITE_TILE_SIZE=""
+ARG VITE_SATELLITE_MAXZOOM=""
+ARG VITE_SATELLITE_ATTRIBUTION=""
 # The build's git short-SHA (compose.prod.yml's GIT_SHA build arg) — baked into the bundle
 # so VersionBanner.tsx can detect a tab left open across a deploy by comparing it against
 # /healthz's own version field.
@@ -53,6 +59,10 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV VITE_API_BASE_URL=""
 ENV VITE_BASEMAP_ORIGIN=$VITE_BASEMAP_ORIGIN
+ENV VITE_SATELLITE_TILES=$VITE_SATELLITE_TILES
+ENV VITE_SATELLITE_TILE_SIZE=$VITE_SATELLITE_TILE_SIZE
+ENV VITE_SATELLITE_MAXZOOM=$VITE_SATELLITE_MAXZOOM
+ENV VITE_SATELLITE_ATTRIBUTION=$VITE_SATELLITE_ATTRIBUTION
 ENV VITE_GIT_SHA=$GIT_SHA
 RUN npm run build
 

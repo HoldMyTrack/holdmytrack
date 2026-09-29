@@ -7,7 +7,35 @@
       "type": "vector",
       "url": "pmtiles://__HOLDMYTRACK_BASEMAP_ORIGIN__/basemap/basemap.pmtiles",
       "attribution": "<a href=\"https://protomaps.com\">Protomaps</a> © <a href=\"https://openstreetmap.org\">OpenStreetMap</a>"
+    },
+    "satellite": {
+      "type": "raster",
+      "tiles": [
+        "__HOLDMYTRACK_SATELLITE_TILES__"
+      ],
+      "tileSize": 512,
+      "maxzoom": 18,
+      "attribution": "__HOLDMYTRACK_SATELLITE_ATTRIBUTION__"
     }
+  },
+  "metadata": {
+    "holdmytrack:satellite-hides": [
+      "background",
+      "earth",
+      "landuse_park",
+      "landuse_urban_green",
+      "landuse_hospital",
+      "landuse_industrial",
+      "landuse_school",
+      "landuse_beach",
+      "landuse_zoo",
+      "landuse_aerodrome",
+      "landuse_runway",
+      "water",
+      "landuse_pedestrian",
+      "landuse_pier",
+      "buildings"
+    ]
   },
   "layers": [
     {
@@ -15,6 +43,14 @@
       "type": "background",
       "paint": {
         "background-color": "#2b2b2b"
+      }
+    },
+    {
+      "id": "satellite",
+      "type": "raster",
+      "source": "satellite",
+      "layout": {
+        "visibility": "none"
       }
     },
     {
