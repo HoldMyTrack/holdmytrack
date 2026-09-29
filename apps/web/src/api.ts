@@ -924,6 +924,17 @@ export async function listStories(signal?: AbortSignal): Promise<Story[]> {
   return ((await res.json()) as { stories: StoryBody[] }).stories.map(toStory);
 }
 
+/** `DELETE /v1/stories/{id}` — the Story only; its activities stay. */
+export async function deleteStory(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/stories/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  if (!res.ok && res.status !== 404) {
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
+  }
+}
+
 /** `POST /v1/stories/{id}/activities` — puts them in the Story; any already there stay as they are. */
 export async function addStoryActivities(id: string, activityIds: string[]): Promise<Story> {
   const res = await fetch(`${API_BASE_URL}${API_V1}/stories/${encodeURIComponent(id)}/activities`, {

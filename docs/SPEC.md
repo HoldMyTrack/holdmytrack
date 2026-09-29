@@ -392,7 +392,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 ### FR-3.4 Import status and history
 
-**Description**: A user can see the status of in-progress and past uploads and syncs, and jump from a finished one straight to it on the map. The Activities panel has three tabs, **Activities** (the list, FR-5), **Sync**, and **Privacy** (Private locations, FR-8.1). The Sync tab holds the file drop zone and picker (`.gpx`/`.fit`/`.tcx`, `.zip`, and Google Takeout — FR-3.1–FR-3.3) above one history list of everything imported into the account, whatever the source: uploaded files alongside activity synced from the Android app (Health Connect and in-app GPS recording — FR-3.6, FR-3.8). The web can't start a phone sync; the history is a read-only status view, not a "sync now" button: that sync is phone-triggered, and nothing in the web app can request it (`apps/android/docs/SPEC.md` §7.4's own "Ask every time"/"Always allow" split is the closest analogue, and it lives entirely on the phone). The Android app's Sync history screen shows the same history in the same rows, pager and summary (`apps/android/docs/SPEC.md` FR-4.1) — one account's history should read the same on every client.
+**Description**: A user can see the status of in-progress and past uploads and syncs, and jump from a finished one straight to it on the map. The Activities panel has four tabs, **Activities** (the list, FR-5), **Stories** (FR-14.6), **Sync**, and **Privacy** (Private locations, FR-8.1). The Sync tab holds the file drop zone and picker (`.gpx`/`.fit`/`.tcx`, `.zip`, and Google Takeout — FR-3.1–FR-3.3) above one history list of everything imported into the account, whatever the source: uploaded files alongside activity synced from the Android app (Health Connect and in-app GPS recording — FR-3.6, FR-3.8). The web can't start a phone sync; the history is a read-only status view, not a "sync now" button: that sync is phone-triggered, and nothing in the web app can request it (`apps/android/docs/SPEC.md` §7.4's own "Ask every time"/"Always allow" split is the closest analogue, and it lives entirely on the phone). The Android app's Sync history screen shows the same history in the same rows, pager and summary (`apps/android/docs/SPEC.md` FR-4.1) — one account's history should read the same on every client.
 
 **Preconditions**: Active session.
 
@@ -629,7 +629,7 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 
 **Behavior**: Each row's primary line is the activity's own name if one has been set (FR-5.10), or its start date/time otherwise — an activity has a name only once a person has typed one in via FR-5.10's edit dialog, never from parsing a source file. A row whose primary line is a name still shows its date/time as part of the row's secondary line, alongside distance, duration, and type — a row's only other elements are its checkbox and this text; there is no separate per-row column or icon of any kind, and no per-row action controls (edit/delete/hide are reached via FR-5.6's checkbox plus the header toolbar, not from the row itself). Regardless of what a row displays, **the list itself is always ordered by start date/time, newest first** — a name never affects sort order. The list is not paginated — every matching activity is shown at once. The panel also shows a running count of matching activities and total distance for the range (independent of the TYPE/DISTANCE filters, which narrow the visible rows without changing this total).
 
-**Story badge**: A row whose activity is in a Story (FR-14) carries a badge beside the Pending and Hidden ones (FR-5.15), in the accent color: "Story" for one, "2 stories" for more, its tooltip naming them — "In a story: Brecksville Reservation". In the Story view (FR-14.7) the Story on screen doesn't count, since every row is in it: a row there is badged only for its other Stories ("Also in: …"). `GET /v1/activities` carries each row's Stories, newest first, as `stories` (`[{id, name}]`, empty for none).
+**Story badge**: A row whose activity is in a Story (FR-14) carries a badge beside the Pending and Hidden ones (FR-5.15), in the accent color: "Story" for one, "2 stories" for more, its tooltip naming them — "In a story: Brecksville Reservation". Under the open Story on the Stories tab (FR-14.6) that Story doesn't count, since every row there is in it: a row there is badged only for its other Stories ("Also in: …"). The badge is only a label; clicking it does nothing. `GET /v1/activities` carries each row's Stories, newest first, as `stories` (`[{id, name}]`, empty for none).
 
 ### FR-5.2 TYPE filter
 
@@ -782,7 +782,7 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 **Behavior**:
 1. The icon opens a Create story dialog over the map naming what it's made of — "A story of 3 checked activities (58 km). Only you can see it." — with Name (required, up to 200 characters) and Description (optional, up to 2000).
 2. "Create story" stays disabled until Name has something besides spaces; Enter in Name does the same as clicking it. Cancel, Escape or a click outside closes the dialog with nothing made.
-3. Creating makes the Story with those activities in one step (FR-14.2) and opens it in the Story view (FR-14.7).
+3. Creating makes the Story with those activities in one step (FR-14.2) and opens it on the Stories tab (FR-14.6).
 
 **Error cases**: A request that fails keeps the dialog open with the server's message under the fields, the fields as typed.
 
@@ -796,8 +796,8 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 1. The tab lists every Story of the account, newest first, each with a checkbox and how many activities it holds, under "Tick a story to put this activity in it, clear one to take it out" (or "all 3 activities" for a group). It loads when the window opens. With no Stories, it says how to make one (FR-5.16).
 2. A Story's box is ticked when it holds every one of the window's activities, indeterminate when it holds some of them (its tooltip says so), and clear when it holds none.
 3. Clicking a clear or indeterminate box ticks it; clicking a ticked box clears it. A box can't be set back to indeterminate by a click — Cancel discards every change. The tab carries a dot while any box differs from what's saved.
-4. Save commits each changed Story in one request: ticked puts all the window's activities in it (any already there stay), cleared takes them all out (FR-14.3); the activities themselves never change. The fields (FR-5.10) are written first, then the Stories, then a track edit (FR-5.14). If a later request fails, the window stays open with the error, and Save again skips what was already written.
-5. In the Story view (FR-14.7), taking an activity out of the Story on screen drops it from the list, bars, tracks and header as Save closes the window; putting one in brings it in.
+4. Save commits each changed Story in one request: ticked puts all the window's activities in it (any already there stay), cleared takes them all out (FR-14.3); the activities themselves never change. The fields (FR-5.10) are written first, then the Stories, then a track edit (FR-5.14). If a later request fails, the window stays open with the error, and Save again skips what was already written. The rows' Story badges (FR-5.1) follow as the window closes.
+5. This tab is the only place an activity goes into or out of an existing Story: the Stories tab (FR-14.6) only shows them.
 
 ## 8. FR-6 — Date Range Picker
 
@@ -912,7 +912,7 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 
 ### FR-10.2 Help page
 
-**Description**: A public page at `/help` that explains how HoldMyTrack works, in six sections reachable from jump links under its title: the map (the opening view, the Normal / Fog of War / Heatmap modes, and how Fog and Heatmap switch to whole states or regions, then whole countries, as the map zooms out — FR-4), the timeline (what a bar is, the selection band and how to extend, move or scroll it, and the phone slider — FR-6), Stories (making one, adding and removing activities, the Stories page and the Story view, the badge — FR-14, FR-5.16, FR-5.17), getting activities in (files, `.zip` archives, Google Takeout with a link to Google's own download guide, the Android app, and what happens on a repeated or cross-source import — FR-3), exporting a map image (FR-4.10), and settings and privacy (Country, Timezone, Private locations — FR-1.7, FR-8.1 — what HoldMyTrack stores and doesn't: no health data, only the route, and the original upload kept only to rebuild it (`VISION.md` §1.1; anchor `#what-we-store`) — and how to ask for an account to be deleted, which is by email to the Contacts address since there is no self-service deletion yet, and how to revoke Google's or Facebook's access on their side; its `#delete-account` anchor is the deployment's data-deletion instructions URL for Facebook, FR-1.10).
+**Description**: A public page at `/help` that explains how HoldMyTrack works, in six sections reachable from jump links under its title: the map (the opening view, the Normal / Fog of War / Heatmap modes, and how Fog and Heatmap switch to whole states or regions, then whole countries, as the map zooms out — FR-4), the timeline (what a bar is, the selection band and how to extend, move or scroll it, and the phone slider — FR-6), Stories (making one, adding and removing activities, the Stories tab, renaming and deleting, the badge — FR-14, FR-5.16, FR-5.17), getting activities in (files, `.zip` archives, Google Takeout with a link to Google's own download guide, the Android app, and what happens on a repeated or cross-source import — FR-3), exporting a map image (FR-4.10), and settings and privacy (Country, Timezone, Private locations — FR-1.7, FR-8.1 — what HoldMyTrack stores and doesn't: no health data, only the route, and the original upload kept only to rebuild it (`VISION.md` §1.1; anchor `#what-we-store`) — and how to ask for an account to be deleted, which is by email to the Contacts address since there is no self-service deletion yet, and how to revoke Google's or Facebook's access on their side; its `#delete-account` anchor is the deployment's data-deletion instructions URL for Facebook, FR-1.10).
 
 **Preconditions**: None.
 
@@ -934,7 +934,7 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 **Description**: Every page shares one header — the map and Profile included — and every page other than those two shares one footer.
 
 **Behavior**:
-1. The header shows the logo, wordmark and tagline (the brand links to `/`), then Donate (FR-11.1), with a session a "Stories" link to `/stories` (FR-14.6, marked while on it), an "Info" menu listing About, Help and Contacts with the current page marked, and the account area.
+1. The header shows the logo, wordmark and tagline (the brand links to `/`), then Donate (FR-11.1), an "Info" menu listing About, Help and Contacts with the current page marked, and the account area.
 2. Signed out, the account area is a "Sign in" link to `/signin`. With a session (real or demo), it is an account menu showing the account's avatar (or a generic icon) that opens to the account's email (a demo session shows its display name instead, followed by "Create your own account", FR-2.3), then "Profile" (`/profile`), "Settings" (`/settings`), "Admin" (`/admin`, an admin only — FR-12.1) and "Sign out".
 3. Both menus open and close without JavaScript.
 4. "Sign out" submits `POST /logout`, which ends the session the same way `POST /v1/auth/logout` does and redirects to `/`. The request is refused (`403`) unless its `Origin` header — or, without one, its `Referer` — is the app's own origin.
@@ -1015,7 +1015,7 @@ A read-only view of every account and every account's activities, for the people
 
 ## 16. FR-14 — Stories
 
-A Story is a hand-picked, private set of the account's activities — a hike, a holiday, a race weekend — with a name, an optional description and joint statistics (`VISION.md` §4.2, ADR-0020). An activity can be in any number of Stories. This section covers the API, the web's Stories page (FR-14.6) and the map's Story view (FR-14.7); a Story is made from the map with Create story (FR-5.16), activities go in and out of Stories from the Edit window (FR-5.17), and a row's Story badge is FR-5.1.
+A Story is a hand-picked, private set of the account's activities — a hike, a holiday, a race weekend — with a name, an optional description and joint statistics (`VISION.md` §4.2, ADR-0020). An activity can be in any number of Stories. This section covers the API and the Activities panel's Stories tab (FR-14.6), where a Story is opened on the map; a Story is made from the map with Create story (FR-5.16), activities go in and out of Stories from the Edit window (FR-5.17), and a row's Story badge is FR-5.1.
 
 | Endpoint | Purpose |
 | :-- | :-- |
@@ -1076,41 +1076,29 @@ A Story is a hand-picked, private set of the account's activities — a hike, a 
 1. A Story is visible only to its own account. Another account's Story, a Story that doesn't exist and an id that isn't a UUID are all `404` on every endpoint, indistinguishable from each other; the list holds only the account's own Stories.
 2. A demo session reads the Demo Customer's Stories like any other account, and every write — create, rename, delete, add, remove — is refused with `403` `demo_read_only`, as for every other write (FR-2.1).
 
-### FR-14.6 The Stories page
+### FR-14.6 The Stories tab
 
-**Description**: A private page at `/stories`, reached from the header's "Stories" link (FR-10.4), listing the account's Stories.
+**Description**: The Activities panel's second tab, after Activities (FR-5), lists the account's Stories and shows one of them on the map at a time.
 
-**Preconditions**: Signed in, past email verification and first-run Settings (FR-1.8, FR-1.7) — as on every signed-in page, anyone else is sent there, or to sign-in.
+**Preconditions**: Signed in, on the map in Normal mode (FR-4.1).
 
 **Behavior**:
-1. Every Story, newest first, as a card: its name, its description when it has one, a line with its activity count, distance and moving time (FR-14.1), and the same per activity type, the most frequent first — each type by its display name, in the page's language (FR-13.1). Distances follow the account's units (FR-1.7). A Story with no activities says so instead.
-2. "View on map" opens the map's Story view, `/?story=<id>`.
-3. "Delete" opens a confirmation beside it — "Delete “<name>”? Its activities stay." — with a "Delete story" button. It deletes the Story (FR-14.2) and reloads the page with "Story deleted." It needs no script.
-4. With no Stories, the page says how to make one: check activities in the map's Activities panel, then choose Create story.
-5. A demo session sees the Demo Customer's Stories with Delete disabled.
+1. Every Story is a folder row: a triangle, then its name. The triangle points right while the Story is folded and turns to point down when it's open. Stories are ordered by when they were made, newest first. The tab has no Type or Distance filters, no checkboxes and no toolbar.
+2. Exactly one Story is open at a time. Opening the tab opens the newest. Clicking another Story opens it and folds the one that was open. Clicking the open Story does nothing, so there is no way to fold them all.
+3. The open Story shows its description, when there is one, and then its activities as rows, newest first, like the Activities tab's rows (FR-5.1) but without checkboxes. Hovering a row previews its track (FR-5.4) and clicking one focuses it (FR-5.5). Nothing else can be done to them here: an activity goes into or out of a Story from the Edit window (FR-5.17).
+4. While a Story is open, the drawn tracks, the listed rows and the date-range picker (FR-6) are that Story's activities only. The picker's bars are their days, it spans the Story's first to last activity day, and it opens on the whole Story; narrowing it narrows the rows, the tracks and an exported image (FR-4.10) as outside a Story.
+5. The footer at the bottom of the panel shows the open Story's statistics: its activity count, distance and moving time (FR-14.1), then the same per activity type, the most frequent first, each type by its display name. These are for the whole Story, whatever the picker selects. A Story with no activities says so instead.
+6. Opening a Story fits the camera to its drawn tracks. Opened by URL, a camera in the URL wins; without one the camera fits the Story. On a phone, opening a Story collapses the panel's sheet so the tracks can be seen.
+7. Each folder row has a pencil and a bin, shown while the pointer is over the row or it has keyboard focus, and always on a phone. The pencil opens Edit story, the Create story dialog (FR-5.16) with Name and Description filled in and Save (FR-14.2). The bin asks "Delete “<name>”? Its activities stay." with a "Delete story" button, then deletes the Story (FR-14.2). Deleting the open Story opens the next newest one.
+8. Leaving the tab closes the open Story: the map goes back to the date range from before it was opened, or to the usual default range (FR-6.1) for a page that opened straight into a Story. The camera stays. Coming back to the tab opens the newest Story again.
+9. The URL carries the open Story, `/?story=<id>`: a refresh or a shared link opens the Stories tab with that Story open, and Back and Forward move between Stories and to and from the tab. Create story (FR-5.16) opens the new Story the same way.
+10. Normal mode only: Fog of War and Heatmap stay all-time (FR-4.2, FR-4.3), and returning to Normal shows the open Story again.
+11. With no Stories, the tab says how to make one: check activities on the Activities tab, then choose Create story. The map stays as on the Activities tab.
+12. A demo session sees the Demo Customer's Stories the same way, with the pencil and the bin disabled.
 
 **Error cases**:
-- Deleting another account's Story, or one that doesn't exist → the "Page not found" page (`404`); nothing is deleted.
-- A delete submitted from another site → `403`; nothing is deleted.
-- A delete from a demo session → `403`, the page again with "Demo accounts can't add, edit, or delete activities — create an account to save your own data."
-
-### FR-14.7 The Story view
-
-**Description**: The map showing one Story's activities alone, at `/?story=<id>` — opened by "View on map" on the Stories page (FR-14.6), by Create story (FR-5.16), or by that URL itself.
-
-**Behavior**:
-1. The Activities panel's tabs give way to the Story's header: "Story: <name>", a pencil, Exit story, the description when there is one, and the whole Story's statistics with a row per activity type (FR-14.1) — the whole Story whatever range is selected; a Story with no activities says so. Sync and Privacy aren't reachable until Exit story.
-2. The date-range picker (FR-6) works as outside a Story, over the Story's activities only: its bars are their days, it spans the Story's first to last activity day, and it opens on the whole Story. The list, the panel's totals, the drawn tracks and an exported image (FR-4.10) follow its selection.
-3. Opened from the map (Create story, Back or Forward), the camera fits the Story's drawn tracks. Opened by URL, a camera in the URL wins; without one the camera fits the Story.
-4. Type and Distance filters, focus, checkboxes, Show/hide, Edit, Create story and Delete work as outside a Story (FR-5). Entering or leaving a Story starts them afresh, as a new range does (FR-6.6).
-5. The toolbar gains Remove from story (a book with a minus), over its target (FR-5.7): the activities leave the Story — not the account — and the list, bars, tracks, totals and header update.
-6. The pencil opens Edit story, the Create story dialog's Name and Description filled in, with Save (FR-14.2).
-7. Exit story returns to the map outside the Story, with the date range from before it; a page opened straight into a Story exits onto the usual default range (FR-6.1). The camera stays.
-8. The URL carries the Story, so a refresh or a shared link reopens it, and Back and Forward move between it and the map outside it.
-9. Normal mode only: Fog of War and Heatmap stay all-time (FR-4.2, FR-4.3), and returning to Normal returns to the Story.
-10. A demo session sees its Stories the same way, with the pencil and Remove from story disabled.
-
-**Error cases**: A Story that doesn't exist or isn't the account's shows "This story doesn't exist, or isn't yours." in the header with Exit story, and no activities.
+- A `?story=` for a Story that doesn't exist or isn't the account's shows "This story doesn't exist, or isn't yours." at the top of the tab, with no Story open and no activities; clicking a Story opens it.
+- A rename or delete that fails keeps its dialog open with the server's message.
 
 ## 17. Non-Functional Requirements (summary)
 

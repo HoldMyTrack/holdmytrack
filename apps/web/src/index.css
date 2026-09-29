@@ -147,7 +147,7 @@ body {
   background: rgb(var(--fm-accent-rgb) / 35%);
 }
 
-/* The panel's tab strip (ActivitiesPanel.tsx: Activities | Sync). Each tab keeps the serif
+/* The panel's tab strip (ActivitiesPanel.tsx: Activities | Stories | Sync | Privacy). Each tab keeps the serif
    heading look the panel title had before there were two; the inactive one is just dimmed,
    and the active one carries an accent underline like the other tab strips here. */
 .activities-panel__head {
@@ -157,88 +157,157 @@ body {
   padding: var(--fm-space-12) var(--fm-space-16) 0;
   margin-bottom: var(--fm-space-8);
   border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 8%);
+  /* Four tabs don't always fit a narrow panel or a phone, Russian's "Синхронизация" least of
+     all, so the strip scrolls sideways rather than widening the panel; ActivitiesPanel.tsx
+     keeps the selected tab in view. */
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
-/* The Story view's header (FR-14.7), in the tabs' place: "Story: <name>" with the pencil and
-   Exit story on one line, then the description, the whole Story's numbers and a row per type. */
-.story-head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fm-space-6);
-  padding: var(--fm-space-12) var(--fm-space-16);
-  margin-bottom: var(--fm-space-8);
+.activities-panel__head::-webkit-scrollbar {
+  display: none;
+}
+
+/* The Stories tab (StoriesTab.tsx, FR-14.6): one scrolling list of folders, one of them open
+   with its activities inside, and the open Story's numbers pinned below in the footer. */
+.stories-tab {
+  flex: 1;
+  min-height: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
+}
+
+.stories-tab__story {
   border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 8%);
 }
 
-.story-head__row {
+.stories-tab__folder {
+  display: flex;
+  align-items: center;
+  gap: var(--fm-space-6);
+  padding: var(--fm-space-6) var(--fm-space-16) var(--fm-space-6) var(--fm-space-10);
+}
+
+.stories-tab__toggle {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--fm-space-8);
-}
-
-.story-head__title {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  font-family: var(--fm-font-serif);
-  font-size: var(--fm-text-xl);
-  font-weight: var(--fm-weight-semibold);
-  line-height: 1.25;
-  overflow-wrap: anywhere;
-}
-
-.story-head__exit {
-  flex: none;
-  border: 1px solid rgb(var(--fm-ink-rgb) / 18%);
-  border-radius: var(--fm-radius-sm);
-  padding: var(--fm-space-6) var(--fm-space-10);
-  background: var(--fm-surface);
+  border: 0;
+  padding: var(--fm-space-6);
+  background: none;
   color: var(--fm-ink);
   font: inherit;
-  font-size: var(--fm-text-md);
-  font-weight: var(--fm-weight-semibold);
+  text-align: left;
   cursor: pointer;
 }
 
-.story-head__exit:hover {
-  background: var(--fm-surface-tint);
+.stories-tab__story--open .stories-tab__toggle {
+  cursor: default;
 }
 
-.story-head__description {
+/* The Play triangle points right while folded and turns to point down once open. */
+.stories-tab__chevron {
+  flex: none;
+  fill: currentColor;
+  color: rgb(var(--fm-ink-rgb) / 55%);
+  transition: transform 150ms ease;
+}
+
+.stories-tab__story--open .stories-tab__chevron {
+  transform: rotate(90deg);
+  color: var(--fm-accent-strong);
+}
+
+.stories-tab__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--fm-font-serif);
+  font-size: var(--fm-text-lg);
+  font-weight: var(--fm-weight-semibold);
+}
+
+/* A folder's pencil and trash show on hover (and for keyboard focus) at desktop width; the
+   phone query below keeps them visible, since a finger has no hover. */
+.stories-tab__action {
+  opacity: 0;
+}
+
+.stories-tab__folder:hover .stories-tab__action,
+.stories-tab__folder:focus-within .stories-tab__action {
+  opacity: 1;
+}
+
+.stories-tab__body {
+  padding-bottom: var(--fm-space-6);
+}
+
+.stories-tab__description {
   margin: 0;
+  padding: 0 var(--fm-space-16) var(--fm-space-8) 36px;
   font-size: var(--fm-text-md);
   color: var(--fm-ink-secondary);
   white-space: pre-line;
   overflow-wrap: anywhere;
 }
 
-.story-head__stats {
+.stories-tab__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid rgb(var(--fm-ink-rgb) / 6%);
+}
+
+/* Set in under the folder's name, which is what makes them its contents. */
+.stories-tab__rows .activities-panel__row {
+  padding-left: 36px;
+}
+
+.stories-tab__rows .activities-panel__row:last-child {
+  border-bottom: 0;
+}
+
+/* Two classes, to win over .activities-panel__footer's row layout further down. */
+.activities-panel__footer.stories-tab__stats {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--fm-space-4);
+  text-align: left;
+}
+
+.stories-tab__stats-line {
   margin: 0;
   font-size: var(--fm-text-md);
   font-weight: var(--fm-weight-semibold);
 }
 
-.story-head__types {
+.stories-tab__types {
   border-collapse: collapse;
   font-size: var(--fm-text-sm);
   color: rgb(var(--fm-ink-rgb) / 70%);
 }
 
-.story-head__types th {
+.stories-tab__types th {
   padding: 1px var(--fm-space-12) 1px 0;
   font-weight: var(--fm-weight-regular);
   text-align: left;
 }
 
-.story-head__types td {
+.stories-tab__types td {
   padding: 1px 0;
 }
 
 .activities-panel__tab {
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--fm-space-8);
-  margin-bottom: -1px;
   padding: 0 0 var(--fm-space-6);
   border: 0;
   border-bottom: 2px solid transparent;
@@ -637,7 +706,6 @@ body {
 .activities-panel__edit,
 .activities-panel__edit-track,
 .activities-panel__create-story,
-.activities-panel__remove-from-story,
 .activities-panel__delete,
 .activities-panel__visibility,
 .activities-panel__focus {
@@ -658,7 +726,6 @@ body {
 .activities-panel__edit:hover:not(:disabled),
 .activities-panel__edit-track:hover:not(:disabled),
 .activities-panel__create-story:hover:not(:disabled),
-.activities-panel__remove-from-story:hover:not(:disabled),
 .activities-panel__delete:hover:not(:disabled),
 .activities-panel__visibility:hover:not(:disabled) {
   background: var(--fm-surface-tint-strong);
@@ -671,7 +738,6 @@ body {
 .activities-panel__edit:disabled,
 .activities-panel__edit-track:disabled,
 .activities-panel__create-story:disabled,
-.activities-panel__remove-from-story:disabled,
 .activities-panel__delete:disabled,
 .activities-panel__visibility:disabled,
 .activities-panel__focus:disabled {
@@ -2228,12 +2294,16 @@ body {
 
   .activities-panel__edit,
   .activities-panel__create-story,
-  .activities-panel__remove-from-story,
   .activities-panel__delete,
   .activities-panel__visibility,
   .activities-panel__focus {
     width: 34px;
     height: 34px;
+  }
+
+  /* A finger has no hover, so a Story's pencil and bin stay in view. */
+  .stories-tab__action {
+    opacity: 1;
   }
 
   .activities-panel__type-trigger {

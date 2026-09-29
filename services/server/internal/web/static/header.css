@@ -167,8 +167,6 @@
   margin: 0;
 }
 
-/* Stories, a plain link that looks like the Info menu's trigger beside it. */
-.header-link,
 .info-menu__trigger {
   display: inline-flex;
   align-items: center;
@@ -180,12 +178,6 @@
   color: var(--fm-ink);
 }
 
-.header-link {
-  text-decoration: none;
-}
-
-.header-link:hover,
-.header-link[aria-current='page'],
 .info-menu__trigger:hover,
 .info-menu[open] .info-menu__trigger {
   background: rgb(var(--fm-ink-rgb) / 6%);
@@ -264,8 +256,7 @@
     gap: 2px;
   }
 
-  /* Stories, Info and the avatar must still fit beside the brand on a 320px screen. */
-  .header-link,
+  /* Info and the avatar must still fit beside the brand on a 320px screen. */
   .info-menu__trigger {
     padding: 6px;
   }
