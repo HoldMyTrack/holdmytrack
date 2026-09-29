@@ -28,11 +28,12 @@ import dev.holdmytrack.android.net.Activity
 import dev.holdmytrack.android.net.Duplicate
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
+import dev.holdmytrack.android.net.Story
 import dev.holdmytrack.android.recording.RecordingTypes
 import kotlin.math.abs
 
-/** The panel's three tabs, the web's `PanelTab`. */
-enum class PanelTab { ACTIVITIES, SYNC, PRIVACY }
+/** The panel's four tabs, the web's `PanelTab`. */
+enum class PanelTab { ACTIVITIES, STORIES, SYNC, PRIVACY }
 
 /**
  * The map's Activities panel, as the web draws it at phone width
@@ -40,15 +41,17 @@ enum class PanelTab { ACTIVITIES, SYNC, PRIVACY }
  * date-range footer, collapsed to its tab row and a line under it ("… loaded" on the
  * Activities tab), expanded to most of the screen by tapping that line. The Activities tab
  * holds the Type dropdown and the DISTANCE slider, a toolbar over the toolbar's target, the
- * rows, the target's summary, and the duplicates disclosure; the Sync tab, the import
- * history ([SyncTab]); the Privacy tab, the Private locations ([PrivacyTab], which
- * `MainActivity` owns, since it works on the map).
+ * rows, the target's summary, and the duplicates disclosure; the Stories tab, the account's
+ * Stories with one open on the map ([StoriesTab]); the Sync tab, the import history
+ * ([SyncTab]); the Privacy tab, the Private locations ([PrivacyTab], which `MainActivity`
+ * owns, since it works on the map).
  *
  * The rules live in [PanelState]; this draws it and turns taps into state changes.
  * `MainActivity` owns the map and the fetch: it hands over each list ([setActivities]) and
  * hears about every change that touches the map through [onMapChanged] (what to hide, what's
  * selected) and [onFly] (the activities to frame); Edit is [onEdit]'s to open, and a finished
- * Delete is reported through [onDeleted].
+ * Delete is reported through [onDeleted]. Which Story is open is `MainActivity`'s too
+ * ([onOpenStory], [onCloseStory]): it narrows the map and the list, which this then draws.
  */
 class ActivitiesPanel(
     private val sheet: View,
@@ -65,14 +68,25 @@ class ActivitiesPanel(
     /** A Sync tab row's View on map, once the panel is back on its Activities tab and
      *  collapsed: the activity, and when it started. */
     private val onViewOnMap: (activityId: String, startedAt: String) -> Unit,
-    /** The tab changed — the Privacy tab has the map to itself while it shows. */
+    /** The tab changed — the Privacy tab has the map to itself while it shows, and leaving the
+     *  Stories tab closes its Story. */
     private val onTabChanged: (PanelTab) -> Unit,
+    /** The Stories tab opened a Story (`docs/SPEC.md` FR-14.6). */
+    private val onOpenStory: (storyId: String) -> Unit,
+    /** The Stories tab has no Story left to open. */
+    private val onCloseStory: () -> Unit,
+    /** Create story made one of the checked group (`docs/SPEC.md` FR-5.16). */
+    private val onStoryCreated: (Story) -> Unit,
+    /** A Story renamed or deleted: the rows' Story badges are out of date. */
+    private val onStoriesChanged: () -> Unit,
 ) {
     private val context = sheet.context
     private val res = context.resources
 
     private val count: TextView = sheet.findViewById(R.id.panel_count)
     private val tabActivities: View = sheet.findViewById(R.id.panel_tab_activities)
+    private val tabStories: View = sheet.findViewById(R.id.panel_tab_stories)
+    private val storiesContent: View = sheet.findViewById(R.id.panel_stories_content)
     private val tabSync: View = sheet.findViewById(R.id.panel_tab_sync)
     private val syncBadge: TextView = sheet.findViewById(R.id.panel_sync_badge)
     private val activitiesContent: View = sheet.findViewById(R.id.panel_activities_content)
@@ -94,6 +108,7 @@ class ActivitiesPanel(
     private val invert: ImageButton = sheet.findViewById(R.id.panel_invert)
     private val visibility: ImageButton = sheet.findViewById(R.id.panel_visibility)
     private val edit: ImageButton = sheet.findViewById(R.id.panel_edit)
+    private val createStory: ImageButton = sheet.findViewById(R.id.panel_create_story)
     private val delete: ImageButton = sheet.findViewById(R.id.panel_delete)
     private val focus: ImageButton = sheet.findViewById(R.id.panel_focus)
     private val list: RecyclerView = sheet.findViewById(R.id.panel_list)
@@ -125,6 +140,20 @@ class ActivitiesPanel(
     )
     private val noteAdapter = NoteAdapter()
 
+    /** The Stories tab — its rows are this panel's list, narrowed to the open Story. */
+    val storiesTab = StoriesTab(
+        storiesContent,
+        onOpen = { id, collapse ->
+            // The expanded sheet would cover the Story's tracks, as after View on map.
+            if (collapse) setExpanded(false)
+            onOpenStory(id)
+        },
+        onClose = { onCloseStory() },
+        onSelect = ::select,
+        onClearFocus = ::clearFocus,
+        onBadgesChanged = { onStoriesChanged() },
+    )
+
     private var loading = false
     private var error: String? = null
     private var duplicates: List<Duplicate> = emptyList()
@@ -150,6 +179,7 @@ class ActivitiesPanel(
 
         toggle.setOnClickListener { setExpanded(!expanded) }
         tabActivities.setOnClickListener { showTab(PanelTab.ACTIVITIES) }
+        tabStories.setOnClickListener { showTab(PanelTab.STORIES) }
         tabSync.setOnClickListener { showTab(PanelTab.SYNC) }
         tabPrivacy.setOnClickListener { showTab(PanelTab.PRIVACY) }
         // The collapsed height is the toggle row's bottom edge, whatever the font scale makes
@@ -195,6 +225,7 @@ class ActivitiesPanel(
             onFly(state.targets.filter { it.id !in hidden })
         }
         edit.setOnClickListener { state.targets.takeIf { it.isNotEmpty() }?.let(onEdit) }
+        createStory.setOnClickListener { openCreateStory() }
         delete.setOnClickListener { confirmDelete() }
         sheet.findViewById<View>(R.id.panel_duplicates_toggle).setOnClickListener {
             duplicatesOpen = !duplicatesOpen
@@ -207,9 +238,14 @@ class ActivitiesPanel(
         if (tab == next) return
         tab = next
         dismissPopups()
+        if (next == PanelTab.STORIES) storiesTab.start() else storiesTab.stop()
         render()
         onTabChanged(next)
     }
+
+    /** Onto the Stories tab from outside — a Story Create story just made, which
+     *  `MainActivity` opens straight away. */
+    fun showStories() = showTab(PanelTab.STORIES)
 
     /** A new list is on its way — for a new range, or the same one again. */
     fun setLoading() {
@@ -242,7 +278,7 @@ class ActivitiesPanel(
      *  middle of the list — without expanding a collapsed sheet (`docs/SPEC.md` §18). */
     fun focusFromMap(id: String) {
         select(id)
-        scrollToFocused()
+        if (tab == PanelTab.STORIES) storiesTab.scrollToRow(id) else scrollToFocused()
     }
 
     /** A tap on empty map, or on the list's empty space: the selection goes, the group stays. */
@@ -313,6 +349,8 @@ class ActivitiesPanel(
         renderTabs()
         subtext.text = if (tab == PanelTab.SYNC) {
             res.getString(R.string.panel_sync_subtext)
+        } else if (tab == PanelTab.STORIES) {
+            res.getString(R.string.story_subtext)
         } else if (tab == PanelTab.PRIVACY) {
             res.getString(R.string.private_subtitle)
         } else if (loading && state.activities.isEmpty()) {
@@ -332,9 +370,9 @@ class ActivitiesPanel(
         resetFilters.visibility = if (state.hasActiveFilters) View.VISIBLE else View.GONE
         renderToolbar(listed)
 
-        adapter.submitList(
-            listed.map { Row(it, checked = it.id in state.checked, focused = it.id == state.focused, hidden = it.id in state.hidden) },
-        )
+        val rows = listed.map { ActivityRowItem(it, checked = it.id in state.checked, focused = it.id == state.focused, hidden = it.id in state.hidden) }
+        adapter.submitList(rows)
+        if (tab == PanelTab.STORIES) storiesTab.setRows(rows, loading, error)
         noteAdapter.note = when {
             loading -> Note(res.getString(R.string.panel_loading), failed = false)
             error != null -> Note(error!!, failed = true)
@@ -354,7 +392,8 @@ class ActivitiesPanel(
     /** The selected tab at full strength over the accent underline, the other at 45% — the
      *  web's `.activities-panel__tab` — and its content in the sheet. */
     private fun renderTabs() {
-        for ((view, which) in listOf(tabActivities to PanelTab.ACTIVITIES, tabSync to PanelTab.SYNC, tabPrivacy to PanelTab.PRIVACY)) {
+        val tabs = listOf(tabActivities to PanelTab.ACTIVITIES, tabStories to PanelTab.STORIES, tabSync to PanelTab.SYNC, tabPrivacy to PanelTab.PRIVACY)
+        for ((view, which) in tabs) {
             val selected = tab == which
             view.alpha = if (selected) 1f else UNSELECTED_TAB_ALPHA
             if (selected) view.setBackgroundResource(R.drawable.bg_panel_tab_selected) else view.background = null
@@ -362,6 +401,7 @@ class ActivitiesPanel(
             view.contentDescription = null
         }
         activitiesContent.visibility = if (tab == PanelTab.ACTIVITIES) View.VISIBLE else View.GONE
+        storiesContent.visibility = if (tab == PanelTab.STORIES) View.VISIBLE else View.GONE
         syncContent.visibility = if (tab == PanelTab.SYNC) View.VISIBLE else View.GONE
         privacyContent.visibility = if (tab == PanelTab.PRIVACY) View.VISIBLE else View.GONE
     }
@@ -412,7 +452,7 @@ class ActivitiesPanel(
         val targetName = when {
             targets.isEmpty() -> null
             state.checked.isNotEmpty() -> res.getQuantityString(R.plurals.panel_checked_count, targets.size, targets.size)
-            else -> res.getString(R.string.panel_target_one, rowLabel(targets.first()))
+            else -> res.getString(R.string.panel_target_one, PanelFormat.rowLabel(res, targets.first()))
         }
         val noTarget = res.getString(R.string.panel_no_target)
         val anyHidden = targets.any { it.id in state.hidden }
@@ -435,6 +475,21 @@ class ActivitiesPanel(
             },
             enabled = !demo && targetName != null,
         )
+        // Create story takes the checked group alone, never the selected row: a Story is a set
+        // picked on purpose, and checking is how a set is picked (FR-5.16).
+        val checked = listed.filter { it.id in state.checked }
+        describe(
+            createStory,
+            when {
+                demo -> res.getString(R.string.story_demo_create)
+                checked.isEmpty() -> res.getString(R.string.story_create_none)
+                else -> res.getString(
+                    R.string.story_create_target,
+                    res.getQuantityString(R.plurals.panel_checked_count, checked.size, checked.size),
+                )
+            },
+            enabled = !demo && checked.isNotEmpty(),
+        )
         // A Pending row can't be deleted until its reprocess lands: the job would race it.
         describe(
             delete,
@@ -454,9 +509,21 @@ class ActivitiesPanel(
         val name = if (state.checked.isNotEmpty()) {
             res.getQuantityString(R.plurals.panel_checked_count, targets.size, targets.size)
         } else {
-            res.getString(R.string.panel_target_one, rowLabel(targets.first()))
+            res.getString(R.string.panel_target_one, PanelFormat.rowLabel(res, targets.first()))
         }
         return res.getString(R.string.panel_group_summary, name, PanelFormat.totalDistance(res, targets.sumOf { it.distanceMeters ?: 0.0 }))
+    }
+
+    /** Create story over the checked rows the list shows (`docs/SPEC.md` FR-5.16). */
+    private fun openCreateStory() {
+        val checked = state.listed.filter { it.id in state.checked }
+        if (checked.isEmpty() || Session.isDemo) return
+        val summary = res.getString(
+            R.string.panel_group_summary,
+            res.getQuantityString(R.plurals.panel_checked_count, checked.size, checked.size),
+            PanelFormat.totalDistance(res, checked.sumOf { it.distanceMeters ?: 0.0 }),
+        )
+        StoryDialog.create(context, summary, checked.map { it.id }, onStoryCreated)
     }
 
     /**
@@ -649,11 +716,6 @@ class ActivitiesPanel(
         }
     }
 
-    /** A row's primary line: its name when it has one, else its start time — also how the
-     *  toolbar names one selected activity. */
-    private fun rowLabel(activity: Activity): String =
-        activity.name?.trim()?.takeIf { it.isNotEmpty() } ?: PanelFormat.startedAt(res, activity.startedAt)
-
     private data class Note(val text: String, val failed: Boolean)
 
     /** The list's note, as its one last item — or no item at all. A tap on it clears the
@@ -688,80 +750,28 @@ class ActivitiesPanel(
         }
     }
 
-    /** One row as drawn: the activity and its marks, so a diff rebinds only what changed —
-     *  a tick, the selection moving, a refetch — rather than every row, which also cancelled
-     *  a tap on another row landing mid-rebind. */
-    private data class Row(val activity: Activity, val checked: Boolean, val focused: Boolean, val hidden: Boolean)
-
-    private inner class RowAdapter : ListAdapter<Row, RowHolder>(
-        object : DiffUtil.ItemCallback<Row>() {
-            override fun areItemsTheSame(old: Row, new: Row) = old.activity.id == new.activity.id
-            override fun areContentsTheSame(old: Row, new: Row) = old == new
+    private inner class RowAdapter : ListAdapter<ActivityRowItem, ActivityRowHolder>(
+        object : DiffUtil.ItemCallback<ActivityRowItem>() {
+            override fun areItemsTheSame(old: ActivityRowItem, new: ActivityRowItem) = old.activity.id == new.activity.id
+            override fun areContentsTheSame(old: ActivityRowItem, new: ActivityRowItem) = old == new
         },
     ) {
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
-            RowHolder(LayoutInflater.from(parent.context).inflate(R.layout.item_activity_row, parent, false))
+            ActivityRowHolder(LayoutInflater.from(parent.context).inflate(R.layout.item_activity_row, parent, false))
 
-        override fun onBindViewHolder(holder: RowHolder, position: Int) = holder.bind(getItem(position))
-    }
-
-    private inner class RowHolder(view: View) : RecyclerView.ViewHolder(view) {
-        private val check: MaterialCheckBox = view.findViewById(R.id.activity_check)
-        private val text: View = view.findViewById(R.id.activity_text)
-        private val title: TextView = view.findViewById(R.id.activity_title)
-        private val meta: TextView = view.findViewById(R.id.activity_meta)
-        private val badges: View = view.findViewById(R.id.activity_badges)
-        private val pending: View = view.findViewById(R.id.activity_pending)
-        private val hidden: View = view.findViewById(R.id.activity_hidden)
-
-        fun bind(row: Row) {
-            val activity = row.activity
-            val label = rowLabel(activity)
-            val named = activity.name?.trim()?.isNotEmpty() == true
-            val isChecked = row.checked
-            val isHidden = row.hidden
-
-            itemView.isSelected = row.focused
-            title.text = label
-            // The date moves down here once a name has taken the title.
-            meta.text = buildString {
-                if (named) append(PanelFormat.startedAt(res, activity.startedAt)).append(" · ")
-                append(PanelFormat.distance(res, activity.distanceMeters)).append(" · ")
-                append(PanelFormat.duration(res, activity.durationSeconds)).append(" · ")
-                append(RecordingTypes.format(res, activity.activityType))
-            }
-            val dim = when {
-                activity.pending -> PENDING_ALPHA
-                isHidden -> HIDDEN_ALPHA
-                else -> 1f
-            }
-            title.alpha = dim
-            meta.alpha = dim
-            badges.visibility = if (activity.pending || isHidden) View.VISIBLE else View.GONE
-            pending.visibility = if (activity.pending) View.VISIBLE else View.GONE
-            hidden.visibility = if (isHidden) View.VISIBLE else View.GONE
-
-            check.setOnCheckedChangeListener(null)
-            check.isChecked = isChecked
-            // Pending is disabled until its reprocess lands, except that a checked one can
-            // still be unchecked.
-            check.isEnabled = !activity.pending || isChecked
-            check.contentDescription = res.getString(if (isChecked) R.string.panel_row_uncheck else R.string.panel_row_check, label)
-            check.setOnCheckedChangeListener { _, _ ->
-                state.toggleChecked(activity.id)
+        override fun onBindViewHolder(holder: ActivityRowHolder, position: Int) = holder.bind(
+            getItem(position),
+            openStoryId = null,
+            onCheck = { id ->
+                state.toggleChecked(id)
                 changed()
-            }
-
-            text.isEnabled = !activity.pending
-            text.contentDescription = res.getString(R.string.panel_fly_to, label) + ". " + meta.text
-            text.setOnClickListener { select(activity.id) }
-        }
+            },
+            onSelect = ::select,
+        )
     }
 
     private companion object {
         const val SHEET_ANIMATION_MS = 150L
-        const val PENDING_ALPHA = 0.45f
-        const val HIDDEN_ALPHA = 0.55f
         const val TYPE_LIST_MAX_DP = 192
         const val SNAP_METERS = 1.0
         const val UNSELECTED_TAB_ALPHA = 0.45f

@@ -135,6 +135,10 @@ object MapOverlays {
     private var hiddenTracks: Set<String> = emptySet()
     private var selectedTrack: String? = null
 
+    /** The open Story the tracks are narrowed to, or null — kept here for the same reason, so
+     *  every replacement of the tracks source carries it ([setTrackStory]). */
+    private var trackStory: String? = null
+
     /**
      * Bumped by [refreshTracks] and sent as `v` (the server ignores it), the web's
      * `tracksVersion`: every tile URL also carries the account's tile version as `cv`
@@ -199,15 +203,17 @@ object MapOverlays {
      * style reload (a day/night flavor swap) discards custom layers, so this has to be
      * re-runnable rather than one-shot.
      *
-     * Only the tracks tile carries a filter, and only `from`/`to` — the same as the web, whose
-     * date range narrows the tracks alone: Fog and Heatmap show coverage no filter narrows
+     * Only the tracks tile carries a filter, and only `from`/`to` and an open Story's `story`
+     * ([setTrackStory]) — the same as the web, whose date range and Story narrow the tracks alone: Fog and Heatmap show coverage no filter narrows
      * (`docs/SPEC.md` FR-4.2, FR-4.3). The Activities panel's TYPE/DISTANCE filters, hidden
      * set and selection are applied on the client, as layer filters ([setTrackFilter]).
      *
-     * [dark] says the style is the dark basemap flavor, so Fog gets the cream veil.
+     * [dark] says the style is the dark basemap flavor, so Fog gets the cream veil; [story] is
+     * the open Story, or null ([setTrackStory]).
      */
-    fun attach(style: Style, mode: MapMode, range: DateRange?, dark: Boolean) {
+    fun attach(style: Style, mode: MapMode, range: DateRange?, dark: Boolean, story: String?) {
         darkVeil = dark
+        trackStory = story
         val beforeId = labelInsertionPoint(style)
         addCoverage(style, beforeId)
         addTracks(style, beforeId, range)
@@ -315,6 +321,13 @@ object MapOverlays {
         val beforeId = if (style.getLayer(BAND_LAYER_ID) != null) BAND_LAYER_ID else labelInsertionPoint(style)
         addTracks(style, beforeId, range)
         TRACK_LAYER_IDS.forEach { id -> style.getLayer(id)?.setProperties(PropertyFactory.visibility(visibility)) }
+    }
+
+    /** Narrows the tracks to [story]'s activities as well as [range] — the tile's `story`
+     *  filter (`docs/SPEC.md` FR-14.4) — or, with null, back to the whole history's. */
+    fun setTrackStory(style: Style, story: String?, range: DateRange?) {
+        trackStory = story
+        setTrackRange(style, range)
     }
 
     /**
@@ -493,6 +506,7 @@ object MapOverlays {
                     add("from=${range.from}")
                     add("to=${range.to}")
                 }
+                trackStory?.let { add("story=$it") }
                 Session.tileVersion.takeIf { it.isNotEmpty() }?.let { add("cv=${Uri.encode(it)}") }
                 if (tracksVersion > 0) add("v=$tracksVersion")
             }

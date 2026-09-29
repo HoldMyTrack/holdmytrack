@@ -78,7 +78,9 @@ import java.time.ZoneId
  * (`panel/ActivitiesPanel`), a sheet listing the range's activities, on the date range the
  * tracks are drawn for — the web's phone footer (`map/DateRangeSlider`), defaulting to the five
  * most recent activity days as the web does (`docs/SPEC.md` FR-6.1). Tapping a track selects
- * it in the panel, and tapping empty map clears the selection.
+ * it in the panel, and tapping empty map clears the selection. On the panel's Stories tab one
+ * Story is open, and the tracks, the list and the date range are its activities only
+ * ([enterStory]).
  *
  * Also the one place GPS recording is controlled from in the app: a record button in the chrome
  * row (tap to start, tap to pause/resume, hold for two seconds to stop —
@@ -172,6 +174,18 @@ class MainActivity : AppCompatActivity() {
     /** The date range the tracks are drawn for; null until the first page of activity days
      *  has set the default, when the tracks are the whole history. */
     private var selectedRange: DateRange? = null
+
+    /** The Story open on the Stories tab (`docs/SPEC.md` FR-14.6), or null: while one is, the
+     *  tracks, the list and the date range are its activities only. */
+    private var storyId: String? = null
+
+    /** The range from before the first Story opened, and whether the user had picked it —
+     *  what closing the Story goes back to. Moving from Story to Story keeps it. */
+    private var beforeStory: Pair<DateRange?, Boolean>? = null
+
+    /** A Story just opened is waiting for its days: its range, first to last activity day,
+     *  is set once they're in, and the camera fits it. */
+    private var storySpanPending = false
 
     /** Whether the user has picked [selectedRange] themselves. Until then it is the default,
      *  re-derived whenever the activity days reload — so a first sync on an empty account
@@ -327,7 +341,16 @@ class MainActivity : AppCompatActivity() {
             onEdit = ::openEditWindow,
             onDeleted = ::onActivitiesDeleted,
             onViewOnMap = ::viewActivityOnMap,
-            onTabChanged = { renderPrivacy() },
+            onTabChanged = { tab ->
+                // Leaving the Stories tab closes its Story.
+                if (tab != PanelTab.STORIES && storyId != null) exitStory()
+                renderPrivacy()
+            },
+            onOpenStory = ::enterStory,
+            onCloseStory = ::exitStory,
+            // A Story just made opens straight away, on the Stories tab.
+            onStoryCreated = { story -> enterStory(story.id) },
+            onStoriesChanged = { selectedRange?.let { loadActivities(it, fly = false) } },
         )
         privacyTab = PrivacyTab(
             findViewById(R.id.panel_privacy_content),
@@ -622,14 +645,15 @@ class MainActivity : AppCompatActivity() {
             daysStale = false
             activityDays.reload()
             // Sync or a recording may have changed the range's activities too, not just which
-            // days have any.
+            // days have any — and an open Story's numbers.
             selectedRange?.let { loadActivities(it, fly = false) }
+            panel.storiesTab.reloadOpen()
         }
         renderDateFooter()
 
         val loaded = style ?: return
         if (!overlaysAttached) {
-            MapOverlays.attach(loaded, mode, selectedRange, isNight())
+            MapOverlays.attach(loaded, mode, selectedRange, isNight(), storyId)
             MapOverlays.setTrackFilter(loaded, panelState.mapHidden, panelState.focused)
             overlaysAttached = true
             renderTrackMetrics()
@@ -666,7 +690,16 @@ class MainActivity : AppCompatActivity() {
      */
     private fun onActivityDaysChanged(reloaded: Boolean) {
         dateSlider.setDays(activityDays.visibleDays, activityDays.canPanEarlier, activityDays.canPanLater)
-        if (reloaded && !userChangedRange) {
+        val story = storyId
+        if (reloaded && story != null) {
+            // A Story opens on its whole span, first to last activity day, once the days in
+            // hand are really its own; an empty one has none, and gets today.
+            if (storySpanPending && activityDays.loadedStory == story) {
+                storySpanPending = false
+                val today = LocalDate.now().toString()
+                applyRange(DateRange(activityDays.earliest ?: today, activityDays.latest ?: today), fly = true)
+            }
+        } else if (reloaded && !userChangedRange && activityDays.loadedStory == null) {
             val today = LocalDate.now().toString()
             val from = activityDays.visibleDays.takeLast(DEFAULT_RANGE_DAYS).firstOrNull()?.date
                 ?: activityDays.earliest
@@ -700,9 +733,10 @@ class MainActivity : AppCompatActivity() {
      *  changed the list may have produced one. */
     private fun loadActivities(range: DateRange, fly: Boolean) {
         panel.setLoading()
-        HoldMyTrackApi.activities(range.from, range.to) { result ->
-            // A later pick owns the list now.
-            if (range != selectedRange) return@activities
+        val story = storyId
+        HoldMyTrackApi.activities(range.from, range.to, story) { result ->
+            // A later pick, or another Story, owns the list now.
+            if (range != selectedRange || story != storyId) return@activities
             result.onSuccess { activities ->
                 panel.setActivities(activities)
                 trackPending(activities)
@@ -749,7 +783,10 @@ class MainActivity : AppCompatActivity() {
             style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
             coverageWatch.watch()
         }
-        if (finished) activityDays.reload()
+        if (finished) {
+            activityDays.reload()
+            panel.storiesTab.reloadOpen()
+        }
         mapView.removeCallbacks(pendingPoll)
         if (now.isNotEmpty()) mapView.postDelayed(pendingPoll, PENDING_POLL_MS)
     }
@@ -776,6 +813,48 @@ class MainActivity : AppCompatActivity() {
         applyTrackFilter()
         // The selection flies to the activity itself; the range's own fly would override it.
         applyRange(DateRange(day, day), fly = false)
+    }
+
+    /**
+     * Opens Story [id] on the map — the web's `enterStory`: the panel's state starts afresh, as
+     * for a new range, since the rows are a different set; the tracks narrow to the Story at
+     * once, and its days are read, whose first and last set the range and the camera
+     * ([onActivityDaysChanged]). Also how Create story lands on the tab.
+     */
+    private fun enterStory(id: String) {
+        // Switching from one Story to another still closes onto the range from before the first.
+        if (storyId == null) beforeStory = selectedRange to userChangedRange
+        storyId = id
+        storySpanPending = true
+        panelState.resetForNewRange()
+        applyTrackFilter()
+        panel.showStories()
+        panel.storiesTab.setOpen(id)
+        panel.setLoading()
+        style?.takeIf { overlaysAttached }?.let { MapOverlays.setTrackStory(it, id, null) }
+        activityDays.story = id
+        activityDays.reload()
+    }
+
+    /**
+     * Closes the open Story — the web's `exitStory`: the range from before it opened comes back
+     * (or, if there was none yet, the default, once the whole history's days are in), with the
+     * panel's state afresh. The camera stays.
+     */
+    private fun exitStory() {
+        val before = beforeStory
+        beforeStory = null
+        storyId = null
+        storySpanPending = false
+        panel.storiesTab.setOpen(null)
+        panelState.resetForNewRange()
+        applyTrackFilter()
+        userChangedRange = before?.second ?: false
+        val range = before?.first
+        style?.takeIf { overlaysAttached }?.let { MapOverlays.setTrackStory(it, null, range) }
+        if (range != null) applyRange(range, fly = false) else panel.setActivities(emptyList())
+        activityDays.story = null
+        activityDays.reload()
     }
 
     /** The toolbar's Edit: the window over its target, the panel held down and made inert
@@ -862,6 +941,7 @@ class MainActivity : AppCompatActivity() {
             selectedRange?.let { loadActivities(it, fly = false) }
             activityDays.reload()
             updateTrackMetrics(refetch = true)
+            panel.storiesTab.reloadOpen()
         }
     }
 
@@ -883,6 +963,7 @@ class MainActivity : AppCompatActivity() {
         selectedRange?.let { loadActivities(it, fly = false) }
         activityDays.reload()
         coverageWatch.watch()
+        panel.storiesTab.reloadOpen()
     }
 
     /** The mode toggle: shown once the session allows, away while recording or editing. */
@@ -1422,10 +1503,13 @@ class MainActivity : AppCompatActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         mapView.onSaveInstanceState(outState)
-        selectedRange?.let {
+        // The panel comes back on its Activities tab, so an open Story is closed onto the range
+        // from before it.
+        val (range, chosen) = if (storyId != null) beforeStory ?: (null to false) else selectedRange to userChangedRange
+        range?.let {
             outState.putString(STATE_RANGE_FROM, it.from)
             outState.putString(STATE_RANGE_TO, it.to)
-            outState.putBoolean(STATE_RANGE_CHOSEN, userChangedRange)
+            outState.putBoolean(STATE_RANGE_CHOSEN, chosen)
         }
         if (attributionBaseCaptured) {
             outState.putInt(STATE_LOGO_MARGIN, logoBaseMarginBottom)

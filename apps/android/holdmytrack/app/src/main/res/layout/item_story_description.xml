@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The open Story's description, under its folder (.stories-tab__description), set in with the
+     rows under it. -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="36dp"
+    android:paddingEnd="@dimen/hmt_space_16"
+    android:paddingBottom="@dimen/hmt_space_8"
+    android:textColor="@color/hmt_ink_secondary"
+    android:textSize="@dimen/hmt_text_md" />

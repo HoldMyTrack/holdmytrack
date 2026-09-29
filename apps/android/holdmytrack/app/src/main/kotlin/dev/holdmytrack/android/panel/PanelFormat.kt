@@ -2,6 +2,7 @@ package dev.holdmytrack.android.panel
 
 import android.content.res.Resources
 import dev.holdmytrack.android.R
+import dev.holdmytrack.android.net.Activity
 import dev.holdmytrack.android.recording.RecordingFormat
 import java.text.NumberFormat
 import java.time.OffsetDateTime
@@ -65,6 +66,11 @@ object PanelFormat {
             else -> res.getString(R.string.panel_duration_s, seconds)
         }
     }
+
+    /** A row's primary line: its name when it has one, else its start time — also how the
+     *  toolbar names one selected activity. */
+    fun rowLabel(res: Resources, activity: Activity): String =
+        activity.name?.trim()?.takeIf { it.isNotEmpty() } ?: startedAt(res, activity.startedAt)
 
     /** "Sep 24, 2026, 4:00 AM", in the phone's timezone, as the web shows it in the browser's. */
     fun startedAt(res: Resources, iso: String): String =

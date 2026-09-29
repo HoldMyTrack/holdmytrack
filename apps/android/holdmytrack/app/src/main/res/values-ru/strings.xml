@@ -372,8 +372,8 @@
         <item quantity="other">%1$d точки</item>
     </plurals>
     <string name="edit_title_one">Редактировать занятие</string>
-    <string name="edit_multi_subtitle">Ко всем отмеченным занятиям применяется только тип — см. ниже.</string>
-    <string name="edit_multi_reason">При редактировании нескольких занятий меняется только тип — название и описание у каждого занятия свои.</string>
+    <string name="edit_multi_subtitle">Тип и истории применяются ко всем отмеченным занятиям; название и описание у каждого свои.</string>
+    <string name="edit_multi_reason">При редактировании нескольких занятий меняются тип и истории — название и описание у каждого занятия свои.</string>
     <string name="edit_type">Тип</string>
     <string name="edit_name">Название</string>
     <string name="edit_name_placeholder">Необязательно — показывается вместо даты в списке занятий</string>
@@ -411,6 +411,78 @@
     <string name="private_delete_body">Занятия, которые начинаются или заканчиваются внутри него, снова покажут эти части после повторной обработки.</string>
     <string name="private_delete_label">Удалить «%1$s»</string>
     <string name="private_delete_failed">Не удалось удалить: %1$s</string>
+
+    <!-- Stories (panel/StoriesTab.kt, panel/StoryDialog.kt, the Edit window's Stories tab and the
+         rows' Story badge), after the web's stories.* messages. -->
+    <string name="panel_tab_stories">Истории</string>
+    <string name="story_subtext">Подборки ваших занятий. Видны только вам.</string>
+    <string name="story_empty">Историй пока нет. На вкладке «Занятия» отметьте нужные занятия и выберите «Создать историю».</string>
+    <string name="story_no_activities">В этой истории нет занятий.</string>
+    <string name="story_not_found">Такой истории нет, или она не ваша.</string>
+    <string name="story_load_failed">Не удалось загрузить истории</string>
+    <string name="story_open">Открыта</string>
+    <string name="story_folded">Свёрнута</string>
+    <string name="story_edit">Изменить название и описание</string>
+    <string name="story_demo_edit">Недоступно в демо-аккаунте — создайте аккаунт, чтобы изменять истории</string>
+    <string name="story_delete">Удалить историю</string>
+    <string name="story_demo_delete">Недоступно в демо-аккаунте — создайте аккаунт, чтобы удалять истории</string>
+    <string name="story_delete_title">Удалить историю</string>
+    <string name="story_delete_confirm">Удалить «%1$s»? Занятия останутся.</string>
+    <string name="story_delete_button">Удалить историю</string>
+    <string name="story_delete_failed">Не удалось удалить историю: %1$s</string>
+    <string name="story_create_target">Создать историю: %1$s</string>
+    <string name="story_create_none">Отметьте занятия, чтобы собрать из них историю</string>
+    <string name="story_demo_create">Недоступно в демо-аккаунте — создайте аккаунт, чтобы собирать истории</string>
+    <string name="story_create_title">Создать историю</string>
+    <string name="story_create_body">История из: %1$s. Видна только вам.</string>
+    <string name="story_name">Название</string>
+    <string name="story_name_placeholder">Поход, отпуск, выходные с забегом</string>
+    <string name="story_description">Описание</string>
+    <string name="story_description_placeholder">Необязательно</string>
+    <string name="story_create_confirm">Создать историю</string>
+    <string name="story_creating">Создание…</string>
+    <string name="story_edit_title">Изменить историю</string>
+    <string name="story_save_failed">Не удалось сохранить историю</string>
+    <string name="story_stats">%1$s · %2$s · %3$s в движении</string>
+    <string name="story_by_type">По типам занятий</string>
+    <plurals name="story_activity_count">
+        <item quantity="one">%1$d занятие</item>
+        <item quantity="few">%1$d занятия</item>
+        <item quantity="many">%1$d занятий</item>
+        <item quantity="other">%1$d занятия</item>
+    </plurals>
+    <string name="panel_story_badge_one">История</string>
+    <plurals name="panel_story_badge">
+        <item quantity="one">%1$d история</item>
+        <item quantity="few">%1$d истории</item>
+        <item quantity="many">%1$d историй</item>
+        <item quantity="other">%1$d истории</item>
+    </plurals>
+    <string name="panel_in_story">В истории: %1$s</string>
+    <plurals name="panel_in_stories">
+        <item quantity="one">В %1$d истории: %2$s</item>
+        <item quantity="few">В %1$d историях: %2$s</item>
+        <item quantity="many">В %1$d историях: %2$s</item>
+        <item quantity="other">В %1$d историях: %2$s</item>
+    </plurals>
+    <string name="panel_in_other_story">Также в истории: %1$s</string>
+    <plurals name="panel_in_other_stories">
+        <item quantity="one">Также в %1$d другой истории: %2$s</item>
+        <item quantity="few">Также в %1$d других историях: %2$s</item>
+        <item quantity="many">Также в %1$d других историях: %2$s</item>
+        <item quantity="other">Также в %1$d других историях: %2$s</item>
+    </plurals>
+    <string name="edit_tab_stories">Истории</string>
+    <string name="edit_stories_hint_one">Отметьте историю, чтобы добавить в неё это занятие, снимите отметку, чтобы убрать.</string>
+    <plurals name="edit_stories_hint">
+        <item quantity="one">Отметьте историю, чтобы добавить в неё все %1$d занятие, снимите отметку, чтобы убрать их.</item>
+        <item quantity="few">Отметьте историю, чтобы добавить в неё все %1$d занятия, снимите отметку, чтобы убрать их.</item>
+        <item quantity="many">Отметьте историю, чтобы добавить в неё все %1$d занятий, снимите отметку, чтобы убрать их.</item>
+        <item quantity="other">Отметьте историю, чтобы добавить в неё все %1$d занятия, снимите отметку, чтобы убрать их.</item>
+    </plurals>
+    <string name="edit_stories_some">Содержит часть этих занятий</string>
+    <string name="edit_stories_empty">Историй пока нет. Отметьте занятия в списке и выберите «Создать историю».</string>
+    <string name="edit_stories_unsaved">Истории, с несохранёнными изменениями</string>
 
     <!-- Activity types' display names, the web's activity_type.* (RecordingTypes.label); a type without one is title-cased from its raw value. -->
     <string name="activity_type_alpine_skiing">Горные лыжи</string>

@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- One Activities row, after the web's .activities-panel__row: the checkbox, then the text —
      the name or start time over "[date ·] distance · duration · type" — which is the row's own
-     tap target (select, fly to), and the Pending / Hidden badges at the end. A hairline under
+     tap target (select, fly to), and the Pending / Hidden / Story badges at the end
+     (panel/ActivityRows.kt; an open Story's rows on the Stories tab leave the checkbox out). A hairline under
      it; selected, the accent tint and a bar down its left edge (bg_panel_row). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
@@ -74,5 +75,10 @@
             style="@style/Widget.HoldMyTrack.PanelStatusBadge"
             android:layout_marginTop="@dimen/hmt_space_2"
             android:text="@string/panel_hidden" />
+
+        <TextView
+            android:id="@+id/activity_story"
+            style="@style/Widget.HoldMyTrack.PanelStatusBadge.Story"
+            android:layout_marginTop="@dimen/hmt_space_2" />
     </LinearLayout>
 </LinearLayout>

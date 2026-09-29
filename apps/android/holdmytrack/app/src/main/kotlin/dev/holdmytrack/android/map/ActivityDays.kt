@@ -34,6 +34,17 @@ class ActivityDays(private val windowDays: Int, private val onChange: (reloaded:
     var ready = false
         private set
 
+    /** The Story whose days these are — null for the whole history (`docs/SPEC.md` FR-14.4).
+     *  Set it, then [reload]: the days in hand stay the old ones until the new page lands. */
+    var story: String? = null
+
+    /** The Story the days in hand were read for — [story] as it was when they came back. */
+    var loadedStory: String? = null
+        private set
+
+    /** The most recent day loaded, which is the most recent there is. */
+    val latest: String? get() = days.lastOrNull()?.date
+
     private var anchor: String? = null
 
     /** One extend request at a time: a second would be anchored at the same day and prepend
@@ -73,9 +84,11 @@ class ActivityDays(private val windowDays: Int, private val onChange: (reloaded:
     /** Re-reads from the newest end, back to the window's opening position. */
     fun reload() {
         val gen = ++generation
-        HoldMyTrackApi.activityDayPage(PAGE_SIZE, null) { result ->
+        val forStory = story
+        HoldMyTrackApi.activityDayPage(PAGE_SIZE, null, forStory) { result ->
             if (gen != generation) return@activityDayPage
             result.onSuccess { page ->
+                loadedStory = forStory
                 days = page.days
                 earliest = page.earliest
                 anchor = null
@@ -108,7 +121,7 @@ class ActivityDays(private val windowDays: Int, private val onChange: (reloaded:
         if (extending) return
         extending = true
         val gen = generation
-        HoldMyTrackApi.activityDayPage(PAGE_SIZE, oldest) { result ->
+        HoldMyTrackApi.activityDayPage(PAGE_SIZE, oldest, loadedStory) { result ->
             if (gen != generation) return@activityDayPage
             extending = false
             result.onSuccess { page ->
