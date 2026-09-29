@@ -68,6 +68,34 @@ export const SATELLITE_LAYER_ID = 'satellite';
  *  from the served document rather than from this module (Android's `MapSatellite`). */
 export const SATELLITE_HIDES_METADATA = 'holdmytrack:satellite-hides';
 
+/** The style `metadata` keys naming the road layers satellite mode dims, and to what opacity —
+ *  read from the style rather than re-derived, since a dimmed layer no longer looks undimmed. */
+export const SATELLITE_DIMS_METADATA = 'holdmytrack:satellite-dims';
+export const SATELLITE_ROAD_OPACITY_METADATA = 'holdmytrack:satellite-road-opacity';
+
+/** Over imagery the roads are drawn see-through, so they mark the way without painting over the
+ *  ground they cross — the flavors' road colors are made for a flat background, not a photo. */
+export const SATELLITE_ROAD_OPACITY = 0.4;
+
+/**
+ * The road lines satellite mode dims to `SATELLITE_ROAD_OPACITY`: the basemap's `roads_*` line
+ * layers, casings included, that set no opacity of their own. That leaves out rail (already
+ * half-transparent, and not a road), so switching back only has to reset the rest to the
+ * default. The path layers (trails, tracks, bike paths) stay opaque: they're what a user
+ * switched on to see.
+ */
+export function satelliteDimmedLayerIds(style: readonly LayerSpecification[]): string[] {
+  return style
+    .filter(
+      (layer) =>
+        layer.type === 'line' &&
+        layer.source === BASEMAP_SOURCE &&
+        layer.id.startsWith('roads_') &&
+        layer.paint?.['line-opacity'] === undefined,
+    )
+    .map((layer) => layer.id);
+}
+
 /**
  * The layers satellite mode hides so the imagery shows through: the basemap's background and
  * area fills (earth, water, landuse, landcover, buildings). Roads, boundaries and labels stay —
@@ -243,6 +271,7 @@ export function buildStyle(options: BuildStyleOptions): StyleSpecification {
   const base = origin.replace(/\/$/, '');
   const vector = withPathLayers(layers(BASEMAP_SOURCE, namedFlavor(flavor), { lang }), flavor, paths);
   const hidden = satellite ? satelliteHiddenLayerIds(vector) : [];
+  const dimmed = satellite ? satelliteDimmedLayerIds(vector) : [];
 
   return {
     version: 8,
@@ -261,8 +290,14 @@ export function buildStyle(options: BuildStyleOptions): StyleSpecification {
       },
       ...(satellite && { [SATELLITE_SOURCE]: satelliteSourceSpec(satellite) }),
     },
-    ...(satellite && { metadata: { [SATELLITE_HIDES_METADATA]: hidden } }),
-    layers: satellite ? withSatelliteLayer(vector, hidden, satelliteOn) : vector,
+    ...(satellite && {
+      metadata: {
+        [SATELLITE_HIDES_METADATA]: hidden,
+        [SATELLITE_DIMS_METADATA]: dimmed,
+        [SATELLITE_ROAD_OPACITY_METADATA]: SATELLITE_ROAD_OPACITY,
+      },
+    }),
+    layers: satellite ? withSatelliteLayer(vector, hidden, dimmed, satelliteOn) : vector,
   };
 }
 
@@ -278,7 +313,12 @@ function satelliteSourceSpec(satellite: SatelliteSource): RasterSourceSpecificat
 
 /** The imagery right above the background, so everything the vector basemap draws after it —
  *  and every overlay inserted at the first symbol layer — stacks over it. */
-function withSatelliteLayer(base: LayerSpecification[], hidden: string[], on: boolean): LayerSpecification[] {
+function withSatelliteLayer(
+  base: LayerSpecification[],
+  hidden: string[],
+  dimmed: string[],
+  on: boolean,
+): LayerSpecification[] {
   const imagery: LayerSpecification = {
     id: SATELLITE_LAYER_ID,
     type: 'raster',
@@ -286,9 +326,12 @@ function withSatelliteLayer(base: LayerSpecification[], hidden: string[], on: bo
     layout: { visibility: on ? 'visible' : 'none' },
   };
   const hide = new Set(on ? hidden : []);
-  const layers = base.map((layer) =>
-    hide.has(layer.id) ? ({ ...layer, layout: { ...layer.layout, visibility: 'none' } } as LayerSpecification) : layer,
-  );
+  const dim = new Set(on ? dimmed : []);
+  const layers = base.map((layer) => {
+    if (hide.has(layer.id)) return { ...layer, layout: { ...layer.layout, visibility: 'none' } } as LayerSpecification;
+    if (dim.has(layer.id)) return { ...layer, paint: { ...layer.paint, 'line-opacity': SATELLITE_ROAD_OPACITY } } as LayerSpecification;
+    return layer;
+  });
   const at = layers.findIndex((layer) => layer.type === 'background') + 1;
   return [...layers.slice(0, at), imagery, ...layers.slice(at)];
 }
