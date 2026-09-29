@@ -13,8 +13,8 @@ export interface StoryState {
   set: (story: Story) => void;
 }
 
-/** Reader for `GET /v1/stories/{id}` — the Story view's header (FR-14.1): its name, description
- *  and whole-Story statistics, whatever the date range. */
+/** Reader for `GET /v1/stories/{id}` — the open Story on the Stories tab: its whole-Story
+ *  statistics (FR-14.1) for the footer, whatever the date range. */
 export function useStory(id: string | null): StoryState {
   const [story, setStory] = useState<Story | null>(null);
   const [error, setError] = useState<string | null>(null);

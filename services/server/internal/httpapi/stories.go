@@ -258,8 +258,7 @@ func (s *Server) handleDeleteStory(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// deleteStory deletes userID's Story, errStoryNotFound when it isn't theirs — the API's
-// DELETE and the Stories page's form both end here.
+// deleteStory deletes userID's Story, errStoryNotFound when it isn't theirs.
 func (s *Server) deleteStory(ctx context.Context, userID, id string) error {
 	return s.inTx(ctx, func(tx pgx.Tx) error {
 		// RETURNING reads the statement's own snapshot, before the cascade removes the

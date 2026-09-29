@@ -1,38 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { BookMinus, BookPlus, ChevronDown, ChevronUp, Eye, EyeOff, Focus, Pencil, Trash2 } from 'lucide-react';
-import {
-  deleteActivity,
-  removeStoryActivities,
-  type Activity,
-  type ActivityTotals,
-  type DuplicateActivity,
-  type Story,
-  type StoryTotals,
-} from '../api';
+import { BookPlus, ChevronDown, ChevronUp, Eye, EyeOff, Focus, Pencil, Trash2 } from 'lucide-react';
+import { deleteActivity, type Activity, type ActivityTotals, type DuplicateActivity, type Story } from '../api';
+import { ActivityRow, rowLabel, useScrollFocusedRow } from './ActivityRow';
 import { ConfirmDialog } from './ConfirmDialog';
 import { StoryDialog } from './StoryDialog';
 import { DistanceFilter } from './DistanceFilter';
 import { PrivateLocationsPanel } from './PrivateLocationsPanel';
+import { StoriesTab } from './StoriesTab';
 import { SyncTab } from './SyncTab';
 import type { DistanceRange, TypeFacet } from './activityFacets';
-import {
-  formatActivityType,
-  formatDistance,
-  formatDuration,
-  formatIngestSource,
-  formatStartedAt,
-  formatTotalDistance,
-} from './format';
-import { useUnitSystem, type UnitSystem } from './units';
+import { formatActivityType, formatDistance, formatIngestSource, formatStartedAt, formatTotalDistance } from './format';
+import { useUnitSystem } from './units';
 import type { ImportsState } from './useImports';
 import { lang, t, tn } from '../i18n';
 
 /**
- * The left sidebar, with three tabs: **Activities** (the list, below), **Sync** (SyncTab.tsx —
- * file upload and the import history, formerly the header's Import dropdown) and **Privacy**
- * (PrivateLocationsPanel.tsx — FR-8.1's list, whose editor floats over the map like Edit track's). The
- * tab is MapView's state, so `/?private-locations` can open onto Privacy and the tab survives
+ * The left sidebar, with four tabs: **Activities** (the list, below), **Stories** (StoriesTab.tsx
+ * — every Story as a folder, the open one's activities inside it, FR-14.6), **Sync** (SyncTab.tsx
+ * — file upload and the import history) and **Privacy** (PrivateLocationsPanel.tsx — FR-8.1's
+ * list, whose editor floats over the map like Edit track's). The tab is MapView's state, so
+ * `/?private-locations` can open onto Privacy, `/?story=` onto Stories, and the tab survives
  * this panel unmounting for Fog/Heatmap; the upload queue behind Sync is MapView's too
  * (useImports), so it keeps running while another tab is showing.
  *
@@ -73,22 +61,6 @@ import { lang, t, tn } from '../i18n';
  *  - The toolbar's Show/hide button toggles whether the target's tracks paint on the map at
  *    all, independent of all three of the above; a hidden activity's row dims in place.
  */
-/** A Story's numbers, or one type's share of them, in one line — "3 activities · 58 km · 3h 26m
- *  moving", as the Stories page words it too. */
-function storyStatsLine(totals: StoryTotals, system: UnitSystem): string {
-  return t('stories.stats', {
-    activities: tn('activities.count', totals.count),
-    distance: formatTotalDistance(totals.distanceMeters, system),
-    moving: formatDuration(totals.movingSeconds),
-  });
-}
-
-/** A row's primary line: its user-entered name (§4.7's revised decision) when it has one, else
- *  its start date/time — also how the toolbar names a single selected activity. */
-function rowLabel(activity: Activity): string {
-  return activity.name?.trim() || formatStartedAt(activity.startedAt);
-}
-
 export interface ActivitiesPanelProps {
   /** A demo account (`docs/SPEC.md` FR-2.1–FR-2.3) — the
    *  backend already rejects every mutation a demo session attempts (requireNotDemo), so this
@@ -159,11 +131,10 @@ export interface ActivitiesPanelProps {
    *  (EditActivityWindow.tsx: Activity and Track tabs) over the map. */
   onEdit: (activities: Activity[]) => void;
   /** A Story just made of the checked activities with the toolbar's Create story
-   *  (StoryDialog.tsx) — MapView opens it. */
+   *  (StoryDialog.tsx) — MapView opens it on the Stories tab. */
   onStoryCreated: (story: Story) => void;
-  /** The Story view (FR-14.7), null outside one. The tabs give way to the Story's own header,
-   *  and the toolbar gains Remove from story; MapView keeps `tab` on Activities meanwhile. */
-  storyView: StoryView | null;
+  /** The Stories tab's list and its open Story — MapView's. */
+  stories: StoriesPanel;
   /** FR-3.7's "Not yet built" gap, closed: activities cross-source dedup took out of
    *  circulation, each alongside the richer copy that superseded it — mirrors the Android
    *  app's own duplicates section (`SyncStatusActivity`). Never filtered by the date range or
@@ -183,18 +154,20 @@ export interface ActivitiesPanelProps {
   onPrivateLocationsChanged: () => void;
 }
 
-export type PanelTab = 'activities' | 'sync' | 'private';
+export type PanelTab = 'activities' | 'stories' | 'sync' | 'private';
 
-export interface StoryView {
-  id: string;
-  /** null while it loads, and when it couldn't be (`error`). */
-  story: Story | null;
+/** What the Stories tab needs from MapView beyond the activity list the other tabs share —
+ *  see StoriesTab.tsx's props of the same names. */
+export interface StoriesPanel {
+  stories: Story[];
+  ready: boolean;
   error: string | null;
-  onExit: () => void;
-  /** Renamed or re-described with the pencil — the Story as the server returned it. */
+  openId: string | null;
+  openStory: Story | null;
+  openError: string | null;
+  onOpen: (id: string) => void;
   onEdited: (story: Story) => void;
-  /** Activities taken out with Remove from story — they stay, just not in the Story. */
-  onRemoved: (ids: string[], story: Story) => void;
+  onDeleted: (id: string) => void;
 }
 
 export function ActivitiesPanel({
@@ -227,7 +200,7 @@ export function ActivitiesPanel({
   onActivitiesDeleted,
   onEdit,
   onStoryCreated,
-  storyView,
+  stories,
   duplicates,
   duplicatesError,
   imports,
@@ -252,30 +225,22 @@ export function ActivitiesPanel({
   const [duplicatesOpen, setDuplicatesOpen] = useState(false);
   const duplicatesRef = useRef<HTMLDivElement>(null);
 
-  // Scrolls the newly row-click-focused activity into view, centered — reported live as
-  // having to hunt for the now-bolded row by eye after clicking a track on the map, since a
-  // long list scrolled it out of view as often as not. Keyed on focusedId alone (not
-  // `checked`): a row click always has exactly one target to center on, while a checkbox spree
-  // building up a multi-row group has no single row to scroll to, and would otherwise jerk the
-  // list around after every click. `data-activity-id` on the row below is what this looks up.
-  //
-  // Scrolls the list alone, not `row.scrollIntoView()`: that scrolls every ancestor too, and
-  // on a phone the collapsed sheet (`overflow: hidden`, 68px tall) is one — a tap on a track
-  // scrolled the whole sheet up by its own content, pushing the header and the expand strip
-  // out of its visible box, where no gesture could bring them back.
+  // The row list, for useScrollFocusedRow (ActivityRow.tsx): a newly focused row scrolls into view.
   const listRef = useRef<HTMLUListElement>(null);
+  useScrollFocusedRow(listRef, focusedId);
+
+  // The tab strip scrolls sideways when the tabs don't fit (index.css); the selected tab is
+  // brought into view, scrolling the strip alone, for the reason useScrollFocusedRow gives.
+  const tabsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (focusedId === null) return;
-    const list = listRef.current;
-    const row = list?.querySelector(`[data-activity-id="${CSS.escape(focusedId)}"]`);
-    if (!list || !row) return;
-    const rowRect = row.getBoundingClientRect();
-    const offset = rowRect.top - list.getBoundingClientRect().top;
-    list.scrollTo({
-      top: list.scrollTop + offset - (list.clientHeight - rowRect.height) / 2,
-      behavior: 'smooth',
-    });
-  }, [focusedId]);
+    const strip = tabsRef.current;
+    const selected = strip?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!strip || !selected) return;
+    const left = selected.getBoundingClientRect().left - strip.getBoundingClientRect().left + strip.scrollLeft;
+    if (left < strip.scrollLeft || left + selected.offsetWidth > strip.scrollLeft + strip.clientWidth) {
+      strip.scrollTo({ left: left - (strip.clientWidth - selected.offsetWidth) / 2, behavior: 'smooth' });
+    }
+  }, [tab]);
 
   useEffect(() => {
     if (!typeFilterOpen) return;
@@ -316,10 +281,6 @@ export function ActivitiesPanel({
   const [deletingGroup, setDeletingGroup] = useState(false);
   // FR-5.16's Create story dialog, over the checked group.
   const [creatingStory, setCreatingStory] = useState(false);
-  // The Story view's pencil (FR-14.7), and Remove from story's request and its failure.
-  const [editingStory, setEditingStory] = useState(false);
-  const [removingFromStory, setRemovingFromStory] = useState(false);
-  const [storyActionError, setStoryActionError] = useState<string | null>(null);
 
   // Mobile-only bottom sheet (index.css's `@media (max-width: 768px)` layer) — collapsed by
   // default, same reasoning as typeFilterOpen above. Desktop CSS never reacts to the
@@ -426,26 +387,6 @@ export function ActivitiesPanel({
       ? t('stories.create_none')
       : t('stories.create_target', { target: tn('activities.checked_count', checkedActivities.length) });
   const focusTitle = targetName === null ? noTarget : t('activities.focus_target', { target: targetName });
-  const removeTitle = readOnly
-    ? t('stories.demo_remove')
-    : targetName === null
-      ? noTarget
-      : t('stories.remove_target', { target: targetName });
-
-  const story = storyView?.story ?? null;
-  async function removeFromStory() {
-    if (!story) return;
-    const ids = targetActivities.map((a) => a.id);
-    setRemovingFromStory(true);
-    setStoryActionError(null);
-    try {
-      storyView?.onRemoved(ids, await removeStoryActivities(story.id, ids));
-    } catch (err) {
-      setStoryActionError(err instanceof Error ? err.message : t('common.something_wrong'));
-    } finally {
-      setRemovingFromStory(false);
-    }
-  }
 
   return (
     <div
@@ -470,47 +411,7 @@ export function ActivitiesPanel({
         onPointerUp={onResizePointerUp}
         onPointerCancel={onResizePointerUp}
       />
-      {storyView ? (
-        <div className="story-head" data-testid="story-head">
-          <div className="story-head__row">
-            <h2 className="story-head__title">
-              {story ? t('stories.view_title', { name: story.name }) : (storyView.error ?? t('common.loading'))}
-            </h2>
-            <button
-              type="button"
-              className="activities-panel__edit"
-              disabled={readOnly || !story}
-              onClick={() => setEditingStory(true)}
-              aria-label={readOnly ? t('stories.demo_edit') : t('stories.edit')}
-              title={readOnly ? t('stories.demo_edit') : t('stories.edit')}
-            >
-              <Pencil size={16} />
-            </button>
-            <button type="button" className="story-head__exit" data-testid="story-exit" onClick={storyView.onExit}>
-              {t('stories.exit')}
-            </button>
-          </div>
-          {story && story.description !== '' && <p className="story-head__description">{story.description}</p>}
-          {story && story.stats.count > 0 && (
-            <>
-              <p className="story-head__stats">{storyStatsLine(story.stats, system)}</p>
-              <table className="story-head__types" aria-label={t('stories.by_type')}>
-                <tbody>
-                  {story.stats.byType.map((type) => (
-                    <tr key={type.activityType}>
-                      <th scope="row">{formatActivityType(type.activityType)}</th>
-                      <td>{storyStatsLine(type, system)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </>
-          )}
-          {story && story.stats.count === 0 && <p className="story-head__stats">{t('stories.no_activities')}</p>}
-          {storyActionError && <p className="settings-page__error">{storyActionError}</p>}
-        </div>
-      ) : (
-      <div className="activities-panel__head" role="tablist" aria-label={t('activities.panel')}>
+      <div className="activities-panel__head" role="tablist" aria-label={t('activities.panel')} ref={tabsRef}>
         <button
           type="button"
           role="tab"
@@ -520,7 +421,18 @@ export function ActivitiesPanel({
           onClick={() => setTab('activities')}
         >
           <span className="activities-panel__heading-text">{t('activities.tab')}</span>
-          <span className="activities-panel__badge">{activities.length.toLocaleString(lang)}</span>
+          {/* On the Stories tab the list is the open Story's, not the date range's. */}
+          {tab !== 'stories' && <span className="activities-panel__badge">{activities.length.toLocaleString(lang)}</span>}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'stories'}
+          className="activities-panel__tab"
+          data-testid="activities-panel-tab-stories"
+          onClick={() => setTab('stories')}
+        >
+          <span className="activities-panel__heading-text">{t('stories.tab')}</span>
         </button>
         <button
           type="button"
@@ -546,7 +458,6 @@ export function ActivitiesPanel({
           <span className="activities-panel__heading-text">{t('private.tab')}</span>
         </button>
       </div>
-      )}
       {/* A <button>, not a <p> — on mobile this is the bottom sheet's own peek-strip tap
           target (expand/collapse), styled identically to the old plain text on desktop
           (index.css keeps `cursor: default` there) so clicking it is a harmless, invisible
@@ -562,9 +473,11 @@ export function ActivitiesPanel({
           ? t('sync.subtext')
           : tab === 'private'
             ? t('private.subtitle')
-            : totals !== null
-              ? t('activities.loaded', { distance: formatTotalDistance(totals.distanceMeters, system) })
-              : t('common.loading')}
+            : tab === 'stories'
+              ? t('stories.subtext')
+              : totals !== null
+                ? t('activities.loaded', { distance: formatTotalDistance(totals.distanceMeters, system) })
+                : t('common.loading')}
         <span className="activities-panel__sheet-chevron" aria-hidden="true">
           {sheetExpanded ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
         </span>
@@ -583,6 +496,31 @@ export function ActivitiesPanel({
         ) : (
           <p className="edit-track__note">{t('common.loading')}</p>
         )
+      ) : tab === 'stories' ? (
+        <StoriesTab
+          readOnly={readOnly}
+          stories={stories.stories}
+          storiesReady={stories.ready}
+          storiesError={stories.error}
+          openId={stories.openId}
+          openStory={stories.openStory}
+          openError={stories.openError}
+          activities={activities}
+          activitiesLoading={loading}
+          activitiesError={error}
+          focusedId={focusedId}
+          hoveredId={hoveredId}
+          onOpen={(id) => {
+            // On a phone the expanded sheet would cover the Story's tracks, as after View on map.
+            setSheetExpanded(false);
+            stories.onOpen(id);
+          }}
+          onFocus={onFocus}
+          onClearFocus={onClearFocus}
+          onHoverActivity={onHoverActivity}
+          onEdited={stories.onEdited}
+          onDeleted={stories.onDeleted}
+        />
       ) : tab === 'sync' ? (
         <SyncTab
           imports={imports}
@@ -740,18 +678,6 @@ export function ActivitiesPanel({
             >
               <BookPlus size={16} />
             </button>
-            {storyView && (
-              <button
-                type="button"
-                className="activities-panel__remove-from-story"
-                disabled={readOnly || !hasTarget || !story || removingFromStory}
-                onClick={() => void removeFromStory()}
-                aria-label={removeTitle}
-                title={removeTitle}
-              >
-                <BookMinus size={16} />
-              </button>
-            )}
             <button
               type="button"
               className="activities-panel__delete"
@@ -788,98 +714,19 @@ export function ActivitiesPanel({
               if (target === e.currentTarget || target.classList.contains('activities-panel__note')) onClearFocus();
             }}
           >
-            {activities.map((activity) => {
-              const isChecked = checked.has(activity.id);
-              const isFocused = focusedId === activity.id;
-              const isHovered = hoveredId === activity.id;
-              const isHidden = hiddenIds.has(activity.id);
-              const isPending = activity.pending;
-              // The Stories it's in, but not the one on screen: in a Story view every row is in
-              // that one, so only its other Stories are worth a badge.
-              const otherStories = activity.stories.filter((s) => s.id !== storyView?.id);
-              // A user-entered name (§4.7's revised decision) leads; started_at is the fallback
-              // for a row that has none — never the reverse, so an activity's date doesn't
-              // disappear from the list just because it also has a name (shown in the meta line
-              // below instead). Sorting itself is untouched either way: the list's order comes
-              // entirely from the server's own `ORDER BY started_at DESC`, never from this label.
-              const displayName = activity.name?.trim() || null;
-              const label = rowLabel(activity);
-              const classes = ['activities-panel__row'];
-              // Only the selected row is bold on the map, so only it gets the row highlight — a
-              // checked row's ticked box is its only mark.
-              if (isFocused) classes.push('activities-panel__row--selected');
-              if (isHidden) classes.push('activities-panel__row--hidden');
-              if (isPending) classes.push('activities-panel__row--pending');
-              return (
-                <li
-                  key={activity.id}
-                  data-activity-id={activity.id}
-                  className={classes.join(' ')}
-                  // The description (§4.7.4) shows as a hover tooltip only — no second visible
-                  // line, and undefined (not an empty string) when there is none, so a row with
-                  // nothing written there gets no title attribute at all rather than an empty
-                  // one a browser might still render as an inert tooltip.
-                  title={activity.description ?? undefined}
-                  onMouseEnter={() => onHoverActivity(activity.id)}
-                  onMouseLeave={() => onHoverActivity(null)}
-                >
-                  <input
-                    type="checkbox"
-                    className="activities-panel__checkbox"
-                    checked={isChecked}
-                    // A pending row (§4.7.7) is disabled until its reprocess lands, except that an
-                    // already-checked one can still be unchecked.
-                    disabled={isPending && !isChecked}
-                    aria-label={isChecked ? t('activities.row_uncheck', { label }) : t('activities.row_check', { label })}
-                    onChange={() => onToggle(activity.id)}
-                  />
-                  <button
-                    type="button"
-                    className="activities-panel__text"
-                    disabled={isPending}
-                    aria-pressed={isFocused}
-                    aria-label={t('activities.fly_to', { label })}
-                    title={activity.bbox === null ? t('activities.no_track') : label}
-                    onClick={() => onFocus(activity.id)}
-                  >
-                    <span className={`activities-panel__title${isHovered ? ' activities-panel__title--hovered' : ''}`}>{label}</span>
-                    <span className="activities-panel__meta">
-                      {/* The date moves down here, ahead of distance/duration, once a name has
-                          taken its place as the title above — otherwise it's already the title
-                          and repeating it here would be redundant. Type trails the line now
-                          (there's no separate trailing column any more — single-item actions,
-                          including visibility, all moved to the toolbar via check-then-toolbar,
-                          so a bare row has nothing left to show but this text). */}
-                      {displayName && `${formatStartedAt(activity.startedAt)} · `}
-                      {formatDistance(activity.distanceMeters, system)} · {formatDuration(activity.durationSeconds)} ·{' '}
-                      {formatActivityType(activity.activityType)}
-                    </span>
-                  </button>
-                  {(isPending || isHidden || otherStories.length > 0) && (
-                    // One right-aligned group, so the badges share one right edge whatever the
-                    // text beside them does, and a row that's both stacks them there together.
-                    <span className="activities-panel__badges">
-                      {otherStories.length > 0 && (
-                        <span
-                          className="activities-panel__hidden-badge activities-panel__story-badge"
-                          title={tn(storyView ? 'activities.in_other_stories' : 'activities.in_stories', otherStories.length, {
-                            names: otherStories.map((s) => s.name).join(', '),
-                          })}
-                        >
-                          {tn('activities.story_badge', otherStories.length)}
-                        </span>
-                      )}
-                      {isPending && (
-                        <span className="activities-panel__hidden-badge" title={t('activities.pending_title')}>
-                          {t('activities.pending')}
-                        </span>
-                      )}
-                      {isHidden && <span className="activities-panel__hidden-badge">{t('activities.hidden')}</span>}
-                    </span>
-                  )}
-                </li>
-              );
-            })}
+            {activities.map((activity) => (
+              <ActivityRow
+                key={activity.id}
+                activity={activity}
+                system={system}
+                focused={focusedId === activity.id}
+                hovered={hoveredId === activity.id}
+                hidden={hiddenIds.has(activity.id)}
+                checkbox={{ checked: checked.has(activity.id), onToggle: () => onToggle(activity.id) }}
+                onFocus={() => onFocus(activity.id)}
+                onHover={onHoverActivity}
+              />
+            ))}
             {loading && <li className="activities-panel__note">{t('common.loading')}</li>}
             {error && !loading && (
               <li className="activities-panel__note activities-panel__note--error">{error}</li>
@@ -901,7 +748,7 @@ export function ActivitiesPanel({
               two different reasons — it failed, or cross-source dedup already had it from
               somewhere else — and only the second is not a fault. Hidden entirely when there's
               nothing to say, the same as Android's own duplicatesHeading. */}
-          {!storyView && (duplicates.length > 0 || duplicatesError) && (
+          {(duplicates.length > 0 || duplicatesError) && (
             <div className="activities-panel__duplicates" ref={duplicatesRef}>
               <button
                 type="button"
@@ -942,10 +789,6 @@ export function ActivitiesPanel({
           onSaved={onStoryCreated}
           onClose={() => setCreatingStory(false)}
         />
-      )}
-
-      {editingStory && story && storyView && (
-        <StoryDialog mode="edit" story={story} onSaved={storyView.onEdited} onClose={() => setEditingStory(false)} />
       )}
 
       {deletingGroup && (

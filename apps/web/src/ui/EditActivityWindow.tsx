@@ -74,16 +74,15 @@ export interface EditActivityWindowProps {
   /** Why the Track tab is disabled, or null when `activities` is one editable track. */
   trackUnavailable: string | null;
   onStartTrack: (activity: Activity) => void;
-  /** `saved`: something was written, so the list reloads. `trackApplied`: a track edit was
-   *  sent, so the row now reads Pending until its reprocess lands. `storiesChanged`: an activity
-   *  went into or out of a Story, which an open Story view has to show. */
+  /** `saved`: something was written (a Story membership too, which the rows' Story badges
+   *  show), so the list reloads. `trackApplied`: a track edit was sent, so the row now reads
+   *  Pending until its reprocess lands. */
   onClose: (result: EditWindowResult) => void;
 }
 
 export interface EditWindowResult {
   saved: boolean;
   trackApplied: boolean;
-  storiesChanged: boolean;
 }
 
 export function EditActivityWindow({ map, activities, knownTypes, trackUnavailable, onStartTrack, onClose }: EditActivityWindowProps) {
@@ -136,8 +135,7 @@ export function EditActivityWindow({ map, activities, knownTypes, trackUnavailab
   }, []);
 
   const cancel = useCallback(() => {
-    const storiesChanged = storiesSaved.current.size > 0;
-    onClose({ saved: fieldsSaved.current || storiesChanged, trackApplied: false, storiesChanged });
+    onClose({ saved: fieldsSaved.current || storiesSaved.current.size > 0, trackApplied: false });
   }, [onClose]);
 
   useEffect(() => {
@@ -206,13 +204,12 @@ export function EditActivityWindow({ map, activities, knownTypes, trackUnavailab
         else await removeStoryActivities(storyId, activityIds);
         storiesSaved.current.add(storyId);
       }
-      const storiesChanged = storiesSaved.current.size > 0;
       if (single && trackPending) {
         await saveActivityTrackEdit(single.id, trackPending.edit);
-        onClose({ saved: true, trackApplied: true, storiesChanged });
+        onClose({ saved: true, trackApplied: true });
         return;
       }
-      onClose({ saved: fieldsSaved.current || storiesChanged, trackApplied: false, storiesChanged });
+      onClose({ saved: fieldsSaved.current || storiesSaved.current.size > 0, trackApplied: false });
     } catch (err) {
       setError(err instanceof Error ? err.message : t('edit.save_failed'));
       setSaving(false);

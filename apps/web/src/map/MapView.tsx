@@ -26,7 +26,7 @@ import { flavorForTheme, parseHash, pinnedFlavor, replaceHash, type HashState, t
 import { getActivityTrackMetrics, type Activity, type ActivityTrackMetrics, type Story } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
-import { ActivitiesPanel, type PanelTab, type StoryView } from '../ui/ActivitiesPanel';
+import { ActivitiesPanel, type PanelTab, type StoriesPanel } from '../ui/ActivitiesPanel';
 import { ActivityHistogram } from '../ui/ActivityHistogram';
 import { EditActivityWindow, type EditWindowResult } from '../ui/EditActivityWindow';
 import { ExportControl } from '../ui/ExportControl';
@@ -39,6 +39,7 @@ import { useActivityList } from '../ui/useActivityList';
 import { useActivityTotals } from '../ui/useActivityTotals';
 import { useDuplicates } from '../ui/useDuplicates';
 import { useImports } from '../ui/useImports';
+import { useStories } from '../ui/useStories';
 import { useStory } from '../ui/useStory';
 import { currentTheme, useTheme } from '../ui/useTheme';
 import { t } from '../i18n';
@@ -47,8 +48,8 @@ import { t } from '../i18n';
  *  activity's worth of ingest, so a few seconds is the right order of magnitude. */
 const EDIT_PENDING_POLL_MS = 2000;
 
-/** The Story the URL opens, `/?story=<id>` (FR-14.7) — kept in the URL, unlike
- *  `?private-locations`, so a refresh or a shared link comes back to it. */
+/** The Story the URL opens on the Stories tab, `/?story=<id>` (FR-14.6) — kept in the URL,
+ *  unlike `?private-locations`, so a refresh or a shared link comes back to it. */
 function storyParam(): string | null {
   return new URLSearchParams(window.location.search).get('story') || null;
 }
@@ -61,6 +62,15 @@ function urlWithStory(id: string | null): string {
   else params.set('story', id);
   const qs = params.toString();
   return window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash;
+}
+
+/** What opening or closing a Story does to the URL: a new history entry, a replaced one, or
+ *  nothing (Back/Forward already moved it). */
+type StoryNav = 'push' | 'replace' | 'none';
+
+function moveStoryUrl(id: string | null, nav: StoryNav) {
+  if (nav === 'push') window.history.pushState(null, '', urlWithStory(id));
+  else if (nav === 'replace') window.history.replaceState(null, '', urlWithStory(id));
 }
 
 export interface MapViewProps {
@@ -180,8 +190,11 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   const editingTrack = editingActivityId !== null;
 
   // The Activities panel's tab — here rather than in the panel so `/?private-locations` can open
-  // onto Privacy (FR-8.1), and so the tab outlives the panel unmounting for Fog/Heatmap.
-  const [panelTab, setPanelTab] = useState<PanelTab>(initialPrivateLocationsOpen ? 'private' : 'activities');
+  // onto Privacy (FR-8.1) and `/?story=` onto Stories (FR-14.6), and so the tab outlives the
+  // panel unmounting for Fog/Heatmap.
+  const [panelTab, setPanelTab] = useState<PanelTab>(
+    storyParam() !== null ? 'stories' : initialPrivateLocationsOpen ? 'private' : 'activities',
+  );
 
   // The list/summary filter — the highlighted band in the range picker. The picker's own pan
   // position is not here on purpose: it lives in useActivityDays and the two are independent,
@@ -191,13 +204,15 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // render.
   const [selectedRange, setSelectedRangeState] = useState<DateRange | null>(null);
 
-  // The Story view (FR-14.7): while a Story is open, the list, the totals, the drawn tracks and
-  // the range picker's bars are that Story's activities alone. Entered from the URL, from Create
-  // story, or by Back/Forward; left with Exit story, which puts back the range from before it.
+  // The open Story (FR-14.6): while one is open on the Stories tab, the list, the totals, the
+  // drawn tracks and the range picker's bars are that Story's activities alone. Opened from the
+  // tab, the URL, Create story, or by Back/Forward; closed by leaving the tab, which puts back
+  // the range from before it.
   const [storyId, setStoryId] = useState<string | null>(storyParam);
   const storyState = useStory(storyId);
-  // The range (and whether the user had picked it) to restore on Exit story — null when the
-  // page opened straight into a Story, which then exits onto the usual default range.
+  const storiesList = useStories(panelTab === 'stories');
+  // The range (and whether the user had picked it) to restore on leaving the tab — null when the
+  // page opened straight into a Story, which then closes onto the usual default range.
   const beforeStoryRef = useRef<{ range: DateRange | null; userChanged: boolean } | null>(null);
   // Set on entering a Story, until its whole span is selected (the effect further down) —
   // `fly` says whether to fit the camera to it then: yes when entered from the map, no on page
@@ -376,7 +391,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     // visibleDays deliberately isn't a dependency — see the comment above.
   }, [daysReady, earliest, historyGeneration, today, editOpen, storyId, loadedStory]);
 
-  // A Story opens on the whole of it: its first activity's day to its last (FR-14.7), once the
+  // A Story opens on the whole of it: its first activity's day to its last (FR-14.6), once the
   // picker's days are that Story's. An empty Story has no days, and gets today.
   useEffect(() => {
     const pending = storyRangePendingRef.current;
@@ -664,7 +679,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     if (!hasFlownToActivitiesRef.current) {
       const drawn = activities.filter((a) => a.bbox !== null && !a.pending);
       // A Story with nothing to draw (an empty one, or one that doesn't exist) leaves this for
-      // the history Exit story goes back to.
+      // the history leaving the tab goes back to.
       if (storyId !== null && drawn.length === 0) return;
       // The first list, even an empty one: an account with no history yet gets the fallback
       // view below, and its first upload doesn't fly either.
@@ -869,9 +884,8 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     setEditWindowIds(group.map((a) => a.id));
   }, []);
 
-  // Into and out of the Story view. Both start the list's state afresh, as a new range does
-  // (changeSelectedRange): the rows are a different set. `push` is false when Back/Forward
-  // already moved the URL.
+  // Opening and closing a Story. Both start the list's state afresh, as a new range does
+  // (changeSelectedRange): the rows are a different set.
   const resetListState = useCallback(() => {
     setCheckedActivityIds(new Set());
     setFocusedActivityId(null);
@@ -880,19 +894,19 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     setDistanceFilter(null);
   }, []);
   const enterStory = useCallback(
-    (id: string, push = true) => {
-      // Opening a second Story from inside one (Create story there) still exits to the range
-      // from before the first.
+    (id: string, nav: StoryNav = 'push') => {
+      // Switching from one Story to another still closes onto the range from before the first.
       if (storyId === null) beforeStoryRef.current = { range: selectedRange, userChanged: userChangedRangeRef.current };
       storyRangePendingRef.current = { fly: true };
       resetListState();
       setStoryId(id);
-      if (push) window.history.pushState(null, '', urlWithStory(id));
+      setPanelTab('stories');
+      moveStoryUrl(id, nav);
     },
     [storyId, selectedRange, resetListState],
   );
   const exitStory = useCallback(
-    (push = true) => {
+    (nav: StoryNav = 'push') => {
       const before = beforeStoryRef.current;
       beforeStoryRef.current = null;
       storyRangePendingRef.current = null;
@@ -903,11 +917,26 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       userChangedRangeRef.current = before?.userChanged ?? false;
       flyToNextRangeRef.current = false;
       setSelectedRangeState(before?.range ?? null);
-      if (push) window.history.pushState(null, '', urlWithStory(null));
+      moveStoryUrl(null, nav);
     },
     [resetListState],
   );
-  // Back and Forward between a Story and the map outside it.
+  // The panel's tabs: leaving Stories closes its Story; opening it opens the newest one (the
+  // effect below, once the list is in).
+  const changePanelTab = useCallback(
+    (next: PanelTab) => {
+      if (next !== 'stories' && storyId !== null) exitStory();
+      setPanelTab(next);
+    },
+    [storyId, exitStory],
+  );
+  // One Story is always open on the Stories tab: the newest, until another is picked.
+  useEffect(() => {
+    if (panelTab !== 'stories' || storyId !== null || !storiesList.ready) return;
+    const newest = storiesList.stories[0];
+    if (newest) enterStory(newest.id);
+  }, [panelTab, storyId, storiesList.ready, storiesList.stories, enterStory]);
+  // Back and Forward between Stories, and to and from the tab.
   const storyNavRef = useRef({ storyId, enterStory, exitStory });
   storyNavRef.current = { storyId, enterStory, exitStory };
   useEffect(() => {
@@ -915,48 +944,54 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       const { storyId: current, enterStory: enter, exitStory: exit } = storyNavRef.current;
       const next = storyParam();
       if (next === current) return;
-      if (next === null) exit(false);
-      else enter(next, false);
+      if (next !== null) {
+        enter(next, 'none');
+        return;
+      }
+      exit('none');
+      setPanelTab('activities');
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
-  // A Story just made with the toolbar's Create story opens straight away.
+  // A Story just made with the toolbar's Create story opens straight away, on the Stories tab —
+  // whose list, fetched as the tab opens, has it.
   const openCreatedStory = useCallback((story: Story) => enterStory(story.id), [enterStory]);
 
-  // Remove from story (FR-14.7): the Story as the server now has it, and the list, totals, bars
-  // and tracks without those activities. Like a delete, they leave every selection too.
-  const handleRemovedFromStory = useCallback(
-    (ids: string[], story: Story) => {
-      storyState.set(story);
-      if (map) refreshTrackLayer(map, activityQuery);
-      reloadActivities();
-      reloadTotals();
-      reloadHistogram();
-      const removed = new Set(ids);
-      const without = (current: Set<string>) =>
-        [...removed].some((id) => current.has(id)) ? new Set([...current].filter((id) => !removed.has(id))) : current;
-      setFocusedActivityId((current) => (current !== null && removed.has(current) ? null : current));
-      setCheckedActivityIds(without);
-      setHiddenActivityIds(without);
+  const handleStoryEdited = useCallback(
+    (story: Story) => {
+      storiesList.replace(story);
+      if (story.id === storyId) storyState.set(story);
     },
-    [storyState.set, map, activityQuery, reloadActivities, reloadTotals, reloadHistogram],
+    [storiesList.replace, storyId, storyState.set],
+  );
+  // A deleted Story's activities stay, but their Story badges change. Deleting the open one
+  // opens the next newest, in its place in the history; deleting the last leaves none open.
+  const handleStoryDeleted = useCallback(
+    (id: string) => {
+      storiesList.remove(id);
+      if (id !== storyId) return;
+      const next = storiesList.stories.find((s) => s.id !== id);
+      if (next) enterStory(next.id, 'replace');
+      else exitStory('replace');
+    },
+    [storiesList.remove, storiesList.stories, storyId, enterStory, exitStory],
   );
 
-  const storyView: StoryView | null = useMemo(
-    () =>
-      storyId === null
-        ? null
-        : {
-            id: storyId,
-            story: storyState.story,
-            error: storyState.error,
-            onExit: () => exitStory(),
-            onEdited: storyState.set,
-            onRemoved: handleRemovedFromStory,
-          },
-    [storyId, storyState.story, storyState.error, storyState.set, exitStory, handleRemovedFromStory],
+  const storiesPanel: StoriesPanel = useMemo(
+    () => ({
+      stories: storiesList.stories,
+      ready: storiesList.ready,
+      error: storiesList.error,
+      openId: storyId,
+      openStory: storyState.story,
+      openError: storyState.error,
+      onOpen: (id: string) => enterStory(id),
+      onEdited: handleStoryEdited,
+      onDeleted: handleStoryDeleted,
+    }),
+    [storiesList.stories, storiesList.ready, storiesList.error, storyId, storyState.story, storyState.error, enterStory, handleStoryEdited, handleStoryDeleted],
   );
   // §4.7.7's track session, from the Edit window's Track tab. Flies there the same way a row
   // click does, then hands the map to TrackEditor until the window closes.
@@ -973,25 +1008,14 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // enough on its own.
   const awaitingEditIdsRef = useRef<Set<string>>(new Set());
   const closeEditWindow = useCallback(
-    ({ saved, trackApplied, storiesChanged }: EditWindowResult) => {
+    ({ saved, trackApplied }: EditWindowResult) => {
       if (trackApplied && editingActivityId !== null) awaitingEditIdsRef.current.add(editingActivityId);
       setEditWindowIds(null);
       setEditingActivityId(null);
       // A track edit leaves the row Pending — the effects below poll until the reprocess lands.
-      if (saved) {
-        reloadActivities();
-        // A new type moves an activity between the Story's per-type rows.
-        storyState.reload();
-      }
-      // The Stories tab may have taken an activity out of (or put one into) the Story on
-      // screen: its tracks, totals and bars follow, as after Remove from story.
-      if (storiesChanged && storyId !== null) {
-        if (map) refreshTrackLayer(map, activityQuery);
-        reloadTotals();
-        reloadHistogram();
-      }
+      if (saved) reloadActivities();
     },
-    [editingActivityId, reloadActivities, storyState.reload, storyId, map, activityQuery, reloadTotals, reloadHistogram],
+    [editingActivityId, reloadActivities],
   );
   // A saved or deleted Private location reprocesses every activity it could clip. The list
   // reload shows those rows Pending right away, and the Pending poll below refreshes the map
@@ -1220,13 +1244,13 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
               onActivitiesDeleted={handleActivitiesDeleted}
               onEdit={openEditWindow}
               onStoryCreated={openCreatedStory}
-              storyView={storyView}
+              stories={storiesPanel}
               duplicates={duplicates.duplicates}
               duplicatesError={duplicates.error}
               imports={imports}
               onViewOnMap={viewActivityOnMap}
-              tab={storyId !== null ? 'activities' : panelTab}
-              onTabChange={setPanelTab}
+              tab={panelTab}
+              onTabChange={changePanelTab}
               map={map}
               onPrivateLocationsChanged={handlePrivateLocationsChanged}
             />

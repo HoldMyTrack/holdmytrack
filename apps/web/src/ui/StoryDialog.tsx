@@ -7,7 +7,7 @@ import { t } from '../i18n';
  *
  *  - **Create** (`SPEC.md` FR-5.16) — the Activities panel toolbar's Create story, making a Story
  *    of the checked activities with one `POST /v1/stories` that carries them too.
- *  - **Edit** (FR-14.7) — the Story view's pencil, renaming it or changing its description.
+ *  - **Edit** (FR-14.6) — a Stories tab folder's pencil, renaming it or changing its description.
  *
  * A modal `<dialog>` like ConfirmDialog.tsx, and like it owns its busy and error state and closes
  * itself once the request has succeeded; `onSaved` gets the Story as the server returned it,
