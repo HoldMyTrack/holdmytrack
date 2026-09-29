@@ -105,7 +105,7 @@ Stories — hand-picked, private sets of activities with their own totals and ma
 
 ## Phase 9: Spots
 
-Spots — outdoor places from OpenStreetMap — are built on the web (root `docs/SPEC.md` FR-15, `docs/IMPLEMENTATION.md` §4.25, [ADR-0021](../../../docs/adr/0021-spots-from-osm-visits-from-tracks.md)). This phase brings them to the map here, on the same `/tiles/v1/spots` tiles, with no Android-only server work. Once visits exist (root `docs/ROADMAP.md` Phase 1) there is still no geofencing and no background location: a visit comes from a synced track, whether Health Connect's or the app's own recording, matched on the server like any other.
+Spots — outdoor places from OpenStreetMap — are built on the web and here (root `docs/SPEC.md` FR-15, `docs/IMPLEMENTATION.md` §4.25, [ADR-0021](../../../docs/adr/0021-spots-from-osm-visits-from-tracks.md)). They're on the map here on the same `/tiles/v1/spots` tiles, with no Android-only server work (`apps/android/docs/SPEC.md` FR-2.8). Once visits exist (root `docs/ROADMAP.md` Phase 1) there is still no geofencing and no background location: a visit comes from a synced track, whether Health Connect's or the app's own recording, matched on the server like any other.
 
-- [ ] **Points of interest on the map** — the web's per-category choice (its Layers menu), category icons and areas, in every map mode, and "Show in this area" below zoom 13.
-- [ ] **The popup** — name, category, OSM's text, Copy address, and the Wikipedia link.
+- [x] **Points of interest on the map** — the web's per-category choice (its Layers menu), category icons and areas, in every map mode, and "Show in this area" below zoom 13.
+- [x] **The popup** — name, category, OSM's text, Copy address, and the Wikipedia link.
