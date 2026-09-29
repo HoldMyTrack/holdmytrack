@@ -158,7 +158,7 @@ export const PATH_LAYER_IDS = [
   'paths_bridges_track',
 ] as const;
 
-/** The three kinds the web's Overlays menu shows separately (overlays.ts). Android toggles all
+/** The three kinds the web's Layers menu shows separately (overlays.ts). Android toggles all
  *  six together. */
 export const TRAIL_LAYER_IDS = ['paths_trail', 'paths_bridges_trail'] as const;
 export const TRACK_LAYER_IDS = ['paths_track', 'paths_bridges_track'] as const;

@@ -1564,21 +1564,6 @@ body {
   border: 0;
 }
 
-/* The Base map choice (FR-4.14) above everything, set off from the overlays by a rule. */
-.overlays-menu__group--basemap {
-  margin-bottom: var(--fm-space-8);
-  padding-bottom: var(--fm-space-8);
-  border-bottom: 1px solid var(--fm-border);
-}
-
-/* The master All, over both groups, set off from them by a rule. */
-.overlays-menu__item--all {
-  margin-bottom: var(--fm-space-8);
-  padding-bottom: var(--fm-space-8);
-  border-bottom: 1px solid var(--fm-border);
-  font-weight: var(--fm-weight-semibold);
-}
-
 .overlays-menu__group + .overlays-menu__group {
   margin-top: var(--fm-space-8);
   padding-top: var(--fm-space-8);
@@ -1608,6 +1593,47 @@ body {
 .overlays-menu__item input[type='radio'] {
   flex: none;
   accent-color: var(--fm-accent);
+}
+
+/* An entry with an info button beside it (Tracks): the label keeps its full-width hit area. */
+.overlays-menu__row {
+  display: flex;
+  align-items: center;
+}
+
+.overlays-menu__row .overlays-menu__item {
+  flex: 1;
+}
+
+.overlays-menu__info {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--fm-ink-muted);
+  cursor: pointer;
+}
+
+.overlays-menu__info:hover,
+.overlays-menu__info[aria-expanded='true'] {
+  background: var(--fm-surface-tint);
+  color: var(--fm-ink);
+}
+
+/* The explanation the info button opens, indented under its checkbox's label. */
+.overlays-menu__hint {
+  margin: 0 var(--fm-space-2) var(--fm-space-4) calc(var(--fm-space-2) + 13px + var(--fm-space-8));
+  padding: var(--fm-space-4) var(--fm-space-8);
+  border-radius: var(--fm-radius-md);
+  background: var(--fm-surface-tint);
+  font-size: var(--fm-text-sm);
+  color: var(--fm-ink-muted);
 }
 
 /* "Show in this area" (ShowInArea.tsx): a pill centered over the map, under the toggles. */

@@ -2,7 +2,7 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { SATELLITE_DIMS_METADATA, SATELLITE_LAYER_ID, SATELLITE_ROAD_OPACITY, satelliteHiddenLayerIds } from './style';
 
 /**
- * The Overlays menu's Base map switch (docs/SPEC.md FR-4.14, overlays.ts): shows the satellite
+ * The Layers menu's Base map switch (docs/SPEC.md FR-4.14, overlays.ts): shows the satellite
  * imagery, hides the basemap's background and area fills over it and draws the roads at
  * `SATELLITE_ROAD_OPACITY`, or the reverse — boundaries and labels stay as they are either way.
  * Diffs before setting, like paths.ts: reattachOverlays calls this on every 'styledata', and an

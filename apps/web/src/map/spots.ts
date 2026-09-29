@@ -10,7 +10,7 @@ import { REGION_MIN_ZOOM } from './zoomTiers';
 
 /**
  * The Spots layers (IMPLEMENTATION.md §4.25, ADR-0021): outdoor places from OpenStreetMap, each an
- * icon over its area, drawn in every map mode for the categories the Overlays menu has on. The tiles come from
+ * icon over its area, drawn in every map mode for the categories the Layers menu has on. The tiles come from
  * `/tiles/v1/spots`, cached under the account's tile version like every other map tile
  * (coverageVersion.ts).
  *
@@ -50,7 +50,7 @@ const SPOTS_TILE_URL = `${API_BASE_URL}${TILES_V1}/spots/{z}/{x}/{y}.mvt`;
 
 export type SpotCategory = 'playground' | 'dog_park' | 'monument' | 'viewpoint' | 'history';
 
-/** Every category, in the order the Overlays menu lists them. */
+/** Every category, in the order the Layers menu lists them. */
 export const SPOT_CATEGORIES: readonly SpotCategory[] = ['playground', 'dog_park', 'monument', 'viewpoint', 'history'];
 
 /** Lucide has no seesaw, so this one is drawn in its grid and stroke: a plank tilted over an
@@ -291,7 +291,7 @@ function addAreaLayers(map: MapLibreMap): void {
 }
 
 /**
- * Shows the chosen categories (the Overlays menu, overlays.ts) and hides the rest — a filter on
+ * Shows the chosen categories (the Layers menu, overlays.ts) and hides the rest — a filter on
  * every layer, and every layer hidden when none is chosen. Diffs first, like mapMode.ts's
  * setVisible: a bare setLayoutProperty or setFilter would start the styledata loop its comment
  * describes.

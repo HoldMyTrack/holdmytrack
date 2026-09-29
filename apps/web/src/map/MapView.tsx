@@ -152,7 +152,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // Normal is what already rendered before fog existed — it needed no new work to count
   // as a "mode" (IMPLEMENTATION.md §4.2.2).
   const [mapMode, setMapModeState] = useState<MapMode>('normal');
-  // The Overlays menu (OverlaysMenu.tsx): the Base map, then Trails, Tracks, Bike paths and each
+  // The Layers menu (OverlaysMenu.tsx): the Base map, then Trails, Tracks, Bike paths and each
   // Spots category, over any mode, remembered per browser (overlays.ts).
   const [overlays, setOverlays] = useState<Overlays>(loadOverlays);
   const changeOverlays = useCallback((next: Overlays) => {
