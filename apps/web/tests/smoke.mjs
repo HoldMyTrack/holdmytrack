@@ -223,19 +223,33 @@ describe('basemap foundation', () => {
     assert.ok(true);
   });
 
-  it('8. Trails & bike paths toggle: off by default, draws the paths, remembered across reload', async () => {
-    const PATH_LAYERS = ['paths_cycleway', 'paths_trail', 'paths_bridges_cycleway', 'paths_bridges_trail'];
-    const visibility = () =>
-      page.evaluate((ids) => ids.map((id) => window.__holdmytrack.getLayoutProperty(id, 'visibility')), PATH_LAYERS);
-    const toggle = page.getByTestId('map-paths-toggle').getByRole('button');
+  it('8. Overlays menu: trails, tracks and bike paths off by default, each shown on its own, remembered across reload', async () => {
+    const TRAILS = ['paths_trail', 'paths_bridges_trail'];
+    const TRACKS = ['paths_track', 'paths_bridges_track'];
+    const BIKES = ['paths_cycleway', 'paths_bridges_cycleway'];
+    const ALL = [...TRAILS, ...TRACKS, ...BIKES];
+    const visibility = (ids) =>
+      page.evaluate((ids) => ids.map((id) => window.__holdmytrack.getLayoutProperty(id, 'visibility')), ids);
+    const menu = page.getByTestId('map-overlays');
+    // Opens the menu if it's closed; the checkboxes live in its panel.
+    const openMenu = async () => {
+      const trigger = menu.getByRole('button').first();
+      if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+    };
 
-    assert.deepEqual(await visibility(), PATH_LAYERS.map(() => 'none'), 'hidden until turned on');
-    assert.equal(await toggle.getAttribute('aria-pressed'), 'false');
+    assert.deepEqual(await visibility(ALL), ALL.map(() => 'none'), 'hidden until turned on');
 
     // The Olentangy Trail, Columbus: cycleways and footpaths in the extract at z14.
     await page.evaluate(() => window.__holdmytrack.jumpTo({ center: [-83.02, 39.99], zoom: 14 }));
-    await toggle.click();
-    assert.deepEqual(await visibility(), PATH_LAYERS.map(() => 'visible'), 'shown once turned on');
+    await openMenu();
+    await page.locator('#overlay-bike-paths').check();
+    assert.deepEqual(await visibility(BIKES), BIKES.map(() => 'visible'), 'bike paths shown once ticked');
+    assert.deepEqual(await visibility([...TRAILS, ...TRACKS]), [...TRAILS, ...TRACKS].map(() => 'none'), 'trails and tracks still hidden');
+    await page.locator('#overlay-trails').check();
+    assert.deepEqual(await visibility(TRAILS), TRAILS.map(() => 'visible'), 'trails shown once ticked');
+    assert.deepEqual(await visibility(TRACKS), TRACKS.map(() => 'none'), 'tracks their own entry');
+    await page.locator('#overlay-tracks').check();
+    assert.deepEqual(await visibility(TRACKS), TRACKS.map(() => 'visible'), 'tracks shown once ticked');
     await styleLoaded();
     await page.waitForFunction(() => window.__holdmytrack.areTilesLoaded(), undefined, { timeout: 30_000 });
     const rendered = await page.evaluate(() => ({
@@ -248,8 +262,11 @@ describe('basemap foundation', () => {
 
     await page.reload();
     await styleLoaded();
-    assert.deepEqual(await visibility(), PATH_LAYERS.map(() => 'visible'), 'remembered across reload');
-    await toggle.click();
-    assert.deepEqual(await visibility(), PATH_LAYERS.map(() => 'none'), 'hidden again once turned off');
+    assert.deepEqual(await visibility(ALL), ALL.map(() => 'visible'), 'remembered across reload');
+    await openMenu();
+    await page.locator('#overlay-trails').uncheck();
+    await page.locator('#overlay-tracks').uncheck();
+    await page.locator('#overlay-bike-paths').uncheck();
+    assert.deepEqual(await visibility(ALL), ALL.map(() => 'none'), 'hidden again once unticked');
   });
 });

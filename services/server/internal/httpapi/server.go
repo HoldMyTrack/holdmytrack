@@ -166,6 +166,8 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(tileRoute("GET", "/tracks/{z}/{x}/{y}"), s.requireVerified(s.handleTracksTile))
 	s.mux.HandleFunc(tileRoute("GET", "/fog/{z}/{x}/{y}"), s.requireVerified(s.handleFogTile))
 	s.mux.HandleFunc(tileRoute("GET", "/heatmap/{z}/{x}/{y}"), s.requireVerified(s.handleHeatmapTile))
+	s.mux.HandleFunc(tileRoute("GET", "/spots/{z}/{x}/{y}"), s.requireVerified(s.handleSpotsTile))
+	s.mux.HandleFunc(route("GET", "/spots"), s.requireVerified(s.handleSpotsInArea))
 	// §4.2.4's Country/Region zoom tiers — live MVT, not precomputed, see
 	// admin_country_tiles.go's own doc comment for why that's safe here despite the
 	// live-heatmap-compositing cost fog/heatmap's own tiles were moved away from.

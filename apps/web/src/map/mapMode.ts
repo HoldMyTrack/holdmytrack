@@ -1,6 +1,7 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { COUNTRY_FOG_LAYER_ID, FOG_LAYER_ID, REGION_FOG_LAYER_ID } from './fog';
 import { COUNTRY_HEATMAP_LAYER_ID, HEATMAP_LAYER_ID, REGION_HEATMAP_LAYER_ID } from './heatmap';
+import { SPOTS_LAYER_ID } from './spots';
 import { BAND_LAYER_ID } from './trackBands';
 import { TRACKS_CASING_LAYER_ID, TRACKS_LAYER_ID } from './tracks';
 
@@ -41,12 +42,12 @@ export function setMapMode(map: MapLibreMap, mode: MapMode, editingTrack = false
   // Basemap labels (place names, street names, POIs) stay above the veil (layers.ts) so
   // they're legible, but at full strength they read as brighter than the fog itself and
   // pull the eye away from what's actually been cleared — so Fog mode mutes them. Every
-  // symbol layer on the map is the basemap's own (no overlay adds one), and
-  // @protomaps/basemaps never sets text-/icon-opacity itself, so resetting to undefined
-  // restores exactly the style's default rather than a remembered value.
+  // symbol layer on the map is the basemap's own but Spots' (spots.ts), which stays at full
+  // strength: it's there to be found. @protomaps/basemaps never sets text-/icon-opacity itself,
+  // so resetting to undefined restores exactly the style's default rather than a remembered value.
   const labelOpacity = mode === 'fog' ? FOG_LABEL_OPACITY : undefined;
   for (const layer of map.getStyle().layers) {
-    if (layer.type !== 'symbol') continue;
+    if (layer.type !== 'symbol' || layer.id === SPOTS_LAYER_ID) continue;
     setPaint(map, layer.id, 'text-opacity', labelOpacity);
     setPaint(map, layer.id, 'icon-opacity', labelOpacity);
   }

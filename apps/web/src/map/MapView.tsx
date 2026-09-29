@@ -9,7 +9,9 @@ import type { ExportPreset } from './exportPresets';
 import { ensureFogLayer } from './fog';
 import { ensureHeatmapLayer } from './heatmap';
 import { setMapMode, type MapMode } from './mapMode';
-import { loadShowPaths, saveShowPaths, setPathsVisible } from './paths';
+import { loadOverlays, saveOverlays, type Overlays } from './overlays';
+import { setPathsVisible } from './paths';
+import { ensureSpotsLayer, setSpotClickHandler, setSpotsVisible, type Spot, type SpotCategory } from './spots';
 import { labelInsertionPoint } from './layers';
 import { buildStyle, isDarkFlavor, type Flavor } from './style';
 import { clearTrackBands, ensureBandLayer, setTrackBands } from './trackBands';
@@ -32,6 +34,9 @@ import { ActivityHistogram } from '../ui/ActivityHistogram';
 import { EditActivityWindow, type EditWindowResult } from '../ui/EditActivityWindow';
 import { ExportControl } from '../ui/ExportControl';
 import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
+import { OverlaysMenu } from '../ui/OverlaysMenu';
+import { ShowInArea } from '../ui/ShowInArea';
+import { SpotPopup } from '../ui/SpotPopup';
 import { dayDiff, dayInZone, todayLocal } from '../ui/dateMath';
 import type { DateRange } from '../ui/RangePicker';
 import { useUnitSystem } from '../ui/units';
@@ -146,11 +151,19 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // Normal is what already rendered before fog existed — it needed no new work to count
   // as a "mode" (IMPLEMENTATION.md §4.2.2).
   const [mapMode, setMapModeState] = useState<MapMode>('normal');
-  const [showPaths, setShowPaths] = useState(loadShowPaths);
-  const toggleShowPaths = useCallback(() => {
-    saveShowPaths(!showPaths);
-    setShowPaths(!showPaths);
-  }, [showPaths]);
+  // The Overlays menu (OverlaysMenu.tsx): Trails, Tracks, Bike paths and each Spots category, over any
+  // mode, remembered per browser (overlays.ts).
+  const [overlays, setOverlays] = useState<Overlays>(loadOverlays);
+  const changeOverlays = useCallback((next: Overlays) => {
+    saveOverlays(next);
+    setOverlays(next);
+  }, []);
+  const paths = useMemo(
+    () => ({ trails: overlays.trails, tracks: overlays.tracks, bikePaths: overlays.bikePaths }),
+    [overlays.trails, overlays.tracks, overlays.bikePaths],
+  );
+  // The spot whose popup is open (SpotPopup, FR-15.3) — null when none is.
+  const [openSpot, setOpenSpot] = useState<Spot | null>(null);
 
   const today = useMemo(() => todayLocal(), []);
 
@@ -194,6 +207,8 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // the window closes. While it's set, every other track is hidden and TrackEditor owns the map.
   const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
   const editingTrack = editingActivityId !== null;
+  // Spots step aside during a track session, like every other track: TrackEditor owns the map.
+  const spotsShown = useMemo<readonly SpotCategory[]>(() => (editingTrack ? [] : overlays.spots), [editingTrack, overlays.spots]);
 
   // The Activities panel's tab — here rather than in the panel so `/?private-locations` can open
   // onto Privacy (FR-8.1) and `/?story=` onto Stories (FR-14.6), and so the tab outlives the
@@ -487,7 +502,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     try {
       const blob = await exportFramedImage(
         map,
-        { flavor, mode: mapMode, activityQuery, hiddenIds: [...mapHiddenIds], showPaths },
+        { flavor, mode: mapMode, activityQuery, hiddenIds: [...mapHiddenIds], paths },
         {
           ...geometry,
           ...(preset !== 'custom' && { target: { widthPx: preset.widthPx, heightPx: preset.heightPx } }),
@@ -510,7 +525,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       // discard the frame the user just positioned, forcing them to redo it from scratch.
       setExportFlow((flow) => (flow.stage === 'capturing' ? { stage: 'framing', preset: flow.preset, geometry: flow.geometry } : flow));
     }
-  }, [exportFlow, map, flavor, mapMode, activityQuery, mapHiddenIds, showPaths]);
+  }, [exportFlow, map, flavor, mapMode, activityQuery, mapHiddenIds, paths]);
 
   const handleExportCancel = useCallback(() => {
     setExportFlow({ stage: 'idle' });
@@ -747,6 +762,15 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
         : { onSelect: focusActivity, onHover: setHoveredActivityId, onClickAway: clearFocus },
     );
   }, [focusActivity, clearFocus, editOpen]);
+
+  // A click on a spot opens its popup; hiding its category closes it.
+  useEffect(() => {
+    setSpotClickHandler(setOpenSpot);
+  }, []);
+  useEffect(() => {
+    if (map) setSpotsVisible(map, spotsShown);
+    setOpenSpot((open) => (open && !spotsShown.includes(open.category) ? null : open));
+  }, [map, spotsShown]);
 
   // The one track bold on the map is the focused (selected) one, however it got that way — a
   // row's own text or a direct click on the map (both focusActivity, via the handler just
@@ -1143,9 +1167,11 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       // see trackBands.ts's own doc comment for why this is a second layer rather than a
       // change to the shared one.
       ensureBandLayer(instance, beforeId);
+      // Spots last, above everything including the basemap's labels (spots.ts).
+      ensureSpotsLayer(instance, spotsShown);
       setMapMode(instance, mapMode, editingTrack);
       // A style swap brings the path layers back at the style's default (hidden).
-      setPathsVisible(instance, showPaths);
+      setPathsVisible(instance, paths);
       // Same reasoning as setMapMode just above: addLayer always starts the tracks layer
       // with no filter, so a styledata that recreates it would otherwise silently un-hide
       // everything the eye icon/TYPE/DISTANCE filters had hidden. Both setMapMode and
@@ -1161,7 +1187,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
         setTrackBands(instance, trackMetrics.points);
       }
     },
-    [flavor, mapMode, editingTrack, showPaths, mapHiddenIds, activityQuery, trackMetrics, focusedActivityId, focusedPending],
+    [flavor, mapMode, editingTrack, paths, spotsShown, mapHiddenIds, activityQuery, trackMetrics, focusedActivityId, focusedPending],
   );
 
   useEffect(() => {
@@ -1201,8 +1227,8 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
 
   useEffect(() => {
     if (!map) return;
-    setPathsVisible(map, showPaths);
-  }, [map, showPaths]);
+    setPathsVisible(map, paths);
+  }, [map, paths]);
 
   // Keep the hash current. `moveend` rather than `move`: one rewrite per gesture,
   // not one per animation frame.
@@ -1329,19 +1355,12 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
                   {t('map.mode_heatmap')}
                 </button>
               </div>
-              {/* Its own group: a layer switched on and off over any mode, not a fourth mode. */}
-              <div className="map-mode-toggle" data-testid="map-paths-toggle">
-                <button
-                  type="button"
-                  className={showPaths ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
-                  aria-pressed={showPaths}
-                  onClick={toggleShowPaths}
-                >
-                  {t('map.paths')}
-                </button>
-              </div>
+              {/* Its own group: layers switched on and off over any mode, not a fourth mode. */}
+              <OverlaysMenu overlays={overlays} onChange={changeOverlays} />
             </div>
           )}
+          {map && !editOpen && <ShowInArea map={map} categories={spotsShown} />}
+          {map && openSpot && <SpotPopup map={map} spot={openSpot} onClose={() => setOpenSpot(null)} />}
         </div>
       </div>
 

@@ -53,10 +53,10 @@ export interface BuildStyleOptions {
   pmtilesPath?: string;
   glyphsPath?: string;
   spriteBasePath?: string;
-  /** Whether the trail and bike-path layers (`PATH_LAYER_IDS`) start visible. Off by default,
-   *  so the served style documents look the same as the stock basemap to a client that never
-   *  flips them. */
-  showPaths?: boolean;
+  /** Which of the path layers start visible: trails (`TRAIL_LAYER_IDS`) and bike paths
+   *  (`BIKE_PATH_LAYER_IDS`). Both off by default, so the served style documents look the same
+   *  as the stock basemap to a client that never flips them. */
+  paths?: PathOverlays;
 }
 
 /**
@@ -70,33 +70,69 @@ export interface BuildStyleOptions {
 export const PATH_LAYER_IDS = [
   'paths_cycleway',
   'paths_trail',
+  'paths_track',
   'paths_bridges_cycleway',
   'paths_bridges_trail',
+  'paths_bridges_track',
 ] as const;
 
-/** Sidewalks, crossings, steps and pedestrian areas stay on the stock grey on purpose: in a
- *  city they outnumber real paths and would bury them. */
-const TRAIL_DETAILS = ['path', 'footway', 'bridleway', 'track'];
+/** The three kinds the web's Overlays menu shows separately (overlays.ts). Android toggles all
+ *  six together. */
+export const TRAIL_LAYER_IDS = ['paths_trail', 'paths_bridges_trail'] as const;
+export const TRACK_LAYER_IDS = ['paths_track', 'paths_bridges_track'] as const;
+export const BIKE_PATH_LAYER_IDS = ['paths_cycleway', 'paths_bridges_cycleway'] as const;
 
-/** Cool for cycleways, earthy for trails, both clear of the ochre activity tracks (tracks.ts).
- *  The monochrome flavors stay monochrome; there the two differ by weight and dash. */
-const PATH_COLORS: Record<Flavor, { cycleway: string; trail: string }> = {
-  light: { cycleway: '#1f7fa8', trail: '#4f7a3a' },
-  dark: { cycleway: '#5cbfe0', trail: '#8fbf6a' },
-  white: { cycleway: '#4a4a4a', trail: '#6e6e6e' },
-  grayscale: { cycleway: '#3d3d3d', trail: '#666666' },
-  black: { cycleway: '#c4c4c4', trail: '#9a9a9a' },
+/** Which path layers are showing. */
+export interface PathOverlays {
+  trails: boolean;
+  tracks: boolean;
+  bikePaths: boolean;
+}
+
+/** Sidewalks, crossings, steps and pedestrian areas stay on the stock grey on purpose: in a
+ *  city they outnumber real paths and would bury them. Tracks — OSM's `highway=track`, dirt,
+ *  farm and forest roads — are their own layer: vehicle-width, often the very thing a rider
+ *  looks for or avoids, and where OSM maps every field and forestry road (much of Europe) far
+ *  more of them than trails. */
+const TRAIL_DETAILS = ['path', 'footway', 'bridleway'];
+const TRACK_DETAIL = 'track';
+
+/** Cool for cycleways, green for trails, brown for tracks, all clear of the ochre activity
+ *  tracks (tracks.ts). The monochrome flavors stay monochrome; there the three differ by weight
+ *  and dash. */
+const PATH_COLORS: Record<Flavor, { cycleway: string; trail: string; track: string }> = {
+  light: { cycleway: '#1f7fa8', trail: '#4f7a3a', track: '#8a5a2b' },
+  dark: { cycleway: '#5cbfe0', trail: '#8fbf6a', track: '#c9955e' },
+  white: { cycleway: '#4a4a4a', trail: '#6e6e6e', track: '#5c5c5c' },
+  grayscale: { cycleway: '#3d3d3d', trail: '#666666', track: '#555555' },
+  black: { cycleway: '#c4c4c4', trail: '#9a9a9a', track: '#b0b0b0' },
 };
 
-function pathLayers(flavor: Flavor, bridges: boolean, visible: boolean): LineLayerSpecification[] {
+function pathLayers(flavor: Flavor, bridges: boolean, visible: PathOverlays): LineLayerSpecification[] {
   const colors = PATH_COLORS[flavor];
   // Legacy filter syntax, the same as the stock road layers use.
   const structure = bridges ? [['has', 'is_bridge']] : [['!has', 'is_tunnel'], ['!has', 'is_bridge']];
   const filter = (detail: unknown[]) =>
     ['all', ...structure, ['==', 'kind', 'path'], detail] as unknown as FilterSpecification;
   const prefix = bridges ? 'paths_bridges_' : 'paths_';
-  const visibility = visible ? 'visible' : 'none';
+  const visibility = (on: boolean) => (on ? 'visible' : 'none');
+  // Tracks first, so a trail sharing a stretch with one draws over it.
   return [
+    {
+      id: `${prefix}track`,
+      type: 'line',
+      source: BASEMAP_SOURCE,
+      'source-layer': 'roads',
+      minzoom: 13,
+      filter: filter(['==', 'kind_detail', TRACK_DETAIL]),
+      layout: { visibility: visibility(visible.tracks) },
+      paint: {
+        'line-color': colors.track,
+        // Longer dashes and a wider line than a trail: a road a vehicle fits on.
+        'line-dasharray': [3, 1.5],
+        'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], 13, 1, 18, 3.5],
+      },
+    },
     {
       id: `${prefix}trail`,
       type: 'line',
@@ -104,7 +140,7 @@ function pathLayers(flavor: Flavor, bridges: boolean, visible: boolean): LineLay
       'source-layer': 'roads',
       minzoom: 13,
       filter: filter(['in', 'kind_detail', ...TRAIL_DETAILS]),
-      layout: { visibility },
+      layout: { visibility: visibility(visible.trails) },
       paint: {
         'line-color': colors.trail,
         'line-dasharray': [2, 1],
@@ -118,7 +154,7 @@ function pathLayers(flavor: Flavor, bridges: boolean, visible: boolean): LineLay
       'source-layer': 'roads',
       minzoom: 12,
       filter: filter(['==', 'kind_detail', 'cycleway']),
-      layout: { visibility, 'line-cap': 'round' },
+      layout: { visibility: visibility(visible.bikePaths), 'line-cap': 'round' },
       paint: {
         'line-color': colors.cycleway,
         'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], 12, 1, 18, 4],
@@ -129,7 +165,7 @@ function pathLayers(flavor: Flavor, bridges: boolean, visible: boolean): LineLay
 
 /** Stock layers with the path layers spliced in right after the one that draws the same
  *  features, so bridges, casings and labels keep stacking over them as they did. */
-function withPathLayers(base: LayerSpecification[], flavor: Flavor, visible: boolean): LayerSpecification[] {
+function withPathLayers(base: LayerSpecification[], flavor: Flavor, visible: PathOverlays): LayerSpecification[] {
   return base.flatMap((layer) => {
     if (layer.id === 'roads_other') return [layer, ...pathLayers(flavor, false, visible)];
     if (layer.id === 'roads_bridges_other') return [layer, ...pathLayers(flavor, true, visible)];
@@ -145,7 +181,7 @@ export function buildStyle(options: BuildStyleOptions): StyleSpecification {
     pmtilesPath = PMTILES_PATH,
     glyphsPath = GLYPHS_PATH,
     spriteBasePath = SPRITE_BASE_PATH,
-    showPaths = false,
+    paths = { trails: false, tracks: false, bikePaths: false },
   } = options;
 
   const base = origin.replace(/\/$/, '');
@@ -166,6 +202,6 @@ export function buildStyle(options: BuildStyleOptions): StyleSpecification {
         attribution: ATTRIBUTION,
       },
     },
-    layers: withPathLayers(layers(BASEMAP_SOURCE, namedFlavor(flavor), { lang }), flavor, showPaths),
+    layers: withPathLayers(layers(BASEMAP_SOURCE, namedFlavor(flavor), { lang }), flavor, paths),
   };
 }

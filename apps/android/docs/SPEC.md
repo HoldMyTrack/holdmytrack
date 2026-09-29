@@ -156,7 +156,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 4. All three layers sit beneath the basemap's first label layer, so place names stay legible; within that, the active raster (fog or heatmap) is drawn beneath the tracks layer so a cleared route reads as visible through the fog rather than obscured by it — the same ordering the web client uses.
 5. Exactly one of the three is active at a time; tapping the active one leaves it active. Its button is filled (dark ink, white text); the other two are plain text on the toggle's light panel.
 6. While a GPS recording is in progress (FR-5.1) the toggle is hidden and none of the three modes' layers are drawn — the map shows only that recording. The previously selected mode returns when the recording stops.
-7. After a second divider, the same row has the Trails & bike paths toggle (`docs/SPEC.md` FR-4.13). It is independent of the mode, off by default, filled while on, and kept on the phone only. Like the mode buttons, it is hidden while recording.
+7. After a second divider, the same row has the Trails & bike paths toggle (`docs/SPEC.md` FR-4.13), which shows trails, tracks (dirt, farm and forest roads) and bike paths together. It is independent of the mode, off by default, filled while on, and kept on the phone only. Like the mode buttons, it is hidden while recording.
 
 **Notes — filtering**: Normal's tracks are narrowed to the selected date range (FR-2.6), sent as the tracks tile's `from`/`to`. Fog and Heatmap are never filtered, as on the web (`docs/SPEC.md` FR-4.2, FR-4.3). Within the range, the Activities panel's TYPE and DISTANCE filters, its hidden tracks and Pending rows leave tracks off the map, on the device rather than in the tile request, as on the web (FR-2.7).
 
@@ -184,7 +184,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 ### FR-2.6 Date range
 
-**Description**: A footer along the bottom of the map in Normal mode selects the date range whose tracks are drawn — the web's phone footer (`docs/SPEC.md` §18 item 2) and the same design: a two-knob slider with Earlier/Later buttons either side and the selected start and end dates under it.
+**Description**: A footer along the bottom of the map in Normal mode selects the date range whose tracks are drawn — the web's phone footer (`docs/SPEC.md` §19 item 2) and the same design: a two-knob slider with Earlier/Later buttons either side and the selected start and end dates under it.
 
 **Behavior**:
 1. Shown in Normal mode only, once the session is verified and the account has at least one activity day. Hidden in Fog and Heatmap (which ignore the range, as on the web) and while recording. A full-width bar along the bottom edge, as on the phone web, with the Activities panel (FR-2.7) sitting on it; MapLibre's logo and attribution move up above the collapsed panel while they're shown.
@@ -195,7 +195,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 ### FR-2.7 Activities panel
 
-**Description**: The web's Activities panel as it is at phone width (`docs/SPEC.md` FR-5, §18 item 1), in the same layout and with the same rules: a sheet over the date-range footer (FR-2.6) listing the range's activities, with the Type and Distance filters, a checkbox group, a toolbar over the group or the selected row, and a tap on a row or a track selecting it. Normal mode only, and not while recording.
+**Description**: The web's Activities panel as it is at phone width (`docs/SPEC.md` FR-5, §19 item 1), in the same layout and with the same rules: a sheet over the date-range footer (FR-2.6) listing the range's activities, with the Type and Distance filters, a checkbox group, a toolbar over the group or the selected row, and a tap on a row or a track selecting it. Normal mode only, and not while recording.
 
 **Behavior**:
 1. **Collapsed and expanded.** Collapsed, the sheet shows its tab row — **Activities** in the serif with the listed rows' count in a badge, **Stories** (item 15), **Sync** (FR-4.1) with, while any import is still processing, how many in an accent badge, and **Privacy** (item 14); the selected tab at full strength and underlined in the accent, the others dimmed, the row scrolling sideways when the four don't fit (Russian) — and a line under it with a chevron: "{distance} loaded" on Activities, the whole range's total however the filters narrow the rows, "Hand-picked sets of your activities. Only you can see them." on Stories, "Everything imported, from the phone or the web" on Sync, and "Tracks never start or end inside these circles." on Privacy. Items 2–13 and 16–18 are the Activities tab. Tapping that line expands the sheet upward to 78% of the screen less the footer, and tapping it again collapses it; there is no drag. The list keeps its scroll position while collapsed. MapLibre's logo and attribution stay above the collapsed sheet whether or not it's expanded.
@@ -356,7 +356,7 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 
 ## 9. Known Limitations & Out-of-Scope Items
 
-Named here rather than left implicit, the way `docs/SPEC.md` §19 does for the wider system:
+Named here rather than left implicit, the way `docs/SPEC.md` §20 does for the wider system:
 
 - **No final visual design.** The palette, type scale, fonts and Lucide icons are the web's current ones carried over (Material 3) rather than a frozen design, and the screens are designed after their web counterparts until root `docs/ROADMAP.md` Phase 3's design freeze settles the final look (`apps/android/docs/ROADMAP.md` Phase 5). The dark palette is the web's, carried over the same way.
 - **The Activities panel is the web's minus its uploads.** Every tab and action of the phone web's panel is ported (FR-2.7, FR-4.1), except the Sync tab's file upload: this app imports through Sync Source (FR-3.5). Where the web reads a value on hover — the profile's readout, Cut's preview — a touch and hold stands in.

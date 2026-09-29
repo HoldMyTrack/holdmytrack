@@ -1,4 +1,5 @@
 import { t } from './i18n';
+import type { SpotCategory, SpotInArea } from './map/spots';
 
 /**
  * The Go backend's upload endpoint (IMPLEMENTATION.md §4.0).
@@ -1002,4 +1003,28 @@ export async function getCoverageStatus(signal?: AbortSignal): Promise<CoverageS
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
   return (await res.json()) as CoverageStatus;
+}
+
+/** `GET /v1/spots` — "Show in this area" (FR-15.5): the places in a box, in the chosen
+ *  categories. `total` is how many the box holds; more than `spots.length` when the server cut
+ *  the answer at its limit. */
+export interface SpotsInArea {
+  spots: SpotInArea[];
+  total: number;
+}
+
+export async function getSpotsInArea(
+  bbox: [west: number, south: number, east: number, north: number],
+  categories: readonly SpotCategory[],
+  signal?: AbortSignal,
+): Promise<SpotsInArea> {
+  const params = new URLSearchParams({ bbox: bbox.map((v) => v.toFixed(5)).join(','), categories: categories.join(',') });
+  const res = await fetch(`${API_BASE_URL}${API_V1}/spots?${params}`, {
+    ...(signal ? { signal } : {}),
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
+  }
+  return (await res.json()) as SpotsInArea;
 }

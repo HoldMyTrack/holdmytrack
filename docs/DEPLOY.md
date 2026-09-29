@@ -95,6 +95,26 @@ docker compose -f compose.prod.yml --env-file .env.prod run --rm api set-admin y
 
 `false` in place of `true` revokes it. This is the only way to grant or revoke admin; nothing on the web can.
 
+Spots (`SPEC.md` FR-15) needs its places loaded once; until then the Overlays menu's points of interest show none. The extract is made **off the server**: filtering the planet file takes more memory and disk than this box has. On any machine with [osmium-tool](https://osmcode.org/osmium-tool/), about 100 GB of free disk and the current [planet file](https://planet.openstreetmap.org/pbf/):
+
+```
+osmium tags-filter planet-latest.osm.pbf \
+  nwr/leisure=playground,dog_park \
+  nwr/historic=monument,memorial,castle,ruins,fort,archaeological_site \
+  nwr/tourism=viewpoint \
+  -o spots.osm.pbf
+osmium export spots.osm.pbf -f geojsonseq -u type_id --geometry-types=point,polygon -o spots.geojsonseq
+```
+
+`-u type_id` gives each feature the OSM id the import upserts by, and `--geometry-types=point,polygon` keeps nodes and areas. The same two commands over a [Geofabrik](https://download.geofabrik.de/) region extract make a small file for a dev database. Copy the result to the server and import it:
+
+```
+mkdir -p /tmp/spots && chmod 755 /tmp/spots   # put spots.geojsonseq here, world-readable
+docker compose -f compose.prod.yml --env-file .env.prod run --rm -v /tmp/spots:/data:ro api import-spots /data/spots.geojsonseq
+```
+
+It upserts every place by its OSM id, so a re-run with a newer extract updates the places already there (it doesn't remove ones the newer extract lacks). It then moves every account's tile version, so browsers fetch the new places (`IMPLEMENTATION.md` §4.25).
+
 ## 7. Maintenance mode
 
 DigitalOcean (and most VPS providers) have no Droplet-level maintenance toggle, so this lives in the app stack instead. Before a deploy that touches migrations or involves manual DB work — i.e. before step 6's `up -d --build` — put the site into maintenance mode so visitors see a friendly page instead of Caddy's raw `502`s while `api` is mid-restart:
