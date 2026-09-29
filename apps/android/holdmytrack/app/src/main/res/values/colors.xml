@@ -42,4 +42,9 @@
 
     <!-- The floating map chrome's background: the web's rgb(255 255 255 / 92%). -->
     <color name="hmt_map_chrome">#EBFFFFFF</color>
+
+    <!-- The record button's recording red and paused amber (bg_record_button_*.xml), for the
+         status pill beside it — the same in both themes, as the button's are. -->
+    <color name="hmt_record">#FFE53935</color>
+    <color name="hmt_record_paused">#FFFFB300</color>
 </resources>

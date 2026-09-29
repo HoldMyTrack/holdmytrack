@@ -12,10 +12,14 @@ import android.graphics.RectF
 import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
+import android.content.res.ColorStateList
+import android.os.SystemClock
+import android.view.HapticFeedbackConstants
 import android.view.View
 import android.view.ViewGroup.MarginLayoutParams
 import android.view.WindowInsets
 import android.widget.Button
+import android.widget.Chronometer
 import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
@@ -27,6 +31,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.progressindicator.LinearProgressIndicator
 import dev.holdmytrack.android.map.ActivityDays
 import dev.holdmytrack.android.map.CoverageWatch
 import dev.holdmytrack.android.map.EditPreview
@@ -86,7 +91,8 @@ import java.time.ZoneId
  *
  * Also the one place GPS recording is controlled from in the app: a record button in the chrome
  * row (tap to start, tap to pause/resume, hold for two seconds to stop —
- * `RecordingService` does the rest, and its notification offers the same controls). While a recording is in
+ * `RecordingService` does the rest, and its notification offers the same controls, its Stop
+ * confirmed here first). While a recording is in
  * progress the map shows only that recording's live track: the mode toggle and every history
  * layer are hidden (`MapOverlays.setRecording`), and the camera follows the latest fix.
  *
@@ -118,6 +124,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var pathsToggle: MaterialButton
     private lateinit var satelliteToggle: MaterialButton
     private lateinit var recordButton: RecordButton
+    private lateinit var recordRow: View
+    private lateinit var recordingStatus: View
+    private lateinit var recordingStatusDot: View
+    private lateinit var recordingStatusTime: Chronometer
+    private lateinit var recordingStatusDetail: TextView
+    private lateinit var recordingStatusHold: LinearProgressIndicator
+
+    /** Whether a hold on the record button is counting down, which the status pill shows in
+     *  place of its detail line. */
+    private var holdingToStop = false
     private lateinit var locateButton: MaterialButton
 
     /** Find my location's panel — what hides while recording, so no empty panel is left. */
@@ -251,12 +267,21 @@ class MainActivity : AppCompatActivity() {
      *  asks again, and returning to the map mustn't stack a second one on it. */
     private var leftoverDialog: AlertDialog? = null
 
+    /** The notification's Stop confirmation, while it's up; and whether one is owed to a Stop
+     *  that arrived before the bind answered, to be asked once it does. */
+    private var stopDialog: AlertDialog? = null
+    private var pendingStopConfirm = false
+
     private val recorderConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
             val service = (binder as RecordingService.LocalBinder).service
             recorder = service
             service.onChange = ::renderRecording
             renderRecording()
+            if (pendingStopConfirm) {
+                pendingStopConfirm = false
+                confirmStop()
+            }
             if (service.state == RecordingState.IDLE) service.findLeftover(::offerLeftover)
         }
 
@@ -334,6 +359,17 @@ class MainActivity : AppCompatActivity() {
         recordButton = findViewById(R.id.record_button)
         recordButton.setOnClickListener { onRecordTap() }
         recordButton.onHoldComplete = ::stopRecording
+        recordButton.onHoldProgress = ::renderHoldProgress
+        recordRow = findViewById(R.id.record_row)
+        recordingStatus = findViewById(R.id.recording_status)
+        recordingStatusDot = findViewById(R.id.recording_status_dot)
+        recordingStatusTime = findViewById(R.id.recording_status_time)
+        recordingStatusDetail = findViewById(R.id.recording_status_detail)
+        recordingStatusHold = findViewById(R.id.recording_status_hold)
+        // The notification's own format rather than the Chronometer's, so the two agree.
+        recordingStatusTime.setOnChronometerTickListener {
+            it.text = RecordingFormat.duration(SystemClock.elapsedRealtime() - it.base)
+        }
 
         locateButton = findViewById(R.id.locate_button)
         locatePanel = findViewById(R.id.locate_panel)
@@ -504,12 +540,40 @@ class MainActivity : AppCompatActivity() {
 
     /** The notification's Stop comes through here rather than straight to `RecordingService`
      *  (`RecordingService.buildNotification`): the Save screen that follows a stop needs an app
-     *  window in the foreground to open over. Ignored when relaunched from recents, which
-     *  replays the last intent — that would stop a recording started since. */
+     *  window in the foreground to open over, and the stop is confirmed first ([confirmStop]).
+     *  Ignored when relaunched from recents, which replays the last intent — that would stop a
+     *  recording started since. */
     private fun handleStopIntent(intent: Intent) {
         if (intent.action != RecordingService.ACTION_STOP) return
         if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
-        stopRecording()
+        confirmStop()
+    }
+
+    /** The notification's Stop asks before it stops: one tap in the shade is easy to make by
+     *  mistake, where the map's own Stop takes a two-second hold ([RecordButton]) that is its
+     *  own confirmation. Before the bind answers there's nothing to show yet — no state, no
+     *  stats — so it's asked from `onServiceConnected` instead. */
+    private fun confirmStop() {
+        val service = recorder
+        if (service == null) {
+            pendingStopConfirm = true
+            return
+        }
+        if (service.state == RecordingState.IDLE || stopDialog?.isShowing == true || isFinishing) return
+        val stats = service.currentStats()
+        stopDialog = MaterialAlertDialogBuilder(this, R.style.ThemeOverlay_HoldMyTrack_Dialog_Destructive)
+            .setTitle(R.string.recording_stop_confirm_title)
+            .setMessage(
+                getString(
+                    R.string.recording_stop_confirm_message,
+                    RecordingFormat.duration(stats.elapsedMs),
+                    RecordingFormat.distance(resources, stats.distanceM),
+                ),
+            )
+            .setPositiveButton(R.string.recording_stop) { _, _ -> stopRecording() }
+            .setNegativeButton(R.string.recording_keep, null)
+            .setOnDismissListener { stopDialog = null }
+            .show()
     }
 
     /**
@@ -577,7 +641,7 @@ class MainActivity : AppCompatActivity() {
         // laid out, below the status bar at least.
         val belowTopBar = maxOf(
             findViewById<View>(R.id.top_bar).bottom,
-            if (recordButton.isVisible) recordButton.bottom else 0,
+            if (recordRow.isVisible) recordRow.bottom else 0,
             if (notice.isVisible) notice.bottom else 0,
         )
         settings.setCompassMargins(
@@ -991,7 +1055,7 @@ class MainActivity : AppCompatActivity() {
      *  location editor is open, since both open over that row. */
     private fun renderRecordButton() {
         val editing = editWindow.isOpen || (::privacyTab.isInitialized && privacyTab.isEditing)
-        recordButton.visibility = if (editing) View.GONE else View.VISIBLE
+        recordRow.visibility = if (editing) View.GONE else View.VISIBLE
     }
 
     /** The panel's hidden set, filters, Pending rows and selection, onto the track layers —
@@ -1123,11 +1187,16 @@ class MainActivity : AppCompatActivity() {
     /** Idle: start (asking for permissions first if they're missing). Recording or paused:
      *  toggle between the two. Nothing here ever asks for a name or a type — see
      *  `RecordingService`'s class doc for where those come from. Pausing says how to stop
-     *  instead: a tap is the obvious guess at "stop", and it only pauses. */
+     *  instead: a tap is the obvious guess at "stop", and it only pauses. Every tap is felt —
+     *  pause and resume as a toggle's off and on, start as [startRecording]'s confirm — so a
+     *  tap that registered is never in doubt. */
     private fun onRecordTap() {
         if (isRecording()) {
             if (recorder?.state == RecordingState.RECORDING) {
+                recordButton.performHapticFeedback(HapticFeedbackConstants.TOGGLE_OFF)
                 Toast.makeText(this, R.string.record_hold_to_stop, Toast.LENGTH_SHORT).show()
+            } else {
+                recordButton.performHapticFeedback(HapticFeedbackConstants.TOGGLE_ON)
             }
             startService(RecordingService.intent(this, RecordingService.ACTION_TOGGLE))
             return
@@ -1144,7 +1213,14 @@ class MainActivity : AppCompatActivity() {
         startService(RecordingService.intent(this, RecordingService.ACTION_STOP))
     }
 
+    /** Felt and seen: a confirm haptic and a short pop of the button, ahead of the red ring,
+     *  pulse and status pill that [renderRecording] brings once the service reports in. */
     private fun startRecording() {
+        recordButton.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+        recordButton.animate().cancel()
+        recordButton.animate().scaleX(POP_SCALE).scaleY(POP_SCALE).setDuration(POP_HALF_MS).withEndAction {
+            recordButton.animate().scaleX(1f).scaleY(1f).setDuration(POP_HALF_MS)
+        }
         ContextCompat.startForegroundService(this, RecordingService.intent(this, RecordingService.ACTION_START))
     }
 
@@ -1242,6 +1318,11 @@ class MainActivity : AppCompatActivity() {
         recordButton.setBackgroundResource(background)
         recordButton.contentDescription = getString(description)
         recordButton.holdEnabled = active
+        recordButton.pulsing = state == RecordingState.RECORDING
+        sizeRecordButton(active)
+        if (!active) stopDialog?.dismiss()
+        val points = if (active) recorder?.points().orEmpty() else emptyList()
+        renderRecordingStatus(state, hasFix = points.isNotEmpty())
         renderModeBar()
         locatePanel.visibility = if (active) View.GONE else View.VISIBLE
         renderDateFooter()
@@ -1249,7 +1330,6 @@ class MainActivity : AppCompatActivity() {
 
         val loaded = style ?: return
         if (overlaysAttached) MapOverlays.setRecording(loaded, active, mode)
-        val points = if (active) recorder?.points().orEmpty() else emptyList()
         MapOverlays.updateLiveTrack(loaded, points)
 
         if (!active) {
@@ -1269,6 +1349,67 @@ class MainActivity : AppCompatActivity() {
             instance.animateCamera(CameraUpdateFactory.newLatLngZoom(target, zoom), FRAME_DURATION_MS)
         } else {
             instance.easeCamera(CameraUpdateFactory.newLatLng(target))
+        }
+    }
+
+    /** 48dp idle, 56dp while a recording is in progress — a bigger target for the hold that
+     *  stops it, with less of it under the finger. The end margin keeps it centred under Find
+     *  my location's 56dp panel either way (`activity_main.xml`). */
+    private fun sizeRecordButton(active: Boolean) {
+        val density = resources.displayMetrics.density
+        val size = ((if (active) RECORD_BUTTON_ACTIVE_DP else RECORD_BUTTON_IDLE_DP) * density).toInt()
+        val params = recordButton.layoutParams as MarginLayoutParams
+        if (params.width == size) return
+        params.width = size
+        params.height = size
+        params.marginEnd = ((RECORD_BUTTON_ACTIVE_DP - (if (active) RECORD_BUTTON_ACTIVE_DP else RECORD_BUTTON_IDLE_DP)) / 2 * density).toInt()
+        recordButton.layoutParams = params
+    }
+
+    /** The pill beside the record button, while a recording is in progress: a red dot (amber
+     *  paused), the moving time — ticking on its own while recording, frozen while paused — and
+     *  the distance, or "Waiting for GPS…" until the first fix arrives. A hold on the button
+     *  takes the detail line over ([renderHoldProgress]). */
+    private fun renderRecordingStatus(state: RecordingState, hasFix: Boolean) {
+        val service = recorder
+        if (state == RecordingState.IDLE || service == null) {
+            recordingStatusTime.stop()
+            recordingStatus.visibility = View.GONE
+            return
+        }
+        recordingStatus.visibility = View.VISIBLE
+        val recording = state == RecordingState.RECORDING
+        val stats = service.currentStats()
+        recordingStatusTime.base = SystemClock.elapsedRealtime() - stats.elapsedMs
+        if (recording) {
+            recordingStatusTime.start()
+        } else {
+            // Stopped, nothing ticks after setBase's own redraw in the Chronometer's format.
+            recordingStatusTime.stop()
+            recordingStatusTime.text = RecordingFormat.duration(stats.elapsedMs)
+        }
+        recordingStatusDot.backgroundTintList =
+            ColorStateList.valueOf(getColor(if (recording) R.color.hmt_record else R.color.hmt_record_paused))
+        if (holdingToStop) return
+        val distance = RecordingFormat.distance(resources, stats.distanceM)
+        recordingStatusDetail.text = when {
+            !recording -> getString(R.string.recording_status_paused, distance)
+            !hasFix -> getString(R.string.recording_status_waiting)
+            else -> distance
+        }
+    }
+
+    /** The hold's countdown in the pill too, where the finger on the button can't hide it. */
+    private fun renderHoldProgress(progress: Float) {
+        val holding = progress > 0f
+        recordingStatusHold.progress = (progress * recordingStatusHold.max).toInt()
+        if (holding == holdingToStop) return
+        holdingToStop = holding
+        recordingStatusHold.visibility = if (holding) View.VISIBLE else View.GONE
+        if (holding) {
+            recordingStatusDetail.setText(R.string.recording_status_holding)
+        } else {
+            renderRecordingStatus(recorder?.state ?: RecordingState.IDLE, hasFix = recorder?.points()?.isNotEmpty() == true)
         }
     }
 
@@ -1560,6 +1701,7 @@ class MainActivity : AppCompatActivity() {
     // callback above but still reaches this one.
     override fun onDestroy() {
         leftoverDialog?.dismiss()
+        stopDialog?.dismiss()
         if (::mapView.isInitialized) mapView.onDestroy()
         if (::dateSlider.isInitialized) dateSlider.release()
         coverageWatch.stop()
@@ -1568,6 +1710,10 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "HoldMyTrack"
+        private const val RECORD_BUTTON_IDLE_DP = 48f
+        private const val RECORD_BUTTON_ACTIVE_DP = 56f
+        private const val POP_SCALE = 1.15f
+        private const val POP_HALF_MS = 100L
         private const val FRAME_PADDING_PX = 64
         private const val MAX_FRAME_ZOOM = 15.0
 
