@@ -114,8 +114,12 @@ func TestETagVariesWithOrigin(t *testing.T) {
 // satelliteStyle decodes just what the satellite tests look at.
 type satelliteStyle struct {
 	Sources  map[string]map[string]any `json:"sources"`
-	Metadata map[string][]string       `json:"metadata"`
-	Layers   []struct {
+	Metadata *struct {
+		Hides       []string `json:"holdmytrack:satellite-hides"`
+		Dims        []string `json:"holdmytrack:satellite-dims"`
+		RoadOpacity float64  `json:"holdmytrack:satellite-road-opacity"`
+	} `json:"metadata"`
+	Layers []struct {
 		ID     string         `json:"id"`
 		Type   string         `json:"type"`
 		Layout map[string]any `json:"layout"`
@@ -168,9 +172,17 @@ func TestDocumentFillsSatellite(t *testing.T) {
 		if s.Layers[1].Layout["visibility"] != "none" {
 			t.Errorf("%s: satellite starts %v, want hidden", flavor, s.Layers[1].Layout["visibility"])
 		}
-		hides := s.Metadata["holdmytrack:satellite-hides"]
-		if !slices.Contains(hides, "background") || !slices.Contains(hides, "water") {
-			t.Errorf("%s: satellite-hides = %v, want the background and fills", flavor, hides)
+		if s.Metadata == nil {
+			t.Fatalf("%s: no metadata", flavor)
+		}
+		if m := s.Metadata; !slices.Contains(m.Hides, "background") || !slices.Contains(m.Hides, "water") {
+			t.Errorf("%s: satellite-hides = %v, want the background and fills", flavor, m.Hides)
+		}
+		if m := s.Metadata; !slices.Contains(m.Dims, "roads_major") || slices.Contains(m.Dims, "roads_rail") {
+			t.Errorf("%s: satellite-dims = %v, want the roads but not rail", flavor, m.Dims)
+		}
+		if s.Metadata.RoadOpacity != 0.4 {
+			t.Errorf("%s: satellite-road-opacity = %v, want 0.4", flavor, s.Metadata.RoadOpacity)
 		}
 		if _, ok := s.Sources["protomaps"]; !ok {
 			t.Errorf("%s: lost the basemap source", flavor)

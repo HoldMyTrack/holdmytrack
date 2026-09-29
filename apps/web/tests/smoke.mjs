@@ -306,6 +306,9 @@ describe('basemap foundation', () => {
     assert.deepEqual(await visibility(['satellite']), ['visible'], 'imagery on');
     assert.deepEqual(await visibility(FILLS), FILLS.map(() => 'none'), 'fills hidden over it');
     assert.deepEqual(await visibility(KEPT), KEPT.map(() => 'visible'), 'roads and labels kept');
+    const roadOpacity = () =>
+      page.evaluate(() => ['roads_major', 'roads_minor', 'roads_rail'].map((id) => window.__holdmytrack.getPaintProperty(id, 'line-opacity')));
+    assert.deepEqual(await roadOpacity(), [0.4, 0.4, 0.5], 'roads see-through over the imagery, rail as it was');
     const order = await page.evaluate(() => window.__holdmytrack.getStyle().layers.map((l) => l.id));
     assert.ok(order.indexOf('satellite') < order.indexOf('roads_major'), 'imagery under the roads');
     await styleLoaded();
@@ -321,5 +324,6 @@ describe('basemap foundation', () => {
     await page.locator('#overlay-basemap-map').check();
     assert.deepEqual(await visibility(['satellite']), ['none'], 'imagery off again');
     assert.deepEqual(await visibility(FILLS), FILLS.map(() => 'visible'), 'fills back');
+    assert.deepEqual(await roadOpacity(), [undefined, undefined, 0.5], 'roads opaque again');
   });
 });
