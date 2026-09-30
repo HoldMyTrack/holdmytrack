@@ -67,7 +67,6 @@ Everything is under `app/src/main/kotlin/dev/holdmytrack/android/`:
 Alongside:
 
 - `gradle/libs.versions.toml` — every dependency version, including MapLibre Native.
-- `../poc-healthconnect/` — a separate, throwaway build answering the roadmap's Phase 1 questions. Not a module of this project, and deleted once its findings are recorded.
 
 ## Syncing from Health Connect
 

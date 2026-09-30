@@ -4,7 +4,7 @@ This document outlines the engineering and product roadmap for the native Androi
 
 As stated in `apps/android/README.md`, the Android development environment is not containerized and runs directly on the host machine.
 
-`apps/android/` holds two Gradle builds: `holdmytrack/`, the app itself, and `poc-healthconnect/`, the throwaway Phase 1 diagnostic that is deleted once its findings are all recorded here. Every server-side prerequisite the app depends on is built.
+`apps/android/holdmytrack/` is the app's Gradle build. Every server-side prerequisite the app depends on is built.
 
 ## Where this sits in the wider plan
 
@@ -36,7 +36,7 @@ Before implementing any UI or sync routines, we must design around two hard plat
 
 One throwaway app, one physical device, both platform questions answered together. Framed as due diligence rather than an open blocker: root `ROADMAP.md` notes that Samsung's own developer docs already state `EXERCISE_ROUTE` is unreachable, and this is "double-checking in case reality is better than documented". Both checks need the same device and the same permission plumbing, and the Samsung answer changes what Phase 3 has to build, so neither can wait until after the app exists.
 
-- [x] **Health Connect route-access proof of concept** — `apps/android/poc-healthconnect`, measured on a Pixel 10a running Android 17 (API 37) against a Health Connect store fed by Fitbit.
+- [x] **Health Connect route-access proof of concept** — a throwaway diagnostic app, measured on a Pixel 10a running Android 17 (API 37) against a Health Connect store fed by Fitbit.
   - **`READ_EXERCISE_ROUTES` is not programmatically requestable.** Requesting it alongside `READ_EXERCISE` and `READ_HEALTH_DATA_IN_BACKGROUND` grants the other two and silently omits it — it never even acquires a `USER_SET` flag. The user grants it at **Health Connect → the app → Additional access → Access exercise routes → Always allow**, a screen two levels below the app's main permission page and not linked from it. Phase 3's onboarding has to walk the user there explicitly; "grant permissions" is not a single flow.
   - **Foreground-only is real, and "Always allow" does not lift it.** With all three permissions granted, the same query over the same 46 sessions returned `23 route / 23 no-route / 0 consent-required` in the foreground and `0 / 23 / 23` in the background. Background access being granted changes nothing for routes.
   - **`NoData` and `ConsentRequired` are distinguishable, and both are stable.** 23 of the 46 sessions read as `NoData` in both runs — indoor workouts, which have no route to begin with — while the outdoor half flipped between geometry and `ConsentRequired` depending only on foreground state. So the two conditions never have to be conflated: a rejected sync can say "recorded indoors, no route" or "route not readable right now, sync again in the foreground" as the different things they are, rather than one generic "couldn't sync" message.
