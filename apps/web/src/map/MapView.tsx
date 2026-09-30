@@ -12,7 +12,7 @@ import { setMapMode, type MapMode } from './mapMode';
 import { loadOverlays, saveOverlays, type Overlays } from './overlays';
 import { setPathsVisible } from './paths';
 import { setSatelliteVisible } from './satellite';
-import { ensureSpotsLayer, setSpotClickHandler, setSpotsVisible, type Spot, type SpotCategory } from './spots';
+import { ensureSpotsLayer, setSpotClickHandler, setSpotsCaptured, setSpotsVisible, type Spot, type SpotCategory } from './spots';
 import { labelInsertionPoint } from './layers';
 import { buildStyle, isDarkBase, type Flavor } from './style';
 import { clearTrackBands, ensureBandLayer, setTrackBands } from './trackBands';
@@ -27,7 +27,7 @@ import {
 import { useCoverageRefresh } from './useCoverageRefresh';
 import { useMapInstance } from './useMapInstance';
 import { flavorForTheme, parseHash, pinnedFlavor, replaceHash, type HashState, type ViewState } from './viewState';
-import { getActivityTrackMetrics, type Activity, type ActivityTrackMetrics, type Story } from '../api';
+import { getActivityTrackMetrics, getSpotCaptures, type Activity, type ActivityTrackMetrics, type SpotCapture, type Story } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
 import { ActivitiesPanel, type PanelTab, type StoriesPanel } from '../ui/ActivitiesPanel';
@@ -167,6 +167,9 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   const satellite = satelliteAvailable && overlays.satellite;
   // The spot whose popup is open (SpotPopup, FR-15.3) — null when none is.
   const [openSpot, setOpenSpot] = useState<Spot | null>(null);
+  // The places this account captured with the Android app (FR-15.6): drawn with the captured
+  // badge, and dated in their popup.
+  const [spotCaptures, setSpotCaptures] = useState<readonly SpotCapture[]>([]);
 
   const today = useMemo(() => todayLocal(), []);
 
@@ -742,6 +745,29 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   useEffect(() => {
     setSpotClickHandler(setOpenSpot);
   }, []);
+  // Captures are made on the phone, so they're read again whenever the page comes back into view.
+  useEffect(() => {
+    let controller: AbortController | null = null;
+    const load = () => {
+      controller?.abort();
+      controller = new AbortController();
+      getSpotCaptures(controller.signal).then(setSpotCaptures, () => {
+        // Not loaded (offline, or aborted): the badges stay as they were.
+      });
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') load();
+    };
+    load();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      controller?.abort();
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
+  useEffect(() => {
+    if (map) setSpotsCaptured(map, spotCaptures.map((c) => c.spot_id));
+  }, [map, spotCaptures]);
   useEffect(() => {
     if (map) setSpotsVisible(map, spotsShown);
     setOpenSpot((open) => (open && !spotsShown.includes(open.category) ? null : open));
@@ -1421,7 +1447,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
             </div>
           )}
           {map && !editOpen && <ShowInArea map={map} categories={spotsShown} />}
-          {map && openSpot && <SpotPopup map={map} spot={openSpot} onClose={() => setOpenSpot(null)} />}
+          {map && openSpot && <SpotPopup map={map} spot={openSpot} capturedAt={spotCaptures.find((c) => c.spot_id === openSpot.id)?.captured_at ?? null} onClose={() => setOpenSpot(null)} />}
         </div>
       </div>
 

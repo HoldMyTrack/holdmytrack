@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Popup, type Map as MapLibreMap } from 'maplibre-gl';
-import { BookOpen, Check, Copy } from 'lucide-react';
+import { BookOpen, Check, Copy, Flag } from 'lucide-react';
 import type { Spot, SpotCategory } from '../map/spots';
-import { t } from '../i18n';
+import { lang, t } from '../i18n';
 import type { MessageKey } from '../i18n/en';
 
 export interface SpotPopupProps {
   map: MapLibreMap;
   spot: Spot;
+  /** When the account captured the place (FR-15.6), or null. */
+  capturedAt: string | null;
   /** The popup's × button was clicked. */
   onClose: () => void;
 }
@@ -52,7 +54,7 @@ export function memorialLabel(memorial: string): string {
  * spot, so it moves with the map; React renders into it through a portal, the way
  * ExportControl renders into its map control.
  */
-export function SpotPopup({ map, spot, onClose }: SpotPopupProps) {
+export function SpotPopup({ map, spot, capturedAt, onClose }: SpotPopupProps) {
   const [container, setContainer] = useState<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -113,10 +115,16 @@ export function SpotPopup({ map, spot, onClose }: SpotPopupProps) {
       {spot.description && <p className="spot-popup__description">{spot.description}</p>}
       {spot.inscription && <blockquote className="spot-popup__inscription">{spot.inscription}</blockquote>}
       {spot.address && <div className="spot-popup__address">{spot.address}</div>}
+      {capturedAt && (
+        <div className="spot-popup__captured">
+          <Flag size={14} aria-hidden="true" />
+          {t('spots.captured_on', { date: new Date(capturedAt).toLocaleDateString(lang, { dateStyle: 'medium' }) })}
+        </div>
+      )}
       <div className="spot-popup__actions">
         <button type="button" className="spot-popup__btn" onClick={copy}>
           {copied ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
-          {copied ? t('spots.copied') : t('spots.copy_address')}
+          {copied ? t('spots.copied') : spot.address ? t('spots.copy_address') : t('spots.copy_location')}
         </button>
         {spot.wikipedia && (
           <a className="spot-popup__btn" href={wikipediaURL(spot.wikipedia)} target="_blank" rel="noopener noreferrer">
