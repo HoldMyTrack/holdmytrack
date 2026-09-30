@@ -168,6 +168,7 @@
     <string name="menu_about">О проекте</string>
     <string name="menu_help">Справка</string>
     <string name="menu_contacts">Контакты</string>
+    <string name="menu_version">Версия %1$s</string>
 
     <string name="settings_title">Настройки</string>
     <string name="settings_onboarding_title">Добро пожаловать! Настройте аккаунт</string>

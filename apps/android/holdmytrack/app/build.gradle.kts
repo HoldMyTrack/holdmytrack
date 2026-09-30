@@ -4,6 +4,15 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
+/** `git <args>`'s output, trimmed — or null outside a git checkout (a source archive), where
+ *  the version falls back to code 1 and SHA "dev". */
+fun gitOutput(vararg args: String): String? = runCatching {
+    providers.exec {
+        commandLine("git", *args)
+        isIgnoreExitValue = true
+    }.standardOutput.asText.get().trim().takeIf { it.isNotEmpty() }
+}.getOrNull()
+
 android {
     namespace = "dev.holdmytrack.android"
     compileSdk = 37
@@ -20,8 +29,13 @@ android {
         // platform and matches compileSdk, so no behaviour changes are being opted out of.
         // Re-check this against Play's current requirement at each release, not this comment.
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1"
+        // versionCode is the commit count, so it rises with every commit to main and never
+        // needs remembering — Play refuses an upload whose code isn't higher than the last.
+        // versionName is the release number, bumped by hand when a release means something;
+        // GIT_SHA is the exact commit, the same short SHA the server's /healthz reports.
+        versionCode = gitOutput("rev-list", "--count", "HEAD")?.toIntOrNull() ?: 1
+        versionName = "0.2"
+        buildConfigField("String", "GIT_SHA", "\"${gitOutput("rev-parse", "--short", "HEAD") ?: "dev"}\"")
 
         // The API origin is a build input, not a constant: the same source builds against a
         // dev stack on the host and against a deployed server. See gradle.properties.
