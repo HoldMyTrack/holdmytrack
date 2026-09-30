@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. The places are built on the web (`SPEC.md` FR-15, `IMPLEMENTATION.md` §4.25), with a 30 m circle rather than 50 m for a place mapped as a point; visits are not built yet (`ROADMAP.md` Phase 1). Android follows (`apps/android/docs/ROADMAP.md`). ADR-0023 adds capturing a spot live in the Android app, a mark separate from a visit, and so no longer rejects an in-app mechanic outright.
+Accepted. The places are built on the web (`SPEC.md` FR-15, `IMPLEMENTATION.md` §4.25), with a 30 m circle rather than 50 m for a place mapped as a point; visits are not built yet (`ROADMAP.md` Phase 1). Android follows (`apps/android/docs/ROADMAP.md`). ADR-0023 adds capturing a spot live in the Android app, a mark separate from a visit, and so no longer rejects an in-app mechanic outright. Refreshing the places — a manual quarterly re-import that retires places gone from OSM rather than deleting them — is planned (`ROADMAP.md` "Spots places refresh").
 
 ## Context
 
