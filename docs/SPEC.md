@@ -823,18 +823,20 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 
 **Notes**: An activity entirely inside Private locations (FR-8.1 behavior 3) is Normal with no geometry — nothing to draw or count — rather than a fourth state; superseded duplicates (FR-3.7) are never listed at all.
 
-### FR-5.16 Create story
+### FR-5.16 Add to story
 
-**Description**: A book-with-a-plus icon in the Activities panel's header toolbar, between Edit and Delete, makes a Story (FR-14) of the checked activities.
+**Description**: A book-with-a-plus icon in the Activities panel's header toolbar, between Edit and Delete, puts the toolbar's target (FR-5.7) — the checked activities, else the selected one — into a Story (FR-14): a new one, or one that already exists. This is where activities go into Stories; they come out on the Stories tab (FR-14.6).
 
-**Preconditions**: A real account (a demo session sees the icon disabled, its tooltip saying the demo can't make stories); at least one listed activity checked (FR-5.6). Unlike the toolbar's other actions it never takes the selected row alone (FR-5.7's target): a Story is a set picked on purpose, and checking is how a set is picked. With nothing checked the icon is disabled, its tooltip saying to check activities first; with some, the tooltip names them — "Create a story from 3 checked activities".
+**Preconditions**: A real account (a demo session sees the icon disabled, its tooltip saying the demo can't make stories); a target. With no target the icon is disabled, its tooltip saying to select or check activities first, like the toolbar's other actions; with one, the tooltip names it — "Add 3 checked activities to a story".
 
 **Behavior**:
-1. The icon opens a Create story dialog over the map naming what it's made of — "A story of 3 checked activities (58 km). Only you can see it." — with Name (required, up to 200 characters) and Description (optional, up to 2000).
-2. "Create story" stays disabled until Name has something besides spaces; Enter in Name does the same as clicking it. Cancel, Escape or a click outside closes the dialog with nothing made.
-3. Creating makes the Story with those activities in one step (FR-14.2) and opens it on the Stories tab (FR-14.6).
+1. The icon opens a menu under the toolbar: **New story…** first, then every Story of the account, newest first, each with how many activities it holds. The Stories are read each time the menu opens. A Story that already holds all of the target is ticked and can't be picked.
+2. Picking a Story adds the target to it in one request (FR-14.3) — any of them already there stay — and closes the menu. The list stays as it is; the rows' Story badges (FR-5.1) follow.
+3. **New story…** opens a Create story dialog over the map naming what it's made of — "A story of 3 checked activities (58 km). Only you can see it." — with Name (required, up to 200 characters) and Description (optional, up to 2000). "Create story" stays disabled until Name has something besides spaces; Enter in Name does the same as clicking it. Cancel, Escape or a click outside closes the dialog with nothing made.
+4. Creating makes the Story with the target's activities in one step (FR-14.2) and opens it on the Stories tab (FR-14.6).
+5. The menu closes on Escape, a click outside it, or its icon clicked again, and whenever the target changes.
 
-**Error cases**: A request that fails keeps the dialog open with the server's message under the fields, the fields as typed.
+**Error cases**: A failed add keeps the menu open with the server's message at its foot. A failed create keeps the dialog open with the server's message under the fields, the fields as typed.
 
 ### FR-5.17 Stories tab
 
@@ -847,7 +849,7 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 2. A Story's box is ticked when it holds every one of the window's activities, indeterminate when it holds some of them (its tooltip says so), and clear when it holds none.
 3. Clicking a clear or indeterminate box ticks it; clicking a ticked box clears it. A box can't be set back to indeterminate by a click — Cancel discards every change. The tab carries a dot while any box differs from what's saved.
 4. Save commits each changed Story in one request: ticked puts all the window's activities in it (any already there stay), cleared takes them all out (FR-14.3); the activities themselves never change. The fields (FR-5.10) are written first, then the Stories, then a track edit (FR-5.14). If a later request fails, the window stays open with the error, and Save again skips what was already written. The rows' Story badges (FR-5.1) follow as the window closes.
-5. This tab is the only place an activity goes into or out of an existing Story: the Stories tab (FR-14.6) only shows them.
+5. This tab and Add to story (FR-5.16) are where an activity goes into an existing Story; this tab is also where one comes out.
 
 ## 8. FR-6 — Date Range Slider
 
@@ -1059,7 +1061,7 @@ A read-only view of every account and every account's activities, for the people
 
 ## 16. FR-14 — Stories
 
-A Story is a hand-picked, private set of the account's activities — a hike, a holiday, a race weekend — with a name, an optional description and joint statistics (`VISION.md` §4.2, ADR-0020). An activity can be in any number of Stories. This section covers the API and the Activities panel's Stories tab (FR-14.6), where a Story is opened on the map; a Story is made from the map with Create story (FR-5.16), activities go in and out of Stories from the Edit window (FR-5.17), and a row's Story badge is FR-5.1.
+A Story is a hand-picked, private set of the account's activities — a hike, a holiday, a race weekend — with a name, an optional description and joint statistics (`VISION.md` §4.2, ADR-0020). An activity can be in any number of Stories. This section covers the API and the Activities panel's Stories tab (FR-14.6), where a Story is opened on the map; a Story is made, and activities go into Stories, with the Activities toolbar's Add to story (FR-5.16) or the Edit window (FR-5.17), activities come out of Stories there too, and a row's Story badge is FR-5.1.
 
 | Endpoint | Purpose |
 | :-- | :-- |
@@ -1133,11 +1135,11 @@ A Story is a hand-picked, private set of the account's activities — a hike, a 
 4. While a Story is open, the drawn tracks, the listed rows and an exported image (FR-4.10) are all of that Story's activities, whatever date range the Activities tab has; the tab has no date slider (FR-6).
 5. The footer at the bottom of the panel shows the open Story's statistics: its activity count, distance and moving time (FR-14.1), then the same per activity type, the most frequent first, each type by its display name. A Story with no activities says so instead.
 6. Opening a Story fits the camera to its drawn tracks. Opened by URL, a camera in the URL wins; without one the camera fits the Story. On a phone, opening a Story collapses the panel's sheet so the tracks can be seen.
-7. Each folder row has a pencil and a bin, shown while the pointer is over the row or it has keyboard focus, and always on a phone. The pencil opens Edit story, the Create story dialog (FR-5.16) with Name and Description filled in and Save (FR-14.2). The bin asks "Delete “<name>”? Its activities stay." with a "Delete story" button, then deletes the Story (FR-14.2). Deleting the open Story opens the next newest one.
+7. Each folder row has a pencil and a bin, shown while the pointer is over the row or it has keyboard focus, and always on a phone. The pencil opens Edit story, Add to story's Create story dialog (FR-5.16) with Name and Description filled in and Save (FR-14.2). The bin asks "Delete “<name>”? Its activities stay." with a "Delete story" button, then deletes the Story (FR-14.2). Deleting the open Story opens the next newest one.
 8. Leaving the tab closes the open Story: the map goes back to the Activities tab's date range, which opening a Story never changes — or the usual default range (FR-6.1) for a page that opened straight into a Story. The camera stays. Coming back to the tab opens the newest Story again.
 9. The URL carries the open Story, `/?story=<id>`: a refresh or a shared link opens the Stories tab with that Story open, and Back and Forward move between Stories and to and from the tab. Create story (FR-5.16) opens the new Story the same way.
 10. Normal mode only: Fog of War and Heatmap stay all-time (FR-4.2, FR-4.3), and returning to Normal shows the open Story again.
-11. With no Stories, the tab says how to make one: check activities on the Activities tab, then choose Create story. The map stays as on the Activities tab.
+11. With no Stories, the tab says how to make one: select or check activities on the Activities tab, then choose Add to story. The map stays as on the Activities tab.
 12. A demo session sees the Demo Customer's Stories the same way, with the pencil and the bin disabled.
 
 **Error cases**:

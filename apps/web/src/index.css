@@ -705,7 +705,7 @@ body {
    family regardless of which one is destructive. */
 .activities-panel__edit,
 .activities-panel__edit-track,
-.activities-panel__create-story,
+.activities-panel__add-story,
 .activities-panel__delete,
 .activities-panel__visibility,
 .activities-panel__focus {
@@ -725,7 +725,7 @@ body {
 
 .activities-panel__edit:hover:not(:disabled),
 .activities-panel__edit-track:hover:not(:disabled),
-.activities-panel__create-story:hover:not(:disabled),
+.activities-panel__add-story:hover:not(:disabled),
 .activities-panel__delete:hover:not(:disabled),
 .activities-panel__visibility:hover:not(:disabled) {
   background: var(--fm-surface-tint-strong);
@@ -737,7 +737,7 @@ body {
    reads before anyone hovers for the title tooltip. */
 .activities-panel__edit:disabled,
 .activities-panel__edit-track:disabled,
-.activities-panel__create-story:disabled,
+.activities-panel__add-story:disabled,
 .activities-panel__delete:disabled,
 .activities-panel__visibility:disabled,
 .activities-panel__focus:disabled {
@@ -776,6 +776,8 @@ body {
    dropdown, a flex spacer pushing the rest right, the group action chips, a divider, then the
    one accent-tinted "focus on map" action. */
 .activities-panel__toolbar {
+  /* The containing block for Add to story's menu (.story-menu__panel). */
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--fm-space-10);
@@ -905,6 +907,104 @@ body {
 .activity-filters__type-item--all {
   font-weight: var(--fm-weight-semibold);
   color: var(--fm-ink);
+}
+
+/* AddToStoryMenu.tsx — anchored to the toolbar, not to its own button: the panel is
+   `overflow: hidden` and as narrow as 260px, so a menu hanging off a mid-toolbar button would be
+   clipped. Spanning the toolbar's width below it always fits. */
+.story-menu {
+  flex: none;
+  display: flex;
+}
+
+.story-menu__panel {
+  position: absolute;
+  top: calc(100% - 4px);
+  left: var(--fm-space-16);
+  right: var(--fm-space-16);
+  z-index: 3;
+  border: 1px solid var(--fm-border-panel);
+  border-radius: var(--fm-radius-lg);
+  background: var(--fm-surface);
+  box-shadow: var(--fm-shadow-lg);
+  padding: var(--fm-space-6);
+}
+
+.story-menu__list {
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+.story-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--fm-space-8);
+  width: 100%;
+  border: 0;
+  border-radius: var(--fm-radius-sm);
+  padding: var(--fm-space-6) var(--fm-space-8);
+  background: none;
+  color: var(--fm-ink);
+  font: inherit;
+  font-size: var(--fm-text-md);
+  text-align: left;
+  cursor: pointer;
+}
+
+.story-menu__item:hover:not(:disabled),
+.story-menu__item:focus-visible {
+  background: var(--fm-surface-tint);
+}
+
+.story-menu__item:disabled {
+  cursor: default;
+}
+
+.story-menu__item--new {
+  font-weight: var(--fm-weight-semibold);
+  color: var(--fm-accent);
+}
+
+.story-menu__check {
+  flex: none;
+  display: inline-flex;
+  width: 14px;
+  color: var(--fm-accent);
+}
+
+.story-menu__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.story-menu__item:disabled .story-menu__name {
+  color: var(--fm-ink-muted);
+}
+
+.story-menu__count {
+  flex: none;
+  font-size: var(--fm-text-2xs);
+  color: var(--fm-ink-muted);
+}
+
+.story-menu__divider {
+  height: 1px;
+  background: var(--fm-divider-tint);
+  margin: var(--fm-space-4) 0;
+}
+
+.story-menu__note {
+  margin: 0;
+  padding: var(--fm-space-6) var(--fm-space-8);
+  font-size: var(--fm-text-sm);
+  color: var(--fm-ink-muted);
+}
+
+.story-menu__note--error {
+  color: var(--fm-danger);
 }
 
 .activities-panel__type-panel-divider {
@@ -2312,7 +2412,7 @@ body {
   }
 
   .activities-panel__edit,
-  .activities-panel__create-story,
+  .activities-panel__add-story,
   .activities-panel__delete,
   .activities-panel__visibility,
   .activities-panel__focus {

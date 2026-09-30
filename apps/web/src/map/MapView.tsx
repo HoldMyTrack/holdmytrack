@@ -942,9 +942,18 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
-  // A Story just made with the toolbar's Create story opens straight away, on the Stories tab —
+  // A Story just made with Add to story's "New story…" opens straight away, on the Stories tab —
   // whose list, fetched as the tab opens, has it.
   const openCreatedStory = useCallback((story: Story) => enterStory(story.id), [enterStory]);
+  // Activities just added to an existing Story with Add to story: the list stays where it is, and
+  // its reload brings the rows' Story badges up to date.
+  const handleStoryAdded = useCallback(
+    (story: Story) => {
+      storiesList.replace(story);
+      reloadActivities();
+    },
+    [storiesList.replace, reloadActivities],
+  );
 
   const handleStoryEdited = useCallback(
     (story: Story) => {
@@ -1251,6 +1260,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
               onActivitiesDeleted={handleActivitiesDeleted}
               onEdit={openEditWindow}
               onStoryCreated={openCreatedStory}
+              onStoryAdded={handleStoryAdded}
               stories={storiesPanel}
               duplicates={duplicates.duplicates}
               duplicatesError={duplicates.error}

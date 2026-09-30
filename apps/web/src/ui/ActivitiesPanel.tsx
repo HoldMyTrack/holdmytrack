@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { BookPlus, ChevronDown, ChevronUp, Eye, EyeOff, Focus, Pencil, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, EyeOff, Focus, Pencil, Trash2 } from 'lucide-react';
 import { deleteActivity, type Activity, type ActivityTotals, type DuplicateActivity, type Story } from '../api';
 import { ActivityRow, rowLabel, useScrollFocusedRow } from './ActivityRow';
+import { AddToStoryMenu } from './AddToStoryMenu';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DateRangeSlider, type DateRangeSliderProps } from './DateRangeSlider';
-import { StoryDialog } from './StoryDialog';
 import { DistanceFilter } from './DistanceFilter';
 import { PrivateLocationsPanel } from './PrivateLocationsPanel';
 import { StoriesTab } from './StoriesTab';
@@ -48,7 +48,8 @@ import { lang, t, tn } from '../i18n';
  * checkbox mirrors the checked group's state, then icon actions over the target — Show/hide,
  * Edit (the Edit window, EditActivityWindow.tsx: its Activity tab edits Type/Name/Description
  * for exactly one activity and Type only for more than one, its Track tab one activity's
- * track), Delete, and, set off by a divider, Focus on map (fly-to-fit). Each one's tooltip
+ * track), Add to story (AddToStoryMenu.tsx), Delete, and, set off by a divider, Focus on map
+ * (fly-to-fit). Each one's tooltip
  * names the target ("3 checked activities", or the selected row's own label), so which of the
  * two applies is never a guess. The footer keeps only the target's "N selected · X km" summary.
  *
@@ -136,9 +137,12 @@ export interface ActivitiesPanelProps {
   /** The toolbar's Edit button, over the toolbar's target — MapView opens the Edit window
    *  (EditActivityWindow.tsx: Activity and Track tabs) over the map. */
   onEdit: (activities: Activity[]) => void;
-  /** A Story just made of the checked activities with the toolbar's Create story
-   *  (StoryDialog.tsx) — MapView opens it on the Stories tab. */
+  /** A Story just made of the toolbar's target with Add to story's "New story…"
+   *  (AddToStoryMenu.tsx) — MapView opens it on the Stories tab. */
   onStoryCreated: (story: Story) => void;
+  /** An existing Story the toolbar's target was just added to with Add to story, as the server
+   *  returned it — MapView reloads the list so the rows' Story badges follow. */
+  onStoryAdded: (story: Story) => void;
   /** The Stories tab's list and its open Story — MapView's. */
   stories: StoriesPanel;
   /** FR-3.7's "Not yet built" gap, closed: activities cross-source dedup took out of
@@ -208,6 +212,7 @@ export function ActivitiesPanel({
   onActivitiesDeleted,
   onEdit,
   onStoryCreated,
+  onStoryAdded,
   stories,
   duplicates,
   duplicatesError,
@@ -288,8 +293,6 @@ export function ActivitiesPanel({
   // (there's no per-row delete button), so this covers both the one-activity and many-activity
   // case uniformly. The confirm title and message below branch on targetActivities.length.
   const [deletingGroup, setDeletingGroup] = useState(false);
-  // FR-5.16's Create story dialog, over the checked group.
-  const [creatingStory, setCreatingStory] = useState(false);
 
   // Mobile-only bottom sheet (index.css's `@media (max-width: 768px)` layer) — collapsed by
   // default, same reasoning as typeFilterOpen above. Desktop CSS never reacts to the
@@ -386,15 +389,6 @@ export function ActivitiesPanel({
       : t(targetActivities.length === 1 ? 'activities.edit_one' : 'activities.edit_many', { target: targetName });
   const deleteTitle = targetName === null ? noTarget : t('activities.delete_target', { target: targetName });
 
-  // Create story takes the checked group only, never the selected row alone (FR-5.16): a Story
-  // is a set picked on purpose, and checking is how a set is picked here. Listed rows only, like
-  // every toolbar action.
-  const checkedActivities = checked.size > 0 ? targetActivities : [];
-  const storyTitle = readOnly
-    ? t('stories.demo_create')
-    : checkedActivities.length === 0
-      ? t('stories.create_none')
-      : t('stories.create_target', { target: tn('activities.checked_count', checkedActivities.length) });
   const focusTitle = targetName === null ? noTarget : t('activities.focus_target', { target: targetName });
 
   return (
@@ -680,16 +674,14 @@ export function ActivitiesPanel({
             >
               <Pencil size={16} />
             </button>
-            <button
-              type="button"
-              className="activities-panel__create-story"
-              disabled={readOnly || checkedActivities.length === 0}
-              onClick={() => setCreatingStory(true)}
-              aria-label={storyTitle}
-              title={storyTitle}
-            >
-              <BookPlus size={16} />
-            </button>
+            <AddToStoryMenu
+              readOnly={readOnly}
+              target={targetActivities}
+              targetName={targetName}
+              summary={groupSummary}
+              onCreated={onStoryCreated}
+              onAdded={onStoryAdded}
+            />
             <button
               type="button"
               className="activities-panel__delete"
@@ -793,15 +785,6 @@ export function ActivitiesPanel({
       )}
 
 
-      {creatingStory && (
-        <StoryDialog
-          mode="create"
-          activityIds={checkedActivities.map((a) => a.id)}
-          summary={groupSummary}
-          onSaved={onStoryCreated}
-          onClose={() => setCreatingStory(false)}
-        />
-      )}
 
       {deletingGroup && (
         <ConfirmDialog
