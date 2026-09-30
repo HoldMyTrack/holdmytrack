@@ -36,6 +36,7 @@ import { ExportControl } from '../ui/ExportControl';
 import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
 import { OverlaysMenu } from '../ui/OverlaysMenu';
 import { ShowInArea } from '../ui/ShowInArea';
+import { ZoomLevelNotice } from '../ui/ZoomLevelNotice';
 import { SpotPopup } from '../ui/SpotPopup';
 import { todayLocal, type DateRange } from '../ui/dateMath';
 import { useUnitSystem } from '../ui/units';
@@ -1194,7 +1195,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
       // silently drop back to Normal.
       // Satellite imagery reads dark, so it takes the dark flavors' veil (style.ts's isDarkBase).
       ensureFogLayer(instance, beforeId, isDarkBase(flavor, satellite));
-      ensureHeatmapLayer(instance, beforeId);
+      ensureHeatmapLayer(instance, beforeId, isDarkBase(flavor, satellite));
       ensureTrackLayer(instance, beforeId, activityQuery);
       // After tracks, so it paints on top and fully overlays the one track it applies to —
       // see trackBands.ts's own doc comment for why this is a second layer rather than a
@@ -1415,6 +1416,8 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
               </div>
               {/* Its own group: layers switched on and off over any mode, not a fourth mode. */}
               <OverlaysMenu overlays={overlays} satelliteAvailable={satelliteAvailable} onChange={changeOverlays} />
+              {/* On a line of its own under the toggles, however many rows they wrap to. */}
+              {map && <ZoomLevelNotice map={map} mode={mapMode} />}
             </div>
           )}
           {map && !editOpen && <ShowInArea map={map} categories={spotsShown} />}

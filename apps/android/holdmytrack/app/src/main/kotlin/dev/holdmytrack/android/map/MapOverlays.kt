@@ -174,10 +174,11 @@ object MapOverlays {
      *  uses, and keeps using across a [refreshCoverage]. */
     private var darkVeil = false
 
-    /** The heatmap ramp's own base hue (also `TRACK_COLOR` above) at a fixed moderate
-     *  opacity — "you've been somewhere in this country," not graded by how much. */
-    private const val HEATMAP_FILL_COLOR = "#b07e2e"
-    private const val HEATMAP_FILL_OPACITY = 0.45f
+    /** The heatmap ramp's own base colour (the server's `heatmapRamp`, the deep red a single
+     *  visit is drawn in) at a fixed opacity — "you've been somewhere in this country," not
+     *  graded by how much. The web's `heatmap.ts` uses the same pair. */
+    private const val HEATMAP_FILL_COLOR = "#b3261e"
+    private const val HEATMAP_FILL_OPACITY = 0.55f
 
     /** How far Fog mode mutes basemap labels — the web's `FOG_LABEL_OPACITY`: dim enough to
      *  recede behind the veil, still readable enough to orient by. */

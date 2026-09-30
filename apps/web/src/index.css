@@ -1559,6 +1559,31 @@ button.activities-panel__story-badge:hover {
   color: var(--fm-ink-secondary);
 }
 
+/* ZoomLevelNotice.tsx — which level Fog/Heatmap is drawing at, fading out after a few seconds.
+   A line of its own in .map-toggles (flex-basis 100%), so it sits under the toggles however many
+   rows they wrap to on a narrow screen. Takes no pointer events, like .map-toggles itself. */
+.zoom-level-notice {
+  flex-basis: 100%;
+  display: flex;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.zoom-level-notice--visible {
+  opacity: 1;
+}
+
+.zoom-level-notice__pill {
+  max-width: 22rem;
+  padding: var(--fm-space-8) var(--fm-space-12);
+  border-radius: var(--fm-radius-lg);
+  background: var(--fm-surface);
+  box-shadow: var(--fm-shadow-md);
+  font-size: var(--fm-text-sm);
+  line-height: 1.35;
+  color: var(--fm-ink);
+}
+
 /* A spot's popup (SpotPopup.tsx, FR-15.3) — MapLibre's own popup, restyled as the app's cards. */
 .spot-popup .maplibregl-popup-content {
   padding: var(--fm-space-12) var(--fm-space-16);
