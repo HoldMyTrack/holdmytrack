@@ -1561,7 +1561,7 @@ class MainActivity : AppCompatActivity() {
 
     /** The burger menu: the destinations that don't fit on the map itself — the app's own
      *  screens, then the web header's Donate and Info pages (About, Help, Contacts), opened in
-     *  a browser tab. */
+     *  a browser tab, and last the app's version, a line to read rather than an action. */
     private fun showMenu(anchor: View) {
         val menu = PopupMenu(this, anchor)
         menu.menu.add(MENU_GROUP_APP, MENU_PROFILE, 0, R.string.menu_profile)
@@ -1571,6 +1571,7 @@ class MainActivity : AppCompatActivity() {
         menu.menu.add(MENU_GROUP_WEB, MENU_ABOUT, 4, R.string.menu_about)
         menu.menu.add(MENU_GROUP_WEB, MENU_HELP, 5, R.string.menu_help)
         menu.menu.add(MENU_GROUP_WEB, MENU_CONTACTS, 6, R.string.menu_contacts)
+        menu.menu.add(MENU_GROUP_VERSION, MENU_VERSION, 7, getString(R.string.menu_version, HoldMyTrackApi.appVersion)).isEnabled = false
         menu.menu.setGroupDividerEnabled(true)
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
@@ -1815,6 +1816,7 @@ class MainActivity : AppCompatActivity() {
         private const val MIN_TOUCH_TARGET_DP = 48
         private const val MENU_GROUP_APP = 1
         private const val MENU_GROUP_WEB = 2
+        private const val MENU_GROUP_VERSION = 3
         private const val MENU_PROFILE = 1
         private const val MENU_SYNC = 2
         private const val MENU_SETTINGS = 4
@@ -1822,6 +1824,7 @@ class MainActivity : AppCompatActivity() {
         private const val MENU_ABOUT = 6
         private const val MENU_HELP = 7
         private const val MENU_CONTACTS = 8
+        private const val MENU_VERSION = 9
         private const val EXTRA_VIEW_ACTIVITY = "dev.holdmytrack.android.VIEW_ACTIVITY"
         private const val EXTRA_VIEW_STARTED_AT = "dev.holdmytrack.android.VIEW_STARTED_AT"
 
