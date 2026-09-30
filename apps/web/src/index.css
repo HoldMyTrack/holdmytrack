@@ -703,6 +703,31 @@ body {
   background: rgb(var(--fm-accent-rgb) / 12%);
 }
 
+/* The badge is a button (ActivityRow.tsx's StoryBadge) that opens its Story; with several, a
+   menu of their names hangs under it, right-aligned to the badge. */
+button.activities-panel__story-badge {
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+button.activities-panel__story-badge:hover {
+  background: rgb(var(--fm-accent-rgb) / 20%);
+}
+
+.activities-panel__story-badge-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.story-menu__panel.activities-panel__story-badge-menu {
+  top: calc(100% + 4px);
+  left: auto;
+  right: 0;
+  width: 14rem;
+  max-width: calc(100vw - 48px);
+}
+
 /* The reverse direction of the hover above: hovering this activity's *track on the map*
    (not the row itself) also underlines the title, via MapView's shared hoveredActivityId
    state rather than a real `:hover` here — the pointer isn't over this row at all. */

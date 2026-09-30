@@ -181,6 +181,10 @@ export function StoriesTab({
                           disabled: readOnly || removing !== null,
                           onRemove: () => void remove(story.id, activity.id),
                         }}
+                        onOpenStory={(id) => {
+                          setRemoveError(null);
+                          onOpen(id);
+                        }}
                         onFocus={() => onFocus(activity.id)}
                         onHover={onHoverActivity}
                       />

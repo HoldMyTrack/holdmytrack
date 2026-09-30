@@ -729,6 +729,11 @@ export function ActivitiesPanel({
                 hovered={hoveredId === activity.id}
                 hidden={hiddenIds.has(activity.id)}
                 checkbox={{ checked: checked.has(activity.id), onToggle: () => onToggle(activity.id) }}
+                onOpenStory={(id) => {
+                  // On a phone the expanded sheet would cover the Story's tracks, as on the Stories tab.
+                  setSheetExpanded(false);
+                  stories.onOpen(id);
+                }}
                 onFocus={() => onFocus(activity.id)}
                 onHover={onHoverActivity}
               />

@@ -71,6 +71,7 @@ export const ru: Record<MessageKey, string> & Record<string, string> = {
   'activities.focus_target': 'Приблизить карту: {target}',
   'activities.footer': 'Выбрано: {n} · {distance}',
   'activities.group_summary': '{activities} ({distance})',
+  'activities.open_story': 'Открыть «{name}»',
   'activities.story_badge.one': 'История',
   'activities.story_badge.few': '{n} истории',
   'activities.story_badge.many': '{n} историй',

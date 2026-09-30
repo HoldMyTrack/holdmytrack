@@ -64,6 +64,7 @@ export const en = {
   'activities.focus_target': 'Focus the map on {target}',
   'activities.footer': '{n} selected · {distance}',
   'activities.group_summary': '{activities} ({distance})',
+  'activities.open_story': 'Open “{name}”',
   'activities.story_badge.one': 'Story',
   'activities.story_badge.other': '{n} stories',
   'activities.in_stories.one': 'In a story: {names}',
