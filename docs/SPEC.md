@@ -535,7 +535,7 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 **Description**: An alternate map mode shading locations by how often they've been visited recently — a rolling window, not an all-time record, so a route no longer visited can cool off.
 
 **Behavior**:
-1. Selecting "Heatmap" replaces the track lines with a raster overlay, brighter wherever more recorded activity has crossed the same location (a daily commute reads brighter than a once-ridden road).
+1. Selecting "Heatmap" replaces the track lines with a raster overlay: anywhere recorded activity has crossed is plainly visible, deep red where it was crossed rarely, turning orange and then bright yellow the more often it was crossed (a daily commute reads hotter than a once-ridden road). The basemap is washed lighter beneath it (darker on a dark map), so the heat stands off roads and land. Its colors are the same whether the map is light or dark.
 2. Like Fog of War, Heatmap ignores the date range and the Type/Distance/hidden-track filters, hides the Activities panel and with it the date slider, clears any checked or focused activity, and leaves the camera exactly where it was (see FR-4.2's note on why). Unlike Fog, it only considers activities within a fixed rolling window (the last 365 days, not user-configurable).
 3. Individual track lines are not drawn in this mode.
 4. How much crossing traffic it takes to reach full brightness adapts to the account's own history, recomputed daily — a new account and a long-running one don't saturate at the same point, so each account's own most-used spot is what reads as hottest, not a fixed number of visits everyone shares.

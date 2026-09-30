@@ -1194,7 +1194,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
       // silently drop back to Normal.
       // Satellite imagery reads dark, so it takes the dark flavors' veil (style.ts's isDarkBase).
       ensureFogLayer(instance, beforeId, isDarkBase(flavor, satellite));
-      ensureHeatmapLayer(instance, beforeId);
+      ensureHeatmapLayer(instance, beforeId, isDarkBase(flavor, satellite));
       ensureTrackLayer(instance, beforeId, activityQuery);
       // After tracks, so it paints on top and fully overlays the one track it applies to —
       // see trackBands.ts's own doc comment for why this is a second layer rather than a

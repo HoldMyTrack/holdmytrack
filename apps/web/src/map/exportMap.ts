@@ -342,7 +342,7 @@ async function renderOffscreen(
 
     const beforeId = labelInsertionPoint(instance);
     ensureFogLayer(instance, beforeId, isDarkBase(state.flavor, state.satellite));
-    ensureHeatmapLayer(instance, beforeId);
+    ensureHeatmapLayer(instance, beforeId, isDarkBase(state.flavor, state.satellite));
     ensureTrackLayer(instance, beforeId, state.activityQuery);
     setMapMode(instance, state.mode);
     setHiddenTracks(instance, state.hiddenIds);

@@ -1,6 +1,6 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { COUNTRY_FOG_LAYER_ID, FOG_LAYER_ID, REGION_FOG_LAYER_ID } from './fog';
-import { COUNTRY_HEATMAP_LAYER_ID, HEATMAP_LAYER_ID, REGION_HEATMAP_LAYER_ID } from './heatmap';
+import { COUNTRY_HEATMAP_LAYER_ID, HEATMAP_DIM_LAYER_ID, HEATMAP_LAYER_ID, REGION_HEATMAP_LAYER_ID } from './heatmap';
 import { SPOTS_LAYER_ID } from './spots';
 import { BAND_LAYER_ID } from './trackBands';
 import { TRACKS_CASING_LAYER_ID, TRACKS_LAYER_ID } from './tracks';
@@ -32,6 +32,8 @@ export function setMapMode(map: MapLibreMap, mode: MapMode, editingTrack = false
   setVisible(map, HEATMAP_LAYER_ID, mode === 'heatmap');
   setVisible(map, COUNTRY_HEATMAP_LAYER_ID, mode === 'heatmap');
   setVisible(map, REGION_HEATMAP_LAYER_ID, mode === 'heatmap');
+  // Heatmap washes the basemap beneath the heat (heatmap.ts), so the heat stands off it.
+  setVisible(map, HEATMAP_DIM_LAYER_ID, mode === 'heatmap');
   // Tracks stay visible only in Normal — both Fog and Heatmap hide them (§4.2.2).
   setVisible(map, TRACKS_LAYER_ID, mode === 'normal' && !editingTrack);
   setVisible(map, TRACKS_CASING_LAYER_ID, mode === 'normal' && !editingTrack);

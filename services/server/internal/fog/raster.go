@@ -256,25 +256,29 @@ func compositeHeatmapMask(masks []*image.Gray, cap float64) *image.Gray {
 }
 
 // heatmapRamp is a small set of (position, colour, alpha) control points, linearly
-// interpolated between neighbours: transparent at zero, a fast ramp into the app's own rust
-// accent (#b07e2e, `apps/web/src/map/tracks.ts`'s TRACK_COLOR — a single activity's track and
-// a low-intensity heatmap cell are meant to read as the same colour) even at low intensity (a
-// heatmap should read as "something happened here" well before the cap), through toward a
-// saturated hot yellow at the cap. Every stop's colour is a straight lerp from rust to yellow
-// at that stop's own `t`, so the hue shifts smoothly across the whole ramp rather than passing
-// through an unrelated third colour (an earlier version's independent red-orange-yellow scheme
-// didn't share a colour with anything else in the app). The alpha shape (fast ramp to
-// near-opaque, fully opaque well before the cap) is unchanged from that version.
+// interpolated between neighbours. Two rules shape it:
+//
+//   - Anywhere visited is plainly visible. Intensity is sqrt(passes / heatmap_cap), and the cap
+//     is the account's busiest tile, so a place crossed once sits at an intensity of about
+//     5-20 of 255 on a real history — which the old ramp drew about 15% opaque, a remote place
+//     visited once all but invisible on the cream basemap. The floor stop at t = 0.02 (5/255)
+//     jumps straight to ~67% opaque, so frequency changes the colour, not whether it shows.
+//     Only the faintest fringe of the blurred edge stays below it, which keeps the edge soft.
+//   - Colours that stand off the basemap: deep red, through orange, to bright yellow at the
+//     cap. The old rust-to-yellow ramp sat too close to the cream land and yellow roads.
+//
+// Applied when a tile is served (RenderHeatmapPNG), so a change here needs no re-render —
+// only the tile-version bump rerender-coverage gives every account, so browsers refetch.
 type rampStop struct {
 	t          float64
 	r, g, b, a uint8
 }
 
 var heatmapRamp = []rampStop{
-	{t: 0.00, r: 176, g: 126, b: 46, a: 0},
-	{t: 0.15, r: 188, g: 142, b: 48, a: 130},
-	{t: 0.55, r: 219, g: 186, b: 54, a: 210},
-	{t: 1.00, r: 255, g: 235, b: 60, a: 255},
+	{t: 0.00, r: 179, g: 38, b: 30, a: 0},
+	{t: 0.02, r: 179, g: 38, b: 30, a: 170},
+	{t: 0.45, r: 232, g: 116, b: 26, a: 215},
+	{t: 1.00, r: 255, g: 216, b: 74, a: 255},
 }
 
 func heatmapColor(intensity uint8) color.RGBA {

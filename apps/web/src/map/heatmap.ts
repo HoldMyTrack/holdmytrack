@@ -21,17 +21,23 @@ export const COUNTRY_HEATMAP_SOURCE_ID = 'country-heatmap';
 export const COUNTRY_HEATMAP_LAYER_ID = 'country-heatmap-fill';
 export const REGION_HEATMAP_SOURCE_ID = 'region-heatmap';
 export const REGION_HEATMAP_LAYER_ID = 'region-heatmap-fill';
+export const HEATMAP_DIM_LAYER_ID = 'heatmap-dim';
 
 const HEATMAP_TILE_URL = `${API_BASE_URL}${TILES_V1}/heatmap/{z}/{x}/{y}.png`;
 const COUNTRY_HEATMAP_TILE_URL = `${API_BASE_URL}${TILES_V1}/country-heatmap/{z}/{x}/{y}.mvt`;
 const REGION_HEATMAP_TILE_URL = `${API_BASE_URL}${TILES_V1}/region-heatmap/{z}/{x}/{y}.mvt`;
 
-// The heatmap ramp's own base hue (internal/fog/raster.go's heatmapRamp zero-stop, also
-// tracks.ts's TRACK_COLOR — a single visit and a low-intensity heatmap cell read as the same
-// colour everywhere else in the app) at a fixed moderate opacity: "you've been somewhere in
-// this country," not graded by how much.
-const HEATMAP_FILL_COLOR = '#b07e2e';
-const HEATMAP_FILL_OPACITY = 0.45;
+// The heatmap ramp's own base colour (internal/fog/raster.go's heatmapRamp, the deep red a
+// single visit is drawn in), so nothing shifts colour crossing into city zoom, at a fixed
+// opacity: "you've been somewhere in this country," not graded by how much.
+const HEATMAP_FILL_COLOR = '#b3261e';
+const HEATMAP_FILL_OPACITY = 0.55;
+
+// Heatmap mode's wash over the basemap, beneath the heat: the heat reads against a quieter map,
+// as Fog mode quiets the labels (mapMode.ts). Cream on the light flavors, black on the dark
+// ones — the fog veils' own pairing, lightened.
+const LIGHT_DIM = { color: '#f7f4ec', opacity: 0.45 };
+const DARK_DIM = { color: '#000000', opacity: 0.35 };
 
 /**
  * Adds the heatmap source and layer if not already present — idempotent for the same
@@ -39,8 +45,29 @@ const HEATMAP_FILL_OPACITY = 0.45;
  *
  * `beforeId` is the same insertion point fog and tracks use (layers.ts) — beneath the
  * basemap's first symbol layer, so labels stay legible over the glow too.
+ *
+ * `dark` picks the dim wash under the heat (style.ts's isDarkBase, as for the fog veil).
  */
-export function ensureHeatmapLayer(map: MapLibreMap, beforeId: string | undefined): void {
+export function ensureHeatmapLayer(map: MapLibreMap, beforeId: string | undefined, dark: boolean): void {
+  // The wash first, so every heat layer added after it — each before `beforeId` too — lands
+  // above it. On a theme swap its colour follows.
+  const dim = dark ? DARK_DIM : LIGHT_DIM;
+  if (!map.getLayer(HEATMAP_DIM_LAYER_ID)) {
+    const firstHeat = [COUNTRY_HEATMAP_LAYER_ID, REGION_HEATMAP_LAYER_ID, HEATMAP_LAYER_ID].find((id) => map.getLayer(id));
+    map.addLayer(
+      {
+        id: HEATMAP_DIM_LAYER_ID,
+        type: 'background',
+        paint: { 'background-color': dim.color, 'background-opacity': dim.opacity },
+        layout: { visibility: 'none' },
+      },
+      firstHeat ?? beforeId,
+    );
+  } else if (map.getPaintProperty(HEATMAP_DIM_LAYER_ID, 'background-color') !== dim.color) {
+    map.setPaintProperty(HEATMAP_DIM_LAYER_ID, 'background-color', dim.color);
+    map.setPaintProperty(HEATMAP_DIM_LAYER_ID, 'background-opacity', dim.opacity);
+  }
+
   if (!map.getSource(HEATMAP_SOURCE_ID)) {
     map.addSource(HEATMAP_SOURCE_ID, {
       type: 'raster',
