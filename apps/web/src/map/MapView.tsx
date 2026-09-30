@@ -37,12 +37,10 @@ import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
 import { OverlaysMenu } from '../ui/OverlaysMenu';
 import { ShowInArea } from '../ui/ShowInArea';
 import { SpotPopup } from '../ui/SpotPopup';
-import { dayInZone, todayLocal, type DateRange } from '../ui/dateMath';
+import { todayLocal, type DateRange } from '../ui/dateMath';
 import { useUnitSystem } from '../ui/units';
 import { useActivityDays } from '../ui/useActivityDays';
 import { useActivityList } from '../ui/useActivityList';
-import { useDuplicates } from '../ui/useDuplicates';
-import { useImports } from '../ui/useImports';
 import { useStories } from '../ui/useStories';
 import { useStory } from '../ui/useStory';
 import { currentTheme, useTheme } from '../ui/useTheme';
@@ -352,9 +350,6 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     reload: reloadActivities,
     loadedKey: activitiesLoadedKey,
   } = useActivityList(activityQuery);
-  // Not scoped by activityQuery — FR-3.7's duplicate list, like the slider's days, answers "what
-  // happened to my whole history", not "what's in the currently selected date range".
-  const duplicates = useDuplicates();
   // The slider's window of days and its pan position, independent of the selection above — it
   // pages by days-with-activity rather than by calendar window, see useActivityDays.
   const {
@@ -555,19 +550,17 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     [activities, mapHiddenIds, fitToSelection],
   );
 
-  // "View on map" — SyncTab.tsx's per-row action and the /sync page's link, reusing focusActivity
-  // above rather than inventing a second fly-to mechanism. The one thing a row click doesn't
-  // already handle: the target activity may not be in the currently selected date range (an
-  // old Takeout import, a Health Connect backfill), in which case focusActivity would silently
-  // find nothing in `activities` and no-op. When that happens, this narrows the range to just
-  // that activity's own day (changeSelectedRange, the same mechanism the slider commits through)
-  // and defers the actual focus to the effect below, which fires once
-  // that range's own refetch has actually landed and the id is really there — a two-step async
-  // sequence, not a single call, since the range change and the fly both depend on a fetch
-  // landing first. Also restores Normal mode first: Fog/Heatmap have no per-track focus
-  // concept, and their own mode-switch effect already clears focus whenever entering either.
+  // The /sync page's "View on map" (`/?activity=&day=`, below), reusing focusActivity above
+  // rather than inventing a second fly-to mechanism. The one thing a row click doesn't already
+  // handle: the target activity may not be in the currently selected date range (an old Takeout
+  // import, a Health Connect backfill), in which case focusActivity would silently find nothing
+  // in `activities` and no-op. When that happens, this narrows the range to just that activity's
+  // own day — in the account's timezone, as the link carries it (changeSelectedRange, the same
+  // mechanism the slider commits through) — and defers the actual focus to the effect below,
+  // which fires once that range's own refetch has actually landed and the id is really there.
+  // Also restores Normal mode first: Fog/Heatmap have no per-track focus concept, and their own
+  // mode-switch effect already clears focus whenever entering either.
   const pendingFocusIdRef = useRef<string | null>(null);
-  // By its day, already in the account's timezone — the /sync page's link carries it that way.
   const viewActivityOnDay = useCallback(
     (activityId: string, day: string) => {
       if (mapMode !== 'normal') changeMapMode('normal');
@@ -581,10 +574,6 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
       flyToNextRangeRef.current = false;
     },
     [mapMode, changeMapMode, selectedRange, changeSelectedRange, focusActivity],
-  );
-  const viewActivityOnMap = useCallback(
-    (activityId: string, startedAtIso: string) => viewActivityOnDay(activityId, dayInZone(startedAtIso, user.timezone)),
-    [viewActivityOnDay, user.timezone],
   );
   // `/?activity=&day=` (App.tsx), once, on arrival: before any range of the user's own, so the
   // default range never replaces it.
@@ -840,22 +829,16 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // to drain, then refetches both (useCoverageRefresh.ts).
   const watchCoverage = useCoverageRefresh(map);
 
-  // A finished upload is a new track on the map and a new row in every §4.7 response, so
-  // refresh all four together rather than let the Sync tab's badge fall behind the geometry.
+  // A finished import is a new track on the map and a new row in every §4.7 response, so all of
+  // them refresh together — the header's Upload menu says when (hmt:imports-changed, below).
   const handleUploaded = useCallback(() => {
     if (map) refreshTrackLayer(map, activityQuery);
     reloadActivities();
     reloadDays();
     storyState.reload();
-    // A finished upload/sync is also the one thing that can produce a new duplicate.
-    duplicates.refresh();
     // Deletes come through here too (handleActivitiesDeleted), so this covers both.
     watchCoverage();
-  }, [map, activityQuery, reloadActivities, reloadDays, storyState.reload, duplicates.refresh, watchCoverage]);
-
-  // The Sync tab's upload queue and history — held here rather than in the tab, so an upload
-  // and its polling survive the panel unmounting (Fog/Heatmap) or showing the other tab.
-  const imports = useImports(handleUploaded);
+  }, [map, activityQuery, reloadActivities, reloadDays, storyState.reload, watchCoverage]);
 
   // The header's Upload menu (static/upload.js, served with the page's header) says when an
   // import it's following has finished, or a file's upload has landed — the same refresh.
@@ -1341,10 +1324,6 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
               onStoryCreated={openCreatedStory}
               onStoryAdded={handleStoryAdded}
               stories={storiesPanel}
-              duplicates={duplicates.duplicates}
-              duplicatesError={duplicates.error}
-              imports={imports}
-              onViewOnMap={viewActivityOnMap}
               tab={panelTab}
               onTabChange={changePanelTab}
               map={map}

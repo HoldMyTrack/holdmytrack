@@ -93,30 +93,13 @@ export function formatTotalDistance(meters: number, system: UnitSystem): string 
   return `${converted.toLocaleString(lang, { maximumFractionDigits: converted < 10 ? 1 : 0 })} ${unitLabel(system)}`;
 }
 
-/** "9 Sep" — the Sync tab's finished rows (SyncTab.tsx) need "which day did this
- *  land on", not a full datetime; `formatStartedAt` above is a row's primary line, this
- *  is a compact subtitle next to a filename that's already the row's primary line. */
-export function formatShortDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(lang, { day: 'numeric', month: 'short' });
-}
-
-/** "9 MAR 2026" — the date slider's labels (DateRangeSlider.tsx), per main-screen-v6.png. Takes a YYYY-MM-DD day, read as UTC so the
- *  label is exactly that calendar day in every browser time zone. */
+/** "9 MAR 2026" — the date slider's labels (DateRangeSlider.tsx), per main-screen-v6.png. Takes
+ *  a YYYY-MM-DD day, read as UTC so the label is exactly that calendar day in every browser time
+ *  zone. */
 export function formatDayLabel(date: string): string {
   const d = new Date(`${date}T00:00:00Z`);
   const month = d.toLocaleDateString(lang, { month: 'short', timeZone: 'UTC' }).toUpperCase();
   return `${d.getUTCDate()} ${month} ${d.getUTCFullYear()}`;
-}
-
-/** "412 KB" / "1.4 MB" — a dropped or picked file's own size, before any network transfer
- *  has happened, so this can't come from the backend. Binary (1024-based) units, matching
- *  what every OS file picker and Chrome's own devtools already show for a local file. */
-export function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return t('size.b', { v: bytes });
-  if (bytes < 1024 * 1024) return t('size.kb', { v: Math.round(bytes / 1024) });
-  return t('size.mb', { v: (bytes / (1024 * 1024)).toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) });
 }
 
 /**
@@ -135,48 +118,4 @@ export function formatActivityType(activityType: string): string {
     .filter(Boolean)
     .map((word) => word[0]!.toUpperCase() + word.slice(1))
     .join(' ');
-}
-
-/** The schema's `source` values (`IMPLEMENTATION.md` §3.3), said the way a person would say
- *  them — same closed mapping and wording as the Android app's own `sourceName()`
- *  (`SyncStatusActivity.kt`), so a duplicate's origin reads the same on both clients. Unlike
- *  `formatActivityType`, this *is* a fixed vocabulary — `source` is a small enum the ingest
- *  pipeline itself defines, not open text a source can invent. */
-export function formatIngestSource(source: string): string {
-  switch (source) {
-    case 'healthconnect':
-      return 'Health Connect';
-    case 'healthkit':
-      return 'HealthKit';
-    case 'upload':
-      return t('source.upload_phrase');
-    case 'takeout':
-      return t('source.takeout_phrase');
-    case 'recorded':
-      return t('source.recorded_phrase');
-    default:
-      return source;
-  }
-}
-
-/** The same `source` values as `formatIngestSource`, but as a short title rather than a
- *  sentence fragment — SyncTab.tsx's titles for synced rows, where a synced row's own
- *  `filename` is a raw external id never meant to be shown directly. Kept as its own switch
- *  rather than stripping `formatIngestSource`'s leading article: the wording itself differs
- *  too ("GPS Logger" vs. "a GPS recording"), not just the article. */
-export function formatSourceLabel(source: string): string {
-  switch (source) {
-    case 'healthconnect':
-      return 'Health Connect';
-    case 'healthkit':
-      return 'HealthKit';
-    case 'upload':
-      return t('source.upload');
-    case 'takeout':
-      return 'Google Takeout';
-    case 'recorded':
-      return t('source.recorded');
-    default:
-      return source;
-  }
 }

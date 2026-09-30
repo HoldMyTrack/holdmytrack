@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { ChevronDown, ChevronUp, Eye, EyeOff, Focus, Pencil, Trash2 } from 'lucide-react';
-import { deleteActivity, type Activity, type DuplicateActivity, type Story } from '../api';
+import { deleteActivity, type Activity, type Story } from '../api';
 import { ActivityRow, rowLabel, useScrollFocusedRow } from './ActivityRow';
 import { AddToStoryMenu } from './AddToStoryMenu';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -9,21 +9,19 @@ import { DateRangeSlider, type DateRangeSliderProps } from './DateRangeSlider';
 import { DistanceFilter } from './DistanceFilter';
 import { PrivateLocationsPanel } from './PrivateLocationsPanel';
 import { StoriesTab } from './StoriesTab';
-import { SyncTab } from './SyncTab';
 import type { DistanceRange, TypeFacet } from './activityFacets';
-import { formatActivityType, formatDistance, formatIngestSource, formatStartedAt, formatTotalDistance } from './format';
+import { formatActivityType, formatTotalDistance } from './format';
 import { useUnitSystem } from './units';
-import type { ImportsState } from './useImports';
 import { lang, t, tn } from '../i18n';
 
 /**
- * The left sidebar, with four tabs: **Activities** (the list, below), **Stories** (StoriesTab.tsx
- * — every Story as a folder, the open one's activities inside it, FR-14.6), **Sync** (SyncTab.tsx
- * — file upload and the import history) and **Privacy** (PrivateLocationsPanel.tsx — FR-8.1's
- * list, whose editor floats over the map like Edit track's). The tab is MapView's state, so
- * `/?private-locations` can open onto Privacy, `/?story=` onto Stories, and the tab survives
- * this panel unmounting for Fog/Heatmap; the upload queue behind Sync is MapView's too
- * (useImports), so it keeps running while another tab is showing.
+ * The left sidebar, with three tabs, each about what the map shows under it: **Activities** (the
+ * list, below), **Stories** (StoriesTab.tsx — every Story as a folder, the open one's
+ * activities inside it, FR-14.6) and **Privacy** (PrivateLocationsPanel.tsx — FR-8.1's list,
+ * whose editor floats over the map like Edit track's). Importing is the header's Upload menu and
+ * the /sync page, not a tab here. The tab is MapView's state, so `/?private-locations` can open
+ * onto Privacy, `/?story=` onto Stories, and the tab survives this panel unmounting for
+ * Fog/Heatmap.
  *
  * The activity list — a permanent left sidebar (not a collapsible
  * dropdown, nor a paginated one: §4.7's list
@@ -142,17 +140,6 @@ export interface ActivitiesPanelProps {
   onStoryAdded: (story: Story) => void;
   /** The Stories tab's list and its open Story — MapView's. */
   stories: StoriesPanel;
-  /** FR-3.7's "Not yet built" gap, closed: activities cross-source dedup took out of
-   *  circulation, each alongside the richer copy that superseded it — mirrors the Android
-   *  app's own duplicates section (`SyncStatusActivity`). Never filtered by the date range or
-   *  TYPE/DISTANCE facets above; a duplicate answers "where did my activity go", which isn't
-   *  a question scoped to whatever's currently selected. */
-  duplicates: DuplicateActivity[];
-  duplicatesError: string | null;
-  /** The Sync tab's upload queue and history — MapView's useImports. */
-  imports: ImportsState;
-  /** A Sync-tab row's "View on map" — MapView's viewActivityOnMap. */
-  onViewOnMap: (activityId: string, startedAt: string) => void;
   tab: PanelTab;
   onTabChange: (tab: PanelTab) => void;
   /** The Privacy tab's map, for its overlay — null until MapView's map has loaded. */
@@ -163,7 +150,7 @@ export interface ActivitiesPanelProps {
   dateRange: DateRangeSliderProps;
 }
 
-export type PanelTab = 'activities' | 'stories' | 'sync' | 'private';
+export type PanelTab = 'activities' | 'stories' | 'private';
 
 /** What the Stories tab needs from MapView beyond the activity list the other tabs share —
  *  see StoriesTab.tsx's props of the same names. */
@@ -211,10 +198,6 @@ export function ActivitiesPanel({
   onStoryCreated,
   onStoryAdded,
   stories,
-  duplicates,
-  duplicatesError,
-  imports,
-  onViewOnMap,
   tab,
   onTabChange: setTab,
   map,
@@ -225,16 +208,9 @@ export function ActivitiesPanel({
 
   // The Type dropdown, in the filter row beside Distance — closed by
   // default, same "most sessions don't start by narrowing filters" reasoning the old "Filter"
-  // toggle button had. Dismiss on outside click or Escape, the same hand-wired pattern
-  // the Duplicates disclosure below uses too (not shared into a hook for two call sites).
+  // toggle button had. Dismiss on outside click or Escape.
   const [typeFilterOpen, setTypeFilterOpen] = useState(false);
   const typeFilterRef = useRef<HTMLDivElement>(null);
-
-  // The Duplicates disclosure, same closed-by-default/dismiss-on-outside-click pattern as the
-  // Type dropdown above — a small footer link, not part of the main row list, since a
-  // duplicate isn't one of "my activities" in the sense the rest of this panel means.
-  const [duplicatesOpen, setDuplicatesOpen] = useState(false);
-  const duplicatesRef = useRef<HTMLDivElement>(null);
 
   // The row list, for useScrollFocusedRow (ActivityRow.tsx): a newly focused row scrolls into view.
   const listRef = useRef<HTMLUListElement>(null);
@@ -269,21 +245,6 @@ export function ActivitiesPanel({
     };
   }, [typeFilterOpen]);
 
-  useEffect(() => {
-    if (!duplicatesOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!duplicatesRef.current?.contains(event.target as Node)) setDuplicatesOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setDuplicatesOpen(false);
-    };
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [duplicatesOpen]);
 
 
   // §4.7.5's delete confirm dialog — the toolbar's Delete is the only delete entry point
@@ -437,19 +398,6 @@ export function ActivitiesPanel({
         <button
           type="button"
           role="tab"
-          aria-selected={tab === 'sync'}
-          className="activities-panel__tab"
-          data-testid="activities-panel-tab-sync"
-          onClick={() => setTab('sync')}
-        >
-          <span className="activities-panel__heading-text">{t('sync.tab')}</span>
-          {/* Visible from the Activities tab too, so an upload's progress doesn't disappear
-              the moment you switch away from it. */}
-          {imports.badgeCount > 0 && <span className="activities-panel__sync-badge">{imports.badgeCount}</span>}
-        </button>
-        <button
-          type="button"
-          role="tab"
           aria-selected={tab === 'private'}
           className="activities-panel__tab"
           data-testid="activities-panel-tab-private"
@@ -473,13 +421,7 @@ export function ActivitiesPanel({
         aria-label={tab === 'activities' ? t(sheetExpanded ? 'activities.collapse_sheet' : 'activities.expand_sheet') : undefined}
         onClick={() => setSheetExpanded((expanded) => !expanded)}
       >
-        {tab === 'sync'
-          ? t('sync.subtext')
-          : tab === 'private'
-            ? t('private.subtitle')
-            : tab === 'stories'
-              ? t('stories.subtext')
-              : null}
+        {tab === 'private' ? t('private.subtitle') : tab === 'stories' ? t('stories.subtext') : null}
         <span className="activities-panel__sheet-chevron" aria-hidden="true">
           {sheetExpanded ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
         </span>
@@ -523,18 +465,6 @@ export function ActivitiesPanel({
           onEdited={stories.onEdited}
           onDeleted={stories.onDeleted}
           onActivityRemoved={stories.onActivityRemoved}
-        />
-      ) : tab === 'sync' ? (
-        <SyncTab
-          imports={imports}
-          readOnly={readOnly}
-          onViewOnMap={(activityId, startedAt) => {
-            setTab('activities');
-            // On a phone the sheet is expanded to show this tab, and would stay drawn over the
-            // very map the link is meant to show. No visible effect at desktop width.
-            setSheetExpanded(false);
-            onViewOnMap(activityId, startedAt);
-          }}
         />
       ) : (
         <>
@@ -753,39 +683,6 @@ export function ActivitiesPanel({
             </span>
           </div>
 
-          {/* FR-3.7's "not yet built" gap: something synced can be absent from the list above for
-              two different reasons — it failed, or cross-source dedup already had it from
-              somewhere else — and only the second is not a fault. Hidden entirely when there's
-              nothing to say, the same as Android's own duplicatesHeading. */}
-          {(duplicates.length > 0 || duplicatesError) && (
-            <div className="activities-panel__duplicates" ref={duplicatesRef}>
-              <button
-                type="button"
-                className="activities-panel__duplicates-toggle"
-                aria-expanded={duplicatesOpen}
-                onClick={() => setDuplicatesOpen((open) => !open)}
-              >
-                {duplicatesError
-                  ? t('activities.duplicates_failed')
-                  : tn('activities.duplicates_found', duplicates.length)}
-                <span className="activities-panel__duplicates-chevron" aria-hidden="true">
-                  {duplicatesOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                </span>
-              </button>
-              {duplicatesOpen && !duplicatesError && (
-                <ul className="activities-panel__duplicates-list" data-testid="activities-duplicates-list">
-                  {duplicates.map((d) => (
-                    <li key={d.id} className="activities-panel__duplicates-row">
-                      {formatStartedAt(d.startedAt)} · {formatActivityType(d.activityType)}
-                      {d.distanceMeters !== null && ` · ${formatDistance(d.distanceMeters, system)}`}
-                      <br />
-                      {t('activities.duplicate_from', { source: formatIngestSource(d.source), kept: formatIngestSource(d.supersededBy.source) })}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
         </>
       )}
 

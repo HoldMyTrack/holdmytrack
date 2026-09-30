@@ -45,7 +45,7 @@
       <li><strong>Drag a knob</strong>, or press the slider near one, to move that end of your selection. Bring the knobs one step apart to pick a single day.</li>
       <li><strong>Go back through your history</strong> with the Earlier and Later buttons, five days per press, or hold one down. A knob parked on that edge comes along, which is how a selection grows beyond fifteen days; otherwise your selection stays as it was.</li>
     </ul>
-    <p>Choosing new dates clears your filters, hidden tracks and selected activities, since they described the old ones. The Stories, Sync and Privacy tabs don't use dates, and neither do Fog of War and Heatmap, so the slider is only on the Activities tab. On a phone it sits at the bottom of the screen, under the panel.</p>
+    <p>Choosing new dates clears your filters, hidden tracks and selected activities, since they described the old ones. The Stories and Privacy tabs don't use dates, and neither do Fog of War and Heatmap, so the slider is only on the Activities tab. On a phone it sits at the bottom of the screen, under the panel.</p>
   </section>
 
   <section class="page-section" id="stories">
@@ -63,21 +63,21 @@
 
   <section class="page-section" id="sync">
     <h2>Getting your activities in</h2>
-    <p>Everything comes in through the <strong>Sync</strong> tab, next to Activities in the panel on the left. It also lists everything you have imported, with its status (Processing, Ready or Failed); "View on map" jumps straight to a finished one.</p>
+    <p>Everything comes in through the <strong>Upload</strong> button at the top of every page. Its menu shows what is being imported right now: files uploading, then being processed, including what your phone is syncing. Once an import has finished it leaves the menu for <a href="/sync">Import history</a>, which lists everything you have imported as Ready or Failed, with why; "View on map" jumps straight to a finished one. If an import fails, the Upload button gets a red dot until you've seen it.</p>
 
     <h3>Files</h3>
-    <p>Drop files onto the Sync tab, or choose them from your computer. HoldMyTrack reads <strong>GPX</strong>, <strong>FIT</strong> and <strong>TCX</strong> files, the formats watches, bike computers and most fitness apps export. You can add up to 20 files at a time, each up to 64 MB. For more, put them in a <strong>.zip</strong> archive: one archive can hold up to 5,000 files.</p>
+    <p>Choose files from the Upload menu, or drop them anywhere on the map. HoldMyTrack reads <strong>GPX</strong>, <strong>FIT</strong> and <strong>TCX</strong> files, the formats watches, bike computers and most fitness apps export. You can add up to 20 files at a time, each up to 64 MB. For more, put them in a <strong>.zip</strong> archive: one archive can hold up to 5,000 files.</p>
 
     <h3>Google Takeout (Fitbit and Google Health)</h3>
-    <p>If your history lives with Fitbit or Google, download it with <a href="https://takeout.google.com">Google Takeout</a>: select your Fitbit data, create the export, and download the <strong>.zip</strong> it gives you (Google's own guide: <a href="https://support.google.com/accounts/answer/3024190">How to download your Google data</a>). Upload that .zip to the Sync tab as it is, without unpacking it. HoldMyTrack recognizes a Takeout export by itself and imports every activity that has a GPS route; activities without one, like a logged swim, are skipped.</p>
+    <p>If your history lives with Fitbit or Google, download it with <a href="https://takeout.google.com">Google Takeout</a>: select your Fitbit data, create the export, and download the <strong>.zip</strong> it gives you (Google's own guide: <a href="https://support.google.com/accounts/answer/3024190">How to download your Google data</a>). Upload that .zip as it is, without unpacking it; it shows as one row in the Upload menu, counting its activities as they're processed. HoldMyTrack recognizes a Takeout export by itself and imports every activity that has a GPS route; activities without one, like a logged swim, are skipped.</p>
 
     <h3>The Android app</h3>
-    <p>The HoldMyTrack Android app syncs your workouts from Health Connect, where most Android watches and fitness apps store them. Open it and tap <strong>Sync Now</strong>: the new activities appear in the Sync tab's history and on your map. Workouts without a route can't be placed on a map, so they're skipped: indoor ones, and Samsung Galaxy Watch workouts, whose routes Samsung doesn't share with Health Connect. The app can also record a walk, hike or drive by itself when you just want the route; recordings stay on your phone until you choose to sync them.</p>
+    <p>The HoldMyTrack Android app syncs your workouts from Health Connect, where most Android watches and fitness apps store them. Open it and tap <strong>Sync Now</strong>: the new activities show in the Upload menu while they're processed, then in Import history and on your map. Workouts without a route can't be placed on a map, so they're skipped: indoor ones, and Samsung Galaxy Watch workouts, whose routes Samsung doesn't share with Health Connect. The app can also record a walk, hike or drive by itself when you just want the route; recordings stay on your phone until you choose to sync them.</p>
 
     <h3>Importing twice is safe</h3>
     <ul class="page-list">
       <li><strong>The same file again</strong> is recognized and skipped; you'll see a note that it was already uploaded, and nothing is added twice.</li>
-      <li><strong>The same activity from two places</strong>, say synced from your watch and later uploaded as a FIT file, is kept once. HoldMyTrack keeps the richer copy (the one with a route, or with elevation) and sets the other aside. When that happens, a "duplicates found" link at the bottom of the Activities list shows what was set aside and why. Delete the copy that was kept, and the other one comes back.</li>
+      <li><strong>The same activity from two places</strong>, say synced from your watch and later uploaded as a FIT file, is kept once. HoldMyTrack keeps the richer copy (the one with a route, or with elevation) and sets the other aside. When that happens, <a href="/sync">Import history</a> lists what was set aside and why, under your imports. Delete the copy that was kept, and the other one comes back.</li>
     </ul>
   </section>
 
