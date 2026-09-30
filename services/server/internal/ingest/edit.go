@@ -83,6 +83,15 @@ func (e TrackEdit) Apply(points []parse.Point) []parse.Point {
 	return out
 }
 
+// ApplyClipped applies the edit to points already clipped against zones, then clips the
+// result's ends again. ClipEnds trims only the run of points inside a zone at each end, so an
+// edit that removes the first or last point outside one — a stray GPS fix before leaving home,
+// a Chop of the track's end — leaves the new end inside it, and those points would otherwise
+// be shown. Clipping an unedited end again changes nothing: it already sits on a zone's edge.
+func (e TrackEdit) ApplyClipped(points []parse.Point, zones []Zone) []parse.Point {
+	return ClipEnds(e.Apply(points), zones)
+}
+
 // ErrNotEditable is why a track can't be edited at all: the spec addresses points by
 // timestamp, which only works when timestamps run forward. A planned route with no times, or
 // a file whose clock jumps backwards, has no way to say "the points from here to there."
@@ -197,7 +206,7 @@ func DisplayedPoints(ctx context.Context, pool *pgxpool.Pool, store *storage.Sto
 		// The stored trajectory and the stored spec may disagree until the job lands.
 		return nil, errors.New("an edit or Private location change is still being applied")
 	}
-	_, points, err := loadClippedPoints(ctx, pool, store, userID, sourceDetail, *rawKey)
+	_, points, zones, err := loadClippedPoints(ctx, pool, store, userID, sourceDetail, *rawKey)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +215,7 @@ func DisplayedPoints(ctx context.Context, pool *pgxpool.Pool, store *storage.Sto
 		if err := json.Unmarshal(storedEdit, &edit); err != nil {
 			return nil, fmt.Errorf("stored track edit unreadable: %w", err)
 		}
-		points = edit.Apply(points)
+		points = edit.ApplyClipped(points, zones)
 	}
 	if len(points) < 2 {
 		return nil, nil
@@ -254,23 +263,26 @@ func reprocessActivity(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 
 	// Clipped with the account's current Private locations — the same points the editor's own
 	// list was built from (handleActivityTrackPoints), so what the user saw is what's processed.
-	act, points, err := loadClippedPoints(ctx, pool, store, userID, sourceDetail, *rawKey)
+	act, points, zones, err := loadClippedPoints(ctx, pool, store, userID, sourceDetail, *rawKey)
 	if err != nil {
 		return err
 	}
 	var editJSON []byte
 	if edit != nil && !edit.IsEmpty() {
 		if points != nil {
-			points = edit.Apply(points)
+			// Counted before clipping again: an edit leaving less than a line is the user's
+			// mistake, while one whose remaining points all lie inside Private locations
+			// just hides the track, as those locations would on their own.
+			if points = edit.Apply(points); userEdit && len(points) < 2 {
+				return errFewPointsAfterEdit
+			}
+			points = ClipEnds(points, zones) // see ApplyClipped
 		}
 		if editJSON, err = json.Marshal(edit); err != nil {
 			return err
 		}
 	}
 	if len(points) < 2 {
-		if userEdit && points != nil {
-			return errFewPointsAfterEdit
-		}
 		points = nil // hidden by Private locations, or by a stored edit on top of them
 	}
 
