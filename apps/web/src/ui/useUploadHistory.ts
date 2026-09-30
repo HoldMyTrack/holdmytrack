@@ -35,7 +35,7 @@ export interface UploadHistoryState {
  * `onPoll` fires after every *poll-driven* read (not the initial one, and not the one
  * `refresh()` triggers) — the one reliable signal that a job may have actually finished
  * server-side, as opposed to just been enqueued. MapView's own "a new track landed" refresh
- * (Activities list, totals, histogram, the tracks tile layer) used to hang off `refresh()`
+ * (Activities list, the slider's days, the tracks tile layer) used to hang off `refresh()`
  * instead, which fires the instant the upload HTTP request returns — before the worker has
  * parsed the file and inserted its `activities` row at all. Reported live as exactly that: a
  * freshly uploaded track missing from the Activities list until a manual page reload, by

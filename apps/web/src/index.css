@@ -363,6 +363,12 @@ body {
   cursor: default;
 }
 
+/* The Activities tab's has no text: at desktop width it isn't shown at all, and on a phone (below)
+   it's the sheet's expand strip, a bare chevron. */
+.activities-panel__subtext--bare {
+  display: none;
+}
+
 /* Hidden at desktop width — only meaningful once the subtext button above becomes the
    bottom sheet's own expand/collapse indicator (mobile media query below). */
 .activities-panel__sheet-chevron {
@@ -2413,6 +2419,10 @@ button.activities-panel__story-badge:hover {
     align-items: center;
     justify-content: space-between;
     gap: var(--fm-space-8);
+  }
+
+  .activities-panel__subtext--bare {
+    justify-content: flex-end;
   }
 
   .activities-panel__sheet-chevron {

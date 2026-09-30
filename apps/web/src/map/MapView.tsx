@@ -41,7 +41,6 @@ import { dayInZone, todayLocal, type DateRange } from '../ui/dateMath';
 import { useUnitSystem } from '../ui/units';
 import { useActivityDays } from '../ui/useActivityDays';
 import { useActivityList } from '../ui/useActivityList';
-import { useActivityTotals } from '../ui/useActivityTotals';
 import { useDuplicates } from '../ui/useDuplicates';
 import { useImports } from '../ui/useImports';
 import { useStories } from '../ui/useStories';
@@ -226,9 +225,9 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // effect below) needs the first page of days, which hasn't loaded yet on first render.
   const [selectedRange, setSelectedRangeState] = useState<DateRange | null>(null);
 
-  // The open Story (FR-14.6): while one is open on the Stories tab, the list, the totals and the
+  // The open Story (FR-14.6): while one is open on the Stories tab, the list and the
   // drawn tracks are the whole Story's activities, with no date range — `selectedRange` is left
-  // alone, so leaving the tab finds it as it was. Opened from the tab, the URL, Create story, or
+  // alone, so leaving the tab finds it as it was. Opened from the tab, the URL, Add to story, or
   // by Back/Forward; closed by leaving the tab.
   const [storyId, setStoryId] = useState<string | null>(storyParam);
   const storyState = useStory(storyId);
@@ -341,8 +340,8 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     [selectedRange, storyId],
   );
 
-  // Fetched once here rather than in each consumer: the header badge, the panel subtext and
-  // the map's drawn tracks all have to agree on the same rows after an upload.
+  // Fetched once here rather than in each consumer: the header badge, the panel's list and the
+  // map's drawn tracks all have to agree on the same rows after an upload.
   const {
     activities,
     loading: activitiesLoading,
@@ -350,7 +349,6 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     reload: reloadActivities,
     loadedKey: activitiesLoadedKey,
   } = useActivityList(activityQuery);
-  const { totals, reload: reloadTotals } = useActivityTotals(activityQuery);
   // Not scoped by activityQuery — FR-3.7's duplicate list, like the slider's days, answers "what
   // happened to my whole history", not "what's in the currently selected date range".
   const duplicates = useDuplicates();
@@ -827,22 +825,20 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   const handleUploaded = useCallback(() => {
     if (map) refreshTrackLayer(map, activityQuery);
     reloadActivities();
-    reloadTotals();
     reloadDays();
     storyState.reload();
     // A finished upload/sync is also the one thing that can produce a new duplicate.
     duplicates.refresh();
     // Deletes come through here too (handleActivitiesDeleted), so this covers both.
     watchCoverage();
-  }, [map, activityQuery, reloadActivities, reloadTotals, reloadDays, storyState.reload, duplicates.refresh, watchCoverage]);
+  }, [map, activityQuery, reloadActivities, reloadDays, storyState.reload, duplicates.refresh, watchCoverage]);
 
   // The Sync tab's upload queue and history — held here rather than in the tab, so an upload
   // and its polling survive the panel unmounting (Fog/Heatmap) or showing the other tab.
   const imports = useImports(handleUploaded);
 
-  // §4.7.5/§4.7.6: one or more deleted activities need the exact same four-part refresh a
-  // finished upload does (unlike editing type/description, deleting changes distance/duration
-  // totals and the slider's days too) — plus dropping every deleted id from any local selection
+  // §4.7.5/§4.7.6: one or more deleted activities need the exact same refresh a finished
+  // upload does (unlike editing type/description, deleting changes the slider's days too) — plus dropping every deleted id from any local selection
   // state that could otherwise still reference it. focusedActivityId is the one that actually
   // matters for correctness: left pointing at a now-deleted id, the pace-colored segments
   // effect would keep trying to fetch track-metrics for an activity that no
@@ -1052,12 +1048,11 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     watchCoverage(() => {
       if (map) refreshTrackLayer(map, activityQuery);
       reloadActivities();
-      reloadTotals();
       reloadDays();
       storyState.reload();
       setTrackMetricsVersion((v) => v + 1);
     });
-  }, [map, activityQuery, reloadActivities, reloadTotals, reloadDays, storyState.reload, watchCoverage]);
+  }, [map, activityQuery, reloadActivities, reloadDays, storyState.reload, watchCoverage]);
   const editWindowActivities = useMemo(() => {
     if (editWindowIds === null) return null;
     const group = activities.filter((a) => editWindowIds.includes(a.id));
@@ -1091,7 +1086,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   }, [pendingIds, reloadActivities]);
 
   // A row that stops being pending has new points, distance and duration: the drawn track,
-  // the totals, the slider's days and (if it's focused) its bands all need the new version.
+  // the slider's days and (if it's focused) its bands all need the new version.
   // None of it moves the camera — the row simply reappears where it is (FR-5.15).
   //
   // Fog/Heatmap go through the coverage watch rather than refetching here: the server clears
@@ -1132,11 +1127,10 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     if (map) refreshTrackLayer(map, activityQuery);
     // Includes the Country/Region tiers, since an edit can un-visit a region too.
     watchCoverage();
-    reloadTotals();
     reloadDays();
     storyState.reload();
     setTrackMetricsVersion((v) => v + 1);
-  }, [pendingIds, map, activityQuery, reloadTotals, reloadDays, storyState.reload, watchCoverage]);
+  }, [pendingIds, map, activityQuery, reloadDays, storyState.reload, watchCoverage]);
 
   /**
    * Re-attach anything that is not part of the basemap style.
@@ -1265,7 +1259,6 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
               activities={filteredActivities}
               loading={activitiesLoading}
               error={activitiesError}
-              totals={totals}
               facets={facets}
               excludedTypes={excludedTypes}
               onToggleType={toggleType}

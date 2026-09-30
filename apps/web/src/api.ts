@@ -551,43 +551,6 @@ export async function getDuplicates(signal?: AbortSignal): Promise<DuplicateActi
 }
 
 /**
- * §4.7's range summary: the aggregate behind the header badge, the panel's subtext and the
- * histogram's stats line. Unlike the per-row metrics these are never null — a sum over zero
- * matching activities is legitimately 0, not unknown.
- */
-export interface ActivityTotals {
-  count: number;
-  distanceMeters: number;
-  durationSeconds: number;
-  elevationGainM: number;
-}
-
-interface ActivityTotalsBody {
-  count: number;
-  distance_meters: number;
-  duration_seconds: number;
-  elevation_gain_m: number;
-}
-
-/** `GET /v1/activities/summary`, over the same from/to/types filter as listActivities. */
-export async function getActivityTotals(query: ActivityQuery = {}, signal?: AbortSignal): Promise<ActivityTotals> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/activities/summary${activityQueryString(query)}`, {
-    ...(signal ? { signal } : {}),
-    credentials: 'include',
-  });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
-  }
-  const body = (await res.json()) as ActivityTotalsBody;
-  return {
-    count: body.count,
-    distanceMeters: body.distance_meters,
-    durationSeconds: body.duration_seconds,
-    elevationGainM: body.elevation_gain_m,
-  };
-}
-
-/**
  * One day of §4.7's histogram — a day that actually has activities. Days with none are
  * simply absent, at every level: the endpoint never returns them, and the date slider never
  * gives one a slot (DateRangeSlider.tsx), so a day's neighbours are the adjacent days the user

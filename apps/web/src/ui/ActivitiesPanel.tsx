@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { ChevronDown, ChevronUp, Eye, EyeOff, Focus, Pencil, Trash2 } from 'lucide-react';
-import { deleteActivity, type Activity, type ActivityTotals, type DuplicateActivity, type Story } from '../api';
+import { deleteActivity, type Activity, type DuplicateActivity, type Story } from '../api';
 import { ActivityRow, rowLabel, useScrollFocusedRow } from './ActivityRow';
 import { AddToStoryMenu } from './AddToStoryMenu';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -81,9 +81,6 @@ export interface ActivitiesPanelProps {
   activities: Activity[];
   loading: boolean;
   error: string | null;
-  /** §4.7's range summary — unfiltered by TYPE/DISTANCE, so "km loaded" always describes the
-   *  whole date range regardless of how the two filters below narrow what's shown. */
-  totals: ActivityTotals | null;
   facets: TypeFacet[];
   excludedTypes: ReadonlySet<string>;
   onToggleType: (type: string) => void;
@@ -130,7 +127,7 @@ export interface ActivitiesPanelProps {
   onToggleGroupVisibility: () => void;
   /** §4.7.5's toolbar Delete — the only delete entry point (over the toolbar's target: the
    *  checked group, or the selected row alone), so always an array even for one id. Unlike onActivityUpdated, this also has to drop every deleted id from
-   *  `checked`/`hiddenIds`/`focusedId` and refresh the map's track layer and totals/histogram
+   *  `checked`/`hiddenIds`/`focusedId` and refresh the map's track layer and the slider's days
    *  (deleting changes distance/duration, editing never does) — MapView's own
    *  handleActivitiesDeleted does more than a plain reload. */
   onActivitiesDeleted: (ids: string[]) => void;
@@ -188,7 +185,6 @@ export function ActivitiesPanel({
   activities,
   loading,
   error,
-  totals,
   facets,
   excludedTypes,
   onToggleType,
@@ -466,11 +462,15 @@ export function ActivitiesPanel({
           target (expand/collapse), styled identically to the old plain text on desktop
           (index.css keeps `cursor: default` there) so clicking it is a harmless, invisible
           no-op at desktop width rather than a behavior change. */}
+      {/* The Activities tab has no subtext: its slider and filters say what's listed. Its button
+          stays for a phone, where it's the sheet's expand strip (a bare chevron); index.css hides
+          it at desktop width. */}
       <button
         type="button"
-        className="activities-panel__subtext"
+        className={`activities-panel__subtext${tab === 'activities' ? ' activities-panel__subtext--bare' : ''}`}
         data-testid="activities-panel-sheet-toggle"
         aria-expanded={sheetExpanded}
+        aria-label={tab === 'activities' ? t(sheetExpanded ? 'activities.collapse_sheet' : 'activities.expand_sheet') : undefined}
         onClick={() => setSheetExpanded((expanded) => !expanded)}
       >
         {tab === 'sync'
@@ -479,9 +479,7 @@ export function ActivitiesPanel({
             ? t('private.subtitle')
             : tab === 'stories'
               ? t('stories.subtext')
-              : totals !== null
-                ? t('activities.loaded', { distance: formatTotalDistance(totals.distanceMeters, system) })
-                : t('common.loading')}
+              : null}
         <span className="activities-panel__sheet-chevron" aria-hidden="true">
           {sheetExpanded ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
         </span>
