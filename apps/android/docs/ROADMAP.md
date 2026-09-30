@@ -111,3 +111,4 @@ Spots — outdoor places from OpenStreetMap — are built on the web and here (r
 
 - [x] **Points of interest on the map** — the web's per-category choice (its Layers menu), category icons and areas, in every map mode, and "Show in this area" below zoom 13.
 - [x] **The popup** — name, category, OSM's text, Copy address, and the Wikipedia link.
+- [x] **Capture** — capture mode from a spot's popup: guided there by an arrow, the distance and a line, 30 s inside captures it on the server, and captured spots get a filled badge here and on the web (ADR-0023).
