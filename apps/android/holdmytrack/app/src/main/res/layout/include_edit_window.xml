@@ -203,7 +203,7 @@
 
             <include layout="@layout/include_track_editor" />
 
-            <!-- The Stories tab (apps/web/src/ui/EditStoriesTab.tsx): the hint, or loading, none yet,
+            <!-- The Stories tab (apps/android/docs/SPEC.md FR-2.7 item 17): the hint, or loading, none yet,
                  or the read's error, then one checkbox row per Story (item_edit_story). -->
             <LinearLayout
                 android:id="@+id/edit_stories_panel"

@@ -559,8 +559,8 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // already handle: the target activity may not be in the currently selected date range (an
   // old Takeout import, a Health Connect backfill), in which case focusActivity would silently
   // find nothing in `activities` and no-op. When that happens, this narrows the range to just
-  // that activity's own day (changeSelectedRange, the same mechanism a manual single-day pick
-  // already uses — FR-6.5) and defers the actual focus to the effect below, which fires once
+  // that activity's own day (changeSelectedRange, the same mechanism the slider commits through)
+  // and defers the actual focus to the effect below, which fires once
   // that range's own refetch has actually landed and the id is really there — a two-step async
   // sequence, not a single call, since the range change and the fly both depend on a fetch
   // landing first. Also restores Normal mode first: Fog/Heatmap have no per-track focus

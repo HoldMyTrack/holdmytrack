@@ -586,13 +586,13 @@ ORDER BY day`
 
 // activityDayPageQuery is the same aggregate paginated by *activity-day* rather than by
 // calendar range: the `days` most recent distinct days-with-activity, optionally restricted
-// to those strictly before some day. It exists because the range picker's strip now packs
-// one bar per day-with-activity with the empty days removed entirely
-// (apps/web/src/ui/RangePicker.tsx), so "one screen of bars" is a count of real days, not a
-// width of calendar time. Asking for that with a calendar window would mean the client
-// guessing a window and widening it until enough bars came back — several round trips per
-// pan step over a sparse history, and a guess that is wrong in a different direction for
-// every user. One page here is exactly `days` bars, every time.
+// to those strictly before some day. It exists because the date slider has one slot per
+// day-with-activity with the empty days removed entirely (apps/web/src/ui/DateRangeSlider.tsx,
+// and the Android app's footer), so "one window of days" is a count of real days, not a width
+// of calendar time. Asking for that with a calendar window would mean the client guessing a
+// window and widening it until enough days came back — several round trips per page over a
+// sparse history, and a guess that is wrong in a different direction for every user. One page
+// here is exactly `days` days, every time.
 //
 // The anchor filters `started_at`, not the grouped `day`, so it stays on
 // idx_activities_user_time: a UTC day D's activities are exactly those with
@@ -629,7 +629,7 @@ type activityHistogramResponse struct {
 	Buckets []histogramBucket `json:"buckets"`
 	// The account's own local day of its very first activity, omitted when they have none. Not
 	// bounded by From/To — it answers a different question ("how far back is there
-	// anything at all") than the window does, so the client's range-picker strip knows
+	// anything at all") than the window does, so the client's date slider knows
 	// when it has paged back as far as there is anything to page back to, however far
 	// back `from` currently is.
 	Earliest string `json:"earliest,omitempty"`
