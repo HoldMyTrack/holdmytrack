@@ -180,6 +180,7 @@ export interface StoriesPanel {
   onOpen: (id: string) => void;
   onEdited: (story: Story) => void;
   onDeleted: (id: string) => void;
+  onActivityRemoved: (story: Story, activityId: string) => void;
 }
 
 export function ActivitiesPanel({
@@ -523,6 +524,7 @@ export function ActivitiesPanel({
           onHoverActivity={onHoverActivity}
           onEdited={stories.onEdited}
           onDeleted={stories.onDeleted}
+          onActivityRemoved={stories.onActivityRemoved}
         />
       ) : tab === 'sync' ? (
         <SyncTab

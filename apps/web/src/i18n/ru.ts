@@ -280,6 +280,8 @@ export const ru: Record<MessageKey, string> & Record<string, string> = {
   'stories.new': 'Новая история…',
   'stories.holds_all': 'Уже в этой истории',
   'stories.adding': 'Добавление…',
+  'stories.remove': 'Убрать из истории',
+  'stories.demo_remove': 'Недоступно в демо-аккаунте — создайте аккаунт, чтобы изменять истории',
   'stories.create_title': 'Создать историю',
   'stories.create_body': 'История из: {group}. Видна только вам.',
   'stories.name': 'Название',

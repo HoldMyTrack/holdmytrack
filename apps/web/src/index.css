@@ -645,6 +645,44 @@ body {
   gap: var(--fm-space-2);
 }
 
+/* An open Story's row's Remove from story (StoriesTab.tsx) — hidden until the row is hovered or
+   has focus, like a Story folder's pencil and bin; always shown on a phone. */
+.activities-panel__row-remove {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-left: auto;
+  border: 0;
+  border-radius: var(--fm-radius-sm);
+  padding: 0;
+  background: var(--fm-surface-tint);
+  color: var(--fm-ink-secondary);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.activities-panel__badges + .activities-panel__row-remove {
+  margin-left: 0;
+}
+
+.activities-panel__row:hover .activities-panel__row-remove,
+.activities-panel__row:focus-within .activities-panel__row-remove {
+  opacity: 1;
+}
+
+.activities-panel__row-remove:hover:not(:disabled) {
+  background: var(--fm-surface-tint-strong);
+  color: var(--fm-ink);
+}
+
+.activities-panel__row-remove:disabled {
+  color: var(--fm-ink-faint);
+  cursor: not-allowed;
+}
+
 .activities-panel__hidden-badge {
   flex: none;
   font-size: var(--fm-text-2xs);
@@ -2420,8 +2458,9 @@ body {
     height: 34px;
   }
 
-  /* A finger has no hover, so a Story's pencil and bin stay in view. */
-  .stories-tab__action {
+  /* A finger has no hover, so a Story's pencil and bin, and its rows' ×, stay in view. */
+  .stories-tab__action,
+  .activities-panel__row-remove {
     opacity: 1;
   }
 

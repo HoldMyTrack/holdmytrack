@@ -947,12 +947,15 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   const openCreatedStory = useCallback((story: Story) => enterStory(story.id), [enterStory]);
   // Activities just added to an existing Story with Add to story: the list stays where it is, and
   // its reload brings the rows' Story badges up to date.
+  // The server has moved the account's tile version, which only `watchCoverage` brings to this
+  // page — without it, opening this Story later could draw its tracks from tiles cached before.
   const handleStoryAdded = useCallback(
     (story: Story) => {
       storiesList.replace(story);
       reloadActivities();
+      watchCoverage();
     },
-    [storiesList.replace, reloadActivities],
+    [storiesList.replace, reloadActivities, watchCoverage],
   );
 
   const handleStoryEdited = useCallback(
@@ -975,6 +978,21 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     [storiesList.remove, storiesList.stories, storyId, enterStory, exitStory],
   );
 
+  // An activity taken out of the open Story with its row's × (FR-14.6): the Story's new numbers,
+  // its list without the row, and its tracks redrawn at the tile version the removal moved to.
+  const handleStoryActivityRemoved = useCallback(
+    (story: Story, activityId: string) => {
+      handleStoryEdited(story);
+      setFocusedActivityId((id) => (id === activityId ? null : id));
+      setHoveredActivityId((id) => (id === activityId ? null : id));
+      reloadActivities();
+      watchCoverage(() => {
+        if (map) refreshTrackLayer(map, activityQuery);
+      });
+    },
+    [handleStoryEdited, reloadActivities, watchCoverage, map, activityQuery],
+  );
+
   const storiesPanel: StoriesPanel = useMemo(
     () => ({
       stories: storiesList.stories,
@@ -986,8 +1004,20 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       onOpen: (id: string) => enterStory(id),
       onEdited: handleStoryEdited,
       onDeleted: handleStoryDeleted,
+      onActivityRemoved: handleStoryActivityRemoved,
     }),
-    [storiesList.stories, storiesList.ready, storiesList.error, storyId, storyState.story, storyState.error, enterStory, handleStoryEdited, handleStoryDeleted],
+    [
+      storiesList.stories,
+      storiesList.ready,
+      storiesList.error,
+      storyId,
+      storyState.story,
+      storyState.error,
+      enterStory,
+      handleStoryEdited,
+      handleStoryDeleted,
+      handleStoryActivityRemoved,
+    ],
   );
   // §4.7.7's track session, from the Edit window's Track tab. Flies there the same way a row
   // click does, then hands the map to TrackEditor until the window closes.

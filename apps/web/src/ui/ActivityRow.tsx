@@ -1,4 +1,5 @@
 import { useEffect, type RefObject } from 'react';
+import { X } from 'lucide-react';
 import type { Activity } from '../api';
 import { formatActivityType, formatDistance, formatDuration, formatStartedAt } from './format';
 import type { UnitSystem } from './units';
@@ -21,13 +22,16 @@ export interface ActivityRowProps {
   openStoryId?: string;
   /** The Activities tab's checkbox; the Stories tab's rows have none. */
   checkbox?: { checked: boolean; onToggle: () => void };
+  /** The Stories tab's Remove from story — an × at the row's end, shown on hover or focus (always
+   *  on a phone). */
+  remove?: { label: string; disabled: boolean; onRemove: () => void };
   onFocus: () => void;
   onHover: (id: string | null) => void;
 }
 
 /** One activity in a panel list — the Activities tab's (ActivitiesPanel.tsx, which documents the
  *  four row interactions) and an open Story's on the Stories tab (StoriesTab.tsx). */
-export function ActivityRow({ activity, system, focused, hovered, hidden, openStoryId, checkbox, onFocus, onHover }: ActivityRowProps) {
+export function ActivityRow({ activity, system, focused, hovered, hidden, openStoryId, checkbox, remove, onFocus, onHover }: ActivityRowProps) {
   const isPending = activity.pending;
   const otherStories = activity.stories.filter((s) => s.id !== openStoryId);
   // A user-entered name (§4.7's revised decision) leads; started_at is the fallback for a row
@@ -107,6 +111,18 @@ export function ActivityRow({ activity, system, focused, hovered, hidden, openSt
           )}
           {hidden && <span className="activities-panel__hidden-badge">{t('activities.hidden')}</span>}
         </span>
+      )}
+      {remove && (
+        <button
+          type="button"
+          className="activities-panel__row-remove"
+          disabled={remove.disabled}
+          aria-label={`${remove.label}: ${label}`}
+          title={remove.label}
+          onClick={remove.onRemove}
+        >
+          <X size={14} />
+        </button>
       )}
     </li>
   );

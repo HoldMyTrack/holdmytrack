@@ -253,6 +253,8 @@ export const en = {
   'stories.new': 'New story…',
   'stories.holds_all': 'Already in this story',
   'stories.adding': 'Adding…',
+  'stories.remove': 'Remove from story',
+  'stories.demo_remove': 'Not available for demo accounts — create an account to change stories',
   'stories.create_title': 'Create story',
   'stories.create_body': 'A story of {group}. Only you can see it.',
   'stories.name': 'Name',

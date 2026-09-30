@@ -849,7 +849,7 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 2. A Story's box is ticked when it holds every one of the window's activities, indeterminate when it holds some of them (its tooltip says so), and clear when it holds none.
 3. Clicking a clear or indeterminate box ticks it; clicking a ticked box clears it. A box can't be set back to indeterminate by a click — Cancel discards every change. The tab carries a dot while any box differs from what's saved.
 4. Save commits each changed Story in one request: ticked puts all the window's activities in it (any already there stay), cleared takes them all out (FR-14.3); the activities themselves never change. The fields (FR-5.10) are written first, then the Stories, then a track edit (FR-5.14). If a later request fails, the window stays open with the error, and Save again skips what was already written. The rows' Story badges (FR-5.1) follow as the window closes.
-5. This tab and Add to story (FR-5.16) are where an activity goes into an existing Story; this tab is also where one comes out.
+5. This tab and Add to story (FR-5.16) are where an activity goes into an existing Story; this tab and the Stories tab's rows (FR-14.6) are where one comes out.
 
 ## 8. FR-6 — Date Range Slider
 
@@ -1061,7 +1061,7 @@ A read-only view of every account and every account's activities, for the people
 
 ## 16. FR-14 — Stories
 
-A Story is a hand-picked, private set of the account's activities — a hike, a holiday, a race weekend — with a name, an optional description and joint statistics (`VISION.md` §4.2, ADR-0020). An activity can be in any number of Stories. This section covers the API and the Activities panel's Stories tab (FR-14.6), where a Story is opened on the map; a Story is made, and activities go into Stories, with the Activities toolbar's Add to story (FR-5.16) or the Edit window (FR-5.17), activities come out of Stories there too, and a row's Story badge is FR-5.1.
+A Story is a hand-picked, private set of the account's activities — a hike, a holiday, a race weekend — with a name, an optional description and joint statistics (`VISION.md` §4.2, ADR-0020). An activity can be in any number of Stories. This section covers the API and the Activities panel's Stories tab (FR-14.6), where a Story is opened on the map; a Story is made, and activities go into Stories, with the Activities toolbar's Add to story (FR-5.16) or the Edit window (FR-5.17); activities come out of a Story from its rows on the Stories tab or the Edit window; and a row's Story badge is FR-5.1.
 
 | Endpoint | Purpose |
 | :-- | :-- |
@@ -1131,7 +1131,7 @@ A Story is a hand-picked, private set of the account's activities — a hike, a 
 **Behavior**:
 1. Every Story is a folder row: a triangle, then its name. The triangle points right while the Story is folded and turns to point down when it's open. Stories are ordered by when they were made, newest first. The tab has no Type or Distance filters, no checkboxes and no toolbar.
 2. Exactly one Story is open at a time. Opening the tab opens the newest. Clicking another Story opens it and folds the one that was open. Clicking the open Story does nothing, so there is no way to fold them all.
-3. The open Story shows its description, when there is one, and then its activities as rows, newest first, like the Activities tab's rows (FR-5.1) but without checkboxes. Hovering a row previews its track (FR-5.4) and clicking one focuses it (FR-5.5). Nothing else can be done to them here: an activity goes into or out of a Story from the Edit window (FR-5.17).
+3. The open Story shows its description, when there is one, and then its activities as rows, newest first, like the Activities tab's rows (FR-5.1) but without checkboxes. Hovering a row previews its track (FR-5.4) and clicking one focuses it (FR-5.5). Each row has an × at its end, shown while the pointer is over the row or it has keyboard focus, and always on a phone: it takes that activity out of the Story (FR-14.3) with no confirmation — the activity itself stays, and Add to story (FR-5.16) puts it back. The row leaves the list, its track leaves the map and the footer's statistics follow; if it was focused, the focus clears. A removal that fails shows the server's message above the rows.
 4. While a Story is open, the drawn tracks, the listed rows and an exported image (FR-4.10) are all of that Story's activities, whatever date range the Activities tab has; the tab has no date slider (FR-6).
 5. The footer at the bottom of the panel shows the open Story's statistics: its activity count, distance and moving time (FR-14.1), then the same per activity type, the most frequent first, each type by its display name. A Story with no activities says so instead.
 6. Opening a Story fits the camera to its drawn tracks. Opened by URL, a camera in the URL wins; without one the camera fits the Story. On a phone, opening a Story collapses the panel's sheet so the tracks can be seen.
@@ -1140,7 +1140,7 @@ A Story is a hand-picked, private set of the account's activities — a hike, a 
 9. The URL carries the open Story, `/?story=<id>`: a refresh or a shared link opens the Stories tab with that Story open, and Back and Forward move between Stories and to and from the tab. Create story (FR-5.16) opens the new Story the same way.
 10. Normal mode only: Fog of War and Heatmap stay all-time (FR-4.2, FR-4.3), and returning to Normal shows the open Story again.
 11. With no Stories, the tab says how to make one: select or check activities on the Activities tab, then choose Add to story. The map stays as on the Activities tab.
-12. A demo session sees the Demo Customer's Stories the same way, with the pencil and the bin disabled.
+12. A demo session sees the Demo Customer's Stories the same way, with the pencil, the bin and the rows' × disabled.
 
 **Error cases**:
 - A `?story=` for a Story that doesn't exist or isn't the account's shows "This story doesn't exist, or isn't yours." at the top of the tab, with no Story open and no activities; clicking a Story opens it.
