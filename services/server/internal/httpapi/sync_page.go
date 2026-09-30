@@ -38,7 +38,7 @@ SELECT COUNT(*) FROM jobs WHERE kind = 'ingest' AND user_id = $1 AND state IN ('
 type syncView struct {
 	IsDemo     bool
 	Rows       []syncRow
-	Range      string // "1–20 of 57", "" with nothing imported
+	Range      string // the pager's "1–20 of 57", "" with nothing imported
 	NewerHref  string // "" on the first page
 	OlderHref  string // "" on the last
 	Duplicates []syncDuplicate
@@ -138,7 +138,11 @@ func (s *Server) buildSync(ctx context.Context, l *i18n.Localizer, acct *pageAcc
 
 	if total > 0 && offset < total {
 		end := min(offset+syncPageSize, total)
-		view.Range = l.T("sync.range", "from", l.Int(int64(offset+1)), "to", l.Int(int64(end)), "total", l.Int(int64(total)))
+		if end == offset+1 {
+			view.Range = l.T("sync.range_one", "n", l.Int(int64(end)), "total", l.Int(int64(total)))
+		} else {
+			view.Range = l.T("sync.range", "from", l.Int(int64(offset+1)), "to", l.Int(int64(end)), "total", l.Int(int64(total)))
+		}
 		if offset > 0 {
 			view.NewerHref = "/sync"
 			if prev := offset - syncPageSize; prev > 0 {

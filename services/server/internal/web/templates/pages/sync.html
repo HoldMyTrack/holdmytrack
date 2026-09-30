@@ -8,7 +8,6 @@
         <h2 class="profile__title" id="sync-history">{{t "sync.title"}}</h2>
         <p class="profile__subtext">{{if .IsDemo}}{{t "sync.demo"}}{{else}}{{t "sync.subtext"}}{{end}}</p>
       </div>
-      {{with .Range}}<span class="sync__range">{{.}}</span>{{end}}
     </div>
     {{if .Rows}}
     <ul class="sync__list">
@@ -24,9 +23,11 @@
       {{end}}
     </ul>
     {{if or .NewerHref .OlderHref}}
+    {{/* Both buttons always, in the same places: the one with nowhere to go stays, disabled. */}}
     <nav class="sync__pager" aria-label="{{t "sync.pages"}}">
-      {{if .NewerHref}}<a class="profile__toggle-btn" href="{{.NewerHref}}">{{t "sync.newer"}}</a>{{end}}
-      {{if .OlderHref}}<a class="profile__toggle-btn" href="{{.OlderHref}}">{{t "sync.older"}}</a>{{end}}
+      {{if .NewerHref}}<a class="sync__pager-btn" href="{{.NewerHref}}">{{t "sync.newer"}}</a>{{else}}<span class="sync__pager-btn" aria-disabled="true">{{t "sync.newer"}}</span>{{end}}
+      <span class="sync__pager-range">{{.Range}}</span>
+      {{if .OlderHref}}<a class="sync__pager-btn" href="{{.OlderHref}}">{{t "sync.older"}}</a>{{else}}<span class="sync__pager-btn" aria-disabled="true">{{t "sync.older"}}</span>{{end}}
     </nav>
     {{end}}
     {{else}}

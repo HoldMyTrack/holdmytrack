@@ -486,7 +486,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Preconditions**: Signed in; signed out, the page sends you to sign in.
 
 **Behavior**:
-1. Newest first by when each finished, 20 per page, with "1–20 of 57" and Newer/Older links. An import still being processed is not listed: the page shows only finished ones, so it doesn't change while it's open.
+1. Newest first by when each finished, 20 per page. With more than one page, a pager under the list: **← Newer** on the left, "1–20 of 57" (or "21 of 21") between, **Older →** on the right — both always in their places, the one with nowhere to go shown disabled. An import still being processed is not listed: the page shows only finished ones, so it doesn't change while it's open.
 2. Each row has a title — the file's name, or for a phone sync its source ("Health Connect", "GPS Logger") — then **Ready** with the activity's date and distance and a **View on map** link, or **Failed** with the reason in the reader's language (§17's error messages).
 3. **View on map** opens the map on that activity: on the Activities tab, the date range narrowed to its day if it isn't already in view, the activity selected (FR-5.5) and the camera fitted to it; on a phone the Activities sheet stays collapsed, so the track is visible. The link's parameters leave the address bar once read, so a refresh doesn't do it again.
 4. Under the history, when there are any, the duplicates: each one's start date and time and distance, and which source it came from and which copy replaced it — "From Health Connect, replaced by the copy from an uploaded file."

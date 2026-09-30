@@ -284,6 +284,7 @@
   "sync.failed": "Failed",
   "sync.view_on_map": "View on map",
   "sync.range": "{from}–{to} of {total}",
+  "sync.range_one": "{n} of {total}",
   "sync.pages": "Pages",
   "sync.newer": "← Newer",
   "sync.older": "Older →",

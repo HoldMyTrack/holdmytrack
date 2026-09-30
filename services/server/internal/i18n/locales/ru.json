@@ -288,6 +288,7 @@
   "sync.failed": "Ошибка",
   "sync.view_on_map": "Показать на карте",
   "sync.range": "{from}–{to} из {total}",
+  "sync.range_one": "{n} из {total}",
   "sync.pages": "Страницы",
   "sync.newer": "← Новее",
   "sync.older": "Старше →",
