@@ -23,6 +23,7 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/db"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/geo"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/httpapi"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mail"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mapstyle"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/spots"
@@ -40,7 +41,7 @@ func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: holdmytrack <serve|work|migrate|seed-demo-customer|export-demo-activities|seed-admin-boundaries|import-spots|set-admin>")
+		fmt.Fprintln(os.Stderr, "usage: holdmytrack <serve|work|migrate|seed-demo-customer|export-demo-activities|seed-admin-boundaries|rerender-coverage|import-spots|set-admin>")
 		os.Exit(2)
 	}
 
@@ -182,6 +183,23 @@ func main() {
 			os.Exit(1)
 		}
 		log.Info("export-demo-activities: done", "files", len(files))
+
+	case "rerender-coverage":
+		// One-off, on deploying a change to how Fog/Heatmap tiles are drawn (docs/DEPLOY.md):
+		// queues a full re-render of every account's tiles, or of one account's with --user.
+		// Idempotent. See internal/ingest.RerenderCoverage's doc comment.
+		userID := ""
+		switch {
+		case len(os.Args) == 4 && os.Args[2] == "--user":
+			userID = os.Args[3]
+		case len(os.Args) != 2:
+			fmt.Fprintln(os.Stderr, "usage: holdmytrack rerender-coverage [--user <id>]")
+			os.Exit(2)
+		}
+		if err := ingest.RerenderCoverage(ctx, pool, log, userID); err != nil {
+			log.Error("rerender-coverage", "err", err)
+			os.Exit(1)
+		}
 
 	case "seed-admin-boundaries":
 		// One-time (idempotent — safe to re-run on redeploy) load of the Natural Earth

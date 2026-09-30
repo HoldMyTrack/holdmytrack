@@ -43,3 +43,37 @@ func TestRenderFogPNGVeils(t *testing.T) {
 		}
 	}
 }
+
+// A one-pixel line at z14 — a track thinner than a pixel, far out — stays fully covered and at
+// least 3 px wide however many levels it's downsampled through, instead of fading as a mean
+// would thin it out. Each level feeds the next the way renderPyramidLevel does, the line's tile
+// as the top-left child.
+func TestDownsampleKeepsThinLinesVisible(t *testing.T) {
+	tile := blankTile()
+	for x := 0; x < TileSize; x++ {
+		tile.Pix[200*TileSize+x] = 255 // a horizontal line, one pixel high
+	}
+	for level := 1; level <= 6; level++ {
+		tile = downsampleQuadrants([4]*image.Gray{tile, blankTile(), blankTile(), blankTile()})
+		width, full := 0, false
+		for y := 0; y < TileSize; y++ {
+			if v := tile.Pix[y*TileSize+1]; v > 0 { // near the left edge: each level shrinks the line into the top-left quarter
+				width++
+				full = full || v == 255
+			}
+		}
+		if !full || width < 3 {
+			t.Fatalf("after %d levels the line is %d px wide, full strength %v; want >= 3 px at 255", level, width, full)
+		}
+	}
+}
+
+// Nothing visited stays nothing: an all-blank block downsamples to an all-blank tile.
+func TestDownsampleKeepsBlankBlank(t *testing.T) {
+	out := downsampleQuadrants([4]*image.Gray{blankTile(), blankTile(), blankTile(), blankTile()})
+	for i, v := range out.Pix {
+		if v != 0 {
+			t.Fatalf("pixel %d = %d, want 0", i, v)
+		}
+	}
+}
