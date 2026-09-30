@@ -67,7 +67,7 @@ type Result struct {
 }
 
 func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job Job) (Result, error) {
-	act, points, err := loadClippedPoints(ctx, pool, store, job.UserID, job.SourceDetail, job.RawPayloadKey)
+	act, points, _, err := loadClippedPoints(ctx, pool, store, job.UserID, job.SourceDetail, job.RawPayloadKey)
 	if err != nil {
 		return Result{}, err
 	}
@@ -194,30 +194,32 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 // the points a fresh ingest would have kept, never on hidden ones.
 //
 // The returned points are nil when the whole track lies inside Private locations; act still
-// carries the parsed metadata (type, name, start time) the caller persists either way.
-func loadClippedPoints(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID, sourceDetail, rawKey string) (parse.Activity, []parse.Point, error) {
+// carries the parsed metadata (type, name, start time) the caller persists either way. The
+// zones clipped with are returned too, for a caller that applies a track edit and has to clip
+// its result again (TrackEdit.ApplyClipped).
+func loadClippedPoints(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID, sourceDetail, rawKey string) (parse.Activity, []parse.Point, []Zone, error) {
 	obj, err := store.Get(ctx, rawKey)
 	if err != nil {
-		return parse.Activity{}, nil, fmt.Errorf("ingest: fetch raw payload: %w", err)
+		return parse.Activity{}, nil, nil, fmt.Errorf("ingest: fetch raw payload: %w", err)
 	}
 	defer obj.Close()
 
 	act, err := parseByExtensionReader(sourceDetail, obj)
 	if err != nil {
-		return parse.Activity{}, nil, parseError{err}
+		return parse.Activity{}, nil, nil, parseError{err}
 	}
 	if act.Points, err = keepTimed(act.Points); err != nil {
-		return parse.Activity{}, nil, err
+		return parse.Activity{}, nil, nil, err
 	}
 	if len(act.Points) < 2 {
-		return parse.Activity{}, nil, fmt.Errorf("ingest: %w (%d)", errTooFewPoints, len(act.Points))
+		return parse.Activity{}, nil, nil, fmt.Errorf("ingest: %w (%d)", errTooFewPoints, len(act.Points))
 	}
 
 	zones, err := LoadZones(ctx, pool, userID)
 	if err != nil {
-		return parse.Activity{}, nil, fmt.Errorf("ingest: load private locations: %w", err)
+		return parse.Activity{}, nil, nil, fmt.Errorf("ingest: load private locations: %w", err)
 	}
-	return act, ClipEnds(act.Points, zones), nil
+	return act, ClipEnds(act.Points, zones), zones, nil
 }
 
 // errNoTimestamps fails a file whose points carry no time at all — a planned route exported
@@ -245,7 +247,7 @@ func keepTimed(points []parse.Point) ([]parse.Point, error) {
 // LoadClippedPoints is loadClippedPoints for the track editor's point endpoint
 // (httpapi's handleActivityTrackPoints), which needs the same post-clip points to show.
 func LoadClippedPoints(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID, sourceDetail, rawKey string) ([]parse.Point, error) {
-	_, points, err := loadClippedPoints(ctx, pool, store, userID, sourceDetail, rawKey)
+	_, points, _, err := loadClippedPoints(ctx, pool, store, userID, sourceDetail, rawKey)
 	return points, err
 }
 
