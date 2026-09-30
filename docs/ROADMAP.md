@@ -143,6 +143,7 @@ An engineering requirement, can land alongside any of the above (`IMPLEMENTATION
 - [ ] Raw payload expiry schedule (object storage) — note this caps how far back a `reprivacy` job (a Private location change) can reach; document the tradeoff wherever it's implemented.
 - [ ] Per-user quotas (activity count, total points) — bounds one pathological account's cost, not a monetization lever.
 - [ ] Rate limits on upload, export, and tile requests (the auth endpoints already have `fixedWindowLimiter` — reuse it), plus a CDN/object-store spend cap.
+- [ ] Conditional reads for `GET /v1/spots/captures` — the web map reads the whole list again on every window focus and tab return (`SPEC.md` FR-15.2), so an `ETag` built from the account's capture count and latest `captured_at`, answered with `304 Not Modified` when it matches `If-None-Match`, keeps the repeat reads bodyless; the Android app's reads get the same for free. Preferred over a `?since=` cursor, which only sees new rows and misses a capture that cascades away with its spot.
 - [ ] Cost-per-active-user measurement from day one — the number that decides whether `VISION.md` §6's funding model actually works.
 
 ---
