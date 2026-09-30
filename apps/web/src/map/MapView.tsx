@@ -80,6 +80,9 @@ function moveStoryUrl(id: string | null, nav: StoryNav) {
 export interface MapViewProps {
   /** Mount with the Activities panel on its Privacy tab — `/?private-locations` (App.tsx). */
   initialPrivateLocationsOpen?: boolean;
+  /** Mount on one activity: its day selected, it focused — `/?activity=&day=` (App.tsx), the
+   *  /sync page's "View on map". */
+  initialActivity?: { id: string; day: string } | null;
 }
 
 /** The frame-and-capture export flow's own state — lives here, not inside `ExportFrame.tsx`,
@@ -107,7 +110,7 @@ function frameSize(
   return maxW / maxH >= ratio ? { widthPx: maxH * ratio, heightPx: maxH } : { widthPx: maxW, heightPx: maxW / ratio };
 }
 
-export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
+export function MapView({ initialPrivateLocationsOpen = false, initialActivity = null }: MapViewProps) {
   // docs/SPEC.md FR-2.1–FR-2.3: a demo account is
   // read-only (no upload/sync, no edit/delete) — see ActivitiesPanel's own readOnly prop and
   // the importControl below. `'email' in user` is the same narrowing api.ts's SessionUser
@@ -215,7 +218,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // onto Privacy (FR-8.1) and `/?story=` onto Stories (FR-14.6), and so the tab outlives the
   // panel unmounting for Fog/Heatmap.
   const [panelTab, setPanelTab] = useState<PanelTab>(
-    storyParam() !== null ? 'stories' : initialPrivateLocationsOpen ? 'private' : 'activities',
+    initialActivity !== null ? 'activities' : storyParam() !== null ? 'stories' : initialPrivateLocationsOpen ? 'private' : 'activities',
   );
 
   // The list/summary filter — the Activities tab's date slider (DateRangeSlider.tsx). The
@@ -552,7 +555,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     [activities, mapHiddenIds, fitToSelection],
   );
 
-  // ROADMAP.md's "View on map" item — SyncTab.tsx's per-row action, reusing focusActivity
+  // "View on map" — SyncTab.tsx's per-row action and the /sync page's link, reusing focusActivity
   // above rather than inventing a second fly-to mechanism. The one thing a row click doesn't
   // already handle: the target activity may not be in the currently selected date range (an
   // old Takeout import, a Health Connect backfill), in which case focusActivity would silently
@@ -564,10 +567,10 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // landing first. Also restores Normal mode first: Fog/Heatmap have no per-track focus
   // concept, and their own mode-switch effect already clears focus whenever entering either.
   const pendingFocusIdRef = useRef<string | null>(null);
-  const viewActivityOnMap = useCallback(
-    (activityId: string, startedAtIso: string) => {
+  // By its day, already in the account's timezone — the /sync page's link carries it that way.
+  const viewActivityOnDay = useCallback(
+    (activityId: string, day: string) => {
       if (mapMode !== 'normal') changeMapMode('normal');
-      const day = dayInZone(startedAtIso, user.timezone);
       if (selectedRange !== null && day >= selectedRange.from && day <= selectedRange.to) {
         focusActivity(activityId);
         return;
@@ -577,16 +580,30 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       // The focus below flies to the activity itself; the range fly would override it.
       flyToNextRangeRef.current = false;
     },
-    [mapMode, changeMapMode, selectedRange, changeSelectedRange, focusActivity, user.timezone],
+    [mapMode, changeMapMode, selectedRange, changeSelectedRange, focusActivity],
   );
+  const viewActivityOnMap = useCallback(
+    (activityId: string, startedAtIso: string) => viewActivityOnDay(activityId, dayInZone(startedAtIso, user.timezone)),
+    [viewActivityOnDay, user.timezone],
+  );
+  // `/?activity=&day=` (App.tsx), once, on arrival: before any range of the user's own, so the
+  // default range never replaces it.
+  const arrivedOnActivityRef = useRef(false);
+  useEffect(() => {
+    if (initialActivity === null || arrivedOnActivityRef.current) return;
+    arrivedOnActivityRef.current = true;
+    viewActivityOnDay(initialActivity.id, initialActivity.day);
+  }, [initialActivity, viewActivityOnDay]);
+  // Waits for the map too: arriving by `/?activity=` the list can land before the map has
+  // loaded, and a focus then would have nothing to fly.
   useEffect(() => {
     const pending = pendingFocusIdRef.current;
-    if (pending === null) return;
+    if (pending === null || !map) return;
     if (activities.some((a) => a.id === pending)) {
       pendingFocusIdRef.current = null;
       focusActivity(pending);
     }
-  }, [activities, focusActivity]);
+  }, [map, activities, focusActivity]);
 
   // A click on empty space in the Activities panel's list — the panel's counterpart to clicking
   // away from every track on the map (tracks.ts's onClickAway). The checked group stays.
@@ -654,7 +671,10 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // one). Keyed on the query the list was fetched for, not on `activities`, which is a new
   // array on every reload — keyed on that, a batch of uploads or Pending rows flew the camera
   // back over and over (reported live).
-  const hasFlownToActivitiesRef = useRef(false);
+  // Arriving on one activity (`/?activity=&day=`) is a view of its own: its day selected and it
+  // focused, which flies to it — so the first list's fly to the most recent activity stands
+  // aside.
+  const hasFlownToActivitiesRef = useRef(initialActivity !== null);
   const flownRangeKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (!map || activitiesLoadedKey === null) return;
