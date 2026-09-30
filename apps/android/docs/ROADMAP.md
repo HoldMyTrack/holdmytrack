@@ -109,6 +109,7 @@ The web has since simplified how Stories and the date range are used (root `docs
 - [ ] **Remove from story on the Stories tab.** An × on each row under the open Story, with no confirmation, via `DELETE /v1/stories/{id}/activities`; the list, the tracks and the footer's statistics follow.
 - [ ] **Drop the Edit window's Stories tab**, once the two items above are in.
 - [ ] **A tappable Story badge**, opening its Story — or, in several, a menu of their names.
+- [ ] **Imports: follow the web's split, or keep the Sync tab.** The web moved its import history out of the Activities panel: what's in progress is the header's Upload menu, what finished is the `/sync` page (root `docs/SPEC.md` FR-3.4, FR-3.9), and the duplicates live there too. The app's panel still has its Sync tab (`apps/android/docs/SPEC.md` FR-4.1) and duplicates disclosure, whose design notes (`apps/android/docs/IMPLEMENTATION.md`'s `panel/SyncTab`, the layouts' comments) cite the web's `SyncTab.tsx` and `.sync-tab` classes, which no longer exist. Decide which way the app goes, then point those notes at what they now follow.
 
 ---
 
