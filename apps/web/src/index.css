@@ -147,24 +147,40 @@ body {
   background: rgb(var(--fm-accent-rgb) / 35%);
 }
 
-/* The panel's tab strip (ActivitiesPanel.tsx: Activities | Stories | Sync | Privacy). Each tab keeps the serif
-   heading look the panel title had before there were two; the inactive one is just dimmed,
-   and the active one carries an accent underline like the other tab strips here. */
+/* The panel's tab strip (ActivitiesPanel.tsx: Activities | Stories | Privacy), and on a phone the
+   sheet's chevron at its end. Each tab keeps the serif heading look the panel title had before
+   there were two; the inactive one is just dimmed, and the active one carries an accent
+   underline like the other tab strips here. `flex: none`: the tabs' own `overflow-x` would
+   otherwise let the panel's column squeeze the row down to nothing, as the phone's short
+   collapsed sheet did. */
 .activities-panel__head {
+  flex: none;
   display: flex;
-  align-items: baseline;
-  gap: var(--fm-space-20);
+  align-items: center;
+  gap: var(--fm-space-8);
   padding: var(--fm-space-12) var(--fm-space-16) 0;
   margin-bottom: var(--fm-space-8);
   border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 8%);
-  /* Four tabs don't always fit a narrow panel or a phone, Russian's "Синхронизация" least of
-     all, so the strip scrolls sideways rather than widening the panel; ActivitiesPanel.tsx
-     keeps the selected tab in view. */
+}
+
+/* Tabs don't always fit a narrow panel or a phone, Russian's least of all, so the strip scrolls
+   sideways rather than widening the panel; ActivitiesPanel.tsx keeps the selected tab in view. */
+.activities-panel__tabs {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--fm-space-20);
   overflow-x: auto;
   scrollbar-width: none;
 }
 
-.activities-panel__head::-webkit-scrollbar {
+.activities-panel__tabs::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hidden at desktop width — the phone's bottom sheet alone has anything to expand. */
+.activities-panel__sheet-toggle {
   display: none;
 }
 
@@ -344,35 +360,11 @@ body {
   font-weight: var(--fm-weight-bold);
 }
 
-/* A <button> now (ActivitiesPanel.tsx — the mobile bottom sheet's own peek-strip tap
-   target), reset to look exactly like the plain text it used to be at desktop width:
-   `cursor: default` here, not `pointer` — only the mobile media query below makes it look
-   and behave like a control, so clicking it at desktop width is an invisible no-op rather
-   than a behavior change. */
 .activities-panel__subtext {
-  display: block;
-  width: 100%;
   margin: 0 0 var(--fm-space-8);
   padding: 0 var(--fm-space-16);
-  border: 0;
-  background: none;
   color: rgb(var(--fm-ink-rgb) / 55%);
-  font: inherit;
   font-size: var(--fm-text-sm);
-  text-align: left;
-  cursor: default;
-}
-
-/* The Activities tab's has no text: at desktop width it isn't shown at all, and on a phone (below)
-   it's the sheet's expand strip, a bare chevron. */
-.activities-panel__subtext--bare {
-  display: none;
-}
-
-/* Hidden at desktop width — only meaningful once the subtext button above becomes the
-   bottom sheet's own expand/collapse indicator (mobile media query below). */
-.activities-panel__sheet-chevron {
-  display: none;
 }
 
 /* DistanceFilter.tsx — the DISTANCE dual slider, standalone and always visible (§4.7.6)
@@ -2086,7 +2078,7 @@ button.activities-panel__story-badge:hover {
      (`--sheet-bottom`, set per tab below). */
   :root {
     --phone-footer-height: 76px;
-    --phone-sheet-peek: 68px;
+    --phone-sheet-peek: 49px;
   }
 
   /* Reserves the peek strip (and on the Activities tab the slider under it) under the map, so
@@ -2105,8 +2097,9 @@ button.activities-panel__story-badge:hover {
      `.app-body`'s flex row entirely, so `.map-root` (the only flex child left in that row,
      `flex: 1`) naturally expands to the full width with no `.app-body`/`.map-root` change
      needed at all. Collapsed by default (ActivitiesPanel.tsx's `sheetExpanded`, `false`
-     initially) to a slim peek strip — the map stays fully interactive around and under it;
-     expanding it (tapping the subtext button) grows it upward to cover most of the screen.
+     initially) to a peek strip that is its tab row — the map stays fully interactive around and
+     under it; expanding it (the row's chevron, or any tab) grows it upward to cover most of the
+     screen.
      On the Activities tab anchored to the date slider's top edge, not the viewport's bottom,
      so the slider stays visible under the sheet in either state. No `map.resize()` call is needed either
      way, since the map's own container dimensions never change with the sheet's state —
@@ -2152,30 +2145,27 @@ button.activities-panel__story-badge:hover {
     display: none;
   }
 
-  /* The peek strip's own tap target — cursor/appearance-only; ActivitiesPanel.tsx's onClick
-     is already wired unconditionally (see its own comment for why that's safe). */
-  .activities-panel__subtext {
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--fm-space-8);
-  }
-
-  .activities-panel__subtext--bare {
-    justify-content: flex-end;
-  }
-
-  .activities-panel__sheet-chevron {
-    /* Larger than the 14px carets elsewhere (the icon's own size={20}): this is the sheet's
-       whole expand/collapse affordance on a touchscreen, not a decorative aside to its text. */
+  /* The sheet's expand/collapse control, at the end of the tab row that is the peek strip.
+     Larger than the 14px carets elsewhere (the icon's own size={20}): it's the sheet's whole
+     expand/collapse affordance on a touchscreen. A finger-sized box, pulled into the row's
+     right padding so the icon lines up with the content below it. */
+  .activities-panel__sheet-toggle {
     display: inline-flex;
     flex: none;
-    color: rgb(var(--fm-ink-rgb) / 40%);
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 36px;
+    margin-right: calc(-1 * var(--fm-space-8));
+    padding: 0;
+    border: 0;
+    background: none;
+    color: rgb(var(--fm-ink-rgb) / 45%);
+    cursor: pointer;
   }
 
   /* Collapsed: the list/filters/footer need no rule of their own here at all — they're
-     simply clipped by the panel's own 68px height plus `overflow: hidden` (already set in
+     simply clipped by the panel's peek height plus `overflow: hidden` (already set in
      the base rule), same `flex: 1; min-height: 0; overflow-y: auto` they already have on
      desktop. Not unmounted, so a mid-scroll collapse doesn't lose the list's own scroll
      position, and expanding just gives that same flex child more height to actually use.

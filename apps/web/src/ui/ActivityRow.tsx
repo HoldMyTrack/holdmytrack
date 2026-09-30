@@ -226,7 +226,7 @@ function StoryBadge({
  * after every click. `data-activity-id` on the row is what this looks up.
  *
  * Scrolls the list alone, not `row.scrollIntoView()`: that scrolls every ancestor too, and on a
- * phone the collapsed sheet (`overflow: hidden`, 68px tall) is one — a tap on a track scrolled
+ * phone the collapsed sheet (`overflow: hidden`, its tab row tall) is one — a tap on a track scrolled
  * the whole sheet up by its own content, pushing the header and the expand strip out of its
  * visible box, where no gesture could bring them back.
  */
