@@ -857,6 +857,42 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // and its polling survive the panel unmounting (Fog/Heatmap) or showing the other tab.
   const imports = useImports(handleUploaded);
 
+  // The header's Upload menu (static/upload.js, served with the page's header) says when an
+  // import it's following has finished, or a file's upload has landed — the same refresh.
+  useEffect(() => {
+    window.addEventListener('hmt:imports-changed', handleUploaded);
+    return () => window.removeEventListener('hmt:imports-changed', handleUploaded);
+  }, [handleUploaded]);
+
+  // Files dropped on the map go to the header's Upload menu, which uploads them and shows their
+  // progress. A demo account has no Upload menu, and the map takes no drop.
+  const [fileDragOver, setFileDragOver] = useState(false);
+  const dragDepthRef = useRef(0);
+  const carriesFiles = (event: React.DragEvent) => !isDemo && Array.from(event.dataTransfer.types).includes('Files');
+  const onMapDragEnter = (event: React.DragEvent) => {
+    if (!carriesFiles(event)) return;
+    event.preventDefault();
+    dragDepthRef.current += 1;
+    setFileDragOver(true);
+  };
+  const onMapDragOver = (event: React.DragEvent) => {
+    if (!carriesFiles(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  };
+  const onMapDragLeave = (event: React.DragEvent) => {
+    if (!carriesFiles(event)) return;
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setFileDragOver(false);
+  };
+  const onMapDrop = (event: React.DragEvent) => {
+    if (!carriesFiles(event)) return;
+    event.preventDefault();
+    dragDepthRef.current = 0;
+    setFileDragOver(false);
+    window.dispatchEvent(new CustomEvent('hmt:upload-files', { detail: event.dataTransfer.files }));
+  };
+
   // §4.7.5/§4.7.6: one or more deleted activities need the exact same refresh a finished
   // upload does (unlike editing type/description, deleting changes the slider's days too) — plus dropping every deleted id from any local selection
   // state that could otherwise still reference it. focusedActivityId is the one that actually
@@ -1325,7 +1361,18 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
           </div>
         )}
 
-        <div className="map-root">
+        <div
+          className="map-root"
+          onDragEnter={onMapDragEnter}
+          onDragOver={onMapDragOver}
+          onDragLeave={onMapDragLeave}
+          onDrop={onMapDrop}
+        >
+          {fileDragOver && (
+            <div className="map-drop" data-testid="map-drop">
+              <span className="map-drop__label">{t('map.drop_files')}</span>
+            </div>
+          )}
           <div ref={container} className="map-canvas" data-testid="map-canvas" />
           {map && <ExportControl map={map} active={exportFlow.stage !== 'idle'} onOpen={handleExportOpen} />}
           {map && (exportFlow.stage === 'framing' || exportFlow.stage === 'capturing') && (

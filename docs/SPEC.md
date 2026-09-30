@@ -340,7 +340,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Inputs**: One or more files, each a `.gpx`, `.fit`, or `.tcx` file no larger than 64 MiB. Up to 20 individually-selected files per batch (a larger selection is rejected client-side in full, before any upload begins, with a message directing the user to a `.zip` archive instead — FR-3.2).
 
 **Behavior**:
-1. User drags files onto the drop zone in the Activities panel's Sync tab (FR-3.4), or selects them via a file picker.
+1. User chooses files from the header's **Upload** menu (FR-3.4), on any page, or drops them on the map; the Activities panel's Sync tab has a drop zone and picker too.
 2. Each file uploads independently, as its own `POST /v1/activities/upload` request (multipart), and is tracked independently — one file failing does not affect the others.
 3. For each file: server validates its extension and size, computes a content hash to check for a duplicate (FR-3.5), persists the raw file, and enqueues a background parsing job.
 4. The Sync tab's history shows each file's live status (uploading, with a progress percentage; then "Processing…") until the background job finishes.
@@ -402,6 +402,16 @@ All upload functionality requires an active session (demo or registered — FR-1
 3. While anything is still processing, the history refreshes automatically (polled every 1.5 seconds) until every row settles to "Ready" or "Failed" — no manual refresh needed. Polling and uploads carry on while the Activities tab is showing, or the panel is hidden in Fog of War/Heatmap mode, since a job finishing still has to reach the map.
 4. For a demo session, the drop zone is replaced by a note that importing isn't available for demo accounts.
 5. A "View on map" action appears on every finished (`"Ready"`) row. Clicking it switches the panel back to the Activities tab, focuses that activity exactly as clicking its row in the Activities panel would (FR-5.5) — track bolded, camera flown to fit it — and, if the activity's own date — its day in the account's timezone, the same day the date range is read in — falls outside the currently selected date range (FR-6), first narrows the selected range to just that one day (FR-6) before focusing, rather than focusing something the Activities panel isn't currently showing at all. On a phone (§19) the expanded bottom sheet collapses, so the focused track is visible.
+
+**The Upload menu**: an **Upload** button in the header of every page, for a signed-in account, opening a menu of what is being imported right now.
+1. **Choose files…** opens the file picker (`.gpx`, `.fit`, `.tcx`, `.zip` — FR-3.1–FR-3.3); files dropped anywhere on the map, which shows a dashed "Drop to upload" cover while they're dragged over it, go to the same place. Choosing or dropping opens the menu.
+2. The menu lists every import in progress: files waiting their turn ("Queued"), a file being sent ("Uploading 45%"), then each one the server is processing ("Processing…"), including activities synced from the phone, named after their source. A `.zip` or Takeout export is one row counting its files — "Processing 120 of 340". The button shows how many rows there are.
+3. An import leaves the menu as soon as it has finished, whether it succeeded or failed; what it came to is the import history page's (FR-3.9). The map refreshes itself as each finishes.
+4. A failed import that hasn't been seen yet puts a red dot on the button and one line in the menu, "Failed imports: 1 · See import history", linking to the history page. Opening that page, or dismissing the line, clears it.
+5. Messages about this page's own uploads — a file already uploaded before, the files a `.zip` skipped, too many files chosen, a file the server refused outright (with the reason) — show in the menu until dismissed, one by one.
+6. The menu ends with a link to the import history page. It closes on a click outside it or Escape.
+7. What's in progress is read from the server every 2 seconds while anything is, every 20 otherwise.
+8. A demo session sees the button disabled, its tooltip saying why.
 
 **Outputs**: `GET /v1/uploads?limit=&offset=&source=` returns the current page, the total count (scoped to `source` when given), and how many are still processing (always the global count, unscoped, for the badge). `source` is an optional comma-separated filter (e.g. `upload,takeout`); the Sync tab omits it, for the combined view. Each row also carries `source` and, once the job has produced one, the resulting activity's own `id` — what the "View on map" action targets.
 

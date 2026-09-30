@@ -173,6 +173,7 @@ export const ru: Record<MessageKey, string> & Record<string, string> = {
   'slider.end': 'Дата конца',
   'slider.later': 'Позже',
   'slider.start': 'Дата начала',
+  'map.drop_files': 'Отпустите, чтобы загрузить: .gpx, .fit, .tcx или zip-архив',
   'map.mode': 'Режим карты',
   'map.mode_fog': 'Туман',
   'map.mode_heatmap': 'Тепловая карта',

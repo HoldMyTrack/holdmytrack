@@ -183,6 +183,174 @@
   background: rgb(var(--fm-ink-rgb) / 6%);
 }
 
+/* The Upload menu (static/upload.js): what's being imported now. Its trigger reads like the
+   Info menu's, with the upload icon; a count of what's in progress beside it, and a red dot for
+   a failure not yet seen. */
+.upload-menu__trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fm-ink);
+}
+
+.upload-menu__trigger:hover:not(:disabled),
+.upload-menu[open] .upload-menu__trigger {
+  background: rgb(var(--fm-ink-rgb) / 6%);
+}
+
+.upload-menu__trigger:disabled {
+  color: var(--fm-ink-faint);
+  cursor: not-allowed;
+}
+
+.upload-menu__badge {
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 9px;
+  background: var(--fm-accent);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+  color: var(--fm-on-accent);
+}
+
+.upload-menu__alert {
+  position: absolute;
+  top: 4px;
+  left: 18px;
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--fm-surface);
+  border-radius: 50%;
+  background: var(--fm-danger);
+}
+
+.upload-menu__badge[hidden],
+.upload-menu__alert[hidden] {
+  display: none;
+}
+
+.upload-menu__dropdown {
+  width: min(22rem, calc(100vw - 20px));
+  gap: 2px;
+  padding: 8px;
+}
+
+.upload-menu__choose {
+  display: block;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: var(--fm-accent);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--fm-on-accent);
+  cursor: pointer;
+}
+
+.upload-menu__choose:hover {
+  background: var(--fm-accent-hover);
+}
+
+.upload-menu__hint,
+.upload-menu__idle {
+  margin: 4px 2px 6px;
+  font-size: 12px;
+  color: rgb(var(--fm-ink-rgb) / 55%);
+}
+
+.upload-menu__list,
+.upload-menu__notes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.upload-menu__list:empty,
+.upload-menu__notes:empty,
+.upload-menu__idle[hidden],
+.upload-menu__failed[hidden] {
+  display: none;
+}
+
+.upload-menu__row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 2px;
+  border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
+  font-size: 13px;
+}
+
+.upload-menu__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-menu__status {
+  flex: none;
+  font-size: 12px;
+  color: rgb(var(--fm-ink-rgb) / 60%);
+}
+
+.upload-menu__note,
+.upload-menu__failed {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 4px;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: rgb(var(--fm-ink-rgb) / 5%);
+  font-size: 12px;
+  color: var(--fm-ink);
+}
+
+.upload-menu__note > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.upload-menu__note--error,
+.upload-menu__failed {
+  background: rgb(var(--fm-danger-rgb) / 10%);
+  color: var(--fm-danger);
+}
+
+.upload-menu__failed a {
+  color: inherit;
+  font-weight: 600;
+}
+
+.upload-menu__dismiss {
+  flex: none;
+  margin-left: auto;
+  border: 0;
+  padding: 0 4px;
+  background: none;
+  font-size: 15px;
+  line-height: 1;
+  color: inherit;
+  cursor: pointer;
+}
+
+.upload-menu__history {
+  margin-top: 4px;
+  border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
+  border-radius: 0 0 6px 6px;
+}
+
 .user-menu__avatar {
   display: inline-flex;
   align-items: center;
@@ -272,8 +440,23 @@
 
   .page-header__divider,
   .page-header__tagline,
-  .donate-button__label {
+  .donate-button__label,
+  .upload-menu__label {
     display: none;
+  }
+
+  .upload-menu__trigger {
+    padding: 6px;
+  }
+
+  /* Right-aligned under its trigger, mid-header, the menu would run off the screen's left edge:
+     on a phone it spans the screen under the header instead. */
+  .upload-menu__dropdown {
+    position: fixed;
+    top: 60px;
+    left: 10px;
+    right: 10px;
+    width: auto;
   }
 
   .donate-button {

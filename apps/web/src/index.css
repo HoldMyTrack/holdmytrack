@@ -1153,6 +1153,32 @@ button.activities-panel__story-badge:hover {
   width: 100%;
 }
 
+/* Files dragged over the map (MapView's onMapDrop, headed for the header's Upload menu): a
+   tinted cover saying what a drop does. Above the map's own controls, and takes no pointer
+   events, so the drag's own events keep reaching .map-root under it. */
+.map-drop {
+  position: absolute;
+  inset: 8px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--fm-accent);
+  border-radius: var(--fm-radius-lg);
+  background: rgb(var(--fm-accent-rgb) / 12%);
+  pointer-events: none;
+}
+
+.map-drop__label {
+  border-radius: var(--fm-radius-md);
+  padding: var(--fm-space-10) var(--fm-space-16);
+  background: var(--fm-surface);
+  box-shadow: var(--fm-shadow-lg);
+  font-size: var(--fm-text-lg);
+  font-weight: var(--fm-weight-semibold);
+  color: var(--fm-ink);
+}
+
 .map-canvas {
   position: absolute;
   inset: 0;

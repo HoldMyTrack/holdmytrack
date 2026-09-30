@@ -152,6 +152,7 @@ export const en = {
   'slider.end': 'End date',
   'slider.later': 'Later',
   'slider.start': 'Start date',
+  'map.drop_files': 'Drop to upload: .gpx, .fit, .tcx or a .zip',
   'map.mode': 'Map mode',
   'map.mode_fog': 'Fog',
   'map.mode_heatmap': 'Heatmap',
