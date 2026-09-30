@@ -57,12 +57,13 @@ Everything is under `app/src/main/kotlin/dev/holdmytrack/android/`:
 - `net/Session.kt` — the session token, held process-wide and mirrored to private `SharedPreferences`.
 - `net/HoldMyTrackApi.kt` — the whole HTTP surface: the shared `OkHttpClient`, the interceptor that attaches the token to HoldMyTrack's own origin and nowhere else, and the five calls the app makes.
 - `map/MapOverlays.kt` — the tracks, fog and heatmap layers, their ordering beneath the basemap's labels, and the three-way mode toggle.
-- `SyncActivity.kt` — Health Connect onboarding and the sync run. Also registered for `ACTION_SHOW_PERMISSIONS_RATIONALE`, so Health Connect opens it as the app's own explanation of what it reads.
+- `SyncActivity.kt` — the Sync screen: Health Connect onboarding, the recordings, and the sync run. Also registered for `ACTION_SHOW_PERMISSIONS_RATIONALE`, so Health Connect opens it as the app's own explanation of what it reads.
 - `health/HealthConnect.kt` — availability, the three permissions, and the readiness states the onboarding walks through.
 - `health/ExerciseTypes.kt` — Health Connect's exercise type to HoldMyTrack's `activity_type`, normalised onto the vocabulary the other ingest paths already produce.
 - `sync/SyncCursor.kt` — the watermark. Read its comment before changing anything about it.
 - `sync/SyncRunner.kt` — one foreground sync run: read, classify, batch, post, advance.
-- `panel/` — the map's Activities panel, the web's phone sheet: `ActivitiesPanel.kt` (the sheet and its Activities tab), `PanelState.kt` and `ActivityFacets.kt` (its rules, unit-tested), `EditActivityWindow.kt` (Edit), `TrackEditor.kt` and `EditTrackOps.kt` (its Track tab, the rules unit-tested), `SyncTab.kt` (the sync history: pending work, failure detail, View on map), `PrivacyTab.kt` (Private locations).
+- `sync/ImportHistory.kt` — the Sync screen's history of every import and the duplicates, the web's `/sync` page.
+- `panel/` — the map's Activities panel, the web's phone sheet: `ActivitiesPanel.kt` (the sheet and its Activities tab), `PanelState.kt` and `ActivityFacets.kt` (its rules, unit-tested), `EditActivityWindow.kt` (Edit), `TrackEditor.kt` and `EditTrackOps.kt` (its Track tab, the rules unit-tested), `StoriesTab.kt` (Stories), `PrivacyTab.kt` (Private locations).
 
 Alongside:
 

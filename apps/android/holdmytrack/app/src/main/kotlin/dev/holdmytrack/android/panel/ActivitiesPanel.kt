@@ -25,15 +25,14 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.slider.RangeSlider
 import dev.holdmytrack.android.R
 import dev.holdmytrack.android.net.Activity
-import dev.holdmytrack.android.net.Duplicate
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.net.Story
 import dev.holdmytrack.android.recording.RecordingTypes
 import kotlin.math.abs
 
-/** The panel's four tabs, the web's `PanelTab`. */
-enum class PanelTab { ACTIVITIES, STORIES, SYNC, PRIVACY }
+/** The panel's three tabs, the web's `PanelTab`. */
+enum class PanelTab { ACTIVITIES, STORIES, PRIVACY }
 
 /**
  * The map's Activities panel, as the web draws it at phone width
@@ -41,10 +40,9 @@ enum class PanelTab { ACTIVITIES, STORIES, SYNC, PRIVACY }
  * date-range footer, collapsed to its tab row and a line under it ("… loaded" on the
  * Activities tab), expanded to most of the screen by tapping that line. The Activities tab
  * holds the Type dropdown and the DISTANCE slider, a toolbar over the toolbar's target, the
- * rows, the target's summary, and the duplicates disclosure; the Stories tab, the account's
- * Stories with one open on the map ([StoriesTab]); the Sync tab, the import history
- * ([SyncTab]); the Privacy tab, the Private locations ([PrivacyTab], which `MainActivity`
- * owns, since it works on the map).
+ * rows and the target's summary; the Stories tab, the account's Stories with one open on the
+ * map ([StoriesTab]); the Privacy tab, the Private locations ([PrivacyTab], which
+ * `MainActivity` owns, since it works on the map).
  *
  * The rules live in [PanelState]; this draws it and turns taps into state changes.
  * `MainActivity` owns the map and the fetch: it hands over each list ([setActivities]) and
@@ -65,9 +63,6 @@ class ActivitiesPanel(
     /** Every id the toolbar's Delete removed — the map, the list and the footer need
      *  fetching again. */
     private val onDeleted: (List<String>) -> Unit,
-    /** A Sync tab row's View on map, once the panel is back on its Activities tab and
-     *  collapsed: the activity, and when it started. */
-    private val onViewOnMap: (activityId: String, startedAt: String) -> Unit,
     /** The tab changed — the Privacy tab has the map to itself while it shows, and leaving the
      *  Stories tab closes its Story. */
     private val onTabChanged: (PanelTab) -> Unit,
@@ -87,10 +82,7 @@ class ActivitiesPanel(
     private val tabActivities: View = sheet.findViewById(R.id.panel_tab_activities)
     private val tabStories: View = sheet.findViewById(R.id.panel_tab_stories)
     private val storiesContent: View = sheet.findViewById(R.id.panel_stories_content)
-    private val tabSync: View = sheet.findViewById(R.id.panel_tab_sync)
-    private val syncBadge: TextView = sheet.findViewById(R.id.panel_sync_badge)
     private val activitiesContent: View = sheet.findViewById(R.id.panel_activities_content)
-    private val syncContent: View = sheet.findViewById(R.id.panel_sync_content)
     private val tabPrivacy: View = sheet.findViewById(R.id.panel_tab_privacy)
     private val privacyContent: View = sheet.findViewById(R.id.panel_privacy_content)
     private val toggle: View = sheet.findViewById(R.id.panel_toggle)
@@ -113,38 +105,18 @@ class ActivitiesPanel(
     private val focus: ImageButton = sheet.findViewById(R.id.panel_focus)
     private val list: RecyclerView = sheet.findViewById(R.id.panel_list)
     private val footer: TextView = sheet.findViewById(R.id.panel_footer)
-    private val duplicatesBox: View = sheet.findViewById(R.id.panel_duplicates)
-    private val duplicatesLabel: TextView = sheet.findViewById(R.id.panel_duplicates_label)
-    private val duplicatesChevron: ImageView = sheet.findViewById(R.id.panel_duplicates_chevron)
-    private val duplicatesList: LinearLayout = sheet.findViewById(R.id.panel_duplicates_list)
 
     private val adapter = RowAdapter()
     var tab = PanelTab.ACTIVITIES
         private set
 
-    /** The Sync tab — kept reading while another tab shows, since its badge counts what's
-     *  still processing. */
-    val syncTab = SyncTab(
-        syncContent,
-        onProcessing = { n ->
-            syncBadge.text = PanelFormat.count(res, n)
-            syncBadge.visibility = if (n > 0) View.VISIBLE else View.GONE
-        },
-        onViewOnMap = { activityId, startedAt ->
-            // The sheet is expanded to show the tab, and would stay drawn over the very map
-            // the link is meant to show.
-            showTab(PanelTab.ACTIVITIES)
-            setExpanded(false)
-            onViewOnMap(activityId, startedAt)
-        },
-    )
     private val noteAdapter = NoteAdapter()
 
     /** The Stories tab — its rows are this panel's list, narrowed to the open Story. */
     val storiesTab = StoriesTab(
         storiesContent,
         onOpen = { id, collapse ->
-            // The expanded sheet would cover the Story's tracks, as after View on map.
+            // The expanded sheet would cover the Story's tracks.
             if (collapse) setExpanded(false)
             onOpenStory(id)
         },
@@ -156,9 +128,6 @@ class ActivitiesPanel(
 
     private var loading = false
     private var error: String? = null
-    private var duplicates: List<Duplicate> = emptyList()
-    private var duplicatesFailed = false
-    private var duplicatesOpen = false
 
     var expanded = false
         private set
@@ -180,7 +149,6 @@ class ActivitiesPanel(
         toggle.setOnClickListener { setExpanded(!expanded) }
         tabActivities.setOnClickListener { showTab(PanelTab.ACTIVITIES) }
         tabStories.setOnClickListener { showTab(PanelTab.STORIES) }
-        tabSync.setOnClickListener { showTab(PanelTab.SYNC) }
         tabPrivacy.setOnClickListener { showTab(PanelTab.PRIVACY) }
         // The collapsed height is the toggle row's bottom edge, whatever the font scale makes
         // of the tab row above it.
@@ -227,10 +195,6 @@ class ActivitiesPanel(
         edit.setOnClickListener { state.targets.takeIf { it.isNotEmpty() }?.let(onEdit) }
         createStory.setOnClickListener { openCreateStory() }
         delete.setOnClickListener { confirmDelete() }
-        sheet.findViewById<View>(R.id.panel_duplicates_toggle).setOnClickListener {
-            duplicatesOpen = !duplicatesOpen
-            renderDuplicates()
-        }
         render()
     }
 
@@ -246,6 +210,12 @@ class ActivitiesPanel(
     /** Onto the Stories tab from outside — a Story Create story just made, which
      *  `MainActivity` opens straight away. */
     fun showStories() = showTab(PanelTab.STORIES)
+
+    /** The Activities tab, collapsed — the Sync screen's View on map, which is about the map. */
+    fun showActivities() {
+        showTab(PanelTab.ACTIVITIES)
+        setExpanded(false)
+    }
 
     /** A new list is on its way — for a new range, or the same one again. */
     fun setLoading() {
@@ -265,13 +235,6 @@ class ActivitiesPanel(
         loading = false
         error = message
         render()
-    }
-
-    /** Null when the read failed: the disclosure then says so rather than disappearing. */
-    fun setDuplicates(next: List<Duplicate>?) {
-        duplicatesFailed = next == null
-        duplicates = next.orEmpty()
-        renderDuplicates()
     }
 
     /** A track tapped on the map: selects it, as a row tap does, and scrolls its row to the
@@ -347,9 +310,7 @@ class ActivitiesPanel(
         val listed = state.listed
         count.text = PanelFormat.count(res, listed.size)
         renderTabs()
-        subtext.text = if (tab == PanelTab.SYNC) {
-            res.getString(R.string.panel_sync_subtext)
-        } else if (tab == PanelTab.STORIES) {
+        subtext.text = if (tab == PanelTab.STORIES) {
             res.getString(R.string.story_subtext)
         } else if (tab == PanelTab.PRIVACY) {
             res.getString(R.string.private_subtitle)
@@ -392,7 +353,7 @@ class ActivitiesPanel(
     /** The selected tab at full strength over the accent underline, the other at 45% — the
      *  web's `.activities-panel__tab` — and its content in the sheet. */
     private fun renderTabs() {
-        val tabs = listOf(tabActivities to PanelTab.ACTIVITIES, tabStories to PanelTab.STORIES, tabSync to PanelTab.SYNC, tabPrivacy to PanelTab.PRIVACY)
+        val tabs = listOf(tabActivities to PanelTab.ACTIVITIES, tabStories to PanelTab.STORIES, tabPrivacy to PanelTab.PRIVACY)
         for ((view, which) in tabs) {
             val selected = tab == which
             view.alpha = if (selected) 1f else UNSELECTED_TAB_ALPHA
@@ -402,7 +363,6 @@ class ActivitiesPanel(
         }
         activitiesContent.visibility = if (tab == PanelTab.ACTIVITIES) View.VISIBLE else View.GONE
         storiesContent.visibility = if (tab == PanelTab.STORIES) View.VISIBLE else View.GONE
-        syncContent.visibility = if (tab == PanelTab.SYNC) View.VISIBLE else View.GONE
         privacyContent.visibility = if (tab == PanelTab.PRIVACY) View.VISIBLE else View.GONE
     }
 
@@ -580,54 +540,6 @@ class ActivitiesPanel(
         button.isEnabled = enabled
         button.contentDescription = text
         TooltipCompat.setTooltipText(button, text)
-    }
-
-    private fun renderDuplicates() {
-        if (duplicates.isEmpty() && !duplicatesFailed) {
-            duplicatesBox.visibility = View.GONE
-            return
-        }
-        duplicatesBox.visibility = View.VISIBLE
-        duplicatesLabel.text = if (duplicatesFailed) {
-            res.getString(R.string.panel_duplicates_failed)
-        } else {
-            res.getQuantityString(R.plurals.panel_duplicates_found, duplicates.size, duplicates.size)
-        }
-        duplicatesChevron.setImageResource(if (duplicatesOpen) R.drawable.ic_chevron_down else R.drawable.ic_chevron_up)
-        duplicatesList.visibility = if (duplicatesOpen && !duplicatesFailed) View.VISIBLE else View.GONE
-        duplicatesList.removeAllViews()
-        if (!duplicatesOpen) return
-        duplicates.forEachIndexed { i, d ->
-            val line = buildString {
-                append(PanelFormat.startedAt(res, d.startedAt))
-                append(" · ")
-                append(RecordingTypes.format(res, d.activityType))
-                d.distanceMeters?.let { append(" · ").append(PanelFormat.distance(res, it)) }
-                append('\n')
-                append(res.getString(R.string.panel_duplicate_from, sourceName(d.source), sourceName(d.supersededBySource)))
-            }
-            duplicatesList.addView(
-                TextView(context).apply {
-                    text = line
-                    setTextColor(context.getColor(R.color.hmt_ink_hint))
-                    textSize = 11f
-                    val pad = res.getDimensionPixelSize(R.dimen.hmt_space_6)
-                    setPadding(0, pad, 0, pad)
-                    if (i > 0) setBackgroundResource(R.drawable.bg_list_top)
-                },
-            )
-        }
-    }
-
-    /** The `source` values, said the way a person would say them (the web's
-     *  `formatIngestSource`). */
-    private fun sourceName(source: String): String = when (source) {
-        "healthconnect" -> res.getString(R.string.source_health_connect)
-        "healthkit" -> res.getString(R.string.source_health_kit)
-        "upload" -> res.getString(R.string.source_upload)
-        "takeout" -> res.getString(R.string.source_takeout)
-        "recorded" -> res.getString(R.string.source_recorded)
-        else -> source
     }
 
     /** The Type dropdown, anchored under its trigger, closed by a tap outside it. */

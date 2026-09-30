@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One Recorded Activities row, after the web's .activities-panel__row: the queue checkbox, the
-     route's silhouette, the name over its metadata, then Edit and Delete as icon buttons with the
-     web's own icons for those actions. Filled by RecordedActivityRows. The name and its
+<!-- One Recorded Activities row, after the web's .activities-panel__row: the route's
+     silhouette, the name over its metadata, then Edit and Delete as icon buttons with the web's
+     own icons for those actions. Filled by RecordedActivityRows. The name and its
      metadata take two lines each before eliding: at a large font size, one line left a date
      cut to "Sep 26, 202…". -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -13,12 +13,6 @@
     android:orientation="horizontal"
     android:paddingTop="@dimen/hmt_space_10"
     android:paddingBottom="@dimen/hmt_space_10">
-
-    <com.google.android.material.checkbox.MaterialCheckBox
-        android:id="@+id/row_queued"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:contentDescription="@string/recorded_row_queue" />
 
     <dev.holdmytrack.android.recording.TrackSilhouetteView
         android:id="@+id/row_preview"

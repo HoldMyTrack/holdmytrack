@@ -6,7 +6,7 @@ import dev.holdmytrack.android.net.Story
 enum class StoryMembership { ALL, SOME, NONE }
 
 /**
- * The Edit window's Stories tab rules (`apps/android/docs/SPEC.md` FR-2.7 item 17):
+ * The Edit window's Stories tab rules (`apps/android/docs/SPEC.md` FR-2.7 item 16):
  * a Story's box is ticked when it holds every one of the window's activities, partly ticked
  * when it holds some, clear when it holds none; a tap ticks a clear or partial box and clears a
  * ticked one, so partial is the one state a tap can't choose, only leave. [changes] is what the

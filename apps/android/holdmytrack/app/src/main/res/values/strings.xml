@@ -150,7 +150,7 @@
     </plurals>
     <string name="locate_needs_location">HoldMyTrack needs location access to show where you are.</string>
     <string name="menu_profile">Profile</string>
-    <string name="menu_sync">Sync Source</string>
+    <string name="menu_sync">Sync</string>
 
     <string name="settings_title">Settings</string>
     <string name="settings_onboarding_title">Welcome — set up your account</string>
@@ -237,17 +237,14 @@
     <string name="unit_mph">%1$.1f mph</string>
 
     <string name="recorded_empty">No recorded activities yet.</string>
-    <string name="recorded_row_queue">Queue for sync</string>
-    <string name="recorded_row_queue_named">Queue %1$s for sync</string>
     <string name="recorded_row_edit_named">Edit %1$s</string>
     <string name="recorded_row_delete_named">Delete %1$s</string>
-    <string name="recorded_row_subtitle">%1$s · %2$s</string>
     <string name="recording_delete">Delete</string>
     <string name="recorded_row_preview">Route preview</string>
     <string name="recorded_delete_confirm_title">Delete this recording?</string>
     <string name="recorded_delete_confirm_message">It hasn\'t been synced, so this is the only copy. This can\'t be undone.</string>
 
-    <string name="sync_title">Sync Source</string>
+    <string name="sync_title">Sync</string>
     <string name="sync_rationale">HoldMyTrack reads your recorded exercise sessions and their GPS routes from Health Connect, and adds the outdoor ones to your map. It reads nothing else — no heart rate, no weight, no sleep — and it never writes anything back. Sessions recorded indoors have no route, so they are skipped.</string>
     <string name="sync_section_recorded">Recorded activities</string>
     <string name="sync_source_health_connect">Health Connect</string>
@@ -299,8 +296,9 @@
     <string name="status_row_failed_with">Failed: %1$s</string>
     <string name="status_view_on_map">View on map</string>
     <string name="status_range">%1$d–%2$d of %3$d</string>
-    <string name="status_previous_page">Previous page</string>
-    <string name="status_next_page">Next page</string>
+    <string name="status_range_one">%1$d of %2$d</string>
+    <string name="status_newer">← Newer</string>
+    <string name="status_older">Older →</string>
     <string name="source_health_connect" translatable="false">Health Connect</string>
     <string name="source_health_kit" translatable="false">HealthKit</string>
     <string name="source_upload">an uploaded file</string>
@@ -313,8 +311,6 @@
     <!-- The map's Activities panel (panel/ActivitiesPanel.kt), after the web's activities.* and filters.* messages. -->
     <string name="panel_label">Activities panel</string>
     <string name="panel_tab_activities">Activities</string>
-    <string name="panel_tab_sync">Sync</string>
-    <string name="panel_sync_subtext">Everything imported, from the phone or the web</string>
     <string name="panel_unit_m">m</string>
     <string name="panel_unit_ft">ft</string>
     <string name="panel_loaded">%1$s loaded</string>
@@ -344,8 +340,9 @@
     <string name="panel_row_check">Add %1$s to selection</string>
     <string name="panel_row_uncheck">Remove %1$s from selection</string>
     <string name="panel_fly_to">Fly to %1$s</string>
-    <string name="panel_duplicates_failed">Duplicates — failed to load</string>
-    <string name="panel_duplicate_from">From %1$s — replaced by the copy from %2$s.</string>
+    <string name="duplicate_from">From %1$s, replaced by the copy from %2$s.</string>
+    <string name="duplicates_title">Duplicates</string>
+    <string name="duplicates_subtext">Activities recorded twice, by your watch and your phone, say. Only the fuller copy is kept on the map.</string>
     <string name="panel_duration_hm">%1$dh %2$dm</string>
     <string name="panel_duration_m">%1$dm</string>
     <string name="panel_duration_s">%1$ds</string>
@@ -354,10 +351,6 @@
     <plurals name="panel_checked_count">
         <item quantity="one">%1$d checked activity</item>
         <item quantity="other">%1$d checked activities</item>
-    </plurals>
-    <plurals name="panel_duplicates_found">
-        <item quantity="one">%1$d duplicate found</item>
-        <item quantity="other">%1$d duplicates found</item>
     </plurals>
 
     <!-- The panel's Edit and Delete (panel/EditActivityWindow.kt), after the web's edit.* and activities.delete_* messages. -->

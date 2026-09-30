@@ -175,8 +175,13 @@ class MainActivity : AppCompatActivity() {
     private var trackMetrics: TrackMetrics? = null
     private var trackMetricsFor: String? = null
 
-    /** A Sync tab row's activity, to select once its range's list has it (`viewActivityOnMap`). */
+    /** A Sync history row's activity, to select once its range's list has it
+     *  (`viewActivityOnMap`). */
     private var pendingFocusId: String? = null
+
+    /** A View on map from the Sync screen ([viewOnMap]) — the activity and when it started —
+     *  waiting for the session to be confirmed. */
+    private var viewOnMapRequest: Pair<String, String>? = null
 
     /** The activity whose track the Edit window's Track tab is editing, while it is. */
     private var editingTrackId: String? = null
@@ -399,7 +404,6 @@ class MainActivity : AppCompatActivity() {
             onFly = ::flyToActivities,
             onEdit = ::openEditWindow,
             onDeleted = ::onActivitiesDeleted,
-            onViewOnMap = ::viewActivityOnMap,
             onTabChanged = { tab ->
                 // Leaving the Stories tab closes its Story.
                 if (tab != PanelTab.STORIES && storyId != null) exitStory()
@@ -457,7 +461,10 @@ class MainActivity : AppCompatActivity() {
         setMode(mode)
 
         insetSystemBars()
-        if (savedInstanceState == null) handleStopIntent(intent)
+        if (savedInstanceState == null) {
+            handleStopIntent(intent)
+            takeViewOnMap(intent)
+        }
 
         mapView = findViewById(R.id.map_view)
         mapView.onCreate(savedInstanceState)
@@ -554,6 +561,18 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleStopIntent(intent)
+        takeViewOnMap(intent)
+    }
+
+    /** The Sync screen's View on map ([viewOnMap]): kept until the session is confirmed
+     *  (`syncSession`), and the opening camera skipped, since this activity is the view. */
+    private fun takeViewOnMap(intent: Intent) {
+        // A relaunch from recents replays the intent; it has been handled.
+        if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
+        val id = intent.getStringExtra(EXTRA_VIEW_ACTIVITY) ?: return
+        val startedAt = intent.getStringExtra(EXTRA_VIEW_STARTED_AT) ?: return
+        viewOnMapRequest = id to startedAt
+        framed = true
     }
 
     /** The notification's Stop comes through here rather than straight to `RecordingService`
@@ -737,7 +756,6 @@ class MainActivity : AppCompatActivity() {
 
         modeBarReady = true
         renderModeBar()
-        panel.syncTab.start()
         if (daysStale) {
             daysStale = false
             activityDays.reload()
@@ -747,6 +765,10 @@ class MainActivity : AppCompatActivity() {
             panel.storiesTab.reloadOpen()
         }
         renderDateFooter()
+        viewOnMapRequest?.let { (id, startedAt) ->
+            viewOnMapRequest = null
+            viewActivityOnMap(id, startedAt)
+        }
 
         val loaded = style ?: return
         if (!overlaysAttached) {
@@ -830,8 +852,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** `GET /v1/activities` for [range], into the panel — and, with [fly], the camera onto
-     *  every drawn one. Duplicates ride along: they aren't scoped to the range, but whatever
-     *  changed the list may have produced one. */
+     *  every drawn one. */
     private fun loadActivities(range: DateRange, fly: Boolean) {
         panel.setLoading()
         val story = storyId
@@ -856,7 +877,6 @@ class MainActivity : AppCompatActivity() {
                 if (pendingIds.isNotEmpty()) mapView.postDelayed(pendingPoll, PENDING_POLL_MS)
             }
         }
-        HoldMyTrackApi.duplicates { result -> panel.setDuplicates(result.getOrNull()) }
     }
 
     /**
@@ -893,13 +913,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * A Sync tab row's View on map — the web's `viewActivityOnMap`: Normal mode, then the
-     * activity selected and flown to, as a row tap does. When its day (in the account's
+     * A Sync history row's View on map — the web's `viewActivityOnMap`: Normal mode and the
+     * collapsed Activities tab, then the activity selected and flown to, as a row tap does. When its day (in the account's
      * timezone, the day the server files it under) is outside the range, the range becomes
      * that one day, as if picked, and the selection waits for that range's list.
      */
     private fun viewActivityOnMap(activityId: String, startedAt: String) {
         setMode(MapMode.NORMAL)
+        // The expanded sheet would stay drawn over the very map the link is meant to show.
+        panel.showActivities()
         val zone = runCatching { ZoneId.of(Session.timezone) }.getOrDefault(ZoneId.systemDefault())
         val day = runCatching { OffsetDateTime.parse(startedAt).atZoneSameInstant(zone).toLocalDate().toString() }
             .getOrNull() ?: return
@@ -1713,7 +1735,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         if (::mapView.isInitialized) mapView.removeCallbacks(pendingPoll)
-        if (::panel.isInitialized) panel.syncTab.stop()
         if (recorderBound) {
             recorder?.onChange = null
             unbindService(recorderConnection)
@@ -1794,6 +1815,19 @@ class MainActivity : AppCompatActivity() {
         private const val MENU_PROFILE = 1
         private const val MENU_SYNC = 2
         private const val MENU_SETTINGS = 4
+        private const val EXTRA_VIEW_ACTIVITY = "dev.holdmytrack.android.VIEW_ACTIVITY"
+        private const val EXTRA_VIEW_STARTED_AT = "dev.holdmytrack.android.VIEW_STARTED_AT"
+
+        /** Opens the map on [activityId], started at [startedAt] — the Sync screen's View on
+         *  map. Clears whatever is over an existing map, which then selects it. */
+        fun viewOnMap(context: Context, activityId: String, startedAt: String) {
+            context.startActivity(
+                Intent(context, MainActivity::class.java)
+                    .putExtra(EXTRA_VIEW_ACTIVITY, activityId)
+                    .putExtra(EXTRA_VIEW_STARTED_AT, startedAt)
+                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            )
+        }
 
         /** The default range's length in activity days (`docs/SPEC.md` FR-6.1). */
         private const val DEFAULT_RANGE_DAYS = 5

@@ -357,7 +357,7 @@
         <item name="android:lineHeight">20sp</item>
     </style>
 
-    <!-- A notice box (.auth-card__notice, .sync-tab__notice) and its error variant
+    <!-- A notice box (.auth-card__notice) and its error variant
          (.auth-card__error): tinted fill, small radius, 8/10 padding, 13sp. -->
     <style name="Widget.HoldMyTrack.Notice" parent="">
         <item name="android:background">@drawable/bg_notice</item>
