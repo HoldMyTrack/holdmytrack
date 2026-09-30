@@ -8,8 +8,8 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
-import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.PopupMenu
 import android.widget.PopupWindow
 import android.widget.ScrollView
 import android.widget.TextView
@@ -37,8 +37,8 @@ enum class PanelTab { ACTIVITIES, STORIES, PRIVACY }
 /**
  * The map's Activities panel, as the web draws it at phone width
  * (`apps/web/src/ui/ActivitiesPanel.tsx` and index.css's phone layer): a bottom sheet over the
- * date-range footer, collapsed to its tab row and a line under it ("… loaded" on the
- * Activities tab), expanded to most of the screen by tapping that line. The Activities tab
+ * date-range footer, collapsed to its tab row, expanded to most of the screen by the chevron at
+ * the row's end or a tab. The Activities tab
  * holds the Type dropdown and the DISTANCE slider, a toolbar over the toolbar's target, the
  * rows and the target's summary; the Stories tab, the account's Stories with one open on the
  * map ([StoriesTab]); the Privacy tab, the Private locations ([PrivacyTab], which
@@ -87,9 +87,9 @@ class ActivitiesPanel(
     private val activitiesContent: View = sheet.findViewById(R.id.panel_activities_content)
     private val tabPrivacy: View = sheet.findViewById(R.id.panel_tab_privacy)
     private val privacyContent: View = sheet.findViewById(R.id.panel_privacy_content)
-    private val toggle: View = sheet.findViewById(R.id.panel_toggle)
+    private val head: View = sheet.findViewById(R.id.panel_head)
+    private val toggle: ImageButton = sheet.findViewById(R.id.panel_toggle)
     private val subtext: TextView = sheet.findViewById(R.id.panel_subtext)
-    private val chevron: ImageView = sheet.findViewById(R.id.panel_chevron)
     private val typeTrigger: View = sheet.findViewById(R.id.panel_type_trigger)
     private val typeDot: View = sheet.findViewById(R.id.panel_type_dot)
     private val distance: View = sheet.findViewById(R.id.panel_distance)
@@ -99,7 +99,7 @@ class ActivitiesPanel(
     private val distanceMax: TextView = sheet.findViewById(R.id.panel_distance_max)
     private val resetFilters: View = sheet.findViewById(R.id.panel_reset_filters)
     private val checkAll: MaterialCheckBox = sheet.findViewById(R.id.panel_check_all)
-    private val invert: ImageButton = sheet.findViewById(R.id.panel_invert)
+    private val selectMenu: ImageButton = sheet.findViewById(R.id.panel_select_menu)
     private val visibility: ImageButton = sheet.findViewById(R.id.panel_visibility)
     private val edit: ImageButton = sheet.findViewById(R.id.panel_edit)
     private val addToStory: ImageButton = sheet.findViewById(R.id.panel_add_to_story)
@@ -155,12 +155,11 @@ class ActivitiesPanel(
         clearFocusOnEmptyTap()
 
         toggle.setOnClickListener { setExpanded(!expanded) }
-        tabActivities.setOnClickListener { showTab(PanelTab.ACTIVITIES) }
-        tabStories.setOnClickListener { showTab(PanelTab.STORIES) }
-        tabPrivacy.setOnClickListener { showTab(PanelTab.PRIVACY) }
-        // The collapsed height is the toggle row's bottom edge, whatever the font scale makes
-        // of the tab row above it.
-        toggle.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyHeight(animate = false) }
+        tabActivities.setOnClickListener { selectTab(PanelTab.ACTIVITIES) }
+        tabStories.setOnClickListener { selectTab(PanelTab.STORIES) }
+        tabPrivacy.setOnClickListener { selectTab(PanelTab.PRIVACY) }
+        // The collapsed height is the tab row's bottom edge, whatever the font scale makes of it.
+        head.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyHeight(animate = false) }
 
         typeTrigger.setOnClickListener { showTypeFilter() }
         distanceSlider.addOnChangeListener { slider, _, fromUser ->
@@ -187,11 +186,8 @@ class ActivitiesPanel(
             if (checked > 0) state.clearChecked() else state.checkAll()
             changed()
         }
-        invert.setOnClickListener {
-            state.invertChecked()
-            changed()
-        }
-        TooltipCompat.setTooltipText(invert, res.getString(R.string.panel_invert))
+        selectMenu.setOnClickListener { showSelectMenu() }
+        TooltipCompat.setTooltipText(selectMenu, res.getString(R.string.panel_select_menu))
         visibility.setOnClickListener {
             state.toggleTargetVisibility()
             changed()
@@ -204,6 +200,13 @@ class ActivitiesPanel(
         addToStory.setOnClickListener { if (storyPopup == null) showAddToStory() else storyPopup?.dismiss() }
         delete.setOnClickListener { confirmDelete() }
         render()
+    }
+
+    /** A tab tapped: the sheet opens onto it, as the web's phone sheet does — collapsed, the
+     *  tab row is all there is of it. */
+    private fun selectTab(next: PanelTab) {
+        showTab(next)
+        if (!expanded) setExpanded(true)
     }
 
     private fun showTab(next: PanelTab) {
@@ -270,6 +273,7 @@ class ActivitiesPanel(
         if (held == down) return
         held = down
         applyHeight(animate = true)
+        render()
     }
 
     fun dismissPopups() {
@@ -277,9 +281,9 @@ class ActivitiesPanel(
         storyPopup?.dismiss()
     }
 
-    /** The collapsed sheet's height: the tab row and the toggle line. */
+    /** The collapsed sheet's height: the tab row. */
     val peekHeight: Int
-        get() = toggle.bottom
+        get() = head.bottom
 
     private fun select(id: String) {
         state.focus(id)
@@ -321,21 +325,13 @@ class ActivitiesPanel(
         // aren't what the badge counts, as on the web.
         if (tab != PanelTab.STORIES) count.text = PanelFormat.count(res, listed.size)
         renderTabs()
-        subtext.text = if (tab == PanelTab.STORIES) {
-            res.getString(R.string.story_subtext)
-        } else if (tab == PanelTab.PRIVACY) {
-            res.getString(R.string.private_subtitle)
-        } else if (loading && state.activities.isEmpty()) {
-            res.getString(R.string.panel_loading)
-        } else {
-            // The whole range, whatever TYPE and DISTANCE narrow the rows to — the web's
-            // range summary, which the two filters don't touch either.
-            res.getString(R.string.panel_loaded, PanelFormat.totalDistance(res, state.activities.sumOf { it.distanceMeters ?: 0.0 }))
-        }
-        chevron.setImageResource(if (expanded) R.drawable.ic_chevron_down else R.drawable.ic_chevron_up)
-        toggle.contentDescription = res.getString(
-            if (expanded) R.string.panel_collapse else R.string.panel_expand,
-        ) + ". " + subtext.text
+        subtext.visibility = if (tab == PanelTab.ACTIVITIES) View.GONE else View.VISIBLE
+        subtext.setText(if (tab == PanelTab.PRIVACY) R.string.private_subtitle else R.string.story_subtext)
+        // Held down under an edit, the sheet is collapsed whatever it was.
+        val open = expanded && !held
+        toggle.setImageResource(if (open) R.drawable.ic_chevron_down else R.drawable.ic_chevron_up)
+        toggle.contentDescription = res.getString(if (open) R.string.panel_collapse else R.string.panel_expand)
+        TooltipCompat.setTooltipText(toggle, toggle.contentDescription)
 
         typeDot.visibility = if (state.excludedTypes.isNotEmpty()) View.VISIBLE else View.GONE
         renderDistance()
@@ -416,7 +412,7 @@ class ActivitiesPanel(
             else -> MaterialCheckBox.STATE_UNCHECKED
         }
         checkAll.contentDescription = res.getString(if (allChecked) R.string.panel_uncheck_all else R.string.panel_check_all)
-        invert.isEnabled = listed.isNotEmpty()
+        selectMenu.isEnabled = listed.isNotEmpty()
 
         // The toolbar names its target, so which of the group and the selected row it acts on
         // is never a guess: "3 checked activities", or the selected row's own label.
@@ -467,6 +463,27 @@ class ActivitiesPanel(
             enabled = !demo && targetName != null && targets.none { it.pending },
         )
         describe(focus, targetName?.let { res.getString(R.string.panel_focus_target, it) } ?: noTarget, enabled = targetName != null)
+    }
+
+    /** The master checkbox's ▾ (the web's `.select-menu`): All, None and Invert over the listed
+     *  rows — All disabled once every one is checked, None once nothing is. */
+    private fun showSelectMenu() {
+        val listed = state.listed
+        val checkedCount = listed.count { it.id in state.checked }
+        val menu = PopupMenu(context, selectMenu)
+        menu.menu.add(0, SELECT_ALL, 0, R.string.panel_select_all).isEnabled = checkedCount < listed.size
+        menu.menu.add(0, SELECT_NONE, 1, R.string.panel_select_none).isEnabled = state.checked.isNotEmpty()
+        menu.menu.add(0, SELECT_INVERT, 2, R.string.panel_select_invert)
+        menu.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                SELECT_ALL -> state.checkAll()
+                SELECT_NONE -> state.clearChecked()
+                SELECT_INVERT -> state.invertChecked()
+            }
+            changed()
+            true
+        }
+        menu.show()
     }
 
     /** The toolbar's name for its target, for the delete confirmation: "3 checked activities
@@ -765,5 +782,8 @@ class ActivitiesPanel(
         const val SNAP_METERS = 1.0
         const val UNSELECTED_TAB_ALPHA = 0.45f
         const val DISABLED_ROW_ALPHA = 0.5f
+        const val SELECT_ALL = 1
+        const val SELECT_NONE = 2
+        const val SELECT_INVERT = 3
     }
 }

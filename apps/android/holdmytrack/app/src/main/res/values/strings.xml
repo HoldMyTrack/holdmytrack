@@ -317,10 +317,13 @@
     <string name="panel_tab_activities">Activities</string>
     <string name="panel_unit_m">m</string>
     <string name="panel_unit_ft">ft</string>
-    <string name="panel_loaded">%1$s loaded</string>
     <string name="panel_loading">Loading…</string>
-    <string name="panel_expand">Show the activities list</string>
-    <string name="panel_collapse">Hide the activities list</string>
+    <string name="panel_expand">Expand the panel</string>
+    <string name="panel_collapse">Collapse the panel</string>
+    <string name="panel_select_menu">Select</string>
+    <string name="panel_select_all">All</string>
+    <string name="panel_select_none">None</string>
+    <string name="panel_select_invert">Invert</string>
     <string name="panel_type">Type</string>
     <string name="panel_all_types">All types</string>
     <string name="panel_filter_by_type">Filter by type</string>
@@ -331,7 +334,6 @@
     <string name="panel_distance_range">%1$s – %2$s %3$s</string>
     <string name="panel_check_all">Check all activities</string>
     <string name="panel_uncheck_all">Uncheck all activities</string>
-    <string name="panel_invert">Invert selection</string>
     <string name="panel_hide_target">Hide %1$s from the map</string>
     <string name="panel_show_target">Show %1$s on the map</string>
     <string name="panel_focus_target">Focus the map on %1$s</string>

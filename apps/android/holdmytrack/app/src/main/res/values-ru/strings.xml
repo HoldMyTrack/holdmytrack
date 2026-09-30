@@ -328,10 +328,13 @@
     <string name="panel_tab_activities">Занятия</string>
     <string name="panel_unit_m">м</string>
     <string name="panel_unit_ft">фт</string>
-    <string name="panel_loaded">Загружено: %1$s</string>
     <string name="panel_loading">Загрузка…</string>
-    <string name="panel_expand">Показать список занятий</string>
-    <string name="panel_collapse">Скрыть список занятий</string>
+    <string name="panel_expand">Развернуть панель</string>
+    <string name="panel_collapse">Свернуть панель</string>
+    <string name="panel_select_menu">Выбрать</string>
+    <string name="panel_select_all">Все</string>
+    <string name="panel_select_none">Ничего</string>
+    <string name="panel_select_invert">Обратить выбор</string>
     <string name="panel_type">Тип</string>
     <string name="panel_all_types">Все типы</string>
     <string name="panel_filter_by_type">Фильтр по типу</string>
@@ -342,7 +345,6 @@
     <string name="panel_distance_range">%1$s – %2$s %3$s</string>
     <string name="panel_check_all">Отметить все занятия</string>
     <string name="panel_uncheck_all">Снять отметку со всех занятий</string>
-    <string name="panel_invert">Инвертировать выбор</string>
     <string name="panel_hide_target">Скрыть с карты: %1$s</string>
     <string name="panel_show_target">Показать на карте: %1$s</string>
     <string name="panel_focus_target">Приблизить карту: %1$s</string>
