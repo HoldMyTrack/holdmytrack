@@ -1,6 +1,6 @@
 {{/* The header every page shares (ADR-0012), the React app's shell included — brand,
-     tagline, Donate, the Upload menu (signed in; static/upload.js), the Info menu, the account
-     menu. Its styles are
+     tagline, Donate, the Upload menu (signed in; static/upload.js) and Sync (signed in; the
+     import history, /sync), the Info menu, the account menu. Its styles are
      static/header.css, which the app's shell loads alone and every other page alongside
      pages.css. The two menus are
      <details> dropdowns: they open and close with no script. Sign out is a form POST to /logout
@@ -32,12 +32,12 @@
         <ul class="upload-menu__list" aria-live="polite"></ul>
         <p class="upload-menu__idle">{{t "upload.idle"}}</p>
         <ul class="upload-menu__notes" aria-live="polite"></ul>
-        <div class="upload-menu__failed" hidden><span class="upload-menu__failed-text"></span> · <a href="/sync">{{t "upload.see_history"}}</a><button type="button" class="upload-menu__dismiss upload-menu__failed-dismiss" aria-label="{{t "upload.dismiss"}}" title="{{t "upload.dismiss"}}">×</button></div>
-        <a class="header-menu__item upload-menu__history" href="/sync">{{t "upload.history"}}</a>
-        <script type="application/json" class="upload-menu__strings">{"queued": {{t "upload.queued"}}, "uploading": {{t "upload.uploading"}}, "processing": {{t "upload.processing"}}, "processing_count": {{t "upload.processing_count"}}, "failed_unseen": {{t "upload.failed_unseen"}}, "dismiss": {{t "upload.dismiss"}}, "too_many": {{t "upload.too_many"}}, "already": {{t "upload.already"}}, "skipped": {{t "upload.skipped"}}, "truncated": {{t "upload.truncated"}}, "failed_transfer": {{t "upload.failed_transfer"}}, "network_error": {{t "upload.network_error"}}, "request_failed": {{t "upload.request_failed"}}}</script>
+        <script type="application/json" class="upload-menu__strings">{"queued": {{t "upload.queued"}}, "uploading": {{t "upload.uploading"}}, "processing": {{t "upload.processing"}}, "processing_count": {{t "upload.processing_count"}}, "failed_unseen": {{t "sync.failed_unseen"}}, "dismiss": {{t "upload.dismiss"}}, "too_many": {{t "upload.too_many"}}, "already": {{t "upload.already"}}, "skipped": {{t "upload.skipped"}}, "truncated": {{t "upload.truncated"}}, "failed_transfer": {{t "upload.failed_transfer"}}, "network_error": {{t "upload.network_error"}}, "request_failed": {{t "upload.request_failed"}}}</script>
       </div>
     </details>
-    {{end}}{{end}}
+    {{end}}
+    <a class="sync-link" href="/sync" data-sync-link{{if eq $.Path "/sync"}} aria-current="page"{{end}} aria-label="{{t "header.sync"}}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg><span class="sync-link__label">{{t "header.sync"}}</span><span class="sync-link__alert" hidden></span></a>
+    {{end}}
     <details class="header-menu info-menu">
       <summary class="info-menu__trigger">{{t "header.info"}}<svg class="info-menu__caret" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></summary>
       <div class="header-menu__dropdown" role="menu">

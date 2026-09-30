@@ -64,8 +64,8 @@ func TestActiveImports(t *testing.T) {
 	}
 }
 
-// A failure that finished after the account last looked is unseen until /v1/uploads/seen (or
-// opening /sync) moves imports_seen_at past it.
+// A failure that finished after the account last looked is unseen until opening /sync moves
+// imports_seen_at past it.
 func TestUnseenImportFailures(t *testing.T) {
 	d := newDBTest(t)
 	me := d.newAccount(false)
@@ -80,11 +80,11 @@ func TestUnseenImportFailures(t *testing.T) {
 	if resp.UnseenFailures != 1 {
 		t.Fatalf("unseen failures %d, want 1", resp.UnseenFailures)
 	}
-	if res := d.do(me, "POST", "/v1/uploads/seen", nil); res.Code != http.StatusNoContent {
-		t.Fatalf("seen: %d", res.Code)
+	if res := d.do(me, "GET", "/sync", nil); res.Code != http.StatusOK {
+		t.Fatalf("GET /sync: %d", res.Code)
 	}
 	d.decode(d.do(me, "GET", "/v1/uploads/active", nil), http.StatusOK, &resp)
 	if resp.UnseenFailures != 0 {
-		t.Errorf("unseen failures after seen %d, want 0", resp.UnseenFailures)
+		t.Errorf("unseen failures after opening /sync %d, want 0", resp.UnseenFailures)
 	}
 }

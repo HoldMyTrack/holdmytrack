@@ -343,7 +343,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 1. User chooses files from the header's **Upload** menu (FR-3.4), on any page, or drops them on the map.
 2. Each file uploads independently, as its own `POST /v1/activities/upload` request (multipart), and is tracked independently — one file failing does not affect the others.
 3. For each file: server validates its extension and size, computes a content hash to check for a duplicate (FR-3.5), persists the raw file, and enqueues a background parsing job.
-4. The Upload menu shows each file's live status (uploading, with a progress percentage; then "Processing…") until the background job finishes; then it leaves the menu for the import history page (FR-3.9).
+4. The Upload menu shows each file's live status (uploading, with a progress percentage; then "Processing…") until the background job finishes; then it leaves the menu for the Sync page (FR-3.9).
 5. Once ingestion completes, the activity appears automatically in the Activities panel, the map, and every summary that reflects the current date range — no page reload is required. Its Fog-of-War/Heatmap coverage follows a few seconds later, once the background re-render finishes, also without a reload.
 
 **Outputs**: One new `Activity` per successfully ingested file, each with a parsed trajectory, distance, duration, and (where the source file provides it) elevation data. Heart rate and any other health data in the file are ignored — never read out of it (`VISION.md` §1.1).
@@ -352,7 +352,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 - Unsupported file extension → `415 Unsupported Media Type`.
 - File too large, or malformed request → `413 Request Entity Too Large`.
 - Empty file → `400 Bad Request`.
-- Unparseable/corrupt file content → the background job fails; the import history page (FR-3.9) shows it "Failed" with a reason, the Upload menu flags the failure until it has been seen (FR-3.4), and no `Activity` is created.
+- Unparseable/corrupt file content → the background job fails; the Sync page (FR-3.9) shows it "Failed" with a reason, the header's Sync item carries a red dot until that page has been opened (FR-3.9), and no `Activity` is created.
 - A file whose points carry no timestamps at all (a planned route rather than a recorded activity) → the background job fails the same way, with a reason saying the file has no timestamps. Points without a timestamp inside an otherwise timed track are dropped, not failed on.
 
 ### FR-3.2 Bulk upload via `.zip` archive
@@ -392,21 +392,20 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 ### FR-3.4 Import status
 
-**Description**: What's being imported right now is the header's **Upload** menu, on every page; what an import came to once it has finished is the import history page, `/sync` (FR-3.9). Imports from every source show in both: uploaded files and archives alongside activities synced from the Android app (Health Connect and in-app GPS recording — FR-3.6, FR-3.8). The web can't start a phone sync — that sync is phone-triggered, and nothing in the web app can request it; the Android app shows its own history of the same imports in its panel's Sync tab (`apps/android/docs/SPEC.md` FR-4.1).
+**Description**: What's being imported right now is the header's **Upload** menu, on every page; what an import came to once it has finished is the **Sync** page, `/sync` (FR-3.9), the header's next item. Imports from every source show in both: uploaded files and archives alongside activities synced from the Android app (Health Connect and in-app GPS recording — FR-3.6, FR-3.8). The web can't start a phone sync — that sync is phone-triggered, and nothing in the web app can request it; the Android app shows its own history of the same imports in its panel's Sync tab (`apps/android/docs/SPEC.md` FR-4.1).
 
 **Preconditions**: Active session.
 
 **Behavior** — an **Upload** button in the header of every page opens a menu of what is being imported right now:
 1. **Choose files…** opens the file picker (`.gpx`, `.fit`, `.tcx`, `.zip` — FR-3.1–FR-3.3); files dropped anywhere on the map, which shows a dashed "Drop to upload" cover while they're dragged over it, go to the same place. Choosing or dropping opens the menu.
 2. The menu lists every import in progress: files waiting their turn ("Queued"), a file being sent ("Uploading 45%"), then each one the server is processing ("Processing…"), including activities synced from the phone, named after their source. A `.zip` or Takeout export is one row counting its files — "Processing 120 of 340". The button shows how many rows there are.
-3. An import leaves the menu as soon as it has finished, whether it succeeded or failed; what it came to is the import history page's (FR-3.9). The map refreshes itself as each finishes.
-4. A failed import that hasn't been seen yet puts a red dot on the button and one line in the menu, "Failed imports: 1 · See import history", linking to the history page. Opening that page, or dismissing the line, clears it.
-5. Messages about this page's own uploads — a file already uploaded before, the files a `.zip` skipped, too many files chosen, a file the server refused outright (with the reason) — show in the menu until dismissed, one by one.
-6. The menu ends with a link to the import history page. It closes on a click outside it or Escape.
-7. What's in progress is read from the server every 2 seconds while anything is, every 20 otherwise.
-8. A demo session sees the button disabled, its tooltip saying why.
+3. An import leaves the menu as soon as it has finished, whether it succeeded or failed; what it came to is the Sync page's (FR-3.9). The map refreshes itself as each finishes.
+4. Messages about this page's own uploads — a file already uploaded before, the files a `.zip` skipped, too many files chosen, a file the server refused outright (with the reason) — show in the menu until dismissed, one by one.
+5. The menu closes on a click outside it or Escape. It has nothing about finished imports: those are the header's Sync item's (FR-3.9).
+6. What's in progress is read from the server every 2 seconds while anything is, every 20 otherwise.
+7. A demo session sees the button disabled, its tooltip saying why.
 
-**Outputs**: `GET /v1/uploads/active` returns the imports still in progress — each with a title, its source, how many of its jobs have finished and how many there are, and when it was submitted — and how many failed imports the account hasn't seen yet; `POST /v1/uploads/seen` marks every failure so far as seen. `GET /v1/uploads?limit=&offset=&source=` (the Android app's Sync tab) returns one page of every import, the total count (scoped to `source` when given), and how many are still processing; each row carries `source` and, once the job has produced one, the resulting activity's own `id`.
+**Outputs**: `GET /v1/uploads/active` returns the imports still in progress — each with a title, its source, how many of its jobs have finished and how many there are, and when it was submitted — and how many failed imports the account hasn't seen yet on the Sync page. `GET /v1/uploads?limit=&offset=&source=` (the Android app's Sync tab) returns one page of every import, the total count (scoped to `source` when given), and how many are still processing; each row carries `source` and, once the job has produced one, the resulting activity's own `id`.
 
 ### FR-3.5 Duplicate detection
 
@@ -451,7 +450,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Outputs**: At most one live `Activity` per real-world activity, regardless of how many sources reported it.
 
-5. The web's import history page (FR-3.9) lists the superseded activities under its history whenever there are any, with each one's start time, distance and source and which source's copy superseded it; the Android app's panel shows them as a "N duplicates found" disclosure (`apps/android/docs/SPEC.md` FR-2.7). `GET /v1/activities/duplicates` returns the same rows.
+5. The web's Sync page (FR-3.9) lists the superseded activities under its history whenever there are any, with each one's start time, distance and source and which source's copy superseded it; the Android app's panel shows them as a "N duplicates found" disclosure (`apps/android/docs/SPEC.md` FR-2.7). `GET /v1/activities/duplicates` returns the same rows.
 
 ### FR-3.8 In-app GPS recording (Android)
 
@@ -480,9 +479,9 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Not yet built**: a discard confirmation before Stop finalizes a save; the iOS half (`docs/ROADMAP.md` Phase 2 tracks it as a combined Android/iOS item; Android's half is what this FR describes).
 
-### FR-3.9 Import history page
+### FR-3.9 The Sync page
 
-**Description**: `/sync`, a page of its own, lists every import that has finished — uploaded files, the files inside an archive and activities synced from the phone alike — and the duplicates cross-source detection took out of circulation (FR-3.7).
+**Description**: **Sync**, an item of its own in the header of every page for a signed-in account (after Upload), opens `/sync`, which lists every import that has finished — uploaded files, the files inside an archive and activities synced from the phone alike — and the duplicates cross-source detection took out of circulation (FR-3.7).
 
 **Preconditions**: Signed in; signed out, the page sends you to sign in.
 
@@ -491,7 +490,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 2. Each row has a title — the file's name, or for a phone sync its source ("Health Connect", "GPS Logger") — then **Ready** with the activity's date and distance and a **View on map** link, or **Failed** with the reason in the reader's language (§17's error messages).
 3. **View on map** opens the map on that activity: on the Activities tab, the date range narrowed to its day if it isn't already in view, the activity selected (FR-5.5) and the camera fitted to it; on a phone the Activities sheet stays collapsed, so the track is visible. The link's parameters leave the address bar once read, so a refresh doesn't do it again.
 4. Under the history, when there are any, the duplicates: each one's start date and time and distance, and which source it came from and which copy replaced it — "From Health Connect, replaced by the copy from an uploaded file."
-5. Opening the page counts every failed import so far as seen.
+5. A failed import the account hasn't seen yet puts a red dot on the header's Sync item, its tooltip saying how many ("Failed imports: 1"); opening the page counts every failure so far as seen and clears it. The item is highlighted while the page is open, and on a phone it's its icon alone.
 6. A demo session sees the Demo Customer's history, with a line saying to create an account to import one's own.
 
 ## 6. FR-4 — Map Visualization

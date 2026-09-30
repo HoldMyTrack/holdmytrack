@@ -23,7 +23,7 @@ type activeImport struct {
 type activeImportsResponse struct {
 	Imports []activeImport `json:"imports"`
 	// Failed imports that finished after the account last looked (users.imports_seen_at, moved
-	// by opening /sync or by POST /v1/uploads/seen) — the Upload menu's "1 import failed" line.
+	// by opening /sync) — the red dot on the header's Sync item.
 	UnseenFailures int64 `json:"unseen_failures"`
 }
 
@@ -117,20 +117,10 @@ func (s *Server) handleActiveUploads(w http.ResponseWriter, r *http.Request) {
 }
 
 // markImportsSeen moves the account's imports_seen_at to now: every failure so far has been
-// seen. Opening /sync does it, and so does dismissing the Upload menu's failure line.
+// seen. Opening /sync does it.
 func (s *Server) markImportsSeen(r *http.Request, userID string) error {
 	_, err := s.pool.Exec(r.Context(), `UPDATE users SET imports_seen_at = NOW() WHERE id = $1`, userID)
 	return err
-}
-
-// handleImportsSeen serves `POST /v1/uploads/seen` — the Upload menu's dismiss on its failure line.
-func (s *Server) handleImportsSeen(w http.ResponseWriter, r *http.Request) {
-	if err := s.markImportsSeen(r, userIDFromContext(r.Context())); err != nil {
-		s.log.Error("mark imports seen failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
 }
 
 // newBatchID names one request's jobs as a batch (ingest.Job.Batch). An empty id — random bytes

@@ -1,6 +1,6 @@
 -- The header's Upload menu and the /sync page (IMPLEMENTATION.md §4.0.1): when an import job
 -- finished, and when its account last looked at its finished imports — a failure after that
--- is one the Upload menu still flags.
+-- is flagged on the header's Sync item.
 
 ALTER TABLE jobs ADD COLUMN finished_at TIMESTAMPTZ;   -- set by the worker on 'done' or 'failed'
 UPDATE jobs SET finished_at = created_at WHERE state IN ('done', 'failed');

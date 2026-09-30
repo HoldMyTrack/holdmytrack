@@ -119,7 +119,7 @@ Connecting the app to third-party services.
 - [ ] Wahoo connector (after partner approval).
 - [ ] COROS connector (after partner approval).
 - [ ] Deauthorization deletion for each connector as it ships, not after — Garmin/Wahoo/COROS contractually require it (§7).
-- [ ] These connectors are the one part of the web's import history page, `/sync` (`docs/IMPLEMENTATION.md` §4.0.1), that's actually triggerable from the page itself — connect/disconnect, and (once token-refresh runs on a schedule) a last-synced/status summary alongside Health Connect/GPS Logger's own read-only rows there. Sync stayed read-only-only through Phase 2 specifically because neither on-device source can be triggered from the web; a cloud connector can.
+- [ ] These connectors are the one part of the web's Sync page, `/sync` (`docs/IMPLEMENTATION.md` §4.0.1), that's actually triggerable from the page itself — connect/disconnect, and (once token-refresh runs on a schedule) a last-synced/status summary alongside Health Connect/GPS Logger's own read-only rows there. Sync stayed read-only-only through Phase 2 specifically because neither on-device source can be triggered from the web; a cloud connector can.
 
 ---
 

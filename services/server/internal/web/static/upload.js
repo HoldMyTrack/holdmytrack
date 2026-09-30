@@ -2,14 +2,14 @@
 // chosen here — or dropped on the map, which sends them here as an `hmt:upload-files` event —
 // upload one at a time with their progress, then show as "Processing…" until the server has
 // finished them, a .zip or Takeout export as one row counting its files. A finished import
-// leaves the menu, whatever became of it: what it came to is the /sync page's. A failure the
-// account hasn't seen yet shows as one line linking there, until the page is opened or the
-// line dismissed.
+// leaves the menu, whatever became of it: what it came to is the header's Sync item's, the
+// /sync page, whose red dot this script also keeps — a failure the account hasn't seen there.
 //
 // The server's GET /v1/uploads/active is the list of what's still processing — a phone sync's
-// too — read every POLL_MS while anything is in flight and every IDLE_MS otherwise. Whenever an
-// import finishes, or a file's upload lands, the menu fires `hmt:imports-changed` on window,
-// which the map listens to (MapView.tsx) to redraw its list and tracks.
+// too — and the count of unseen failures, read every POLL_MS while anything is in flight and
+// every IDLE_MS otherwise. Whenever an import finishes, or a file's upload lands, the menu
+// fires `hmt:imports-changed` on window, which the map listens to (MapView.tsx) to redraw its
+// list and tracks.
 //
 // The menu's words are the server's catalog, rendered into <script class="upload-menu__strings">.
 (function () {
@@ -28,8 +28,9 @@
   var list = menu.querySelector('.upload-menu__list');
   var idle = menu.querySelector('.upload-menu__idle');
   var notes = menu.querySelector('.upload-menu__notes');
-  var failed = menu.querySelector('.upload-menu__failed');
-  var failedText = menu.querySelector('.upload-menu__failed-text');
+  // The header's Sync item, where finished imports are: its dot is a failure not yet seen there.
+  var syncLink = document.querySelector('[data-sync-link]');
+  var syncAlert = syncLink && syncLink.querySelector('.sync-link__alert');
   var badge = menu.querySelector('.upload-menu__badge');
   var alertDot = menu.querySelector('.upload-menu__alert');
 
@@ -95,9 +96,12 @@
       notes.appendChild(li);
     });
 
-    failed.hidden = unseenFailures === 0;
-    failedText.textContent = fill(strings.failed_unseen, { n: unseenFailures });
-    alertDot.hidden = unseenFailures === 0 && !noteList.some(function (n) { return n.error; });
+    alertDot.hidden = !noteList.some(function (n) { return n.error; });
+    if (syncAlert) {
+      syncAlert.hidden = unseenFailures === 0;
+      if (unseenFailures > 0) syncLink.title = fill(strings.failed_unseen, { n: unseenFailures });
+      else syncLink.removeAttribute('title');
+    }
   }
 
   function note(text, error) {
@@ -243,12 +247,6 @@
 
   window.addEventListener('hmt:upload-files', function (event) {
     enqueue(event.detail);
-  });
-
-  menu.querySelector('.upload-menu__failed-dismiss').addEventListener('click', function () {
-    unseenFailures = 0;
-    render();
-    fetch('/v1/uploads/seen', { method: 'POST', credentials: 'same-origin' }).catch(function () {});
   });
 
   // Opening the menu reads the latest at once rather than waiting for the next tick.

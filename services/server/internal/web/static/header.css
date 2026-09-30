@@ -276,8 +276,7 @@
 
 .upload-menu__list:empty,
 .upload-menu__notes:empty,
-.upload-menu__idle[hidden],
-.upload-menu__failed[hidden] {
+.upload-menu__idle[hidden] {
   display: none;
 }
 
@@ -304,8 +303,7 @@
   color: rgb(var(--fm-ink-rgb) / 60%);
 }
 
-.upload-menu__note,
-.upload-menu__failed {
+.upload-menu__note {
   display: flex;
   align-items: baseline;
   gap: 6px;
@@ -322,15 +320,9 @@
   min-width: 0;
 }
 
-.upload-menu__note--error,
-.upload-menu__failed {
+.upload-menu__note--error {
   background: rgb(var(--fm-danger-rgb) / 10%);
   color: var(--fm-danger);
-}
-
-.upload-menu__failed a {
-  color: inherit;
-  font-weight: 600;
 }
 
 .upload-menu__dismiss {
@@ -345,10 +337,40 @@
   cursor: pointer;
 }
 
-.upload-menu__history {
-  margin-top: 4px;
-  border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
-  border-radius: 0 0 6px 6px;
+/* Sync (the import history, /sync): a link, not a menu, beside Upload — the Info menu's look,
+   with its icon, and a red dot for a failed import not yet seen there. */
+.sync-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fm-ink);
+  text-decoration: none;
+}
+
+.sync-link:hover,
+.sync-link[aria-current='page'] {
+  color: var(--fm-ink);
+  background: rgb(var(--fm-ink-rgb) / 6%);
+}
+
+.sync-link__alert {
+  position: absolute;
+  top: 4px;
+  left: 18px;
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--fm-surface);
+  border-radius: 50%;
+  background: var(--fm-danger);
+}
+
+.sync-link__alert[hidden] {
+  display: none;
 }
 
 .user-menu__avatar {
@@ -441,11 +463,13 @@
   .page-header__divider,
   .page-header__tagline,
   .donate-button__label,
-  .upload-menu__label {
+  .upload-menu__label,
+  .sync-link__label {
     display: none;
   }
 
-  .upload-menu__trigger {
+  .upload-menu__trigger,
+  .sync-link {
     padding: 6px;
   }
 

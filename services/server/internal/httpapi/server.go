@@ -164,7 +164,6 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(route("DELETE", "/stories/{id}/activities"), s.requireNotDemo(s.handleRemoveStoryActivities))
 	s.mux.HandleFunc(route("GET", "/uploads"), s.requireVerified(s.handleListUploads))
 	s.mux.HandleFunc(route("GET", "/uploads/active"), s.requireVerified(s.handleActiveUploads))
-	s.mux.HandleFunc(route("POST", "/uploads/seen"), s.requireVerified(s.handleImportsSeen))
 	s.mux.HandleFunc(route("GET", "/coverage/status"), s.requireVerified(s.handleCoverageStatus))
 	s.mux.HandleFunc(route("POST", "/sync/activities"), s.requireNotDemo(s.handleSyncActivities))
 	s.mux.HandleFunc(tileRoute("GET", "/tracks/{z}/{x}/{y}"), s.requireVerified(s.handleTracksTile))
