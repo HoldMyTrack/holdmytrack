@@ -477,6 +477,20 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Not yet built**: a discard confirmation before Stop finalizes a save; the iOS half (`docs/ROADMAP.md` Phase 2 tracks it as a combined Android/iOS item; Android's half is what this FR describes).
 
+### FR-3.9 Import history page
+
+**Description**: `/sync`, a page of its own, lists every import that has finished — uploaded files, the files inside an archive and activities synced from the phone alike — and the duplicates cross-source detection took out of circulation (FR-3.7).
+
+**Preconditions**: Signed in; signed out, the page sends you to sign in.
+
+**Behavior**:
+1. Newest first by when each finished, 20 per page, with "1–20 of 57" and Newer/Older links. An import still being processed is not listed: the page shows only finished ones, so it doesn't change while it's open.
+2. Each row has a title — the file's name, or for a phone sync its source ("Health Connect", "GPS Logger") — then **Ready** with the activity's date and distance and a **View on map** link, or **Failed** with the reason in the reader's language (§17's error messages).
+3. **View on map** opens the map on that activity: on the Activities tab, the date range narrowed to its day if it isn't already in view, the activity selected and the camera fitted to it, as FR-3.4's "View on map" does.
+4. Under the history, when there are any, the duplicates: each one's start date and time and distance, and which source it came from and which copy replaced it — "From Health Connect, replaced by the copy from an uploaded file."
+5. Opening the page counts every failed import so far as seen.
+6. A demo session sees the Demo Customer's history, with a line saying to create an account to import one's own.
+
 ## 6. FR-4 — Map Visualization
 
 ### FR-4.1 Track rendering (Normal mode)
