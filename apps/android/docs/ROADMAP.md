@@ -94,12 +94,21 @@ Prepare the app for testing and store publication.
 
 ## Phase 8: Stories
 
-Stories — hand-picked, private sets of activities with their own totals and map view ([ADR-0020](../../../docs/adr/0020-stories-hand-picked-and-private.md); root `docs/SPEC.md` FR-14, FR-5.16, FR-5.17; `docs/IMPLEMENTATION.md` §4.23) — ported from the web's phone layout against the same `/v1/stories` API, the same `story` filter on the activity list, tracks tiles and histogram, and the `stories` each activity row carries, with no Android-only server work (`apps/android/docs/SPEC.md` FR-2.7 items 15–18, `apps/android/docs/IMPLEMENTATION.md` §3.2). Checked on the emulator against the local stack, English and Russian: creating from a checked group and landing on the Story, switching Stories, the statistics, the range restored on leaving the tab, the badge, the Edit window's ticked/partial/clear boxes, renaming, deleting the open Story and then the last one, and the Russian tab strip scrolling. The demo account's disabled controls were not walked on the emulator.
+Stories — hand-picked, private sets of activities with their own totals and map view ([ADR-0020](../../../docs/adr/0020-stories-hand-picked-and-private.md); root `docs/SPEC.md` FR-14, FR-5.16; `docs/IMPLEMENTATION.md` §4.23) — ported from the web's phone layout against the same `/v1/stories` API, the same `story` filter on the activity list, tracks tiles and histogram, and the `stories` each activity row carries, with no Android-only server work (`apps/android/docs/SPEC.md` FR-2.7 items 15–18, `apps/android/docs/IMPLEMENTATION.md` §3.2). Checked on the emulator against the local stack, English and Russian: creating from a checked group and landing on the Story, switching Stories, the statistics, the range restored on leaving the tab, the badge, the Edit window's ticked/partial/clear boxes, renaming, deleting the open Story and then the last one, and the Russian tab strip scrolling. The demo account's disabled controls were not walked on the emulator.
 
 - [x] **The Stories tab** — the Activities panel's second tab, as on the web: every Story as a folder, exactly one open, its description and rows under it, the whole Story's statistics as the footer, the map, the list and the date range narrowed to it, a folder's pencil and bin for rename and delete.
 - [x] **Create story** — the toolbar's book-plus over the checked group, opening the new Story on the tab.
 - [x] **The Edit window's Stories tab** — the account's Stories as ticked, partly ticked or clear boxes for the window's activities, written by the window's one Save.
 - [x] **The Story badge** on an activity's row, from the row's `stories` (root `docs/SPEC.md` FR-5.1).
+
+The web has since simplified how Stories and the date range are used (root `docs/SPEC.md` FR-5.16, FR-6, FR-14.6); the app still works the earlier way. To bring it in line, with no server work — every endpoint these need already exists:
+
+- [ ] **The date slider on the Activities tab only.** Hide the footer on the Stories, Sync and Privacy tabs (the sheet then sits on the bottom edge), as the web does.
+- [ ] **An open Story ignores the date range.** List and draw the whole Story (`story` alone, no `from`/`to` on the list and the tracks tile), with no footer, and stop saving and restoring the range around it (`beforeStory`); leaving the tab finds the range untouched.
+- [ ] **Add to story instead of Create story.** The toolbar's book-plus over the toolbar's target, checked group or selected row, opening a menu: "New story…" (today's Create story dialog), then every Story, newest first, a Story already holding all of the target ticked and disabled; picking one adds the target with `POST /v1/stories/{id}/activities`.
+- [ ] **Remove from story on the Stories tab.** An × on each row under the open Story, with no confirmation, via `DELETE /v1/stories/{id}/activities`; the list, the tracks and the footer's statistics follow.
+- [ ] **Drop the Edit window's Stories tab**, once the two items above are in.
+- [ ] **A tappable Story badge**, opening its Story — or, in several, a menu of their names.
 
 ---
 
