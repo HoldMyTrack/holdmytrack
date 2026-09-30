@@ -359,6 +359,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     canPanEarlier,
     canPanLater,
     panBy,
+    reveal: revealDay,
     reload: reloadDays,
     generation: historyGeneration,
   } = useActivityDays();
@@ -564,6 +565,8 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   const viewActivityOnDay = useCallback(
     (activityId: string, day: string) => {
       if (mapMode !== 'normal') changeMapMode('normal');
+      // The slider's window moves to the day too, or its knobs would sit off its edges.
+      revealDay(day);
       if (selectedRange !== null && day >= selectedRange.from && day <= selectedRange.to) {
         focusActivity(activityId);
         return;
@@ -573,7 +576,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
       // The focus below flies to the activity itself; the range fly would override it.
       flyToNextRangeRef.current = false;
     },
-    [mapMode, changeMapMode, selectedRange, changeSelectedRange, focusActivity],
+    [mapMode, changeMapMode, selectedRange, changeSelectedRange, focusActivity, revealDay],
   );
   // `/?activity=&day=` (App.tsx), once, on arrival: before any range of the user's own, so the
   // default range never replaces it.

@@ -52,6 +52,11 @@ export interface ActivityDaysState {
   canPanLater: boolean;
   /** Moves the window by whole activity-days — negative is toward the past. */
   panBy: (deltaDays: number) => void;
+  /** Moves the window to show `day` (YYYY-MM-DD), in its middle where there's room, loading
+   *  older history first if it's further back than what's loaded — for a range picked from
+   *  outside the slider (MapView's viewActivityOnDay), whose knobs would otherwise sit off the
+   *  window's edges. */
+  reveal: (day: string) => void;
   /** Re-reads from the newest end; the upload widget calls this once a job finishes. */
   reload: () => void;
   /** Bumps by exactly one on every `reload()` (not on `panBy`, which never refetches — see
@@ -155,6 +160,27 @@ export function useActivityDays(): ActivityDaysState {
     panBy(owed);
   }, [days]);
 
+  // A day to show, until the window has moved to it — waiting for the first page, and for as
+  // many older pages as it takes to reach it.
+  const [revealing, setRevealing] = useState<string | null>(null);
+  useEffect(() => {
+    if (revealing === null || !ready) return;
+    if (days.length === 0) {
+      setRevealing(null);
+      return;
+    }
+    if (days[0]!.date > revealing && hasEarlier) {
+      extendEarlier();
+      return;
+    }
+    let index = days.findIndex((day) => day.date >= revealing);
+    if (index === -1) index = days.length - 1;
+    const next = Math.min(Math.max(index - Math.floor(WINDOW_DAYS / 2), 0), maxStart);
+    setAnchor(next >= maxStart ? null : days[next]!.date);
+    setRevealing(null);
+  }, [revealing, ready, days, hasEarlier, extendEarlier, maxStart]);
+  const reveal = useCallback((day: string) => setRevealing(day), []);
+
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
   return {
@@ -165,6 +191,7 @@ export function useActivityDays(): ActivityDaysState {
     canPanEarlier: start > 0 || hasEarlier,
     canPanLater: start < maxStart,
     panBy,
+    reveal,
     reload,
     generation: nonce,
   };
