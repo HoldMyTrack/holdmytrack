@@ -226,20 +226,13 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // effect below) needs the first page of days, which hasn't loaded yet on first render.
   const [selectedRange, setSelectedRangeState] = useState<DateRange | null>(null);
 
-  // The open Story (FR-14.6): while one is open on the Stories tab, the list, the totals, the
-  // drawn tracks and the range picker's bars are that Story's activities alone. Opened from the
-  // tab, the URL, Create story, or by Back/Forward; closed by leaving the tab, which puts back
-  // the range from before it.
+  // The open Story (FR-14.6): while one is open on the Stories tab, the list, the totals and the
+  // drawn tracks are the whole Story's activities, with no date range — `selectedRange` is left
+  // alone, so leaving the tab finds it as it was. Opened from the tab, the URL, Create story, or
+  // by Back/Forward; closed by leaving the tab.
   const [storyId, setStoryId] = useState<string | null>(storyParam);
   const storyState = useStory(storyId);
   const storiesList = useStories(panelTab === 'stories');
-  // The range (and whether the user had picked it) to restore on leaving the tab — null when the
-  // page opened straight into a Story, which then closes onto the usual default range.
-  const beforeStoryRef = useRef<{ range: DateRange | null; userChanged: boolean } | null>(null);
-  // Set on entering a Story, until its whole span is selected (the effect further down) —
-  // `fly` says whether to fit the camera to it then: yes when entered from the map, no on page
-  // load, where the first list's own fly (or the URL's camera) already decides.
-  const storyRangePendingRef = useRef<{ fly: boolean } | null>(storyId !== null ? { fly: false } : null);
 
   // TYPE/DISTANCE facets — pure client-side filters over
   // whatever the current date range already fetched, per activityFacets.ts.
@@ -337,11 +330,14 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     setDistanceFilter(null);
   }, []);
 
+  // A Story, or the date range — never both: a Story is the whole of it.
   const activityQuery = useMemo(
-    () => ({
-      ...(selectedRange ? { from: selectedRange.from, to: selectedRange.to } : {}),
-      ...(storyId !== null ? { story: storyId } : {}),
-    }),
+    () =>
+      storyId !== null
+        ? { story: storyId }
+        : selectedRange
+          ? { from: selectedRange.from, to: selectedRange.to }
+          : {},
     [selectedRange, storyId],
   );
 
@@ -363,15 +359,13 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   const {
     visibleDays,
     earliest,
-    latest,
-    loadedStory,
     ready: daysReady,
     canPanEarlier,
     canPanLater,
     panBy,
     reload: reloadDays,
     generation: historyGeneration,
-  } = useActivityDays(storyId);
+  } = useActivityDays();
 
   // Defaults to the 5 most recent activity-days, not all-time: "what did I do lately" is what
   // opening the map asks, and a whole history's tracks at once is slow to draw and fit. It also
@@ -399,25 +393,12 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // from the list, and the window can't outlive its activities (below), so it kept closing
   // itself until the whole zip had finished. `editOpen` is a dependency so the default
   // catches up on whatever landed meanwhile the moment the window closes.
-  //
-  // Not inside a Story, which opens on its whole span instead (below); and not until the days in
-  // hand are the whole history's again after leaving one.
   useEffect(() => {
-    if (userChangedRangeRef.current || !daysReady || editOpen || storyId !== null || loadedStory !== null) return;
+    if (userChangedRangeRef.current || !daysReady || editOpen) return;
     const recentDays = visibleDays.slice(-5);
     setSelectedRangeState({ from: recentDays[0]?.date ?? earliest ?? today, to: today });
     // visibleDays deliberately isn't a dependency — see the comment above.
-  }, [daysReady, earliest, historyGeneration, today, editOpen, storyId, loadedStory]);
-
-  // A Story opens on the whole of it: its first activity's day to its last (FR-14.6), once the
-  // picker's days are that Story's. An empty Story has no days, and gets today.
-  useEffect(() => {
-    const pending = storyRangePendingRef.current;
-    if (pending === null || storyId === null || !daysReady || loadedStory !== storyId || editOpen) return;
-    storyRangePendingRef.current = null;
-    flyToNextRangeRef.current = pending.fly;
-    setSelectedRangeState({ from: earliest ?? today, to: latest ?? today });
-  }, [storyId, daysReady, loadedStory, earliest, latest, today, editOpen]);
+  }, [daysReady, earliest, historyGeneration, today, editOpen]);
 
   // Rows with a reprocess still pending — an Edit track (§4.7.7) or a Private location change
   // — read by the polling and completion effects further down, by the bands effect, and by
@@ -666,8 +647,8 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // flies to just the single most recent activity rather than the whole default selection —
   // an account with scattered recent history (e.g. one activity in another country yesterday,
   // one locally today) would otherwise fitBounds to a near-world view, which reads as broken
-  // rather than just generic. After that, only a range the user picked (changeSelectedRange)
-  // flies, to fit whatever's now actually visible.
+  // rather than just generic. After that, only a range the user picked (changeSelectedRange) or
+  // a Story opened from the map (enterStory) flies, to fit whatever's now actually visible.
   //
   // Nothing else moves the camera: not a reload of the same range (the Pending poll every 2s,
   // a finished upload or sync, a Private location change), and not a new range the default
@@ -684,7 +665,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     if (!hasFlownToActivitiesRef.current) {
       const drawn = activities.filter((a) => a.bbox !== null && !a.pending);
       // A Story with nothing to draw (an empty one, or one that doesn't exist) leaves this for
-      // the history leaving the tab goes back to.
+      // the date range leaving the tab goes back to.
       if (storyId !== null && drawn.length === 0) return;
       // The first list, even an empty one: an account with no history yet gets the fallback
       // view below, and its first upload doesn't fly either.
@@ -718,11 +699,10 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     if (!map || hasFlownToFallbackRef.current) return;
     if (initial.hash.view != null) return;
     if (activities.length > 0) return;
-    // Only the whole history's days say it's genuinely empty — not an empty Story's.
-    if (!daysReady || earliest != null || storyId !== null || loadedStory !== null) return;
+    if (!daysReady || earliest != null) return;
     hasFlownToFallbackRef.current = true;
     flyToView(map, countryView(user.country) ?? WORLD_VIEW);
-  }, [map, activities, daysReady, earliest, user.country, storyId, loadedStory]);
+  }, [map, activities, daysReady, earliest, user.country]);
 
   // Clicking a track directly on the map is the row-text "focus" behavior, not the checkbox's
   // — it bolds just that one track, replacing whichever was focused before, and flies to it,
@@ -899,7 +879,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   }, []);
 
   // Opening and closing a Story. Both start the list's state afresh, as a new range does
-  // (changeSelectedRange): the rows are a different set.
+  // (changeSelectedRange): the rows are a different set. Neither touches the date range.
   const resetListState = useCallback(() => {
     setCheckedActivityIds(new Set());
     setFocusedActivityId(null);
@@ -909,28 +889,21 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   }, []);
   const enterStory = useCallback(
     (id: string, nav: StoryNav = 'push') => {
-      // Switching from one Story to another still closes onto the range from before the first.
-      if (storyId === null) beforeStoryRef.current = { range: selectedRange, userChanged: userChangedRangeRef.current };
-      storyRangePendingRef.current = { fly: true };
+      // Fits the camera to the Story once its list lands (the fly effect above).
+      flyToNextRangeRef.current = true;
       resetListState();
       setStoryId(id);
       setPanelTab('stories');
       moveStoryUrl(id, nav);
     },
-    [storyId, selectedRange, resetListState],
+    [resetListState],
   );
   const exitStory = useCallback(
     (nav: StoryNav = 'push') => {
-      const before = beforeStoryRef.current;
-      beforeStoryRef.current = null;
-      storyRangePendingRef.current = null;
       resetListState();
       setStoryId(null);
-      // The range from before, or — for a page that opened in the Story — the default the
-      // effect above derives once the whole history's days are back. The camera stays.
-      userChangedRangeRef.current = before?.userChanged ?? false;
+      // The list goes back to the date range as it was; the camera stays.
       flyToNextRangeRef.current = false;
-      setSelectedRangeState(before?.range ?? null);
       moveStoryUrl(null, nav);
     },
     [resetListState],

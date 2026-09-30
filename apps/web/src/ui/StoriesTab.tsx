@@ -32,7 +32,7 @@ export interface StoriesTabProps {
   openStory: Story | null;
   /** Why the open Story couldn't be read — a `?story=` that doesn't exist or isn't this account's. */
   openError: string | null;
-  /** The open Story's activities, following the timeline's selection — MapView's list. */
+  /** The open Story's activities, all of them — MapView's list. */
   activities: Activity[];
   activitiesLoading: boolean;
   activitiesError: string | null;
@@ -50,8 +50,8 @@ export interface StoriesTabProps {
 
 /**
  * The Activities panel's Stories tab (`SPEC.md` FR-14.6): every Story as a folder, newest first,
- * exactly one of them open. Opening one is viewing it — MapView narrows the drawn tracks, the
- * timeline and the list to it, and this tab shows that list inside the folder and the whole
+ * exactly one of them open. Opening one is viewing it — MapView narrows the drawn tracks and the
+ * list to it, whatever date range the Activities tab has, and this tab shows that list inside the folder and the whole
  * Story's statistics in the footer. The rows are for looking only (hover preview, click to
  * focus); what's in a Story changes from the Edit window's Stories tab. A folder's pencil and
  * trash rename and delete that Story.
@@ -174,7 +174,7 @@ export function StoriesTab({
         {storiesReady && stories.length === 0 && <li className="activities-panel__note">{t('stories.empty')}</li>}
       </ul>
 
-      {/* The whole Story, whatever the timeline selects (FR-14.1). */}
+      {/* The whole Story's statistics (FR-14.1). */}
       {openStory && openStory.id === openId && (
         <div className="activities-panel__footer stories-tab__stats" data-testid="stories-tab-stats">
           {openStory.stats.count > 0 ? (

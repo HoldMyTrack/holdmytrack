@@ -625,16 +625,13 @@ export interface DayPageQuery {
   limit: number;
   /** Return the `limit` most recent days strictly before this one; omit for the newest. */
   before?: string;
-  /** One Story's days only, `earliest` its first (`SPEC.md` FR-14.4). */
-  story?: string;
 }
 
 /**
  * `GET /v1/activities/histogram?days=&before=` — §4.7's activity-day pagination mode.
  *
  * Never takes the type/distance filter: this is the whole history a range is picked from, not a
- * view of the current one — except `story`: inside a Story, the Story is the whole history
- * (FR-14.4). It pages by *days that have activity* rather than by calendar window because that
+ * view of the current one. It pages by *days that have activity* rather than by calendar window because that
  * is what the slider's slots are — one per such day, packed — so a page is exactly `limit`
  * days however sparse the underlying history is.
  * The endpoint's other mode (`from`/`to`, a real calendar window) has no reader here; §4.8's
@@ -643,7 +640,6 @@ export interface DayPageQuery {
 export async function getActivityDayPage(query: DayPageQuery, signal?: AbortSignal): Promise<ActivityDayPage> {
   const params = new URLSearchParams({ days: String(query.limit) });
   if (query.before) params.set('before', query.before);
-  if (query.story) params.set('story', query.story);
   const res = await fetch(`${API_BASE_URL}${API_V1}/activities/histogram?${params.toString()}`, {
     ...(signal ? { signal } : {}),
     credentials: 'include',
