@@ -13,3 +13,14 @@ export const COUNTRY_MAX_ZOOM = 5;
 export const REGION_MIN_ZOOM = 5;
 export const REGION_MAX_ZOOM = 8;
 export const CITY_MIN_ZOOM = 8;
+
+/** Which of the three tiers Fog and Heatmap draw at `zoom` — the same bands the layers above
+ *  switch on (a layer shows at minzoom <= zoom < maxzoom), for anything that has to name the
+ *  tier in view, like ZoomLevelNotice.tsx. */
+export type ZoomTier = 'country' | 'region' | 'city';
+
+export function zoomTier(zoom: number): ZoomTier {
+  if (zoom < COUNTRY_MAX_ZOOM) return 'country';
+  if (zoom < REGION_MAX_ZOOM) return 'region';
+  return 'city';
+}
