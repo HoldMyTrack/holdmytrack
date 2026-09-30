@@ -186,17 +186,28 @@ func main() {
 
 	case "rerender-coverage":
 		// One-off, on deploying a change to how Fog/Heatmap tiles are drawn (docs/DEPLOY.md):
-		// queues a full re-render of every account's tiles, or of one account's with --user.
+		// queues a full re-render of every account's tiles, or of one account's with --user;
+		// --masks redraws every activity's stored masks first, for a change to the stroke.
 		// Idempotent. See internal/ingest.RerenderCoverage's doc comment.
-		userID := ""
-		switch {
-		case len(os.Args) == 4 && os.Args[2] == "--user":
-			userID = os.Args[3]
-		case len(os.Args) != 2:
-			fmt.Fprintln(os.Stderr, "usage: holdmytrack rerender-coverage [--user <id>]")
-			os.Exit(2)
+		userID, masks := "", false
+		for i := 2; i < len(os.Args); i++ {
+			switch {
+			case os.Args[i] == "--masks":
+				masks = true
+			case os.Args[i] == "--user" && i+1 < len(os.Args):
+				userID = os.Args[i+1]
+				i++
+			default:
+				fmt.Fprintln(os.Stderr, "usage: holdmytrack rerender-coverage [--masks] [--user <id>]")
+				os.Exit(2)
+			}
 		}
-		if err := ingest.RerenderCoverage(ctx, pool, log, userID); err != nil {
+		store, err := storage.New(cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3Bucket)
+		if err != nil {
+			log.Error("storage", "err", err)
+			os.Exit(1)
+		}
+		if err := ingest.RerenderCoverage(ctx, pool, store, log, userID, masks); err != nil {
 			log.Error("rerender-coverage", "err", err)
 			os.Exit(1)
 		}
