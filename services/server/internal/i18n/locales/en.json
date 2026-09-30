@@ -309,6 +309,7 @@
   "upload.dismiss": "Dismiss",
   "upload.too_many": "Too many files selected ({n}) — zip them and upload the archive instead.",
   "upload.already": "{filename} was already uploaded before.",
+  "upload.already_in": "Already uploaded before, in {filename}: {n}",
   "upload.skipped": "Skipped in {filename}: {n}",
   "upload.truncated": "{filename} had more files than can be processed at once; the rest weren't read.",
   "upload.failed_transfer": "{filename}: {error}",

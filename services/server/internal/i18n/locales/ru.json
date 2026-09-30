@@ -313,6 +313,7 @@
   "upload.dismiss": "Скрыть",
   "upload.too_many": "Выбрано слишком много файлов ({n}) — упакуйте их в zip-архив и загрузите его.",
   "upload.already": "{filename} уже был загружен раньше.",
+  "upload.already_in": "Уже загружено раньше, в {filename}: {n}",
   "upload.skipped": "Пропущено в {filename}: {n}",
   "upload.truncated": "В {filename} больше файлов, чем можно обработать за раз; остальные не прочитаны.",
   "upload.failed_transfer": "{filename}: {error}",

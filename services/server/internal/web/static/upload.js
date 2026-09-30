@@ -194,7 +194,15 @@
         }
         if (body.status === 'already_processed') note(fill(strings.already, { filename: file.name }));
         if (body.status === 'zip_processed') {
-          var skipped = (body.files || []).filter(function (f) { return f.status === 'skipped'; }).length;
+          var files = body.files || [];
+          var count = function (status) {
+            return files.filter(function (f) { return f.status === status; }).length;
+          };
+          // Neither kind becomes a job, so neither shows on the Sync page: this note is the only
+          // place they're told — and for an archive with nothing new, the only sign it arrived.
+          var already = count('already_processed');
+          var skipped = count('skipped');
+          if (already > 0) note(fill(strings.already_in, { filename: file.name, n: already }));
           if (skipped > 0) note(fill(strings.skipped, { filename: file.name, n: skipped }));
           if (body.truncated) note(fill(strings.truncated, { filename: file.name }));
         }
