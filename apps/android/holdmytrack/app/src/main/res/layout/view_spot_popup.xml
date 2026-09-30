@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- A spot's popup (map/SpotPopup, docs/SPEC.md FR-15.3), the web's .spot-popup: the name (or
      the category), a line of category, memorial type and date, the description and the
-     inscription — each scrolling past six lines — the address, then Copy address and
-     Wikipedia. Each part is gone when OSM has none. Placed over the spot by SpotPopup. -->
+     inscription — each scrolling past six lines — the address, when the account captured it,
+     then Copy address (Copy location without one) and Wikipedia, and Capture for a place not yet
+     captured. Each part is gone when OSM has none. Placed over the spot by SpotPopup. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -97,6 +98,22 @@
             android:textColor="@color/hmt_ink_secondary"
             android:textSize="@dimen/hmt_text_sm" />
 
+        <TextView
+            android:id="@+id/spot_popup_captured"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_6"
+            android:drawablePadding="@dimen/hmt_space_4"
+            android:gravity="center_vertical"
+            android:textColor="@color/hmt_accent"
+            android:textSize="@dimen/hmt_text_sm"
+            android:textStyle="bold"
+            android:visibility="gone"
+            app:drawableStartCompat="@drawable/ic_flag"
+            app:drawableTint="@color/hmt_accent"
+            tools:text="Captured Sep 30, 2026"
+            tools:visibility="visible" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -120,5 +137,19 @@
                 android:text="@string/spots_wikipedia"
                 app:icon="@drawable/ic_book_open" />
         </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/spot_popup_capture"
+            style="@style/Widget.HoldMyTrack.Button.SpotAction"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/spots_capture"
+            android:textColor="@color/hmt_on_accent"
+            android:visibility="gone"
+            app:backgroundTint="@color/hmt_accent"
+            app:icon="@drawable/ic_flag"
+            app:iconTint="@color/hmt_on_accent"
+            app:strokeWidth="0dp"
+            tools:visibility="visible" />
     </LinearLayout>
 </LinearLayout>

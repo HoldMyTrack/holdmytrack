@@ -31,6 +31,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0020](0020-stories-hand-picked-and-private.md) | Stories are hand-picked, private sets of activities, shown in Normal mode with a story-scoped date picker |
 | [0021](0021-spots-from-osm-visits-from-tracks.md) | Spots are bulk-imported from OpenStreetMap, and a visit is five minutes inside one, worked out from tracks |
 | [0022](0022-satellite-imagery-optional-base-map.md) | Satellite imagery is an optional base map, opt-in per deployment, drawn under the vector roads and labels |
+| [0023](0023-spots-captured-live-on-the-phone.md) | A spot can be captured live in the Android app, by staying 30 seconds inside it, and the capture is kept on the server |
 
 ## Writing a new one
 

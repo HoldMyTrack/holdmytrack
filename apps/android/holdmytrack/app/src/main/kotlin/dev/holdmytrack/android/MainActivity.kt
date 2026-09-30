@@ -34,6 +34,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import dev.holdmytrack.android.map.ActivityDays
+import dev.holdmytrack.android.map.CaptureMode
 import dev.holdmytrack.android.map.CoverageWatch
 import dev.holdmytrack.android.map.EditPreview
 import dev.holdmytrack.android.map.TrackEditOverlay
@@ -52,6 +53,7 @@ import dev.holdmytrack.android.net.ApiException
 import dev.holdmytrack.android.net.TrackMetrics
 import dev.holdmytrack.android.net.TrackPoint
 import dev.holdmytrack.android.net.HoldMyTrackApi
+import dev.holdmytrack.android.net.Spot
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.panel.ActivitiesPanel
 import dev.holdmytrack.android.panel.ActivityFacets
@@ -128,6 +130,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var modeButtons: Map<MapMode, MaterialButton>
     private lateinit var layersMenu: LayersMenu
     private lateinit var spotPopup: SpotPopup
+    private lateinit var captureMode: CaptureMode
     /** Created with the map instance it reads the camera of. */
     private var showInArea: ShowInArea? = null
     private lateinit var recordButton: RecordButton
@@ -311,6 +314,23 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Asked for on a spot's Capture, when location isn't granted yet. Capture counts only
+     *  fixes accurate to 25 m, so it needs precise location; approximate alone isn't enough. */
+    private val capturePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) {
+        val spot = pendingCapture
+        pendingCapture = null
+        if (hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
+            spot?.let(captureMode::start)
+        } else {
+            Toast.makeText(this, R.string.spots_capture_needs_location, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    /** The spot whose Capture is waiting on the permission prompt. */
+    private var pendingCapture: Spot? = null
+
     /** Asked for on the first tap of Find my location. Approximate is enough to show the
      *  user roughly where they are, so either grant counts. */
     private val locatePermissionLauncher = registerForActivityResult(
@@ -365,7 +385,12 @@ class MainActivity : AppCompatActivity() {
             onSatellite = ::setSatellite,
             onSpots = ::setSpots,
         )
-        spotPopup = SpotPopup(findViewById(R.id.spot_popup)) { topChrome.bottom }
+        spotPopup = SpotPopup(findViewById(R.id.spot_popup), { topChrome.bottom }, ::onCaptureTap)
+        captureMode = CaptureMode(
+            this, findViewById(R.id.capture_banner), { map }, { style?.takeIf { overlaysAttached } },
+            frame = ::flyTo,
+            onCaptured = spotPopup::renderCaptured,
+        )
         menuButton.setOnClickListener { showMenu(it) }
 
         recordButton = findViewById(R.id.record_button)
@@ -773,12 +798,24 @@ class MainActivity : AppCompatActivity() {
             // Last, so the places are over everything else, labels included.
             MapSpots.attach(loaded, this, MapSpots.get(this))
             overlaysAttached = true
+            loadSpotCaptures()
+            captureMode.onStyleAttached()
             renderTrackMetrics()
             // A new style has none of the circles; draw them again if the tab has the map.
             if (privacyShowing) privacyTab.start()
             if (isRecording()) MapOverlays.setRecording(loaded, true, mode)
             frameActivities()
             checkTileVersion()
+        }
+    }
+
+    /** The account's captured spots (`docs/SPEC.md` FR-15.6), for the badges and the popup —
+     *  when the overlays attach and on every return to the app. Kept as they were on a failure. */
+    private fun loadSpotCaptures() {
+        HoldMyTrackApi.spotCaptures { result ->
+            val captures = result.getOrNull() ?: return@spotCaptures
+            MapSpots.setCaptured(style?.takeIf { overlaysAttached }, captures.associate { it.spotId to it.capturedAt })
+            spotPopup.renderCaptured()
         }
     }
 
@@ -991,6 +1028,7 @@ class MainActivity : AppCompatActivity() {
             MapSpots.setEditing(it, true)
         }
         spotPopup.close()
+        captureMode.stop()
         // Once the Track tab has laid out, so the fit leaves room under the window as it now is.
         findViewById<View>(R.id.edit_window).post { flyToActivities(listOf(activity)) }
     }
@@ -1318,6 +1356,19 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    /** A spot's Capture: capture mode on it (FR-2.8), once precise location is granted. */
+    private fun onCaptureTap(spot: Spot) {
+        spotPopup.close()
+        if (hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
+            captureMode.start(spot)
+        } else {
+            pendingCapture = spot
+            capturePermissionLauncher.launch(
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+            )
+        }
+    }
+
     private fun hasLocationPermission() =
         hasPermission(Manifest.permission.ACCESS_FINE_LOCATION) || hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
 
@@ -1607,6 +1658,7 @@ class MainActivity : AppCompatActivity() {
         MapSpots.set(this, categories)
         style?.takeIf { overlaysAttached }?.let { MapSpots.setCategories(it, categories) }
         spotPopup.spot?.let { open -> if (categories.none { it.wire == open.category }) spotPopup.close() }
+        captureMode.spot?.let { target -> if (categories.none { it.wire == target.category }) captureMode.stop() }
         showInArea?.setCategories(categories)
     }
 
@@ -1669,7 +1721,13 @@ class MainActivity : AppCompatActivity() {
         val bounds = LatLngBounds.from(box[3], box[2], box[1], box[0])
         // Into the map left showing between the chrome row and the panel, not under either.
         val card = findViewById<View>(R.id.edit_window)
-        val top = maxOf(FRAME_PADDING_PX, findViewById<View>(R.id.top_bar).bottom, if (card.isVisible) card.bottom + FRAME_PADDING_PX / 2 else 0)
+        val banner = findViewById<View>(R.id.capture_banner)
+        val top = maxOf(
+            FRAME_PADDING_PX,
+            findViewById<View>(R.id.top_bar).bottom,
+            if (card.isVisible) card.bottom + FRAME_PADDING_PX / 2 else 0,
+            if (banner.isVisible) topChrome.top + banner.bottom + FRAME_PADDING_PX / 2 else 0,
+        )
         // The panel's height it's heading to, not mid-animation: a View on map collapses it and
         // flies in the same moment, and fitting to the expanded sheet pushed the activity to
         // the top of the screen.
@@ -1724,6 +1782,8 @@ class MainActivity : AppCompatActivity() {
         mapView.onResume()
         daysStale = true
         syncSession()
+        if (overlaysAttached) loadSpotCaptures()
+        captureMode.resume()
         // An empty map is asked again on every return — typically from Sync — so the notice
         // goes, and the camera frames the new history, as soon as something has arrived.
         if (shownNotice == Notice.EMPTY) {
@@ -1733,6 +1793,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        captureMode.pause()
         mapView.onPause()
         super.onPause()
     }
@@ -1775,6 +1836,7 @@ class MainActivity : AppCompatActivity() {
         leftoverDialog?.dismiss()
         stopDialog?.dismiss()
         if (::layersMenu.isInitialized) layersMenu.dismiss()
+        if (::captureMode.isInitialized) captureMode.stop()
         if (::mapView.isInitialized) mapView.onDestroy()
         if (::dateSlider.isInitialized) dateSlider.release()
         coverageWatch.stop()

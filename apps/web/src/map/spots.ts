@@ -1,7 +1,7 @@
 import { createElement, type ComponentType } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
-import type { FilterSpecification, GeoJSONSource, Map as MapLibreMap, MapGeoJSONFeature } from 'maplibre-gl';
+import type { ExpressionSpecification, FilterSpecification, GeoJSONSource, Map as MapLibreMap, MapGeoJSONFeature } from 'maplibre-gl';
 import type { FeatureCollection, Point } from 'geojson';
 import { Binoculars, Castle, createLucideIcon, Dog, Landmark, type LucideProps } from 'lucide-react';
 import { API_BASE_URL, TILES_V1 } from '../api';
@@ -109,17 +109,28 @@ export interface Spot {
   lat: number;
 }
 
-// The marker: a round badge, the category icon in ink on white, ringed in the accent. Fixed
-// colors, not the theme's: the badge carries its own background, so it reads the same on either
-// basemap.
+// The marker: a round badge, the category icon in ink on white, ringed in the accent — or, for
+// a place the account has captured (FR-15.6), white on the accent, ringed darker. Fixed colors,
+// not the theme's: the badge carries its own background, so it reads the same on either basemap.
 const INK = '#202b25'; // --fm-ink
 const ACCENT = '#b07e2e'; // --fm-accent
+const ACCENT_DARK = '#7d5820';
 const WHITE = '#ffffff';
 const BADGE_PX = 30;
 const PIXEL_RATIO = 2;
 
-function imageName(category: SpotCategory): string {
-  return `spot-${category}`;
+function imageName(category: SpotCategory, captured: boolean): string {
+  return captured ? `spot-captured-${category}` : `spot-${category}`;
+}
+
+/** Each badge's image: the captured one when its id is among the account's captures. */
+function iconImage(captured: readonly number[]): ExpressionSpecification {
+  return [
+    'case',
+    ['in', ['to-number', ['get', 'id']], ['literal', [...captured]]],
+    ['concat', 'spot-captured-', ['get', 'category']],
+    ['concat', 'spot-', ['get', 'category']],
+  ];
 }
 
 /** The icon's own SVG children, rendered once from its Lucide component, so the map's icon is
@@ -133,12 +144,13 @@ function iconMarkup(Icon: ComponentType<LucideProps>): string {
   return markup;
 }
 
-function badgeSVG(icon: string): string {
+function badgeSVG(icon: string, captured: boolean): string {
+  const [fill, ring, ink] = captured ? [ACCENT, ACCENT_DARK, WHITE] : [WHITE, ACCENT, INK];
   // Lucide draws in a 24-unit box; 16 of the badge's 30 units leaves a comfortable margin.
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${BADGE_PX * PIXEL_RATIO}" height="${BADGE_PX * PIXEL_RATIO}" viewBox="0 0 30 30">` +
-    `<circle cx="15" cy="15" r="13.5" fill="${WHITE}" stroke="${ACCENT}" stroke-width="2"/>` +
-    `<g transform="translate(7 7) scale(${16 / 24})" fill="none" stroke="${INK}" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">${icon}</g>` +
+    `<circle cx="15" cy="15" r="13.5" fill="${fill}" stroke="${ring}" stroke-width="2"/>` +
+    `<g transform="translate(7 7) scale(${16 / 24})" fill="none" stroke="${ink}" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">${icon}</g>` +
     `</svg>`
   );
 }
@@ -158,7 +170,7 @@ async function rasterize(svg: string): Promise<ImageData> {
 }
 
 /**
- * The five badge images, drawn once per page. Module-level because a theme swap (`setStyle`)
+ * The badge images, plain and captured for each of the five categories, drawn once per page. Module-level because a theme swap (`setStyle`)
  * drops a style's images along with its layers, and they're added back from here — the drawing
  * is asynchronous (an SVG has to decode before it can be drawn), the adding isn't.
  */
@@ -172,7 +184,10 @@ function loadImages(): Promise<void> {
     await Promise.resolve();
     const drawn = new Map<string, ImageData>();
     for (const category of SPOT_CATEGORIES) {
-      drawn.set(imageName(category), await rasterize(badgeSVG(iconMarkup(CATEGORY_ICONS[category]))));
+      const icon = iconMarkup(CATEGORY_ICONS[category]);
+      for (const captured of [false, true]) {
+        drawn.set(imageName(category, captured), await rasterize(badgeSVG(icon, captured)));
+      }
     }
     images = drawn;
   })();
@@ -182,6 +197,10 @@ function loadImages(): Promise<void> {
 /** Which categories each map was last asked to show — what a layer added later (the first
  *  call's, once the images are drawn, or one re-added after a theme swap) starts with. */
 const spotsWanted = new WeakMap<MapLibreMap, readonly SpotCategory[]>();
+
+/** The ids of the places the account has captured, per map — what a badge layer added later
+ *  starts with. */
+const capturedIds = new WeakMap<MapLibreMap, readonly number[]>();
 
 /** "Show in this area"'s places for each map, kept so a theme swap puts them back. */
 const inAreaData = new WeakMap<MapLibreMap, FeatureCollection<Point>>();
@@ -234,7 +253,7 @@ export function ensureSpotsLayer(map: MapLibreMap, categories: readonly SpotCate
         maxzoom,
         layout: {
           visibility: 'none',
-          'icon-image': ['concat', 'spot-', ['get', 'category']],
+          'icon-image': iconImage(capturedIds.get(map) ?? []),
           // Every spot is drawn, however close to another: a hidden playground is a missed one.
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,
@@ -317,6 +336,18 @@ export function setSpotsVisible(map: MapLibreMap, categories: readonly SpotCateg
     if (!map.getLayer(id)) continue;
     if (map.getLayoutProperty(id, 'visibility') !== visibility) map.setLayoutProperty(id, 'visibility', visibility);
     if (JSON.stringify(map.getFilter(id) ?? null) !== JSON.stringify(filters[id])) map.setFilter(id, filters[id]);
+  }
+}
+
+/** Draws the account's captured places (FR-15.6) with the captured badge, the rest plain. */
+export function setSpotsCaptured(map: MapLibreMap, captured: readonly number[]): void {
+  capturedIds.set(map, captured);
+  const image = iconImage(captured);
+  for (const id of [SPOTS_IN_AREA_LAYER_ID, SPOTS_LAYER_ID]) {
+    if (!map.getLayer(id)) continue;
+    if (JSON.stringify(map.getLayoutProperty(id, 'icon-image') ?? null) !== JSON.stringify(image)) {
+      map.setLayoutProperty(id, 'icon-image', image);
+    }
   }
 }
 

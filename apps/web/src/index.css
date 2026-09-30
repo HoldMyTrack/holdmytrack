@@ -1653,6 +1653,16 @@ button.activities-panel__story-badge:hover {
   color: var(--fm-ink-secondary);
 }
 
+.spot-popup__captured {
+  display: flex;
+  align-items: center;
+  gap: var(--fm-space-4);
+  margin-top: var(--fm-space-6);
+  font-size: var(--fm-text-sm);
+  font-weight: 600;
+  color: var(--fm-accent);
+}
+
 .spot-popup__actions {
   display: flex;
   gap: var(--fm-space-8);

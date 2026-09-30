@@ -724,3 +724,21 @@ export async function getSpotsInArea(
   }
   return (await res.json()) as SpotsInArea;
 }
+
+/** One place the account has captured with the Android app (FR-15.6). */
+export interface SpotCapture {
+  spot_id: number;
+  captured_at: string;
+}
+
+/** `GET /v1/spots/captures` — the account's captured places, newest first. */
+export async function getSpotCaptures(signal?: AbortSignal): Promise<SpotCapture[]> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/spots/captures`, {
+    ...(signal ? { signal } : {}),
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
+  }
+  return ((await res.json()) as { captures: SpotCapture[] }).captures;
+}

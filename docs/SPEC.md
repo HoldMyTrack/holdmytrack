@@ -1157,6 +1157,9 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 | :-- | :-- |
 | `GET /tiles/v1/spots/{z}/{x}/{y}.mvt` | The places in one tile, and their areas |
 | `GET /v1/spots` | The places in a box — "Show in this area" (FR-15.5) |
+| `GET /v1/spots/{id}` | One place with its whole area, and when the caller captured it (FR-15.6) |
+| `GET /v1/spots/captures` | The places the caller has captured (FR-15.6) |
+| `POST /v1/spots/{id}/captures` | Capture a place (FR-15.6) |
 
 ### FR-15.1 Places
 
@@ -1174,7 +1177,7 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 
 **Behavior**:
 1. The Layers menu's Points of interest group (FR-4.13 describes the menu) has one checkbox per category — Playgrounds, Dog parks, Monuments, Mesmerizing views, Historic sites. Each works the same over Normal, Fog and Heatmap. All start off; each browser (or, in the Android app, each phone) remembers its choice, and a browser that had the former Show POI toggle on starts with every category on.
-2. From zoom 13 up — where the paths (FR-4.13) start too — each place in a ticked category is a round badge — its category's icon in ink on white, ringed in gold — at a point on its area, loaded as the map moves. Between zoom 10 and 13 places show only on request (FR-15.5); below zoom 10, none. Every place is drawn, however close to others. Playground's icon is a seesaw.
+2. From zoom 13 up — where the paths (FR-4.13) start too — each place in a ticked category is a round badge — its category's icon in ink on white, ringed in gold — at a point on its area, loaded as the map moves. Between zoom 10 and 13 places show only on request (FR-15.5); below zoom 10, none. Every place is drawn, however close to others. Playground's icon is a seesaw. A place the account has captured (FR-15.6) has a filled badge instead — its icon in white on gold, ringed darker — on the web and in the Android app alike; the web reads the account's captures again whenever the page comes back into view.
 3. From zoom 13 up, under each badge its area is shaded faintly in gold: the place's outline from OpenStreetMap, edged with a solid line, or — for a place mapped only as a point — its 30 m circle, edged with a dashed line. Clicking an area does nothing, and a track under it can still be clicked.
 4. Badges and areas are drawn over everything else, the Fog veil and map labels included, and Fog doesn't dim them.
 5. They hide during an Edit track session (FR-5.14) and come back after it.
@@ -1182,8 +1185,8 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 ### FR-15.3 The popup
 
 **Behavior**:
-1. Clicking a badge opens a popup at the place: its name (or its category, when OSM has no name), then — each only when the place has it — its category (when the name is the title), its memorial type, "Since" its start date, its description, its inscription (quoted, keeping its line breaks) and its address. A long description or inscription scrolls within the popup. Only one popup is open at a time.
-2. **Copy address** copies the address, or the place's coordinates as `latitude, longitude` when it has none, and shows **Copied** for a moment.
+1. Clicking a badge opens a popup at the place: its name (or its category, when OSM has no name), then — each only when the place has it — its category (when the name is the title), its memorial type, "Since" its start date, its description, its inscription (quoted, keeping its line breaks), its address, and "Captured" with the date for a place the account has captured (FR-15.6). A long description or inscription scrolls within the popup. Only one popup is open at a time.
+2. **Copy address** copies the address; for a place with none it reads **Copy location** and copies its coordinates as `latitude, longitude`. Either shows **Copied** for a moment.
 3. **Wikipedia**, shown only for a place with an article, opens that article on that language's Wikipedia in a new tab.
 4. Clicking a badge doesn't select or unfocus a track under it (FR-4.1). The popup closes with its × button, a click elsewhere on the map, or unticking its category.
 
@@ -1218,6 +1221,22 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 **Error cases**:
 - No session → `401`. A demo session sees the places too.
 - Non-numeric coordinates → `400`.
+
+### FR-15.6 Captures
+
+**Description**: A place an account has captured by staying inside it for 30 seconds with the Android app's capture mode on (`apps/android/docs/SPEC.md` FR-2.8, ADR-0023). Only the app captures; the web and the app both show what's captured (FR-15.2, FR-15.3). A capture is separate from a visit (ADR-0021), which isn't built.
+
+**Behavior**:
+1. `GET /v1/spots/{id}` answers one place: the fields of FR-15.5's places, `area` — its whole area as a GeoJSON MultiPolygon — and `captured_at` when the caller has captured it (absent otherwise).
+2. `GET /v1/spots/captures` answers `{captures}`: the caller's captured places as `{spot_id, captured_at}`, newest first; an empty list when there are none.
+3. `POST /v1/spots/{id}/captures` takes `{lat, lon}`, the position the phone last measured inside the place. The position must be inside the place's area, or within 10 m of it. The first capture of a place is kept: a new one answers `201`, a repeat `200` with the first one's `captured_at`, both as `{spot_id, captured_at}`.
+4. A capture belongs to its account and is deleted with it, or with its place.
+
+**Error cases**:
+- An unknown place, or an `id` that isn't a positive number → `404`.
+- A body without numeric `lat` and `lon`, or outside ±90/±180 → `400`.
+- A position farther than 10 m outside the place → `422`.
+- No session → `401`. A demo session can read but not capture → `403` (`demo_read_only`).
 
 ## 18. Non-Functional Requirements (summary)
 

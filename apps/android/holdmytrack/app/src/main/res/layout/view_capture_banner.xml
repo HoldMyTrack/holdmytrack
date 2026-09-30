@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Capture mode's banner (map/CaptureMode, apps/android/docs/SPEC.md FR-2.8), a map panel
+     under the chrome's second row: an arrow turned towards the spot, what to do ("Get into …",
+     "Stay here", "Captured!"), the distance or the seconds left over the hold's progress, and
+     Stop. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/capture_banner"
+    style="@style/Widget.HoldMyTrack.MapPanel"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="@dimen/hmt_space_12"
+    android:layout_marginTop="@dimen/hmt_space_8"
+    android:layout_marginEnd="@dimen/hmt_space_12"
+    android:accessibilityLiveRegion="polite"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/hmt_space_12"
+    android:paddingEnd="@dimen/hmt_space_4"
+    android:visibility="gone"
+    tools:visibility="visible">
+
+    <ImageView
+        android:id="@+id/capture_arrow"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:importantForAccessibility="no"
+        android:src="@drawable/ic_navigation"
+        app:tint="@color/hmt_accent" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/hmt_space_12"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:paddingTop="@dimen/hmt_space_8"
+        android:paddingBottom="@dimen/hmt_space_8">
+
+        <TextView
+            android:id="@+id/capture_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/hmt_ink"
+            android:textSize="@dimen/hmt_text_md"
+            android:textStyle="bold"
+            tools:text="Get into Berea Falls Scenic Overlook" />
+
+        <TextView
+            android:id="@+id/capture_detail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_2"
+            android:textColor="@color/hmt_ink_secondary"
+            android:textSize="@dimen/hmt_text_sm"
+            tools:text="240 m away" />
+
+        <com.google.android.material.progressindicator.LinearProgressIndicator
+            android:id="@+id/capture_progress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_6"
+            android:max="30"
+            android:visibility="gone"
+            app:indicatorColor="@color/hmt_accent"
+            app:trackCornerRadius="2dp"
+            app:trackThickness="4dp"
+            tools:progress="12"
+            tools:visibility="visible" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/capture_stop"
+        style="@style/Widget.HoldMyTrack.Button.Link"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/hmt_space_4"
+        android:text="@string/spots_capture_stop" />
+</LinearLayout>

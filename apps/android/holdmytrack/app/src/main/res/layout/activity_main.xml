@@ -351,6 +351,9 @@
                 android:layout_marginStart="@dimen/hmt_space_4"
                 android:visibility="gone" />
         </LinearLayout>
+
+        <!-- Capture mode's banner (map/CaptureMode). -->
+        <include layout="@layout/view_capture_banner" />
     </LinearLayout>
 
     <!-- The Edit window (include_edit_window, panel/EditActivityWindow), under the chrome row. -->
