@@ -25,7 +25,6 @@ import dev.holdmytrack.android.R
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.recording.db.LiveRecordingJournal
 import dev.holdmytrack.android.recording.db.RecordedActivityRecord
-import dev.holdmytrack.android.recording.db.SyncStatus
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.Executors
@@ -68,7 +67,7 @@ data class RecordingStats(
  * **Stop saves here, not in a screen**, for the same reason: Stop can come from the
  * notification. A recording shorter than [MIN_DURATION_MS] of moving time (pauses excluded),
  * or with fewer than two fixes, is dropped rather than saved. Otherwise it's inserted into
- * `recorded_activities` as [SyncStatus.NOT_SYNCED] with no name or description and the
+ * `recorded_activities` with no name or description and the
  * account's last-used type ([RecordingTypes.lastUsed]) — nothing is asked while recording —
  * and then `RecordingActivity`'s Save screen opens on the new row for name, type and
  * description. The row is already stored by then, so leaving that screen with Back keeps it
@@ -487,7 +486,6 @@ class RecordingService : Service() {
                 distanceMeters = distanceM,
                 durationSeconds = movingMs / 1000,
                 points = points,
-                syncStatus = SyncStatus.NOT_SYNCED,
                 createdAtMs = System.currentTimeMillis(),
             )
         }

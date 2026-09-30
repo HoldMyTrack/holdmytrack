@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- One Activities row, after the web's .activities-panel__row: the checkbox, then the text —
      the name or start time over "[date ·] distance · duration · type" — which is the row's own
-     tap target (select, fly to), and the Pending / Hidden / Story badges at the end
-     (panel/ActivityRows.kt; an open Story's rows on the Stories tab leave the checkbox out). A hairline under
-     it; selected, the accent tint and a bar down its left edge (bg_panel_row). -->
+     tap target (select, fly to), and the Pending / Hidden / Story badges at the end, the Story
+     badge opening its Story (panel/ActivityRows.kt). An open Story's rows on the Stories tab
+     leave the checkbox out and end in an × instead. A hairline under it; selected, the accent
+     tint and a bar down its left edge (bg_panel_row). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -79,6 +81,20 @@
         <TextView
             android:id="@+id/activity_story"
             style="@style/Widget.HoldMyTrack.PanelStatusBadge.Story"
-            android:layout_marginTop="@dimen/hmt_space_2" />
+            android:layout_marginTop="@dimen/hmt_space_2"
+            android:clickable="true"
+            android:focusable="true" />
     </LinearLayout>
+
+    <!-- An open Story's row only: takes the activity out of the Story (.stories-tab__remove). -->
+    <Button
+        android:id="@+id/activity_remove"
+        style="@style/Widget.HoldMyTrack.Button.RowIcon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="-12dp"
+        android:visibility="gone"
+        app:icon="@drawable/ic_x"
+        app:iconSize="16dp"
+        app:iconTint="@color/hmt_ink_muted" />
 </LinearLayout>

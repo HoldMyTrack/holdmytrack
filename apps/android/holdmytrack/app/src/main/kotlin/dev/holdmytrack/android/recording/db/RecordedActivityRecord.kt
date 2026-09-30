@@ -5,21 +5,11 @@ import java.time.Instant
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Sync state a locally recorded activity moves through. Deliberately two values, not more
- *  — a successful submit deletes the row from the device (the activity now lives on the
- *  server), and a failed one simply leaves it [QUEUED] rather than introducing a "failed"
- *  state, so the next "Sync Now" retries it without the user having to notice or re-check
- *  anything (the same resumable-retry posture Health Connect sync already has). */
-object SyncStatus {
-    const val NOT_SYNCED = "not_synced"
-    const val QUEUED = "queued"
-}
-
 /**
  * One GPS recording, persisted locally by `RecordingService` the moment it stops rather than
- * submitted immediately — submission is a separate, explicit step (the row's checkbox on the
- * Sync Source screen, `RecordedActivityRows`, then its "Sync now", which walks rows here
- * marked [SyncStatus.QUEUED]), after which the row is deleted from the device.
+ * submitted immediately — submission is a separate, explicit step (the Sync screen's "Sync now",
+ * which sends every row here), after which the row is deleted from the device. A failed submit
+ * leaves the row as it is, so the next Sync now retries it.
  *
  * [id] is the same client-generated UUID used as `external_id` on the wire
  * (`docs/IMPLEMENTATION.md` §4.0.4) — minted once at Start (it keys the recording's journal,
@@ -34,7 +24,6 @@ data class RecordedActivityRecord(
     val distanceMeters: Double,
     val durationSeconds: Long,
     val points: List<RecordedPoint>,
-    val syncStatus: String,
     val createdAtMs: Long,
 )
 

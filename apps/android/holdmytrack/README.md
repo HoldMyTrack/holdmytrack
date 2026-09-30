@@ -51,23 +51,23 @@ Both buttons appear only when the API the app points at has them configured (`GE
 Everything is under `app/src/main/kotlin/dev/holdmytrack/android/`:
 
 - `HoldMyTrackApplication.kt` — process-level setup. The load-bearing line is `HttpRequestUtil.setOkHttpClient`, which replaces MapLibre Native's own HTTP client with the app's. The map SDK fetches the style, the archive and every tile through a stack the app's API client never sees, so without this the session would reach none of the user layers.
-- `MainActivity.kt` — the map, the on-map mode toggle, the burger menu (Profile, Sync), and MapLibre's lifecycle forwarding.
+- `MainActivity.kt` — the map, the on-map mode toggle, the burger menu (Profile, Sync, Settings, and the web's Donate, About, Help and Contacts pages), and MapLibre's lifecycle forwarding.
 - `ProfileActivity.kt` — the account half of the burger menu: who is signed in, and sign in/out.
 - `SignInActivity.kt` — sign in, create an account, or start a demo account.
 - `net/Session.kt` — the session token, held process-wide and mirrored to private `SharedPreferences`.
 - `net/HoldMyTrackApi.kt` — the whole HTTP surface: the shared `OkHttpClient`, the interceptor that attaches the token to HoldMyTrack's own origin and nowhere else, and the five calls the app makes.
 - `map/MapOverlays.kt` — the tracks, fog and heatmap layers, their ordering beneath the basemap's labels, and the three-way mode toggle.
-- `SyncActivity.kt` — Health Connect onboarding and the sync run. Also registered for `ACTION_SHOW_PERMISSIONS_RATIONALE`, so Health Connect opens it as the app's own explanation of what it reads.
+- `SyncActivity.kt` — the Sync screen: Health Connect onboarding, the recordings, and the sync run. Also registered for `ACTION_SHOW_PERMISSIONS_RATIONALE`, so Health Connect opens it as the app's own explanation of what it reads.
 - `health/HealthConnect.kt` — availability, the three permissions, and the readiness states the onboarding walks through.
 - `health/ExerciseTypes.kt` — Health Connect's exercise type to HoldMyTrack's `activity_type`, normalised onto the vocabulary the other ingest paths already produce.
 - `sync/SyncCursor.kt` — the watermark. Read its comment before changing anything about it.
 - `sync/SyncRunner.kt` — one foreground sync run: read, classify, batch, post, advance.
-- `panel/` — the map's Activities panel, the web's phone sheet: `ActivitiesPanel.kt` (the sheet and its Activities tab), `PanelState.kt` and `ActivityFacets.kt` (its rules, unit-tested), `EditActivityWindow.kt` (Edit), `TrackEditor.kt` and `EditTrackOps.kt` (its Track tab, the rules unit-tested), `SyncTab.kt` (the sync history: pending work, failure detail, View on map), `PrivacyTab.kt` (Private locations).
+- `sync/ImportHistory.kt` — the Sync screen's history of every import and the duplicates, the web's `/sync` page.
+- `panel/` — the map's Activities panel, the web's phone sheet: `ActivitiesPanel.kt` (the sheet and its Activities tab), `PanelState.kt` and `ActivityFacets.kt` (its rules, unit-tested), `EditActivityWindow.kt` (Edit), `TrackEditor.kt` and `EditTrackOps.kt` (its Track tab, the rules unit-tested), `StoriesTab.kt` (Stories), `PrivacyTab.kt` (Private locations).
 
 Alongside:
 
 - `gradle/libs.versions.toml` — every dependency version, including MapLibre Native.
-- `../poc-healthconnect/` — a separate, throwaway build answering the roadmap's Phase 1 questions. Not a module of this project, and deleted once its findings are recorded.
 
 ## Syncing from Health Connect
 

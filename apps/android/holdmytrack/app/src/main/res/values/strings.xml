@@ -150,7 +150,11 @@
     </plurals>
     <string name="locate_needs_location">HoldMyTrack needs location access to show where you are.</string>
     <string name="menu_profile">Profile</string>
-    <string name="menu_sync">Sync Source</string>
+    <string name="menu_sync">Sync</string>
+    <string name="menu_donate">Donate</string>
+    <string name="menu_about">About</string>
+    <string name="menu_help">Help</string>
+    <string name="menu_contacts">Contacts</string>
 
     <string name="settings_title">Settings</string>
     <string name="settings_onboarding_title">Welcome — set up your account</string>
@@ -237,17 +241,14 @@
     <string name="unit_mph">%1$.1f mph</string>
 
     <string name="recorded_empty">No recorded activities yet.</string>
-    <string name="recorded_row_queue">Queue for sync</string>
-    <string name="recorded_row_queue_named">Queue %1$s for sync</string>
     <string name="recorded_row_edit_named">Edit %1$s</string>
     <string name="recorded_row_delete_named">Delete %1$s</string>
-    <string name="recorded_row_subtitle">%1$s · %2$s</string>
     <string name="recording_delete">Delete</string>
     <string name="recorded_row_preview">Route preview</string>
     <string name="recorded_delete_confirm_title">Delete this recording?</string>
     <string name="recorded_delete_confirm_message">It hasn\'t been synced, so this is the only copy. This can\'t be undone.</string>
 
-    <string name="sync_title">Sync Source</string>
+    <string name="sync_title">Sync</string>
     <string name="sync_rationale">HoldMyTrack reads your recorded exercise sessions and their GPS routes from Health Connect, and adds the outdoor ones to your map. It reads nothing else — no heart rate, no weight, no sleep — and it never writes anything back. Sessions recorded indoors have no route, so they are skipped.</string>
     <string name="sync_section_recorded">Recorded activities</string>
     <string name="sync_source_health_connect">Health Connect</string>
@@ -299,8 +300,9 @@
     <string name="status_row_failed_with">Failed: %1$s</string>
     <string name="status_view_on_map">View on map</string>
     <string name="status_range">%1$d–%2$d of %3$d</string>
-    <string name="status_previous_page">Previous page</string>
-    <string name="status_next_page">Next page</string>
+    <string name="status_range_one">%1$d of %2$d</string>
+    <string name="status_newer">← Newer</string>
+    <string name="status_older">Older →</string>
     <string name="source_health_connect" translatable="false">Health Connect</string>
     <string name="source_health_kit" translatable="false">HealthKit</string>
     <string name="source_upload">an uploaded file</string>
@@ -313,14 +315,15 @@
     <!-- The map's Activities panel (panel/ActivitiesPanel.kt), after the web's activities.* and filters.* messages. -->
     <string name="panel_label">Activities panel</string>
     <string name="panel_tab_activities">Activities</string>
-    <string name="panel_tab_sync">Sync</string>
-    <string name="panel_sync_subtext">Everything imported, from the phone or the web</string>
     <string name="panel_unit_m">m</string>
     <string name="panel_unit_ft">ft</string>
-    <string name="panel_loaded">%1$s loaded</string>
     <string name="panel_loading">Loading…</string>
-    <string name="panel_expand">Show the activities list</string>
-    <string name="panel_collapse">Hide the activities list</string>
+    <string name="panel_expand">Expand the panel</string>
+    <string name="panel_collapse">Collapse the panel</string>
+    <string name="panel_select_menu">Select</string>
+    <string name="panel_select_all">All</string>
+    <string name="panel_select_none">None</string>
+    <string name="panel_select_invert">Invert</string>
     <string name="panel_type">Type</string>
     <string name="panel_all_types">All types</string>
     <string name="panel_filter_by_type">Filter by type</string>
@@ -331,7 +334,6 @@
     <string name="panel_distance_range">%1$s – %2$s %3$s</string>
     <string name="panel_check_all">Check all activities</string>
     <string name="panel_uncheck_all">Uncheck all activities</string>
-    <string name="panel_invert">Invert selection</string>
     <string name="panel_hide_target">Hide %1$s from the map</string>
     <string name="panel_show_target">Show %1$s on the map</string>
     <string name="panel_focus_target">Focus the map on %1$s</string>
@@ -344,8 +346,9 @@
     <string name="panel_row_check">Add %1$s to selection</string>
     <string name="panel_row_uncheck">Remove %1$s from selection</string>
     <string name="panel_fly_to">Fly to %1$s</string>
-    <string name="panel_duplicates_failed">Duplicates — failed to load</string>
-    <string name="panel_duplicate_from">From %1$s — replaced by the copy from %2$s.</string>
+    <string name="duplicate_from">From %1$s, replaced by the copy from %2$s.</string>
+    <string name="duplicates_title">Duplicates</string>
+    <string name="duplicates_subtext">Activities recorded twice, by your watch and your phone, say. Only the fuller copy is kept on the map.</string>
     <string name="panel_duration_hm">%1$dh %2$dm</string>
     <string name="panel_duration_m">%1$dm</string>
     <string name="panel_duration_s">%1$ds</string>
@@ -354,10 +357,6 @@
     <plurals name="panel_checked_count">
         <item quantity="one">%1$d checked activity</item>
         <item quantity="other">%1$d checked activities</item>
-    </plurals>
-    <plurals name="panel_duplicates_found">
-        <item quantity="one">%1$d duplicate found</item>
-        <item quantity="other">%1$d duplicates found</item>
     </plurals>
 
     <!-- The panel's Edit and Delete (panel/EditActivityWindow.kt), after the web's edit.* and activities.delete_* messages. -->
@@ -438,11 +437,19 @@
     <string name="private_delete_label">Delete %1$s</string>
     <string name="private_delete_failed">Could not delete it: %1$s</string>
 
-    <!-- Stories (panel/StoriesTab.kt, panel/StoryDialog.kt, the Edit window's Stories tab and the
+    <!-- Stories (panel/StoriesTab.kt, panel/StoryDialog.kt, Add to story (panel/ActivitiesPanel.kt) and the
          rows' Story badge), after the web's stories.* messages. -->
     <string name="panel_tab_stories">Stories</string>
     <string name="story_subtext">Hand-picked sets of your activities. Only you can see them.</string>
-    <string name="story_empty">No stories yet. On the Activities tab, check the activities you want, then choose Create story.</string>
+    <string name="story_empty">No stories yet. On the Activities tab, select or check the activities you want, then choose Add to story.</string>
+    <string name="story_add_target">Add %1$s to a story</string>
+    <string name="story_demo_add">Not available for demo accounts — create an account to make stories</string>
+    <string name="story_new">New story…</string>
+    <string name="story_holds_all">Already in this story</string>
+    <string name="story_adding">Adding…</string>
+    <string name="story_remove">Remove from story</string>
+    <string name="story_demo_remove">Not available for demo accounts — create an account to change stories</string>
+    <string name="panel_open_story">Open “%1$s”</string>
     <string name="story_no_activities">No activities in this story.</string>
     <string name="story_not_found">This story doesn\'t exist, or isn\'t yours.</string>
     <string name="story_load_failed">Could not load your stories</string>
@@ -456,9 +463,6 @@
     <string name="story_delete_confirm">Delete “%1$s”? Its activities stay.</string>
     <string name="story_delete_button">Delete story</string>
     <string name="story_delete_failed">Could not delete the story: %1$s</string>
-    <string name="story_create_target">Create a story from %1$s</string>
-    <string name="story_create_none">Check activities to make a story of them</string>
-    <string name="story_demo_create">Not available for demo accounts — create an account to make stories</string>
     <string name="story_create_title">Create story</string>
     <string name="story_create_body">A story of %1$s. Only you can see it.</string>
     <string name="story_name">Name</string>
@@ -490,15 +494,6 @@
         <item quantity="one">Also in %1$d other story: %2$s</item>
         <item quantity="other">Also in %1$d other stories: %2$s</item>
     </plurals>
-    <string name="edit_tab_stories">Stories</string>
-    <string name="edit_stories_hint_one">Tick a story to put this activity in it, clear one to take it out.</string>
-    <plurals name="edit_stories_hint">
-        <item quantity="one">Tick a story to put all %1$d activity in it, clear one to take it out.</item>
-        <item quantity="other">Tick a story to put all %1$d activities in it, clear one to take them all out.</item>
-    </plurals>
-    <string name="edit_stories_some">Holds some of these activities</string>
-    <string name="edit_stories_empty">No stories yet. Check activities in the list and choose Create story to make one.</string>
-    <string name="edit_stories_unsaved">Stories, with unsaved changes</string>
 
     <!-- Activity types' display names, the web's activity_type.* (RecordingTypes.label); a type without one is title-cased from its raw value. -->
     <string name="activity_type_alpine_skiing">Alpine Skiing</string>

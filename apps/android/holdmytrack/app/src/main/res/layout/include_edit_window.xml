@@ -2,9 +2,8 @@
 <!-- The Edit window (panel/EditActivityWindow.kt), after the web's EditActivityWindow.tsx at phone
      width: a card floating over the top of the map, under the chrome row (its top margin is set
      in MainActivity), rather than a modal dialog, so its Track tab can edit on the map. The title
-     and whose it is, the Activity, Track and Stories tabs — Type, Name and Description on the
-     first, the track editor (panel/TrackEditor) on the second, the account's Stories as
-     checkboxes on the third — then an error line, and Cancel and Save.
+     and whose it is, the Activity and Track tabs — Type, Name and Description on the first, the
+     track editor (panel/TrackEditor) on the second — then an error line, and Cancel and Save.
      Clickable, so a touch on it never reaches the map. -->
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -95,29 +94,6 @@
                         android:layout_marginStart="@dimen/hmt_space_6"
                         android:background="@drawable/bg_panel_dot"
                         android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/edit_tab_stories"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/hmt_space_16"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:minHeight="40dp"
-                        android:gravity="center_vertical"
-                        android:paddingBottom="@dimen/hmt_space_6"
-                        android:text="@string/edit_tab_stories"
-                        android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleSmall" />
-
-                    <!-- Story boxes changed since the window opened. -->
-                    <View
-                        android:id="@+id/edit_tab_stories_dot"
-                        android:layout_width="6dp"
-                        android:layout_height="6dp"
-                        android:layout_gravity="center_vertical"
-                        android:layout_marginStart="@dimen/hmt_space_6"
-                        android:background="@drawable/bg_panel_dot"
-                        android:visibility="gone" />
                 </LinearLayout>
 
                 <View
@@ -202,30 +178,6 @@
             </LinearLayout>
 
             <include layout="@layout/include_track_editor" />
-
-            <!-- The Stories tab (apps/android/docs/SPEC.md FR-2.7 item 17): the hint, or loading, none yet,
-                 or the read's error, then one checkbox row per Story (item_edit_story). -->
-            <LinearLayout
-                android:id="@+id/edit_stories_panel"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:visibility="gone">
-
-                <TextView
-                    android:id="@+id/edit_stories_note"
-                    style="@style/Widget.HoldMyTrack.Hint"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/hmt_space_10" />
-
-                <LinearLayout
-                    android:id="@+id/edit_stories_rows"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/hmt_space_4"
-                    android:orientation="vertical" />
-            </LinearLayout>
 
             <TextView
                 android:id="@+id/edit_error"

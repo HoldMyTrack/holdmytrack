@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One sync history row, after the web's .sync-tab__row: on the left the name, one line,
-     and under it a finished row's date and distance (.sync-tab__row-meta); on the right the
-     status, and under it View on map (.sync-tab__row-view) for a row that became an activity.
-     Filled by panel/SyncTab. -->
+<!-- One sync history or duplicate row, after the web's /sync .sync__row: on the left the name,
+     one line, and under it a finished row's date and distance (.sync__detail); on the right the
+     status, and under it View on map (.sync__map) for a row that became an activity. Filled by
+     sync/ImportHistory. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"

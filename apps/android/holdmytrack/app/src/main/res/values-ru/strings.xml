@@ -163,7 +163,11 @@
     </plurals>
     <string name="locate_needs_location">HoldMyTrack нужен доступ к местоположению, чтобы показать, где вы.</string>
     <string name="menu_profile">Профиль</string>
-    <string name="menu_sync">Источник синхронизации</string>
+    <string name="menu_sync">Синхронизация</string>
+    <string name="menu_donate">Поддержать</string>
+    <string name="menu_about">О проекте</string>
+    <string name="menu_help">Справка</string>
+    <string name="menu_contacts">Контакты</string>
 
     <string name="settings_title">Настройки</string>
     <string name="settings_onboarding_title">Добро пожаловать! Настройте аккаунт</string>
@@ -249,17 +253,14 @@
     <string name="unit_mph">%1$.1f ми/ч</string>
 
     <string name="recorded_empty">Записанных занятий пока нет.</string>
-    <string name="recorded_row_queue">Поставить в очередь на синхронизацию</string>
-    <string name="recorded_row_queue_named">Поставить в очередь на синхронизацию: %1$s</string>
     <string name="recorded_row_edit_named">Изменить: %1$s</string>
     <string name="recorded_row_delete_named">Удалить: %1$s</string>
-    <string name="recorded_row_subtitle">%1$s · %2$s</string>
     <string name="recording_delete">Удалить</string>
     <string name="recorded_row_preview">Предпросмотр маршрута</string>
     <string name="recorded_delete_confirm_title">Удалить эту запись?</string>
     <string name="recorded_delete_confirm_message">Она не синхронизирована, так что это единственная копия. Это нельзя отменить.</string>
 
-    <string name="sync_title">Источник синхронизации</string>
+    <string name="sync_title">Синхронизация</string>
     <string name="sync_rationale">HoldMyTrack читает из Health Connect ваши записанные тренировки и их GPS-маршруты и добавляет тренировки на улице на вашу карту. Больше он ничего не читает — ни пульс, ни вес, ни сон — и никогда ничего не записывает обратно. У тренировок в помещении нет маршрута, поэтому они пропускаются.</string>
     <string name="sync_section_recorded">Записанные занятия</string>
     <string name="sync_source_health_connect">Health Connect</string>
@@ -313,8 +314,9 @@
     <string name="status_row_failed_with">Ошибка: %1$s</string>
     <string name="status_view_on_map">Показать на карте</string>
     <string name="status_range">%1$d–%2$d из %3$d</string>
-    <string name="status_previous_page">Предыдущая страница</string>
-    <string name="status_next_page">Следующая страница</string>
+    <string name="status_range_one">%1$d из %2$d</string>
+    <string name="status_newer">← Новее</string>
+    <string name="status_older">Старше →</string>
     <string name="source_upload">загруженного файла</string>
     <string name="source_takeout">импорта Google Takeout</string>
     <string name="source_recorded">GPS-записи</string>
@@ -324,14 +326,15 @@
     <!-- The map's Activities panel (panel/ActivitiesPanel.kt), after the web's activities.* and filters.* messages. -->
     <string name="panel_label">Панель занятий</string>
     <string name="panel_tab_activities">Занятия</string>
-    <string name="panel_tab_sync">Синхронизация</string>
-    <string name="panel_sync_subtext">Всё импортированное — с телефона или из веба</string>
     <string name="panel_unit_m">м</string>
     <string name="panel_unit_ft">фт</string>
-    <string name="panel_loaded">Загружено: %1$s</string>
     <string name="panel_loading">Загрузка…</string>
-    <string name="panel_expand">Показать список занятий</string>
-    <string name="panel_collapse">Скрыть список занятий</string>
+    <string name="panel_expand">Развернуть панель</string>
+    <string name="panel_collapse">Свернуть панель</string>
+    <string name="panel_select_menu">Выбрать</string>
+    <string name="panel_select_all">Все</string>
+    <string name="panel_select_none">Ничего</string>
+    <string name="panel_select_invert">Обратить выбор</string>
     <string name="panel_type">Тип</string>
     <string name="panel_all_types">Все типы</string>
     <string name="panel_filter_by_type">Фильтр по типу</string>
@@ -342,7 +345,6 @@
     <string name="panel_distance_range">%1$s – %2$s %3$s</string>
     <string name="panel_check_all">Отметить все занятия</string>
     <string name="panel_uncheck_all">Снять отметку со всех занятий</string>
-    <string name="panel_invert">Инвертировать выбор</string>
     <string name="panel_hide_target">Скрыть с карты: %1$s</string>
     <string name="panel_show_target">Показать на карте: %1$s</string>
     <string name="panel_focus_target">Приблизить карту: %1$s</string>
@@ -355,8 +357,9 @@
     <string name="panel_row_check">Отметить «%1$s»</string>
     <string name="panel_row_uncheck">Снять отметку с «%1$s»</string>
     <string name="panel_fly_to">Перейти к «%1$s»</string>
-    <string name="panel_duplicates_failed">Дубликаты — не удалось загрузить</string>
-    <string name="panel_duplicate_from">Из %1$s — заменено копией из %2$s.</string>
+    <string name="duplicate_from">Из %1$s, заменено копией из %2$s.</string>
+    <string name="duplicates_title">Дубликаты</string>
+    <string name="duplicates_subtext">Занятия, записанные дважды, например часами и телефоном. На карте остаётся только более полная копия.</string>
     <string name="panel_duration_hm">%1$d ч %2$d мин</string>
     <string name="panel_duration_m">%1$d мин</string>
     <string name="panel_duration_s">%1$d с</string>
@@ -367,12 +370,6 @@
         <item quantity="few">%1$d отмеченных занятия</item>
         <item quantity="many">%1$d отмеченных занятий</item>
         <item quantity="other">%1$d отмеченного занятия</item>
-    </plurals>
-    <plurals name="panel_duplicates_found">
-        <item quantity="one">Найден %1$d дубликат</item>
-        <item quantity="few">Найдено %1$d дубликата</item>
-        <item quantity="many">Найдено %1$d дубликатов</item>
-        <item quantity="other">Найдено %1$d дубликата</item>
     </plurals>
 
     <!-- The panel's Edit and Delete (panel/EditActivityWindow.kt), after the web's edit.* and activities.delete_* messages. -->
@@ -457,11 +454,19 @@
     <string name="private_delete_label">Удалить «%1$s»</string>
     <string name="private_delete_failed">Не удалось удалить: %1$s</string>
 
-    <!-- Stories (panel/StoriesTab.kt, panel/StoryDialog.kt, the Edit window's Stories tab and the
+    <!-- Stories (panel/StoriesTab.kt, panel/StoryDialog.kt, Add to story (panel/ActivitiesPanel.kt) and the
          rows' Story badge), after the web's stories.* messages. -->
     <string name="panel_tab_stories">Истории</string>
     <string name="story_subtext">Подборки ваших занятий. Видны только вам.</string>
-    <string name="story_empty">Историй пока нет. На вкладке «Занятия» отметьте нужные занятия и выберите «Создать историю».</string>
+    <string name="story_empty">Историй пока нет. На вкладке «Занятия» выберите или отметьте нужные занятия и нажмите «Добавить в историю».</string>
+    <string name="story_add_target">Добавить в историю: %1$s</string>
+    <string name="story_demo_add">Недоступно в демо-аккаунте — создайте аккаунт, чтобы собирать истории</string>
+    <string name="story_new">Новая история…</string>
+    <string name="story_holds_all">Уже в этой истории</string>
+    <string name="story_adding">Добавление…</string>
+    <string name="story_remove">Убрать из истории</string>
+    <string name="story_demo_remove">Недоступно в демо-аккаунте — создайте аккаунт, чтобы изменять истории</string>
+    <string name="panel_open_story">Открыть «%1$s»</string>
     <string name="story_no_activities">В этой истории нет занятий.</string>
     <string name="story_not_found">Такой истории нет, или она не ваша.</string>
     <string name="story_load_failed">Не удалось загрузить истории</string>
@@ -475,9 +480,6 @@
     <string name="story_delete_confirm">Удалить «%1$s»? Занятия останутся.</string>
     <string name="story_delete_button">Удалить историю</string>
     <string name="story_delete_failed">Не удалось удалить историю: %1$s</string>
-    <string name="story_create_target">Создать историю: %1$s</string>
-    <string name="story_create_none">Отметьте занятия, чтобы собрать из них историю</string>
-    <string name="story_demo_create">Недоступно в демо-аккаунте — создайте аккаунт, чтобы собирать истории</string>
     <string name="story_create_title">Создать историю</string>
     <string name="story_create_body">История из: %1$s. Видна только вам.</string>
     <string name="story_name">Название</string>
@@ -517,17 +519,6 @@
         <item quantity="many">Также в %1$d других историях: %2$s</item>
         <item quantity="other">Также в %1$d других историях: %2$s</item>
     </plurals>
-    <string name="edit_tab_stories">Истории</string>
-    <string name="edit_stories_hint_one">Отметьте историю, чтобы добавить в неё это занятие, снимите отметку, чтобы убрать.</string>
-    <plurals name="edit_stories_hint">
-        <item quantity="one">Отметьте историю, чтобы добавить в неё все %1$d занятие, снимите отметку, чтобы убрать их.</item>
-        <item quantity="few">Отметьте историю, чтобы добавить в неё все %1$d занятия, снимите отметку, чтобы убрать их.</item>
-        <item quantity="many">Отметьте историю, чтобы добавить в неё все %1$d занятий, снимите отметку, чтобы убрать их.</item>
-        <item quantity="other">Отметьте историю, чтобы добавить в неё все %1$d занятия, снимите отметку, чтобы убрать их.</item>
-    </plurals>
-    <string name="edit_stories_some">Содержит часть этих занятий</string>
-    <string name="edit_stories_empty">Историй пока нет. Отметьте занятия в списке и выберите «Создать историю».</string>
-    <string name="edit_stories_unsaved">Истории, с несохранёнными изменениями</string>
 
     <!-- Activity types' display names, the web's activity_type.* (RecordingTypes.label); a type without one is title-cased from its raw value. -->
     <string name="activity_type_alpine_skiing">Горные лыжи</string>

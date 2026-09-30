@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Sync Source: every place activities come from on this device, each with its own checkbox,
-     and one "Sync now" that sends whatever is checked. After the web's Sync tab
-     (apps/web/src/ui/SyncTab.tsx, .sync-tab in index.css): its 16dp padding and gap, where
-     things stand in a notice box, and what a run did in notices
-     under the button that started it. -->
+<!-- Sync: what this phone sends, and everything imported so far. Health Connect and the
+     recordings on the device, one Sync now that sends all of it, then the sync history and
+     the duplicates, the web's /sync page (services/server/internal/web/templates/pages/sync.html)
+     under it. 16dp padding and gap; where things stand in a notice box, and what a run did in
+     notices under the button that started it. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -19,7 +19,7 @@
         android:padding="@dimen/hmt_space_16"
         android:showDividers="middle">
 
-        <!-- Why nothing below can sync: signed out, email unconfirmed, or the read-only demo
+        <!-- Why nothing here can sync: signed out, email unconfirmed, or the read-only demo
              account (SyncActivity.render). -->
         <TextView
             android:id="@+id/sync_account_notice"
@@ -28,15 +28,14 @@
             android:layout_height="wrap_content"
             android:visibility="gone" />
 
-        <!-- Health Connect: its own checkbox with an info button beside it, then "Open Health
-             Connect", where its setup stands and whatever it takes to finish it. The checkbox is
-             disabled while that setup is unfinished. The info button opens the rationale
+        <!-- Health Connect: its title with an info button beside it, where its setup stands, and
+             the one step it still needs, if any. The info button opens the rationale
              (SyncActivity.showRationale), which Health Connect itself asks this screen for. -->
         <LinearLayout
             android:id="@+id/sync_health_connect_section"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:divider="@drawable/gap_16"
+            android:divider="@drawable/gap_8"
             android:orientation="vertical"
             android:showDividers="middle">
 
@@ -46,13 +45,13 @@
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <com.google.android.material.checkbox.MaterialCheckBox
-                    android:id="@+id/sync_health_connect"
+                <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:accessibilityHeading="true"
                     android:text="@string/sync_source_health_connect"
-                    android:textAppearance="?attr/textAppearanceTitleSmall" />
+                    android:textAppearance="@style/TextAppearance.HoldMyTrack.Overline" />
 
                 <Button
                     android:id="@+id/sync_health_connect_info"
@@ -62,13 +61,6 @@
                     android:contentDescription="@string/sync_health_connect_info"
                     app:icon="@drawable/ic_info" />
             </LinearLayout>
-
-            <Button
-                android:id="@+id/sync_open_health_connect"
-                style="@style/Widget.HoldMyTrack.Button.Outlined"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/sync_open_health_connect" />
 
             <!-- Where Health Connect stands: ready, a permission missing. A notice, or the error
                  box when Health Connect couldn't be opened (SyncActivity.showStatus). -->
@@ -107,6 +99,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="@dimen/hmt_space_8"
+                android:accessibilityHeading="true"
                 android:text="@string/sync_section_recorded"
                 android:textAppearance="@style/TextAppearance.HoldMyTrack.Overline" />
 
@@ -133,9 +126,9 @@
             android:text="@string/sync_now" />
 
         <!-- The run: progress while it goes, then what it did in a notice, and what it couldn't
-             — rejected activities, why it stopped, or the whole run failing — in the error box,
-             the web's .sync-tab__notice and its error modifier. Selectable, since a rejection's
-             reason is exactly what someone would paste into a bug report. -->
+             — rejected activities, why it stopped, or the whole run failing — in the error box.
+             Selectable, since a rejection's reason is exactly what someone would paste into a
+             bug report. -->
         <TextView
             android:id="@+id/sync_results"
             style="@style/Widget.HoldMyTrack.Notice"
@@ -152,5 +145,110 @@
             android:layout_height="wrap_content"
             android:textIsSelectable="true"
             android:visibility="gone" />
+
+        <!-- The sync history (the web's /sync list): every import from every source, newest
+             first, a page at a time. Filled by sync/ImportHistory. -->
+        <LinearLayout
+            android:id="@+id/sync_history_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_8"
+            android:orientation="vertical">
+
+            <include
+                android:id="@+id/sync_head"
+                layout="@layout/include_list_head" />
+
+            <TextView
+                android:id="@+id/sync_error"
+                style="@style/Widget.HoldMyTrack.Notice.Error"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/hmt_space_8"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/sync_empty"
+                style="@style/Widget.HoldMyTrack.Hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/status_summary_empty"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/sync_rows"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_list_top"
+                android:orientation="vertical" />
+
+            <!-- The web's .sync__pager: ← Newer, the range, Older →, both buttons always in
+                 their places, the one with nowhere to go disabled. Only past one page. -->
+            <LinearLayout
+                android:id="@+id/sync_pager"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_4"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <Button
+                    android:id="@+id/sync_newer"
+                    style="@style/Widget.HoldMyTrack.Button.Link"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/status_newer" />
+
+                <TextView
+                    android:id="@+id/sync_range"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:textAppearance="?attr/textAppearanceLabelSmall"
+                    android:textColor="@color/hmt_ink_meta"
+                    android:textFontWeight="400" />
+
+                <Button
+                    android:id="@+id/sync_older"
+                    style="@style/Widget.HoldMyTrack.Button.Link"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/status_older" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- The duplicates cross-source detection set aside (the web's /sync, under the history):
+             gone when there are none. Filled by sync/ImportHistory. -->
+        <LinearLayout
+            android:id="@+id/sync_duplicates_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:accessibilityHeading="true"
+                android:text="@string/duplicates_title"
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.Overline" />
+
+            <TextView
+                style="@style/Widget.HoldMyTrack.Hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_4"
+                android:layout_marginBottom="@dimen/hmt_space_8"
+                android:text="@string/duplicates_subtext" />
+
+            <LinearLayout
+                android:id="@+id/sync_duplicates_rows"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_list_top"
+                android:orientation="vertical" />
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>

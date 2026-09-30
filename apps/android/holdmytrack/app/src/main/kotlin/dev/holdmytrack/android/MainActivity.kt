@@ -27,6 +27,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import com.google.android.material.button.MaterialButton
@@ -175,8 +176,13 @@ class MainActivity : AppCompatActivity() {
     private var trackMetrics: TrackMetrics? = null
     private var trackMetricsFor: String? = null
 
-    /** A Sync tab row's activity, to select once its range's list has it (`viewActivityOnMap`). */
+    /** A Sync history row's activity, to select once its range's list has it
+     *  (`viewActivityOnMap`). */
     private var pendingFocusId: String? = null
+
+    /** A View on map from the Sync screen ([viewOnMap]) — the activity and when it started —
+     *  waiting for the session to be confirmed. */
+    private var viewOnMapRequest: Pair<String, String>? = null
 
     /** The activity whose track the Edit window's Track tab is editing, while it is. */
     private var editingTrackId: String? = null
@@ -193,7 +199,7 @@ class MainActivity : AppCompatActivity() {
     private var pendingIds: Set<String> = emptySet()
 
     /** Re-reads the list while any of it is Pending, the web's `EDIT_PENDING_POLL_MS`. */
-    private val pendingPoll = Runnable { selectedRange?.let { loadActivities(it, fly = false) } }
+    private val pendingPoll = Runnable { reloadList() }
     private lateinit var dateFooter: View
     private lateinit var dateSlider: DateRangeSlider
     private lateinit var activityDays: ActivityDays
@@ -203,16 +209,9 @@ class MainActivity : AppCompatActivity() {
     private var selectedRange: DateRange? = null
 
     /** The Story open on the Stories tab (`docs/SPEC.md` FR-14.6), or null: while one is, the
-     *  tracks, the list and the date range are its activities only. */
+     *  tracks and the list are all of its activities, whatever [selectedRange] is — which
+     *  opening a Story leaves alone, so closing it goes straight back. */
     private var storyId: String? = null
-
-    /** The range from before the first Story opened, and whether the user had picked it —
-     *  what closing the Story goes back to. Moving from Story to Story keeps it. */
-    private var beforeStory: Pair<DateRange?, Boolean>? = null
-
-    /** A Story just opened is waiting for its days: its range, first to last activity day,
-     *  is set once they're in, and the camera fits it. */
-    private var storySpanPending = false
 
     /** Whether the user has picked [selectedRange] themselves. Until then it is the default,
      *  re-derived whenever the activity days reload — so a first sync on an empty account
@@ -399,17 +398,18 @@ class MainActivity : AppCompatActivity() {
             onFly = ::flyToActivities,
             onEdit = ::openEditWindow,
             onDeleted = ::onActivitiesDeleted,
-            onViewOnMap = ::viewActivityOnMap,
             onTabChanged = { tab ->
                 // Leaving the Stories tab closes its Story.
                 if (tab != PanelTab.STORIES && storyId != null) exitStory()
-                renderPrivacy()
+                // The footer is the Activities tab's; renderDateFooter renders Privacy too.
+                renderDateFooter()
             },
             onOpenStory = ::enterStory,
             onCloseStory = ::exitStory,
             // A Story just made opens straight away, on the Stories tab.
             onStoryCreated = { story -> enterStory(story.id) },
-            onStoriesChanged = { selectedRange?.let { loadActivities(it, fly = false) } },
+            onStoriesChanged = { reloadList() },
+            onRemovedFromStory = ::onRemovedFromStory,
         )
         privacyTab = PrivacyTab(
             findViewById(R.id.panel_privacy_content),
@@ -457,7 +457,10 @@ class MainActivity : AppCompatActivity() {
         setMode(mode)
 
         insetSystemBars()
-        if (savedInstanceState == null) handleStopIntent(intent)
+        if (savedInstanceState == null) {
+            handleStopIntent(intent)
+            takeViewOnMap(intent)
+        }
 
         mapView = findViewById(R.id.map_view)
         mapView.onCreate(savedInstanceState)
@@ -554,6 +557,18 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleStopIntent(intent)
+        takeViewOnMap(intent)
+    }
+
+    /** The Sync screen's View on map ([viewOnMap]): kept until the session is confirmed
+     *  (`syncSession`), and the opening camera skipped, since this activity is the view. */
+    private fun takeViewOnMap(intent: Intent) {
+        // A relaunch from recents replays the intent; it has been handled.
+        if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
+        val id = intent.getStringExtra(EXTRA_VIEW_ACTIVITY) ?: return
+        val startedAt = intent.getStringExtra(EXTRA_VIEW_STARTED_AT) ?: return
+        viewOnMapRequest = id to startedAt
+        framed = true
     }
 
     /** The notification's Stop comes through here rather than straight to `RecordingService`
@@ -737,16 +752,19 @@ class MainActivity : AppCompatActivity() {
 
         modeBarReady = true
         renderModeBar()
-        panel.syncTab.start()
         if (daysStale) {
             daysStale = false
             activityDays.reload()
             // Sync or a recording may have changed the range's activities too, not just which
             // days have any — and an open Story's numbers.
-            selectedRange?.let { loadActivities(it, fly = false) }
+            reloadList()
             panel.storiesTab.reloadOpen()
         }
         renderDateFooter()
+        viewOnMapRequest?.let { (id, startedAt) ->
+            viewOnMapRequest = null
+            viewActivityOnMap(id, startedAt)
+        }
 
         val loaded = style ?: return
         if (!overlaysAttached) {
@@ -791,16 +809,7 @@ class MainActivity : AppCompatActivity() {
      */
     private fun onActivityDaysChanged(reloaded: Boolean) {
         dateSlider.setDays(activityDays.visibleDays, activityDays.canPanEarlier, activityDays.canPanLater)
-        val story = storyId
-        if (reloaded && story != null) {
-            // A Story opens on its whole span, first to last activity day, once the days in
-            // hand are really its own; an empty one has none, and gets today.
-            if (storySpanPending && activityDays.loadedStory == story) {
-                storySpanPending = false
-                val today = LocalDate.now().toString()
-                applyRange(DateRange(activityDays.earliest ?: today, activityDays.latest ?: today), fly = true)
-            }
-        } else if (reloaded && !userChangedRange && activityDays.loadedStory == null) {
+        if (reloaded && !userChangedRange) {
             val today = LocalDate.now().toString()
             val from = activityDays.visibleDays.takeLast(DEFAULT_RANGE_DAYS).firstOrNull()?.date
                 ?: activityDays.earliest
@@ -829,15 +838,18 @@ class MainActivity : AppCompatActivity() {
         loadActivities(range, fly)
     }
 
-    /** `GET /v1/activities` for [range], into the panel — and, with [fly], the camera onto
-     *  every drawn one. Duplicates ride along: they aren't scoped to the range, but whatever
-     *  changed the list may have produced one. */
-    private fun loadActivities(range: DateRange, fly: Boolean) {
-        panel.setLoading()
+    /** The panel's list read again for what it shows now — the open Story, else the range. */
+    private fun reloadList() = loadActivities(selectedRange, fly = false)
+
+    /** `GET /v1/activities` for [range] — or, while a Story is open, for all of that Story,
+     *  whatever the range — into the panel, and, with [fly], the camera onto every drawn one. */
+    private fun loadActivities(range: DateRange?, fly: Boolean) {
         val story = storyId
-        HoldMyTrackApi.activities(range.from, range.to, story) { result ->
+        if (story == null && range == null) return
+        panel.setLoading()
+        HoldMyTrackApi.activities(range?.from.takeIf { story == null }, range?.to.takeIf { story == null }, story) { result ->
             // A later pick, or another Story, owns the list now.
-            if (range != selectedRange || story != storyId) return@activities
+            if (story != storyId || (story == null && range != selectedRange)) return@activities
             result.onSuccess { activities ->
                 panel.setActivities(activities)
                 trackPending(activities)
@@ -856,7 +868,6 @@ class MainActivity : AppCompatActivity() {
                 if (pendingIds.isNotEmpty()) mapView.postDelayed(pendingPoll, PENDING_POLL_MS)
             }
         }
-        HoldMyTrackApi.duplicates { result -> panel.setDuplicates(result.getOrNull()) }
     }
 
     /**
@@ -893,13 +904,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * A Sync tab row's View on map — the web's `viewActivityOnMap`: Normal mode, then the
-     * activity selected and flown to, as a row tap does. When its day (in the account's
+     * A Sync history row's View on map — the web's `viewActivityOnMap`: Normal mode and the
+     * collapsed Activities tab, then the activity selected and flown to, as a row tap does. When its day (in the account's
      * timezone, the day the server files it under) is outside the range, the range becomes
      * that one day, as if picked, and the selection waits for that range's list.
      */
     private fun viewActivityOnMap(activityId: String, startedAt: String) {
         setMode(MapMode.NORMAL)
+        // The expanded sheet would stay drawn over the very map the link is meant to show.
+        panel.showActivities()
         val zone = runCatching { ZoneId.of(Session.timezone) }.getOrDefault(ZoneId.systemDefault())
         val day = runCatching { OffsetDateTime.parse(startedAt).atZoneSameInstant(zone).toLocalDate().toString() }
             .getOrNull() ?: return
@@ -918,44 +931,40 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * Opens Story [id] on the map — the web's `enterStory`: the panel's state starts afresh, as
-     * for a new range, since the rows are a different set; the tracks narrow to the Story at
-     * once, and its days are read, whose first and last set the range and the camera
-     * ([onActivityDaysChanged]). Also how Create story lands on the tab.
+     * for a new range, since the rows are a different set; the tracks and the list become all
+     * of the Story's activities, whatever the range, and the camera fits them. Also how Add to
+     * story's new Story lands on the tab.
      */
     private fun enterStory(id: String) {
-        // Switching from one Story to another still closes onto the range from before the first.
-        if (storyId == null) beforeStory = selectedRange to userChangedRange
         storyId = id
-        storySpanPending = true
         panelState.resetForNewRange()
         applyTrackFilter()
         panel.showStories()
         panel.storiesTab.setOpen(id)
-        panel.setLoading()
         style?.takeIf { overlaysAttached }?.let { MapOverlays.setTrackStory(it, id, null) }
-        activityDays.story = id
-        activityDays.reload()
+        loadActivities(null, fly = true)
     }
 
     /**
-     * Closes the open Story — the web's `exitStory`: the range from before it opened comes back
-     * (or, if there was none yet, the default, once the whole history's days are in), with the
-     * panel's state afresh. The camera stays.
+     * Closes the open Story — the web's `exitStory`: back to the range, which opening it never
+     * changed, with the panel's state afresh. The camera stays.
      */
     private fun exitStory() {
-        val before = beforeStory
-        beforeStory = null
         storyId = null
-        storySpanPending = false
         panel.storiesTab.setOpen(null)
         panelState.resetForNewRange()
         applyTrackFilter()
-        userChangedRange = before?.second ?: false
-        val range = before?.first
-        style?.takeIf { overlaysAttached }?.let { MapOverlays.setTrackStory(it, null, range) }
-        if (range != null) applyRange(range, fly = false) else panel.setActivities(emptyList())
-        activityDays.story = null
-        activityDays.reload()
+        style?.takeIf { overlaysAttached }?.let { MapOverlays.setTrackStory(it, null, selectedRange) }
+        if (selectedRange != null) reloadList() else panel.setActivities(emptyList())
+    }
+
+    /** An activity taken out of the open Story: its track leaves the map and its row the list;
+     *  a selection on it goes. The tile version moved with the change, and the tiles follow. */
+    private fun onRemovedFromStory(activityId: String) {
+        if (panelState.focused == activityId) panel.clearFocus()
+        checkTileVersion()
+        style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
+        reloadList()
     }
 
     /** The toolbar's Edit: the window over its target, the panel held down and made inert
@@ -1008,7 +1017,7 @@ class MainActivity : AppCompatActivity() {
         renderModeBar()
         renderRecordButton()
         renderTrackMetrics()
-        if (saved) selectedRange?.let { loadActivities(it, fly = false) }
+        if (saved) reloadList()
     }
 
     /** The Edit window and the Private location editor sit just under the chrome row, the
@@ -1043,10 +1052,10 @@ class MainActivity : AppCompatActivity() {
      * showed a row Pending at all.
      */
     private fun onPrivateLocationsChanged() {
-        selectedRange?.let { loadActivities(it, fly = false) }
+        reloadList()
         coverageWatch.watch {
             style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
-            selectedRange?.let { loadActivities(it, fly = false) }
+            reloadList()
             activityDays.reload()
             updateTrackMetrics(refetch = true)
             panel.storiesTab.reloadOpen()
@@ -1062,13 +1071,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** The toolbar's Delete finished: the tracks, the list, the days and duplicates read
-     *  again, and Fog and Heatmap watched until their re-render lands — the web's
-     *  `handleActivitiesDeleted`. Deleted ids drop out of the selection with the reload. */
+    /** The toolbar's Delete finished: the tracks, the list and the days read again, and Fog
+     *  and Heatmap watched until their re-render lands — the web's `handleActivitiesDeleted`.
+     *  Deleted ids drop out of the selection with the reload. */
     private fun onActivitiesDeleted(ids: List<String>) {
         if (ids.isEmpty()) return
         style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
-        selectedRange?.let { loadActivities(it, fly = false) }
+        reloadList()
         activityDays.reload()
         coverageWatch.watch()
         panel.storiesTab.reloadOpen()
@@ -1210,10 +1219,11 @@ class MainActivity : AppCompatActivity() {
      *  ignore the range and select nothing — `docs/SPEC.md` FR-4.2), and step aside while
      *  recording. Both wait for the session; the footer also for the first page of days, and
      *  an account with no activity at all has nothing to pick from — the empty notice speaks
-     *  for it instead. */
+     *  for it instead. The footer is the Activities tab's alone: Stories and Privacy take no
+     *  range (`docs/SPEC.md` FR-6), and the sheet sits on the bottom edge without it. */
     private fun renderDateFooter() {
         val normal = modeBarReady && mode == MapMode.NORMAL && !isRecording()
-        val footer = normal && activityDays.ready && activityDays.earliest != null
+        val footer = normal && panel.tab == PanelTab.ACTIVITIES && activityDays.ready && activityDays.earliest != null
         dateFooter.visibility = if (footer) View.VISIBLE else View.GONE
         sheet.visibility = if (normal) View.VISIBLE else View.GONE
         bottomChrome.visibility = if (normal) View.VISIBLE else View.GONE
@@ -1549,21 +1559,36 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** The burger menu: the destinations that don't fit on the map itself. */
+    /** The burger menu: the destinations that don't fit on the map itself — the app's own
+     *  screens, then the web header's Donate and Info pages (About, Help, Contacts), opened in
+     *  a browser tab. */
     private fun showMenu(anchor: View) {
         val menu = PopupMenu(this, anchor)
-        menu.menu.add(0, MENU_PROFILE, 0, R.string.menu_profile)
-        menu.menu.add(0, MENU_SYNC, 1, R.string.menu_sync)
-        menu.menu.add(0, MENU_SETTINGS, 3, R.string.menu_settings)
+        menu.menu.add(MENU_GROUP_APP, MENU_PROFILE, 0, R.string.menu_profile)
+        menu.menu.add(MENU_GROUP_APP, MENU_SYNC, 1, R.string.menu_sync)
+        menu.menu.add(MENU_GROUP_APP, MENU_SETTINGS, 2, R.string.menu_settings)
+        menu.menu.add(MENU_GROUP_WEB, MENU_DONATE, 3, R.string.menu_donate)
+        menu.menu.add(MENU_GROUP_WEB, MENU_ABOUT, 4, R.string.menu_about)
+        menu.menu.add(MENU_GROUP_WEB, MENU_HELP, 5, R.string.menu_help)
+        menu.menu.add(MENU_GROUP_WEB, MENU_CONTACTS, 6, R.string.menu_contacts)
+        menu.menu.setGroupDividerEnabled(true)
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 MENU_PROFILE -> startActivity(Intent(this, ProfileActivity::class.java))
                 MENU_SYNC -> startActivity(Intent(this, SyncActivity::class.java))
                 MENU_SETTINGS -> SettingsActivity.open(this)
+                MENU_DONATE -> openWebPage("/about#funding")
+                MENU_ABOUT -> openWebPage("/about")
+                MENU_HELP -> openWebPage("/help")
+                MENU_CONTACTS -> openWebPage("/contacts")
             }
             true
         }
         menu.show()
+    }
+
+    private fun openWebPage(path: String) {
+        CustomTabsIntent.Builder().build().launchUrl(this, HoldMyTrackApi.webPageUri(path))
     }
 
     private fun setMode(next: MapMode) {
@@ -1713,7 +1738,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         if (::mapView.isInitialized) mapView.removeCallbacks(pendingPoll)
-        if (::panel.isInitialized) panel.syncTab.stop()
         if (recorderBound) {
             recorder?.onChange = null
             unbindService(recorderConnection)
@@ -1727,13 +1751,11 @@ class MainActivity : AppCompatActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         mapView.onSaveInstanceState(outState)
-        // The panel comes back on its Activities tab, so an open Story is closed onto the range
-        // from before it.
-        val (range, chosen) = if (storyId != null) beforeStory ?: (null to false) else selectedRange to userChangedRange
-        range?.let {
+        // The panel comes back on its Activities tab; an open Story never changed the range.
+        selectedRange?.let {
             outState.putString(STATE_RANGE_FROM, it.from)
             outState.putString(STATE_RANGE_TO, it.to)
-            outState.putBoolean(STATE_RANGE_CHOSEN, chosen)
+            outState.putBoolean(STATE_RANGE_CHOSEN, userChangedRange)
         }
         if (attributionBaseCaptured) {
             outState.putInt(STATE_LOGO_MARGIN, logoBaseMarginBottom)
@@ -1791,9 +1813,28 @@ class MainActivity : AppCompatActivity() {
 
         /** Material's and the platform's minimum touch target. */
         private const val MIN_TOUCH_TARGET_DP = 48
+        private const val MENU_GROUP_APP = 1
+        private const val MENU_GROUP_WEB = 2
         private const val MENU_PROFILE = 1
         private const val MENU_SYNC = 2
         private const val MENU_SETTINGS = 4
+        private const val MENU_DONATE = 5
+        private const val MENU_ABOUT = 6
+        private const val MENU_HELP = 7
+        private const val MENU_CONTACTS = 8
+        private const val EXTRA_VIEW_ACTIVITY = "dev.holdmytrack.android.VIEW_ACTIVITY"
+        private const val EXTRA_VIEW_STARTED_AT = "dev.holdmytrack.android.VIEW_STARTED_AT"
+
+        /** Opens the map on [activityId], started at [startedAt] — the Sync screen's View on
+         *  map. Clears whatever is over an existing map, which then selects it. */
+        fun viewOnMap(context: Context, activityId: String, startedAt: String) {
+            context.startActivity(
+                Intent(context, MainActivity::class.java)
+                    .putExtra(EXTRA_VIEW_ACTIVITY, activityId)
+                    .putExtra(EXTRA_VIEW_STARTED_AT, startedAt)
+                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            )
+        }
 
         /** The default range's length in activity days (`docs/SPEC.md` FR-6.1). */
         private const val DEFAULT_RANGE_DAYS = 5

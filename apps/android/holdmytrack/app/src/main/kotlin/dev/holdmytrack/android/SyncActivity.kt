@@ -11,7 +11,6 @@ import androidx.activity.result.contract.ActivityResultContract
 import androidx.appcompat.app.AppCompatActivity
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.holdmytrack.android.health.HealthConnect
 import dev.holdmytrack.android.net.HoldMyTrackApi
@@ -19,11 +18,11 @@ import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.recording.RecordedActivityRows
 import dev.holdmytrack.android.recording.db.RecordedActivityStore
 import dev.holdmytrack.android.recording.db.toSyncJson
+import dev.holdmytrack.android.sync.ImportHistory
 import dev.holdmytrack.android.sync.SyncCursor
 import dev.holdmytrack.android.sync.SyncProgress
 import dev.holdmytrack.android.sync.SyncReport
 import dev.holdmytrack.android.sync.SyncRunner
-import dev.holdmytrack.android.sync.SyncSources
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -31,14 +30,14 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
- * Sync Source: every place activities come from on this device, each with its own checkbox,
- * and one "Sync now" that sends whatever is checked — the GPS recordings checked row by row
- * (`RecordedActivityRows`), and Health Connect as a whole (`SyncSources`). Health Connect's
- * onboarding lives here too, under its checkbox — Path 2's on-device half
+ * Sync: every place activities come from on this device and one "Sync now" that sends all of
+ * it — Health Connect, once it can be read, and every GPS recording on the device
+ * (`RecordedActivityRows`) — then everything imported so far, the web's `/sync` page
+ * ([ImportHistory]). Health Connect's onboarding lives here too — Path 2's on-device half
  * (`docs/adr/0001-three-independent-ingest-paths.md`).
  *
  * Also the screen Health Connect opens as this app's permission *rationale*. What is read and
- * what it is for sits behind the info button beside Health Connect's checkbox, and opens by
+ * what it is for sits behind the info button beside Health Connect's title, and opens by
  * itself when Health Connect launched this screen to ask exactly that. The same text serves
  * both purposes; a rationale that says something different from the app's own explanation
  * would be the wrong kind of surprise.
@@ -60,13 +59,13 @@ class SyncActivity : AppCompatActivity() {
     private lateinit var recordedSection: View
     private lateinit var recordedRows: RecordedActivityRows
     private lateinit var healthConnectSection: View
-    private lateinit var healthConnectBox: MaterialCheckBox
+    private lateinit var historySection: View
+    private lateinit var history: ImportHistory
     private lateinit var status: TextView
     private lateinit var instructions: TextView
     private lateinit var results: TextView
     private lateinit var problems: TextView
     private lateinit var primary: Button
-    private lateinit var openHealthConnect: Button
     private lateinit var syncNow: Button
 
     private var syncJob: Job? = null
@@ -93,17 +92,16 @@ class SyncActivity : AppCompatActivity() {
             onChanged = ::updateSyncNow,
         )
         healthConnectSection = findViewById(R.id.sync_health_connect_section)
-        healthConnectBox = findViewById(R.id.sync_health_connect)
+        historySection = findViewById(R.id.sync_history_section)
+        history = ImportHistory(findViewById(android.R.id.content), onViewOnMap = ::viewOnMap)
         status = findViewById(R.id.sync_status)
         instructions = findViewById(R.id.sync_instructions)
         results = findViewById(R.id.sync_results)
         problems = findViewById(R.id.sync_problems)
         primary = findViewById(R.id.sync_primary)
-        openHealthConnect = findViewById(R.id.sync_open_health_connect)
         syncNow = findViewById(R.id.sync_now)
 
         findViewById<Button>(R.id.sync_health_connect_info).setOnClickListener { showRationale() }
-        openHealthConnect.setOnClickListener { openSettings() }
         syncNow.setOnClickListener { startSync() }
 
         // Health Connect asked "why does this app want my data" — answer it straight away,
@@ -133,7 +131,14 @@ class SyncActivity : AppCompatActivity() {
     override fun onStop() {
         syncJob?.cancel()
         syncJob = null
+        history.stop()
         super.onStop()
+    }
+
+    /** A history row's View on map: the map, on that activity (`MainActivity.viewOnMap`). */
+    private fun viewOnMap(activityId: String, startedAt: String) {
+        MainActivity.viewOnMap(this, activityId, startedAt)
+        finish()
     }
 
     private fun refresh() {
@@ -164,15 +169,15 @@ class SyncActivity : AppCompatActivity() {
         // POST /sync/activities for a demo account regardless of what this screen offers, the
         // same way it rejects upload/edit/delete for every other client — but the web app
         // doesn't rely on that alone: it disables the Upload control up front, with an
-        // explanation, rather than letting the user discover the block from a server error
-        // (UploadPanel.tsx's readOnly prop). This is that same treatment on Android: Sync now
-        // and the Health Connect section are hidden rather than left to fail. Recordings stay
-        // listed — a demo account can still record, edit and delete them locally — just not
-        // checkable. (Its history is the map panel's Sync tab, which reading doesn't change.)
+        // explanation, rather than letting the user discover the block from a server error.
+        // This is that same treatment on Android: Sync now and the Health Connect section are
+        // hidden rather than left to fail. Recordings stay listed — a demo account can still
+        // record, edit and delete them locally — and so does its history, as on the web.
+        historySection.visibility = View.VISIBLE
+        history.start()
         if (Session.isDemo) {
             showAccountNotice(getString(R.string.sync_demo_read_only))
             recordedSection.visibility = View.VISIBLE
-            recordedRows.checkable = false
             healthConnectSection.visibility = View.GONE
             syncNow.visibility = View.GONE
             return
@@ -180,7 +185,6 @@ class SyncActivity : AppCompatActivity() {
 
         accountNotice.visibility = View.GONE
         recordedSection.visibility = View.VISIBLE
-        recordedRows.checkable = true
         healthConnectSection.visibility = View.VISIBLE
         syncNow.visibility = View.VISIBLE
         renderHealthConnect(readiness)
@@ -193,6 +197,7 @@ class SyncActivity : AppCompatActivity() {
         recordedSection.visibility = View.GONE
         healthConnectSection.visibility = View.GONE
         syncNow.visibility = View.GONE
+        historySection.visibility = View.GONE
     }
 
     private fun showAccountNotice(text: String) {
@@ -201,35 +206,11 @@ class SyncActivity : AppCompatActivity() {
     }
 
     /**
-     * Health Connect's checkbox and whatever its setup still needs. The checkbox is only
-     * enabled while Health Connect can actually be read — READY, or READY-but-30-days, which
-     * still syncs, just not as far back — and shows unticked otherwise, without touching the
-     * saved choice, so finishing setup brings back whatever the user last picked. The setup
-     * step itself is the section's primary button, and "Open Health Connect" stays available
-     * alongside it while access is still being granted, except where the primary already is
-     * that button.
+     * Where Health Connect's setup stands, and its one remaining step as the section's button.
+     * Sync now includes Health Connect whenever it can be read — READY, or READY-but-30-days,
+     * which still syncs, just not as far back.
      */
     private fun renderHealthConnect(readiness: HealthConnect.Readiness) {
-        val syncable = readiness.isSyncable()
-        healthConnectBox.setOnCheckedChangeListener(null)
-        healthConnectBox.isEnabled = syncable
-        healthConnectBox.isChecked = syncable && sources().healthConnect
-        healthConnectBox.setOnCheckedChangeListener { _, checked ->
-            sources().healthConnect = checked
-            updateSyncNow()
-        }
-
-        // Shown only while access is still being granted, and only where the primary button
-        // isn't already this button: in the two states that send the user to Health Connect,
-        // the primary says so, and two identical buttons stacked on each other is just a
-        // question about which one is the real one. Once READY there is nothing left to do
-        // there.
-        openHealthConnect.visibility = when (readiness) {
-            HealthConnect.Readiness.NEEDS_EXERCISE_PERMISSION,
-            HealthConnect.Readiness.NEEDS_HISTORY_PERMISSION,
-            -> View.VISIBLE
-            else -> View.GONE
-        }
         primary.visibility = View.VISIBLE
         instructions.visibility = View.GONE
 
@@ -269,8 +250,8 @@ class SyncActivity : AppCompatActivity() {
                 // Unlike the routes permission, this one *is* requestable, so the app asks
                 // rather than sending the user off to find a toggle. Syncing still works
                 // without it — it just can't reach back — and declining a permission is a real
-                // answer, so the checkbox stays enabled and Sync now takes the shallower sync
-                // rather than holding it hostage to granting this.
+                // answer, so Sync now takes the shallower sync rather than holding it hostage
+                // to granting this.
                 primary.setText(R.string.sync_allow_history)
                 primary.setOnClickListener {
                     permissionLauncher.launch(setOf(HealthConnect.READ_HISTORY))
@@ -287,13 +268,12 @@ class SyncActivity : AppCompatActivity() {
     private fun HealthConnect.Readiness.isSyncable() =
         this == HealthConnect.Readiness.READY || this == HealthConnect.Readiness.NEEDS_HISTORY_PERMISSION
 
-    /** Health Connect is in this run only when it's both ticked and readable. */
-    private fun includesHealthConnect() =
-        readiness?.isSyncable() == true && sources().healthConnect
+    /** Health Connect is in this run whenever it can be read. */
+    private fun includesHealthConnect() = readiness?.isSyncable() == true
 
-    /** Enabled when there's something checked to send and no run already going. */
+    /** Enabled when there's something to send and no run already going. */
     private fun updateSyncNow() {
-        syncNow.isEnabled = syncJob == null && (includesHealthConnect() || recordedRows.checkedCount > 0)
+        syncNow.isEnabled = syncJob == null && (includesHealthConnect() || recordedRows.count > 0)
     }
 
     private fun lastSyncedLabel(): String {
@@ -304,11 +284,9 @@ class SyncActivity : AppCompatActivity() {
     /** Keyed by account so two people on one device never inherit each other's position. */
     private fun cursor() = SyncCursor(this, Session.email)
 
-    private fun sources() = SyncSources(this, Session.email)
-
     /**
-     * Health Connect sync when its box is ticked, then whatever GPS recordings are checked —
-     * one button, both sources, since submitting a checked recording is exactly the same
+     * Health Connect sync when it can be read, then every GPS recording on the device — one
+     * button, both sources, since submitting a checked recording is exactly the same
      * batched endpoint Health Connect sync already posts to (`docs/IMPLEMENTATION.md` §4.0.4).
      * The recorded flush runs even when Health Connect itself throws (a dead network says
      * nothing about whether the *local* recordings can still go out), just without a combined
@@ -337,17 +315,16 @@ class SyncActivity : AppCompatActivity() {
         updateSyncNow()
     }
 
-    /** Submits every locally queued GPS recording (`RecordedActivityStore`,
-     *  `SyncStatus.QUEUED`) and deletes each one from the device on success — it lives on the
-     *  server from then on, in the activity list and on the map. A rejected or
-     *  failed submit is left queued rather than reverted — the same resumable-retry posture
-     *  `SyncRunner`'s own watermark already uses, so the next "Sync Now" tries it again with
-     *  no action needed from the user. */
+    /** Submits every GPS recording on the device (`RecordedActivityStore`) and deletes each
+     *  one from the device on success — it lives on the server from then on, in the activity
+     *  list and on the map. A rejected or failed submit is left where it is — the same
+     *  resumable-retry posture `SyncRunner`'s own watermark already uses, so the next "Sync
+     *  now" tries it again with no action needed from the user. */
     private suspend fun flushRecordedQueue(): RecordedSyncResult {
         val store = RecordedActivityStore(this)
         var synced = 0
         var failed = 0
-        for (record in store.queued()) {
+        for (record in store.all()) {
             val status = runCatching { HoldMyTrackApi.syncActivities(listOf(record.toSyncJson()), HoldMyTrackApi.SOURCE_RECORDED) }
                 .getOrNull()?.firstOrNull()?.status
             if (status == "enqueued" || status == "already_processed") {
@@ -378,8 +355,8 @@ class SyncActivity : AppCompatActivity() {
      * from which the server actually refused, and with the server's own reason, since the two
      * are different things and a single "couldn't sync" would conflate them.
      *
-     * The persistent, browsable version of this belongs to the sync status dashboard in the
-     * next phase; this is the run you just watched, not a history.
+     * This is the run you just watched; the history under it ([ImportHistory]) is the
+     * browsable record.
      */
     private fun show(report: SyncReport?, recordedResult: RecordedSyncResult) {
         val lines = mutableListOf(getString(R.string.sync_done))

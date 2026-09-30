@@ -2,10 +2,10 @@
 <!-- The map's Activities panel as the web draws it at phone width (apps/web/src/ui/ActivitiesPanel.tsx,
      the @media (max-width: 768px) layer of index.css): a sheet sitting on the date-range footer
      (activity_main's bottom_chrome draws the white, the hairline and the shadow for both),
-     collapsed to the tab row and the "… loaded" line, and grown upward to most of the
-     screen when that line is tapped (panel/ActivitiesPanel.kt sets the height). Everything under
-     the line stays laid out while collapsed, just clipped, so the list keeps its scroll
-     position. Clickable, so a touch on it never reaches the map underneath. -->
+     collapsed to the tab row, and grown upward to most of the screen by the chevron at its end
+     or a tab (panel/ActivitiesPanel.kt sets the height). Everything under the row stays laid out
+     while collapsed, just clipped, so the list keeps its scroll position. Clickable, so a touch
+     on it never reaches the map underneath. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -19,17 +19,21 @@
     android:visibility="gone">
 
     <!-- The tab row (.activities-panel__head): the tab titles in the serif, the selected one
-         underlined in the accent, a hairline under the row. -->
+         underlined in the accent, the chevron at its end, a hairline under the row. Its bottom
+         edge is the collapsed sheet's height (ActivitiesPanel.peekHeight). -->
     <FrameLayout
+        android:id="@+id/panel_head"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:minHeight="48dp">
 
         <!-- The tabs (.activities-panel__tab): the selected one at full strength with the accent
-             underline, the others dimmed. They scroll sideways when the four don't fit (Russian
-             on a narrow phone), as the web's tab strip does. -->
+             underline, the others dimmed. They scroll sideways when the three don't fit, as the
+             web's tab strip does, clear of the chevron. -->
         <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginEnd="48dp"
             android:overScrollMode="never"
             android:scrollbars="none">
 
@@ -86,42 +90,6 @@
                     android:text="@string/panel_tab_stories"
                     android:textAppearance="@style/TextAppearance.HoldMyTrack.PanelTab" />
 
-                <LinearLayout
-                    android:id="@+id/panel_tab_sync"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/hmt_space_20"
-                    android:alpha="0.45"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingBottom="@dimen/hmt_space_6">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/panel_tab_sync"
-                        android:textAppearance="@style/TextAppearance.HoldMyTrack.PanelTab" />
-
-                    <TextView
-                        android:id="@+id/panel_sync_badge"
-                        android:layout_width="wrap_content"
-                        android:layout_height="16dp"
-                        android:layout_marginStart="@dimen/hmt_space_8"
-                        android:background="@drawable/bg_panel_sync_badge"
-                        android:gravity="center"
-                        android:minWidth="16dp"
-                        android:paddingStart="@dimen/hmt_space_4"
-                        android:paddingEnd="@dimen/hmt_space_4"
-                        android:textColor="@color/hmt_on_accent"
-                        android:textFontWeight="700"
-                        android:textSize="@dimen/hmt_text_2xs"
-                        android:visibility="gone"
-                        tools:text="2"
-                        tools:visibility="visible" />
-                </LinearLayout>
-
                 <TextView
                     android:id="@+id/panel_tab_privacy"
                     android:layout_width="wrap_content"
@@ -136,6 +104,20 @@
             </LinearLayout>
         </HorizontalScrollView>
 
+        <!-- The sheet's expand/collapse control (.activities-panel__sheet-toggle), a full 48dp
+             touch target. -->
+        <ImageButton
+            android:id="@+id/panel_toggle"
+            android:layout_width="48dp"
+            android:layout_height="match_parent"
+            android:layout_gravity="end"
+            android:background="?attr/selectableItemBackground"
+            android:contentDescription="@string/panel_expand"
+            android:padding="14dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_chevron_up"
+            app:tint="@color/panel_ink_40" />
+
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
@@ -143,38 +125,21 @@
             android:background="@color/hmt_hairline" />
     </FrameLayout>
 
-    <!-- "29 km loaded" and the chevron — the whole row is the sheet's expand/collapse toggle
-         (.activities-panel__subtext), 48dp tall, a full touch target. Its bottom edge is the
-         collapsed sheet's height (ActivitiesPanel.peekHeight). -->
-    <LinearLayout
-        android:id="@+id/panel_toggle"
+    <!-- What the Stories and Privacy tabs are (.activities-panel__subtext); the Activities tab
+         has none, its slider and filters saying what's listed. Under the tab row, so only an
+         expanded sheet shows it. -->
+    <TextView
+        android:id="@+id/panel_subtext"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:background="?attr/selectableItemBackground"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
+        android:layout_height="wrap_content"
         android:paddingStart="@dimen/hmt_space_16"
-        android:paddingEnd="@dimen/hmt_space_16">
-
-        <TextView
-            android:id="@+id/panel_subtext"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:textColor="@color/hmt_ink_meta"
-            android:textSize="@dimen/hmt_text_sm"
-            tools:text="29 km loaded" />
-
-        <ImageView
-            android:id="@+id/panel_chevron"
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:importantForAccessibility="no"
-            android:src="@drawable/ic_chevron_up"
-            app:tint="@color/panel_ink_40" />
-    </LinearLayout>
+        android:paddingTop="@dimen/hmt_space_10"
+        android:paddingEnd="@dimen/hmt_space_16"
+        android:paddingBottom="@dimen/hmt_space_10"
+        android:textColor="@color/hmt_ink_meta"
+        android:textSize="@dimen/hmt_text_sm"
+        android:visibility="gone"
+        tools:text="Hand-picked sets of your activities. Only you can see them." />
 
     <!-- The tabs' contents, one showing at a time. -->
     <FrameLayout
@@ -182,7 +147,7 @@
         android:layout_height="0dp"
         android:layout_weight="1">
 
-        <!-- The Activities tab: filters, toolbar, rows, footer, duplicates. -->
+        <!-- The Activities tab: filters, toolbar, rows, footer. -->
         <LinearLayout
             android:id="@+id/panel_activities_content"
             android:layout_width="match_parent"
@@ -323,8 +288,9 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- The toolbar (.activities-panel__toolbar): the master checkbox and Invert, then the
-                 actions over the toolbar's target, a divider, and the accent Focus on map. -->
+            <!-- The toolbar (.activities-panel__toolbar): the master checkbox and the ▾ of its All /
+                 None / Invert menu, then the actions over the toolbar's target, a divider, and the
+                 accent Focus on map. -->
             <LinearLayout
                 android:id="@+id/panel_toolbar"
                 android:layout_width="match_parent"
@@ -341,16 +307,16 @@
                     android:layout_height="wrap_content" />
 
                 <ImageButton
-                    android:id="@+id/panel_invert"
-                    android:layout_width="40dp"
+                    android:id="@+id/panel_select_menu"
+                    android:layout_width="32dp"
                     android:layout_height="48dp"
-                    android:layout_marginStart="-6dp"
+                    android:layout_marginStart="-8dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/panel_invert"
-                    android:padding="12dp"
+                    android:contentDescription="@string/panel_select_menu"
+                    android:padding="9dp"
                     android:scaleType="fitCenter"
-                    android:src="@drawable/ic_invert"
-                    app:tint="@color/panel_invert_icon" />
+                    android:src="@drawable/ic_chevron_down"
+                    app:tint="@color/panel_select_icon" />
 
                 <Space
                     android:layout_width="0dp"
@@ -370,9 +336,9 @@
                     android:src="@drawable/ic_pencil" />
 
                 <ImageButton
-                    android:id="@+id/panel_create_story"
+                    android:id="@+id/panel_add_to_story"
                     style="@style/Widget.HoldMyTrack.PanelChip"
-                    android:contentDescription="@string/story_create_none"
+                    android:contentDescription="@string/panel_no_target"
                     android:src="@drawable/ic_book_plus" />
 
                 <ImageButton
@@ -420,58 +386,6 @@
                 android:textColor="@color/hmt_ink_hint"
                 android:textSize="@dimen/hmt_text_md"
                 tools:text="1 selected · 10 km" />
-
-            <!-- "N duplicates found" (.activities-panel__duplicates): collapsed by default, and gone
-                 entirely when there are none. -->
-            <LinearLayout
-                android:id="@+id/panel_duplicates"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_list_top"
-                android:orientation="vertical"
-                android:visibility="gone">
-
-                <LinearLayout
-                    android:id="@+id/panel_duplicates_toggle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="48dp"
-                    android:orientation="horizontal"
-                    android:paddingStart="@dimen/hmt_space_16"
-                    android:paddingEnd="@dimen/hmt_space_16">
-
-                    <TextView
-                        android:id="@+id/panel_duplicates_label"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textColor="@color/hmt_ink_meta"
-                        android:textSize="@dimen/hmt_text_sm"
-                        tools:text="2 duplicates found" />
-
-                    <ImageView
-                        android:id="@+id/panel_duplicates_chevron"
-                        android:layout_width="14dp"
-                        android:layout_height="14dp"
-                        android:layout_marginStart="@dimen/hmt_space_6"
-                        android:importantForAccessibility="no"
-                        android:src="@drawable/ic_chevron_up"
-                        app:tint="@color/hmt_ink_meta" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/panel_duplicates_list"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:paddingStart="@dimen/hmt_space_16"
-                    android:paddingEnd="@dimen/hmt_space_16"
-                    android:paddingBottom="@dimen/hmt_space_10"
-                    android:visibility="gone" />
-            </LinearLayout>
         </LinearLayout>
 
         <!-- The Stories tab (apps/web/src/ui/StoriesTab.tsx): every Story as a folder, the open
@@ -524,90 +438,6 @@
                     android:shrinkColumns="1" />
             </LinearLayout>
         </LinearLayout>
-
-        <!-- The Sync tab (apps/web/src/ui/SyncTab.tsx's history): every import from every source,
-             five a page, filled by panel/SyncTab. -->
-        <ScrollView
-            android:id="@+id/panel_sync_content"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="gone">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingStart="@dimen/hmt_space_16"
-                android:paddingTop="@dimen/hmt_space_4"
-                android:paddingEnd="@dimen/hmt_space_16"
-                android:paddingBottom="@dimen/hmt_space_16">
-
-                <include
-                    android:id="@+id/sync_head"
-                    layout="@layout/include_list_head" />
-
-                <TextView
-                    android:id="@+id/sync_error"
-                    style="@style/Widget.HoldMyTrack.Notice.Error"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="@dimen/hmt_space_8"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/sync_empty"
-                    style="@style/Widget.HoldMyTrack.Hint"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/status_summary_empty"
-                    android:visibility="gone" />
-
-                <LinearLayout
-                    android:id="@+id/sync_rows"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/bg_list_top"
-                    android:orientation="vertical" />
-
-                <!-- The web's .sync-tab__pager: the range, then earlier and later. Only when the
-                     history runs past one page. -->
-                <LinearLayout
-                    android:id="@+id/sync_pager"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/hmt_space_4"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:visibility="gone">
-
-                    <TextView
-                        android:id="@+id/sync_range"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:textAppearance="?attr/textAppearanceLabelSmall"
-                        android:textColor="@color/hmt_ink_meta"
-                        android:textFontWeight="400" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/sync_previous"
-                        style="@style/Widget.HoldMyTrack.Button.MapPage"
-                        android:layout_width="32dp"
-                        android:layout_height="wrap_content"
-                        android:contentDescription="@string/status_previous_page"
-                        app:icon="@drawable/ic_chevron_left" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/sync_next"
-                        style="@style/Widget.HoldMyTrack.Button.MapPage"
-                        android:layout_width="32dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/hmt_space_4"
-                        android:contentDescription="@string/status_next_page"
-                        app:icon="@drawable/ic_chevron_right" />
-                </LinearLayout>
-            </LinearLayout>
-        </ScrollView>
 
         <!-- The Privacy tab (apps/web/src/ui/PrivateLocationsPanel.tsx), laid out as the
              Activities tab is: a toolbar strip with Create, the circles as rows, and a footer

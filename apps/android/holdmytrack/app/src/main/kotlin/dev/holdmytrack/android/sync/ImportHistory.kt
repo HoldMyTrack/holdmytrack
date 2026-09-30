@@ -1,37 +1,36 @@
-package dev.holdmytrack.android.panel
+package dev.holdmytrack.android.sync
 
 import android.os.Handler
 import android.os.Looper
 import android.text.format.DateFormat
 import android.view.LayoutInflater
 import android.view.View
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.google.android.material.button.MaterialButton
 import dev.holdmytrack.android.R
+import dev.holdmytrack.android.net.Duplicate
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.SyncHistory
 import dev.holdmytrack.android.net.SyncHistoryEntry
+import dev.holdmytrack.android.panel.PanelFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
- * The Activities panel's Sync tab — the history half of the web's `apps/web/src/ui/SyncTab.tsx`
- * (`apps/android/docs/SPEC.md` FR-4.1): every ingest job the account has produced, from any
- * path, as `GET /v1/uploads` lists them — a Health Connect session, a GPS recording and a file
- * uploaded on the web are the same kind of job, so they share one history. Five a page with a
- * pager, re-read every 1.5 seconds while anything is still processing (whichever tab is
- * showing, since the tab's badge counts those), and a finished row that became an activity has
- * View on map.
- *
- * The web tab's upload drop zone isn't here: this app sends activities through Sync Source.
+ * The Sync screen's history and duplicates — the web's `/sync` page
+ * (`apps/android/docs/SPEC.md` FR-4): every ingest job the account has produced, from any path,
+ * as `GET /v1/uploads` lists them — a Health Connect session, a GPS recording and a file
+ * uploaded on the web are the same kind of job, so they share one history — then the
+ * activities cross-source deduplication set aside. Twenty a page with the web's pager, re-read
+ * every 1.5 seconds while anything is still processing (the web shows those in its Upload menu;
+ * this app has no other place for them), and a finished row that became an activity has View on
+ * map.
  */
-class SyncTab(
+class ImportHistory(
     private val root: View,
-    /** How many jobs are still processing — the tab's badge. */
-    private val onProcessing: (Int) -> Unit,
     /** A row's View on map: the activity it became, and when it started. */
     private val onViewOnMap: (activityId: String, startedAt: String) -> Unit,
 ) {
@@ -44,12 +43,14 @@ class SyncTab(
     private val rows: LinearLayout = root.findViewById(R.id.sync_rows)
     private val pager: View = root.findViewById(R.id.sync_pager)
     private val range: TextView = root.findViewById(R.id.sync_range)
-    private val previous: MaterialButton = root.findViewById(R.id.sync_previous)
-    private val next: MaterialButton = root.findViewById(R.id.sync_next)
+    private val newer: Button = root.findViewById(R.id.sync_newer)
+    private val older: Button = root.findViewById(R.id.sync_older)
+    private val duplicatesSection: View = root.findViewById(R.id.sync_duplicates_section)
+    private val duplicateRows: LinearLayout = root.findViewById(R.id.sync_duplicates_rows)
 
     private val main = Handler(Looper.getMainLooper())
 
-    /** The page in view, the web's `useUploadHistory` offset. */
+    /** The page in view. */
     private var offset = 0
 
     /** Bumped by every read, so a page answering after a newer one was asked for is dropped. */
@@ -64,25 +65,22 @@ class SyncTab(
         head.findViewById<TextView>(R.id.list_title).setText(R.string.status_history)
         summary = head.findViewById(R.id.list_summary)
         summary.setText(R.string.status_loading)
-        previous.setOnClickListener { showPage(maxOf(0, offset - HISTORY_PAGE)) }
-        next.setOnClickListener { showPage(offset + HISTORY_PAGE) }
+        newer.setOnClickListener { showPage(maxOf(0, offset - HISTORY_PAGE)) }
+        older.setOnClickListener { showPage(offset + HISTORY_PAGE) }
     }
 
-    /** Reads the page in view, and keeps it current while anything is processing. */
+    /** Reads the page in view and the duplicates, and keeps the page current while anything
+     *  is processing. Also how a finished sync is picked up. */
     fun start() {
         started = true
         load()
+        HoldMyTrackApi.duplicates { result -> if (started) renderDuplicates(result.getOrNull().orEmpty()) }
     }
 
     fun stop() {
         started = false
         generation += 1
         main.removeCallbacks(poll)
-    }
-
-    /** Something may have been imported since — a sync, a recording — so read it again. */
-    fun refresh() {
-        if (started) load()
     }
 
     private fun showPage(next: Int) {
@@ -104,7 +102,7 @@ class SyncTab(
 
     private fun render(history: SyncHistory) {
         error.visibility = View.GONE
-        // "12 activities · 2 in progress" — the web's list summary.
+        // "12 activities · 2 in progress".
         val total = history.total.toInt()
         val count = res.getQuantityString(R.plurals.status_count, total, total)
         summary.text = if (history.processing > 0) {
@@ -117,27 +115,31 @@ class SyncTab(
         rows.removeAllViews()
         history.entries.forEach(::addRow)
         renderPager(history)
-        onProcessing(history.processing.toInt())
 
         // Only while something is in flight: a settled history makes no further requests.
         if (started && history.processing > 0) main.postDelayed(poll, POLL_INTERVAL_MS)
     }
 
-    /** The web's `.sync-tab__pager`: only once the history runs past one page. */
+    /** The web's `.sync__pager`: only once the history runs past one page, both buttons in
+     *  their places, "1–20 of 57" or "21 of 21" between. */
     private fun renderPager(history: SyncHistory) {
         if (history.total <= history.limit) {
             pager.visibility = View.GONE
             return
         }
-        val end = minOf(history.offset.toLong() + history.limit, history.total)
+        val end = minOf(history.offset.toLong() + history.limit, history.total).toInt()
         pager.visibility = View.VISIBLE
-        range.text = res.getString(R.string.status_range, history.offset + 1, end.toInt(), history.total.toInt())
-        previous.isEnabled = history.offset > 0
-        next.isEnabled = end < history.total
+        range.text = if (end == history.offset + 1) {
+            res.getString(R.string.status_range_one, end, history.total.toInt())
+        } else {
+            res.getString(R.string.status_range, history.offset + 1, end, history.total.toInt())
+        }
+        newer.isEnabled = history.offset > 0
+        older.isEnabled = end < history.total
     }
 
     /**
-     * One row, as the web's SyncTab draws it: a file's own name, or for anything synced the
+     * One row, as the web's `/sync` draws it: a file's own name, or for anything synced the
      * source it came from — a synced row's `filename` is a raw external id, never meant to be
      * read — with "9 Sep · 34.7 km" under it once finished. At the other end the status, and
      * View on map.
@@ -155,10 +157,7 @@ class SyncTab(
             "done" -> {
                 status.setText(R.string.status_row_ready)
                 status.setTextColor(context.getColor(R.color.hmt_success))
-                meta(entry)?.let {
-                    detail.text = it
-                    detail.visibility = View.VISIBLE
-                }
+                meta(entry)?.let { showDetail(detail, it) }
             }
             "failed" -> {
                 status.text = if (entry.error.isBlank()) {
@@ -181,7 +180,32 @@ class SyncTab(
         rows.addView(view)
     }
 
-    /** "9 Sep · 34.7 km", the web's `.sync-tab__row-meta` — only when both halves are known. */
+    /** The web's duplicates list: when it started and how far, then where it came from and
+     *  which copy replaced it. Gone with none, and when the read fails. */
+    private fun renderDuplicates(duplicates: List<Duplicate>) {
+        duplicatesSection.visibility = if (duplicates.isEmpty()) View.GONE else View.VISIBLE
+        duplicateRows.removeAllViews()
+        for (d in duplicates) {
+            val view = LayoutInflater.from(context).inflate(R.layout.item_sync_history_row, duplicateRows, false)
+            view.findViewById<TextView>(R.id.row_name).text = buildString {
+                append(PanelFormat.startedAt(res, d.startedAt))
+                d.distanceMeters?.let { append(" · ").append(PanelFormat.distance(res, it)) }
+            }
+            showDetail(
+                view.findViewById(R.id.row_detail),
+                res.getString(R.string.duplicate_from, sourceName(d.source), sourceName(d.supersededBySource)),
+            )
+            view.findViewById<View>(R.id.row_status).visibility = View.GONE
+            duplicateRows.addView(view)
+        }
+    }
+
+    private fun showDetail(detail: TextView, text: String) {
+        detail.text = text
+        detail.visibility = View.VISIBLE
+    }
+
+    /** "9 Sep · 34.7 km" — only when both halves are known. */
     private fun meta(entry: SyncHistoryEntry): String? {
         val startedAt = entry.startedAt ?: return null
         val meters = entry.distanceMeters ?: return null
@@ -199,6 +223,16 @@ class SyncTab(
         else -> source
     }
 
+    /** The `source` values, said in a sentence (the web's `formatIngestSource`). */
+    private fun sourceName(source: String): String = when (source) {
+        "healthconnect" -> res.getString(R.string.source_health_connect)
+        "healthkit" -> res.getString(R.string.source_health_kit)
+        "upload" -> res.getString(R.string.source_upload)
+        "takeout" -> res.getString(R.string.source_takeout)
+        "recorded" -> res.getString(R.string.source_recorded)
+        else -> source
+    }
+
     /** "Sep 9" / "9 сент." — the web's `formatShortDate`, in the app's language. Built per
      *  call, since the per-app language can change while the app runs. */
     private fun shortDate(): DateTimeFormatter {
@@ -208,8 +242,8 @@ class SyncTab(
     }
 
     private companion object {
-        /** The web's `useUploadHistory` page size and poll interval. */
-        const val HISTORY_PAGE = 5
+        /** The web's `/sync` page size. */
+        const val HISTORY_PAGE = 20
         const val POLL_INTERVAL_MS = 1_500L
     }
 }

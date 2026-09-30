@@ -31,14 +31,14 @@ import dev.holdmytrack.android.recording.RecordingTypes
  * The Activities panel's Stories tab, the web's `apps/web/src/ui/StoriesTab.tsx` and the Story
  * half of `MapView.tsx` (`docs/SPEC.md` FR-14.6): every Story as a folder, newest first,
  * exactly one of them open while the tab shows — the newest, until another is tapped. Opening
- * one is viewing it: `MainActivity` narrows the tracks, the date range and the list to it
- * ([onOpen]), and this tab lists those rows inside the folder, for looking only (tap to
- * select), with the whole Story's statistics in the footer. A folder's pencil and bin rename
- * and delete it.
+ * one is viewing it: `MainActivity` shows the tracks and the list of all its activities,
+ * whatever the date range ([onOpen]), and this tab lists those rows inside the folder — tap to
+ * select, × to take one out of the Story — with the whole Story's statistics in the footer. A
+ * folder's pencil and bin rename and delete it.
  *
  * The list is read each time the tab opens ([start]), so a Story made or changed since —
- * Create story's included — is there; the open Story is read on its own ([setOpen]) for the
- * footer's numbers, which cover the whole Story whatever the date range selects.
+ * Add to story's included — is there; the open Story is read on its own ([setOpen]) for the
+ * footer's numbers.
  */
 class StoriesTab(
     private val content: View,
@@ -51,6 +51,8 @@ class StoriesTab(
     private val onClearFocus: () -> Unit,
     /** A Story renamed or deleted — the rows' Story badges name it. */
     private val onBadgesChanged: () -> Unit,
+    /** [activityId] was taken out of the open Story: the list and the tracks are out of date. */
+    private val onActivityRemoved: (activityId: String) -> Unit,
 ) {
     private val context = content.context
     private val res = context.resources
@@ -77,6 +79,10 @@ class StoriesTab(
     private var rows: List<ActivityRowItem> = emptyList()
     private var rowsLoading = false
     private var rowsError: String? = null
+
+    /** The last × that failed, with the server's reason — shown above the rows until the next
+     *  one, or another Story opening. */
+    private var removeError: String? = null
 
     init {
         list.layoutManager = LinearLayoutManager(context)
@@ -112,6 +118,7 @@ class StoriesTab(
         if (id != openId) {
             openId = id
             openStory = null
+            removeError = null
         }
         openError = null
         render()
@@ -176,6 +183,7 @@ class StoriesTab(
             items += Item.Folder(story, open)
             if (!open) continue
             if (story.description.isNotEmpty()) items += Item.Description(story.id, story.description)
+            removeError?.let { items += Item.Note(it, failed = true) }
             rows.forEach { items += Item.Row(it, story.id) }
             when {
                 rowsLoading -> items += Item.Note(res.getString(R.string.panel_loading), failed = false)
@@ -278,6 +286,22 @@ class StoriesTab(
         render()
     }
 
+    /** The row's ×: out of the Story at once, with no confirmation — the activity itself stays,
+     *  and Add to story puts it back (`docs/SPEC.md` FR-14.6 item 3). */
+    private fun remove(storyId: String, activityId: String) {
+        HoldMyTrackApi.changeStoryActivities(storyId, listOf(activityId), add = false) { result ->
+            result.onSuccess { story ->
+                removeError = null
+                stories = stories.map { if (it.id == story.id) story else it }
+                if (story.id == openId) openStory = story
+                onActivityRemoved(activityId)
+            }.onFailure { failure ->
+                removeError = failure.message?.takeIf { it.isNotBlank() } ?: res.getString(R.string.story_save_failed)
+            }
+            render()
+        }
+    }
+
     private fun edited(story: Story) {
         stories = stories.map { if (it.id == story.id) story else it }
         if (story.id == openId) openStory = story
@@ -344,7 +368,14 @@ class StoriesTab(
                 is Item.Folder -> (holder as FolderHolder).bind(item)
                 is Item.Description -> (holder.itemView as TextView).text = item.text
                 // Badged only for the row's other Stories: every row here is in this one.
-                is Item.Row -> (holder as ActivityRowHolder).bind(item.row, item.storyId, onCheck = null, onSelect = onSelect)
+                is Item.Row -> (holder as ActivityRowHolder).bind(
+                    item.row,
+                    item.storyId,
+                    onCheck = null,
+                    onSelect = onSelect,
+                    onOpenStory = { id -> onOpen(id, true) },
+                    onRemove = { activityId -> remove(item.storyId, activityId) },
+                )
                 is Item.Note -> (holder.itemView as TextView).apply {
                     text = item.text
                     setTextColor(context.getColor(if (item.failed) R.color.hmt_danger else R.color.panel_ink_50))
@@ -373,7 +404,8 @@ class StoriesTab(
             // Tapping the open Story does nothing: there is no way to fold them all.
             toggle.setOnClickListener { if (!item.open) onOpen(story.id, true) }
 
-            // The demo account sees both, disabled, saying why (FR-14.6 item 12).
+            // The demo account sees both, disabled, saying why (FR-14.6 item 12), as it does
+            // the rows' ×.
             val demo = Session.isDemo
             val editLabel = res.getString(if (demo) R.string.story_demo_edit else R.string.story_edit)
             val deleteLabel = res.getString(if (demo) R.string.story_demo_delete else R.string.story_delete)

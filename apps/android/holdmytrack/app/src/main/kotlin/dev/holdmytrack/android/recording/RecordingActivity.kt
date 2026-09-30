@@ -17,7 +17,6 @@ import com.google.android.material.textfield.TextInputLayout
 import dev.holdmytrack.android.R
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.recording.db.RecordedActivityStore
-import dev.holdmytrack.android.recording.db.SyncStatus
 import dev.holdmytrack.android.recording.db.toGpx
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

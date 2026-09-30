@@ -7,12 +7,11 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.holdmytrack.android.R
+import dev.holdmytrack.android.panel.PanelFormat
 import dev.holdmytrack.android.recording.db.RecordedActivityRecord
 import dev.holdmytrack.android.recording.db.RecordedActivityStore
-import dev.holdmytrack.android.recording.db.SyncStatus
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -20,39 +19,25 @@ import java.time.format.FormatStyle
 import kotlinx.coroutines.launch
 
 /**
- * The Sync Source screen's Recorded activities list: every GPS recording on this device that
- * hasn't synced yet, one `item_recorded_activity` row each, between hairlines (after the web's
- * `.activities-panel__row`). Stop (`RecordingService`) only saves locally, so this is where a
- * recording gets checked to go out with the next "Sync now" and where Edit
- * (`RecordingActivity`) is reached. A row leaves the list once it syncs — it's deleted from the
- * device, and lives on the server from then on.
- *
- * The checkbox *is* the row's `SyncStatus` (QUEUED / NOT_SYNCED), written straight through to
- * `RecordedActivityStore`, so what's checked survives leaving the screen.
+ * The Sync screen's Recorded activities list: every GPS recording on this device that hasn't
+ * synced yet, one `item_recorded_activity` row each, between hairlines (after the web's
+ * `.activities-panel__row`). Stop (`RecordingService`) only saves locally, so this is what the
+ * next "Sync now" sends, and where Edit (`RecordingActivity`) is reached. A row leaves the list
+ * once it syncs — it's deleted from the device, and lives on the server from then on.
  */
 class RecordedActivityRows(
     private val activity: AppCompatActivity,
     private val container: LinearLayout,
     private val emptyView: TextView,
-    /** Called after anything that changes what "Sync now" would send — a check, an uncheck, a
-     *  delete, a reload. */
+    /** Called after anything that changes what "Sync now" would send — a delete, a reload. */
     private val onChanged: () -> Unit,
 ) {
 
     private val store = RecordedActivityStore(activity)
     private var all: List<RecordedActivityRecord> = emptyList()
 
-    /** False for the demo account: it can record and manage rows locally, but the server
-     *  rejects its sync (requireNotDemo, services/server/internal/httpapi/auth.go), so there is
-     *  no point letting it check something "Sync now" can never take. */
-    var checkable: Boolean = true
-        set(value) {
-            field = value
-            render()
-        }
-
-    val checkedCount: Int
-        get() = all.count { it.syncStatus == SyncStatus.QUEUED }
+    val count: Int
+        get() = all.size
 
     /** Re-read from the store — on every resume (returning from Edit is one), and after a sync
      *  that deleted the rows it sent. */
@@ -74,32 +59,22 @@ class RecordedActivityRows(
     private fun buildRow(record: RecordedActivityRecord): View {
         val row = LayoutInflater.from(activity).inflate(R.layout.item_recorded_activity, container, false)
 
-        row.findViewById<MaterialCheckBox>(R.id.row_queued).apply {
-            isChecked = record.syncStatus == SyncStatus.QUEUED
-            isEnabled = checkable
-            setOnCheckedChangeListener { _, checked ->
-                val newStatus = if (checked) SyncStatus.QUEUED else SyncStatus.NOT_SYNCED
-                activity.lifecycleScope.launch {
-                    store.setSyncStatus(record.id, newStatus)
-                    all = all.map { if (it.id == record.id) it.copy(syncStatus = newStatus) else it }
-                    onChanged()
-                }
-            }
-        }
-
         row.findViewById<TrackSilhouetteView>(R.id.row_preview).setPoints(record.points)
         val title = record.name.ifBlank { formatDate(record.startedAtMs) }
         row.findViewById<TextView>(R.id.row_title).text = title
         // Named per row: TalkBack reads each control on its own, and "Delete" alone doesn't
         // say which recording goes.
-        row.findViewById<View>(R.id.row_queued).contentDescription = activity.getString(R.string.recorded_row_queue_named, title)
         row.findViewById<View>(R.id.row_edit).contentDescription = activity.getString(R.string.recorded_row_edit_named, title)
         row.findViewById<View>(R.id.row_delete).contentDescription = activity.getString(R.string.recorded_row_delete_named, title)
-        row.findViewById<TextView>(R.id.row_meta).text = activity.getString(
-            R.string.recorded_row_subtitle,
-            record.activityType,
-            RecordingFormat.distance(activity.resources, record.distanceMeters),
-        )
+        // The Activities panel's row line: "[date · ] distance · duration · type", the date only
+        // when a name took the title.
+        val res = activity.resources
+        row.findViewById<TextView>(R.id.row_meta).text = listOfNotNull(
+            formatDate(record.startedAtMs).takeIf { record.name.isNotBlank() },
+            PanelFormat.distance(res, record.distanceMeters),
+            PanelFormat.duration(res, record.durationSeconds),
+            RecordingTypes.format(res, record.activityType),
+        ).joinToString(" · ")
 
         row.findViewById<View>(R.id.row_edit).setOnClickListener {
             activity.startActivity(

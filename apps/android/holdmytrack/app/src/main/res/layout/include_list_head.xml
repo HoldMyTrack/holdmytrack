@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- A list's heading: a small uppercase title, and a summary at the other end — the web's
-     .sync-tab__list-head. The includer sets the title's text; the summary is filled in code. -->
+     .profile__head. The includer sets the title's text; the summary is filled in code. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"

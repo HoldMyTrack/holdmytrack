@@ -18,7 +18,7 @@ import kotlinx.coroutines.withContext
  * `FusedLocationProviderClient`, plain `OkHttp` over Retrofit).
  */
 internal class RecordingDbHelper(context: Context) :
-    SQLiteOpenHelper(context.applicationContext, "holdmytrack-recordings.db", null, 4) {
+    SQLiteOpenHelper(context.applicationContext, "holdmytrack-recordings.db", null, 5) {
 
     init {
         // `LiveRecordingJournal` writes on every GPS fix while other screens read the finished
@@ -40,7 +40,6 @@ internal class RecordingDbHelper(context: Context) :
                 distance_meters REAL NOT NULL,
                 duration_seconds INTEGER NOT NULL,
                 points_json TEXT NOT NULL,
-                sync_status TEXT NOT NULL,
                 created_at_ms INTEGER NOT NULL
             )
             """.trimIndent(),
@@ -81,7 +80,8 @@ internal class RecordingDbHelper(context: Context) :
     // same "no migration tooling needed pre-launch" call the server side already makes.
     // Version 3 changed no columns: a synced row is now deleted rather than kept with a
     // `synced` status, so upgrading clears the rows that status left behind — and keeps the
-    // unsynced ones, which exist nowhere else. Version 4 added the journal's tables.
+    // unsynced ones, which exist nowhere else. Version 4 added the journal's tables. Version 5
+    // dropped `sync_status`: Sync now sends every row, so there is nothing left to mark.
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) {
             db.execSQL("DROP TABLE IF EXISTS $TABLE")
@@ -90,6 +90,7 @@ internal class RecordingDbHelper(context: Context) :
         }
         if (oldVersion < 3) db.execSQL("DELETE FROM $TABLE WHERE sync_status = 'synced'")
         if (oldVersion < 4) createJournal(db)
+        if (oldVersion < 5) db.execSQL("ALTER TABLE $TABLE DROP COLUMN sync_status")
     }
 
     companion object {
@@ -101,8 +102,8 @@ internal class RecordingDbHelper(context: Context) :
 
 /**
  * Every local GPS recording not yet on the server — inserted by `RecordingService` on Stop,
- * edited from Sync Source's list (`RecordedActivityRows`), and drained by its "Sync now" for
- * whatever's [SyncStatus.QUEUED], each row deleted once the server has it. One instance per
+ * edited from the Sync screen's list (`RecordedActivityRows`), and drained by its "Sync now",
+ * each row deleted once the server has it. One instance per
  * caller is fine; `SQLiteOpenHelper` itself keeps the single underlying connection.
  *
  * **Every read and write is scoped to the currently signed-in account.** Recording works
@@ -149,20 +150,6 @@ class RecordedActivityStore(context: Context) {
         ).use { cursor -> buildList { while (cursor.moveToNext()) add(cursor.toRecord()) } }
     }
 
-    /** What "Sync Now" walks — every row the list's checkbox has queued for *this* account,
-     *  regardless of which activity-type filter happened to be showing when it was checked. */
-    suspend fun queued(): List<RecordedActivityRecord> = withContext(Dispatchers.IO) {
-        helper.readableDatabase.query(
-            RecordingDbHelper.TABLE, null, "sync_status = ? AND account = ?", arrayOf(SyncStatus.QUEUED, account()), null, null, null,
-        ).use { cursor -> buildList { while (cursor.moveToNext()) add(cursor.toRecord()) } }
-    }
-
-    suspend fun setSyncStatus(id: String, status: String) = withContext(Dispatchers.IO) {
-        val values = ContentValues().apply { put("sync_status", status) }
-        helper.writableDatabase.update(RecordingDbHelper.TABLE, values, "id = ? AND account = ?", arrayOf(id, account()))
-        Unit
-    }
-
     /** Removes a row — the user's Delete in `RecordedActivityRows` (the only copy,
      *  since nothing here has synced), or `SyncActivity.flushRecordedQueue` once the server
      *  has accepted it and the activity lives there instead. */
@@ -180,7 +167,6 @@ class RecordedActivityStore(context: Context) {
         distanceMeters = getDouble(getColumnIndexOrThrow("distance_meters")),
         durationSeconds = getLong(getColumnIndexOrThrow("duration_seconds")),
         points = getString(getColumnIndexOrThrow("points_json")).toRecordedPoints(),
-        syncStatus = getString(getColumnIndexOrThrow("sync_status")),
         createdAtMs = getLong(getColumnIndexOrThrow("created_at_ms")),
     )
 }
@@ -197,6 +183,5 @@ internal fun RecordedActivityRecord.toContentValues(account: String) = ContentVa
     put("distance_meters", distanceMeters)
     put("duration_seconds", durationSeconds)
     put("points_json", points.toJson())
-    put("sync_status", syncStatus)
     put("created_at_ms", createdAtMs)
 }
