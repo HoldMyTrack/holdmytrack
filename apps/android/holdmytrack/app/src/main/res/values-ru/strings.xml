@@ -235,6 +235,7 @@
     <string name="recording_type_new">новый</string>
     <string name="recording_type_no_match">Нет типа, подходящего под «%1$s»</string>
     <string name="recording_download">Скачать GPX</string>
+    <string name="recording_saved_until_sync">Запись сохранена. Она появится на карте после синхронизации.</string>
     <string name="recording_downloaded">Трек сохранён.</string>
     <string name="recording_download_failed">Не удалось сохранить трек.</string>
     <string name="recording_stat_time">Время</string>

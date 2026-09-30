@@ -222,6 +222,7 @@
     <string name="recording_type_new">new</string>
     <string name="recording_type_no_match">No type matches “%1$s”</string>
     <string name="recording_download">Download GPX</string>
+    <string name="recording_saved_until_sync">Recording saved. It will appear on the map after you sync.</string>
     <string name="recording_downloaded">Track saved.</string>
     <string name="recording_download_failed">Could not save the track.</string>
     <string name="recording_stat_time">Time</string>

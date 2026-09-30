@@ -124,6 +124,9 @@ class RecordingActivity : AppCompatActivity() {
                 ),
             )
             RecordingTypes.rememberLastUsed(this@RecordingActivity, newType)
+            // A new recording stays on the phone until Sync sends it, which isn't obvious from
+            // the map it returns to. On the app's context, since this screen is finishing.
+            if (isSaveScreen) Toast.makeText(applicationContext, R.string.recording_saved_until_sync, Toast.LENGTH_LONG).show()
             finish()
         }
     }
