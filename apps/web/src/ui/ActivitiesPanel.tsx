@@ -1,28 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { BookPlus, ChevronDown, ChevronUp, Eye, EyeOff, Focus, Pencil, Trash2 } from 'lucide-react';
-import { deleteActivity, type Activity, type ActivityTotals, type DuplicateActivity, type Story } from '../api';
+import { ChevronDown, ChevronUp, Eye, EyeOff, Focus, Pencil, Trash2 } from 'lucide-react';
+import { deleteActivity, type Activity, type Story } from '../api';
 import { ActivityRow, rowLabel, useScrollFocusedRow } from './ActivityRow';
+import { AddToStoryMenu } from './AddToStoryMenu';
 import { ConfirmDialog } from './ConfirmDialog';
-import { StoryDialog } from './StoryDialog';
+import { DateRangeSlider, type DateRangeSliderProps } from './DateRangeSlider';
 import { DistanceFilter } from './DistanceFilter';
 import { PrivateLocationsPanel } from './PrivateLocationsPanel';
 import { StoriesTab } from './StoriesTab';
-import { SyncTab } from './SyncTab';
 import type { DistanceRange, TypeFacet } from './activityFacets';
-import { formatActivityType, formatDistance, formatIngestSource, formatStartedAt, formatTotalDistance } from './format';
+import { formatActivityType, formatTotalDistance } from './format';
 import { useUnitSystem } from './units';
-import type { ImportsState } from './useImports';
 import { lang, t, tn } from '../i18n';
 
 /**
- * The left sidebar, with four tabs: **Activities** (the list, below), **Stories** (StoriesTab.tsx
- * — every Story as a folder, the open one's activities inside it, FR-14.6), **Sync** (SyncTab.tsx
- * — file upload and the import history) and **Privacy** (PrivateLocationsPanel.tsx — FR-8.1's
- * list, whose editor floats over the map like Edit track's). The tab is MapView's state, so
- * `/?private-locations` can open onto Privacy, `/?story=` onto Stories, and the tab survives
- * this panel unmounting for Fog/Heatmap; the upload queue behind Sync is MapView's too
- * (useImports), so it keeps running while another tab is showing.
+ * The left sidebar, with three tabs, each about what the map shows under it: **Activities** (the
+ * list, below), **Stories** (StoriesTab.tsx — every Story as a folder, the open one's
+ * activities inside it, FR-14.6) and **Privacy** (PrivateLocationsPanel.tsx — FR-8.1's list,
+ * whose editor floats over the map like Edit track's). Importing is the header's Upload menu and
+ * the /sync page, not a tab here. The tab is MapView's state, so `/?private-locations` can open
+ * onto Privacy, `/?story=` onto Stories, and the tab survives this panel unmounting for
+ * Fog/Heatmap.
  *
  * The activity list — a permanent left sidebar (not a collapsible
  * dropdown, nor a paginated one: §4.7's list
@@ -30,7 +29,12 @@ import { lang, t, tn } from '../i18n';
  * further by TYPE/DISTANCE). MapView owns the fetch, the range, and both filters' state; this
  * component is purely presentational plus its own dropdown-open/panel-resize local UI state.
  *
- * The filters share one row between the subtext line and the toolbar below: the Type dropdown
+ * The date range is the list's first filter: DateRangeSlider.tsx, under the subtext line, on
+ * this tab alone — the other tabs aren't about a stretch of time, so nothing there is filtered
+ * by one. On a phone index.css pins it to the bottom of the screen under the sheet instead, so
+ * the range can still be changed with the sheet collapsed and the map in view.
+ *
+ * The other filters share one row between the slider and the toolbar below: the Type dropdown
  * (TYPE checkboxes plus an "All types" convenience row that clears every exclusion), then
  * DistanceFilter.tsx, always visible — no longer hidden behind the old "Filter" toggle button,
  * which is gone.
@@ -42,7 +46,8 @@ import { lang, t, tn } from '../i18n';
  * checkbox mirrors the checked group's state, then icon actions over the target — Show/hide,
  * Edit (the Edit window, EditActivityWindow.tsx: its Activity tab edits Type/Name/Description
  * for exactly one activity and Type only for more than one, its Track tab one activity's
- * track), Delete, and, set off by a divider, Focus on map (fly-to-fit). Each one's tooltip
+ * track), Add to story (AddToStoryMenu.tsx), Delete, and, set off by a divider, Focus on map
+ * (fly-to-fit). Each one's tooltip
  * names the target ("3 checked activities", or the selected row's own label), so which of the
  * two applies is never a guess. The footer keeps only the target's "N selected · X km" summary.
  *
@@ -74,9 +79,6 @@ export interface ActivitiesPanelProps {
   activities: Activity[];
   loading: boolean;
   error: string | null;
-  /** §4.7's range summary — unfiltered by TYPE/DISTANCE, so "km loaded" always describes the
-   *  whole date range regardless of how the two filters below narrow what's shown. */
-  totals: ActivityTotals | null;
   facets: TypeFacet[];
   excludedTypes: ReadonlySet<string>;
   onToggleType: (type: string) => void;
@@ -104,12 +106,12 @@ export interface ActivitiesPanelProps {
   onClearFocus: () => void;
   /** The row's own hover preview, `null` on leave — see the component doc comment above. */
   onHoverActivity: (id: string | null) => void;
-  /** Empties the checked group — the header checkbox's "uncheck all" state. */
+  /** Empties the checked group — the header checkbox's "uncheck all", and its menu's None. */
   onClear: () => void;
-  /** Checks every currently-listed row — the header checkbox's "check all" state. */
+  /** Checks every currently-listed row — the header checkbox's "check all", and its menu's All. */
   onSelectAll: () => void;
-  /** Checks every unchecked listed row and unchecks every checked one — the toolbar's
-   *  invert-selection icon beside the header checkbox. */
+  /** Checks every unchecked listed row and unchecks every checked one — the header checkbox's
+   *  menu's Invert. */
   onInvertSelection: () => void;
   /** Flies to fit the toolbar's target without changing it. */
   onShowSelected: () => void;
@@ -123,38 +125,32 @@ export interface ActivitiesPanelProps {
   onToggleGroupVisibility: () => void;
   /** §4.7.5's toolbar Delete — the only delete entry point (over the toolbar's target: the
    *  checked group, or the selected row alone), so always an array even for one id. Unlike onActivityUpdated, this also has to drop every deleted id from
-   *  `checked`/`hiddenIds`/`focusedId` and refresh the map's track layer and totals/histogram
+   *  `checked`/`hiddenIds`/`focusedId` and refresh the map's track layer and the slider's days
    *  (deleting changes distance/duration, editing never does) — MapView's own
    *  handleActivitiesDeleted does more than a plain reload. */
   onActivitiesDeleted: (ids: string[]) => void;
   /** The toolbar's Edit button, over the toolbar's target — MapView opens the Edit window
    *  (EditActivityWindow.tsx: Activity and Track tabs) over the map. */
   onEdit: (activities: Activity[]) => void;
-  /** A Story just made of the checked activities with the toolbar's Create story
-   *  (StoryDialog.tsx) — MapView opens it on the Stories tab. */
+  /** A Story just made of the toolbar's target with Add to story's "New story…"
+   *  (AddToStoryMenu.tsx) — MapView opens it on the Stories tab. */
   onStoryCreated: (story: Story) => void;
+  /** An existing Story the toolbar's target was just added to with Add to story, as the server
+   *  returned it — MapView reloads the list so the rows' Story badges follow. */
+  onStoryAdded: (story: Story) => void;
   /** The Stories tab's list and its open Story — MapView's. */
   stories: StoriesPanel;
-  /** FR-3.7's "Not yet built" gap, closed: activities cross-source dedup took out of
-   *  circulation, each alongside the richer copy that superseded it — mirrors the Android
-   *  app's own duplicates section (`SyncStatusActivity`). Never filtered by the date range or
-   *  TYPE/DISTANCE facets above; a duplicate answers "where did my activity go", which isn't
-   *  a question scoped to whatever's currently selected. */
-  duplicates: DuplicateActivity[];
-  duplicatesError: string | null;
-  /** The Sync tab's upload queue and history — MapView's useImports. */
-  imports: ImportsState;
-  /** A Sync-tab row's "View on map" — MapView's viewActivityOnMap. */
-  onViewOnMap: (activityId: string, startedAt: string) => void;
   tab: PanelTab;
   onTabChange: (tab: PanelTab) => void;
   /** The Privacy tab's map, for its overlay — null until MapView's map has loaded. */
   map: MapLibreMap | null;
   /** A saved or deleted Private location — MapView's handlePrivateLocationsChanged. */
   onPrivateLocationsChanged: () => void;
+  /** The Activities tab's date slider — MapView's selected range and useActivityDays' window. */
+  dateRange: DateRangeSliderProps;
 }
 
-export type PanelTab = 'activities' | 'stories' | 'sync' | 'private';
+export type PanelTab = 'activities' | 'stories' | 'private';
 
 /** What the Stories tab needs from MapView beyond the activity list the other tabs share —
  *  see StoriesTab.tsx's props of the same names. */
@@ -168,6 +164,7 @@ export interface StoriesPanel {
   onOpen: (id: string) => void;
   onEdited: (story: Story) => void;
   onDeleted: (id: string) => void;
+  onActivityRemoved: (story: Story, activityId: string) => void;
 }
 
 export function ActivitiesPanel({
@@ -175,7 +172,6 @@ export function ActivitiesPanel({
   activities,
   loading,
   error,
-  totals,
   facets,
   excludedTypes,
   onToggleType,
@@ -200,30 +196,40 @@ export function ActivitiesPanel({
   onActivitiesDeleted,
   onEdit,
   onStoryCreated,
+  onStoryAdded,
   stories,
-  duplicates,
-  duplicatesError,
-  imports,
-  onViewOnMap,
   tab,
   onTabChange: setTab,
   map,
   onPrivateLocationsChanged,
+  dateRange,
 }: ActivitiesPanelProps) {
   const hasActiveFilters = excludedTypes.size > 0 || distanceFilter !== null;
 
   // The Type dropdown, in the filter row beside Distance — closed by
   // default, same "most sessions don't start by narrowing filters" reasoning the old "Filter"
-  // toggle button had. Dismiss on outside click or Escape, the same hand-wired pattern
-  // the Duplicates disclosure below uses too (not shared into a hook for two call sites).
+  // toggle button had. Dismiss on outside click or Escape.
   const [typeFilterOpen, setTypeFilterOpen] = useState(false);
   const typeFilterRef = useRef<HTMLDivElement>(null);
 
-  // The Duplicates disclosure, same closed-by-default/dismiss-on-outside-click pattern as the
-  // Type dropdown above — a small footer link, not part of the main row list, since a
-  // duplicate isn't one of "my activities" in the sense the rest of this panel means.
-  const [duplicatesOpen, setDuplicatesOpen] = useState(false);
-  const duplicatesRef = useRef<HTMLDivElement>(null);
+  // The header checkbox's ▾ menu — All, None, Invert, as in a mail app. Same dismissal.
+  const [selectMenuOpen, setSelectMenuOpen] = useState(false);
+  const selectMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!selectMenuOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!selectMenuRef.current?.contains(event.target as Node)) setSelectMenuOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [selectMenuOpen]);
 
   // The row list, for useScrollFocusedRow (ActivityRow.tsx): a newly focused row scrolls into view.
   const listRef = useRef<HTMLUListElement>(null);
@@ -258,29 +264,12 @@ export function ActivitiesPanel({
     };
   }, [typeFilterOpen]);
 
-  useEffect(() => {
-    if (!duplicatesOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!duplicatesRef.current?.contains(event.target as Node)) setDuplicatesOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setDuplicatesOpen(false);
-    };
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [duplicatesOpen]);
 
 
   // §4.7.5's delete confirm dialog — the toolbar's Delete is the only delete entry point
   // (there's no per-row delete button), so this covers both the one-activity and many-activity
   // case uniformly. The confirm title and message below branch on targetActivities.length.
   const [deletingGroup, setDeletingGroup] = useState(false);
-  // FR-5.16's Create story dialog, over the checked group.
-  const [creatingStory, setCreatingStory] = useState(false);
 
   // Mobile-only bottom sheet (index.css's `@media (max-width: 768px)` layer) — collapsed by
   // default, same reasoning as typeFilterOpen above. Desktop CSS never reacts to the
@@ -377,20 +366,11 @@ export function ActivitiesPanel({
       : t(targetActivities.length === 1 ? 'activities.edit_one' : 'activities.edit_many', { target: targetName });
   const deleteTitle = targetName === null ? noTarget : t('activities.delete_target', { target: targetName });
 
-  // Create story takes the checked group only, never the selected row alone (FR-5.16): a Story
-  // is a set picked on purpose, and checking is how a set is picked here. Listed rows only, like
-  // every toolbar action.
-  const checkedActivities = checked.size > 0 ? targetActivities : [];
-  const storyTitle = readOnly
-    ? t('stories.demo_create')
-    : checkedActivities.length === 0
-      ? t('stories.create_none')
-      : t('stories.create_target', { target: tn('activities.checked_count', checkedActivities.length) });
   const focusTitle = targetName === null ? noTarget : t('activities.focus_target', { target: targetName });
 
   return (
     <div
-      className={`activities-panel${sheetExpanded ? ' activities-panel--sheet-expanded' : ''}`}
+      className={`activities-panel${sheetExpanded ? ' activities-panel--sheet-expanded' : ''}${tab === 'activities' ? ' activities-panel--dated' : ''}`}
       data-testid="activities-panel"
       // A CSS custom property, not a direct `width`, specifically so the mobile media query
       // can override it with a plain `width: 100%` rule — an inline style always beats an
@@ -437,19 +417,6 @@ export function ActivitiesPanel({
         <button
           type="button"
           role="tab"
-          aria-selected={tab === 'sync'}
-          className="activities-panel__tab"
-          data-testid="activities-panel-tab-sync"
-          onClick={() => setTab('sync')}
-        >
-          <span className="activities-panel__heading-text">{t('sync.tab')}</span>
-          {/* Visible from the Activities tab too, so an upload's progress doesn't disappear
-              the moment you switch away from it. */}
-          {imports.badgeCount > 0 && <span className="activities-panel__sync-badge">{imports.badgeCount}</span>}
-        </button>
-        <button
-          type="button"
-          role="tab"
           aria-selected={tab === 'private'}
           className="activities-panel__tab"
           data-testid="activities-panel-tab-private"
@@ -462,22 +429,18 @@ export function ActivitiesPanel({
           target (expand/collapse), styled identically to the old plain text on desktop
           (index.css keeps `cursor: default` there) so clicking it is a harmless, invisible
           no-op at desktop width rather than a behavior change. */}
+      {/* The Activities tab has no subtext: its slider and filters say what's listed. Its button
+          stays for a phone, where it's the sheet's expand strip (a bare chevron); index.css hides
+          it at desktop width. */}
       <button
         type="button"
-        className="activities-panel__subtext"
+        className={`activities-panel__subtext${tab === 'activities' ? ' activities-panel__subtext--bare' : ''}`}
         data-testid="activities-panel-sheet-toggle"
         aria-expanded={sheetExpanded}
+        aria-label={tab === 'activities' ? t(sheetExpanded ? 'activities.collapse_sheet' : 'activities.expand_sheet') : undefined}
         onClick={() => setSheetExpanded((expanded) => !expanded)}
       >
-        {tab === 'sync'
-          ? t('sync.subtext')
-          : tab === 'private'
-            ? t('private.subtitle')
-            : tab === 'stories'
-              ? t('stories.subtext')
-              : totals !== null
-                ? t('activities.loaded', { distance: formatTotalDistance(totals.distanceMeters, system) })
-                : t('common.loading')}
+        {tab === 'private' ? t('private.subtitle') : tab === 'stories' ? t('stories.subtext') : null}
         <span className="activities-panel__sheet-chevron" aria-hidden="true">
           {sheetExpanded ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
         </span>
@@ -520,21 +483,13 @@ export function ActivitiesPanel({
           onHoverActivity={onHoverActivity}
           onEdited={stories.onEdited}
           onDeleted={stories.onDeleted}
-        />
-      ) : tab === 'sync' ? (
-        <SyncTab
-          imports={imports}
-          readOnly={readOnly}
-          onViewOnMap={(activityId, startedAt) => {
-            setTab('activities');
-            // On a phone the sheet is expanded to show this tab, and would stay drawn over the
-            // very map the link is meant to show. No visible effect at desktop width.
-            setSheetExpanded(false);
-            onViewOnMap(activityId, startedAt);
-          }}
+          onActivityRemoved={stories.onActivityRemoved}
         />
       ) : (
         <>
+          <div className="activities-panel__dates">
+            <DateRangeSlider {...dateRange} />
+          </div>
           {/* The two filters side by side: Type's dropdown, then Distance's slider taking the
               rest of the row. */}
           <div className="activities-panel__filters">
@@ -604,8 +559,8 @@ export function ActivitiesPanel({
 
           {/* The header toolbar — right above the row list. There are no per-row action icons
               to stay column-aligned with (Visible/Edit/Delete all live here, operating on the
-              toolbar's target), so this is a plain compact strip: select-all checkbox, the
-              invert-selection icon, a spacer, the action chips, a divider, then the one
+              toolbar's target), so this is a plain compact strip: select-all checkbox and its
+              ▾ menu (All, None, Invert), a spacer, the action chips, a divider, then the one
               accent-tinted "focus the map on the target" action. */}
           <div className="activities-panel__toolbar">
             <input
@@ -618,33 +573,47 @@ export function ActivitiesPanel({
               title={allChecked ? t('activities.uncheck_all') : t('activities.check_all')}
               onChange={() => (allChecked || someChecked ? onClear() : onSelectAll())}
             />
-            <button
-              type="button"
-              className="activities-panel__invert"
-              disabled={activities.length === 0}
-              onClick={onInvertSelection}
-              aria-label={t('activities.invert')}
-              title={t('activities.invert_title')}
-            >
-              {/* A checkbox-sized square split on the diagonal, one half filled — reads as a
-                  sibling of the select-all checkbox beside it rather than a separate text chip.
-                  Lucide has no such glyph, so it's drawn to Lucide's own geometry (its `square`:
-                  24-unit grid, 2-unit stroke, rx 2) to stay one family with the rest. */}
-              <svg
-                viewBox="0 0 24 24"
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinejoin="round"
-                aria-hidden="true"
-                focusable="false"
+            <div className="select-menu" ref={selectMenuRef}>
+              <button
+                type="button"
+                className="select-menu__trigger"
+                data-testid="select-menu"
+                disabled={activities.length === 0}
+                aria-haspopup="menu"
+                aria-expanded={selectMenuOpen}
+                aria-label={t('activities.select_menu')}
+                title={t('activities.select_menu')}
+                onClick={() => setSelectMenuOpen((open) => !open)}
               >
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <path d="M21 3v16a2 2 0 0 1-2 2H3Z" fill="currentColor" />
-              </svg>
-            </button>
+                <ChevronDown size={12} />
+              </button>
+              {selectMenuOpen && (
+                <div className="story-menu__panel select-menu__panel" role="menu" aria-label={t('activities.select_menu')}>
+                  {(
+                    [
+                      ['all', t('activities.select_all'), allChecked, onSelectAll],
+                      ['none', t('activities.select_none'), checkedCount === 0, onClear],
+                      ['invert', t('activities.select_invert'), false, onInvertSelection],
+                    ] as const
+                  ).map(([key, label, disabled, run]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      role="menuitem"
+                      className="story-menu__item"
+                      data-testid={`select-${key}`}
+                      disabled={disabled}
+                      onClick={() => {
+                        setSelectMenuOpen(false);
+                        run();
+                      }}
+                    >
+                      <span className="story-menu__name">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <span className="activities-panel__toolbar-spacer" aria-hidden="true" />
 
@@ -668,16 +637,14 @@ export function ActivitiesPanel({
             >
               <Pencil size={16} />
             </button>
-            <button
-              type="button"
-              className="activities-panel__create-story"
-              disabled={readOnly || checkedActivities.length === 0}
-              onClick={() => setCreatingStory(true)}
-              aria-label={storyTitle}
-              title={storyTitle}
-            >
-              <BookPlus size={16} />
-            </button>
+            <AddToStoryMenu
+              readOnly={readOnly}
+              target={targetActivities}
+              targetName={targetName}
+              summary={groupSummary}
+              onCreated={onStoryCreated}
+              onAdded={onStoryAdded}
+            />
             <button
               type="button"
               className="activities-panel__delete"
@@ -723,6 +690,11 @@ export function ActivitiesPanel({
                 hovered={hoveredId === activity.id}
                 hidden={hiddenIds.has(activity.id)}
                 checkbox={{ checked: checked.has(activity.id), onToggle: () => onToggle(activity.id) }}
+                onOpenStory={(id) => {
+                  // On a phone the expanded sheet would cover the Story's tracks, as on the Stories tab.
+                  setSheetExpanded(false);
+                  stories.onOpen(id);
+                }}
                 onFocus={() => onFocus(activity.id)}
                 onHover={onHoverActivity}
               />
@@ -744,52 +716,10 @@ export function ActivitiesPanel({
             </span>
           </div>
 
-          {/* FR-3.7's "not yet built" gap: something synced can be absent from the list above for
-              two different reasons — it failed, or cross-source dedup already had it from
-              somewhere else — and only the second is not a fault. Hidden entirely when there's
-              nothing to say, the same as Android's own duplicatesHeading. */}
-          {(duplicates.length > 0 || duplicatesError) && (
-            <div className="activities-panel__duplicates" ref={duplicatesRef}>
-              <button
-                type="button"
-                className="activities-panel__duplicates-toggle"
-                aria-expanded={duplicatesOpen}
-                onClick={() => setDuplicatesOpen((open) => !open)}
-              >
-                {duplicatesError
-                  ? t('activities.duplicates_failed')
-                  : tn('activities.duplicates_found', duplicates.length)}
-                <span className="activities-panel__duplicates-chevron" aria-hidden="true">
-                  {duplicatesOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                </span>
-              </button>
-              {duplicatesOpen && !duplicatesError && (
-                <ul className="activities-panel__duplicates-list" data-testid="activities-duplicates-list">
-                  {duplicates.map((d) => (
-                    <li key={d.id} className="activities-panel__duplicates-row">
-                      {formatStartedAt(d.startedAt)} · {formatActivityType(d.activityType)}
-                      {d.distanceMeters !== null && ` · ${formatDistance(d.distanceMeters, system)}`}
-                      <br />
-                      {t('activities.duplicate_from', { source: formatIngestSource(d.source), kept: formatIngestSource(d.supersededBy.source) })}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
         </>
       )}
 
 
-      {creatingStory && (
-        <StoryDialog
-          mode="create"
-          activityIds={checkedActivities.map((a) => a.id)}
-          summary={groupSummary}
-          onSaved={onStoryCreated}
-          onClose={() => setCreatingStory(false)}
-        />
-      )}
 
       {deletingGroup && (
         <ConfirmDialog

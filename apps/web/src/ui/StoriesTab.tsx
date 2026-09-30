@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Pencil, Play, Trash2 } from 'lucide-react';
-import { deleteStory, type Activity, type Story, type StoryTotals } from '../api';
+import { deleteStory, removeStoryActivities, type Activity, type Story, type StoryTotals } from '../api';
 import { ActivityRow, useScrollFocusedRow } from './ActivityRow';
 import { ConfirmDialog } from './ConfirmDialog';
 import { StoryDialog } from './StoryDialog';
@@ -32,7 +32,7 @@ export interface StoriesTabProps {
   openStory: Story | null;
   /** Why the open Story couldn't be read — a `?story=` that doesn't exist or isn't this account's. */
   openError: string | null;
-  /** The open Story's activities, following the timeline's selection — MapView's list. */
+  /** The open Story's activities, all of them — MapView's list. */
   activities: Activity[];
   activitiesLoading: boolean;
   activitiesError: string | null;
@@ -46,15 +46,20 @@ export interface StoriesTabProps {
   onEdited: (story: Story) => void;
   /** Deleted with a folder's trash, once the server has deleted it. */
   onDeleted: (id: string) => void;
+  /** An activity taken out of the open Story with its row's ×, once the server has done it — the
+   *  Story as the server returned it. */
+  onActivityRemoved: (story: Story, activityId: string) => void;
 }
 
 /**
  * The Activities panel's Stories tab (`SPEC.md` FR-14.6): every Story as a folder, newest first,
- * exactly one of them open. Opening one is viewing it — MapView narrows the drawn tracks, the
- * timeline and the list to it, and this tab shows that list inside the folder and the whole
- * Story's statistics in the footer. The rows are for looking only (hover preview, click to
- * focus); what's in a Story changes from the Edit window's Stories tab. A folder's pencil and
- * trash rename and delete that Story.
+ * exactly one of them open. Opening one is viewing it — MapView narrows the drawn tracks and the
+ * list to it, whatever date range the Activities tab has, and this tab shows that list inside the folder and the whole
+ * Story's statistics in the footer. A row previews on hover and focuses on click, like the
+ * Activities tab's, and its × takes the activity out of the Story (`DELETE
+ * /v1/stories/{id}/activities`) — here, where the Story is open, rather than where activities are
+ * picked, which is where they go in (AddToStoryMenu.tsx). A folder's pencil and trash rename and
+ * delete that Story.
  */
 export function StoriesTab({
   readOnly,
@@ -75,15 +80,33 @@ export function StoriesTab({
   onHoverActivity,
   onEdited,
   onDeleted,
+  onActivityRemoved,
 }: StoriesTabProps) {
   const system = useUnitSystem();
   const [editing, setEditing] = useState<Story | null>(null);
   const [deleting, setDeleting] = useState<Story | null>(null);
+  // The row being taken out of the open Story, and why the last one couldn't be.
+  const [removing, setRemoving] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+
+  async function remove(storyId: string, activityId: string) {
+    if (removing !== null) return;
+    setRemoving(activityId);
+    setRemoveError(null);
+    try {
+      onActivityRemoved(await removeStoryActivities(storyId, [activityId]), activityId);
+    } catch (err) {
+      setRemoveError(err instanceof Error ? err.message : t('common.something_wrong'));
+    } finally {
+      setRemoving(null);
+    }
+  }
   const listRef = useRef<HTMLUListElement>(null);
   useScrollFocusedRow(listRef, focusedId);
 
   const editTitle = readOnly ? t('stories.demo_edit') : t('stories.edit');
   const deleteTitle = readOnly ? t('stories.demo_delete') : t('stories.delete');
+  const removeTitle = readOnly ? t('stories.demo_remove') : t('stories.remove');
   const openListed = openId !== null && stories.some((s) => s.id === openId);
 
   return (
@@ -103,7 +126,9 @@ export function StoriesTab({
                   aria-expanded={open}
                   data-testid="stories-tab-toggle"
                   onClick={() => {
-                    if (!open) onOpen(story.id);
+                    if (open) return;
+                    setRemoveError(null);
+                    onOpen(story.id);
                   }}
                 >
                   <Play size={12} className="stories-tab__chevron" aria-hidden="true" />
@@ -140,6 +165,7 @@ export function StoriesTab({
                   }}
                 >
                   {story.description !== '' && <p className="stories-tab__description">{story.description}</p>}
+                  {removeError && <p className="activities-panel__note activities-panel__note--error">{removeError}</p>}
                   <ul className="stories-tab__rows">
                     {activities.map((activity) => (
                       <ActivityRow
@@ -150,6 +176,15 @@ export function StoriesTab({
                         hovered={hoveredId === activity.id}
                         hidden={false}
                         openStoryId={story.id}
+                        remove={{
+                          label: removeTitle,
+                          disabled: readOnly || removing !== null,
+                          onRemove: () => void remove(story.id, activity.id),
+                        }}
+                        onOpenStory={(id) => {
+                          setRemoveError(null);
+                          onOpen(id);
+                        }}
                         onFocus={() => onFocus(activity.id)}
                         onHover={onHoverActivity}
                       />
@@ -174,7 +209,7 @@ export function StoriesTab({
         {storiesReady && stories.length === 0 && <li className="activities-panel__note">{t('stories.empty')}</li>}
       </ul>
 
-      {/* The whole Story, whatever the timeline selects (FR-14.1). */}
+      {/* The whole Story's statistics (FR-14.1). */}
       {openStory && openStory.id === openId && (
         <div className="activities-panel__footer stories-tab__stats" data-testid="stories-tab-stats">
           {openStory.stats.count > 0 ? (

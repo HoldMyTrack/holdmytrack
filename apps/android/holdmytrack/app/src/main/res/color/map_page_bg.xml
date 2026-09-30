@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The date-range slider's Earlier/Later (the web's .range-picker__page): tinted, and plain
+<!-- The date-range slider's Earlier/Later (the web's .date-range-slider__page): tinted, and plain
      surface once there's nowhere further to page. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:color="@color/hmt_surface" android:state_enabled="false" />

@@ -1,4 +1,5 @@
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
+import { X } from 'lucide-react';
 import type { Activity } from '../api';
 import { formatActivityType, formatDistance, formatDuration, formatStartedAt } from './format';
 import type { UnitSystem } from './units';
@@ -21,13 +22,30 @@ export interface ActivityRowProps {
   openStoryId?: string;
   /** The Activities tab's checkbox; the Stories tab's rows have none. */
   checkbox?: { checked: boolean; onToggle: () => void };
+  /** The Stories tab's Remove from story — an × at the row's end, shown on hover or focus (always
+   *  on a phone). */
+  remove?: { label: string; disabled: boolean; onRemove: () => void };
+  /** A Story badge clicked — opens that Story on the Stories tab (MapView's enterStory). */
+  onOpenStory?: (id: string) => void;
   onFocus: () => void;
   onHover: (id: string | null) => void;
 }
 
 /** One activity in a panel list — the Activities tab's (ActivitiesPanel.tsx, which documents the
  *  four row interactions) and an open Story's on the Stories tab (StoriesTab.tsx). */
-export function ActivityRow({ activity, system, focused, hovered, hidden, openStoryId, checkbox, onFocus, onHover }: ActivityRowProps) {
+export function ActivityRow({
+  activity,
+  system,
+  focused,
+  hovered,
+  hidden,
+  openStoryId,
+  checkbox,
+  remove,
+  onOpenStory,
+  onFocus,
+  onHover,
+}: ActivityRowProps) {
   const isPending = activity.pending;
   const otherStories = activity.stories.filter((s) => s.id !== openStoryId);
   // A user-entered name (§4.7's revised decision) leads; started_at is the fallback for a row
@@ -90,16 +108,7 @@ export function ActivityRow({ activity, system, focused, hovered, hidden, openSt
         // One right-aligned group, so the badges share one right edge whatever the text beside
         // them does, and a row that's both stacks them there together.
         <span className="activities-panel__badges">
-          {otherStories.length > 0 && (
-            <span
-              className="activities-panel__hidden-badge activities-panel__story-badge"
-              title={tn(openStoryId ? 'activities.in_other_stories' : 'activities.in_stories', otherStories.length, {
-                names: otherStories.map((s) => s.name).join(', '),
-              })}
-            >
-              {tn('activities.story_badge', otherStories.length)}
-            </span>
-          )}
+          {otherStories.length > 0 && <StoryBadge stories={otherStories} inOpenStory={openStoryId !== undefined} onOpen={onOpenStory} />}
           {isPending && (
             <span className="activities-panel__hidden-badge" title={t('activities.pending_title')}>
               {t('activities.pending')}
@@ -108,7 +117,103 @@ export function ActivityRow({ activity, system, focused, hovered, hidden, openSt
           {hidden && <span className="activities-panel__hidden-badge">{t('activities.hidden')}</span>}
         </span>
       )}
+      {remove && (
+        <button
+          type="button"
+          className="activities-panel__row-remove"
+          disabled={remove.disabled}
+          aria-label={`${remove.label}: ${label}`}
+          title={remove.label}
+          onClick={remove.onRemove}
+        >
+          <X size={14} />
+        </button>
+      )}
     </li>
+  );
+}
+
+/**
+ * A row's Story badge (`SPEC.md` FR-5.1): the Stories this activity is in — besides the open one,
+ * on the Stories tab. A button that opens a Story: with one, that Story; with more, a small menu
+ * of their names to pick from. Without `onOpen` it's a plain label.
+ */
+function StoryBadge({
+  stories,
+  inOpenStory,
+  onOpen,
+}: {
+  stories: Activity['stories'];
+  inOpenStory: boolean;
+  onOpen: ((id: string) => void) | undefined;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!ref.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [menuOpen]);
+
+  const label = tn('activities.story_badge', stories.length);
+  const names = tn(inOpenStory ? 'activities.in_other_stories' : 'activities.in_stories', stories.length, {
+    names: stories.map((s) => s.name).join(', '),
+  });
+  if (!onOpen) {
+    return (
+      <span className="activities-panel__hidden-badge activities-panel__story-badge" title={names}>
+        {label}
+      </span>
+    );
+  }
+  const only = stories.length === 1 ? stories[0]! : null;
+  const title = only ? t('activities.open_story', { name: only.name }) : names;
+  return (
+    <span className="activities-panel__story-badge-wrap" ref={ref}>
+      <button
+        type="button"
+        className="activities-panel__hidden-badge activities-panel__story-badge"
+        aria-label={title}
+        title={title}
+        aria-haspopup={only ? undefined : 'menu'}
+        aria-expanded={only ? undefined : menuOpen}
+        onClick={() => {
+          if (only) onOpen(only.id);
+          else setMenuOpen((o) => !o);
+        }}
+      >
+        {label}
+      </button>
+      {menuOpen && (
+        <span className="story-menu__panel activities-panel__story-badge-menu" role="menu">
+          {stories.map((story) => (
+            <button
+              key={story.id}
+              type="button"
+              role="menuitem"
+              className="story-menu__item"
+              onClick={() => {
+                setMenuOpen(false);
+                onOpen(story.id);
+              }}
+            >
+              <span className="story-menu__name">{story.name}</span>
+            </button>
+          ))}
+        </span>
+      )}
+    </span>
   );
 }
 

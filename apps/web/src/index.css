@@ -34,7 +34,7 @@ body {
   width: 100%;
 }
 
-/* A row (sidebar + map), then the histogram footer — under the page's own header. */
+/* A row (sidebar + map) under the page's own header. */
 .app-body {
   display: flex;
   flex: 1;
@@ -363,6 +363,12 @@ body {
   cursor: default;
 }
 
+/* The Activities tab's has no text: at desktop width it isn't shown at all, and on a phone (below)
+   it's the sheet's expand strip, a bare chevron. */
+.activities-panel__subtext--bare {
+  display: none;
+}
+
 /* Hidden at desktop width — only meaningful once the subtext button above becomes the
    bottom sheet's own expand/collapse indicator (mobile media query below). */
 .activities-panel__sheet-chevron {
@@ -645,6 +651,44 @@ body {
   gap: var(--fm-space-2);
 }
 
+/* An open Story's row's Remove from story (StoriesTab.tsx) — hidden until the row is hovered or
+   has focus, like a Story folder's pencil and bin; always shown on a phone. */
+.activities-panel__row-remove {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-left: auto;
+  border: 0;
+  border-radius: var(--fm-radius-sm);
+  padding: 0;
+  background: var(--fm-surface-tint);
+  color: var(--fm-ink-secondary);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.activities-panel__badges + .activities-panel__row-remove {
+  margin-left: 0;
+}
+
+.activities-panel__row:hover .activities-panel__row-remove,
+.activities-panel__row:focus-within .activities-panel__row-remove {
+  opacity: 1;
+}
+
+.activities-panel__row-remove:hover:not(:disabled) {
+  background: var(--fm-surface-tint-strong);
+  color: var(--fm-ink);
+}
+
+.activities-panel__row-remove:disabled {
+  color: var(--fm-ink-faint);
+  cursor: not-allowed;
+}
+
 .activities-panel__hidden-badge {
   flex: none;
   font-size: var(--fm-text-2xs);
@@ -663,6 +707,31 @@ body {
 .activities-panel__story-badge {
   color: var(--fm-accent);
   background: rgb(var(--fm-accent-rgb) / 12%);
+}
+
+/* The badge is a button (ActivityRow.tsx's StoryBadge) that opens its Story; with several, a
+   menu of their names hangs under it, right-aligned to the badge. */
+button.activities-panel__story-badge {
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+button.activities-panel__story-badge:hover {
+  background: rgb(var(--fm-accent-rgb) / 20%);
+}
+
+.activities-panel__story-badge-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.story-menu__panel.activities-panel__story-badge-menu {
+  top: calc(100% + 4px);
+  left: auto;
+  right: 0;
+  width: 14rem;
+  max-width: calc(100vw - 48px);
 }
 
 /* The reverse direction of the hover above: hovering this activity's *track on the map*
@@ -705,7 +774,7 @@ body {
    family regardless of which one is destructive. */
 .activities-panel__edit,
 .activities-panel__edit-track,
-.activities-panel__create-story,
+.activities-panel__add-story,
 .activities-panel__delete,
 .activities-panel__visibility,
 .activities-panel__focus {
@@ -725,7 +794,7 @@ body {
 
 .activities-panel__edit:hover:not(:disabled),
 .activities-panel__edit-track:hover:not(:disabled),
-.activities-panel__create-story:hover:not(:disabled),
+.activities-panel__add-story:hover:not(:disabled),
 .activities-panel__delete:hover:not(:disabled),
 .activities-panel__visibility:hover:not(:disabled) {
   background: var(--fm-surface-tint-strong);
@@ -737,7 +806,7 @@ body {
    reads before anyone hovers for the title tooltip. */
 .activities-panel__edit:disabled,
 .activities-panel__edit-track:disabled,
-.activities-panel__create-story:disabled,
+.activities-panel__add-story:disabled,
 .activities-panel__delete:disabled,
 .activities-panel__visibility:disabled,
 .activities-panel__focus:disabled {
@@ -776,6 +845,8 @@ body {
    dropdown, a flex spacer pushing the rest right, the group action chips, a divider, then the
    one accent-tinted "focus on map" action. */
 .activities-panel__toolbar {
+  /* The containing block for Add to story's menu (.story-menu__panel). */
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--fm-space-10);
@@ -821,17 +892,20 @@ body {
   background: var(--fm-surface-tint-strong);
 }
 
-/* An icon, not a text chip — sized to sit beside the 15px select-all checkbox as its
-   sibling (a checkbox outline split diagonally, half filled), with a little padding for a
-   usable hit area. Muted ink rather than the checkbox's accent: it's an action, not state. */
-.activities-panel__invert {
-  flex: none;
+/* The header checkbox's ▾ (ActivitiesPanel.tsx): a menu of All, None and Invert under it, in
+   Add to story's look (.story-menu__panel/__item), anchored to the checkbox's left edge. */
+.select-menu {
+  position: relative;
+  display: flex;
+  margin-left: calc(-1 * var(--fm-space-8));
+}
+
+.select-menu__trigger {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 23px;
+  width: 18px;
   height: 23px;
-  margin-left: calc(-1 * var(--fm-space-6));
   padding: 0;
   border: none;
   border-radius: var(--fm-radius-sm);
@@ -840,19 +914,22 @@ body {
   cursor: pointer;
 }
 
-.activities-panel__invert svg {
-  width: 16px;
-  height: 16px;
-}
-
-.activities-panel__invert:hover:not(:disabled) {
+.select-menu__trigger:hover:not(:disabled),
+.select-menu__trigger[aria-expanded='true'] {
   background: var(--fm-surface-tint-strong);
   color: var(--fm-ink);
 }
 
-.activities-panel__invert:disabled {
+.select-menu__trigger:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+.story-menu__panel.select-menu__panel {
+  top: calc(100% + 6px);
+  left: calc(-1 * var(--fm-space-16));
+  right: auto;
+  width: 9rem;
 }
 
 /* A plain dot, not a count — the trigger's own label already says "Type"; a badge repeating
@@ -907,6 +984,104 @@ body {
   color: var(--fm-ink);
 }
 
+/* AddToStoryMenu.tsx — anchored to the toolbar, not to its own button: the panel is
+   `overflow: hidden` and as narrow as 260px, so a menu hanging off a mid-toolbar button would be
+   clipped. Spanning the toolbar's width below it always fits. */
+.story-menu {
+  flex: none;
+  display: flex;
+}
+
+.story-menu__panel {
+  position: absolute;
+  top: calc(100% - 4px);
+  left: var(--fm-space-16);
+  right: var(--fm-space-16);
+  z-index: 3;
+  border: 1px solid var(--fm-border-panel);
+  border-radius: var(--fm-radius-lg);
+  background: var(--fm-surface);
+  box-shadow: var(--fm-shadow-lg);
+  padding: var(--fm-space-6);
+}
+
+.story-menu__list {
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+.story-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--fm-space-8);
+  width: 100%;
+  border: 0;
+  border-radius: var(--fm-radius-sm);
+  padding: var(--fm-space-6) var(--fm-space-8);
+  background: none;
+  color: var(--fm-ink);
+  font: inherit;
+  font-size: var(--fm-text-md);
+  text-align: left;
+  cursor: pointer;
+}
+
+.story-menu__item:hover:not(:disabled),
+.story-menu__item:focus-visible {
+  background: var(--fm-surface-tint);
+}
+
+.story-menu__item:disabled {
+  cursor: default;
+}
+
+.story-menu__item--new {
+  font-weight: var(--fm-weight-semibold);
+  color: var(--fm-accent);
+}
+
+.story-menu__check {
+  flex: none;
+  display: inline-flex;
+  width: 14px;
+  color: var(--fm-accent);
+}
+
+.story-menu__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.story-menu__item:disabled .story-menu__name {
+  color: var(--fm-ink-muted);
+}
+
+.story-menu__count {
+  flex: none;
+  font-size: var(--fm-text-2xs);
+  color: var(--fm-ink-muted);
+}
+
+.story-menu__divider {
+  height: 1px;
+  background: var(--fm-divider-tint);
+  margin: var(--fm-space-4) 0;
+}
+
+.story-menu__note {
+  margin: 0;
+  padding: var(--fm-space-6) var(--fm-space-8);
+  font-size: var(--fm-text-sm);
+  color: var(--fm-ink-muted);
+}
+
+.story-menu__note--error {
+  color: var(--fm-danger);
+}
+
 .activities-panel__type-panel-divider {
   height: 1px;
   background: var(--fm-divider-tint);
@@ -927,332 +1102,37 @@ body {
   color: rgb(var(--fm-ink-rgb) / 65%);
 }
 
-/* FR-3.7's duplicates disclosure — a plain text toggle in the same subdued register as
-   .activities-panel__subtext above it, not a prominent action: most sessions have nothing
-   here at all (the whole block is unrendered when the list is empty), and the ones that do
-   are explaining an absence, not offering something to do. */
-.activities-panel__duplicates {
-  border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
-}
-
-.activities-panel__duplicates-toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--fm-space-6);
-  width: 100%;
-  margin: 0;
-  padding: var(--fm-space-10) var(--fm-space-16);
-  border: 0;
-  background: none;
-  color: rgb(var(--fm-ink-rgb) / 55%);
-  font: inherit;
-  font-size: var(--fm-text-sm);
-  text-align: left;
-  cursor: pointer;
-}
-
-.activities-panel__duplicates-toggle:hover {
-  color: var(--fm-ink);
-}
-
-.activities-panel__duplicates-chevron {
-  display: inline-flex;
-}
-
-.activities-panel__duplicates-list {
-  list-style: none;
-  margin: 0;
-  padding: 0 var(--fm-space-16) var(--fm-space-10);
-}
-
-.activities-panel__duplicates-row {
-  padding: var(--fm-space-6) 0;
-  border-top: 1px solid rgb(var(--fm-ink-rgb) / 6%);
-  font-size: var(--fm-text-xs);
-  line-height: 1.5;
-  color: rgb(var(--fm-ink-rgb) / 65%);
-}
-
-.activities-panel__duplicates-row:first-child {
-  border-top: 0;
-}
-
-/* Two regions side by side, not a header row above a full-width chart: a legend column sized
-   to match the Activities panel's own current width (`var(--panel-width)`, the same custom
-   property that panel already sets on itself — reusing it is what keeps this row visually
-   aligned with the sidebar above it even as that panel is resized, with no JS of its own
-   needed for that), and a chart area filling the rest, flanked directly by the Earlier/Later
-   buttons instead of sharing a header row with them. */
-.activity-histogram {
-  box-sizing: border-box;
-  flex: none;
-  display: flex;
-  height: 104px;
-  background: var(--fm-surface);
-  border-top: 1px solid var(--fm-border);
-}
-
-/* One stacked block, not two side-by-side halves — found live: splitting the column's width
-   in two left each date range (e.g. "14 SEP 2026 – 19 SEP 2026") only about half the column's
-   own width to render in, which truncated mid-number well before the text actually ran out of
-   room to matter. Stacked, each block gets the legend's full width instead. */
-/* Sized to its own content now, not to the Activities panel's width — the sidebar can be
-   dragged from 260px to 560px (ActivitiesPanel.tsx's own panelWidth state), and there's no
-   reason the date picker beside it should shrink or grow along with that drag. Shrink-wrapped
-   to whichever line of text is actually widest, so the chart area (`flex: 1` below) gets
-   whatever's left over — as much room as the strip can have. */
-.activity-histogram__legend {
-  flex: none;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: var(--fm-space-8);
-  padding: var(--fm-space-10) var(--fm-space-16);
-  border-right: 1px solid var(--fm-border);
-}
-
-.activity-histogram__legend-block {
-  flex: none;
-  min-width: 0;
-  text-align: right;
-}
-
-.activity-histogram__legend-label {
-  margin-bottom: var(--fm-space-2);
-  font-size: var(--fm-text-3xs);
-  font-weight: var(--fm-weight-bold);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--fm-ink-muted);
-}
-
-.activity-histogram__range-label {
-  font-weight: var(--fm-weight-semibold);
-  font-size: var(--fm-text-2xs);
-  color: var(--fm-ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.activity-histogram__stats {
-  margin-top: 1px;
-  font-size: var(--fm-text-3xs);
-  color: var(--fm-ink-muted);
-}
-
-.activity-histogram__chart-area {
-  flex: 1;
-  min-width: 0;
-  box-sizing: border-box;
-  display: flex;
-  /* stretch, not center: the chart and the Earlier/Later buttons fill this box's height (only
-     the small vertical padding below is left as a gap), rather than sitting at a fixed height
-     centered inside a much taller box. */
-  align-items: stretch;
-  gap: var(--fm-space-10);
-  padding: var(--fm-space-6) var(--fm-space-24);
-}
-
-/* Earlier/Later — icon-only now, flanking the chart directly. Active/inactive is a real
-   visual distinction, not just :disabled's default dimming: enabled reads as a tinted,
-   clickable chip; disabled drops back to a plain, faint outline so "nothing further that
-   way" is obvious before a click fails. canPanEarlier/canPanLater (useActivityDays.ts)
-   already gate `disabled` correctly — this only restyles the two states. */
-.range-picker__page {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* Taller and thinner than a typical button — it flanks the full-height chart beside it now,
-     not a fixed 56px strip, so width shrank to match rather than looking squat next to it. */
-  width: 19px;
-  border: 1px solid var(--fm-border-panel);
-  border-radius: var(--fm-radius-md);
-  padding: 0;
-  background: var(--fm-surface-tint);
-  color: var(--fm-ink);
-  cursor: pointer;
-}
-
-.range-picker__page:hover:not(:disabled) {
-  background: var(--fm-surface-tint-strong);
-}
-
-.range-picker__page:disabled {
-  background: var(--fm-surface);
-  border-color: var(--fm-divider-tint);
-  color: var(--fm-ink-faint);
-  cursor: not-allowed;
-}
-
-/* The chart itself: bars, the draggable selection band and its handles, and the month
-   labels, all absolutely positioned within this one relative box. touch-action: none keeps
-   a touchscreen drag from also trying to scroll the page while dragging a handle. No explicit
-   height — `align-items: stretch` on its parent (.activity-histogram__chart-area) is what
-   fills it to the same full height the Earlier/Later buttons beside it stretch to, both
-   bounded only by that container's own small vertical padding. flex: 1 still controls its
-   *width*, unaffected by the cross-axis sizing. */
-.range-picker__chart {
-  position: relative;
-  flex: 1;
-  touch-action: none;
-  /* Belt-and-braces alongside RangePicker.tsx's beginDrag preventDefault(): stops a drag that
-     wanders near the month labels' text from starting a browser text selection at all, which
-     is what let Firefox reinterpret a later drag (a handle included) as "drag the selection"
-     instead of delivering it to us as pointer events. */
-  user-select: none;
-  cursor: grab;
-}
-
-.range-picker__chart:active {
-  cursor: grabbing;
-}
-
-/* The selected sub-range, drawn over the bars rather than replacing them. Stays
-   pointer-events: none deliberately — RangePicker.tsx's onChartPointerDown does the
-   "is this click inside the band" hit-test in JS instead, specifically so this div never
-   captures a bar's hover underneath it (a selection commonly covers most of the strip, so
-   most bars would otherwise never show their own tooltip while selected). Its two children
-   are the edge-resize handles, each `pointer-events: auto` on its own — a child can opt back
-   into pointer events even under a `none` parent, so they stay grabbable regardless. */
-.range-picker__selection {
-  position: absolute;
-  top: 0;
-  bottom: 20px;
-  z-index: 2;
-  background: rgb(var(--fm-accent-rgb) / 14%);
-  border-left: 2px solid var(--fm-accent);
-  border-right: 2px solid var(--fm-accent);
-  pointer-events: none;
-}
-
-.range-picker__handle {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 14px;
-  cursor: ew-resize;
-  pointer-events: auto;
-  touch-action: none;
-}
-
-.range-picker__handle--start {
-  left: -7px;
-}
-
-.range-picker__handle--end {
-  right: -7px;
-}
-
-/* One slot per day *that has activity* — empty days get nothing, so bars are packed.
-   justify-content: flex-end is what pushes a short history's bars against the right edge
-   (the most-recent end) instead of stretching them across the whole width — RangePicker.tsx
-   measures the packed group's actual rendered width (`packedFraction`) and uses it, not a
-   flat `days.length` share of the full chart, to place the selection band and month ticks so
-   they still land exactly on the (now right-aligned) bars. */
-.range-picker__bars {
-  position: absolute;
-  inset: 4px 0 20px;
-  z-index: 1;
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
-  gap: 1px;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-/* flex-grow: 0 — a slot never grows past its own bar's width even when there's leftover
-   room, which is what stops a sparse history from spreading its few bars across the full
-   width (previously flex: 1, the "weird" look this replaced). flex-shrink: 1 is kept: once
-   more days are on screen than fit at full width (a long, dense history), slots still
-   compress together exactly as before rather than overflowing. */
-.range-picker__slot {
-  flex: 0 1 10px;
-  min-width: 0;
-  height: 100%;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
-
-/* Capped width so a six-day history draws six bars rather than six slabs; the slot around
-   it still carries the layout, so capping this changes nothing about the band's alignment.
-   12px (was 22px) to match docs/UI/main-screen-v6.png's own thin, tightly-packed bars —
-   paired with useActivityDays.ts's BARS_PER_VIEW increase, which is what keeps a full
-   screen's slots close to this width instead of each bar floating in a much wider one.
-   pointer-events back on for the per-bar date tooltip. */
-.range-picker__bar {
-  width: 100%;
-  max-width: 10px;
-  background: rgb(var(--fm-ink-rgb) / 18%);
-  border-radius: var(--fm-radius-xs) var(--fm-radius-xs) 0 0;
-  pointer-events: auto;
-}
-
-/* No transition on either rule — the response has to be instant, not eased in, since this is
-   the only feedback a hover gets before the native title tooltip's own delay catches up. */
-.range-picker__bar:hover {
-  background: rgb(var(--fm-accent-rgb) / 55%);
-}
-
-.range-picker__bar--selected {
-  background: rgb(var(--fm-accent-rgb) / 75%);
-}
-
-.range-picker__bar--selected:hover {
-  background: var(--fm-accent);
-}
-
-/* Month labels sit under the first bar of their month, at that bar's real slot position —
-   never spread evenly, which with packed bars would imply an even spacing through time that
-   isn't there. RangePicker drops any label too close to the previous one. */
-.range-picker__months {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 20px;
-  border-top: 1px solid rgb(var(--fm-ink-rgb) / 10%);
-  /* Takes pointer events so it can be grabbed to pan — see RangePicker's note on why the
-     chart needs one surface a selection band can never cover. The labels on it stay inert
-     so a drag that starts on a label still reaches this rail. */
-  cursor: grab;
-}
-
-.range-picker__month {
-  position: absolute;
-  top: 4px;
-  pointer-events: none;
-  font-size: var(--fm-text-2xs);
-  color: rgb(var(--fm-ink-rgb) / 45%);
-  transform: translateX(-50%);
-  white-space: nowrap;
-}
-
-/* A label centered on a bar that's genuinely at (or past) the chart's own left/right edge —
-   found live logged in as the demo account, which seeds enough packed history for the very
-   first bar to land at left: 0% — would have roughly half its own text width extending past
-   that edge, previously overlapping the Earlier/Later button beside the chart entirely.
-   RangePicker.tsx applies these only when the tick's own position is actually that close to
-   an edge (most ticks, including a short history's own first one sitting well inside blank
-   space, still center normally) — anchoring the label's edge to the tick instead of its
-   center keeps the full label on screen rather than clipping or overlapping it. */
-.range-picker__month--start {
-  transform: translateX(0);
-}
-
-.range-picker__month--end {
-  transform: translateX(-100%);
-}
-
 .map-root {
   position: relative;
   flex: 1;
   min-height: 0;
   width: 100%;
+}
+
+/* Files dragged over the map (MapView's onMapDrop, headed for the header's Upload menu): a
+   tinted cover saying what a drop does. Above the map's own controls, and takes no pointer
+   events, so the drag's own events keep reaching .map-root under it. */
+.map-drop {
+  position: absolute;
+  inset: 8px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--fm-accent);
+  border-radius: var(--fm-radius-lg);
+  background: rgb(var(--fm-accent-rgb) / 12%);
+  pointer-events: none;
+}
+
+.map-drop__label {
+  border-radius: var(--fm-radius-md);
+  padding: var(--fm-space-10) var(--fm-space-16);
+  background: var(--fm-surface);
+  box-shadow: var(--fm-shadow-lg);
+  font-size: var(--fm-text-lg);
+  font-weight: var(--fm-weight-semibold);
+  color: var(--fm-ink);
 }
 
 .map-canvas {
@@ -1893,40 +1773,6 @@ body {
   color: rgb(var(--fm-ink-rgb) / 60%);
 }
 
-/* EditStoriesTab.tsx — one row per Story: its checkbox, its name, how many activities it holds. */
-.edit-stories {
-  display: flex;
-  flex-direction: column;
-  max-height: 16rem;
-  margin: 0;
-  padding: 0;
-  overflow-y: auto;
-  list-style: none;
-}
-
-.edit-stories__row {
-  display: flex;
-  align-items: center;
-  gap: var(--fm-space-10);
-  padding: var(--fm-space-6) 0;
-  font-size: var(--fm-text-md);
-  cursor: pointer;
-}
-
-.edit-stories__name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.edit-stories__count {
-  flex: none;
-  font-size: var(--fm-text-sm);
-  color: rgb(var(--fm-ink-rgb) / 55%);
-}
-
 .edit-track__error {
   margin: 0;
   font-size: var(--fm-text-sm);
@@ -2027,7 +1873,7 @@ body {
   gap: var(--fm-space-4);
 }
 
-/* MapView wraps the Activities panel and the timeline in this for the session, `inert` while
+/* MapView wraps the Activities panel in this for the session, `inert` while
    a track is being edited. display: contents keeps the wrapper out of the flex layout; the
    dimming goes on its children, since a display: contents box has no rendering of its own. */
 .edit-track-lock {
@@ -2043,272 +1889,6 @@ body {
     right: 10px;
     width: auto;
   }
-}
-
-/* The Sync tab's badge (ActivitiesPanel.tsx): this session's in-flight uploads plus every
-   pending job for this user globally (see useUploadHistory's own comment on why the latter
-   isn't scoped to whichever page happens to be open) — shown on the tab itself, so progress
-   stays visible while the Activities tab is. */
-.activities-panel__sync-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 var(--fm-space-4);
-  border-radius: var(--fm-radius-pill);
-  background: var(--fm-accent);
-  color: var(--fm-on-accent);
-  font-size: var(--fm-text-2xs);
-  font-weight: var(--fm-weight-bold);
-}
-
-/* SyncTab.tsx — the Activities panel's second tab, taking the place of the list, filters and
-   footer below the panel head; scrolls on its own like the list does. */
-.sync-tab {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: var(--fm-space-4) var(--fm-space-16) var(--fm-space-16);
-}
-
-.sync-tab__hint {
-  margin: var(--fm-space-10) 0;
-  font-size: var(--fm-text-sm);
-  color: rgb(var(--fm-ink-rgb) / 55%);
-}
-
-.sync-tab__dropzone {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--fm-space-4);
-  height: 88px;
-  border: 1px dashed rgb(var(--fm-ink-rgb) / 25%);
-  border-radius: var(--fm-radius-md);
-  font-size: var(--fm-text-md);
-  color: rgb(var(--fm-ink-rgb) / 55%);
-  cursor: pointer;
-  text-align: center;
-}
-
-.sync-tab__dropzone--drag {
-  border-color: var(--fm-accent);
-  background: rgb(var(--fm-accent-rgb) / 6%);
-  color: var(--fm-accent);
-}
-
-.sync-tab__dropzone-hint {
-  font-size: var(--fm-text-xs);
-  color: rgb(var(--fm-ink-rgb) / 45%);
-}
-
-.sync-tab__input {
-  display: none;
-}
-
-.sync-tab__notices {
-  list-style: none;
-  margin: var(--fm-space-10) 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--fm-space-6);
-}
-
-.sync-tab__notice {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--fm-space-8);
-  padding: var(--fm-space-8) var(--fm-space-10);
-  border-radius: var(--fm-radius-sm);
-  background: rgb(var(--fm-accent-rgb) / 8%);
-  font-size: var(--fm-text-sm);
-  line-height: 1.4;
-  color: var(--fm-ink);
-}
-
-.sync-tab__notice--error {
-  background: rgb(var(--fm-danger-rgb) / 8%);
-  color: var(--fm-danger);
-}
-
-.sync-tab__notice-dismiss {
-  display: inline-flex;
-  flex: none;
-  border: 0;
-  background: none;
-  padding: 0;
-  line-height: 1;
-  color: inherit;
-  opacity: 0.6;
-  cursor: pointer;
-}
-
-.sync-tab__list-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--fm-space-8);
-  margin: var(--fm-space-16) 0 var(--fm-space-6);
-}
-
-.sync-tab__list-title {
-  font-size: var(--fm-text-xs);
-  font-weight: var(--fm-weight-bold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgb(var(--fm-ink-rgb) / 50%);
-}
-
-.sync-tab__list-summary {
-  font-size: var(--fm-text-xs);
-  color: rgb(var(--fm-ink-rgb) / 50%);
-}
-
-.sync-tab__rows {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
-}
-
-.sync-tab__row {
-  display: flex;
-  align-items: center;
-  gap: var(--fm-space-8);
-  padding: var(--fm-space-8) 0;
-  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 6%);
-}
-
-/* The name, and under it a finished row's date and distance (.sync-tab__row-meta). */
-.sync-tab__row-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--fm-space-2);
-}
-
-.sync-tab__row-name {
-  font-size: var(--fm-text-md);
-  font-weight: var(--fm-weight-semibold);
-  color: var(--fm-ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sync-tab__row-size {
-  flex: none;
-  font-size: var(--fm-text-xs);
-  color: rgb(var(--fm-ink-rgb) / 45%);
-  min-width: 3.2rem;
-  text-align: right;
-}
-
-.sync-tab__row-detail {
-  /* Shrinkable, and capped, so a long failure reason wraps in its own column instead of
-     pushing the filename out and running off the panel's edge. */
-  flex: 0 1 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: var(--fm-space-4);
-  min-width: 6.5rem;
-  max-width: 60%;
-}
-
-.sync-tab__row-status {
-  font-size: var(--fm-text-xs);
-  color: rgb(var(--fm-ink-rgb) / 55%);
-}
-
-.sync-tab__row-status--error {
-  color: var(--fm-danger);
-  text-align: right;
-  overflow-wrap: anywhere;
-}
-
-.sync-tab__row-status--ready {
-  color: var(--fm-success);
-}
-
-.sync-tab__row-meta {
-  font-size: var(--fm-text-2xs);
-  color: rgb(var(--fm-ink-rgb) / 45%);
-}
-
-/* ROADMAP.md's "View on map" action — plain text, not a button-styled control, to stay
-   visually subordinate to the row's own status/date/distance rather than competing with them
-   for attention in an already-tight detail column. */
-.sync-tab__row-view {
-  border: 0;
-  background: none;
-  padding: 0;
-  font: inherit;
-  font-size: var(--fm-text-2xs);
-  font-weight: var(--fm-weight-semibold);
-  color: var(--fm-accent);
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.sync-tab__progress {
-  display: block;
-  width: 6.5rem;
-  height: 4px;
-  border-radius: var(--fm-radius-xs);
-  background: rgb(var(--fm-ink-rgb) / 8%);
-  overflow: hidden;
-}
-
-.sync-tab__progress-fill {
-  display: block;
-  height: 100%;
-  background: var(--fm-accent);
-  transition: width 120ms linear;
-}
-
-.sync-tab__note {
-  padding: var(--fm-space-10) 0;
-  font-size: var(--fm-text-sm);
-  color: rgb(var(--fm-ink-rgb) / 50%);
-}
-
-.sync-tab__note--error {
-  color: var(--fm-danger);
-}
-
-.sync-tab__pager {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: var(--fm-space-8);
-  padding-top: var(--fm-space-8);
-  font-size: var(--fm-text-xs);
-  color: rgb(var(--fm-ink-rgb) / 50%);
-}
-
-.sync-tab__pager-buttons {
-  display: flex;
-  gap: var(--fm-space-4);
-}
-
-.sync-tab__pager-buttons button {
-  border: 1px solid rgb(var(--fm-ink-rgb) / 15%);
-  border-radius: var(--fm-radius-sm);
-  width: 24px;
-  height: 24px;
-  background: var(--fm-surface);
-  cursor: pointer;
-}
-
-.sync-tab__pager-buttons button:disabled {
-  opacity: 0.35;
-  cursor: default;
 }
 
 .version-banner {
@@ -2446,10 +2026,8 @@ body {
    mobile-support note and technical_implementation_plan.md §5.9 for the full account. */
 @media (max-width: 768px) {
   /* Defensive backstop, not a fix for a specific known overflow (those are fixed at their
-     own source below, e.g. the histogram header) — a few elements deliberately extend
-     slightly past their own logical box on purpose here (the range-picker handles' widened
-     hit area is `left: -15px`/`right: -15px` by design), and a phone browser turns any
-     stray horizontal overflow into a rubber-banding scroll the whole page shouldn't have. */
+     own source below) — a phone browser turns any stray horizontal overflow into a
+     rubber-banding scroll the whole page shouldn't have. */
   html,
   body {
     overflow-x: hidden;
@@ -2461,7 +2039,7 @@ body {
 
   /* The page's height is the visible area, not `height: 100%`'s: a phone browser's toolbar
      slides in and out, and the percentage and `vh` can both resolve to the taller,
-     toolbar-hidden height — which put the date footer, anchored to the bottom, under the
+     toolbar-hidden height — which put the date slider, anchored to the bottom, under the
      toolbar. `dvh` follows the toolbar as it moves. Not reproducible in desktop emulation,
      which has no toolbar. */
   body.app-page {
@@ -2469,26 +2047,33 @@ body {
   }
 
   /* iOS Safari zooms the page in on focusing any text field under 16px and doesn't zoom back
-     out, leaving the fixed sheet and footer off-screen — the interface's inputs are 14px
+     out, leaving the fixed sheet and date slider off-screen — the interface's inputs are 14px
      (--fm-text-lg). `:is()` takes its most specific argument's weight, (0,1,1), so this
      outranks the single-class input rules above it without naming each one. */
   :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='file']), select, textarea) {
     font-size: 16px;
   }
 
-  /* The phone footer (DateRangeSlider.tsx) sits at the very bottom of the screen and the
-     collapsed Activities sheet's peek strip stacks directly on top of it — both fixed
-     heights, so the sheet can be anchored to the footer's top edge with no measuring. */
+  /* On the Activities tab the date slider (DateRangeSlider.tsx) sits at the very bottom of the
+     screen and the collapsed Activities sheet's peek strip stacks directly on top of it — both
+     fixed heights, so the sheet can be anchored to the slider's top edge with no measuring. On
+     the other tabs there is no slider and the sheet sits on the bottom edge itself
+     (`--sheet-bottom`, set per tab below). */
   :root {
     --phone-footer-height: 76px;
     --phone-sheet-peek: 68px;
   }
 
-  /* Reserves the peek strip under the map, so the map's own bottom-anchored controls (the
-     scale control and attribution) end above the sheet rather than
-     under it. Only while the sheet exists — it renders in Normal map mode alone. */
+  /* Reserves the peek strip (and on the Activities tab the slider under it) under the map, so
+     the map's own bottom-anchored controls (the scale control and attribution) end above the
+     sheet rather than under it. Only while the sheet exists — it renders in Normal map mode
+     alone. */
   .app-body:has(.activities-panel) {
     padding-bottom: var(--phone-sheet-peek);
+  }
+
+  .app-body:has(.activities-panel--dated) {
+    padding-bottom: calc(var(--phone-sheet-peek) + var(--phone-footer-height));
   }
 
   /* The Activities panel becomes a bottom sheet: `position: fixed` removes it from
@@ -2497,15 +2082,16 @@ body {
      needed at all. Collapsed by default (ActivitiesPanel.tsx's `sheetExpanded`, `false`
      initially) to a slim peek strip — the map stays fully interactive around and under it;
      expanding it (tapping the subtext button) grows it upward to cover most of the screen.
-     Anchored to the date-range footer's top edge, not the viewport's bottom, so the footer
-     stays visible under the sheet in either state. No `map.resize()` call is needed either
+     On the Activities tab anchored to the date slider's top edge, not the viewport's bottom,
+     so the slider stays visible under the sheet in either state. No `map.resize()` call is needed either
      way, since the map's own container dimensions never change with the sheet's state —
      only what's drawn on top of it does. */
   .activities-panel {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: var(--phone-footer-height);
+    --sheet-bottom: 0px;
+    bottom: var(--sheet-bottom);
     width: 100%;
     height: var(--phone-sheet-peek);
     border-right: none;
@@ -2517,9 +2103,13 @@ body {
     transition: height 0.15s ease;
   }
 
+  .activities-panel--dated {
+    --sheet-bottom: var(--phone-footer-height);
+  }
+
   /* Its top edge stays where it was when the sheet sat on the viewport's bottom. */
   .activities-panel--sheet-expanded {
-    height: calc(78dvh - var(--phone-footer-height));
+    height: calc(78dvh - var(--sheet-bottom));
   }
 
   /* Edit track is started from the sheet's toolbar, so the sheet is expanded at that moment —
@@ -2545,6 +2135,10 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: var(--fm-space-8);
+  }
+
+  .activities-panel__subtext--bare {
+    justify-content: flex-end;
   }
 
   .activities-panel__sheet-chevron {
@@ -2573,7 +2167,7 @@ body {
   }
 
   .activities-panel__edit,
-  .activities-panel__create-story,
+  .activities-panel__add-story,
   .activities-panel__delete,
   .activities-panel__visibility,
   .activities-panel__focus {
@@ -2581,8 +2175,9 @@ body {
     height: 34px;
   }
 
-  /* A finger has no hover, so a Story's pencil and bin stay in view. */
-  .stories-tab__action {
+  /* A finger has no hover, so a Story's pencil and bin, and its rows' ×, stay in view. */
+  .stories-tab__action,
+  .activities-panel__row-remove {
     opacity: 1;
   }
 
@@ -2590,15 +2185,30 @@ body {
     padding: var(--fm-space-8) var(--fm-space-6);
   }
 
-  /* The phone footer is just DateRangeSlider.tsx — ActivityHistogram.tsx swaps out the bar
-     chart and legend below this breakpoint, so none of their desktop rules need a phone
-     variant. A fixed height (its content is one 32px row plus one label line), since the
-     Activities sheet is anchored to its top edge by that same number. */
-  .activity-histogram--compact {
+  /* The date slider leaves the sheet for the bottom of the screen, so the range can be changed
+     with the sheet collapsed and the map in view. Still rendered by the panel (fixed
+     positioning escapes its `overflow: hidden`), so it comes and goes with the Activities tab.
+     A fixed height (its content is one 32px row plus one label line), since the sheet is
+     anchored to its top edge by that same number. */
+  .activities-panel__dates {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    box-sizing: border-box;
     height: var(--phone-footer-height);
+    display: flex;
     align-items: center;
     padding: 0 var(--fm-space-12);
+    background: var(--fm-surface);
+    border-top: 1px solid var(--fm-border);
   }
+}
+
+/* On the Activities tab, the list's first filter: between the subtext line and the Type/Distance
+   row. */
+.activities-panel__dates {
+  padding: var(--fm-space-4) var(--fm-space-16) var(--fm-space-10);
 }
 
 /* DateRangeSlider.tsx — the track line and accent fill are DistanceFilter's own
@@ -2612,7 +2222,9 @@ body {
   width: 100%;
 }
 
-/* Earlier · track · Later. The buttons reuse the desktop footer's .range-picker__page look. */
+/* Earlier · track · Later. Active/inactive is a real visual distinction, not just :disabled's
+   default dimming: enabled reads as a tinted, clickable chip; disabled drops back to a plain,
+   faint outline so "nothing further that way" is obvious before a press fails. */
 .date-range-slider__row {
   display: flex;
   align-items: center;
@@ -2620,9 +2232,30 @@ body {
 }
 
 .date-range-slider__page {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 32px;
   height: 32px;
+  border: 1px solid var(--fm-border-panel);
+  border-radius: var(--fm-radius-md);
+  padding: 0;
+  background: var(--fm-surface-tint);
+  color: var(--fm-ink);
+  cursor: pointer;
   touch-action: none;
+}
+
+.date-range-slider__page:hover:not(:disabled) {
+  background: var(--fm-surface-tint-strong);
+}
+
+.date-range-slider__page:disabled {
+  background: var(--fm-surface);
+  border-color: var(--fm-divider-tint);
+  color: var(--fm-ink-faint);
+  cursor: not-allowed;
 }
 
 .date-range-slider__track {

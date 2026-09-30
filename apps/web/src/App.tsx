@@ -11,7 +11,7 @@ import { VersionBanner } from './ui/VersionBanner';
  * than re-checking one.
  */
 function AuthenticatedApp() {
-  return <MapView initialPrivateLocationsOpen={openPrivateLocations} />;
+  return <MapView initialPrivateLocationsOpen={openPrivateLocations} initialActivity={openActivity} />;
 }
 
 /** `?private-locations` is the map arriving with the Activities panel on its Privacy tab. Read once per page load, here at module load rather than
@@ -19,6 +19,23 @@ function AuthenticatedApp() {
  *  render can run more than once (StrictMode does exactly that in dev), which would see it
  *  already gone. */
 const openPrivateLocations = takePrivateLocationsParam();
+
+/** `?activity=<id>&day=<YYYY-MM-DD>` is the map arriving on one activity — the /sync page's
+ *  "View on map" (`SPEC.md` FR-3.9), which works out the activity's day on the server. Taken
+ *  once and stripped, like `?private-locations`, so a refresh doesn't narrow the range again. */
+const openActivity = takeActivityParam();
+
+function takeActivityParam(): { id: string; day: string } | null {
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('activity');
+  const day = params.get('day');
+  if (id === null) return null;
+  params.delete('activity');
+  params.delete('day');
+  const rest = params.toString();
+  window.history.replaceState(null, '', window.location.pathname + (rest ? `?${rest}` : '') + window.location.hash);
+  return day !== null && /^\d{4}-\d{2}-\d{2}$/.test(day) ? { id, day } : null;
+}
 
 function takePrivateLocationsParam(): boolean {
   const params = new URLSearchParams(window.location.search);

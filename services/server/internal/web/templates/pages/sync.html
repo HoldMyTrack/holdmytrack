@@ -1,0 +1,59 @@
+{{define "content"}}{{with .Page}}
+<main class="page-main sync">
+  <a class="settings__back" href="/">{{t "common.back_to_map"}}</a>
+
+  <section class="sync__section" aria-labelledby="sync-history">
+    <div class="profile__head">
+      <div>
+        <h2 class="profile__title" id="sync-history">{{t "sync.title"}}</h2>
+        <p class="profile__subtext">{{if .IsDemo}}{{t "sync.demo"}}{{else}}{{t "sync.subtext"}}{{end}}</p>
+      </div>
+    </div>
+    {{if .Rows}}
+    <ul class="sync__list">
+      {{range .Rows}}
+      <li class="sync__row{{if .Failed}} sync__row--failed{{end}}">
+        <div class="sync__main">
+          <span class="sync__title">{{.Title}}</span>
+          <span class="sync__detail">{{.Detail}}</span>
+        </div>
+        <span class="sync__status">{{if .Failed}}{{t "sync.failed"}}{{else}}{{t "sync.ready"}}{{end}}</span>
+        {{with .MapHref}}<a class="sync__map" href="{{.}}">{{t "sync.view_on_map"}}</a>{{end}}
+      </li>
+      {{end}}
+    </ul>
+    {{if or .NewerHref .OlderHref}}
+    {{/* Both buttons always, in the same places: the one with nowhere to go stays, disabled. */}}
+    <nav class="sync__pager" aria-label="{{t "sync.pages"}}">
+      {{if .NewerHref}}<a class="sync__pager-btn" href="{{.NewerHref}}">{{t "sync.newer"}}</a>{{else}}<span class="sync__pager-btn" aria-disabled="true">{{t "sync.newer"}}</span>{{end}}
+      <span class="sync__pager-range">{{.Range}}</span>
+      {{if .OlderHref}}<a class="sync__pager-btn" href="{{.OlderHref}}">{{t "sync.older"}}</a>{{else}}<span class="sync__pager-btn" aria-disabled="true">{{t "sync.older"}}</span>{{end}}
+    </nav>
+    {{end}}
+    {{else}}
+    <p class="sync__empty">{{t "sync.empty"}}</p>
+    {{end}}
+  </section>
+
+  {{if .Duplicates}}
+  <section class="sync__section" aria-labelledby="sync-duplicates">
+    <div class="profile__head">
+      <div>
+        <h2 class="profile__title" id="sync-duplicates">{{t "sync.duplicates_title"}}</h2>
+        <p class="profile__subtext">{{t "sync.duplicates_subtext"}}</p>
+      </div>
+    </div>
+    <ul class="sync__list">
+      {{range .Duplicates}}
+      <li class="sync__row">
+        <div class="sync__main">
+          <span class="sync__title">{{.When}}</span>
+          <span class="sync__detail">{{.From}}</span>
+        </div>
+      </li>
+      {{end}}
+    </ul>
+  </section>
+  {{end}}
+</main>
+{{end}}{{end}}

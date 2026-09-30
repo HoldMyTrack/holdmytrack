@@ -23,8 +23,9 @@ import dev.holdmytrack.android.recording.RecordingTypes
 import dev.holdmytrack.android.recording.TypeCount
 
 /**
- * The Edit window, the web's `apps/web/src/ui/EditActivityWindow.tsx` (`docs/SPEC.md`
- * FR-5.10, FR-5.14, FR-5.17): a card over the top of the map, opened from the Activities
+ * The Edit window, after the web's `apps/web/src/ui/EditActivityWindow.tsx` (`docs/SPEC.md`
+ * FR-5.10, FR-5.14; its Stories tab is Android's own now, `apps/android/docs/SPEC.md` FR-2.7
+ * item 17): a card over the top of the map, opened from the Activities
  * toolbar's Edit over its target, with three tabs behind one Save and Cancel.
  *
  *  - **Activity**: one activity edits Type, Name and Description; several edit Type only —

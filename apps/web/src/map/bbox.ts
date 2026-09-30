@@ -21,7 +21,7 @@ const MAX_FLY_ZOOM = 18;
 /**
  * The share of the map container the fitted bounds should span along its tighter axis — the
  * rest is split evenly as padding on each side, which also keeps the track clear of the
- * docked header and the bottom timeline.
+ * docked header and the map's own controls.
  */
 const FLY_FILL = 0.75;
 

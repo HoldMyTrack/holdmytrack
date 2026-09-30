@@ -51,6 +51,7 @@ func (s *Server) handleTakeoutUpload(w http.ResponseWriter, r *http.Request, zr 
 	}
 
 	results := make([]zipEntryResult, 0)
+	batch := newBatchID()
 	for _, t := range archive.Types() {
 		// A swim with no coordinates is not something anyone can hand over as a track. These
 		// logs' own distance and duration are a separate, not-yet-built import path — see
@@ -89,6 +90,8 @@ func (s *Server) handleTakeoutUpload(w http.ResponseWriter, r *http.Request, zr 
 				Ext:          ".gpx",
 				ActivityType: t.Name,
 				Data:         activities[i].GPX(),
+				Batch:        batch,
+				BatchTitle:   filename,
 			})
 			if err != nil {
 				s.log.Error("takeout entry persist/enqueue failed", "err", err, "file", name)

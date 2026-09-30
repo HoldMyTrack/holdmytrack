@@ -43,9 +43,7 @@ function messageFromErrorBody(text: string, fallback: string): string {
 }
 
 /** `messageFromErrorBody` for the `fetch`-based functions below, which all throw through this
- *  rather than reading `res.text()` and constructing an `Error` themselves — `uploadFile`'s
- *  XMLHttpRequest path (no `Response` object to read) calls `messageFromErrorBody` directly
- *  against `xhr.responseText` instead. */
+ *  rather than reading `res.text()` and constructing an `Error` themselves. */
 async function errorMessageFromResponse(res: Response, fallback: string): Promise<string> {
   const text = await res.text().catch(() => '');
   return messageFromErrorBody(text, fallback);
@@ -53,8 +51,8 @@ async function errorMessageFromResponse(res: Response, fallback: string): Promis
 
 /**
  * Simple email+password auth (services/server/internal/httpapi/auth.go) — every request in
- * this file sends `credentials: 'include'` now (and `uploadFile`'s XHR sets
- * `withCredentials`) so the browser attaches the session cookie these endpoints set/read.
+ * this file sends `credentials: 'include'` so the browser attaches the session cookie these
+ * endpoints set/read.
  * Signing in, signing up, password reset and email verification are server-rendered pages
  * (ADR-0012), not calls from here, and so is signing out (the page header's form); this app
  * only reads the session (`getCurrentUser`).
@@ -139,205 +137,6 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   }
   const body = (await res.json()) as AuthResponseBody;
   return toSessionUser(body);
-}
-
-/** A single plain file's own upload outcome — §4.0's original one-file response shape. */
-export interface SingleUploadResult {
-  kind: 'single';
-  status: 'enqueued' | 'already_processed';
-  externalId: string;
-  filename: string;
-}
-
-/** One contained file's outcome inside a `.zip` batch (§4.0.1). */
-export interface ZipEntryResult {
-  filename: string;
-  status: 'enqueued' | 'already_processed' | 'skipped';
-  externalId?: string;
-  /** Only set when status is "skipped" — why this one entry didn't become a job. */
-  reason?: string;
-}
-
-/** A `.zip` archive's own upload outcome — one request, many contained files, each with its
- *  own outcome (§5.1: one bad file inside a bulk import never aborts the rest). */
-export interface ZipUploadResult {
-  kind: 'zip';
-  filename: string;
-  files: ZipEntryResult[];
-  /** The archive had more entries than the server processes in one request — the rest were
-   *  never looked at, not merely skipped for a per-file reason. */
-  truncated: boolean;
-}
-
-export type UploadOutcome = SingleUploadResult | ZipUploadResult;
-
-interface UploadResponseBody {
-  status: string;
-  external_id?: string;
-  filename: string;
-  files?: { filename: string; status: string; external_id?: string; reason?: string }[];
-  truncated?: boolean;
-}
-
-function toUploadOutcome(body: UploadResponseBody): UploadOutcome {
-  if (body.status === 'zip_processed') {
-    return {
-      kind: 'zip',
-      filename: body.filename,
-      truncated: body.truncated ?? false,
-      files: (body.files ?? []).map((f) => ({
-        filename: f.filename,
-        status: f.status as ZipEntryResult['status'],
-        ...(f.external_id ? { externalId: f.external_id } : {}),
-        ...(f.reason ? { reason: f.reason } : {}),
-      })),
-    };
-  }
-  return {
-    kind: 'single',
-    status: body.status as SingleUploadResult['status'],
-    externalId: body.external_id!,
-    filename: body.filename,
-  };
-}
-
-/**
- * POSTs one file (a plain activity file or a `.zip` archive — the server tells them apart by
- * extension, not this function) to §4.0's upload endpoint. Plain `fetch` can't report upload
- * progress in a cross-browser way (no `ReadableStream` request body support everywhere this
- * app needs to run), so this uses `XMLHttpRequest` directly instead — the one place in this
- * codebase that does, specifically for `onProgress`, which a `.zip` archive large enough to
- * take real time uploading needs to be able to show.
- */
-export function uploadFile(
-  file: File,
-  onProgress?: (fraction: number) => void,
-  signal?: AbortSignal,
-): Promise<UploadOutcome> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${API_BASE_URL}${API_V1}/activities/upload`);
-    xhr.withCredentials = true; // send the session cookie — this endpoint requires auth now
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable && onProgress) onProgress(event.loaded / event.total);
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          resolve(toUploadOutcome(JSON.parse(xhr.responseText) as UploadResponseBody));
-        } catch {
-          reject(new Error(t('common.bad_response')));
-        }
-      } else {
-        reject(new Error(messageFromErrorBody(xhr.responseText, t('common.request_failed', { status: xhr.status }))));
-      }
-    };
-    xhr.onerror = () => reject(new Error(t('common.network_error')));
-    xhr.onabort = () => reject(new DOMException('upload aborted', 'AbortError'));
-    if (signal) {
-      if (signal.aborted) {
-        xhr.abort();
-        return;
-      }
-      signal.addEventListener('abort', () => xhr.abort());
-    }
-    const form = new FormData();
-    form.append('file', file);
-    xhr.send(form);
-  });
-}
-
-/** One row of §4.0.1's persistent upload history — every upload ever, including ones whose
- *  browser tab is long closed, which live in-flight status alone can never answer. */
-export interface UploadHistoryRow {
-  filename: string;
-  externalId: string;
-  /** `"upload"` | `"takeout"` | `"healthconnect"` | `"healthkit"` | `"recorded"` — what
-   *  `sources` filters by, and (for an uploaded file) what makes `filename` worth showing at
-   *  all; a synced row's own filename is a raw external id, never meant to be read directly
-   *  (`formatSourceLabel` is what SyncTab.tsx shows as a synced row's title instead). */
-  source: string;
-  status: 'processing' | 'done' | 'failed';
-  error?: string;
-  submittedAt: string;
-  /** Set only when status is "done" — this activity's own date and distance, so a finished
-   *  row can read "9 Sep · 34.7 km" rather than just repeating its own filename. */
-  startedAt?: string;
-  distanceMeters?: number;
-  /** The resulting activity's own id, once one exists — ROADMAP.md's "View on map" item.
-   *  Same nullability as startedAt/distanceMeters: nothing to link to before ingest finishes. */
-  activityId?: string;
-}
-
-export interface UploadHistoryPage {
-  total: number;
-  /** Every pending ingest job for this user, regardless of which page is being viewed — the
-   *  header badge's "N in progress" needs the true count, not just this page's own. */
-  processing: number;
-  limit: number;
-  offset: number;
-  uploads: UploadHistoryRow[];
-}
-
-interface UploadHistoryRowBody {
-  filename: string;
-  external_id: string;
-  source: string;
-  status: string;
-  error?: string;
-  submitted_at: string;
-  started_at?: string;
-  distance_meters?: number;
-  activity_id?: string;
-}
-
-interface UploadHistoryBody {
-  total: number;
-  processing: number;
-  limit: number;
-  offset: number;
-  uploads: UploadHistoryRowBody[];
-}
-
-export interface UploadHistoryQuery {
-  limit?: number;
-  offset?: number;
-  /** Comma-joined server-side, matching §4.3's own `types` filter convention — absent means
-   *  every source — what SyncTab.tsx's one combined history asks for. */
-  sources?: readonly string[];
-}
-
-export async function getUploadHistory(query: UploadHistoryQuery = {}, signal?: AbortSignal): Promise<UploadHistoryPage> {
-  const params = new URLSearchParams();
-  if (query.limit !== undefined) params.set('limit', String(query.limit));
-  if (query.offset !== undefined) params.set('offset', String(query.offset));
-  if (query.sources && query.sources.length > 0) params.set('source', query.sources.join(','));
-  const qs = params.toString();
-  const res = await fetch(`${API_BASE_URL}${API_V1}/uploads${qs ? `?${qs}` : ''}`, {
-    credentials: 'include',
-    ...(signal ? { signal } : {}),
-  });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
-  }
-  const body = (await res.json()) as UploadHistoryBody;
-  return {
-    total: body.total,
-    processing: body.processing,
-    limit: body.limit,
-    offset: body.offset,
-    uploads: body.uploads.map((u) => ({
-      filename: u.filename,
-      externalId: u.external_id,
-      source: u.source,
-      status: u.status as UploadHistoryRow['status'],
-      submittedAt: u.submitted_at,
-      ...(u.error ? { error: u.error } : {}),
-      ...(u.started_at ? { startedAt: u.started_at } : {}),
-      ...(u.distance_meters !== undefined ? { distanceMeters: u.distance_meters } : {}),
-      ...(u.activity_id ? { activityId: u.activity_id } : {}),
-    })),
-  };
 }
 
 /**
@@ -434,7 +233,7 @@ function toActivity(a: ActivityRowBody): Activity {
  * the stats and compute its type/distance facets.
  */
 export async function listActivities(query: ActivityQuery = {}, signal?: AbortSignal): Promise<Activity[]> {
-  // Conditional spread again (see getUploadHistory below): exactOptionalPropertyTypes:true
+  // A conditional spread: exactOptionalPropertyTypes:true
   // rejects `{ signal: undefined }` against RequestInit's `signal?: AbortSignal | null`.
   const res = await fetch(`${API_BASE_URL}${API_V1}/activities${activityQueryString(query)}`, {
     ...(signal ? { signal } : {}),
@@ -489,109 +288,10 @@ export async function deleteActivity(id: string): Promise<void> {
 }
 
 /**
- * One row of FR-3.7's duplicate list (`GET /v1/activities/duplicates`, `IMPLEMENTATION.md`
- * §4.6) — an activity cross-source dedup took out of circulation, alongside the richer copy
- * that superseded it. Both sides carry `source`, since that's the actual answer to "why is
- * this gone": the same activity, already in from somewhere else. Mirrors the Android app's own
- * `SyncStatusActivity` duplicates section (`apps/android/docs/IMPLEMENTATION.md` §6).
- */
-export interface DuplicateActivity {
-  id: string;
-  startedAt: string;
-  activityType: string;
-  distanceMeters: number | null;
-  source: string;
-  supersededBy: {
-    id: string;
-    source: string;
-    startedAt: string;
-  };
-}
-
-interface DuplicateActivityBody {
-  id: string;
-  started_at: string;
-  activity_type: string;
-  distance_meters: number | null;
-  source: string;
-  superseded_by: {
-    id: string;
-    source: string;
-    started_at: string;
-  };
-}
-
-interface DuplicatesBody {
-  duplicates: DuplicateActivityBody[];
-}
-
-/** No filter, no pagination — duplicates are a small set beside the history they came from,
- *  the same reasoning `duplicatesQuery`'s own server-side comment gives. */
-export async function getDuplicates(signal?: AbortSignal): Promise<DuplicateActivity[]> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/activities/duplicates`, {
-    credentials: 'include',
-    ...(signal ? { signal } : {}),
-  });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
-  }
-  const body = (await res.json()) as DuplicatesBody;
-  return body.duplicates.map((d) => ({
-    id: d.id,
-    startedAt: d.started_at,
-    activityType: d.activity_type,
-    distanceMeters: d.distance_meters,
-    source: d.source,
-    supersededBy: {
-      id: d.superseded_by.id,
-      source: d.superseded_by.source,
-      startedAt: d.superseded_by.started_at,
-    },
-  }));
-}
-
-/**
- * §4.7's range summary: the aggregate behind the header badge, the panel's subtext and the
- * histogram's stats line. Unlike the per-row metrics these are never null — a sum over zero
- * matching activities is legitimately 0, not unknown.
- */
-export interface ActivityTotals {
-  count: number;
-  distanceMeters: number;
-  durationSeconds: number;
-  elevationGainM: number;
-}
-
-interface ActivityTotalsBody {
-  count: number;
-  distance_meters: number;
-  duration_seconds: number;
-  elevation_gain_m: number;
-}
-
-/** `GET /v1/activities/summary`, over the same from/to/types filter as listActivities. */
-export async function getActivityTotals(query: ActivityQuery = {}, signal?: AbortSignal): Promise<ActivityTotals> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/activities/summary${activityQueryString(query)}`, {
-    ...(signal ? { signal } : {}),
-    credentials: 'include',
-  });
-  if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
-  }
-  const body = (await res.json()) as ActivityTotalsBody;
-  return {
-    count: body.count,
-    distanceMeters: body.distance_meters,
-    durationSeconds: body.duration_seconds,
-    elevationGainM: body.elevation_gain_m,
-  };
-}
-
-/**
  * One day of §4.7's histogram — a day that actually has activities. Days with none are
- * simply absent, at every level: the endpoint never returns them, and the range picker's
- * strip never draws a slot for one (RangePicker.tsx), so a bar's neighbours are the
- * adjacent days the user *recorded*, however far apart their real dates are.
+ * simply absent, at every level: the endpoint never returns them, and the date slider never
+ * gives one a slot (DateRangeSlider.tsx), so a day's neighbours are the adjacent days the user
+ * *recorded*, however far apart their real dates are.
  */
 export interface HistogramBucket {
   date: string;
@@ -608,7 +308,7 @@ export interface ActivityDayPage {
   /** Ascending by date, exactly `limit` entries unless the history ran out. */
   days: HistogramBucket[];
   /** This user's first activity's UTC day, or null if they have none — how far back the
-   *  range picker's strip can keep paging, independent of this page's own bounds. */
+   *  date slider can keep paging, independent of this page's own bounds. */
   earliest: string | null;
 }
 
@@ -625,25 +325,21 @@ export interface DayPageQuery {
   limit: number;
   /** Return the `limit` most recent days strictly before this one; omit for the newest. */
   before?: string;
-  /** One Story's days only, `earliest` its first (`SPEC.md` FR-14.4). */
-  story?: string;
 }
 
 /**
  * `GET /v1/activities/histogram?days=&before=` — §4.7's activity-day pagination mode.
  *
- * Never takes the type/distance filter: this is the whole timeline a selected sub-range is
- * highlighted against, not a view of the current one — except `story`: inside a Story, the
- * Story is the whole timeline (FR-14.4). It pages by *days that have activity*
- * rather than by calendar window because that is what the strip draws — one bar per such
- * day, packed — so a page is exactly `limit` bars however sparse the underlying history is.
+ * Never takes the type/distance filter: this is the whole history a range is picked from, not a
+ * view of the current one. It pages by *days that have activity* rather than by calendar window because that
+ * is what the slider's slots are — one per such day, packed — so a page is exactly `limit`
+ * days however sparse the underlying history is.
  * The endpoint's other mode (`from`/`to`, a real calendar window) has no reader here; §4.8's
  * planned year grid is the thing that wants it.
  */
 export async function getActivityDayPage(query: DayPageQuery, signal?: AbortSignal): Promise<ActivityDayPage> {
   const params = new URLSearchParams({ days: String(query.limit) });
   if (query.before) params.set('before', query.before);
-  if (query.story) params.set('story', query.story);
   const res = await fetch(`${API_BASE_URL}${API_V1}/activities/histogram?${params.toString()}`, {
     ...(signal ? { signal } : {}),
     credentials: 'include',

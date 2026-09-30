@@ -31,21 +31,16 @@ import { getActivityTrackMetrics, type Activity, type ActivityTrackMetrics, type
 import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
 import { ActivitiesPanel, type PanelTab, type StoriesPanel } from '../ui/ActivitiesPanel';
-import { ActivityHistogram } from '../ui/ActivityHistogram';
 import { EditActivityWindow, type EditWindowResult } from '../ui/EditActivityWindow';
 import { ExportControl } from '../ui/ExportControl';
 import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
 import { OverlaysMenu } from '../ui/OverlaysMenu';
 import { ShowInArea } from '../ui/ShowInArea';
 import { SpotPopup } from '../ui/SpotPopup';
-import { dayDiff, dayInZone, todayLocal } from '../ui/dateMath';
-import type { DateRange } from '../ui/RangePicker';
+import { todayLocal, type DateRange } from '../ui/dateMath';
 import { useUnitSystem } from '../ui/units';
 import { useActivityDays } from '../ui/useActivityDays';
 import { useActivityList } from '../ui/useActivityList';
-import { useActivityTotals } from '../ui/useActivityTotals';
-import { useDuplicates } from '../ui/useDuplicates';
-import { useImports } from '../ui/useImports';
 import { useStories } from '../ui/useStories';
 import { useStory } from '../ui/useStory';
 import { currentTheme, useTheme } from '../ui/useTheme';
@@ -83,6 +78,9 @@ function moveStoryUrl(id: string | null, nav: StoryNav) {
 export interface MapViewProps {
   /** Mount with the Activities panel on its Privacy tab — `/?private-locations` (App.tsx). */
   initialPrivateLocationsOpen?: boolean;
+  /** Mount on one activity: its day selected, it focused — `/?activity=&day=` (App.tsx), the
+   *  /sync page's "View on map". */
+  initialActivity?: { id: string; day: string } | null;
 }
 
 /** The frame-and-capture export flow's own state — lives here, not inside `ExportFrame.tsx`,
@@ -110,7 +108,7 @@ function frameSize(
   return maxW / maxH >= ratio ? { widthPx: maxH * ratio, heightPx: maxH } : { widthPx: maxW, heightPx: maxW / ratio };
 }
 
-export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
+export function MapView({ initialPrivateLocationsOpen = false, initialActivity = null }: MapViewProps) {
   // docs/SPEC.md FR-2.1–FR-2.3: a demo account is
   // read-only (no upload/sync, no edit/delete) — see ActivitiesPanel's own readOnly prop and
   // the importControl below. `'email' in user` is the same narrowing api.ts's SessionUser
@@ -171,7 +169,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
 
   const today = useMemo(() => todayLocal(), []);
 
-  // Left-panel ActivitiesPanel/ActivityHistogram layout.
+  // Left-panel ActivitiesPanel layout.
   // Selection lives here, not in ActivitiesPanel, since the map instance and the fly-to
   // callbacks below both need it. The panel itself is not optional/toggleable.
   //
@@ -204,7 +202,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   const [trackMetricsVersion, setTrackMetricsVersion] = useState(0);
 
   // The Edit window (EditActivityWindow.tsx) — the checked group it was opened over, by id. While
-  // it's open the panel and timeline are inert and the map's own controls step aside.
+  // it's open the panel is inert and the map's own controls step aside.
   const [editWindowIds, setEditWindowIds] = useState<string[] | null>(null);
   const editOpen = editWindowIds !== null;
   // Its Track tab's session (§4.7.7) — one activity, from the first time that tab opens until
@@ -218,31 +216,23 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // onto Privacy (FR-8.1) and `/?story=` onto Stories (FR-14.6), and so the tab outlives the
   // panel unmounting for Fog/Heatmap.
   const [panelTab, setPanelTab] = useState<PanelTab>(
-    storyParam() !== null ? 'stories' : initialPrivateLocationsOpen ? 'private' : 'activities',
+    initialActivity !== null ? 'activities' : storyParam() !== null ? 'stories' : initialPrivateLocationsOpen ? 'private' : 'activities',
   );
 
-  // The list/summary filter — the highlighted band in the range picker. The picker's own pan
-  // position is not here on purpose: it lives in useActivityDays and the two are independent,
-  // so paging back through history never touches what's selected (see RangePicker.tsx).
+  // The list/summary filter — the Activities tab's date slider (DateRangeSlider.tsx). The
+  // slider's own window position is not here on purpose: it lives in useActivityDays and the
+  // two are independent, so paging back through history never touches what's selected.
   // selectedRange starts null: its real default (the 5 most recent activity-days — see the
-  // effect below) needs the picker's first page of days, which hasn't loaded yet on first
-  // render.
+  // effect below) needs the first page of days, which hasn't loaded yet on first render.
   const [selectedRange, setSelectedRangeState] = useState<DateRange | null>(null);
 
-  // The open Story (FR-14.6): while one is open on the Stories tab, the list, the totals, the
-  // drawn tracks and the range picker's bars are that Story's activities alone. Opened from the
-  // tab, the URL, Create story, or by Back/Forward; closed by leaving the tab, which puts back
-  // the range from before it.
+  // The open Story (FR-14.6): while one is open on the Stories tab, the list and the
+  // drawn tracks are the whole Story's activities, with no date range — `selectedRange` is left
+  // alone, so leaving the tab finds it as it was. Opened from the tab, the URL, Add to story, or
+  // by Back/Forward; closed by leaving the tab.
   const [storyId, setStoryId] = useState<string | null>(storyParam);
   const storyState = useStory(storyId);
   const storiesList = useStories(panelTab === 'stories');
-  // The range (and whether the user had picked it) to restore on leaving the tab — null when the
-  // page opened straight into a Story, which then closes onto the usual default range.
-  const beforeStoryRef = useRef<{ range: DateRange | null; userChanged: boolean } | null>(null);
-  // Set on entering a Story, until its whole span is selected (the effect further down) —
-  // `fly` says whether to fit the camera to it then: yes when entered from the map, no on page
-  // load, where the first list's own fly (or the URL's camera) already decides.
-  const storyRangePendingRef = useRef<{ fly: boolean } | null>(storyId !== null ? { fly: false } : null);
 
   // TYPE/DISTANCE facets — pure client-side filters over
   // whatever the current date range already fetched, per activityFacets.ts.
@@ -340,16 +330,19 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     setDistanceFilter(null);
   }, []);
 
+  // A Story, or the date range — never both: a Story is the whole of it.
   const activityQuery = useMemo(
-    () => ({
-      ...(selectedRange ? { from: selectedRange.from, to: selectedRange.to } : {}),
-      ...(storyId !== null ? { story: storyId } : {}),
-    }),
+    () =>
+      storyId !== null
+        ? { story: storyId }
+        : selectedRange
+          ? { from: selectedRange.from, to: selectedRange.to }
+          : {},
     [selectedRange, storyId],
   );
 
-  // Fetched once here rather than in each consumer: the header badge, the panel subtext and
-  // the map's drawn tracks all have to agree on the same rows after an upload.
+  // Fetched once here rather than in each consumer: the header badge, the panel's list and the
+  // map's drawn tracks all have to agree on the same rows after an upload.
   const {
     activities,
     loading: activitiesLoading,
@@ -357,33 +350,24 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     reload: reloadActivities,
     loadedKey: activitiesLoadedKey,
   } = useActivityList(activityQuery);
-  const { totals, reload: reloadTotals } = useActivityTotals(activityQuery);
-  // Not scoped by activityQuery — FR-3.7's duplicate list, like the histogram, answers "what
-  // happened to my whole history", not "what's in the currently selected date range".
-  const duplicates = useDuplicates();
-  // The range picker's own bars and pan position, independent of the selection above — it
+  // The slider's window of days and its pan position, independent of the selection above — it
   // pages by days-with-activity rather than by calendar window, see useActivityDays.
   const {
     visibleDays,
     earliest,
-    latest,
-    loadedStory,
     ready: daysReady,
-    pageStep,
     canPanEarlier,
     canPanLater,
     panBy,
-    reload: reloadHistogram,
+    reveal: revealDay,
+    reload: reloadDays,
     generation: historyGeneration,
-    setBarsPerView,
-  } = useActivityDays(storyId);
+  } = useActivityDays();
 
-  // Defaults to the 5 most recent activity-days, not all-time: an all-time default spans
-  // every loaded bar on first paint, which leaves the selection band pinned to both edges
-  // with nowhere to slide — the drag-to-move gesture below has nothing to demonstrate itself
-  // with until the user already knows to shrink the range first. Five recent days starts the
-  // band well short of either edge instead, so sliding it works the first time it's tried.
-  // `visibleDays` is ascending, so its last 5 entries are the most recent 5.
+  // Defaults to the 5 most recent activity-days, not all-time: "what did I do lately" is what
+  // opening the map asks, and a whole history's tracks at once is slow to draw and fit. It also
+  // leaves both knobs inside the slider's window, with room to move either way. `visibleDays`
+  // is ascending, so its last 5 entries are the most recent 5.
   //
   // Deliberately *not* keyed on `visibleDays` (read fresh from the closure instead, without
   // being a dependency) and guarded on `userChangedRangeRef` rather than `selectedRange !==
@@ -396,7 +380,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // reported live as "the Activities list doesn't pick up a demo's newly uploaded activity",
   // confirmed directly: the row appeared instantly after a manual reload (which re-derives
   // the default fresh against real data) but never on its own. `historyGeneration` (bumped
-  // only by `reloadHistogram`, i.e. a real refetch — never by plain panning, which changes
+  // only by `reloadDays`, i.e. a real refetch — never by plain panning, which changes
   // `visibleDays` just as much but must never re-pick the selection out from under a user
   // who's simply browsing) is what lets this safely reconsider on new data without also
   // firing on every Earlier/Later click.
@@ -406,39 +390,12 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // from the list, and the window can't outlive its activities (below), so it kept closing
   // itself until the whole zip had finished. `editOpen` is a dependency so the default
   // catches up on whatever landed meanwhile the moment the window closes.
-  //
-  // Not inside a Story, which opens on its whole span instead (below); and not until the days in
-  // hand are the whole history's again after leaving one.
   useEffect(() => {
-    if (userChangedRangeRef.current || !daysReady || editOpen || storyId !== null || loadedStory !== null) return;
+    if (userChangedRangeRef.current || !daysReady || editOpen) return;
     const recentDays = visibleDays.slice(-5);
     setSelectedRangeState({ from: recentDays[0]?.date ?? earliest ?? today, to: today });
     // visibleDays deliberately isn't a dependency — see the comment above.
-  }, [daysReady, earliest, historyGeneration, today, editOpen, storyId, loadedStory]);
-
-  // A Story opens on the whole of it: its first activity's day to its last (FR-14.6), once the
-  // picker's days are that Story's. An empty Story has no days, and gets today.
-  useEffect(() => {
-    const pending = storyRangePendingRef.current;
-    if (pending === null || storyId === null || !daysReady || loadedStory !== storyId || editOpen) return;
-    storyRangePendingRef.current = null;
-    flyToNextRangeRef.current = pending.fly;
-    setSelectedRangeState({ from: earliest ?? today, to: latest ?? today });
-  }, [storyId, daysReady, loadedStory, earliest, latest, today, editOpen]);
-
-  // The histogram header's own stats — deliberately not totals.count/distanceMeters, which
-  // ActivitiesPanel's subtext already shows; repeating them in the histogram too would just
-  // be the same two numbers twice. Computed from `activities` (the selectedRange fetch),
-  // not from the picker's `visibleDays`, since that's the pan window and can show a
-  // completely different stretch of history while a selection elsewhere stays put.
-  const selectedRangeDays = useMemo(
-    () => (selectedRange ? dayDiff(selectedRange.from, selectedRange.to) + 1 : 0),
-    [selectedRange],
-  );
-  const selectedActiveDays = useMemo(
-    () => new Set(activities.map((a) => a.startedAt.slice(0, 10))).size,
-    [activities],
-  );
+  }, [daysReady, earliest, historyGeneration, today, editOpen]);
 
   // Rows with a reprocess still pending — an Edit track (§4.7.7) or a Private location change
   // — read by the polling and completion effects further down, by the bands effect, and by
@@ -594,22 +551,22 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     [activities, mapHiddenIds, fitToSelection],
   );
 
-  // ROADMAP.md's "View on map" item — SyncTab.tsx's per-row action, reusing focusActivity
-  // above rather than inventing a second fly-to mechanism. The one thing a row click doesn't
-  // already handle: the target activity may not be in the currently selected date range (an
-  // old Takeout import, a Health Connect backfill), in which case focusActivity would silently
-  // find nothing in `activities` and no-op. When that happens, this narrows the range to just
-  // that activity's own day (changeSelectedRange, the same mechanism a manual single-day pick
-  // already uses — FR-6.5) and defers the actual focus to the effect below, which fires once
-  // that range's own refetch has actually landed and the id is really there — a two-step async
-  // sequence, not a single call, since the range change and the fly both depend on a fetch
-  // landing first. Also restores Normal mode first: Fog/Heatmap have no per-track focus
-  // concept, and their own mode-switch effect already clears focus whenever entering either.
+  // The /sync page's "View on map" (`/?activity=&day=`, below), reusing focusActivity above
+  // rather than inventing a second fly-to mechanism. The one thing a row click doesn't already
+  // handle: the target activity may not be in the currently selected date range (an old Takeout
+  // import, a Health Connect backfill), in which case focusActivity would silently find nothing
+  // in `activities` and no-op. When that happens, this narrows the range to just that activity's
+  // own day — in the account's timezone, as the link carries it (changeSelectedRange, the same
+  // mechanism the slider commits through) — and defers the actual focus to the effect below,
+  // which fires once that range's own refetch has actually landed and the id is really there.
+  // Also restores Normal mode first: Fog/Heatmap have no per-track focus concept, and their own
+  // mode-switch effect already clears focus whenever entering either.
   const pendingFocusIdRef = useRef<string | null>(null);
-  const viewActivityOnMap = useCallback(
-    (activityId: string, startedAtIso: string) => {
+  const viewActivityOnDay = useCallback(
+    (activityId: string, day: string) => {
       if (mapMode !== 'normal') changeMapMode('normal');
-      const day = dayInZone(startedAtIso, user.timezone);
+      // The slider's window moves to the day too, or its knobs would sit off its edges.
+      revealDay(day);
       if (selectedRange !== null && day >= selectedRange.from && day <= selectedRange.to) {
         focusActivity(activityId);
         return;
@@ -619,16 +576,26 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       // The focus below flies to the activity itself; the range fly would override it.
       flyToNextRangeRef.current = false;
     },
-    [mapMode, changeMapMode, selectedRange, changeSelectedRange, focusActivity, user.timezone],
+    [mapMode, changeMapMode, selectedRange, changeSelectedRange, focusActivity, revealDay],
   );
+  // `/?activity=&day=` (App.tsx), once, on arrival: before any range of the user's own, so the
+  // default range never replaces it.
+  const arrivedOnActivityRef = useRef(false);
+  useEffect(() => {
+    if (initialActivity === null || arrivedOnActivityRef.current) return;
+    arrivedOnActivityRef.current = true;
+    viewActivityOnDay(initialActivity.id, initialActivity.day);
+  }, [initialActivity, viewActivityOnDay]);
+  // Waits for the map too: arriving by `/?activity=` the list can land before the map has
+  // loaded, and a focus then would have nothing to fly.
   useEffect(() => {
     const pending = pendingFocusIdRef.current;
-    if (pending === null) return;
+    if (pending === null || !map) return;
     if (activities.some((a) => a.id === pending)) {
       pendingFocusIdRef.current = null;
       focusActivity(pending);
     }
-  }, [activities, focusActivity]);
+  }, [map, activities, focusActivity]);
 
   // A click on empty space in the Activities panel's list — the panel's counterpart to clicking
   // away from every track on the map (tracks.ts's onClickAway). The checked group stays.
@@ -687,8 +654,8 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // flies to just the single most recent activity rather than the whole default selection —
   // an account with scattered recent history (e.g. one activity in another country yesterday,
   // one locally today) would otherwise fitBounds to a near-world view, which reads as broken
-  // rather than just generic. After that, only a range the user picked (changeSelectedRange)
-  // flies, to fit whatever's now actually visible.
+  // rather than just generic. After that, only a range the user picked (changeSelectedRange) or
+  // a Story opened from the map (enterStory) flies, to fit whatever's now actually visible.
   //
   // Nothing else moves the camera: not a reload of the same range (the Pending poll every 2s,
   // a finished upload or sync, a Private location change), and not a new range the default
@@ -696,7 +663,10 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // one). Keyed on the query the list was fetched for, not on `activities`, which is a new
   // array on every reload — keyed on that, a batch of uploads or Pending rows flew the camera
   // back over and over (reported live).
-  const hasFlownToActivitiesRef = useRef(false);
+  // Arriving on one activity (`/?activity=&day=`) is a view of its own: its day selected and it
+  // focused, which flies to it — so the first list's fly to the most recent activity stands
+  // aside.
+  const hasFlownToActivitiesRef = useRef(initialActivity !== null);
   const flownRangeKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (!map || activitiesLoadedKey === null) return;
@@ -705,7 +675,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     if (!hasFlownToActivitiesRef.current) {
       const drawn = activities.filter((a) => a.bbox !== null && !a.pending);
       // A Story with nothing to draw (an empty one, or one that doesn't exist) leaves this for
-      // the history leaving the tab goes back to.
+      // the date range leaving the tab goes back to.
       if (storyId !== null && drawn.length === 0) return;
       // The first list, even an empty one: an account with no history yet gets the fallback
       // view below, and its first upload doesn't fly either.
@@ -739,11 +709,10 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     if (!map || hasFlownToFallbackRef.current) return;
     if (initial.hash.view != null) return;
     if (activities.length > 0) return;
-    // Only the whole history's days say it's genuinely empty — not an empty Story's.
-    if (!daysReady || earliest != null || storyId !== null || loadedStory !== null) return;
+    if (!daysReady || earliest != null) return;
     hasFlownToFallbackRef.current = true;
     flyToView(map, countryView(user.country) ?? WORLD_VIEW);
-  }, [map, activities, daysReady, earliest, user.country, storyId, loadedStory]);
+  }, [map, activities, daysReady, earliest, user.country]);
 
   // Clicking a track directly on the map is the row-text "focus" behavior, not the checkbox's
   // — it bolds just that one track, replacing whichever was focused before, and flies to it,
@@ -863,27 +832,55 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // to drain, then refetches both (useCoverageRefresh.ts).
   const watchCoverage = useCoverageRefresh(map);
 
-  // A finished upload is a new track on the map and a new row in every §4.7 response, so
-  // refresh all four together rather than let the Sync tab's badge fall behind the geometry.
+  // A finished import is a new track on the map and a new row in every §4.7 response, so all of
+  // them refresh together — the header's Upload menu says when (hmt:imports-changed, below).
   const handleUploaded = useCallback(() => {
     if (map) refreshTrackLayer(map, activityQuery);
     reloadActivities();
-    reloadTotals();
-    reloadHistogram();
+    reloadDays();
     storyState.reload();
-    // A finished upload/sync is also the one thing that can produce a new duplicate.
-    duplicates.refresh();
     // Deletes come through here too (handleActivitiesDeleted), so this covers both.
     watchCoverage();
-  }, [map, activityQuery, reloadActivities, reloadTotals, reloadHistogram, storyState.reload, duplicates.refresh, watchCoverage]);
+  }, [map, activityQuery, reloadActivities, reloadDays, storyState.reload, watchCoverage]);
 
-  // The Sync tab's upload queue and history — held here rather than in the tab, so an upload
-  // and its polling survive the panel unmounting (Fog/Heatmap) or showing the other tab.
-  const imports = useImports(handleUploaded);
+  // The header's Upload menu (static/upload.js, served with the page's header) says when an
+  // import it's following has finished, or a file's upload has landed — the same refresh.
+  useEffect(() => {
+    window.addEventListener('hmt:imports-changed', handleUploaded);
+    return () => window.removeEventListener('hmt:imports-changed', handleUploaded);
+  }, [handleUploaded]);
 
-  // §4.7.5/§4.7.6: one or more deleted activities need the exact same four-part refresh a
-  // finished upload does (unlike editing type/description, deleting changes distance/duration
-  // totals and the histogram too) — plus dropping every deleted id from any local selection
+  // Files dropped on the map go to the header's Upload menu, which uploads them and shows their
+  // progress. A demo account has no Upload menu, and the map takes no drop.
+  const [fileDragOver, setFileDragOver] = useState(false);
+  const dragDepthRef = useRef(0);
+  const carriesFiles = (event: React.DragEvent) => !isDemo && Array.from(event.dataTransfer.types).includes('Files');
+  const onMapDragEnter = (event: React.DragEvent) => {
+    if (!carriesFiles(event)) return;
+    event.preventDefault();
+    dragDepthRef.current += 1;
+    setFileDragOver(true);
+  };
+  const onMapDragOver = (event: React.DragEvent) => {
+    if (!carriesFiles(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  };
+  const onMapDragLeave = (event: React.DragEvent) => {
+    if (!carriesFiles(event)) return;
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setFileDragOver(false);
+  };
+  const onMapDrop = (event: React.DragEvent) => {
+    if (!carriesFiles(event)) return;
+    event.preventDefault();
+    dragDepthRef.current = 0;
+    setFileDragOver(false);
+    window.dispatchEvent(new CustomEvent('hmt:upload-files', { detail: event.dataTransfer.files }));
+  };
+
+  // §4.7.5/§4.7.6: one or more deleted activities need the exact same refresh a finished
+  // upload does (unlike editing type/description, deleting changes the slider's days too) — plus dropping every deleted id from any local selection
   // state that could otherwise still reference it. focusedActivityId is the one that actually
   // matters for correctness: left pointing at a now-deleted id, the pace-colored segments
   // effect would keep trying to fetch track-metrics for an activity that no
@@ -920,7 +917,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   }, []);
 
   // Opening and closing a Story. Both start the list's state afresh, as a new range does
-  // (changeSelectedRange): the rows are a different set.
+  // (changeSelectedRange): the rows are a different set. Neither touches the date range.
   const resetListState = useCallback(() => {
     setCheckedActivityIds(new Set());
     setFocusedActivityId(null);
@@ -930,28 +927,21 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   }, []);
   const enterStory = useCallback(
     (id: string, nav: StoryNav = 'push') => {
-      // Switching from one Story to another still closes onto the range from before the first.
-      if (storyId === null) beforeStoryRef.current = { range: selectedRange, userChanged: userChangedRangeRef.current };
-      storyRangePendingRef.current = { fly: true };
+      // Fits the camera to the Story once its list lands (the fly effect above).
+      flyToNextRangeRef.current = true;
       resetListState();
       setStoryId(id);
       setPanelTab('stories');
       moveStoryUrl(id, nav);
     },
-    [storyId, selectedRange, resetListState],
+    [resetListState],
   );
   const exitStory = useCallback(
     (nav: StoryNav = 'push') => {
-      const before = beforeStoryRef.current;
-      beforeStoryRef.current = null;
-      storyRangePendingRef.current = null;
       resetListState();
       setStoryId(null);
-      // The range from before, or — for a page that opened in the Story — the default the
-      // effect above derives once the whole history's days are back. The camera stays.
-      userChangedRangeRef.current = before?.userChanged ?? false;
+      // The list goes back to the date range as it was; the camera stays.
       flyToNextRangeRef.current = false;
-      setSelectedRangeState(before?.range ?? null);
       moveStoryUrl(null, nav);
     },
     [resetListState],
@@ -990,9 +980,21 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
-  // A Story just made with the toolbar's Create story opens straight away, on the Stories tab —
+  // A Story just made with Add to story's "New story…" opens straight away, on the Stories tab —
   // whose list, fetched as the tab opens, has it.
   const openCreatedStory = useCallback((story: Story) => enterStory(story.id), [enterStory]);
+  // Activities just added to an existing Story with Add to story: the list stays where it is, and
+  // its reload brings the rows' Story badges up to date.
+  // The server has moved the account's tile version, which only `watchCoverage` brings to this
+  // page — without it, opening this Story later could draw its tracks from tiles cached before.
+  const handleStoryAdded = useCallback(
+    (story: Story) => {
+      storiesList.replace(story);
+      reloadActivities();
+      watchCoverage();
+    },
+    [storiesList.replace, reloadActivities, watchCoverage],
+  );
 
   const handleStoryEdited = useCallback(
     (story: Story) => {
@@ -1014,6 +1016,21 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     [storiesList.remove, storiesList.stories, storyId, enterStory, exitStory],
   );
 
+  // An activity taken out of the open Story with its row's × (FR-14.6): the Story's new numbers,
+  // its list without the row, and its tracks redrawn at the tile version the removal moved to.
+  const handleStoryActivityRemoved = useCallback(
+    (story: Story, activityId: string) => {
+      handleStoryEdited(story);
+      setFocusedActivityId((id) => (id === activityId ? null : id));
+      setHoveredActivityId((id) => (id === activityId ? null : id));
+      reloadActivities();
+      watchCoverage(() => {
+        if (map) refreshTrackLayer(map, activityQuery);
+      });
+    },
+    [handleStoryEdited, reloadActivities, watchCoverage, map, activityQuery],
+  );
+
   const storiesPanel: StoriesPanel = useMemo(
     () => ({
       stories: storiesList.stories,
@@ -1025,8 +1042,20 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       onOpen: (id: string) => enterStory(id),
       onEdited: handleStoryEdited,
       onDeleted: handleStoryDeleted,
+      onActivityRemoved: handleStoryActivityRemoved,
     }),
-    [storiesList.stories, storiesList.ready, storiesList.error, storyId, storyState.story, storyState.error, enterStory, handleStoryEdited, handleStoryDeleted],
+    [
+      storiesList.stories,
+      storiesList.ready,
+      storiesList.error,
+      storyId,
+      storyState.story,
+      storyState.error,
+      enterStory,
+      handleStoryEdited,
+      handleStoryDeleted,
+      handleStoryActivityRemoved,
+    ],
   );
   // §4.7.7's track session, from the Edit window's Track tab. Flies there the same way a row
   // click does, then hands the map to TrackEditor until the window closes.
@@ -1061,12 +1090,11 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     watchCoverage(() => {
       if (map) refreshTrackLayer(map, activityQuery);
       reloadActivities();
-      reloadTotals();
-      reloadHistogram();
+      reloadDays();
       storyState.reload();
       setTrackMetricsVersion((v) => v + 1);
     });
-  }, [map, activityQuery, reloadActivities, reloadTotals, reloadHistogram, storyState.reload, watchCoverage]);
+  }, [map, activityQuery, reloadActivities, reloadDays, storyState.reload, watchCoverage]);
   const editWindowActivities = useMemo(() => {
     if (editWindowIds === null) return null;
     const group = activities.filter((a) => editWindowIds.includes(a.id));
@@ -1100,7 +1128,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   }, [pendingIds, reloadActivities]);
 
   // A row that stops being pending has new points, distance and duration: the drawn track,
-  // the totals, the timeline bars and (if it's focused) its bands all need the new version.
+  // the slider's days and (if it's focused) its bands all need the new version.
   // None of it moves the camera — the row simply reappears where it is (FR-5.15).
   //
   // Fog/Heatmap go through the coverage watch rather than refetching here: the server clears
@@ -1141,11 +1169,10 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     if (map) refreshTrackLayer(map, activityQuery);
     // Includes the Country/Region tiers, since an edit can un-visit a region too.
     watchCoverage();
-    reloadTotals();
-    reloadHistogram();
+    reloadDays();
     storyState.reload();
     setTrackMetricsVersion((v) => v + 1);
-  }, [pendingIds, map, activityQuery, reloadTotals, reloadHistogram, storyState.reload, watchCoverage]);
+  }, [pendingIds, map, activityQuery, reloadDays, storyState.reload, watchCoverage]);
 
   /**
    * Re-attach anything that is not part of the basemap style.
@@ -1274,7 +1301,6 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
               activities={filteredActivities}
               loading={activitiesLoading}
               error={activitiesError}
-              totals={totals}
               facets={facets}
               excludedTypes={excludedTypes}
               onToggleType={toggleType}
@@ -1299,20 +1325,36 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
               onActivitiesDeleted={handleActivitiesDeleted}
               onEdit={openEditWindow}
               onStoryCreated={openCreatedStory}
+              onStoryAdded={handleStoryAdded}
               stories={storiesPanel}
-              duplicates={duplicates.duplicates}
-              duplicatesError={duplicates.error}
-              imports={imports}
-              onViewOnMap={viewActivityOnMap}
               tab={panelTab}
               onTabChange={changePanelTab}
               map={map}
               onPrivateLocationsChanged={handlePrivateLocationsChanged}
+              dateRange={{
+                days: visibleDays,
+                onPan: panBy,
+                canPanEarlier,
+                canPanLater,
+                value: selectedRange ?? { from: today, to: today },
+                onChange: changeSelectedRange,
+              }}
             />
           </div>
         )}
 
-        <div className="map-root">
+        <div
+          className="map-root"
+          onDragEnter={onMapDragEnter}
+          onDragOver={onMapDragOver}
+          onDragLeave={onMapDragLeave}
+          onDrop={onMapDrop}
+        >
+          {fileDragOver && (
+            <div className="map-drop" data-testid="map-drop">
+              <span className="map-drop__label">{t('map.drop_files')}</span>
+            </div>
+          )}
           <div ref={container} className="map-canvas" data-testid="map-canvas" />
           {map && <ExportControl map={map} active={exportFlow.stage !== 'idle'} onOpen={handleExportOpen} />}
           {map && (exportFlow.stage === 'framing' || exportFlow.stage === 'capturing') && (
@@ -1380,22 +1422,6 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
         </div>
       </div>
 
-      {mapMode === 'normal' && (
-        <div className="edit-track-lock" inert={editOpen}>
-          <ActivityHistogram
-            days={visibleDays}
-            onPan={panBy}
-            pageStep={pageStep}
-            canPanEarlier={canPanEarlier}
-            canPanLater={canPanLater}
-            selectedRange={selectedRange ?? { from: today, to: today }}
-            onChangeSelection={changeSelectedRange}
-            selectedRangeDays={selectedRangeDays}
-            selectedActiveDays={selectedActiveDays}
-            onCapacityChange={setBarsPerView}
-          />
-        </div>
-      )}
     </div>
   );
 }

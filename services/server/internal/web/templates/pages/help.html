@@ -5,7 +5,7 @@
     <p class="page-lede">A map of everywhere you have been, built from the activities you have already recorded. Here is how to get them in, what the map shows you, and how to make it yours.</p>
     <nav class="help__toc" aria-label="On this page">
       <a href="#map">The map</a>
-      <a href="#timeline">The timeline</a>
+      <a href="#dates">Choosing dates</a>
       <a href="#stories">Stories</a>
       <a href="#sync">Getting your activities in</a>
       <a href="#export">Exporting a map image</a>
@@ -17,12 +17,12 @@
     <h2>The map</h2>
 
     <h3>What you see when you open it</h3>
-    <p>The map flies to your most recent activity (the <a href="#timeline">timeline</a> below it selects the days around it). The address bar keeps your current position, so a reload brings you back to the same view and a copied link opens it for someone else.</p>
+    <p>The map flies to your most recent activity (the <a href="#dates">date slider</a> on the Activities tab selects the days around it). The address bar keeps your current position, so a reload brings you back to the same view and a copied link opens it for someone else.</p>
 
     <h3>Three ways to look at your history</h3>
     <p>The switch in the top-left corner of the map changes what it shows.</p>
     <ul class="page-list">
-      <li><strong>Normal</strong> draws each activity from the dates selected on the <a href="#timeline">timeline</a> as a line. Filter the list by type or distance, hide the ones you don't want to see, and click a track (or its row in the list) to focus it: it is colored by pace, blue where you were slowest and red where you were fastest.</li>
+      <li><strong>Normal</strong> draws each activity from the <a href="#dates">dates you picked</a> as a line. Filter the list by type or distance, hide the ones you don't want to see, and click a track (or its row in the list) to focus it: it is colored by pace, blue where you were slowest and red where you were fastest.</li>
       <li><strong>Fog of War</strong> covers the world in fog and clears it wherever you have ever been. It is your whole history, all the time: the date range and the filters don't apply here, and a place you once cleared stays clear.</li>
       <li><strong>Heatmap</strong> glows brighter wherever you go more often, over the last 365 days only. Places you haven't visited for a year fade out, so it shows the shape of your life now rather than all time. How bright "a lot" is adapts to your own history, so your busiest route is always the hottest.</li>
     </ul>
@@ -37,49 +37,47 @@
     <p>Normal mode doesn't do this: it draws tracks until a few states fit on screen, and shows the plain map when you zoom out further.</p>
   </section>
 
-  <section class="page-section" id="timeline">
-    <h2>The timeline</h2>
-    <p>The timeline along the bottom of the map chooses which dates you're looking at. When you open the map, it selects your five most recent days that have an activity.</p>
+  <section class="page-section" id="dates">
+    <h2>Choosing dates</h2>
+    <p>The slider at the top of the Activities tab chooses which dates you're looking at: the activities between its two knobs are the ones listed and drawn on the map in Normal mode. When you open the map, it selects your five most recent days that have an activity.</p>
     <ul class="page-list">
-      <li><strong>Each bar is one day</strong> with at least one activity. Days with nothing recorded are left out, so the bars sit side by side however far apart the days were. A taller bar means more distance that day.</li>
-      <li><strong>The highlighted band is your selection.</strong> The activities in it are the ones listed in the Activities panel and drawn on the map in Normal mode.</li>
-      <li><strong>Drag the band's edges</strong> to extend or shorten it, or drag the band itself to move it along. Click a bar outside it to select just that day.</li>
-      <li><strong>Scroll back through your history</strong> with the Earlier and Later buttons, or by dragging the timeline. Scrolling doesn't change what's selected. The dates of both are shown on the left: <em>Shown days</em> and <em>Selected range</em>.</li>
+      <li><strong>Each step on the slider is one day</strong> with at least one activity. Days with nothing recorded are left out, so a quiet month takes no room. It shows fifteen of those days at a time, and the dates you picked are written under it.</li>
+      <li><strong>Drag a knob</strong>, or press the slider near one, to move that end of your selection. Bring the knobs one step apart to pick a single day.</li>
+      <li><strong>Go back through your history</strong> with the Earlier and Later buttons, five days per press, or hold one down. A knob parked on that edge comes along, which is how a selection grows beyond fifteen days; otherwise your selection stays as it was.</li>
     </ul>
-    <p>Choosing new dates clears your filters, hidden tracks and selected activities, since they described the old ones. Fog of War and Heatmap don't use dates, so the timeline is hidden in those modes.</p>
-    <p><strong>On a phone</strong>, the timeline is a slider with two knobs, showing fifteen days at a time. Earlier and Later move it five days, carrying along a knob parked on that edge, which is how a selection grows beyond fifteen days.</p>
+    <p>Choosing new dates clears your filters, hidden tracks and selected activities, since they described the old ones. The Stories and Privacy tabs don't use dates, and neither do Fog of War and Heatmap, so the slider is only on the Activities tab. On a phone it sits at the bottom of the screen, under the panel.</p>
   </section>
 
   <section class="page-section" id="stories">
     <h2>Stories</h2>
     <p>A Story keeps a trip as one thing: a hike, a holiday, a race weekend. It's a set of activities you pick yourself, with a name, a description, and its own totals and map. Only you can see your Stories, and an activity can be in as many as you like.</p>
     <ul class="page-list">
-      <li><strong>Making one:</strong> check the activities on the Activities tab of the panel, then choose <strong>Create story</strong> (the book with a plus) in its toolbar. Give it a name and, if you like, a description; the new Story opens on the Stories tab.</li>
-      <li><strong>Adding and removing activities:</strong> open <strong>Edit</strong> on one activity or several, and tick or clear Stories on its <strong>Stories</strong> tab. Removing an activity from a Story never deletes it.</li>
-      <li><strong>Seeing one:</strong> the panel's <strong>Stories</strong> tab lists them all, newest first, and opens the newest. Click another to open it instead: only its activities are listed under it and drawn on the map, the bottom of the panel shows its totals and a line per activity type, and the timeline covers the Story's days only, so you can still narrow it to part of the trip. Going back to the Activities tab returns you to the dates you were looking at before.</li>
+      <li><strong>Making one, or adding to one:</strong> select an activity on the Activities tab of the panel, or check several, then choose <strong>Add to story</strong> (the book with a plus) in its toolbar. Pick <strong>New story…</strong> and give it a name and, if you like, a description — the new Story opens on the Stories tab — or pick a Story you already have to add them to it.</li>
+      <li><strong>Removing activities:</strong> open the Story on the <strong>Stories</strong> tab and click the <strong>×</strong> at the end of an activity's row (hover the row to see it). Removing an activity from a Story never deletes it.</li>
+      <li><strong>Seeing one:</strong> the panel's <strong>Stories</strong> tab lists them all, newest first, and opens the newest. Click another to open it instead: only its activities are listed under it and drawn on the map, the bottom of the panel shows its totals and a line per activity type, whatever dates you had picked. Going back to the Activities tab returns you to the dates you were looking at before.</li>
       <li><strong>Renaming and deleting:</strong> the pencil and the bin beside a Story's name. Hover the name to see them.</li>
-      <li><strong>Which activities are in one:</strong> a <strong>Story</strong> badge on an activity's row says it belongs to a Story; hover it to see which.</li>
+      <li><strong>Which activities are in one:</strong> a <strong>Story</strong> badge on an activity's row says it belongs to a Story; hover it to see which, and click it to open that Story.</li>
     </ul>
     <p>Stories are a Normal mode view: Fog of War and Heatmap always show your whole history. Deleting a Story deletes none of its activities, and deleting an activity takes it out of every Story it was in.</p>
   </section>
 
   <section class="page-section" id="sync">
     <h2>Getting your activities in</h2>
-    <p>Everything comes in through the <strong>Sync</strong> tab, next to Activities in the panel on the left. It also lists everything you have imported, with its status (Processing, Ready or Failed); "View on map" jumps straight to a finished one.</p>
+    <p>Everything comes in through the <strong>Upload</strong> button at the top of every page. Its menu shows what is being imported right now: files uploading, then being processed, including what your phone is syncing. Once an import has finished it leaves the menu for <strong><a href="/sync">Sync</a></strong>, next to Upload, which lists everything you have imported as Ready or Failed, with why; "View on map" jumps straight to a finished one. If an import fails, Sync gets a red dot until you've opened it.</p>
 
     <h3>Files</h3>
-    <p>Drop files onto the Sync tab, or choose them from your computer. HoldMyTrack reads <strong>GPX</strong>, <strong>FIT</strong> and <strong>TCX</strong> files, the formats watches, bike computers and most fitness apps export. You can add up to 20 files at a time, each up to 64 MB. For more, put them in a <strong>.zip</strong> archive: one archive can hold up to 5,000 files.</p>
+    <p>Choose files from the Upload menu, or drop them anywhere on the map. HoldMyTrack reads <strong>GPX</strong>, <strong>FIT</strong> and <strong>TCX</strong> files, the formats watches, bike computers and most fitness apps export. You can add up to 20 files at a time, each up to 64 MB. For more, put them in a <strong>.zip</strong> archive: one archive can hold up to 5,000 files.</p>
 
     <h3>Google Takeout (Fitbit and Google Health)</h3>
-    <p>If your history lives with Fitbit or Google, download it with <a href="https://takeout.google.com">Google Takeout</a>: select your Fitbit data, create the export, and download the <strong>.zip</strong> it gives you (Google's own guide: <a href="https://support.google.com/accounts/answer/3024190">How to download your Google data</a>). Upload that .zip to the Sync tab as it is, without unpacking it. HoldMyTrack recognizes a Takeout export by itself and imports every activity that has a GPS route; activities without one, like a logged swim, are skipped.</p>
+    <p>If your history lives with Fitbit or Google, download it with <a href="https://takeout.google.com">Google Takeout</a>: select your Fitbit data, create the export, and download the <strong>.zip</strong> it gives you (Google's own guide: <a href="https://support.google.com/accounts/answer/3024190">How to download your Google data</a>). Upload that .zip as it is, without unpacking it; it shows as one row in the Upload menu, counting its activities as they're processed. HoldMyTrack recognizes a Takeout export by itself and imports every activity that has a GPS route; activities without one, like a logged swim, are skipped.</p>
 
     <h3>The Android app</h3>
-    <p>The HoldMyTrack Android app syncs your workouts from Health Connect, where most Android watches and fitness apps store them. Open it and tap <strong>Sync Now</strong>: the new activities appear in the Sync tab's history and on your map. Workouts without a route can't be placed on a map, so they're skipped: indoor ones, and Samsung Galaxy Watch workouts, whose routes Samsung doesn't share with Health Connect. The app can also record a walk, hike or drive by itself when you just want the route; recordings stay on your phone until you choose to sync them.</p>
+    <p>The HoldMyTrack Android app syncs your workouts from Health Connect, where most Android watches and fitness apps store them. Open it and tap <strong>Sync Now</strong>: the new activities show in the Upload menu while they're processed, then on the Sync page and on your map. Workouts without a route can't be placed on a map, so they're skipped: indoor ones, and Samsung Galaxy Watch workouts, whose routes Samsung doesn't share with Health Connect. The app can also record a walk, hike or drive by itself when you just want the route; recordings stay on your phone until you choose to sync them.</p>
 
     <h3>Importing twice is safe</h3>
     <ul class="page-list">
       <li><strong>The same file again</strong> is recognized and skipped; you'll see a note that it was already uploaded, and nothing is added twice.</li>
-      <li><strong>The same activity from two places</strong>, say synced from your watch and later uploaded as a FIT file, is kept once. HoldMyTrack keeps the richer copy (the one with a route, or with elevation) and sets the other aside. When that happens, a "duplicates found" link at the bottom of the Activities list shows what was set aside and why. Delete the copy that was kept, and the other one comes back.</li>
+      <li><strong>The same activity from two places</strong>, say synced from your watch and later uploaded as a FIT file, is kept once. HoldMyTrack keeps the richer copy (the one with a route, or with elevation) and sets the other aside. When that happens, the <a href="/sync">Sync</a> page lists what was set aside and why, under your imports. Delete the copy that was kept, and the other one comes back.</li>
     </ul>
   </section>
 
@@ -96,7 +94,7 @@
     <p>Open <a href="/settings">Settings</a> from the menu under your avatar.</p>
     <ul class="page-list">
       <li><strong>Country</strong> sets your units: miles and feet in the United States, Liberia and Myanmar, kilometers and meters everywhere else.</li>
-      <li><strong>Timezone</strong> decides which calendar day an activity counts on, everywhere the app groups by day: the timeline, the activity grid on your Profile, and trends. It is set from your browser when you sign up; change it if you have moved.</li>
+      <li><strong>Timezone</strong> decides which calendar day an activity counts on, everywhere the app groups by day: the date slider, the activity grid on your Profile, and trends. It is set from your browser when you sign up; change it if you have moved.</li>
       <li><strong>Language</strong> is the language of the pages, the map and our emails. It starts on automatic: whatever your browser is set to.</li>
     </ul>
     <p>When you first sign up, HoldMyTrack asks for your country and timezone before showing your map.</p>

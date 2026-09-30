@@ -1,18 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import {
-  addStoryActivities,
-  listStories,
-  removeStoryActivities,
-  saveActivityTrackEdit,
-  updateActivity,
-  type Activity,
-  type Story,
-  type TrackEdit,
-} from '../api';
+import { saveActivityTrackEdit, updateActivity, type Activity, type TrackEdit } from '../api';
 import type { TypeFacet } from './activityFacets';
 import { ActivityTypePicker } from './ActivityTypePicker';
-import { EditStoriesTab } from './EditStoriesTab';
 import { formatStartedAt } from './format';
 import { TrackEditor } from './TrackEditor';
 import { t, tn } from '../i18n';
@@ -24,7 +14,7 @@ const MAX_ACTIVITY_TYPE_LEN = 50;
 const MAX_NAME_LEN = 200;
 const MAX_DESCRIPTION_LEN = 2000;
 
-type Tab = 'activity' | 'track' | 'stories';
+type Tab = 'activity' | 'track';
 
 /**
  * The Edit window (§4.7.4, §4.7.7) — reached from the header toolbar's Edit button
@@ -36,23 +26,20 @@ type Tab = 'activity' | 'track' | 'stories';
  *    Name and Description have nothing to set consistently across several different activities
  *    at once, so they render disabled with a tooltip explaining why rather than silently doing
  *    nothing or (worse) overwriting every checked activity's name/description with one value.
- *  - **Stories** — EditStoriesTab.tsx: the account's Stories as checkboxes for the window's
- *    activities, one or many, loaded when the window opens.
  *  - **Track** — TrackEditor.tsx, over exactly one activity with a finished track;
  *    `trackUnavailable` names why not otherwise, as the disabled tab's tooltip. Opening it the
  *    first time starts MapView's track session (`onStartTrack`: the other tracks hidden, the
  *    camera on this one), which then lasts until the window closes; the editor stays mounted
  *    behind the Activity tab, so switching back and forth loses nothing.
  *
- * Save writes what changed — the fields first (skipped when they're as they were), then each
- * Story whose box changed, then the track edit (skipped when the Track tab did nothing) — and
- * closes. If a later write fails after earlier ones landed, the window stays open with the
+ * Save writes what changed — the fields first (skipped when they're as they were), then the
+ * track edit (skipped when the Track tab did nothing) — and closes. If a later write fails after earlier ones landed, the window stays open with the
  * error, a retry skips what's already written, and `onClose` still reports it so the list picks
  * it up. Cancel (or Escape) discards whatever wasn't written.
  *
  * Floating, not a modal `<dialog>` as the Activity form alone once was: the Track tab edits on
- * the map, and a modal would make the map inert. MapView makes the Activities panel and the
- * timeline inert instead while the window is open — the window edits the checked group, which
+ * the map, and a modal would make the map inert. MapView makes the Activities panel inert
+ * instead while the window is open — the window edits the checked group, which
  * must not change underneath it.
  *
  * Type is ActivityTypePicker.tsx — the same searchable picker as Settings' Country and
@@ -74,8 +61,7 @@ export interface EditActivityWindowProps {
   /** Why the Track tab is disabled, or null when `activities` is one editable track. */
   trackUnavailable: string | null;
   onStartTrack: (activity: Activity) => void;
-  /** `saved`: something was written (a Story membership too, which the rows' Story badges
-   *  show), so the list reloads. `trackApplied`: a track edit was sent, so the row now reads
+  /** `saved`: something was written, so the list reloads. `trackApplied`: a track edit was sent, so the row now reads
    *  Pending until its reprocess lands. */
   onClose: (result: EditWindowResult) => void;
 }
@@ -90,8 +76,7 @@ export function EditActivityWindow({ map, activities, knownTypes, trackUnavailab
   const [tab, setTab] = useState<Tab>('activity');
   const [trackStarted, setTrackStarted] = useState(false);
   // A group whose activities share one type starts on it; a mixed group starts empty ("Mixed
-  // types"), and stays that way unless a type is picked — empty keeps each activity's own, so a
-  // Save made for the Stories tab alone never retypes anything.
+  // types"), and stays that way unless a type is picked — empty keeps each activity's own type.
   const mixedTypes = activities.some((a) => a.activityType !== activities[0]!.activityType);
   const [activityType, setActivityType] = useState(mixedTypes ? '' : activities[0]!.activityType);
   const [name, setName] = useState(single?.name ?? '');
@@ -102,33 +87,6 @@ export function EditActivityWindow({ map, activities, knownTypes, trackUnavailab
   // Fields already written by an earlier Save whose track edit then failed — a later Cancel
   // still has to report them, and a retry needn't write them again.
   const fieldsSaved = useRef(false);
-  // The Stories tab: every Story, loaded once the window opens, and the boxes changed since.
-  // `storiesSaved` is the Stories an earlier Save already wrote, the same way as fieldsSaved.
-  const [stories, setStories] = useState<Story[] | null>(null);
-  const [storiesError, setStoriesError] = useState<string | null>(null);
-  const [storyChanges, setStoryChanges] = useState<ReadonlyMap<string, 'all' | 'none'>>(() => new Map());
-  const storiesSaved = useRef(new Set<string>());
-  const activityIds = activities.map((a) => a.id);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    listStories(controller.signal)
-      .then(setStories)
-      .catch((err: unknown) => {
-        if (!controller.signal.aborted) setStoriesError(err instanceof Error ? err.message : String(err));
-      });
-    return () => controller.abort();
-  }, []);
-
-  const onStoryChange = useCallback((storyId: string, next: 'all' | 'none' | null) => {
-    setStoryChanges((prev) => {
-      const map = new Map(prev);
-      if (next === null) map.delete(storyId);
-      else map.set(storyId, next);
-      return map;
-    });
-    setError(null);
-  }, []);
 
   const onTrackChange = useCallback((pending: { edit: TrackEdit | null } | null) => {
     setTrackPending(pending);
@@ -136,7 +94,7 @@ export function EditActivityWindow({ map, activities, knownTypes, trackUnavailab
   }, []);
 
   const cancel = useCallback(() => {
-    onClose({ saved: fieldsSaved.current || storiesSaved.current.size > 0, trackApplied: false });
+    onClose({ saved: fieldsSaved.current, trackApplied: false });
   }, [onClose]);
 
   useEffect(() => {
@@ -199,18 +157,12 @@ export function EditActivityWindow({ map, activities, knownTypes, trackUnavailab
         }
         fieldsSaved.current = true;
       }
-      for (const [storyId, next] of storyChanges) {
-        if (storiesSaved.current.has(storyId)) continue;
-        if (next === 'all') await addStoryActivities(storyId, activityIds);
-        else await removeStoryActivities(storyId, activityIds);
-        storiesSaved.current.add(storyId);
-      }
       if (single && trackPending) {
         await saveActivityTrackEdit(single.id, trackPending.edit);
         onClose({ saved: true, trackApplied: true });
         return;
       }
-      onClose({ saved: fieldsSaved.current || storiesSaved.current.size > 0, trackApplied: false });
+      onClose({ saved: fieldsSaved.current, trackApplied: false });
     } catch (err) {
       setError(err instanceof Error ? err.message : t('edit.save_failed'));
       setSaving(false);
@@ -251,17 +203,6 @@ export function EditActivityWindow({ map, activities, knownTypes, trackUnavailab
         >
           {t('edit.tab_track')}
           {trackPending && <span className="edit-window__tab-dot" aria-hidden="true" />}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          className="edit-window__tab"
-          aria-selected={tab === 'stories'}
-          onClick={() => openTab('stories')}
-          data-testid="edit-tab-stories"
-        >
-          {t('edit.tab_stories')}
-          {storyChanges.size > 0 && <span className="edit-window__tab-dot" aria-hidden="true" />}
         </button>
       </div>
 
@@ -309,16 +250,6 @@ export function EditActivityWindow({ map, activities, knownTypes, trackUnavailab
         </label>
       </div>
 
-      <div className="edit-window__panel" role="tabpanel" hidden={tab !== 'stories'}>
-        <EditStoriesTab
-          stories={stories}
-          error={storiesError}
-          activityIds={activityIds}
-          changes={storyChanges}
-          onChange={onStoryChange}
-          busy={saving}
-        />
-      </div>
 
       {trackStarted && single && (
         <div className="edit-window__panel" role="tabpanel" hidden={tab !== 'track'}>

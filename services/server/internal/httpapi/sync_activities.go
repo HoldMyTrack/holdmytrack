@@ -104,8 +104,9 @@ func (s *Server) handleSyncActivities(w http.ResponseWriter, r *http.Request) {
 	userID := userIDFromContext(ctx)
 	l := i18n.Get(requestLang(r))
 	results := make([]syncActivityResult, len(req.Activities))
+	batch := newBatchID()
 	for i, act := range req.Activities {
-		results[i] = s.syncOneActivity(ctx, l, userID, req.Source, act)
+		results[i] = s.syncOneActivity(ctx, l, userID, req.Source, batch, act)
 	}
 
 	w.Header().Set("Cache-Control", "no-store")
@@ -115,7 +116,7 @@ func (s *Server) handleSyncActivities(w http.ResponseWriter, r *http.Request) {
 // syncOneActivity validates and persists+enqueues a single batch entry, isolated into its own
 // function so a marshal or persistAndEnqueue failure on one activity can't unwind the loop
 // handling the rest of the batch.
-func (s *Server) syncOneActivity(ctx context.Context, l *i18n.Localizer, userID, source string, act syncActivityRequest) syncActivityResult {
+func (s *Server) syncOneActivity(ctx context.Context, l *i18n.Localizer, userID, source, batch string, act syncActivityRequest) syncActivityResult {
 	result := syncActivityResult{ExternalID: act.ExternalID}
 
 	if act.ExternalID == "" {
@@ -171,6 +172,7 @@ func (s *Server) syncOneActivity(ctx context.Context, l *i18n.Localizer, userID,
 		Ext:        ".json",
 		Data:       data,
 		ExternalID: act.ExternalID,
+		Batch:      batch,
 	})
 	if err != nil {
 		s.log.Error("sync activity persist/enqueue failed", "external_id", act.ExternalID, "err", err)
