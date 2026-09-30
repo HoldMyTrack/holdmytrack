@@ -274,9 +274,15 @@ export function ActivitiesPanel({
   // Mobile-only bottom sheet (index.css's `@media (max-width: 768px)` layer) — collapsed by
   // default, same reasoning as typeFilterOpen above. Desktop CSS never reacts to the
   // `--sheet-expanded` modifier class this drives, so toggling it there is an inert no-op,
-  // not a behavior change; see the subtext button below for why that's safe to leave wired
-  // unconditionally rather than gated behind a JS media-query check.
+  // not a behavior change — safe to leave wired unconditionally rather than gated behind a JS
+  // media-query check.
   const [sheetExpanded, setSheetExpanded] = useState(false);
+  // A tab tap on a phone opens the sheet onto the tab just chosen: collapsed, the tab row is
+  // all there is of it.
+  const selectTab = (next: PanelTab) => {
+    setTab(next);
+    setSheetExpanded(true);
+  };
 
   // Wider than the old fixed 320px, and now draggable — a full "Sep 11, 2026, 09:00 AM"
   // title plus its TYPE label was clipping at 320px. Local state, not lifted to MapView:
@@ -391,60 +397,58 @@ export function ActivitiesPanel({
         onPointerUp={onResizePointerUp}
         onPointerCancel={onResizePointerUp}
       />
-      <div className="activities-panel__head" role="tablist" aria-label={t('activities.panel')} ref={tabsRef}>
+      {/* On a phone the tab row is the collapsed sheet's peek strip, and the chevron at its end
+          the sheet's expand/collapse control; index.css hides the chevron at desktop width. */}
+      <div className="activities-panel__head">
+        <div className="activities-panel__tabs" role="tablist" aria-label={t('activities.panel')} ref={tabsRef}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'activities'}
+            className="activities-panel__tab"
+            data-testid="activities-panel-tab-activities"
+            onClick={() => selectTab('activities')}
+          >
+            <span className="activities-panel__heading-text">{t('activities.tab')}</span>
+            {/* On the Stories tab the list is the open Story's, not the date range's. */}
+            {tab !== 'stories' && <span className="activities-panel__badge">{activities.length.toLocaleString(lang)}</span>}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'stories'}
+            className="activities-panel__tab"
+            data-testid="activities-panel-tab-stories"
+            onClick={() => selectTab('stories')}
+          >
+            <span className="activities-panel__heading-text">{t('stories.tab')}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'private'}
+            className="activities-panel__tab"
+            data-testid="activities-panel-tab-private"
+            onClick={() => selectTab('private')}
+          >
+            <span className="activities-panel__heading-text">{t('private.tab')}</span>
+          </button>
+        </div>
         <button
           type="button"
-          role="tab"
-          aria-selected={tab === 'activities'}
-          className="activities-panel__tab"
-          data-testid="activities-panel-tab-activities"
-          onClick={() => setTab('activities')}
+          className="activities-panel__sheet-toggle"
+          data-testid="activities-panel-sheet-toggle"
+          aria-expanded={sheetExpanded}
+          aria-label={t(sheetExpanded ? 'activities.collapse_sheet' : 'activities.expand_sheet')}
+          onClick={() => setSheetExpanded((expanded) => !expanded)}
         >
-          <span className="activities-panel__heading-text">{t('activities.tab')}</span>
-          {/* On the Stories tab the list is the open Story's, not the date range's. */}
-          {tab !== 'stories' && <span className="activities-panel__badge">{activities.length.toLocaleString(lang)}</span>}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === 'stories'}
-          className="activities-panel__tab"
-          data-testid="activities-panel-tab-stories"
-          onClick={() => setTab('stories')}
-        >
-          <span className="activities-panel__heading-text">{t('stories.tab')}</span>
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === 'private'}
-          className="activities-panel__tab"
-          data-testid="activities-panel-tab-private"
-          onClick={() => setTab('private')}
-        >
-          <span className="activities-panel__heading-text">{t('private.tab')}</span>
+          {sheetExpanded ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
         </button>
       </div>
-      {/* A <button>, not a <p> — on mobile this is the bottom sheet's own peek-strip tap
-          target (expand/collapse), styled identically to the old plain text on desktop
-          (index.css keeps `cursor: default` there) so clicking it is a harmless, invisible
-          no-op at desktop width rather than a behavior change. */}
-      {/* The Activities tab has no subtext: its slider and filters say what's listed. Its button
-          stays for a phone, where it's the sheet's expand strip (a bare chevron); index.css hides
-          it at desktop width. */}
-      <button
-        type="button"
-        className={`activities-panel__subtext${tab === 'activities' ? ' activities-panel__subtext--bare' : ''}`}
-        data-testid="activities-panel-sheet-toggle"
-        aria-expanded={sheetExpanded}
-        aria-label={tab === 'activities' ? t(sheetExpanded ? 'activities.collapse_sheet' : 'activities.expand_sheet') : undefined}
-        onClick={() => setSheetExpanded((expanded) => !expanded)}
-      >
-        {tab === 'private' ? t('private.subtitle') : tab === 'stories' ? t('stories.subtext') : null}
-        <span className="activities-panel__sheet-chevron" aria-hidden="true">
-          {sheetExpanded ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
-        </span>
-      </button>
+      {/* The Activities tab has no subtext: its slider and filters say what's listed. */}
+      {tab !== 'activities' && (
+        <p className="activities-panel__subtext">{tab === 'private' ? t('private.subtitle') : t('stories.subtext')}</p>
+      )}
 
       {tab === 'private' ? (
         map ? (
