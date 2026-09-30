@@ -745,7 +745,8 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   useEffect(() => {
     setSpotClickHandler(setOpenSpot);
   }, []);
-  // Captures are made on the phone, so they're read again whenever the page comes back into view.
+  // Captures are made on the phone, so they're read again whenever the page comes back into view
+  // or the window gets focus back — a browser left open on a desktop stays visible throughout.
   useEffect(() => {
     let controller: AbortController | null = null;
     const load = () => {
@@ -760,9 +761,11 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     };
     load();
     document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', load);
     return () => {
       controller?.abort();
       document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', load);
     };
   }, []);
   useEffect(() => {
