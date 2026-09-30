@@ -773,12 +773,23 @@ class MainActivity : AppCompatActivity() {
             // Last, so the places are over everything else, labels included.
             MapSpots.attach(loaded, this, MapSpots.get(this))
             overlaysAttached = true
+            loadSpotCaptures()
             renderTrackMetrics()
             // A new style has none of the circles; draw them again if the tab has the map.
             if (privacyShowing) privacyTab.start()
             if (isRecording()) MapOverlays.setRecording(loaded, true, mode)
             frameActivities()
             checkTileVersion()
+        }
+    }
+
+    /** The account's captured spots (`docs/SPEC.md` FR-15.6), for the badges and the popup —
+     *  when the overlays attach and on every return to the app. Kept as they were on a failure. */
+    private fun loadSpotCaptures() {
+        HoldMyTrackApi.spotCaptures { result ->
+            val captures = result.getOrNull() ?: return@spotCaptures
+            MapSpots.setCaptured(style?.takeIf { overlaysAttached }, captures.associate { it.spotId to it.capturedAt })
+            spotPopup.renderCaptured()
         }
     }
 
@@ -1724,6 +1735,7 @@ class MainActivity : AppCompatActivity() {
         mapView.onResume()
         daysStale = true
         syncSession()
+        if (overlaysAttached) loadSpotCaptures()
         // An empty map is asked again on every return — typically from Sync — so the notice
         // goes, and the camera frames the new history, as soon as something has arrived.
         if (shownNotice == Notice.EMPTY) {

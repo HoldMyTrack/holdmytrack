@@ -125,7 +125,9 @@
     <string name="spots_category_history">History</string>
     <string name="spots_since">Since %1$s</string>
     <string name="spots_copy_address">Copy address</string>
+    <string name="spots_copy_location">Copy location</string>
     <string name="spots_copied">Copied</string>
+    <string name="spots_captured_on">Captured %1$s</string>
     <string name="spots_wikipedia">Wikipedia</string>
     <string name="spots_close">Close</string>
     <string name="spots_in_area">Show in this area</string>

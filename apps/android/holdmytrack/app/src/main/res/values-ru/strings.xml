@@ -132,7 +132,9 @@
     <string name="spots_category_history">История</string>
     <string name="spots_since">С %1$s</string>
     <string name="spots_copy_address">Скопировать адрес</string>
+    <string name="spots_copy_location">Скопировать координаты</string>
     <string name="spots_copied">Скопировано</string>
+    <string name="spots_captured_on">Захвачено %1$s</string>
     <string name="spots_wikipedia">Википедия</string>
     <string name="spots_close">Закрыть</string>
     <string name="spots_in_area">Показать в этой области</string>

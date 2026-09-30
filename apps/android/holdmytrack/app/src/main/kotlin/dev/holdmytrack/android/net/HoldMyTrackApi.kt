@@ -7,6 +7,8 @@ import android.os.Handler
 import android.os.LocaleList
 import android.os.Looper
 import dev.holdmytrack.android.BuildConfig
+import dev.holdmytrack.android.map.GeoPoint
+import dev.holdmytrack.android.map.SpotArea
 import java.io.IOException
 import java.time.ZoneId
 import java.time.Instant
@@ -265,6 +267,13 @@ data class Spot(
 
 /** `GET /v1/spots`: the places in a box, up to the server's cap, and how many there are in all. */
 data class SpotsInArea(val spots: List<Spot>, val total: Int)
+
+/** `GET /v1/spots/{id}` (`docs/SPEC.md` FR-15.6): the place, its whole [area] — what capture
+ *  mode measures against — and when the account captured it, or null. */
+data class SpotDetail(val spot: Spot, val area: SpotArea, val capturedAt: Instant?)
+
+/** One place the account has captured (`GET /v1/spots/captures`, `POST /v1/spots/{id}/captures`). */
+data class SpotCapture(val spotId: Long, val capturedAt: Instant)
 
 /** One day that has activity, as `GET /v1/activities/histogram` counts it; [date] is `YYYY-MM-DD`
  *  in the account's timezone. Days with none are never returned. */
@@ -808,6 +817,58 @@ object HoldMyTrackApi {
             val rows = json.optJSONArray("spots") ?: JSONArray()
             SpotsInArea(List(rows.length()) { parseSpot(rows.getJSONObject(it)) }, json.optInt("total"))
         }, onResult)
+    }
+
+    /** `GET /v1/spots/{id}` (`docs/IMPLEMENTATION.md` §4.25) — see [SpotDetail]. */
+    fun spotDetail(id: Long, onResult: (Result<SpotDetail>) -> Unit) {
+        call(Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/spots/" + id).build(), { text ->
+            val json = JSONObject(text)
+            SpotDetail(
+                spot = parseSpot(json),
+                area = parseMultiPolygon(json.getJSONObject("area")),
+                capturedAt = json.optString("captured_at").takeIf { it.isNotEmpty() }?.let(::parseInstant),
+            )
+        }, onResult)
+    }
+
+    /** `GET /v1/spots/captures` — every place the account has captured, newest first. */
+    fun spotCaptures(onResult: (Result<List<SpotCapture>>) -> Unit) {
+        call(Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/spots/captures").build(), { text ->
+            val rows = JSONObject(text).optJSONArray("captures") ?: JSONArray()
+            List(rows.length()) { parseSpotCapture(rows.getJSONObject(it)) }
+        }, onResult)
+    }
+
+    /** `POST /v1/spots/{id}/captures` — captures the place at the position last measured inside
+     *  it; the server checks it against the area. A place already captured answers the first
+     *  capture. Outside the area is an [ApiException] with code 422. */
+    fun captureSpot(id: Long, lat: Double, lon: Double, onResult: (Result<SpotCapture>) -> Unit) {
+        val body = JSONObject().put("lat", lat).put("lon", lon)
+        val request = Request.Builder()
+            .url(BuildConfig.API_BASE_URL + API_V1 + "/spots/" + id + "/captures")
+            .post(body.toString().toRequestBody(JSON))
+            .build()
+        call(request, { text -> parseSpotCapture(JSONObject(text)) }, onResult)
+    }
+
+    private fun parseSpotCapture(json: JSONObject) =
+        SpotCapture(json.getLong("spot_id"), parseInstant(json.getString("captured_at")))
+
+    private fun parseInstant(text: String): Instant = OffsetDateTime.parse(text).toInstant()
+
+    /** A GeoJSON MultiPolygon's coordinates, `[[[[lon, lat], …], …], …]`, as polygons of rings. */
+    private fun parseMultiPolygon(json: JSONObject): SpotArea {
+        val polygons = json.getJSONArray("coordinates")
+        return List(polygons.length()) { p ->
+            val rings = polygons.getJSONArray(p)
+            List(rings.length()) { r ->
+                val points = rings.getJSONArray(r)
+                List(points.length()) { i ->
+                    val point = points.getJSONArray(i)
+                    GeoPoint(lat = point.getDouble(1), lon = point.getDouble(0))
+                }
+            }
+        }
     }
 
     private fun parseSpot(json: JSONObject): Spot {

@@ -2,7 +2,6 @@ package dev.holdmytrack.android.map
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.RectF
@@ -32,6 +31,7 @@ import org.maplibre.android.style.sources.VectorSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.Point
+import java.time.Instant
 
 /**
  * The Spots layers (`docs/SPEC.md` FR-15, root `docs/IMPLEMENTATION.md` §4.25), the web's
@@ -98,10 +98,12 @@ object MapSpots {
     private const val SOURCE_LAYER = "spots"
     private const val AREA_SOURCE_LAYER = "spot_areas"
 
-    // The badge: the category icon in ink on white, ringed in the accent — fixed colors, not the
-    // theme's, since the badge carries its own background and reads the same on either basemap.
+    // The badge: the category icon in ink on white, ringed in the accent — or, for a place the
+    // account has captured, white on the accent, ringed darker. Fixed colors, not the theme's,
+    // since the badge carries its own background and reads the same on either basemap.
     private const val INK = "#202b25"
     private const val ACCENT = "#b07e2e"
+    private const val ACCENT_DARK = "#7d5820"
     private const val BADGE_DP = 30f
 
     /** How far from a badge's edge a tap still counts. */
@@ -113,6 +115,11 @@ object MapSpots {
     private var wanted: List<Category> = emptyList()
     private var editing = false
     private var inArea: FeatureCollection = FeatureCollection.fromFeatures(emptyList())
+
+    /** The places the account has captured (`docs/SPEC.md` FR-15.6), by id: drawn with the
+     *  captured badge, and dated in their popup. */
+    var captured: Map<Long, Instant> = emptyMap()
+        private set
 
     fun get(context: Context): List<Category> {
         val saved = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getStringSet(KEY, emptySet()).orEmpty()
@@ -155,6 +162,12 @@ object MapSpots {
     fun setCategories(style: Style, categories: List<Category>) {
         wanted = categories
         apply(style)
+    }
+
+    /** The account's captures, newest from `GET /v1/spots/captures` or one just made. */
+    fun setCaptured(style: Style?, captures: Map<Long, Instant>) {
+        captured = captures
+        style?.let(::apply)
     }
 
     /** A track is being edited: the places step aside with every other track, as on the web
@@ -256,7 +269,7 @@ object MapSpots {
             sourceLayer?.let(::setSourceLayer)
             setProperties(
                 PropertyFactory.visibility(Property.NONE),
-                PropertyFactory.iconImage(Expression.concat(Expression.literal("spot-"), Expression.get("category"))),
+                PropertyFactory.iconImage(iconImage()),
                 // Every spot is drawn, however close to another: a hidden playground is a missed one.
                 PropertyFactory.iconAllowOverlap(true),
                 PropertyFactory.iconIgnorePlacement(true),
@@ -271,8 +284,16 @@ object MapSpots {
         if (above != null) style.addLayerBelow(layer, above) else style.addLayer(layer)
     }
 
+    /** Each badge's image: `spot-captured-{category}` for a captured place, `spot-{category}`
+     *  otherwise. */
+    private fun iconImage(): Expression = Expression.switchCase(
+        Expression.`in`(Expression.toNumber(Expression.get("id")), Expression.literal(captured.keys.map { it.toDouble() }.toTypedArray<Any>())),
+        Expression.concat(Expression.literal("spot-captured-"), Expression.get("category")),
+        Expression.concat(Expression.literal("spot-"), Expression.get("category")),
+    )
+
     /** Every layer filtered to the wanted categories and shown, or all hidden with none wanted
-     *  or a track being edited. */
+     *  or a track being edited; the badges drawn captured or not. */
     private fun apply(style: Style) {
         val shown = wanted.isNotEmpty() && !editing
         val visibility = PropertyFactory.visibility(if (shown) Property.VISIBLE else Property.NONE)
@@ -290,33 +311,37 @@ object MapSpots {
             when (layer) {
                 is FillLayer -> layer.setFilter(filters.getValue(id))
                 is LineLayer -> layer.setFilter(filters.getValue(id))
-                is SymbolLayer -> layer.setFilter(filters.getValue(id))
+                is SymbolLayer -> {
+                    layer.setFilter(filters.getValue(id))
+                    layer.setProperties(PropertyFactory.iconImage(iconImage()))
+                }
             }
         }
     }
 
-    /** The five badges, `spot-{category}`, drawn once per style load: a style reload drops its
-     *  images with its layers. */
+    /** The badges, `spot-{category}` and `spot-captured-{category}` for each of the five, drawn
+     *  once per style load: a style reload drops its images with its layers. */
     private fun addImages(style: Style, context: Context) {
         val metrics = context.resources.displayMetrics
         val size = (BADGE_DP * metrics.density).toInt()
         val unit = size / BADGE_DP
-        for (category in Category.entries) {
-            val name = "spot-${category.wire}"
+        for (category in Category.entries) for (isCaptured in listOf(false, true)) {
+            val name = if (isCaptured) "spot-captured-${category.wire}" else "spot-${category.wire}"
             if (style.getImage(name) != null) continue
+            val (fill, ring, ink) = if (isCaptured) Triple(ACCENT, ACCENT_DARK, "#ffffff") else Triple("#ffffff", ACCENT, INK)
             val bitmap = createBitmap(size, size).apply { density = metrics.densityDpi }
             val canvas = Canvas(bitmap)
             val paint = Paint(Paint.ANTI_ALIAS_FLAG)
             paint.style = Paint.Style.FILL
-            paint.color = Color.WHITE
+            paint.color = fill.toColorInt()
             canvas.drawCircle(size / 2f, size / 2f, 13.5f * unit, paint)
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = 2f * unit
-            paint.color = ACCENT.toColorInt()
+            paint.color = ring.toColorInt()
             canvas.drawCircle(size / 2f, size / 2f, 13.5f * unit, paint)
             // Lucide draws in a 24-unit box; 16 of the badge's 30 units leaves a comfortable margin.
             val icon = AppCompatResources.getDrawable(context, category.icon)!!.mutate()
-            icon.setTint(INK.toColorInt())
+            icon.setTint(ink.toColorInt())
             icon.setBounds((7 * unit).toInt(), (7 * unit).toInt(), (23 * unit).toInt(), (23 * unit).toInt())
             icon.draw(canvas)
             style.addImage(name, bitmap)
