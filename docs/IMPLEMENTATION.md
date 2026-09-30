@@ -413,6 +413,19 @@ CREATE TABLE spots (
 CREATE INDEX idx_spots_geom ON spots USING GIST (geom);
 ```
 
+### 3.21 `spot_captures`
+
+Spot captures (§4.25, FR-15.6, ADR-0023) — `migrations/0011_spot_captures.sql`. One row per account and place it captured with the Android app's capture mode; the primary key keeps the first capture, and a row goes with its account or its place.
+
+```sql
+CREATE TABLE spot_captures (
+    user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    spot_id      BIGINT NOT NULL REFERENCES spots(id) ON DELETE CASCADE,
+    captured_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, spot_id)
+);
+```
+
 ---
 
 ## 4. Core Technical Workflows
@@ -1345,7 +1358,9 @@ The app then posts `{code, verifier}` to `POST /v1/auth/handoff` (`handleAuthHan
 
 **Android** (`apps/android/docs/IMPLEMENTATION.md` §3.3) draws the same five layers from the same two sources — the tiles, versioned by `cv` like every other tile, and a GeoJSON source for Show in this area — on top of the stack, with the badges drawn once per style load from the same Lucide icons and seesaw, and Fog's label dimming skipping them. The Layers menu's Points of interest group keeps its choice in SharedPreferences; the popup is a view over the map that follows the spot as the camera moves; and Show in this area calls the same `GET /v1/spots`, the button in the second row of the map's chrome.
 
-**Tested**: `internal/spots/import_test.go` — categories, addresses, feature parsing (osmium's area ids included) and `PlaceText`, with the `wikipedia` forms it drops. `internal/httpapi/spots_tiles_test.go` — the z14 tile carries the spot with its text and its circle in `spot_areas`, the z13 tile the spot, the z12 tile nothing, and it needs a session. `spots_area_test.go` — a box's places by category, named first, and the `400`s and `401`. The web layer was walked in a browser against a dev stack with an imported fixture — the badges, popups and switching from one to the other, Copy address copying coordinates, a click on a spot keeping the focused track, and the layer over the Fog veil — and, with the Cleveland extract, in headless Chromium: the Layers menu, "Show in this area" at zoom 10 loading 912 places and gone below zoom 5, and a statue's popup with its memorial type, date and inscription. The seesaw badge was checked at full size and at 30 px.
+**Captures** (`httpapi/spot_captures.go`, FR-15.6, ADR-0023). The Android app captures a place by keeping its user inside it for 30 s (`apps/android/docs/IMPLEMENTATION.md` §3.3); the server stores it and both maps draw it. `GET /v1/spots/{id}` (`requireVerified`) is what capture mode measures against: the place, `ST_AsGeoJSON(geom, 7)` as `area` — the whole outline, which the tiles' `spot_areas` only has clipped per tile — and the caller's `captured_at` from a `LEFT JOIN`. `POST /v1/spots/{id}/captures` (`requireNotDemo`) checks the phone's last position against the area with `ST_DWithin` on geography within `spotCaptureSlackM` (10 m) — the phone counts only fixes inside, but a fix is a few metres off either way — so a capture can't be sent from across town, and then `INSERT … ON CONFLICT DO NOTHING RETURNING captured_at`: no row back means the place was already captured, answered `200` with the earlier time. `GET /v1/spots/captures` lists the caller's. The captured badge isn't in the tiles: they stay the same for every account (one cache, no tile version bump per capture), and each map styles its badges from that list instead (`id` is in both badge layers). An account's list is its own few places, small enough for a `literal` in a style expression.
+
+**Tested**: `internal/spots/import_test.go` — categories, addresses, feature parsing (osmium's area ids included) and `PlaceText`, with the `wikipedia` forms it drops. `internal/httpapi/spots_tiles_test.go` — the z14 tile carries the spot with its text and its circle in `spot_areas`, the z13 tile the spot, the z12 tile nothing, and it needs a session. `spots_area_test.go` — a box's places by category, named first, and the `400`s and `401`. `spot_captures_test.go` — a place's detail before and after a capture, a position 55 m out refused and 11 m in taken, a repeat keeping the first time, captures per account, the `400`s, `404`s, a demo `403` and a `401`, and captures gone with the account. The web layer was walked in a browser against a dev stack with an imported fixture — the badges, popups and switching from one to the other, Copy address copying coordinates, a click on a spot keeping the focused track, and the layer over the Fog veil — and, with the Cleveland extract, in headless Chromium: the Layers menu, "Show in this area" at zoom 10 loading 912 places and gone below zoom 5, and a statue's popup with its memorial type, date and inscription. The seesaw badge was checked at full size and at 30 px.
 
 ### 4.26 Satellite mode (FR-4.14, ADR-0022)
 

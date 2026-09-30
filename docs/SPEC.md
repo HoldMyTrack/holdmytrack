@@ -1157,6 +1157,9 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 | :-- | :-- |
 | `GET /tiles/v1/spots/{z}/{x}/{y}.mvt` | The places in one tile, and their areas |
 | `GET /v1/spots` | The places in a box — "Show in this area" (FR-15.5) |
+| `GET /v1/spots/{id}` | One place with its whole area, and when the caller captured it (FR-15.6) |
+| `GET /v1/spots/captures` | The places the caller has captured (FR-15.6) |
+| `POST /v1/spots/{id}/captures` | Capture a place (FR-15.6) |
 
 ### FR-15.1 Places
 
@@ -1218,6 +1221,22 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 **Error cases**:
 - No session → `401`. A demo session sees the places too.
 - Non-numeric coordinates → `400`.
+
+### FR-15.6 Captures
+
+**Description**: A place an account has captured by staying inside it for 30 seconds with the Android app's capture mode on (`apps/android/docs/SPEC.md` FR-2.8, ADR-0023). Only the app captures; the web and the app both show what's captured (FR-15.2, FR-15.3). A capture is separate from a visit (ADR-0021), which isn't built.
+
+**Behavior**:
+1. `GET /v1/spots/{id}` answers one place: the fields of FR-15.5's places, `area` — its whole area as a GeoJSON MultiPolygon — and `captured_at` when the caller has captured it (absent otherwise).
+2. `GET /v1/spots/captures` answers `{captures}`: the caller's captured places as `{spot_id, captured_at}`, newest first; an empty list when there are none.
+3. `POST /v1/spots/{id}/captures` takes `{lat, lon}`, the position the phone last measured inside the place. The position must be inside the place's area, or within 10 m of it. The first capture of a place is kept: a new one answers `201`, a repeat `200` with the first one's `captured_at`, both as `{spot_id, captured_at}`.
+4. A capture belongs to its account and is deleted with it, or with its place.
+
+**Error cases**:
+- An unknown place, or an `id` that isn't a positive number → `404`.
+- A body without numeric `lat` and `lon`, or outside ±90/±180 → `400`.
+- A position farther than 10 m outside the place → `422`.
+- No session → `401`. A demo session can read but not capture → `403` (`demo_read_only`).
 
 ## 18. Non-Functional Requirements (summary)
 
