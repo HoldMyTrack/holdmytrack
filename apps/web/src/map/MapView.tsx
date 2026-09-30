@@ -31,15 +31,13 @@ import { getActivityTrackMetrics, type Activity, type ActivityTrackMetrics, type
 import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
 import { ActivitiesPanel, type PanelTab, type StoriesPanel } from '../ui/ActivitiesPanel';
-import { ActivityHistogram } from '../ui/ActivityHistogram';
 import { EditActivityWindow, type EditWindowResult } from '../ui/EditActivityWindow';
 import { ExportControl } from '../ui/ExportControl';
 import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
 import { OverlaysMenu } from '../ui/OverlaysMenu';
 import { ShowInArea } from '../ui/ShowInArea';
 import { SpotPopup } from '../ui/SpotPopup';
-import { dayDiff, dayInZone, todayLocal } from '../ui/dateMath';
-import type { DateRange } from '../ui/RangePicker';
+import { dayInZone, todayLocal, type DateRange } from '../ui/dateMath';
 import { useUnitSystem } from '../ui/units';
 import { useActivityDays } from '../ui/useActivityDays';
 import { useActivityList } from '../ui/useActivityList';
@@ -171,7 +169,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
 
   const today = useMemo(() => todayLocal(), []);
 
-  // Left-panel ActivitiesPanel/ActivityHistogram layout.
+  // Left-panel ActivitiesPanel layout.
   // Selection lives here, not in ActivitiesPanel, since the map instance and the fly-to
   // callbacks below both need it. The panel itself is not optional/toggleable.
   //
@@ -204,7 +202,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   const [trackMetricsVersion, setTrackMetricsVersion] = useState(0);
 
   // The Edit window (EditActivityWindow.tsx) — the checked group it was opened over, by id. While
-  // it's open the panel and timeline are inert and the map's own controls step aside.
+  // it's open the panel is inert and the map's own controls step aside.
   const [editWindowIds, setEditWindowIds] = useState<string[] | null>(null);
   const editOpen = editWindowIds !== null;
   // Its Track tab's session (§4.7.7) — one activity, from the first time that tab opens until
@@ -221,12 +219,11 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     storyParam() !== null ? 'stories' : initialPrivateLocationsOpen ? 'private' : 'activities',
   );
 
-  // The list/summary filter — the highlighted band in the range picker. The picker's own pan
-  // position is not here on purpose: it lives in useActivityDays and the two are independent,
-  // so paging back through history never touches what's selected (see RangePicker.tsx).
+  // The list/summary filter — the Activities tab's date slider (DateRangeSlider.tsx). The
+  // slider's own window position is not here on purpose: it lives in useActivityDays and the
+  // two are independent, so paging back through history never touches what's selected.
   // selectedRange starts null: its real default (the 5 most recent activity-days — see the
-  // effect below) needs the picker's first page of days, which hasn't loaded yet on first
-  // render.
+  // effect below) needs the first page of days, which hasn't loaded yet on first render.
   const [selectedRange, setSelectedRangeState] = useState<DateRange | null>(null);
 
   // The open Story (FR-14.6): while one is open on the Stories tab, the list, the totals, the
@@ -358,10 +355,10 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     loadedKey: activitiesLoadedKey,
   } = useActivityList(activityQuery);
   const { totals, reload: reloadTotals } = useActivityTotals(activityQuery);
-  // Not scoped by activityQuery — FR-3.7's duplicate list, like the histogram, answers "what
+  // Not scoped by activityQuery — FR-3.7's duplicate list, like the slider's days, answers "what
   // happened to my whole history", not "what's in the currently selected date range".
   const duplicates = useDuplicates();
-  // The range picker's own bars and pan position, independent of the selection above — it
+  // The slider's window of days and its pan position, independent of the selection above — it
   // pages by days-with-activity rather than by calendar window, see useActivityDays.
   const {
     visibleDays,
@@ -369,21 +366,17 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     latest,
     loadedStory,
     ready: daysReady,
-    pageStep,
     canPanEarlier,
     canPanLater,
     panBy,
-    reload: reloadHistogram,
+    reload: reloadDays,
     generation: historyGeneration,
-    setBarsPerView,
   } = useActivityDays(storyId);
 
-  // Defaults to the 5 most recent activity-days, not all-time: an all-time default spans
-  // every loaded bar on first paint, which leaves the selection band pinned to both edges
-  // with nowhere to slide — the drag-to-move gesture below has nothing to demonstrate itself
-  // with until the user already knows to shrink the range first. Five recent days starts the
-  // band well short of either edge instead, so sliding it works the first time it's tried.
-  // `visibleDays` is ascending, so its last 5 entries are the most recent 5.
+  // Defaults to the 5 most recent activity-days, not all-time: "what did I do lately" is what
+  // opening the map asks, and a whole history's tracks at once is slow to draw and fit. It also
+  // leaves both knobs inside the slider's window, with room to move either way. `visibleDays`
+  // is ascending, so its last 5 entries are the most recent 5.
   //
   // Deliberately *not* keyed on `visibleDays` (read fresh from the closure instead, without
   // being a dependency) and guarded on `userChangedRangeRef` rather than `selectedRange !==
@@ -396,7 +389,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   // reported live as "the Activities list doesn't pick up a demo's newly uploaded activity",
   // confirmed directly: the row appeared instantly after a manual reload (which re-derives
   // the default fresh against real data) but never on its own. `historyGeneration` (bumped
-  // only by `reloadHistogram`, i.e. a real refetch — never by plain panning, which changes
+  // only by `reloadDays`, i.e. a real refetch — never by plain panning, which changes
   // `visibleDays` just as much but must never re-pick the selection out from under a user
   // who's simply browsing) is what lets this safely reconsider on new data without also
   // firing on every Earlier/Later click.
@@ -425,20 +418,6 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     flyToNextRangeRef.current = pending.fly;
     setSelectedRangeState({ from: earliest ?? today, to: latest ?? today });
   }, [storyId, daysReady, loadedStory, earliest, latest, today, editOpen]);
-
-  // The histogram header's own stats — deliberately not totals.count/distanceMeters, which
-  // ActivitiesPanel's subtext already shows; repeating them in the histogram too would just
-  // be the same two numbers twice. Computed from `activities` (the selectedRange fetch),
-  // not from the picker's `visibleDays`, since that's the pan window and can show a
-  // completely different stretch of history while a selection elsewhere stays put.
-  const selectedRangeDays = useMemo(
-    () => (selectedRange ? dayDiff(selectedRange.from, selectedRange.to) + 1 : 0),
-    [selectedRange],
-  );
-  const selectedActiveDays = useMemo(
-    () => new Set(activities.map((a) => a.startedAt.slice(0, 10))).size,
-    [activities],
-  );
 
   // Rows with a reprocess still pending — an Edit track (§4.7.7) or a Private location change
   // — read by the polling and completion effects further down, by the bands effect, and by
@@ -869,13 +848,13 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     if (map) refreshTrackLayer(map, activityQuery);
     reloadActivities();
     reloadTotals();
-    reloadHistogram();
+    reloadDays();
     storyState.reload();
     // A finished upload/sync is also the one thing that can produce a new duplicate.
     duplicates.refresh();
     // Deletes come through here too (handleActivitiesDeleted), so this covers both.
     watchCoverage();
-  }, [map, activityQuery, reloadActivities, reloadTotals, reloadHistogram, storyState.reload, duplicates.refresh, watchCoverage]);
+  }, [map, activityQuery, reloadActivities, reloadTotals, reloadDays, storyState.reload, duplicates.refresh, watchCoverage]);
 
   // The Sync tab's upload queue and history — held here rather than in the tab, so an upload
   // and its polling survive the panel unmounting (Fog/Heatmap) or showing the other tab.
@@ -883,7 +862,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
 
   // §4.7.5/§4.7.6: one or more deleted activities need the exact same four-part refresh a
   // finished upload does (unlike editing type/description, deleting changes distance/duration
-  // totals and the histogram too) — plus dropping every deleted id from any local selection
+  // totals and the slider's days too) — plus dropping every deleted id from any local selection
   // state that could otherwise still reference it. focusedActivityId is the one that actually
   // matters for correctness: left pointing at a now-deleted id, the pace-colored segments
   // effect would keep trying to fetch track-metrics for an activity that no
@@ -1062,11 +1041,11 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
       if (map) refreshTrackLayer(map, activityQuery);
       reloadActivities();
       reloadTotals();
-      reloadHistogram();
+      reloadDays();
       storyState.reload();
       setTrackMetricsVersion((v) => v + 1);
     });
-  }, [map, activityQuery, reloadActivities, reloadTotals, reloadHistogram, storyState.reload, watchCoverage]);
+  }, [map, activityQuery, reloadActivities, reloadTotals, reloadDays, storyState.reload, watchCoverage]);
   const editWindowActivities = useMemo(() => {
     if (editWindowIds === null) return null;
     const group = activities.filter((a) => editWindowIds.includes(a.id));
@@ -1100,7 +1079,7 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
   }, [pendingIds, reloadActivities]);
 
   // A row that stops being pending has new points, distance and duration: the drawn track,
-  // the totals, the timeline bars and (if it's focused) its bands all need the new version.
+  // the totals, the slider's days and (if it's focused) its bands all need the new version.
   // None of it moves the camera — the row simply reappears where it is (FR-5.15).
   //
   // Fog/Heatmap go through the coverage watch rather than refetching here: the server clears
@@ -1142,10 +1121,10 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
     // Includes the Country/Region tiers, since an edit can un-visit a region too.
     watchCoverage();
     reloadTotals();
-    reloadHistogram();
+    reloadDays();
     storyState.reload();
     setTrackMetricsVersion((v) => v + 1);
-  }, [pendingIds, map, activityQuery, reloadTotals, reloadHistogram, storyState.reload, watchCoverage]);
+  }, [pendingIds, map, activityQuery, reloadTotals, reloadDays, storyState.reload, watchCoverage]);
 
   /**
    * Re-attach anything that is not part of the basemap style.
@@ -1308,6 +1287,14 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
               onTabChange={changePanelTab}
               map={map}
               onPrivateLocationsChanged={handlePrivateLocationsChanged}
+              dateRange={{
+                days: visibleDays,
+                onPan: panBy,
+                canPanEarlier,
+                canPanLater,
+                value: selectedRange ?? { from: today, to: today },
+                onChange: changeSelectedRange,
+              }}
             />
           </div>
         )}
@@ -1380,22 +1367,6 @@ export function MapView({ initialPrivateLocationsOpen = false }: MapViewProps) {
         </div>
       </div>
 
-      {mapMode === 'normal' && (
-        <div className="edit-track-lock" inert={editOpen}>
-          <ActivityHistogram
-            days={visibleDays}
-            onPan={panBy}
-            pageStep={pageStep}
-            canPanEarlier={canPanEarlier}
-            canPanLater={canPanLater}
-            selectedRange={selectedRange ?? { from: today, to: today }}
-            onChangeSelection={changeSelectedRange}
-            selectedRangeDays={selectedRangeDays}
-            selectedActiveDays={selectedActiveDays}
-            onCapacityChange={setBarsPerView}
-          />
-        </div>
-      )}
     </div>
   );
 }

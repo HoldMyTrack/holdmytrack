@@ -184,7 +184,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 ### FR-2.6 Date range
 
-**Description**: A footer along the bottom of the map in Normal mode selects the date range whose tracks are drawn — the web's phone footer (`docs/SPEC.md` §19 item 2) and the same design: a two-knob slider with Earlier/Later buttons either side and the selected start and end dates under it.
+**Description**: A footer along the bottom of the map in Normal mode selects the date range whose tracks are drawn — the web's date slider (`docs/SPEC.md` FR-6) and the same design: a two-knob slider with Earlier/Later buttons either side and the selected start and end dates under it.
 
 **Behavior**:
 1. Shown in Normal mode only, once the session is verified and the account has at least one activity day. Hidden in Fog and Heatmap (which ignore the range, as on the web) and while recording. A full-width bar along the bottom edge, as on the phone web, with the Activities panel (FR-2.7) sitting on it; MapLibre's logo and attribution move up above the collapsed panel while they're shown.

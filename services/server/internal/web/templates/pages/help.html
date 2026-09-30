@@ -5,7 +5,7 @@
     <p class="page-lede">A map of everywhere you have been, built from the activities you have already recorded. Here is how to get them in, what the map shows you, and how to make it yours.</p>
     <nav class="help__toc" aria-label="On this page">
       <a href="#map">The map</a>
-      <a href="#timeline">The timeline</a>
+      <a href="#dates">Choosing dates</a>
       <a href="#stories">Stories</a>
       <a href="#sync">Getting your activities in</a>
       <a href="#export">Exporting a map image</a>
@@ -17,12 +17,12 @@
     <h2>The map</h2>
 
     <h3>What you see when you open it</h3>
-    <p>The map flies to your most recent activity (the <a href="#timeline">timeline</a> below it selects the days around it). The address bar keeps your current position, so a reload brings you back to the same view and a copied link opens it for someone else.</p>
+    <p>The map flies to your most recent activity (the <a href="#dates">date slider</a> on the Activities tab selects the days around it). The address bar keeps your current position, so a reload brings you back to the same view and a copied link opens it for someone else.</p>
 
     <h3>Three ways to look at your history</h3>
     <p>The switch in the top-left corner of the map changes what it shows.</p>
     <ul class="page-list">
-      <li><strong>Normal</strong> draws each activity from the dates selected on the <a href="#timeline">timeline</a> as a line. Filter the list by type or distance, hide the ones you don't want to see, and click a track (or its row in the list) to focus it: it is colored by pace, blue where you were slowest and red where you were fastest.</li>
+      <li><strong>Normal</strong> draws each activity from the <a href="#dates">dates you picked</a> as a line. Filter the list by type or distance, hide the ones you don't want to see, and click a track (or its row in the list) to focus it: it is colored by pace, blue where you were slowest and red where you were fastest.</li>
       <li><strong>Fog of War</strong> covers the world in fog and clears it wherever you have ever been. It is your whole history, all the time: the date range and the filters don't apply here, and a place you once cleared stays clear.</li>
       <li><strong>Heatmap</strong> glows brighter wherever you go more often, over the last 365 days only. Places you haven't visited for a year fade out, so it shows the shape of your life now rather than all time. How bright "a lot" is adapts to your own history, so your busiest route is always the hottest.</li>
     </ul>
@@ -37,17 +37,15 @@
     <p>Normal mode doesn't do this: it draws tracks until a few states fit on screen, and shows the plain map when you zoom out further.</p>
   </section>
 
-  <section class="page-section" id="timeline">
-    <h2>The timeline</h2>
-    <p>The timeline along the bottom of the map chooses which dates you're looking at. When you open the map, it selects your five most recent days that have an activity.</p>
+  <section class="page-section" id="dates">
+    <h2>Choosing dates</h2>
+    <p>The slider at the top of the Activities tab chooses which dates you're looking at: the activities between its two knobs are the ones listed and drawn on the map in Normal mode. When you open the map, it selects your five most recent days that have an activity.</p>
     <ul class="page-list">
-      <li><strong>Each bar is one day</strong> with at least one activity. Days with nothing recorded are left out, so the bars sit side by side however far apart the days were. A taller bar means more distance that day.</li>
-      <li><strong>The highlighted band is your selection.</strong> The activities in it are the ones listed in the Activities panel and drawn on the map in Normal mode.</li>
-      <li><strong>Drag the band's edges</strong> to extend or shorten it, or drag the band itself to move it along. Click a bar outside it to select just that day.</li>
-      <li><strong>Scroll back through your history</strong> with the Earlier and Later buttons, or by dragging the timeline. Scrolling doesn't change what's selected. The dates of both are shown on the left: <em>Shown days</em> and <em>Selected range</em>.</li>
+      <li><strong>Each step on the slider is one day</strong> with at least one activity. Days with nothing recorded are left out, so a quiet month takes no room. It shows fifteen of those days at a time, and the dates you picked are written under it.</li>
+      <li><strong>Drag a knob</strong>, or press the slider near one, to move that end of your selection. Bring the knobs one step apart to pick a single day.</li>
+      <li><strong>Go back through your history</strong> with the Earlier and Later buttons, five days per press, or hold one down. A knob parked on that edge comes along, which is how a selection grows beyond fifteen days; otherwise your selection stays as it was.</li>
     </ul>
-    <p>Choosing new dates clears your filters, hidden tracks and selected activities, since they described the old ones. Fog of War and Heatmap don't use dates, so the timeline is hidden in those modes.</p>
-    <p><strong>On a phone</strong>, the timeline is a slider with two knobs, showing fifteen days at a time. Earlier and Later move it five days, carrying along a knob parked on that edge, which is how a selection grows beyond fifteen days.</p>
+    <p>Choosing new dates clears your filters, hidden tracks and selected activities, since they described the old ones. The Stories, Sync and Privacy tabs don't use dates, and neither do Fog of War and Heatmap, so the slider is only on the Activities tab. On a phone it sits at the bottom of the screen, under the panel.</p>
   </section>
 
   <section class="page-section" id="stories">
@@ -56,7 +54,7 @@
     <ul class="page-list">
       <li><strong>Making one:</strong> check the activities on the Activities tab of the panel, then choose <strong>Create story</strong> (the book with a plus) in its toolbar. Give it a name and, if you like, a description; the new Story opens on the Stories tab.</li>
       <li><strong>Adding and removing activities:</strong> open <strong>Edit</strong> on one activity or several, and tick or clear Stories on its <strong>Stories</strong> tab. Removing an activity from a Story never deletes it.</li>
-      <li><strong>Seeing one:</strong> the panel's <strong>Stories</strong> tab lists them all, newest first, and opens the newest. Click another to open it instead: only its activities are listed under it and drawn on the map, the bottom of the panel shows its totals and a line per activity type, and the timeline covers the Story's days only, so you can still narrow it to part of the trip. Going back to the Activities tab returns you to the dates you were looking at before.</li>
+      <li><strong>Seeing one:</strong> the panel's <strong>Stories</strong> tab lists them all, newest first, and opens the newest. Click another to open it instead: only its activities are listed under it and drawn on the map, the bottom of the panel shows its totals and a line per activity type, whatever dates you had picked. Going back to the Activities tab returns you to the dates you were looking at before.</li>
       <li><strong>Renaming and deleting:</strong> the pencil and the bin beside a Story's name. Hover the name to see them.</li>
       <li><strong>Which activities are in one:</strong> a <strong>Story</strong> badge on an activity's row says it belongs to a Story; hover it to see which.</li>
     </ul>
@@ -96,7 +94,7 @@
     <p>Open <a href="/settings">Settings</a> from the menu under your avatar.</p>
     <ul class="page-list">
       <li><strong>Country</strong> sets your units: miles and feet in the United States, Liberia and Myanmar, kilometers and meters everywhere else.</li>
-      <li><strong>Timezone</strong> decides which calendar day an activity counts on, everywhere the app groups by day: the timeline, the activity grid on your Profile, and trends. It is set from your browser when you sign up; change it if you have moved.</li>
+      <li><strong>Timezone</strong> decides which calendar day an activity counts on, everywhere the app groups by day: the date slider, the activity grid on your Profile, and trends. It is set from your browser when you sign up; change it if you have moved.</li>
       <li><strong>Language</strong> is the language of the pages, the map and our emails. It starts on automatic: whatever your browser is set to.</li>
     </ul>
     <p>When you first sign up, HoldMyTrack asks for your country and timezone before showing your map.</p>

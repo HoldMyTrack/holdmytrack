@@ -4,6 +4,7 @@ import { BookPlus, ChevronDown, ChevronUp, Eye, EyeOff, Focus, Pencil, Trash2 } 
 import { deleteActivity, type Activity, type ActivityTotals, type DuplicateActivity, type Story } from '../api';
 import { ActivityRow, rowLabel, useScrollFocusedRow } from './ActivityRow';
 import { ConfirmDialog } from './ConfirmDialog';
+import { DateRangeSlider, type DateRangeSliderProps } from './DateRangeSlider';
 import { StoryDialog } from './StoryDialog';
 import { DistanceFilter } from './DistanceFilter';
 import { PrivateLocationsPanel } from './PrivateLocationsPanel';
@@ -30,7 +31,12 @@ import { lang, t, tn } from '../i18n';
  * further by TYPE/DISTANCE). MapView owns the fetch, the range, and both filters' state; this
  * component is purely presentational plus its own dropdown-open/panel-resize local UI state.
  *
- * The filters share one row between the subtext line and the toolbar below: the Type dropdown
+ * The date range is the list's first filter: DateRangeSlider.tsx, under the subtext line, on
+ * this tab alone — the other tabs aren't about a stretch of time, so nothing there is filtered
+ * by one. On a phone index.css pins it to the bottom of the screen under the sheet instead, so
+ * the range can still be changed with the sheet collapsed and the map in view.
+ *
+ * The other filters share one row between the slider and the toolbar below: the Type dropdown
  * (TYPE checkboxes plus an "All types" convenience row that clears every exclusion), then
  * DistanceFilter.tsx, always visible — no longer hidden behind the old "Filter" toggle button,
  * which is gone.
@@ -152,6 +158,8 @@ export interface ActivitiesPanelProps {
   map: MapLibreMap | null;
   /** A saved or deleted Private location — MapView's handlePrivateLocationsChanged. */
   onPrivateLocationsChanged: () => void;
+  /** The Activities tab's date slider — MapView's selected range and useActivityDays' window. */
+  dateRange: DateRangeSliderProps;
 }
 
 export type PanelTab = 'activities' | 'stories' | 'sync' | 'private';
@@ -209,6 +217,7 @@ export function ActivitiesPanel({
   onTabChange: setTab,
   map,
   onPrivateLocationsChanged,
+  dateRange,
 }: ActivitiesPanelProps) {
   const hasActiveFilters = excludedTypes.size > 0 || distanceFilter !== null;
 
@@ -390,7 +399,7 @@ export function ActivitiesPanel({
 
   return (
     <div
-      className={`activities-panel${sheetExpanded ? ' activities-panel--sheet-expanded' : ''}`}
+      className={`activities-panel${sheetExpanded ? ' activities-panel--sheet-expanded' : ''}${tab === 'activities' ? ' activities-panel--dated' : ''}`}
       data-testid="activities-panel"
       // A CSS custom property, not a direct `width`, specifically so the mobile media query
       // can override it with a plain `width: 100%` rule — an inline style always beats an
@@ -535,6 +544,9 @@ export function ActivitiesPanel({
         />
       ) : (
         <>
+          <div className="activities-panel__dates">
+            <DateRangeSlider {...dateRange} />
+          </div>
           {/* The two filters side by side: Type's dropdown, then Distance's slider taking the
               rest of the row. */}
           <div className="activities-panel__filters">

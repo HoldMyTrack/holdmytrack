@@ -589,9 +589,9 @@ export async function getActivityTotals(query: ActivityQuery = {}, signal?: Abor
 
 /**
  * One day of §4.7's histogram — a day that actually has activities. Days with none are
- * simply absent, at every level: the endpoint never returns them, and the range picker's
- * strip never draws a slot for one (RangePicker.tsx), so a bar's neighbours are the
- * adjacent days the user *recorded*, however far apart their real dates are.
+ * simply absent, at every level: the endpoint never returns them, and the date slider never
+ * gives one a slot (DateRangeSlider.tsx), so a day's neighbours are the adjacent days the user
+ * *recorded*, however far apart their real dates are.
  */
 export interface HistogramBucket {
   date: string;
@@ -608,7 +608,7 @@ export interface ActivityDayPage {
   /** Ascending by date, exactly `limit` entries unless the history ran out. */
   days: HistogramBucket[];
   /** This user's first activity's UTC day, or null if they have none — how far back the
-   *  range picker's strip can keep paging, independent of this page's own bounds. */
+   *  date slider can keep paging, independent of this page's own bounds. */
   earliest: string | null;
 }
 
@@ -632,11 +632,11 @@ export interface DayPageQuery {
 /**
  * `GET /v1/activities/histogram?days=&before=` — §4.7's activity-day pagination mode.
  *
- * Never takes the type/distance filter: this is the whole timeline a selected sub-range is
- * highlighted against, not a view of the current one — except `story`: inside a Story, the
- * Story is the whole timeline (FR-14.4). It pages by *days that have activity*
- * rather than by calendar window because that is what the strip draws — one bar per such
- * day, packed — so a page is exactly `limit` bars however sparse the underlying history is.
+ * Never takes the type/distance filter: this is the whole history a range is picked from, not a
+ * view of the current one — except `story`: inside a Story, the Story is the whole history
+ * (FR-14.4). It pages by *days that have activity* rather than by calendar window because that
+ * is what the slider's slots are — one per such day, packed — so a page is exactly `limit`
+ * days however sparse the underlying history is.
  * The endpoint's other mode (`from`/`to`, a real calendar window) has no reader here; §4.8's
  * planned year grid is the thing that wants it.
  */

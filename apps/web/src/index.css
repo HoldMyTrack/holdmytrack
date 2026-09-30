@@ -34,7 +34,7 @@ body {
   width: 100%;
 }
 
-/* A row (sidebar + map), then the histogram footer — under the page's own header. */
+/* A row (sidebar + map) under the page's own header. */
 .app-body {
   display: flex;
   flex: 1;
@@ -977,277 +977,6 @@ body {
   border-top: 0;
 }
 
-/* Two regions side by side, not a header row above a full-width chart: a legend column sized
-   to match the Activities panel's own current width (`var(--panel-width)`, the same custom
-   property that panel already sets on itself — reusing it is what keeps this row visually
-   aligned with the sidebar above it even as that panel is resized, with no JS of its own
-   needed for that), and a chart area filling the rest, flanked directly by the Earlier/Later
-   buttons instead of sharing a header row with them. */
-.activity-histogram {
-  box-sizing: border-box;
-  flex: none;
-  display: flex;
-  height: 104px;
-  background: var(--fm-surface);
-  border-top: 1px solid var(--fm-border);
-}
-
-/* One stacked block, not two side-by-side halves — found live: splitting the column's width
-   in two left each date range (e.g. "14 SEP 2026 – 19 SEP 2026") only about half the column's
-   own width to render in, which truncated mid-number well before the text actually ran out of
-   room to matter. Stacked, each block gets the legend's full width instead. */
-/* Sized to its own content now, not to the Activities panel's width — the sidebar can be
-   dragged from 260px to 560px (ActivitiesPanel.tsx's own panelWidth state), and there's no
-   reason the date picker beside it should shrink or grow along with that drag. Shrink-wrapped
-   to whichever line of text is actually widest, so the chart area (`flex: 1` below) gets
-   whatever's left over — as much room as the strip can have. */
-.activity-histogram__legend {
-  flex: none;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: var(--fm-space-8);
-  padding: var(--fm-space-10) var(--fm-space-16);
-  border-right: 1px solid var(--fm-border);
-}
-
-.activity-histogram__legend-block {
-  flex: none;
-  min-width: 0;
-  text-align: right;
-}
-
-.activity-histogram__legend-label {
-  margin-bottom: var(--fm-space-2);
-  font-size: var(--fm-text-3xs);
-  font-weight: var(--fm-weight-bold);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--fm-ink-muted);
-}
-
-.activity-histogram__range-label {
-  font-weight: var(--fm-weight-semibold);
-  font-size: var(--fm-text-2xs);
-  color: var(--fm-ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.activity-histogram__stats {
-  margin-top: 1px;
-  font-size: var(--fm-text-3xs);
-  color: var(--fm-ink-muted);
-}
-
-.activity-histogram__chart-area {
-  flex: 1;
-  min-width: 0;
-  box-sizing: border-box;
-  display: flex;
-  /* stretch, not center: the chart and the Earlier/Later buttons fill this box's height (only
-     the small vertical padding below is left as a gap), rather than sitting at a fixed height
-     centered inside a much taller box. */
-  align-items: stretch;
-  gap: var(--fm-space-10);
-  padding: var(--fm-space-6) var(--fm-space-24);
-}
-
-/* Earlier/Later — icon-only now, flanking the chart directly. Active/inactive is a real
-   visual distinction, not just :disabled's default dimming: enabled reads as a tinted,
-   clickable chip; disabled drops back to a plain, faint outline so "nothing further that
-   way" is obvious before a click fails. canPanEarlier/canPanLater (useActivityDays.ts)
-   already gate `disabled` correctly — this only restyles the two states. */
-.range-picker__page {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* Taller and thinner than a typical button — it flanks the full-height chart beside it now,
-     not a fixed 56px strip, so width shrank to match rather than looking squat next to it. */
-  width: 19px;
-  border: 1px solid var(--fm-border-panel);
-  border-radius: var(--fm-radius-md);
-  padding: 0;
-  background: var(--fm-surface-tint);
-  color: var(--fm-ink);
-  cursor: pointer;
-}
-
-.range-picker__page:hover:not(:disabled) {
-  background: var(--fm-surface-tint-strong);
-}
-
-.range-picker__page:disabled {
-  background: var(--fm-surface);
-  border-color: var(--fm-divider-tint);
-  color: var(--fm-ink-faint);
-  cursor: not-allowed;
-}
-
-/* The chart itself: bars, the draggable selection band and its handles, and the month
-   labels, all absolutely positioned within this one relative box. touch-action: none keeps
-   a touchscreen drag from also trying to scroll the page while dragging a handle. No explicit
-   height — `align-items: stretch` on its parent (.activity-histogram__chart-area) is what
-   fills it to the same full height the Earlier/Later buttons beside it stretch to, both
-   bounded only by that container's own small vertical padding. flex: 1 still controls its
-   *width*, unaffected by the cross-axis sizing. */
-.range-picker__chart {
-  position: relative;
-  flex: 1;
-  touch-action: none;
-  /* Belt-and-braces alongside RangePicker.tsx's beginDrag preventDefault(): stops a drag that
-     wanders near the month labels' text from starting a browser text selection at all, which
-     is what let Firefox reinterpret a later drag (a handle included) as "drag the selection"
-     instead of delivering it to us as pointer events. */
-  user-select: none;
-  cursor: grab;
-}
-
-.range-picker__chart:active {
-  cursor: grabbing;
-}
-
-/* The selected sub-range, drawn over the bars rather than replacing them. Stays
-   pointer-events: none deliberately — RangePicker.tsx's onChartPointerDown does the
-   "is this click inside the band" hit-test in JS instead, specifically so this div never
-   captures a bar's hover underneath it (a selection commonly covers most of the strip, so
-   most bars would otherwise never show their own tooltip while selected). Its two children
-   are the edge-resize handles, each `pointer-events: auto` on its own — a child can opt back
-   into pointer events even under a `none` parent, so they stay grabbable regardless. */
-.range-picker__selection {
-  position: absolute;
-  top: 0;
-  bottom: 20px;
-  z-index: 2;
-  background: rgb(var(--fm-accent-rgb) / 14%);
-  border-left: 2px solid var(--fm-accent);
-  border-right: 2px solid var(--fm-accent);
-  pointer-events: none;
-}
-
-.range-picker__handle {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 14px;
-  cursor: ew-resize;
-  pointer-events: auto;
-  touch-action: none;
-}
-
-.range-picker__handle--start {
-  left: -7px;
-}
-
-.range-picker__handle--end {
-  right: -7px;
-}
-
-/* One slot per day *that has activity* — empty days get nothing, so bars are packed.
-   justify-content: flex-end is what pushes a short history's bars against the right edge
-   (the most-recent end) instead of stretching them across the whole width — RangePicker.tsx
-   measures the packed group's actual rendered width (`packedFraction`) and uses it, not a
-   flat `days.length` share of the full chart, to place the selection band and month ticks so
-   they still land exactly on the (now right-aligned) bars. */
-.range-picker__bars {
-  position: absolute;
-  inset: 4px 0 20px;
-  z-index: 1;
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
-  gap: 1px;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-/* flex-grow: 0 — a slot never grows past its own bar's width even when there's leftover
-   room, which is what stops a sparse history from spreading its few bars across the full
-   width (previously flex: 1, the "weird" look this replaced). flex-shrink: 1 is kept: once
-   more days are on screen than fit at full width (a long, dense history), slots still
-   compress together exactly as before rather than overflowing. */
-.range-picker__slot {
-  flex: 0 1 10px;
-  min-width: 0;
-  height: 100%;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
-
-/* Capped width so a six-day history draws six bars rather than six slabs; the slot around
-   it still carries the layout, so capping this changes nothing about the band's alignment.
-   12px (was 22px) to match docs/UI/main-screen-v6.png's own thin, tightly-packed bars —
-   paired with useActivityDays.ts's BARS_PER_VIEW increase, which is what keeps a full
-   screen's slots close to this width instead of each bar floating in a much wider one.
-   pointer-events back on for the per-bar date tooltip. */
-.range-picker__bar {
-  width: 100%;
-  max-width: 10px;
-  background: rgb(var(--fm-ink-rgb) / 18%);
-  border-radius: var(--fm-radius-xs) var(--fm-radius-xs) 0 0;
-  pointer-events: auto;
-}
-
-/* No transition on either rule — the response has to be instant, not eased in, since this is
-   the only feedback a hover gets before the native title tooltip's own delay catches up. */
-.range-picker__bar:hover {
-  background: rgb(var(--fm-accent-rgb) / 55%);
-}
-
-.range-picker__bar--selected {
-  background: rgb(var(--fm-accent-rgb) / 75%);
-}
-
-.range-picker__bar--selected:hover {
-  background: var(--fm-accent);
-}
-
-/* Month labels sit under the first bar of their month, at that bar's real slot position —
-   never spread evenly, which with packed bars would imply an even spacing through time that
-   isn't there. RangePicker drops any label too close to the previous one. */
-.range-picker__months {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 20px;
-  border-top: 1px solid rgb(var(--fm-ink-rgb) / 10%);
-  /* Takes pointer events so it can be grabbed to pan — see RangePicker's note on why the
-     chart needs one surface a selection band can never cover. The labels on it stay inert
-     so a drag that starts on a label still reaches this rail. */
-  cursor: grab;
-}
-
-.range-picker__month {
-  position: absolute;
-  top: 4px;
-  pointer-events: none;
-  font-size: var(--fm-text-2xs);
-  color: rgb(var(--fm-ink-rgb) / 45%);
-  transform: translateX(-50%);
-  white-space: nowrap;
-}
-
-/* A label centered on a bar that's genuinely at (or past) the chart's own left/right edge —
-   found live logged in as the demo account, which seeds enough packed history for the very
-   first bar to land at left: 0% — would have roughly half its own text width extending past
-   that edge, previously overlapping the Earlier/Later button beside the chart entirely.
-   RangePicker.tsx applies these only when the tick's own position is actually that close to
-   an edge (most ticks, including a short history's own first one sitting well inside blank
-   space, still center normally) — anchoring the label's edge to the tick instead of its
-   center keeps the full label on screen rather than clipping or overlapping it. */
-.range-picker__month--start {
-  transform: translateX(0);
-}
-
-.range-picker__month--end {
-  transform: translateX(-100%);
-}
-
 .map-root {
   position: relative;
   flex: 1;
@@ -2027,7 +1756,7 @@ body {
   gap: var(--fm-space-4);
 }
 
-/* MapView wraps the Activities panel and the timeline in this for the session, `inert` while
+/* MapView wraps the Activities panel in this for the session, `inert` while
    a track is being edited. display: contents keeps the wrapper out of the flex layout; the
    dimming goes on its children, since a display: contents box has no rendering of its own. */
 .edit-track-lock {
@@ -2446,10 +2175,8 @@ body {
    mobile-support note and technical_implementation_plan.md §5.9 for the full account. */
 @media (max-width: 768px) {
   /* Defensive backstop, not a fix for a specific known overflow (those are fixed at their
-     own source below, e.g. the histogram header) — a few elements deliberately extend
-     slightly past their own logical box on purpose here (the range-picker handles' widened
-     hit area is `left: -15px`/`right: -15px` by design), and a phone browser turns any
-     stray horizontal overflow into a rubber-banding scroll the whole page shouldn't have. */
+     own source below) — a phone browser turns any stray horizontal overflow into a
+     rubber-banding scroll the whole page shouldn't have. */
   html,
   body {
     overflow-x: hidden;
@@ -2461,7 +2188,7 @@ body {
 
   /* The page's height is the visible area, not `height: 100%`'s: a phone browser's toolbar
      slides in and out, and the percentage and `vh` can both resolve to the taller,
-     toolbar-hidden height — which put the date footer, anchored to the bottom, under the
+     toolbar-hidden height — which put the date slider, anchored to the bottom, under the
      toolbar. `dvh` follows the toolbar as it moves. Not reproducible in desktop emulation,
      which has no toolbar. */
   body.app-page {
@@ -2469,26 +2196,33 @@ body {
   }
 
   /* iOS Safari zooms the page in on focusing any text field under 16px and doesn't zoom back
-     out, leaving the fixed sheet and footer off-screen — the interface's inputs are 14px
+     out, leaving the fixed sheet and date slider off-screen — the interface's inputs are 14px
      (--fm-text-lg). `:is()` takes its most specific argument's weight, (0,1,1), so this
      outranks the single-class input rules above it without naming each one. */
   :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='file']), select, textarea) {
     font-size: 16px;
   }
 
-  /* The phone footer (DateRangeSlider.tsx) sits at the very bottom of the screen and the
-     collapsed Activities sheet's peek strip stacks directly on top of it — both fixed
-     heights, so the sheet can be anchored to the footer's top edge with no measuring. */
+  /* On the Activities tab the date slider (DateRangeSlider.tsx) sits at the very bottom of the
+     screen and the collapsed Activities sheet's peek strip stacks directly on top of it — both
+     fixed heights, so the sheet can be anchored to the slider's top edge with no measuring. On
+     the other tabs there is no slider and the sheet sits on the bottom edge itself
+     (`--sheet-bottom`, set per tab below). */
   :root {
     --phone-footer-height: 76px;
     --phone-sheet-peek: 68px;
   }
 
-  /* Reserves the peek strip under the map, so the map's own bottom-anchored controls (the
-     scale control and attribution) end above the sheet rather than
-     under it. Only while the sheet exists — it renders in Normal map mode alone. */
+  /* Reserves the peek strip (and on the Activities tab the slider under it) under the map, so
+     the map's own bottom-anchored controls (the scale control and attribution) end above the
+     sheet rather than under it. Only while the sheet exists — it renders in Normal map mode
+     alone. */
   .app-body:has(.activities-panel) {
     padding-bottom: var(--phone-sheet-peek);
+  }
+
+  .app-body:has(.activities-panel--dated) {
+    padding-bottom: calc(var(--phone-sheet-peek) + var(--phone-footer-height));
   }
 
   /* The Activities panel becomes a bottom sheet: `position: fixed` removes it from
@@ -2497,15 +2231,16 @@ body {
      needed at all. Collapsed by default (ActivitiesPanel.tsx's `sheetExpanded`, `false`
      initially) to a slim peek strip — the map stays fully interactive around and under it;
      expanding it (tapping the subtext button) grows it upward to cover most of the screen.
-     Anchored to the date-range footer's top edge, not the viewport's bottom, so the footer
-     stays visible under the sheet in either state. No `map.resize()` call is needed either
+     On the Activities tab anchored to the date slider's top edge, not the viewport's bottom,
+     so the slider stays visible under the sheet in either state. No `map.resize()` call is needed either
      way, since the map's own container dimensions never change with the sheet's state —
      only what's drawn on top of it does. */
   .activities-panel {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: var(--phone-footer-height);
+    --sheet-bottom: 0px;
+    bottom: var(--sheet-bottom);
     width: 100%;
     height: var(--phone-sheet-peek);
     border-right: none;
@@ -2517,9 +2252,13 @@ body {
     transition: height 0.15s ease;
   }
 
+  .activities-panel--dated {
+    --sheet-bottom: var(--phone-footer-height);
+  }
+
   /* Its top edge stays where it was when the sheet sat on the viewport's bottom. */
   .activities-panel--sheet-expanded {
-    height: calc(78dvh - var(--phone-footer-height));
+    height: calc(78dvh - var(--sheet-bottom));
   }
 
   /* Edit track is started from the sheet's toolbar, so the sheet is expanded at that moment —
@@ -2590,15 +2329,30 @@ body {
     padding: var(--fm-space-8) var(--fm-space-6);
   }
 
-  /* The phone footer is just DateRangeSlider.tsx — ActivityHistogram.tsx swaps out the bar
-     chart and legend below this breakpoint, so none of their desktop rules need a phone
-     variant. A fixed height (its content is one 32px row plus one label line), since the
-     Activities sheet is anchored to its top edge by that same number. */
-  .activity-histogram--compact {
+  /* The date slider leaves the sheet for the bottom of the screen, so the range can be changed
+     with the sheet collapsed and the map in view. Still rendered by the panel (fixed
+     positioning escapes its `overflow: hidden`), so it comes and goes with the Activities tab.
+     A fixed height (its content is one 32px row plus one label line), since the sheet is
+     anchored to its top edge by that same number. */
+  .activities-panel__dates {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    box-sizing: border-box;
     height: var(--phone-footer-height);
+    display: flex;
     align-items: center;
     padding: 0 var(--fm-space-12);
+    background: var(--fm-surface);
+    border-top: 1px solid var(--fm-border);
   }
+}
+
+/* On the Activities tab, the list's first filter: between the subtext line and the Type/Distance
+   row. */
+.activities-panel__dates {
+  padding: var(--fm-space-4) var(--fm-space-16) var(--fm-space-10);
 }
 
 /* DateRangeSlider.tsx — the track line and accent fill are DistanceFilter's own
@@ -2612,7 +2366,9 @@ body {
   width: 100%;
 }
 
-/* Earlier · track · Later. The buttons reuse the desktop footer's .range-picker__page look. */
+/* Earlier · track · Later. Active/inactive is a real visual distinction, not just :disabled's
+   default dimming: enabled reads as a tinted, clickable chip; disabled drops back to a plain,
+   faint outline so "nothing further that way" is obvious before a press fails. */
 .date-range-slider__row {
   display: flex;
   align-items: center;
@@ -2620,9 +2376,30 @@ body {
 }
 
 .date-range-slider__page {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 32px;
   height: 32px;
+  border: 1px solid var(--fm-border-panel);
+  border-radius: var(--fm-radius-md);
+  padding: 0;
+  background: var(--fm-surface-tint);
+  color: var(--fm-ink);
+  cursor: pointer;
   touch-action: none;
+}
+
+.date-range-slider__page:hover:not(:disabled) {
+  background: var(--fm-surface-tint-strong);
+}
+
+.date-range-slider__page:disabled {
+  background: var(--fm-surface);
+  border-color: var(--fm-divider-tint);
+  color: var(--fm-ink-faint);
+  cursor: not-allowed;
 }
 
 .date-range-slider__track {

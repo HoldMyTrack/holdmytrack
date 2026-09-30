@@ -51,8 +51,8 @@ type Tab = 'activity' | 'track' | 'stories';
  * it up. Cancel (or Escape) discards whatever wasn't written.
  *
  * Floating, not a modal `<dialog>` as the Activity form alone once was: the Track tab edits on
- * the map, and a modal would make the map inert. MapView makes the Activities panel and the
- * timeline inert instead while the window is open — the window edits the checked group, which
+ * the map, and a modal would make the map inert. MapView makes the Activities panel inert
+ * instead while the window is open — the window edits the checked group, which
  * must not change underneath it.
  *
  * Type is ActivityTypePicker.tsx — the same searchable picker as Settings' Country and

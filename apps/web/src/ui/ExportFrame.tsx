@@ -73,10 +73,10 @@ interface DragState {
  * dropdown, Close, Capture), which flips inside the frame when there's no room above it.
  *
  * Pointer-capture drag, not a drag library — this app hand-rolls every drag interaction
- * (`RangePicker.tsx`, `ActivitiesPanel.tsx`'s panel-width handle) the same way: `onPointerDown`
+ * (`DateRangeSlider.tsx`, `ActivitiesPanel.tsx`'s panel-width handle) the same way: `onPointerDown`
  * calls `setPointerCapture` and stashes start state in a ref, `onPointerMove` reads it back and
- * calls `event.preventDefault()` up front per `RangePicker.tsx`'s own documented note on why
- * (Firefox hijacks a later drag into a native ghost-image drag once a pointer path crosses text).
+ * calls `event.preventDefault()` up front (Firefox hijacks a later drag into a native ghost-image
+ * drag once a pointer path crosses text).
  */
 export function ExportFrame({
   map,

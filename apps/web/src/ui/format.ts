@@ -102,8 +102,7 @@ export function formatShortDate(iso: string): string {
   return d.toLocaleDateString(lang, { day: 'numeric', month: 'short' });
 }
 
-/** "9 MAR 2026" — the date-range footer's labels (ActivityHistogram.tsx's legend, the mobile
- *  DateRangeSlider.tsx), per main-screen-v6.png. Takes a YYYY-MM-DD day, read as UTC so the
+/** "9 MAR 2026" — the date slider's labels (DateRangeSlider.tsx), per main-screen-v6.png. Takes a YYYY-MM-DD day, read as UTC so the
  *  label is exactly that calendar day in every browser time zone. */
 export function formatDayLabel(date: string): string {
   const d = new Date(`${date}T00:00:00Z`);

@@ -3,28 +3,23 @@ import type { KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as Reac
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { HistogramBucket } from '../api';
 import { formatDayLabel } from './format';
-import type { DateRange } from './RangePicker';
+import type { DateRange } from './dateMath';
 import { t, tn } from '../i18n';
 
 export interface DateRangeSliderProps {
-  /** The window: consecutive days-with-activity, ascending — useActivityDays' `visibleDays`,
-   *  sized to WINDOW_DAYS by this component's own `onCapacityChange` report. */
+  /** The window: WINDOW_DAYS consecutive days-with-activity, ascending — useActivityDays'
+   *  `visibleDays`. */
   days: HistogramBucket[];
   /** Moves the window by whole activity-days — negative is toward the past. */
   onPan: (deltaDays: number) => void;
   canPanEarlier: boolean;
   canPanLater: boolean;
-  /** Reported once on mount, so useActivityDays windows exactly WINDOW_DAYS. */
-  onCapacityChange: (daysPerView: number) => void;
   value: DateRange;
   onChange: (next: DateRange) => void;
 }
 
 type Knob = 'start' | 'end';
 
-/** How many activity-days the track shows edge to edge — ~18px a day on a phone, wide enough
- *  for two knobs one day apart to sit clearly side by side. */
-export const WINDOW_DAYS = 15;
 /** How far one Earlier/Later tap moves the window, in activity-days. */
 const STEP_DAYS = 5;
 
@@ -33,16 +28,14 @@ const REPEAT_DELAY_MS = 400;
 const REPEAT_INTERVAL_MS = 180;
 
 /**
- * The phone footer's date-range control, in place of RangePicker.tsx's bar chart: a plain
- * two-knob slider with the selected dates under it — the look of the Activities panel's
- * DistanceFilter.tsx (its `.activity-filters__track`/`__fill` rules) with finger-height knobs.
- * The bar chart's bars, handles and month rail are far too small for a fingertip on a
- * phone-width strip, so a phone gets this instead.
+ * The date-range control (`SPEC.md` FR-6), on the Activities tab alone: a plain two-knob slider
+ * with Earlier/Later either side and the selected dates under it — the look of the Activities
+ * panel's DistanceFilter.tsx (its `.activity-filters__track`/`__fill` rules) with finger-height
+ * knobs. The same control on a desktop and a phone; only where it sits differs (index.css).
  *
- * **Activity-days, not calendar days** — the same packed scale as RangePicker: one slot per day
- * the user recorded something, none for the days between, so a quiet month costs no track.
- * The window, its paging and the history fetches behind them are useActivityDays', exactly as
- * for the bar chart; this only asks it for WINDOW_DAYS days at a time.
+ * **Activity-days, not calendar days**: one slot per day the user recorded something, none for
+ * the days between, so a quiet month costs no track. The window, its paging and the history
+ * fetches behind them are useActivityDays'.
  *
  * **Knobs sit on slot boundaries, not on slots.** The start knob marks where the first selected
  * day begins and the end knob where the last one ends, so a one-day selection has its knobs one
@@ -52,10 +45,10 @@ const REPEAT_INTERVAL_MS = 180;
  * **Paging.** Earlier/Later move the window STEP_DAYS per tap (repeating while held). A knob
  * sitting on the edge the window moves toward is pulled along with it, which is how a selection
  * grows past the window: park the start knob on the left edge and tap Earlier. The knob on the
- * side being moved toward therefore never scrolls out of view; only the far one can, and — like
- * RangePicker's band — it simply isn't drawn until the window comes back to it, its date still
- * in the label under the track. The pull lands once the moved window has rendered (the days
- * before it may still be loading), so a tap's commit waits for that too.
+ * side being moved toward therefore never scrolls out of view; only the far one can, and it
+ * simply isn't drawn until the window comes back to it, its date still in the label under the
+ * track. The pull lands once the moved window has rendered (the days before it may still be
+ * loading), so a tap's commit waits for that too.
  *
  * Hand-rolled pointer handling on the whole track rather than two stacked native range inputs
  * (which always hand a drag to whichever input is on top): a press moves whichever knob is
@@ -63,15 +56,13 @@ const REPEAT_INTERVAL_MS = 180;
  * carries it. Each knob is also a focusable `role="slider"`.
  *
  * Knob drags and held buttons render from a local draft and commit only on release, so the
- * activity list isn't refetched for every day passed — the same reason RangePicker commits
- * only on release.
+ * activity list isn't refetched for every day passed.
  */
 export function DateRangeSlider({
   days,
   onPan,
   canPanEarlier,
   canPanLater,
-  onCapacityChange,
   value,
   onChange,
 }: DateRangeSliderProps) {
@@ -81,8 +72,6 @@ export function DateRangeSlider({
   /** A pan asked for and not yet rendered, the knobs it pulls along, and whether the gesture
    *  has ended and should commit once it lands. */
   const panRef = useRef<{ start: boolean; end: boolean; commit: boolean } | null>(null);
-
-  useEffect(() => onCapacityChange(WINDOW_DAYS), [onCapacityChange]);
 
   const [draft, setDraft] = useState<DateRange | null>(null);
   const current = draft ?? value;
@@ -210,10 +199,10 @@ export function DateRangeSlider({
   const pageButton = (dir: -1 | 1) => (
     <button
       type="button"
-      className="range-picker__page date-range-slider__page"
+      className="date-range-slider__page"
       data-testid={dir < 0 ? 'date-range-slider-earlier' : 'date-range-slider-later'}
       aria-label={dir < 0 ? tn('slider.days_earlier', STEP_DAYS) : tn('slider.days_later', STEP_DAYS)}
-      title={dir < 0 ? t('histogram.earlier') : t('histogram.later')}
+      title={dir < 0 ? t('slider.earlier') : t('slider.later')}
       disabled={dir < 0 ? !canPanEarlier : !canPanLater}
       onPointerDown={(event) => startRepeat(dir, event)}
       onPointerUp={stopRepeat}
