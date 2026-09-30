@@ -357,6 +357,7 @@
   text-decoration: none;
 }
 
+.info-menu__trigger svg,
 .upload-menu__trigger svg,
 .sync-link svg {
   flex: none;
@@ -447,8 +448,8 @@
 }
 
 /* Between phone and wide desktop the full-size controls don't all fit beside the brand, in
-   Russian above all ("Синхронизация"): the tagline gives way first, then Upload and Sync keep
-   their icons alone, as on a phone. */
+   Russian above all ("Синхронизация"): the tagline gives way first, then Upload, Sync and Info
+   keep their icons alone, as on a phone. */
 @media (max-width: 1180px) {
   .page-header__divider,
   .page-header__tagline {
@@ -458,7 +459,8 @@
 
 @media (max-width: 960px) {
   .upload-menu__label,
-  .sync-link__label {
+  .sync-link__label,
+  .info-menu__label {
     display: none;
   }
 }
@@ -475,18 +477,13 @@
     gap: 2px;
   }
 
-  /* Info and the avatar must still fit beside the brand on a 320px screen: the controls go
-     back to compact — 13px text, 16px icons, a 32px avatar. */
+  /* Every control must still fit beside the brand on a 320px screen: they go back to compact,
+     icons alone — 16px icons, a 32px avatar. */
   .info-menu__trigger {
     padding: 6px;
-    font-size: 13px;
   }
 
-  /* Its caret too: with Upload and Sync beside it, "Инфо" and a caret run past a 360px screen. */
-  .info-menu__caret {
-    display: none;
-  }
-
+  .info-menu__trigger svg,
   .upload-menu__trigger svg,
   .sync-link svg {
     width: 16px;
@@ -527,7 +524,8 @@
   .page-header__tagline,
   .donate-button__label,
   .upload-menu__label,
-  .sync-link__label {
+  .sync-link__label,
+  .info-menu__label {
     display: none;
   }
 
