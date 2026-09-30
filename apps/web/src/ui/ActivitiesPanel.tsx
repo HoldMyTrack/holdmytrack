@@ -106,12 +106,12 @@ export interface ActivitiesPanelProps {
   onClearFocus: () => void;
   /** The row's own hover preview, `null` on leave — see the component doc comment above. */
   onHoverActivity: (id: string | null) => void;
-  /** Empties the checked group — the header checkbox's "uncheck all" state. */
+  /** Empties the checked group — the header checkbox's "uncheck all", and its menu's None. */
   onClear: () => void;
-  /** Checks every currently-listed row — the header checkbox's "check all" state. */
+  /** Checks every currently-listed row — the header checkbox's "check all", and its menu's All. */
   onSelectAll: () => void;
-  /** Checks every unchecked listed row and unchecks every checked one — the toolbar's
-   *  invert-selection icon beside the header checkbox. */
+  /** Checks every unchecked listed row and unchecks every checked one — the header checkbox's
+   *  menu's Invert. */
   onInvertSelection: () => void;
   /** Flies to fit the toolbar's target without changing it. */
   onShowSelected: () => void;
@@ -211,6 +211,25 @@ export function ActivitiesPanel({
   // toggle button had. Dismiss on outside click or Escape.
   const [typeFilterOpen, setTypeFilterOpen] = useState(false);
   const typeFilterRef = useRef<HTMLDivElement>(null);
+
+  // The header checkbox's ▾ menu — All, None, Invert, as in a mail app. Same dismissal.
+  const [selectMenuOpen, setSelectMenuOpen] = useState(false);
+  const selectMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!selectMenuOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!selectMenuRef.current?.contains(event.target as Node)) setSelectMenuOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [selectMenuOpen]);
 
   // The row list, for useScrollFocusedRow (ActivityRow.tsx): a newly focused row scrolls into view.
   const listRef = useRef<HTMLUListElement>(null);
@@ -540,8 +559,8 @@ export function ActivitiesPanel({
 
           {/* The header toolbar — right above the row list. There are no per-row action icons
               to stay column-aligned with (Visible/Edit/Delete all live here, operating on the
-              toolbar's target), so this is a plain compact strip: select-all checkbox, the
-              invert-selection icon, a spacer, the action chips, a divider, then the one
+              toolbar's target), so this is a plain compact strip: select-all checkbox and its
+              ▾ menu (All, None, Invert), a spacer, the action chips, a divider, then the one
               accent-tinted "focus the map on the target" action. */}
           <div className="activities-panel__toolbar">
             <input
@@ -554,33 +573,47 @@ export function ActivitiesPanel({
               title={allChecked ? t('activities.uncheck_all') : t('activities.check_all')}
               onChange={() => (allChecked || someChecked ? onClear() : onSelectAll())}
             />
-            <button
-              type="button"
-              className="activities-panel__invert"
-              disabled={activities.length === 0}
-              onClick={onInvertSelection}
-              aria-label={t('activities.invert')}
-              title={t('activities.invert_title')}
-            >
-              {/* A checkbox-sized square split on the diagonal, one half filled — reads as a
-                  sibling of the select-all checkbox beside it rather than a separate text chip.
-                  Lucide has no such glyph, so it's drawn to Lucide's own geometry (its `square`:
-                  24-unit grid, 2-unit stroke, rx 2) to stay one family with the rest. */}
-              <svg
-                viewBox="0 0 24 24"
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinejoin="round"
-                aria-hidden="true"
-                focusable="false"
+            <div className="select-menu" ref={selectMenuRef}>
+              <button
+                type="button"
+                className="select-menu__trigger"
+                data-testid="select-menu"
+                disabled={activities.length === 0}
+                aria-haspopup="menu"
+                aria-expanded={selectMenuOpen}
+                aria-label={t('activities.select_menu')}
+                title={t('activities.select_menu')}
+                onClick={() => setSelectMenuOpen((open) => !open)}
               >
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <path d="M21 3v16a2 2 0 0 1-2 2H3Z" fill="currentColor" />
-              </svg>
-            </button>
+                <ChevronDown size={12} />
+              </button>
+              {selectMenuOpen && (
+                <div className="story-menu__panel select-menu__panel" role="menu" aria-label={t('activities.select_menu')}>
+                  {(
+                    [
+                      ['all', t('activities.select_all'), allChecked, onSelectAll],
+                      ['none', t('activities.select_none'), checkedCount === 0, onClear],
+                      ['invert', t('activities.select_invert'), false, onInvertSelection],
+                    ] as const
+                  ).map(([key, label, disabled, run]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      role="menuitem"
+                      className="story-menu__item"
+                      data-testid={`select-${key}`}
+                      disabled={disabled}
+                      onClick={() => {
+                        setSelectMenuOpen(false);
+                        run();
+                      }}
+                    >
+                      <span className="story-menu__name">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <span className="activities-panel__toolbar-spacer" aria-hidden="true" />
 

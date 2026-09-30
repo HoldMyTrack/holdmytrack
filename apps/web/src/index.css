@@ -892,17 +892,20 @@ button.activities-panel__story-badge:hover {
   background: var(--fm-surface-tint-strong);
 }
 
-/* An icon, not a text chip — sized to sit beside the 15px select-all checkbox as its
-   sibling (a checkbox outline split diagonally, half filled), with a little padding for a
-   usable hit area. Muted ink rather than the checkbox's accent: it's an action, not state. */
-.activities-panel__invert {
-  flex: none;
+/* The header checkbox's ▾ (ActivitiesPanel.tsx): a menu of All, None and Invert under it, in
+   Add to story's look (.story-menu__panel/__item), anchored to the checkbox's left edge. */
+.select-menu {
+  position: relative;
+  display: flex;
+  margin-left: calc(-1 * var(--fm-space-8));
+}
+
+.select-menu__trigger {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 23px;
+  width: 18px;
   height: 23px;
-  margin-left: calc(-1 * var(--fm-space-6));
   padding: 0;
   border: none;
   border-radius: var(--fm-radius-sm);
@@ -911,19 +914,22 @@ button.activities-panel__story-badge:hover {
   cursor: pointer;
 }
 
-.activities-panel__invert svg {
-  width: 16px;
-  height: 16px;
-}
-
-.activities-panel__invert:hover:not(:disabled) {
+.select-menu__trigger:hover:not(:disabled),
+.select-menu__trigger[aria-expanded='true'] {
   background: var(--fm-surface-tint-strong);
   color: var(--fm-ink);
 }
 
-.activities-panel__invert:disabled {
+.select-menu__trigger:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+.story-menu__panel.select-menu__panel {
+  top: calc(100% + 6px);
+  left: calc(-1 * var(--fm-space-16));
+  right: auto;
+  width: 9rem;
 }
 
 /* A plain dot, not a count — the trigger's own label already says "Type"; a badge repeating
