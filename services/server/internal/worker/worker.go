@@ -130,7 +130,7 @@ func claimAndRunOne(ctx context.Context, pool *pgxpool.Pool, store *storage.Stor
 			code = &c
 		}
 		_, uerr := pool.Exec(ctx, `
-			UPDATE jobs SET state = 'failed', attempts = attempts + 1, last_error = $2, error_code = $3
+			UPDATE jobs SET state = 'failed', attempts = attempts + 1, last_error = $2, error_code = $3, finished_at = NOW()
 			WHERE id = $1
 		`, j.id, runErr.Error(), code)
 		if uerr != nil {
@@ -139,7 +139,7 @@ func claimAndRunOne(ctx context.Context, pool *pgxpool.Pool, store *storage.Stor
 		return true, nil // the queue made progress even though this job failed
 	}
 
-	if _, err := pool.Exec(ctx, `UPDATE jobs SET state = 'done' WHERE id = $1`, j.id); err != nil {
+	if _, err := pool.Exec(ctx, `UPDATE jobs SET state = 'done', finished_at = NOW() WHERE id = $1`, j.id); err != nil {
 		return true, fmt.Errorf("worker: mark done: %w", err)
 	}
 	log.Info("job done", "job_id", j.id, "kind", j.kind)

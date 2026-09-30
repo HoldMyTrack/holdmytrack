@@ -48,6 +48,7 @@ func (s *Server) handleZipUpload(w http.ResponseWriter, r *http.Request, zr *zip
 	ctx := r.Context()
 	userID := userIDFromContext(ctx)
 	results := make([]zipEntryResult, 0, len(zr.File))
+	batch := newBatchID()
 	processed := 0
 	truncated := false
 
@@ -96,6 +97,7 @@ func (s *Server) handleZipUpload(w http.ResponseWriter, r *http.Request, zr *zip
 
 		externalID, alreadyProcessed, err := s.persistAndEnqueue(ctx, uploadFileParams{
 			UserID: userID, Source: "upload", Filename: entryName, Ext: ext, Data: entryData,
+			Batch: batch, BatchTitle: filename,
 		})
 		if err != nil {
 			s.log.Error("zip entry persist/enqueue failed", "err", err, "entry", entryName)

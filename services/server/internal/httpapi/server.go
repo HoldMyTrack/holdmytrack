@@ -163,6 +163,8 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(route("POST", "/stories/{id}/activities"), s.requireNotDemo(s.handleAddStoryActivities))
 	s.mux.HandleFunc(route("DELETE", "/stories/{id}/activities"), s.requireNotDemo(s.handleRemoveStoryActivities))
 	s.mux.HandleFunc(route("GET", "/uploads"), s.requireVerified(s.handleListUploads))
+	s.mux.HandleFunc(route("GET", "/uploads/active"), s.requireVerified(s.handleActiveUploads))
+	s.mux.HandleFunc(route("POST", "/uploads/seen"), s.requireVerified(s.handleImportsSeen))
 	s.mux.HandleFunc(route("GET", "/coverage/status"), s.requireVerified(s.handleCoverageStatus))
 	s.mux.HandleFunc(route("POST", "/sync/activities"), s.requireNotDemo(s.handleSyncActivities))
 	s.mux.HandleFunc(tileRoute("GET", "/tracks/{z}/{x}/{y}"), s.requireVerified(s.handleTracksTile))
@@ -386,6 +388,10 @@ type uploadFileParams struct {
 	// differently, defeating the idempotent-retry requirement rather than serving it. Path 3
 	// has no such id of its own, which is why it still hashes.
 	ExternalID string
+	// Batch and BatchTitle are ingest.Job's — set by the handlers that enqueue many jobs from
+	// one request (zip, Takeout, phone sync), empty for a single upload.
+	Batch      string
+	BatchTitle string
 }
 
 // persistAndEnqueue is handleUpload's idempotency-check-then-persist-then-enqueue core,
@@ -438,6 +444,8 @@ func (s *Server) persistAndEnqueue(ctx context.Context, p uploadFileParams) (ext
 		ExternalID:    externalID,
 		RawPayloadKey: rawKey,
 		ActivityType:  p.ActivityType,
+		Batch:         p.Batch,
+		BatchTitle:    p.BatchTitle,
 	}
 	payload, err := json.Marshal(job)
 	if err != nil {

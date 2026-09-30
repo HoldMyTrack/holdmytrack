@@ -49,6 +49,13 @@ type Job struct {
 	// carries no `<type>` element of its own to parse back out, and reconstructing one from its
 	// display name would just be re-deriving something the caller already has for free.
 	ActivityType string `json:"activity_type,omitempty"`
+	// Batch groups the jobs one request enqueued together — a .zip's or a Takeout export's
+	// files, a phone sync's activities — so the header's Upload menu can show them as one row
+	// ("Takeout.zip · 120 of 340") however the page was reloaded meanwhile. Empty for a single
+	// uploaded file, which is its own row. BatchTitle is that row's name: the archive's file
+	// name; empty for a phone sync, whose row is named after its source.
+	Batch      string `json:"batch,omitempty"`
+	BatchTitle string `json:"batch_title,omitempty"`
 }
 
 // Result reports what happened, distinguishing "persisted a new activity" from "this was
