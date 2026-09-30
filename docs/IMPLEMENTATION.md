@@ -1282,7 +1282,7 @@ The app then posts `{code, verifier}` to `POST /v1/auth/handoff` (`handleAuthHan
 
 ### 4.23 Stories (FR-14, ADR-0020)
 
-**Built, on the web and in the Android app**: the API, the Activities panel's Stories tab, Add to story and the Story badge (the Android app still has Create story and an Edit window Stories tab in their place) — the Android app's own implementation is `apps/android/docs/IMPLEMENTATION.md` §3.2. `internal/httpapi/stories.go`, over §3.19's two tables. Reads are `requireVerified`, so a demo session sees the Demo Customer's Stories; every write is `requireNotDemo`.
+**Built, on the web and in the Android app**: the API, the Activities panel's Stories tab, Add to story and the Story badge — the Android app's own implementation is `apps/android/docs/IMPLEMENTATION.md` §3.2. `internal/httpapi/stories.go`, over §3.19's two tables. Reads are `requireVerified`, so a demo session sees the Demo Customer's Stories; every write is `requireNotDemo`.
 
 **Ownership.** Every query is scoped by `user_id`, so another account's Story matches no row and answers `404` exactly like a missing one; a path id that isn't a UUID is `404` before any query. Adding activities (`addStoryActivities`) reads the caller's own rows among `activity_ids` `FOR KEY SHARE` and fails with `404` unless it found every one, so nothing is added from a request naming someone else's activity. The row lock also makes a concurrent activity delete wait for the commit rather than fail the insert's foreign key. Creating with `activity_ids` runs the insert and the membership in one transaction, so a rejected id creates no Story.
 

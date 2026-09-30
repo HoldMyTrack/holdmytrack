@@ -70,10 +70,12 @@ class ActivitiesPanel(
     private val onOpenStory: (storyId: String) -> Unit,
     /** The Stories tab has no Story left to open. */
     private val onCloseStory: () -> Unit,
-    /** Create story made one of the checked group (`docs/SPEC.md` FR-5.16). */
+    /** Add to story's New story… made one of the toolbar's target (`docs/SPEC.md` FR-5.16). */
     private val onStoryCreated: (Story) -> Unit,
-    /** A Story renamed or deleted: the rows' Story badges are out of date. */
+    /** A Story renamed, deleted or added to: the rows' Story badges are out of date. */
     private val onStoriesChanged: () -> Unit,
+    /** An activity was taken out of the open Story on the Stories tab. */
+    private val onRemovedFromStory: (activityId: String) -> Unit,
 ) {
     private val context = sheet.context
     private val res = context.resources
@@ -100,7 +102,7 @@ class ActivitiesPanel(
     private val invert: ImageButton = sheet.findViewById(R.id.panel_invert)
     private val visibility: ImageButton = sheet.findViewById(R.id.panel_visibility)
     private val edit: ImageButton = sheet.findViewById(R.id.panel_edit)
-    private val createStory: ImageButton = sheet.findViewById(R.id.panel_create_story)
+    private val addToStory: ImageButton = sheet.findViewById(R.id.panel_add_to_story)
     private val delete: ImageButton = sheet.findViewById(R.id.panel_delete)
     private val focus: ImageButton = sheet.findViewById(R.id.panel_focus)
     private val list: RecyclerView = sheet.findViewById(R.id.panel_list)
@@ -124,6 +126,7 @@ class ActivitiesPanel(
         onSelect = ::select,
         onClearFocus = ::clearFocus,
         onBadgesChanged = { onStoriesChanged() },
+        onActivityRemoved = { id -> onRemovedFromStory(id) },
     )
 
     private var loading = false
@@ -137,6 +140,11 @@ class ActivitiesPanel(
     private var held = false
     private var heightAnimator: ValueAnimator? = null
     private var typePopup: PopupWindow? = null
+
+    /** Add to story's menu while it's open, and the target it was opened over — a different
+     *  target closes it, as on the web. */
+    private var storyPopup: PopupWindow? = null
+    private var storyPopupTarget: List<String> = emptyList()
 
     init {
         list.layoutManager = LinearLayoutManager(context)
@@ -193,7 +201,7 @@ class ActivitiesPanel(
             onFly(state.targets.filter { it.id !in hidden })
         }
         edit.setOnClickListener { state.targets.takeIf { it.isNotEmpty() }?.let(onEdit) }
-        createStory.setOnClickListener { openCreateStory() }
+        addToStory.setOnClickListener { if (storyPopup == null) showAddToStory() else storyPopup?.dismiss() }
         delete.setOnClickListener { confirmDelete() }
         render()
     }
@@ -266,6 +274,7 @@ class ActivitiesPanel(
 
     fun dismissPopups() {
         typePopup?.dismiss()
+        storyPopup?.dismiss()
     }
 
     /** The collapsed sheet's height: the tab row and the toggle line. */
@@ -308,7 +317,9 @@ class ActivitiesPanel(
 
     private fun render() {
         val listed = state.listed
-        count.text = PanelFormat.count(res, listed.size)
+        // The Activities tab's own count: an open Story's rows are the list meanwhile, and
+        // aren't what the badge counts, as on the web.
+        if (tab != PanelTab.STORIES) count.text = PanelFormat.count(res, listed.size)
         renderTabs()
         subtext.text = if (tab == PanelTab.STORIES) {
             res.getString(R.string.story_subtext)
@@ -348,6 +359,7 @@ class ActivitiesPanel(
             PanelFormat.totalDistance(res, targets.sumOf { it.distanceMeters ?: 0.0 }),
         )
         typePopup?.let { renderTypeRows(it.contentView) }
+        if (storyPopup != null && targets.map { it.id } != storyPopupTarget) storyPopup?.dismiss()
     }
 
     /** The selected tab at full strength over the accent underline, the other at 45% — the
@@ -435,20 +447,14 @@ class ActivitiesPanel(
             },
             enabled = !demo && targetName != null,
         )
-        // Create story takes the checked group alone, never the selected row: a Story is a set
-        // picked on purpose, and checking is how a set is picked (FR-5.16).
-        val checked = listed.filter { it.id in state.checked }
         describe(
-            createStory,
+            addToStory,
             when {
-                demo -> res.getString(R.string.story_demo_create)
-                checked.isEmpty() -> res.getString(R.string.story_create_none)
-                else -> res.getString(
-                    R.string.story_create_target,
-                    res.getQuantityString(R.plurals.panel_checked_count, checked.size, checked.size),
-                )
+                demo -> res.getString(R.string.story_demo_add)
+                targetName == null -> noTarget
+                else -> res.getString(R.string.story_add_target, targetName)
             },
-            enabled = !demo && checked.isNotEmpty(),
+            enabled = !demo && targetName != null,
         )
         // A Pending row can't be deleted until its reprocess lands: the job would race it.
         describe(
@@ -474,16 +480,80 @@ class ActivitiesPanel(
         return res.getString(R.string.panel_group_summary, name, PanelFormat.totalDistance(res, targets.sumOf { it.distanceMeters ?: 0.0 }))
     }
 
-    /** Create story over the checked rows the list shows (`docs/SPEC.md` FR-5.16). */
-    private fun openCreateStory() {
-        val checked = state.listed.filter { it.id in state.checked }
-        if (checked.isEmpty() || Session.isDemo) return
-        val summary = res.getString(
-            R.string.panel_group_summary,
-            res.getQuantityString(R.plurals.panel_checked_count, checked.size, checked.size),
-            PanelFormat.totalDistance(res, checked.sumOf { it.distanceMeters ?: 0.0 }),
-        )
-        StoryDialog.create(context, summary, checked.map { it.id }, onStoryCreated)
+    /**
+     * Add to story's menu under its button (`docs/SPEC.md` FR-5.16): New story…, then every
+     * Story, newest first — read each time the menu opens — with how many activities it holds.
+     * One that already holds all of the target is ticked and can't be picked. Picking a Story
+     * adds the target to it in one request and closes the menu; a failure stays in the menu.
+     */
+    @SuppressLint("InflateParams") // A popup's content has no parent to inflate against.
+    private fun showAddToStory() {
+        val targets = state.targets
+        if (targets.isEmpty() || Session.isDemo) return
+        val ids = targets.map { it.id }
+        val content = LayoutInflater.from(context).inflate(R.layout.popup_story_menu, null)
+        val rows = content.findViewById<LinearLayout>(R.id.story_menu_rows)
+        val note = content.findViewById<TextView>(R.id.story_menu_note)
+        fun showNote(text: String, failed: Boolean) {
+            note.text = text
+            note.setTextColor(context.getColor(if (failed) R.color.hmt_danger else R.color.hmt_ink_meta))
+            note.visibility = View.VISIBLE
+        }
+        val popup = PopupWindow(content, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, true)
+        content.findViewById<View>(R.id.story_menu_new).setOnClickListener {
+            popup.dismiss()
+            StoryDialog.create(context, targetSummary(targets), ids, onStoryCreated)
+        }
+        showNote(res.getString(R.string.panel_loading), failed = false)
+        HoldMyTrackApi.stories { result ->
+            if (storyPopup !== popup) return@stories
+            result.onSuccess { stories ->
+                note.visibility = View.GONE
+                content.findViewById<View>(R.id.story_menu_divider).visibility = if (stories.isEmpty()) View.GONE else View.VISIBLE
+                for (story in stories) {
+                    val row = LayoutInflater.from(context).inflate(R.layout.item_type_filter, rows, false)
+                    val holdsAll = story.activityIds.containsAll(ids)
+                    val count = row.findViewById<TextView>(R.id.type_filter_count)
+                    row.findViewById<MaterialCheckBox>(R.id.type_filter_check).isChecked = holdsAll
+                    row.findViewById<TextView>(R.id.type_filter_label).text = story.name
+                    count.text = PanelFormat.count(res, story.activityIds.size)
+                    row.isEnabled = !holdsAll
+                    row.alpha = if (holdsAll) DISABLED_ROW_ALPHA else 1f
+                    row.contentDescription = if (holdsAll) "${story.name}, ${res.getString(R.string.story_holds_all)}" else story.name
+                    row.setOnClickListener {
+                        count.setText(R.string.story_adding)
+                        HoldMyTrackApi.changeStoryActivities(story.id, ids, add = true) { added ->
+                            if (storyPopup !== popup) return@changeStoryActivities
+                            added.onSuccess {
+                                popup.dismiss()
+                                onStoriesChanged()
+                            }.onFailure { failure ->
+                                count.text = PanelFormat.count(res, story.activityIds.size)
+                                showNote(failure.message?.takeIf { it.isNotBlank() } ?: res.getString(R.string.story_save_failed), failed = true)
+                            }
+                        }
+                    }
+                    rows.addView(row)
+                }
+                // About twelve rows, then the list scrolls, as the Type dropdown's does.
+                val scroll = content.findViewById<ScrollView>(R.id.story_menu_scroll)
+                rows.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+                val max = (TYPE_LIST_MAX_DP * res.displayMetrics.density).toInt()
+                scroll.layoutParams = scroll.layoutParams.apply {
+                    height = if (rows.measuredHeight > max) max else ViewGroup.LayoutParams.WRAP_CONTENT
+                }
+            }.onFailure { failure ->
+                showNote(failure.message?.takeIf { it.isNotBlank() } ?: res.getString(R.string.story_load_failed), failed = true)
+            }
+        }
+        popup.elevation = res.getDimension(R.dimen.hmt_space_8)
+        popup.setOnDismissListener {
+            storyPopup = null
+            storyPopupTarget = emptyList()
+        }
+        storyPopup = popup
+        storyPopupTarget = ids
+        popup.showAsDropDown(addToStory, 0, res.getDimensionPixelSize(R.dimen.hmt_space_8))
     }
 
     /**
@@ -679,7 +749,14 @@ class ActivitiesPanel(
                 changed()
             },
             onSelect = ::select,
+            onOpenStory = ::openStory,
         )
+    }
+
+    /** A row's Story badge: that Story, on the Stories tab, the sheet down so its tracks show. */
+    private fun openStory(id: String) {
+        setExpanded(false)
+        onOpenStory(id)
     }
 
     private companion object {
@@ -687,5 +764,6 @@ class ActivitiesPanel(
         const val TYPE_LIST_MAX_DP = 192
         const val SNAP_METERS = 1.0
         const val UNSELECTED_TAB_ALPHA = 0.45f
+        const val DISABLED_ROW_ALPHA = 0.5f
     }
 }

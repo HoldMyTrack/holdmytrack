@@ -151,6 +151,10 @@
     <string name="locate_needs_location">HoldMyTrack needs location access to show where you are.</string>
     <string name="menu_profile">Profile</string>
     <string name="menu_sync">Sync</string>
+    <string name="menu_donate">Donate</string>
+    <string name="menu_about">About</string>
+    <string name="menu_help">Help</string>
+    <string name="menu_contacts">Contacts</string>
 
     <string name="settings_title">Settings</string>
     <string name="settings_onboarding_title">Welcome — set up your account</string>
@@ -431,11 +435,19 @@
     <string name="private_delete_label">Delete %1$s</string>
     <string name="private_delete_failed">Could not delete it: %1$s</string>
 
-    <!-- Stories (panel/StoriesTab.kt, panel/StoryDialog.kt, the Edit window's Stories tab and the
+    <!-- Stories (panel/StoriesTab.kt, panel/StoryDialog.kt, Add to story (panel/ActivitiesPanel.kt) and the
          rows' Story badge), after the web's stories.* messages. -->
     <string name="panel_tab_stories">Stories</string>
     <string name="story_subtext">Hand-picked sets of your activities. Only you can see them.</string>
-    <string name="story_empty">No stories yet. On the Activities tab, check the activities you want, then choose Create story.</string>
+    <string name="story_empty">No stories yet. On the Activities tab, select or check the activities you want, then choose Add to story.</string>
+    <string name="story_add_target">Add %1$s to a story</string>
+    <string name="story_demo_add">Not available for demo accounts — create an account to make stories</string>
+    <string name="story_new">New story…</string>
+    <string name="story_holds_all">Already in this story</string>
+    <string name="story_adding">Adding…</string>
+    <string name="story_remove">Remove from story</string>
+    <string name="story_demo_remove">Not available for demo accounts — create an account to change stories</string>
+    <string name="panel_open_story">Open “%1$s”</string>
     <string name="story_no_activities">No activities in this story.</string>
     <string name="story_not_found">This story doesn\'t exist, or isn\'t yours.</string>
     <string name="story_load_failed">Could not load your stories</string>
@@ -449,9 +461,6 @@
     <string name="story_delete_confirm">Delete “%1$s”? Its activities stay.</string>
     <string name="story_delete_button">Delete story</string>
     <string name="story_delete_failed">Could not delete the story: %1$s</string>
-    <string name="story_create_target">Create a story from %1$s</string>
-    <string name="story_create_none">Check activities to make a story of them</string>
-    <string name="story_demo_create">Not available for demo accounts — create an account to make stories</string>
     <string name="story_create_title">Create story</string>
     <string name="story_create_body">A story of %1$s. Only you can see it.</string>
     <string name="story_name">Name</string>
@@ -483,15 +492,6 @@
         <item quantity="one">Also in %1$d other story: %2$s</item>
         <item quantity="other">Also in %1$d other stories: %2$s</item>
     </plurals>
-    <string name="edit_tab_stories">Stories</string>
-    <string name="edit_stories_hint_one">Tick a story to put this activity in it, clear one to take it out.</string>
-    <plurals name="edit_stories_hint">
-        <item quantity="one">Tick a story to put all %1$d activity in it, clear one to take it out.</item>
-        <item quantity="other">Tick a story to put all %1$d activities in it, clear one to take them all out.</item>
-    </plurals>
-    <string name="edit_stories_some">Holds some of these activities</string>
-    <string name="edit_stories_empty">No stories yet. Check activities in the list and choose Create story to make one.</string>
-    <string name="edit_stories_unsaved">Stories, with unsaved changes</string>
 
     <!-- Activity types' display names, the web's activity_type.* (RecordingTypes.label); a type without one is title-cased from its raw value. -->
     <string name="activity_type_alpine_skiing">Alpine Skiing</string>

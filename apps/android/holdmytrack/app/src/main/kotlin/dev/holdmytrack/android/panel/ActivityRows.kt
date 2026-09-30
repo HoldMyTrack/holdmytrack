@@ -1,12 +1,14 @@
 package dev.holdmytrack.android.panel
 
 import android.view.View
+import android.widget.PopupMenu
 import android.widget.TextView
 import androidx.appcompat.widget.TooltipCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.checkbox.MaterialCheckBox
 import dev.holdmytrack.android.R
 import dev.holdmytrack.android.net.Activity
+import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.recording.RecordingTypes
 
 /** One row as drawn: the activity and its marks, so a diff rebinds only what changed — a
@@ -19,7 +21,9 @@ data class ActivityRowItem(val activity: Activity, val checked: Boolean, val foc
  * by the Activities tab and an open Story's rows on the Stories tab ([StoriesTab]). The title
  * and the "[date ·] distance · duration · type" line, dimmed with a Pending or Hidden badge,
  * and a Story badge for the Stories it's in — all but [openStoryId]'s, since every row under
- * an open Story is in that one (`docs/SPEC.md` FR-5.1). [onCheck] null leaves the checkbox out.
+ * an open Story is in that one (`docs/SPEC.md` FR-5.1). The badge opens its Story, or, for
+ * several, a menu of their names. [onCheck] null leaves the checkbox out; [onRemove] shows the
+ * × that takes the row out of the open Story (`docs/SPEC.md` FR-14.6 item 3).
  */
 class ActivityRowHolder(view: View) : RecyclerView.ViewHolder(view) {
     private val res = view.resources
@@ -31,8 +35,16 @@ class ActivityRowHolder(view: View) : RecyclerView.ViewHolder(view) {
     private val pending: View = view.findViewById(R.id.activity_pending)
     private val hidden: View = view.findViewById(R.id.activity_hidden)
     private val story: TextView = view.findViewById(R.id.activity_story)
+    private val remove: View = view.findViewById(R.id.activity_remove)
 
-    fun bind(row: ActivityRowItem, openStoryId: String?, onCheck: ((String) -> Unit)?, onSelect: (String) -> Unit) {
+    fun bind(
+        row: ActivityRowItem,
+        openStoryId: String?,
+        onCheck: ((String) -> Unit)?,
+        onSelect: (String) -> Unit,
+        onOpenStory: (String) -> Unit,
+        onRemove: ((String) -> Unit)? = null,
+    ) {
         val activity = row.activity
         val label = PanelFormat.rowLabel(res, activity)
         val named = activity.name?.trim()?.isNotEmpty() == true
@@ -59,7 +71,6 @@ class ActivityRowHolder(view: View) : RecyclerView.ViewHolder(view) {
         badges.visibility = if (activity.pending || isHidden || others.isNotEmpty()) View.VISIBLE else View.GONE
         pending.visibility = if (activity.pending) View.VISIBLE else View.GONE
         hidden.visibility = if (isHidden) View.VISIBLE else View.GONE
-        // Only a label: a tap on it does what a tap on the row's text does.
         val names = others.joinToString(", ") { it.name }
         val storiesNote = when {
             others.isEmpty() -> null
@@ -77,7 +88,32 @@ class ActivityRowHolder(view: View) : RecyclerView.ViewHolder(view) {
         } else {
             res.getQuantityString(R.plurals.panel_story_badge, others.size, others.size)
         }
-        TooltipCompat.setTooltipText(story, storiesNote)
+        val storyLabel = if (others.size == 1) res.getString(R.string.panel_open_story, others[0].name) else storiesNote
+        story.contentDescription = storyLabel
+        TooltipCompat.setTooltipText(story, storyLabel)
+        story.setOnClickListener {
+            if (others.size == 1) {
+                onOpenStory(others[0].id)
+                return@setOnClickListener
+            }
+            val menu = PopupMenu(story.context, story)
+            others.forEachIndexed { i, ref -> menu.menu.add(0, i, i, ref.name) }
+            menu.setOnMenuItemClickListener { item ->
+                onOpenStory(others[item.itemId].id)
+                true
+            }
+            menu.show()
+        }
+
+        remove.visibility = if (onRemove == null) View.GONE else View.VISIBLE
+        if (onRemove != null) {
+            val demo = Session.isDemo
+            remove.isEnabled = !demo
+            val removeLabel = res.getString(if (demo) R.string.story_demo_remove else R.string.story_remove)
+            remove.contentDescription = "$removeLabel: $label"
+            TooltipCompat.setTooltipText(remove, removeLabel)
+            remove.setOnClickListener { onRemove(activity.id) }
+        }
 
         check.visibility = if (onCheck == null) View.GONE else View.VISIBLE
         check.setOnCheckedChangeListener(null)

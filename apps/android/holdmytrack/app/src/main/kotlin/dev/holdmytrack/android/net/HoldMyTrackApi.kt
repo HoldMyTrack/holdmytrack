@@ -523,8 +523,9 @@ object HoldMyTrackApi {
             .appendQueryParameter("app_challenge", challenge)
             .build()
 
-    /** The web's "Forgot password?" page — served by the API's own origin, outside `/v1`. */
-    fun forgotPasswordUri(): Uri = Uri.parse(BuildConfig.API_BASE_URL + "/forgot")
+    /** One of the web's own pages — "Forgot password?", About, Help — served by the API's own
+     *  origin, outside `/v1`. */
+    fun webPageUri(path: String): Uri = Uri.parse(BuildConfig.API_BASE_URL + path)
 
     /** `POST /v1/auth/handoff` — redeems a browser-tab round trip's one-time code, once. */
     fun exchangeHandoff(code: String, verifier: String, onResult: (Result<Account>) -> Unit) {
@@ -720,12 +721,13 @@ object HoldMyTrackApi {
      * `GET /v1/activities?from=&to=` — every activity from [from] to [to] (`YYYY-MM-DD`,
      * inclusive, read by the server as days in the account's timezone), newest first, in one
      * response: the list isn't paged (`docs/IMPLEMENTATION.md` §4.7). What the map's
-     * Activities panel lists. With [story], only that Story's (`docs/SPEC.md` FR-14.4).
+     * Activities panel lists. With [story] instead, that whole Story's (`docs/SPEC.md`
+     * FR-14.4, FR-14.6: an open Story ignores the date range).
      */
-    fun activities(from: String, to: String, story: String?, onResult: (Result<List<Activity>>) -> Unit) {
+    fun activities(from: String?, to: String?, story: String?, onResult: (Result<List<Activity>>) -> Unit) {
         val url = (BuildConfig.API_BASE_URL + API_V1 + "/activities").toHttpUrl().newBuilder()
-            .addQueryParameter("from", from)
-            .addQueryParameter("to", to)
+            .apply { if (from != null) addQueryParameter("from", from) }
+            .apply { if (to != null) addQueryParameter("to", to) }
             .apply { if (story != null) addQueryParameter("story", story) }
             .build()
         call(Request.Builder().url(url).build(), { body ->
@@ -1022,14 +1024,12 @@ object HoldMyTrackApi {
      * `GET /v1/activities/histogram?days=&before=` — one page of the days that have activity
      * (`docs/IMPLEMENTATION.md` §4.7's activity-day pagination mode): the [limit] most recent,
      * or the [limit] most recent strictly before [before]. What the map's date-range slider
-     * (`map/ActivityDays.kt`) pages through, as the web's does. With [story], only that
-     * Story's days, and `earliest` its first (`docs/SPEC.md` FR-14.4).
+     * (`map/ActivityDays.kt`) pages through, as the web's does.
      */
-    fun activityDayPage(limit: Int, before: String?, story: String?, onResult: (Result<ActivityDayPage>) -> Unit) {
+    fun activityDayPage(limit: Int, before: String?, onResult: (Result<ActivityDayPage>) -> Unit) {
         val url = (BuildConfig.API_BASE_URL + API_V1 + "/activities/histogram").toHttpUrl().newBuilder()
             .addQueryParameter("days", limit.toString())
             .apply { if (before != null) addQueryParameter("before", before) }
-            .apply { if (story != null) addQueryParameter("story", story) }
             .build()
         call(Request.Builder().url(url).build(), ::parseActivityDays, onResult)
     }

@@ -111,7 +111,7 @@ class SignInActivity : AppCompatActivity() {
         // The web's own /forgot, not a native form: the emailed reset link opens the web's
         // /reset page anyway, so the flow ends in the browser whichever way it starts.
         forgot.setOnClickListener {
-            CustomTabsIntent.Builder().build().launchUrl(this, HoldMyTrackApi.forgotPasswordUri())
+            CustomTabsIntent.Builder().build().launchUrl(this, HoldMyTrackApi.webPageUri("/forgot"))
         }
         demo.setOnClickListener {
             setBusy(true)

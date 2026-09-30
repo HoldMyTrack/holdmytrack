@@ -51,7 +51,7 @@ Both buttons appear only when the API the app points at has them configured (`GE
 Everything is under `app/src/main/kotlin/dev/holdmytrack/android/`:
 
 - `HoldMyTrackApplication.kt` — process-level setup. The load-bearing line is `HttpRequestUtil.setOkHttpClient`, which replaces MapLibre Native's own HTTP client with the app's. The map SDK fetches the style, the archive and every tile through a stack the app's API client never sees, so without this the session would reach none of the user layers.
-- `MainActivity.kt` — the map, the on-map mode toggle, the burger menu (Profile, Sync), and MapLibre's lifecycle forwarding.
+- `MainActivity.kt` — the map, the on-map mode toggle, the burger menu (Profile, Sync, Settings, and the web's Donate, About, Help and Contacts pages), and MapLibre's lifecycle forwarding.
 - `ProfileActivity.kt` — the account half of the burger menu: who is signed in, and sign in/out.
 - `SignInActivity.kt` — sign in, create an account, or start a demo account.
 - `net/Session.kt` — the session token, held process-wide and mirrored to private `SharedPreferences`.

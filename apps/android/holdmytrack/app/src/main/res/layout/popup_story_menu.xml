@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Add to story's menu (the web's .story-menu, AddToStoryMenu.tsx): "New story…", a divider,
+     then every Story, newest first, with how many activities it holds — one that already holds
+     all of the target ticked and disabled — and a note while loading or after a failure. Rows
+     (item_type_filter) are added by ActivitiesPanel.showAddToStory; the list scrolls past about
+     twelve. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_panel_popup"
+    android:elevation="8dp"
+    android:minWidth="240dp"
+    android:orientation="vertical"
+    android:padding="@dimen/hmt_space_8">
+
+    <TextView
+        android:id="@+id/story_menu_new"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/selectableItemBackground"
+        android:gravity="center_vertical"
+        android:minHeight="48dp"
+        android:paddingStart="@dimen/hmt_space_8"
+        android:paddingEnd="@dimen/hmt_space_8"
+        android:text="@string/story_new"
+        android:textColor="@color/hmt_ink"
+        android:textFontWeight="600"
+        android:textSize="@dimen/hmt_text_md" />
+
+    <View
+        android:id="@+id/story_menu_divider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="@dimen/hmt_space_6"
+        android:layout_marginBottom="@dimen/hmt_space_6"
+        android:background="@color/hmt_divider_tint"
+        android:visibility="gone" />
+
+    <ScrollView
+        android:id="@+id/story_menu_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <LinearLayout
+            android:id="@+id/story_menu_rows"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </ScrollView>
+
+    <TextView
+        android:id="@+id/story_menu_note"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:maxWidth="260dp"
+        android:padding="@dimen/hmt_space_8"
+        android:textColor="@color/hmt_ink_meta"
+        android:textSize="@dimen/hmt_text_sm"
+        android:visibility="gone" />
+</LinearLayout>

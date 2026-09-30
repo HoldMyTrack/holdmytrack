@@ -334,9 +334,9 @@
                     android:src="@drawable/ic_pencil" />
 
                 <ImageButton
-                    android:id="@+id/panel_create_story"
+                    android:id="@+id/panel_add_to_story"
                     style="@style/Widget.HoldMyTrack.PanelChip"
-                    android:contentDescription="@string/story_create_none"
+                    android:contentDescription="@string/panel_no_target"
                     android:src="@drawable/ic_book_plus" />
 
                 <ImageButton

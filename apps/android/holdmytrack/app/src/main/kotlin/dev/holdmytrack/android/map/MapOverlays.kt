@@ -204,8 +204,9 @@ object MapOverlays {
      * style reload (a day/night flavor swap) discards custom layers, so this has to be
      * re-runnable rather than one-shot.
      *
-     * Only the tracks tile carries a filter, and only `from`/`to` and an open Story's `story`
-     * ([setTrackStory]) — the same as the web, whose date range and Story narrow the tracks alone: Fog and Heatmap show coverage no filter narrows
+     * Only the tracks tile carries a filter: `from`/`to`, or an open Story's `story` in their
+     * place ([setTrackStory]) — the same as the web, whose date range and Story narrow the
+     * tracks alone: Fog and Heatmap show coverage no filter narrows
      * (`docs/SPEC.md` FR-4.2, FR-4.3). The Activities panel's TYPE/DISTANCE filters, hidden
      * set and selection are applied on the client, as layer filters ([setTrackFilter]).
      *
@@ -337,8 +338,8 @@ object MapOverlays {
         TRACK_LAYER_IDS.forEach { id -> style.getLayer(id)?.setProperties(PropertyFactory.visibility(visibility)) }
     }
 
-    /** Narrows the tracks to [story]'s activities as well as [range] — the tile's `story`
-     *  filter (`docs/SPEC.md` FR-14.4) — or, with null, back to the whole history's. */
+    /** Narrows the tracks to [story]'s activities, all of them — the tile's `story` filter
+     *  (`docs/SPEC.md` FR-14.4), with no range — or, with null, back to [range]'s. */
     fun setTrackStory(style: Style, story: String?, range: DateRange?) {
         trackStory = story
         setTrackRange(style, range)
@@ -517,11 +518,14 @@ object MapOverlays {
     private fun addTracks(style: Style, beforeId: String?, range: DateRange?) {
         if (style.getSource(TRACKS_SOURCE_ID) == null) {
             val params = buildList {
-                if (range != null) {
+                // An open Story is drawn whole, whatever the range (`docs/SPEC.md` FR-14.6).
+                val story = trackStory
+                if (story != null) {
+                    add("story=$story")
+                } else if (range != null) {
                     add("from=${range.from}")
                     add("to=${range.to}")
                 }
-                trackStory?.let { add("story=$it") }
                 Session.tileVersion.takeIf { it.isNotEmpty() }?.let { add("cv=${Uri.encode(it)}") }
                 if (tracksVersion > 0) add("v=$tracksVersion")
             }
