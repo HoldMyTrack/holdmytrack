@@ -1089,6 +1089,9 @@ type trackMetricPoint struct {
 	Lon      float64 `json:"lon"`
 	Lat      float64 `json:"lat"`
 	SpeedMps float64 `json:"speed_mps"`
+	// TimeS is the point's moment, epoch seconds — what the Edit window's photo slider (§4.27)
+	// turns a place on the track into.
+	TimeS int64 `json:"time_s"`
 }
 
 type trackMetricsResponse struct {
@@ -1137,7 +1140,7 @@ func (s *Server) handleActivityTrackMetrics(w http.ResponseWriter, r *http.Reque
 
 	points := make([]trackMetricPoint, n)
 	for i := range points {
-		points[i] = trackMetricPoint{Lon: lons[i], Lat: lats[i], SpeedMps: speed[i]}
+		points[i] = trackMetricPoint{Lon: lons[i], Lat: lats[i], SpeedMps: speed[i], TimeS: int64(ms[i])}
 	}
 
 	w.Header().Set("Cache-Control", "no-store")

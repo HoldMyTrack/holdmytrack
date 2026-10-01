@@ -190,15 +190,9 @@ func ResolveDuplicates(
 	}
 	// A hidden copy's photos (§4.27) move to the copy that's shown: they were added to the trip,
 	// not to one recording of it, and a photo's place is a moment on the track, which the winner
-	// covers too. One the hidden copy couldn't place — it had no track — is placed by its
-	// capture time when that falls on the winner's.
+	// covers too (and a moment just past the winner's ends reads at its nearest end).
 	if _, err := pool.Exec(ctx, `
-		UPDATE activity_photos p SET activity_id = $1,
-		       route_at = COALESCE(p.route_at, (
-		           SELECT p.taken_at FROM activities a
-		           WHERE a.id = $1 AND extract(epoch FROM p.taken_at)::float8
-		                 BETWEEN ST_M(ST_StartPoint(a.trajectory)) AND ST_M(ST_EndPoint(a.trajectory))))
-		WHERE p.activity_id = ANY($2::uuid[])
+		UPDATE activity_photos SET activity_id = $1 WHERE activity_id = ANY($2::uuid[])
 	`, winner.id, losers); err != nil {
 		return nil, fmt.Errorf("ingest: move photos to winner: %w", err)
 	}

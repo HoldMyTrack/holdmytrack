@@ -269,6 +269,7 @@
   "error.photo_dimensions": "Photo is larger than {max} px on a side; it should be resized before upload.",
   "error.photo_limit": "This account already holds {max} photos, the most it can.",
   "error.photo_caption_too_long": "Caption must be {max} characters or fewer.",
+  "error.photo_needs_place": "Couldn't tell where on the track this photo was taken. Choose its place.",
   "error.photo_no_track": "This activity has no track to place a photo on.",
   "error.story_name_required": "Name is required.",
   "error.story_name_too_long": "Name must be {max} characters or fewer.",

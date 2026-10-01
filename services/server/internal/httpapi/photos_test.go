@@ -3,6 +3,7 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"image"
 	"image/jpeg"
 	"io"
@@ -144,54 +145,52 @@ func TestPhotoPlacement(t *testing.T) {
 	cases := []struct {
 		name     string
 		fields   map[string]string
-		lon, lat float64 // 0: unplaced
+		lon, lat float64 // 0: refused until the user places it
 	}{
 		{"capture time, mid-track", map[string]string{"taken_at": "2026-05-01T10:00:30Z"}, 10.0005, 50.0005},
 		{"capture time just before the start clamps to it", map[string]string{"taken_at": "2026-05-01T09:57:00Z"}, 10, 50},
 		{"capture time well off the track", map[string]string{"taken_at": "2026-05-01T12:00:00Z"}, 0, 0},
-		{"capture time well before the track", map[string]string{"taken_at": "2026-05-01T08:00:00Z"}, 0, 0},
 		{"wall clock in the account's zone", map[string]string{"taken_local": "2026-05-01T12:00:30"}, 10.0005, 50.0005},
 		{"wall clock in another zone", map[string]string{"taken_local": "2026-05-01T19:00:30"}, 10.0005, 50.0005},
 		{"position only, near the track", map[string]string{"lon": "10.0006", "lat": "50.0004"}, 10.0005, 50.0005},
 		{"position only, far from it", map[string]string{"lon": "11", "lat": "50"}, 0, 0},
 		{"nothing to go by", nil, 0, 0},
+		{"the user's choice", map[string]string{"route_at": "2026-05-01T10:00:30Z"}, 10.0005, 50.0005},
+		{"the user's choice beats the capture time", map[string]string{"taken_at": "2026-05-01T10:00:00Z", "route_at": "2026-05-01T10:01:00Z"}, 10.001, 50.001},
+		{"the user's choice past the end clamps to it", map[string]string{"route_at": "2026-05-01T11:00:00Z"}, 10.001, 50.001},
 	}
+	placed := 0
 	for _, c := range cases {
 		fields := map[string]string{"activity_id": walk}
 		for k, v := range c.fields {
 			fields[k] = v
 		}
-		var p photoJSON
-		d.decode(d.uploadPhoto(me, file, thumb, fields), http.StatusCreated, &p)
+		rec := d.uploadPhoto(me, file, thumb, fields)
 		if c.lon == 0 {
-			if p.Lon != nil || p.RouteAt != nil {
-				t.Errorf("%s: placed at %v,%v (%v), want unplaced", c.name, *p.Lon, *p.Lat, p.RouteAt)
+			var refusal map[string]string
+			d.decode(rec, http.StatusUnprocessableEntity, &refusal)
+			if refusal["error"] != photoNeedsPlaceCode || refusal["message"] == "" {
+				t.Errorf("%s: refusal %v, want %s with a message", c.name, refusal, photoNeedsPlaceCode)
 			}
 			continue
 		}
+		var p photoJSON
+		d.decode(rec, http.StatusCreated, &p)
+		placed++
 		if !near(p.Lon, c.lon) || !near(p.Lat, c.lat) {
 			t.Errorf("%s: at %v,%v, want %v,%v", c.name, p.Lon, p.Lat, c.lon, c.lat)
 		}
 	}
 
-	// Stored, and served back to the owner only.
+	// Stored, in route order, and served back to the owner only.
 	var list photosResponse
 	d.decode(d.do(me, "GET", "/v1/photos?activity="+walk, nil), http.StatusOK, &list)
-	if len(list.Photos) != len(cases) {
-		t.Fatalf("listed %d photos, want %d", len(list.Photos), len(cases))
+	if len(list.Photos) != placed {
+		t.Fatalf("listed %d photos, want %d (refused ones aren't kept)", len(list.Photos), placed)
 	}
-	// Placed ones in route order, then unplaced ones — one taken before the walk started too.
-	for i, p := range list.Photos {
-		if p.RouteAt == nil {
-			for _, rest := range list.Photos[i:] {
-				if rest.RouteAt != nil {
-					t.Errorf("a placed photo after an unplaced one: %+v", list.Photos)
-				}
-			}
-			break
-		}
-		if i > 0 && p.RouteAt.Before(*list.Photos[i-1].RouteAt) {
-			t.Errorf("placed photos out of route order: %+v", list.Photos)
+	for i := 1; i < len(list.Photos); i++ {
+		if list.Photos[i].RouteAt.Before(list.Photos[i-1].RouteAt) {
+			t.Errorf("photos out of route order: %+v", list.Photos)
 		}
 	}
 	first := list.Photos[0]
@@ -215,37 +214,49 @@ func TestPhotoPlacement(t *testing.T) {
 	}
 }
 
-func TestPhotoEditsAndPrivacy(t *testing.T) {
+func TestPhotoEditsAndTrackChanges(t *testing.T) {
 	s3 := newMemS3()
 	d := newDBTestWithS3(t, s3)
 	me := d.newAccount(false)
+	ctx := context.Background()
 	walk := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, startedAt: photoTrackStart, at: &[2]float64{10, 50}})
 	var p photoJSON
-	d.decode(d.uploadPhoto(me, testJPEG(t, 40, 30), testJPEG(t, 8, 6), map[string]string{"activity_id": walk}), http.StatusCreated, &p)
-	if p.Lon != nil {
-		t.Fatalf("a photo with nothing to go by was placed")
+	d.decode(d.uploadPhoto(me, testJPEG(t, 40, 30), testJPEG(t, 8, 6), map[string]string{"activity_id": walk, "taken_at": "2026-05-01T10:00:00Z"}), http.StatusCreated, &p)
+
+	// The slider's track: the display points with their moments.
+	var metrics trackMetricsResponse
+	d.decode(d.do(me, "GET", "/v1/activities/track-metrics/"+walk, nil), http.StatusOK, &metrics)
+	if len(metrics.Points) != 2 || metrics.Points[0].TimeS != photoTrackStart.Unix() || metrics.Points[1].TimeS != photoTrackStart.Unix()+60 {
+		t.Errorf("track metrics %+v, want the two points' moments", metrics.Points)
 	}
 
-	// Put on the map by hand: snaps to the track, however far off.
-	d.decode(d.do(me, "PATCH", p.URL, map[string]any{"position": map[string]float64{"lon": 10.01, "lat": 50.0}}), http.StatusOK, &p)
-	if !near(p.Lon, 10.001) || !near(p.Lat, 50.001) {
-		t.Errorf("placed by hand at %v,%v, want the track's end", p.Lon, p.Lat)
-	}
-	d.decode(d.do(me, "PATCH", p.URL, map[string]any{"position": map[string]float64{"lon": 10.0005, "lat": 50.0005}}), http.StatusOK, &p)
-	if !near(p.Lon, 10.0005) || p.RouteAt == nil || !p.RouteAt.Equal(photoTrackStart.Add(30*time.Second)) {
+	// Moved along the track (the Edit window's slider), clamped to it.
+	d.decode(d.do(me, "PATCH", p.URL, map[string]any{"route_at": "2026-05-01T10:00:30Z"}), http.StatusOK, &p)
+	if !near(p.Lon, 10.0005) || !p.RouteAt.Equal(photoTrackStart.Add(30*time.Second)) {
 		t.Errorf("moved to %v at %v, want the midpoint at 10:00:30", p.Lon, p.RouteAt)
 	}
+	d.decode(d.do(me, "PATCH", p.URL, map[string]any{"route_at": "2026-05-01T09:00:00Z"}), http.StatusOK, &p)
+	if !near(p.Lon, 10) || !p.RouteAt.Equal(photoTrackStart) {
+		t.Errorf("moved before the start: %v at %v, want the start", p.Lon, p.RouteAt)
+	}
+	for _, bad := range []any{nil, "noon"} {
+		if rec := d.do(me, "PATCH", p.URL, map[string]any{"route_at": bad}); rec.Code != http.StatusBadRequest {
+			t.Errorf("route_at %v: %d, want 400", bad, rec.Code)
+		}
+	}
+	d.decode(d.do(me, "PATCH", p.URL, map[string]any{"route_at": "2026-05-01T10:00:30Z"}), http.StatusOK, &p)
 
-	// A Private location added afterwards takes it off the map, and keeps it in the list.
-	if _, err := d.pool.Exec(context.Background(), `
-		INSERT INTO privacy_zones (user_id, center, radius_m) VALUES ($1, ST_MakePoint(10.0005, 50.0005)::geography, 50)
-	`, me.id); err != nil {
+	// A track that loses its second half (Edit track, or a Private location over its end):
+	// the photo stays on what's left, at its end.
+	if _, err := d.pool.Exec(ctx, `
+		UPDATE activities SET trajectory = ST_GeomFromText($2, 4326) WHERE id = $1
+	`, walk, fmt.Sprintf("LINESTRINGM(10 50 %d, 10.0002 50.0002 %d)", photoTrackStart.Unix(), photoTrackStart.Unix()+10)); err != nil {
 		t.Fatal(err)
 	}
 	var list photosResponse
 	d.decode(d.do(me, "GET", "/v1/photos?activity="+walk, nil), http.StatusOK, &list)
-	if len(list.Photos) != 1 || list.Photos[0].Lon != nil || list.Photos[0].RouteAt == nil {
-		t.Errorf("inside a Private location: %+v, want listed, with route_at but no position", list.Photos)
+	if len(list.Photos) != 1 || !near(list.Photos[0].Lon, 10.0002) || !list.Photos[0].RouteAt.Equal(p.RouteAt) {
+		t.Errorf("after the track was cut: %+v, want at the new end with route_at kept", list.Photos)
 	}
 
 	// Caption: trimmed, cleared by an empty one, bounded.
@@ -259,12 +270,6 @@ func TestPhotoEditsAndPrivacy(t *testing.T) {
 	}
 	if rec := d.do(me, "PATCH", p.URL, map[string]any{"caption": strings.Repeat("x", maxPhotoCaptionLen+1)}); rec.Code != http.StatusBadRequest {
 		t.Errorf("long caption: %d, want 400", rec.Code)
-	}
-
-	// Off the map again.
-	d.decode(d.do(me, "PATCH", p.URL, map[string]any{"position": nil}), http.StatusOK, &p)
-	if p.RouteAt != nil {
-		t.Errorf("route_at %v after unplacing", p.RouteAt)
 	}
 
 	// Deleting removes both images.
@@ -283,7 +288,7 @@ func TestPhotoUploadRefusals(t *testing.T) {
 	me := d.newAccount(false)
 	walk := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, startedAt: photoTrackStart, at: &[2]float64{10, 50}})
 	file, thumb := testJPEG(t, 40, 30), testJPEG(t, 8, 6)
-	fields := map[string]string{"activity_id": walk}
+	fields := map[string]string{"activity_id": walk, "route_at": "2026-05-01T10:00:30Z"}
 
 	cases := []struct {
 		name        string
@@ -299,6 +304,8 @@ func TestPhotoUploadRefusals(t *testing.T) {
 		{"no activity", file, thumb, map[string]string{}, http.StatusNotFound},
 		{"someone else's activity", file, thumb, map[string]string{"activity_id": d.newActivity(d.newAccount(false), testActivity{activityType: "walking"})}, http.StatusNotFound},
 		{"bad capture time", file, thumb, map[string]string{"activity_id": walk, "taken_at": "yesterday"}, http.StatusBadRequest},
+		{"bad place", file, thumb, map[string]string{"activity_id": walk, "route_at": "here"}, http.StatusBadRequest},
+		{"an activity with no track", file, thumb, map[string]string{"activity_id": d.newActivity(me, testActivity{activityType: "walking"}), "route_at": "2026-05-01T10:00:30Z"}, http.StatusConflict},
 	}
 	for _, c := range cases {
 		if rec := d.uploadPhoto(me, c.file, c.thumb, c.fields); rec.Code != c.want {
@@ -312,8 +319,8 @@ func TestPhotoUploadRefusals(t *testing.T) {
 
 	// The account limit.
 	if _, err := d.pool.Exec(context.Background(), `
-		INSERT INTO activity_photos (user_id, activity_id, content_type, thumb_content_type, width, height, bytes)
-		SELECT $1, $2, 'image/jpeg', 'image/jpeg', 1, 1, 1 FROM generate_series(1, $3)
+		INSERT INTO activity_photos (user_id, activity_id, route_at, content_type, thumb_content_type, width, height, bytes)
+		SELECT $1, $2, NOW(), 'image/jpeg', 'image/jpeg', 1, 1, 1 FROM generate_series(1, $3)
 	`, me.id, walk, maxPhotosPerAccount); err != nil {
 		t.Fatal(err)
 	}
@@ -329,14 +336,11 @@ func TestPhotosFollowTheirActivity(t *testing.T) {
 	ctx := context.Background()
 	file, thumb := testJPEG(t, 40, 30), testJPEG(t, 8, 6)
 
-	// Two recordings of the same walk: one with a track, one without. The tracked one wins.
+	// Two recordings of the same walk, a second apart. Equally rich, so the one stored first wins.
 	tracked := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, startedAt: photoTrackStart, at: &[2]float64{10, 50}})
-	bare := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, startedAt: photoTrackStart})
+	copied := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, startedAt: photoTrackStart.Add(time.Second), at: &[2]float64{10.0001, 50}})
 	var p photoJSON
-	d.decode(d.uploadPhoto(me, file, thumb, map[string]string{"activity_id": bare, "taken_at": "2026-05-01T10:00:30Z"}), http.StatusCreated, &p)
-	if p.Lon != nil {
-		t.Fatalf("placed on an activity with no track")
-	}
+	d.decode(d.uploadPhoto(me, file, thumb, map[string]string{"activity_id": copied, "taken_at": "2026-05-01T10:00:30Z"}), http.StatusCreated, &p)
 	if _, err := ingest.ResolveDuplicates(ctx, d.pool, me.id, photoTrackStart, 60); err != nil {
 		t.Fatal(err)
 	}
@@ -346,7 +350,7 @@ func TestPhotosFollowTheirActivity(t *testing.T) {
 	if len(list.Photos) != 1 || list.Photos[0].ID != p.ID {
 		t.Fatalf("the winner's photos: %+v, want the hidden copy's", list.Photos)
 	}
-	// Its capture time, kept from the upload, now places it on the winner's track.
+	// Its moment, now on the winner's track.
 	if !near(list.Photos[0].Lon, 10.0005) {
 		t.Errorf("moved photo at %v, want the track's midpoint", list.Photos[0].Lon)
 	}
@@ -366,16 +370,19 @@ func TestStoryPhotos(t *testing.T) {
 	day1 := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, startedAt: photoTrackStart, at: &[2]float64{10, 50}})
 	day2 := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, startedAt: photoTrackStart.Add(24 * time.Hour), at: &[2]float64{11, 50}})
 	elsewhere := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, startedAt: photoTrackStart.Add(48 * time.Hour), at: &[2]float64{12, 50}})
-	for _, a := range []string{day2, day1, elsewhere} {
-		d.decode(d.uploadPhoto(me, file, thumb, map[string]string{"activity_id": a}), http.StatusCreated, nil)
+	for _, a := range []struct {
+		id string
+		at time.Time
+	}{{day2, photoTrackStart.Add(24 * time.Hour)}, {day1, photoTrackStart}, {elsewhere, photoTrackStart.Add(48 * time.Hour)}} {
+		d.decode(d.uploadPhoto(me, file, thumb, map[string]string{"activity_id": a.id, "route_at": a.at.Format(time.RFC3339)}), http.StatusCreated, nil)
 	}
 	var st story
 	d.decode(d.do(me, "POST", "/v1/stories", map[string]any{"name": "Trip", "activity_ids": []string{day1, day2}}), http.StatusCreated, &st)
 
 	var list photosResponse
 	d.decode(d.do(me, "GET", "/v1/photos?story="+st.ID, nil), http.StatusOK, &list)
-	if len(list.Photos) != 2 || list.Photos[0].ActivityID != day2 || list.Photos[1].ActivityID != day1 {
-		t.Errorf("story photos %+v, want day 2's then day 1's (by upload; neither placed)", list.Photos)
+	if len(list.Photos) != 2 || list.Photos[0].ActivityID != day1 || list.Photos[1].ActivityID != day2 {
+		t.Errorf("story photos %+v, want day 1's then day 2's", list.Photos)
 	}
 	for _, path := range []string{"/v1/photos?story=" + st.ID, "/v1/photos?story=nope"} {
 		if rec := d.do(d.newAccount(false), "GET", path, nil); rec.Code != http.StatusNotFound {

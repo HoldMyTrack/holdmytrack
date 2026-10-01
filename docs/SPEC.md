@@ -445,7 +445,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Behavior**:
 1. On ingest, a new activity is compared against the account's existing ones by time: two activities are the same one when their time ranges overlap for at least 80% of the longer one's duration. Activity type and distance are not compared, since sources routinely disagree on both for the same activity ("walking" vs "hiking", a few percent of distance). Two activities that only touch — back-to-back recordings with a few seconds of clock skew — or where one is a small part of the other (a short auto-detected walk inside a long hike, a day hike inside a multi-day recording) stay separate. An activity with no duration is never matched.
 2. A match is resolved by keeping the richer record (route geometry over none; then elevation data over none) and marking the other `superseded_by` the winner, rather than deleting it.
-3. Every user-facing read — the Activities list, totals, histogram, day pages, trends, graph stats, map tiles, and both Fog of War and Heatmap composites — excludes superseded activities automatically. A superseded copy's photos (FR-16) move to the kept copy; one the superseded copy couldn't place is placed by its capture time on the kept copy's track (FR-16.2).
+3. Every user-facing read — the Activities list, totals, histogram, day pages, trends, graph stats, map tiles, and both Fog of War and Heatmap composites — excludes superseded activities automatically. A superseded copy's photos (FR-16) move to the kept copy, at the same moment on its track.
 4. Deleting the kept copy of a matched pair promotes the next-richest superseded copy back to live, rather than leaving both gone.
 
 **Outputs**: At most one live `Activity` per real-world activity, regardless of how many sources reported it.
@@ -1287,7 +1287,7 @@ Deliberately out of scope, not a "not yet" — built and then cut, not planned t
 ### FR-16.1 Upload
 
 **Behavior**:
-1. `POST /v1/photos` takes a multipart body: `activity_id`; `file`, the resized photo, and `thumb`, its thumbnail, each a JPEG or WebP; and optionally what the client read from the original's EXIF — `taken_at` (RFC 3339) or `taken_local` (`YYYY-MM-DDTHH:MM:SS`, a capture time with no time zone), and `lat`/`lon`. It answers `201` with the photo (FR-16.3), placed per FR-16.2.
+1. `POST /v1/photos` takes a multipart body: `activity_id`; `file`, the resized photo, and `thumb`, its thumbnail, each a JPEG or WebP; and optionally what the client read from the original's EXIF — `taken_at` (RFC 3339) or `taken_local` (`YYYY-MM-DDTHH:MM:SS`, a capture time with no time zone), and `lat`/`lon`; and optionally `route_at` (RFC 3339), the place on the track the user chose. It answers `201` with the photo (FR-16.3), placed per FR-16.2.
 2. Each image's type is read from its bytes, never from its filename or declared type.
 3. An account holds at most 2,000 photos.
 
@@ -1295,7 +1295,9 @@ Deliberately out of scope, not a "not yet" — built and then cut, not planned t
 - No session → `401`. A demo session → `403` (`demo_read_only`).
 - An activity that isn't the caller's, or a missing or malformed `activity_id` → `404`.
 - The account already holds 2,000 photos → `409`.
-- A missing `file` or `thumb` → `400`; a `taken_at`, `taken_local` or `lat`/`lon` that doesn't parse → `400`.
+- A missing `file` or `thumb` → `400`; a `taken_at`, `taken_local`, `lat`/`lon` or `route_at` that doesn't parse → `400`.
+- An activity with no track → `409`: a photo needs a place on one.
+- A photo FR-16.2 can't place → `422` with the error code `photo_needs_place` and a message; nothing is stored. The client asks the user where it goes and sends it again with `route_at`.
 - An image that isn't a decodable JPEG or WebP → `415`.
 - `file` larger than 3 MiB or `thumb` larger than 256 KiB (or the body over its limit) → `413`.
 - `file` larger than 2560 px, or `thumb` larger than 640 px, on either side → `422`: an original must be resized first.
@@ -1303,17 +1305,18 @@ Deliberately out of scope, not a "not yet" — built and then cut, not planned t
 ### FR-16.2 Placement
 
 **Behavior**:
-1. A photo is placed by a moment on its activity's track (`route_at`), never by a stored position; its position is that moment's point on the track, worked out on every read.
-2. Placed at its capture time when that falls within the track; a capture time up to 5 minutes before the track starts or after it ends places it at that end.
-3. A `taken_local` time is read in the account's time zone; if that misses the track, in the UTC offset (in 15-minute steps, −12:00 to +14:00) nearest the account's own that puts it on the track. `taken_at` (FR-16.3) is the instant it resolved to.
-4. Without a capture time that places it, an EXIF position within 500 m of the track places it at the track's nearest point.
-5. Otherwise the photo is kept unplaced (`route_at` null).
-6. A placed photo has no position (`lon`/`lat` null) when its moment is outside the track's current span — cut off by Private locations or Edit track — or its point is inside any of the account's Private locations, including one added after the upload. It keeps its `route_at`, and gets its position back if the track or the Private locations change to allow it.
+1. Every photo has a place on its activity's track: a moment on it (`route_at`), never a stored position. Its position is that moment's point on the track, worked out on every read.
+2. A `route_at` the user chose places it there, clamped to the track's first and last moment.
+3. Otherwise it's placed at its capture time when that falls within the track; a capture time up to 5 minutes before the track starts or after it ends places it at that end.
+4. A `taken_local` time is read in the account's time zone; if that misses the track, in the UTC offset (in 15-minute steps, −12:00 to +14:00) nearest the account's own that puts it on the track. `taken_at` (FR-16.3) is the instant it resolved to.
+5. Without a capture time that places it, an EXIF position within 500 m of the track places it at the track's nearest point.
+6. With none of these, the upload is refused for the user to choose (FR-16.1).
+7. A photo is always on the track as it's drawn: a moment the track no longer covers — cut off by Edit track or a Private location at its start or end — reads as the track's nearest end, and `route_at` is kept, so the photo returns to its moment if the track does. A track that passes through a Private location is drawn whole (FR-8.1), so a photo on that stretch shows nothing the track doesn't.
 
 ### FR-16.3 Listing and images
 
 **Behavior**:
-1. `GET /v1/photos?activity={id}` answers `{photos}`: the activity's photos as `{id, activity_id, taken_at, route_at, lon, lat, caption, width, height, url, thumb_url}`, placed ones (with a `route_at`) in route order, then unplaced ones by capture time and upload. `width`/`height` are the stored copy's. `GET /v1/photos?story={id}` answers the same for every activity in a Story (FR-14) that isn't a superseded duplicate, in the same order across all of them.
+1. `GET /v1/photos?activity={id}` answers `{photos}`: the activity's photos as `{id, activity_id, taken_at, route_at, lon, lat, caption, width, height, url, thumb_url}`, in route order (by `route_at`, then upload). `lon`/`lat` are null only when the activity has no track left at all. `width`/`height` are the stored copy's. `GET /v1/photos?story={id}` answers the same for every activity in a Story (FR-14) that isn't a superseded duplicate, in the same order across all of them.
 2. `GET /v1/photos/{id}` and `GET /v1/photos/{id}/thumb` serve the stored copy and its thumbnail with their sniffed content type, to their owner only, cacheable for good (a photo's images never change).
 
 **Error cases**:
@@ -1322,11 +1325,12 @@ Deliberately out of scope, not a "not yet" — built and then cut, not planned t
 ### FR-16.4 Editing
 
 **Behavior**:
-1. `PATCH /v1/photos/{id}` takes a JSON object; a field present changes, a field absent doesn't. `caption`: trimmed; empty or null clears it; at most 500 characters. `position`: `{lon, lat}` places the photo at the track's nearest point to it, at any distance; null takes it off the map (`route_at` null). It answers `200` with the photo.
+1. `PATCH /v1/photos/{id}` takes a JSON object; a field present changes, a field absent doesn't. `caption`: trimmed; empty or null clears it; at most 500 characters. `route_at`: RFC 3339, the photo's new moment on the track, clamped to it. A photo can't be taken off the track. It answers `200` with the photo.
+2. `GET /v1/activities/track-metrics/{id}` (FR-4.8) carries each display point's moment as `time_s` (epoch seconds), so a client can turn a place on the track into a `route_at`.
 
 **Error cases**:
-- A body that isn't a JSON object, or a `position` without numeric `lon` and `lat` within ±180/±90 → `400`. A caption over 500 characters → `400`.
-- A `position` for an activity with no track → `409`.
+- A body that isn't a JSON object, or a `route_at` that is null or not an RFC 3339 time → `400`. A caption over 500 characters → `400`.
+- A `route_at` for an activity with no track → `409`.
 - A photo that isn't the caller's → `404`. A demo session → `403`.
 
 ### FR-16.5 Deleting
