@@ -1,97 +1,90 @@
 import { useEffect, useRef } from 'react';
 import { Marker, type Map as MapLibreMap } from 'maplibre-gl';
-import { API_BASE_URL, type Photo } from '../api';
 
 /**
- * Photo markers (FR-16, IMPLEMENTATION.md §4.27): each placed photo of the focused activity or
- * the open Story, as its own thumbnail in a round frame, at its point on the track.
+ * Photo markers (FR-16, IMPLEMENTATION.md §4.27): each photo of the selected activity or the
+ * open Story, as its own thumbnail in a round frame, at its point on the track.
  *
- * HTML markers rather than a symbol layer: there are tens of them, not thousands, each shows
+ * HTML markers rather than a symbol layer: there are tens of them, not thousands, and each shows
  * its own image (a symbol layer would need every thumbnail added to the style as an icon, and
- * added again after every `setStyle`), and a marker can be dragged. Markers live outside the
- * style, so a theme's `setStyle` leaves them alone and `reattachOverlays` has nothing to do.
+ * added again after every `setStyle`). Markers live outside the style, so a theme's `setStyle`
+ * leaves them alone and `reattachOverlays` has nothing to do.
  */
 
 export const PHOTO_MARKER_CLASS = 'photo-marker';
 
-export interface PhotoMarkerOptions {
-  onOpen: (id: string) => void;
-  /** The photo the viewer has open, or the one being placed, drawn larger and on top. */
-  activeId?: string | null;
-  /** The one photo whose marker can be dragged — the one being placed (FR-16.8) — and what to do
-   *  with where it's dropped. */
-  draggableId?: string | null;
-  onDragEnd?: (id: string, at: { lon: number; lat: number }) => void;
+/** One marker: a saved photo, or one being placed in the Photos tab before it's uploaded. */
+export interface PhotoMarkerItem {
+  id: string;
+  lon: number;
+  lat: number;
+  /** The thumbnail's full URL. */
+  thumbSrc: string;
+  caption: string | null;
 }
 
-function markerElement(photo: Photo, onOpen: (id: string) => void): HTMLElement {
+export interface PhotoMarkerOptions {
+  onOpen: (id: string) => void;
+  /** The photo open in its popup, or being moved in the Photos tab: drawn larger and on top. */
+  activeId?: string | null;
+}
+
+function markerElement(item: PhotoMarkerItem, onOpen: (id: string) => void): HTMLElement {
   const el = document.createElement('button');
   el.type = 'button';
   el.className = PHOTO_MARKER_CLASS;
-  el.dataset.photoId = photo.id;
-  if (photo.caption) el.title = photo.caption;
+  el.dataset.photoId = item.id;
+  if (item.caption) el.title = item.caption;
   const img = document.createElement('img');
-  img.src = API_BASE_URL + photo.thumbUrl;
-  img.alt = photo.caption ?? '';
+  img.src = item.thumbSrc;
+  img.alt = item.caption ?? '';
   img.decoding = 'async';
   img.draggable = false;
   el.append(img);
   el.addEventListener('click', (event) => {
     event.stopPropagation();
-    onOpen(photo.id);
+    onOpen(item.id);
   });
   return el;
 }
 
-/** Keeps one marker per placed photo on the map, in step with `photos`. */
-export function usePhotoMarkers(
-  map: MapLibreMap | null,
-  photos: readonly Photo[],
-  { onOpen, activeId = null, draggableId = null, onDragEnd }: PhotoMarkerOptions,
-): void {
-  const markers = useRef(new Map<string, { marker: Marker; photo: Photo }>());
+/** Keeps one marker per item on the map, in step with `items`. */
+export function usePhotoMarkers(map: MapLibreMap | null, items: readonly PhotoMarkerItem[], { onOpen, activeId = null }: PhotoMarkerOptions): void {
+  const markers = useRef(new Map<string, { marker: Marker; item: PhotoMarkerItem }>());
   // Read through a ref, so a new callback each render doesn't rebuild every marker.
   const onOpenRef = useRef(onOpen);
   onOpenRef.current = onOpen;
-  const onDragEndRef = useRef(onDragEnd);
-  onDragEndRef.current = onDragEnd;
 
   useEffect(() => {
     if (!map) return;
     const current = markers.current;
-    const placed = photos.filter((p) => p.lon !== null && p.lat !== null);
-    const keep = new Set(placed.map((p) => p.id));
+    const keep = new Set(items.map((p) => p.id));
     for (const [id, { marker }] of current) {
       if (!keep.has(id)) {
         marker.remove();
         current.delete(id);
       }
     }
-    for (const photo of placed) {
-      const existing = current.get(photo.id);
-      if (existing && existing.photo.thumbUrl === photo.thumbUrl && existing.photo.caption === photo.caption) {
-        existing.marker.setLngLat([photo.lon!, photo.lat!]);
-        existing.photo = photo;
+    for (const item of items) {
+      const existing = current.get(item.id);
+      if (existing && existing.item.thumbSrc === item.thumbSrc && existing.item.caption === item.caption) {
+        existing.marker.setLngLat([item.lon, item.lat]);
+        existing.item = item;
         continue;
       }
       existing?.marker.remove();
-      const marker = new Marker({ element: markerElement(photo, (id) => onOpenRef.current(id)) })
-        .setLngLat([photo.lon!, photo.lat!])
+      const marker = new Marker({ element: markerElement(item, (id) => onOpenRef.current(id)) })
+        .setLngLat([item.lon, item.lat])
         .addTo(map);
-      marker.on('dragend', () => {
-        const { lng, lat } = marker.getLngLat();
-        onDragEndRef.current?.(photo.id, { lon: lng, lat });
-      });
-      current.set(photo.id, { marker, photo });
+      current.set(item.id, { marker, item });
     }
-  }, [map, photos]);
+  }, [map, items]);
 
   useEffect(() => {
     for (const [id, { marker }] of markers.current) {
       marker.getElement().classList.toggle(`${PHOTO_MARKER_CLASS}--active`, id === activeId);
-      marker.setDraggable(id === draggableId);
     }
-  }, [activeId, draggableId, photos]);
+  }, [activeId, items]);
 
   // Gone with the map view itself.
   useEffect(() => {

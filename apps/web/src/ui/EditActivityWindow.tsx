@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { saveActivityTrackEdit, updateActivity, type Activity, type TrackEdit } from '../api';
+import { saveActivityTrackEdit, updateActivity, type Activity, type Photo, type TrackEdit } from '../api';
+import type { PhotoMarkerItem } from '../map/photos';
 import type { TypeFacet } from './activityFacets';
 import { ActivityTypePicker } from './ActivityTypePicker';
 import { formatStartedAt } from './format';
+import { PhotosTab } from './PhotosTab';
 import { TrackEditor } from './TrackEditor';
 import { t, tn } from '../i18n';
 
@@ -14,7 +16,7 @@ const MAX_ACTIVITY_TYPE_LEN = 50;
 const MAX_NAME_LEN = 200;
 const MAX_DESCRIPTION_LEN = 2000;
 
-type Tab = 'activity' | 'track';
+export type EditTab = 'activity' | 'track' | 'photos';
 
 /**
  * The Edit window (§4.7.4, §4.7.7) — reached from the header toolbar's Edit button
@@ -31,6 +33,10 @@ type Tab = 'activity' | 'track';
  *    first time starts MapView's track session (`onStartTrack`: the other tracks hidden, the
  *    camera on this one), which then lasts until the window closes; the editor stays mounted
  *    behind the Activity tab, so switching back and forth loses nothing.
+ *  - **Photos** — PhotosTab.tsx, over exactly one activity with a track; `photosUnavailable`
+ *    names why not otherwise. Unlike the other two, its changes are saved as they're made: an
+ *    upload can't wait for Save, and neither then should the rest of the list. Mounted on first
+ *    open and kept, so a photo waiting for a place survives a look at another tab.
  *
  * Save writes what changed — the fields first (skipped when they're as they were), then the
  * track edit (skipped when the Track tab did nothing) — and closes. If a later write fails after earlier ones landed, the window stays open with the
@@ -61,6 +67,20 @@ export interface EditActivityWindowProps {
   /** Why the Track tab is disabled, or null when `activities` is one editable track. */
   trackUnavailable: string | null;
   onStartTrack: (activity: Activity) => void;
+  /** Why the Photos tab is disabled, or null when `activities` is one activity with a track. */
+  photosUnavailable: string | null;
+  /** The single activity's photos and what to do as they change — MapView owns them, since
+   *  they're also its markers. */
+  photos: {
+    photos: readonly Photo[];
+    error: string | null;
+    onChanged: () => void;
+    onReplace: (photo: Photo) => void;
+    onRemove: (id: string) => void;
+    onPreview: (preview: PhotoMarkerItem | null) => void;
+  };
+  /** The tab showing changed — MapView hides the photo markers on the Track tab. */
+  onTabChange: (tab: EditTab) => void;
   /** `saved`: something was written, so the list reloads. `trackApplied`: a track edit was sent, so the row now reads
    *  Pending until its reprocess lands. */
   onClose: (result: EditWindowResult) => void;
@@ -71,10 +91,21 @@ export interface EditWindowResult {
   trackApplied: boolean;
 }
 
-export function EditActivityWindow({ map, activities, knownTypes, trackUnavailable, onStartTrack, onClose }: EditActivityWindowProps) {
+export function EditActivityWindow({
+  map,
+  activities,
+  knownTypes,
+  trackUnavailable,
+  onStartTrack,
+  photosUnavailable,
+  photos,
+  onTabChange,
+  onClose,
+}: EditActivityWindowProps) {
   const single = activities.length === 1 ? activities[0]! : null;
-  const [tab, setTab] = useState<Tab>('activity');
+  const [tab, setTab] = useState<EditTab>('activity');
   const [trackStarted, setTrackStarted] = useState(false);
+  const [photosStarted, setPhotosStarted] = useState(false);
   // A group whose activities share one type starts on it; a mixed group starts empty ("Mixed
   // types"), and stays that way unless a type is picked — empty keeps each activity's own type.
   const mixedTypes = activities.some((a) => a.activityType !== activities[0]!.activityType);
@@ -100,14 +131,18 @@ export function EditActivityWindow({ map, activities, knownTypes, trackUnavailab
   useEffect(() => {
     if (saving) return;
     const onKeyDown = (event: KeyboardEvent) => {
+      // Not an Escape meant for a dialog of its own, such as the Photos tab's delete confirmation.
+      if ((event.target as Element | null)?.closest?.('dialog')) return;
       if (event.key === 'Escape' && !event.defaultPrevented) cancel();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [saving, cancel]);
 
-  function openTab(next: Tab) {
+  function openTab(next: EditTab) {
     setTab(next);
+    onTabChange(next);
+    if (next === 'photos') setPhotosStarted(true);
     if (next === 'track' && !trackStarted && single) {
       setTrackStarted(true);
       onStartTrack(single);
@@ -204,6 +239,19 @@ export function EditActivityWindow({ map, activities, knownTypes, trackUnavailab
           {t('edit.tab_track')}
           {trackPending && <span className="edit-window__tab-dot" aria-hidden="true" />}
         </button>
+        <button
+          type="button"
+          role="tab"
+          className="edit-window__tab"
+          aria-selected={tab === 'photos'}
+          disabled={photosUnavailable !== null}
+          title={photosUnavailable ?? undefined}
+          onClick={() => openTab('photos')}
+          data-testid="edit-tab-photos"
+        >
+          {t('photos.tab')}
+          {photosUnavailable === null && photos.photos.length > 0 && <span className="edit-window__tab-count">{photos.photos.length}</span>}
+        </button>
       </div>
 
       <div className="edit-window__panel" role="tabpanel" hidden={tab !== 'activity'}>
@@ -254,6 +302,12 @@ export function EditActivityWindow({ map, activities, knownTypes, trackUnavailab
       {trackStarted && single && (
         <div className="edit-window__panel" role="tabpanel" hidden={tab !== 'track'}>
           <TrackEditor map={map} activity={single} active={tab === 'track'} busy={saving} onChange={onTrackChange} />
+        </div>
+      )}
+
+      {photosStarted && single && photosUnavailable === null && (
+        <div className="edit-window__panel" role="tabpanel" hidden={tab !== 'photos'}>
+          <PhotosTab activity={single} active={tab === 'photos'} {...photos} />
         </div>
       )}
 
