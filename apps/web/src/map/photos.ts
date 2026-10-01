@@ -16,8 +16,12 @@ export const PHOTO_MARKER_CLASS = 'photo-marker';
 
 export interface PhotoMarkerOptions {
   onOpen: (id: string) => void;
-  /** The photo the viewer has open, drawn larger and on top. */
+  /** The photo the viewer has open, or the one being placed, drawn larger and on top. */
   activeId?: string | null;
+  /** The one photo whose marker can be dragged — the one being placed (FR-16.8) — and what to do
+   *  with where it's dropped. */
+  draggableId?: string | null;
+  onDragEnd?: (id: string, at: { lon: number; lat: number }) => void;
 }
 
 function markerElement(photo: Photo, onOpen: (id: string) => void): HTMLElement {
@@ -40,11 +44,17 @@ function markerElement(photo: Photo, onOpen: (id: string) => void): HTMLElement 
 }
 
 /** Keeps one marker per placed photo on the map, in step with `photos`. */
-export function usePhotoMarkers(map: MapLibreMap | null, photos: readonly Photo[], { onOpen, activeId = null }: PhotoMarkerOptions): void {
+export function usePhotoMarkers(
+  map: MapLibreMap | null,
+  photos: readonly Photo[],
+  { onOpen, activeId = null, draggableId = null, onDragEnd }: PhotoMarkerOptions,
+): void {
   const markers = useRef(new Map<string, { marker: Marker; photo: Photo }>());
   // Read through a ref, so a new callback each render doesn't rebuild every marker.
   const onOpenRef = useRef(onOpen);
   onOpenRef.current = onOpen;
+  const onDragEndRef = useRef(onDragEnd);
+  onDragEndRef.current = onDragEnd;
 
   useEffect(() => {
     if (!map) return;
@@ -68,6 +78,10 @@ export function usePhotoMarkers(map: MapLibreMap | null, photos: readonly Photo[
       const marker = new Marker({ element: markerElement(photo, (id) => onOpenRef.current(id)) })
         .setLngLat([photo.lon!, photo.lat!])
         .addTo(map);
+      marker.on('dragend', () => {
+        const { lng, lat } = marker.getLngLat();
+        onDragEndRef.current?.(photo.id, { lon: lng, lat });
+      });
       current.set(photo.id, { marker, photo });
     }
   }, [map, photos]);
@@ -75,8 +89,9 @@ export function usePhotoMarkers(map: MapLibreMap | null, photos: readonly Photo[
   useEffect(() => {
     for (const [id, { marker }] of markers.current) {
       marker.getElement().classList.toggle(`${PHOTO_MARKER_CLASS}--active`, id === activeId);
+      marker.setDraggable(id === draggableId);
     }
-  }, [activeId, photos]);
+  }, [activeId, draggableId, photos]);
 
   // Gone with the map view itself.
   useEffect(() => {

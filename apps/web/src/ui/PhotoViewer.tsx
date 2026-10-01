@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, MapPin, MapPinOff, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, MapPinOff, Move, Trash2, X } from 'lucide-react';
 import { API_BASE_URL, deletePhoto, updatePhoto, type Photo } from '../api';
 import { t } from '../i18n';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -15,9 +15,13 @@ export interface PhotoViewerProps {
   onNavigate: (id: string) => void;
   /** A PATCH answered with this photo. */
   onChanged: (photo: Photo) => void;
+  /** Its place changed, and with it perhaps its place in the order. */
+  onMoved: () => void;
   onDeleted: (id: string) => void;
   /** Close and fly the map to the photo's place. */
   onShowOnMap: (photo: Photo) => void;
+  /** Close and start placing the photo on the map by hand (FR-16.8). */
+  onPlace: (photo: Photo) => void;
   onClose: () => void;
 }
 
@@ -27,7 +31,7 @@ export interface PhotoViewerProps {
  * (buttons or the keyboard). Shows when it was taken, or that it has no place on the map, and
  * lets the owner write a caption (saved on blur or Enter) and delete it.
  */
-export function PhotoViewer({ photos, id, readOnly, onNavigate, onChanged, onDeleted, onShowOnMap, onClose }: PhotoViewerProps) {
+export function PhotoViewer({ photos, id, readOnly, onNavigate, onChanged, onMoved, onDeleted, onShowOnMap, onPlace, onClose }: PhotoViewerProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const index = photos.findIndex((p) => p.id === id);
   const photo = index >= 0 ? photos[index]! : null;
@@ -67,8 +71,20 @@ export function PhotoViewer({ photos, id, readOnly, onNavigate, onChanged, onDel
     }
   }
 
+  async function takeOffMap() {
+    if (!photo) return;
+    try {
+      onChanged(await updatePhoto(photo.id, { position: null }));
+      onMoved();
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('common.something_wrong'));
+    }
+  }
+
   if (!photo) return null;
   const placed = photo.lon !== null && photo.lat !== null;
+  const demoTitle = readOnly ? t('photos.demo_edit') : undefined;
 
   return (
     <dialog
@@ -147,12 +163,22 @@ export function PhotoViewer({ photos, id, readOnly, onNavigate, onChanged, onDel
               {t('photos.show_on_map')}
             </button>
           )}
+          <button type="button" className="photo-viewer__btn" disabled={readOnly} title={demoTitle} onClick={() => onPlace(photo)} data-testid="photo-place">
+            <Move size={16} aria-hidden="true" />
+            {placed ? t('photos.move') : t('photos.place')}
+          </button>
+          {photo.routeAt !== null && (
+            <button type="button" className="photo-viewer__btn" disabled={readOnly} title={demoTitle} onClick={() => void takeOffMap()}>
+              <MapPinOff size={16} aria-hidden="true" />
+              {t('photos.take_off')}
+            </button>
+          )}
           <span className="photo-viewer__spacer" aria-hidden="true" />
           <button
             type="button"
             className="photo-viewer__btn photo-viewer__btn--danger"
             disabled={readOnly}
-            title={readOnly ? t('photos.demo_edit') : undefined}
+            title={demoTitle}
             onClick={() => setConfirmDelete(true)}
           >
             <Trash2 size={16} aria-hidden="true" />

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Map as MapLibreMap } from 'maplibre-gl';
+import type { Map as MapLibreMap, MapMouseEvent } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { flyToBBox, flyToView, unionBBox } from './bbox';
 import { basemapOrigin, satelliteSource, WORLD_VIEW } from './config';
@@ -11,7 +11,7 @@ import { ensureHeatmapLayer } from './heatmap';
 import { setMapMode, type MapMode } from './mapMode';
 import { loadOverlays, saveOverlays, type Overlays } from './overlays';
 import { setPathsVisible } from './paths';
-import { usePhotoMarkers } from './photos';
+import { PHOTO_MARKER_CLASS, usePhotoMarkers } from './photos';
 import { setSatelliteVisible } from './satellite';
 import { ensureSpotsLayer, setSpotClickHandler, setSpotsCaptured, setSpotsVisible, type Spot, type SpotCategory } from './spots';
 import { labelInsertionPoint } from './layers';
@@ -28,7 +28,7 @@ import {
 import { useCoverageRefresh } from './useCoverageRefresh';
 import { useMapInstance } from './useMapInstance';
 import { flavorForTheme, parseHash, pinnedFlavor, replaceHash, type HashState, type ViewState } from './viewState';
-import { getActivityTrackMetrics, getSpotCaptures, type Activity, type ActivityTrackMetrics, type SpotCapture, type Story } from '../api';
+import { getActivityTrackMetrics, getSpotCaptures, updatePhoto, type Activity, type ActivityTrackMetrics, type SpotCapture, type Story } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
 import { ActivitiesPanel, type PanelTab, type StoriesPanel } from '../ui/ActivitiesPanel';
@@ -37,6 +37,7 @@ import { ExportControl } from '../ui/ExportControl';
 import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
 import { OverlaysMenu } from '../ui/OverlaysMenu';
 import { PhotoStrip } from '../ui/PhotoStrip';
+import { PhotoPlacement } from '../ui/PhotoPlacement';
 import { PhotoViewer } from '../ui/PhotoViewer';
 import { ShowInArea } from '../ui/ShowInArea';
 import { ZoomLevelNotice } from '../ui/ZoomLevelNotice';
@@ -250,8 +251,16 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   const photoState = usePhotos(photoScope, trackMetricsVersion);
   // The photo the viewer has open; closed whenever the photos in view change hands.
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
+  // The photo being placed on the map by hand (FR-16.8): a click on the map, or a drag of its
+  // marker, puts it at the track's nearest point.
+  const [placingPhotoId, setPlacingPhotoId] = useState<string | null>(null);
+  const [placingBusy, setPlacingBusy] = useState(false);
+  const [placingError, setPlacingError] = useState<string | null>(null);
   const photoScopeKey = photoScope === null ? null : JSON.stringify(photoScope);
-  useEffect(() => setOpenPhotoId(null), [photoScopeKey]);
+  useEffect(() => {
+    setOpenPhotoId(null);
+    setPlacingPhotoId(null);
+  }, [photoScopeKey]);
   const storiesList = useStories(panelTab === 'stories');
 
   // TYPE/DISTANCE facets — pure client-side filters over
@@ -751,16 +760,18 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // away — and in Delete point mode, every click is aimed at a point. The handlers go quiet.
   useEffect(() => {
     setTrackInteractivityHandlers(
-      editOpen
+      // Placing a photo (FR-16.8) is the same: every click is aimed at the track, to put it there.
+      editOpen || placingPhotoId !== null
         ? { onSelect: () => {}, onHover: () => {}, onClickAway: () => {} }
         : { onSelect: focusActivity, onHover: setHoveredActivityId, onClickAway: clearFocus },
     );
-  }, [focusActivity, clearFocus, editOpen]);
+  }, [focusActivity, clearFocus, editOpen, placingPhotoId]);
 
-  // A click on a spot opens its popup; hiding its category closes it.
+  // A click on a spot opens its popup; hiding its category closes it. Not while a photo is being
+  // placed, when the click is for the photo.
   useEffect(() => {
-    setSpotClickHandler(setOpenSpot);
-  }, []);
+    setSpotClickHandler(placingPhotoId !== null ? () => {} : setOpenSpot);
+  }, [placingPhotoId]);
   // Captures are made on the phone, so they're read again whenever the page comes back into view
   // or the window gets focus back — a browser left open on a desktop stays visible throughout.
   useEffect(() => {
@@ -1334,9 +1345,54 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     };
   }, [map, pinned]);
 
+  // Puts the photo being placed at the track's nearest point to `at`; the server snaps it. On a
+  // refusal the marker goes back where it was (a fresh copy of the list re-sets every marker).
+  const placePhoto = useCallback(
+    async (id: string, at: { lon: number; lat: number }) => {
+      const before = photoState.photos.find((p) => p.id === id);
+      setPlacingBusy(true);
+      setPlacingError(null);
+      try {
+        photoState.replace(await updatePhoto(id, { position: at }));
+        // Its place in the route order may have changed with it.
+        photoState.reload();
+        setPlacingPhotoId(null);
+      } catch (err) {
+        if (before) photoState.replace(before);
+        setPlacingError(err instanceof Error ? err.message : t('common.something_wrong'));
+      } finally {
+        setPlacingBusy(false);
+      }
+    },
+    [photoState.photos, photoState.replace, photoState.reload],
+  );
+
+  useEffect(() => {
+    if (!map || placingPhotoId === null) return;
+    const onClick = (e: MapMouseEvent) => {
+      if ((e.originalEvent.target as Element | null)?.closest?.(`.${PHOTO_MARKER_CLASS}`)) return;
+      void placePhoto(placingPhotoId, { lon: e.lngLat.lng, lat: e.lngLat.lat });
+    };
+    const canvas = map.getCanvas();
+    canvas.style.cursor = 'crosshair';
+    map.on('click', onClick);
+    return () => {
+      map.off('click', onClick);
+      canvas.style.cursor = '';
+    };
+  }, [map, placingPhotoId, placePhoto]);
+
   // Off the map while the Edit window is open: its Track tab edits on the map, and the photos
   // would sit over the very points being cut.
-  usePhotoMarkers(map, editOpen ? [] : photoState.photos, { onOpen: setOpenPhotoId, activeId: openPhotoId });
+  usePhotoMarkers(map, editOpen ? [] : photoState.photos, {
+    // While placing, a click on another photo is a click on the map, not a reason to open it.
+    onOpen: (id) => {
+      if (placingPhotoId === null) setOpenPhotoId(id);
+    },
+    activeId: placingPhotoId ?? openPhotoId,
+    draggableId: placingPhotoId,
+    onDragEnd: (id, at) => void placePhoto(id, at),
+  });
 
   return (
     <div className="app-shell">
@@ -1450,12 +1506,26 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
               readOnly={isDemo}
               onNavigate={setOpenPhotoId}
               onChanged={photoState.replace}
+              onMoved={photoState.reload}
               onDeleted={photoState.remove}
               onShowOnMap={(photo) => {
                 setOpenPhotoId(null);
                 map.flyTo({ center: [photo.lon!, photo.lat!], zoom: Math.max(map.getZoom(), 16) });
               }}
+              onPlace={(photo) => {
+                setOpenPhotoId(null);
+                setPlacingError(null);
+                setPlacingPhotoId(photo.id);
+              }}
               onClose={() => setOpenPhotoId(null)}
+            />
+          )}
+          {map && placingPhotoId !== null && (
+            <PhotoPlacement
+              placed={photoState.photos.some((p) => p.id === placingPhotoId && p.lon !== null)}
+              busy={placingBusy}
+              error={placingError}
+              onCancel={() => setPlacingPhotoId(null)}
             />
           )}
           {!editOpen && (
@@ -1494,7 +1564,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
               {map && <ZoomLevelNotice map={map} mode={mapMode} />}
             </div>
           )}
-          {map && !editOpen && <ShowInArea map={map} categories={spotsShown} />}
+          {map && !editOpen && placingPhotoId === null && <ShowInArea map={map} categories={spotsShown} />}
           {map && openSpot && <SpotPopup map={map} spot={openSpot} capturedAt={spotCaptures.find((c) => c.spot_id === openSpot.id)?.captured_at ?? null} onClose={() => setOpenSpot(null)} />}
         </div>
       </div>

@@ -1841,6 +1841,7 @@ button.activities-panel__story-badge:hover {
 
 .photo-viewer__actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--fm-space-8);
 }
@@ -1881,6 +1882,43 @@ button.activities-panel__story-badge:hover {
   margin: 0;
   font-size: var(--fm-text-sm);
   color: var(--fm-danger);
+}
+
+/* PhotoPlacement.tsx: placing a photo by hand — a pill centred under the toggles, where "Show in
+   this area" sits otherwise (it's hidden meanwhile). */
+.photo-placement {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--fm-space-12);
+  max-width: calc(100% - 32px);
+  box-sizing: border-box;
+  padding: var(--fm-space-6) var(--fm-space-6) var(--fm-space-6) var(--fm-space-16);
+  border-radius: var(--fm-radius-pill);
+  background: var(--fm-surface);
+  box-shadow: var(--fm-shadow-md);
+  font-size: var(--fm-text-md);
+  color: var(--fm-ink);
+  transform: translateX(-50%);
+}
+
+.photo-placement__cancel {
+  flex-shrink: 0;
+  padding: var(--fm-space-4) var(--fm-space-12);
+  border: 1px solid var(--fm-border-strong);
+  border-radius: var(--fm-radius-pill);
+  background: var(--fm-surface);
+  color: var(--fm-ink);
+  font: inherit;
+  font-weight: var(--fm-weight-semibold);
+  cursor: pointer;
+}
+
+.photo-placement__cancel:hover {
+  background: var(--fm-surface-tint);
 }
 
 /* ZoomLevelNotice.tsx — which level Fog/Heatmap is drawing at, fading out after a few seconds.

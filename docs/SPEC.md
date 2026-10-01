@@ -1313,7 +1313,7 @@ Deliberately out of scope, not a "not yet" — built and then cut, not planned t
 ### FR-16.3 Listing and images
 
 **Behavior**:
-1. `GET /v1/photos?activity={id}` answers `{photos}`: the activity's photos as `{id, activity_id, taken_at, route_at, lon, lat, caption, width, height, url, thumb_url}`, placed ones in route order, then unplaced ones by capture time and upload. `width`/`height` are the stored copy's. `GET /v1/photos?story={id}` answers the same for every activity in a Story (FR-14) that isn't a superseded duplicate, in the same order across all of them.
+1. `GET /v1/photos?activity={id}` answers `{photos}`: the activity's photos as `{id, activity_id, taken_at, route_at, lon, lat, caption, width, height, url, thumb_url}`, placed ones (with a `route_at`) in route order, then unplaced ones by capture time and upload. `width`/`height` are the stored copy's. `GET /v1/photos?story={id}` answers the same for every activity in a Story (FR-14) that isn't a superseded duplicate, in the same order across all of them.
 2. `GET /v1/photos/{id}` and `GET /v1/photos/{id}/thumb` serve the stored copy and its thumbnail with their sniffed content type, to their owner only, cacheable for good (a photo's images never change).
 
 **Error cases**:
@@ -1354,3 +1354,12 @@ Deliberately out of scope, not a "not yet" — built and then cut, not planned t
 3. The viewer shows the photo as large as the window allows; its position in the list ("2 of 4"); when it was taken, if known; and a note when it has no place on the map. ← and →, or the arrows on the photo, step through the photos in the strip's order; Escape, the close button or a click outside closes it. The photo open in the viewer is drawn larger on the map.
 4. The owner can write a caption, saved when the field loses focus or on Enter (FR-16.4), and delete the photo after a confirmation (FR-16.5); the viewer then shows the next photo, else the previous, else closes. Show on map closes the viewer and flies the map to the photo.
 5. For a demo session the caption is read-only and Delete is disabled with a tooltip saying why.
+
+### FR-16.8 Placing a photo by hand (web)
+
+**Behavior**:
+1. The viewer's Place on map (Move on map, for a photo already on it) closes the viewer and asks for the place: a click on the map puts the photo at the selected activity's track's nearest point to it (FR-16.4); a photo already on the map can also be dragged there by its marker. The track's own clicks don't change the selection meanwhile, and a spot's click doesn't open its popup.
+2. The photo then shows at its new place, and the strip and the viewer's order follow its new place in the route.
+3. Cancel, or Escape, leaves the photo where it was. If the server refuses, the photo stays where it was and the message shows, still asking for the place.
+4. Take off the map, for a photo with a place on the route, removes it (FR-16.4); the photo stays in the strip, badged.
+5. For a demo session both are disabled, with a tooltip saying why.
