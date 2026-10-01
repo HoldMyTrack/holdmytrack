@@ -386,6 +386,15 @@ func (s *Server) handleDeleteActivity(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.RemoveByPrefix(ctx, "activity-masks/"+activityID+"/"); err != nil {
 		s.log.Error("activity delete: mask cleanup failed, deleting row anyway", "activity_id", activityID, "err", err)
 	}
+	// The activity's photos (§4.27) go with it; the cascade takes their rows, so their images
+	// have to be removed explicitly.
+	if photoIDs, err := s.activityPhotoIDs(ctx, activityID); err != nil {
+		s.log.Error("activity delete: photo lookup failed, deleting row anyway", "activity_id", activityID, "err", err)
+	} else {
+		for _, photoID := range photoIDs {
+			s.removePhotoObjects(ctx, userID, photoID)
+		}
+	}
 	if rawKey != nil {
 		// raw_payload_key is content-addressed (raw/{userID}/{sha256(bytes)}{ext}), not
 		// scoped by source — two distinct activities can share one key if their raw bytes are

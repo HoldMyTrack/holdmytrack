@@ -445,7 +445,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Behavior**:
 1. On ingest, a new activity is compared against the account's existing ones by time: two activities are the same one when their time ranges overlap for at least 80% of the longer one's duration. Activity type and distance are not compared, since sources routinely disagree on both for the same activity ("walking" vs "hiking", a few percent of distance). Two activities that only touch — back-to-back recordings with a few seconds of clock skew — or where one is a small part of the other (a short auto-detected walk inside a long hike, a day hike inside a multi-day recording) stay separate. An activity with no duration is never matched.
 2. A match is resolved by keeping the richer record (route geometry over none; then elevation data over none) and marking the other `superseded_by` the winner, rather than deleting it.
-3. Every user-facing read — the Activities list, totals, histogram, day pages, trends, graph stats, map tiles, and both Fog of War and Heatmap composites — excludes superseded activities automatically.
+3. Every user-facing read — the Activities list, totals, histogram, day pages, trends, graph stats, map tiles, and both Fog of War and Heatmap composites — excludes superseded activities automatically. A superseded copy's photos (FR-16) move to the kept copy; one the superseded copy couldn't place is placed by its capture time on the kept copy's track (FR-16.2).
 4. Deleting the kept copy of a matched pair promotes the next-richest superseded copy back to live, rather than leaving both gone.
 
 **Outputs**: At most one live `Activity` per real-world activity, regardless of how many sources reported it.
@@ -773,7 +773,7 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 
 **Behavior**:
 1. Clicking the toolbar's Delete icon opens a confirmation dialog naming its target — how many activities are checked, or the focused activity's own name or date/time — and their combined distance, stating plainly that this can't be undone; nothing is deleted until the user confirms.
-2. Confirming removes every activity in the target and everything derived from each one: its recorded stream data and its rendered coverage masks.
+2. Confirming removes every activity in the target and everything derived from each one: its recorded stream data, its rendered coverage masks, and its photos (FR-16).
 3. The Fog-of-War/Heatmap view updates to reflect the deletion — coverage a deleted activity was the only source for reverts to unrevealed, not left showing stale coverage for data that no longer exists. An open page picks this up on its own once the background re-render finishes, without a reload.
 4. Canceling the confirmation, or dismissing it, leaves every activity untouched.
 
@@ -1333,3 +1333,4 @@ Deliberately out of scope, not a "not yet" — built and then cut, not planned t
 
 **Behavior**:
 1. `DELETE /v1/photos/{id}` deletes the photo and both its images, answering `204`; a photo that isn't the caller's → `404`, a demo session → `403`.
+2. Deleting an activity deletes its photos (FR-5.11). A duplicate's photos move to the copy that's kept (FR-3.7).

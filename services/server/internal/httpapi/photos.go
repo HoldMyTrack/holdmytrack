@@ -628,6 +628,16 @@ func (s *Server) handleDeletePhoto(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// activityPhotoIDs lists an activity's photos, for removing their images before the activity's
+// own delete cascades their rows away.
+func (s *Server) activityPhotoIDs(ctx context.Context, activityID string) ([]string, error) {
+	rows, err := s.pool.Query(ctx, `SELECT id::text FROM activity_photos WHERE activity_id = $1`, activityID)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowTo[string])
+}
+
 // removePhotoObjects removes a photo's two images, logging rather than failing.
 func (s *Server) removePhotoObjects(ctx context.Context, userID, photoID string) {
 	for _, key := range []string{photoKey(userID, photoID), photoThumbKey(userID, photoID)} {

@@ -15,6 +15,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 )
 
 // memS3 is an object store that keeps what's put in it, enough for minio-go's single-part
@@ -303,4 +305,41 @@ func TestPhotoUploadRefusals(t *testing.T) {
 	if rec := d.uploadPhoto(me, file, thumb, fields); rec.Code != http.StatusConflict {
 		t.Errorf("over the limit: %d, want 409", rec.Code)
 	}
+}
+
+func TestPhotosFollowTheirActivity(t *testing.T) {
+	s3 := newMemS3()
+	d := newDBTestWithS3(t, s3)
+	me := d.newAccount(false)
+	ctx := context.Background()
+	file, thumb := testJPEG(t, 40, 30), testJPEG(t, 8, 6)
+
+	// Two recordings of the same walk: one with a track, one without. The tracked one wins.
+	tracked := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, startedAt: photoTrackStart, at: &[2]float64{10, 50}})
+	bare := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, startedAt: photoTrackStart})
+	var p photoJSON
+	d.decode(d.uploadPhoto(me, file, thumb, map[string]string{"activity_id": bare, "taken_at": "2026-05-01T10:00:30Z"}), http.StatusCreated, &p)
+	if p.Lon != nil {
+		t.Fatalf("placed on an activity with no track")
+	}
+	if _, err := ingest.ResolveDuplicates(ctx, d.pool, me.id, photoTrackStart, 60); err != nil {
+		t.Fatal(err)
+	}
+	d.decode(d.do(me, "GET", p.URL, nil), http.StatusOK, nil)
+	var list photosResponse
+	d.decode(d.do(me, "GET", "/v1/photos?activity="+tracked, nil), http.StatusOK, &list)
+	if len(list.Photos) != 1 || list.Photos[0].ID != p.ID {
+		t.Fatalf("the winner's photos: %+v, want the hidden copy's", list.Photos)
+	}
+	// Its capture time, kept from the upload, now places it on the winner's track.
+	if !near(list.Photos[0].Lon, 10.0005) {
+		t.Errorf("moved photo at %v, want the track's midpoint", list.Photos[0].Lon)
+	}
+
+	// Deleting the activity deletes its photos, images and all.
+	d.decode(d.do(me, "DELETE", "/v1/activities/"+tracked, nil), http.StatusNoContent, nil)
+	if s3.has(photoKey(me.id, p.ID)) || s3.has(photoThumbKey(me.id, p.ID)) {
+		t.Errorf("images left behind after the activity's delete")
+	}
+	d.decode(d.do(me, "GET", p.URL, nil), http.StatusNotFound, nil)
 }
