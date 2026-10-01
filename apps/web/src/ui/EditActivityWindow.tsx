@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { saveActivityTrackEdit, updateActivity, type Activity, type Photo, type TrackEdit } from '../api';
-import type { PhotoMarkerItem } from '../map/photos';
+import { deletePhoto, saveActivityTrackEdit, updateActivity, updatePhoto, uploadPhoto, type Activity, type Photo, type TrackEdit } from '../api';
+import type { PhotoMarkerOverlay } from '../map/photos';
+import { draftIsEmpty, draftSize, EMPTY_DRAFT, isoSeconds, waitingPhotos, type PhotoDraft } from './photoDraft';
 import type { TypeFacet } from './activityFacets';
 import { ActivityTypePicker } from './ActivityTypePicker';
 import { formatStartedAt } from './format';
-import { PhotosTab } from './PhotosTab';
+import { MAX_PHOTO_CAPTION_LEN, PhotosTab } from './PhotosTab';
 import { TrackEditor } from './TrackEditor';
 import { t, tn } from '../i18n';
 
@@ -34,9 +35,9 @@ export type EditTab = 'activity' | 'track' | 'photos';
  *    camera on this one), which then lasts until the window closes; the editor stays mounted
  *    behind the Activity tab, so switching back and forth loses nothing.
  *  - **Photos** — PhotosTab.tsx, over exactly one activity with a track; `photosUnavailable`
- *    names why not otherwise. Unlike the other two, its changes are saved as they're made: an
- *    upload can't wait for Save, and neither then should the rest of the list. Mounted on first
- *    open and kept, so a photo waiting for a place survives a look at another tab.
+ *    names why not otherwise. Its changes are a draft (photoDraft.ts) kept here, like the track
+ *    edit: new photos prepared in the browser with their places settled, moves, captions and
+ *    deletes, written by the same Save. Mounted on first open and kept.
  *
  * Save writes what changed — the fields first (skipped when they're as they were), then the
  * track edit (skipped when the Track tab did nothing) — and closes. If a later write fails after earlier ones landed, the window stays open with the
@@ -69,15 +70,12 @@ export interface EditActivityWindowProps {
   onStartTrack: (activity: Activity) => void;
   /** Why the Photos tab is disabled, or null when `activities` is one activity with a track. */
   photosUnavailable: string | null;
-  /** The single activity's photos and what to do as they change — MapView owns them, since
-   *  they're also its markers. */
+  /** The single activity's saved photos — MapView owns them, since they're also its markers —
+   *  and where to report how the draft changes the markers. */
   photos: {
     photos: readonly Photo[];
     error: string | null;
-    onChanged: () => void;
-    onReplace: (photo: Photo) => void;
-    onRemove: (id: string) => void;
-    onPreview: (preview: PhotoMarkerItem | null) => void;
+    onOverlay: (overlay: PhotoMarkerOverlay | null) => void;
   };
   /** The tab showing changed — MapView hides the photo markers on the Track tab. */
   onTabChange: (tab: EditTab) => void;
@@ -89,6 +87,8 @@ export interface EditActivityWindowProps {
 export interface EditWindowResult {
   saved: boolean;
   trackApplied: boolean;
+  /** Photos were uploaded, changed or deleted, so MapView refetches them. */
+  photosSaved: boolean;
 }
 
 export function EditActivityWindow({
@@ -106,6 +106,19 @@ export function EditActivityWindow({
   const [tab, setTab] = useState<EditTab>('activity');
   const [trackStarted, setTrackStarted] = useState(false);
   const [photosStarted, setPhotosStarted] = useState(false);
+  const [photoDraft, setPhotoDraft] = useState<PhotoDraft>(EMPTY_DRAFT);
+  const [photoProgress, setPhotoProgress] = useState<{ done: number; total: number } | null>(null);
+  // Any photo write landed — a later failure or Cancel still has to report it.
+  const photosSaved = useRef(false);
+  // New photos' local thumbnails are object URLs; whatever's left unsaved goes with the window.
+  const draftRef = useRef(photoDraft);
+  draftRef.current = photoDraft;
+  useEffect(() => () => draftRef.current.added.forEach((p) => URL.revokeObjectURL(p.thumbSrc)), []);
+  // A change to the photos answers whatever Save last refused about them — but not mid-Save,
+  // when the draft shrinks as each write lands.
+  useEffect(() => {
+    if (!saving) setError(null);
+  }, [photoDraft]);
   // A group whose activities share one type starts on it; a mixed group starts empty ("Mixed
   // types"), and stays that way unless a type is picked — empty keeps each activity's own type.
   const mixedTypes = activities.some((a) => a.activityType !== activities[0]!.activityType);
@@ -125,7 +138,7 @@ export function EditActivityWindow({
   }, []);
 
   const cancel = useCallback(() => {
-    onClose({ saved: fieldsSaved.current, trackApplied: false });
+    onClose({ saved: fieldsSaved.current, trackApplied: false, photosSaved: photosSaved.current });
   }, [onClose]);
 
   useEffect(() => {
@@ -163,7 +176,22 @@ export function EditActivityWindow({
             : null;
     if (invalid) {
       setError(invalid);
-      setTab('activity');
+      openTab('activity');
+      return;
+    }
+    // Every photo needs its place before anything is written, and a caption within bounds.
+    const captions = [
+      ...photoDraft.added.map((p) => p.caption),
+      ...Object.values(photoDraft.changed).flatMap((c) => (c.caption === undefined ? [] : [c.caption])),
+    ];
+    const photosInvalid = waitingPhotos(photoDraft).length > 0
+      ? t('photos.place_first')
+      : captions.some((c) => c.trim().length > MAX_PHOTO_CAPTION_LEN)
+        ? t('photos.caption_too_long', { max: MAX_PHOTO_CAPTION_LEN })
+        : null;
+    if (photosInvalid) {
+      setError(photosInvalid);
+      openTab('photos');
       return;
     }
     const fieldsChanged = single
@@ -192,19 +220,64 @@ export function EditActivityWindow({
         }
         fieldsSaved.current = true;
       }
+      if (single && !draftIsEmpty(photoDraft)) await savePhotos(single.id, photoDraft);
       if (single && trackPending) {
         await saveActivityTrackEdit(single.id, trackPending.edit);
-        onClose({ saved: true, trackApplied: true });
+        onClose({ saved: true, trackApplied: true, photosSaved: photosSaved.current });
         return;
       }
-      onClose({ saved: fieldsSaved.current, trackApplied: false });
+      onClose({ saved: fieldsSaved.current, trackApplied: false, photosSaved: photosSaved.current });
     } catch (err) {
       setError(err instanceof Error ? err.message : t('edit.save_failed'));
       setSaving(false);
+      setPhotoProgress(null);
+    }
+  }
+
+  // Writes the photo draft, one request at a time: uploads (each at the place it settled on),
+  // then moves and captions, then deletes. Each write that lands leaves the draft, so a retry
+  // after a failure picks up where it stopped.
+  async function savePhotos(activityId: string, draft: PhotoDraft) {
+    const total = draftSize(draft);
+    let done = 0;
+    const step = () => setPhotoProgress({ done: ++done, total });
+    setPhotoProgress({ done, total });
+    for (const photo of draft.added) {
+      await uploadPhoto(activityId, photo.prepared, isoSeconds(photo.routeAt!), photo.caption.trim() || undefined);
+      photosSaved.current = true;
+      URL.revokeObjectURL(photo.thumbSrc);
+      setPhotoDraft((d) => ({ ...d, added: d.added.filter((p) => p.key !== photo.key) }));
+      step();
+    }
+    for (const [id, change] of Object.entries(draft.changed)) {
+      if (draft.deleted.includes(id)) continue;
+      await updatePhoto(id, {
+        caption: change.caption?.trim(),
+        routeAt: change.routeAt === undefined ? undefined : isoSeconds(change.routeAt),
+      });
+      photosSaved.current = true;
+      setPhotoDraft((d) => {
+        const changed = { ...d.changed };
+        delete changed[id];
+        return { ...d, changed };
+      });
+      step();
+    }
+    for (const id of draft.deleted) {
+      await deletePhoto(id);
+      photosSaved.current = true;
+      setPhotoDraft((d) => {
+        const changed = { ...d.changed };
+        delete changed[id];
+        return { ...d, changed, deleted: d.deleted.filter((x) => x !== id) };
+      });
+      step();
     }
   }
 
   const namedFieldsDisabledReason = single ? undefined : t('edit.multi_reason');
+  // As Save would leave them.
+  const photoCount = photos.photos.length - photoDraft.deleted.length + photoDraft.added.length;
 
   return (
     <section className="edit-track edit-window" aria-label={t('edit.title_one')} data-testid="edit-activity-window">
@@ -250,7 +323,8 @@ export function EditActivityWindow({
           data-testid="edit-tab-photos"
         >
           {t('photos.tab')}
-          {photosUnavailable === null && photos.photos.length > 0 && <span className="edit-window__tab-count">{photos.photos.length}</span>}
+          {photosUnavailable === null && photoCount > 0 && <span className="edit-window__tab-count">{photoCount}</span>}
+          {!draftIsEmpty(photoDraft) && <span className="edit-window__tab-dot" aria-hidden="true" />}
         </button>
       </div>
 
@@ -307,7 +381,16 @@ export function EditActivityWindow({
 
       {photosStarted && single && photosUnavailable === null && (
         <div className="edit-window__panel" role="tabpanel" hidden={tab !== 'photos'}>
-          <PhotosTab activity={single} active={tab === 'photos'} {...photos} />
+          <PhotosTab
+            activity={single}
+            photos={photos.photos}
+            error={photos.error}
+            draft={photoDraft}
+            setDraft={setPhotoDraft}
+            active={tab === 'photos'}
+            busy={saving}
+            onOverlay={photos.onOverlay}
+          />
         </div>
       )}
 
@@ -324,7 +407,11 @@ export function EditActivityWindow({
           onClick={() => void save()}
           data-testid="edit-save"
         >
-          {saving ? t('common.saving') : t('common.save')}
+          {saving && photoProgress
+            ? t('photos.saving_n', { n: Math.min(photoProgress.done + 1, photoProgress.total), total: photoProgress.total })
+            : saving
+              ? t('common.saving')
+              : t('common.save')}
         </button>
       </div>
     </section>

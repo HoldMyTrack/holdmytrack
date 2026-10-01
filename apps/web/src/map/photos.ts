@@ -23,6 +23,15 @@ export interface PhotoMarkerItem {
   caption: string | null;
 }
 
+/** How the Photos tab's unsaved changes alter the markers: photos moved or added (`upserts`,
+ *  replacing a saved one with the same id), photos to be deleted (`hidden`), and the one in hand
+ *  (`activeId`, drawn larger). */
+export interface PhotoMarkerOverlay {
+  upserts: readonly PhotoMarkerItem[];
+  hidden: readonly string[];
+  activeId: string | null;
+}
+
 export interface PhotoMarkerOptions {
   onOpen: (id: string) => void;
   /** The photo open in its popup, or being moved in the Photos tab: drawn larger and on top. */

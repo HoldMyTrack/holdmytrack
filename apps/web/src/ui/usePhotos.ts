@@ -8,9 +8,6 @@ export interface PhotosState {
   photos: readonly Photo[];
   error: string | null;
   reload: () => void;
-  /** Puts a photo a PATCH answered with in place of the one in hand, without a refetch. */
-  replace: (photo: Photo) => void;
-  remove: (id: string) => void;
 }
 
 function scopeKey(scope: PhotoScope): string | null {
@@ -20,7 +17,7 @@ function scopeKey(scope: PhotoScope): string | null {
 
 /**
  * The photos (FR-16) of the focused activity or the open Story — `GET /v1/photos`, refetched
- * whenever the scope or `version` changes or `reload` is called (after an upload). `version` is
+ * whenever the scope or `version` changes or `reload` is called (after the Edit window saved). `version` is
  * whatever else should refetch them: MapView's `trackMetricsVersion`, bumped when a track edit
  * or a Private location change has been reprocessed — either can move a photo, or take it off
  * the map — and an open Story's members. A new scope starts empty
@@ -56,7 +53,5 @@ export function usePhotos(scope: PhotoScope, version: number | string = 0): Phot
   }, [key, nonce, version]);
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
-  const replace = useCallback((photo: Photo) => setPhotos((list) => list.map((p) => (p.id === photo.id ? photo : p))), []);
-  const remove = useCallback((id: string) => setPhotos((list) => list.filter((p) => p.id !== id)), []);
-  return { photos: loadedKey === key ? photos : [], error, reload, replace, remove };
+  return { photos: loadedKey === key ? photos : [], error, reload };
 }

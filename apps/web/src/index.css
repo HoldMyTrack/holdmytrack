@@ -2019,6 +2019,38 @@ button.activities-panel__story-badge:hover {
   background: var(--fm-surface-tint);
 }
 
+.photos-tab__row--deleted .photos-tab__thumb,
+.photos-tab__row--deleted .photos-tab__title {
+  opacity: 0.45;
+}
+
+.photos-tab__row--deleted .photos-tab__title {
+  text-decoration: line-through;
+}
+
+/* New, Changed, Will be deleted: what Save will do to the row. */
+.photos-tab__badge {
+  margin-left: var(--fm-space-6);
+  padding: 0 var(--fm-space-6);
+  border-radius: var(--fm-radius-pill);
+  background: rgb(var(--fm-accent-rgb) / 15%);
+  color: var(--fm-accent-strong);
+  font-size: var(--fm-text-2xs);
+  font-weight: var(--fm-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.photos-tab__badge--deleted {
+  background: rgb(var(--fm-danger-rgb) / 12%);
+  color: var(--fm-danger);
+}
+
+.photos-tab__icon[aria-pressed='true'] {
+  background: rgb(var(--fm-accent-rgb) / 20%);
+  color: var(--fm-accent-strong);
+}
+
 .photos-tab__row--waiting {
   border: 1px solid rgb(var(--fm-accent-rgb) / 45%);
 }

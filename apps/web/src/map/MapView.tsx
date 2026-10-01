@@ -11,7 +11,7 @@ import { ensureHeatmapLayer } from './heatmap';
 import { setMapMode, type MapMode } from './mapMode';
 import { loadOverlays, saveOverlays, type Overlays } from './overlays';
 import { setPathsVisible } from './paths';
-import { usePhotoMarkers, type PhotoMarkerItem } from './photos';
+import { usePhotoMarkers, type PhotoMarkerItem, type PhotoMarkerOverlay } from './photos';
 import { setSatelliteVisible } from './satellite';
 import { ensureSpotsLayer, setSpotClickHandler, setSpotsCaptured, setSpotsVisible, type Spot, type SpotCategory } from './spots';
 import { labelInsertionPoint } from './layers';
@@ -258,8 +258,8 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // change hands, or it's gone from them.
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
   const openPhoto = photoState.photos.find((p) => p.id === openPhotoId) ?? null;
-  // The photo the Photos tab is moving or placing, where its slider has it (PhotosTab.tsx).
-  const [photoPreview, setPhotoPreview] = useState<PhotoMarkerItem | null>(null);
+  // The Photos tab's unsaved changes as they alter the markers (PhotosTab.tsx).
+  const [photoOverlay, setPhotoOverlay] = useState<PhotoMarkerOverlay | null>(null);
   // Which tab the Edit window shows: its Track tab hides the photos.
   const [editTab, setEditTab] = useState<EditTab>('activity');
   const photoScopeKey = photoScope === null ? null : JSON.stringify(photoScope);
@@ -1130,14 +1130,16 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // enough on its own.
   const awaitingEditIdsRef = useRef<Set<string>>(new Set());
   const closeEditWindow = useCallback(
-    ({ saved, trackApplied }: EditWindowResult) => {
+    ({ saved, trackApplied, photosSaved }: EditWindowResult) => {
       if (trackApplied && editingActivityId !== null) awaitingEditIdsRef.current.add(editingActivityId);
       setEditWindowIds(null);
       setEditingActivityId(null);
       // A track edit leaves the row Pending — the effects below poll until the reprocess lands.
       if (saved) reloadActivities();
+      // The Photos tab's draft was written; the markers are the saved photos again.
+      if (photosSaved) photoState.reload();
     },
-    [editingActivityId, reloadActivities],
+    [editingActivityId, reloadActivities, photoState.reload],
   );
   // A saved or deleted Private location reprocesses every activity it could clip. The list
   // reload shows those rows Pending right away, and the Pending poll below refreshes the map
@@ -1186,7 +1188,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // The Edit window opens on its Activity tab, with nothing being moved on the map.
   useEffect(() => {
     setEditTab('activity');
-    setPhotoPreview(null);
+    setPhotoOverlay(null);
   }, [editOpen]);
 
   // While any row is pending, re-read the list every few seconds. Keyed on `activities`
@@ -1369,11 +1371,13 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     const items: PhotoMarkerItem[] = photoState.photos
       .filter((p) => p.lon !== null && p.lat !== null && !mapHiddenIds.has(p.activityId))
       .map((p) => ({ id: p.id, lon: p.lon!, lat: p.lat!, thumbSrc: API_BASE_URL + p.thumbUrl, caption: p.caption }));
-    if (photoPreview === null) return items;
-    const moved = items.map((item) => (item.id === photoPreview.id ? photoPreview : item));
-    return moved.some((item) => item.id === photoPreview.id) ? moved : [...moved, photoPreview];
-  }, [photoScope, editOpen, editTab, mapHiddenIds, photoState.photos, photoPreview]);
-  usePhotoMarkers(map, photoMarkers, { onOpen: setOpenPhotoId, activeId: photoPreview?.id ?? openPhotoId });
+    if (photoOverlay === null) return items;
+    const upserts = new Map(photoOverlay.upserts.map((item) => [item.id, item]));
+    const kept = items.filter((item) => !photoOverlay.hidden.includes(item.id)).map((item) => upserts.get(item.id) ?? item);
+    const keptIds = new Set(kept.map((item) => item.id));
+    return [...kept, ...photoOverlay.upserts.filter((item) => !keptIds.has(item.id))];
+  }, [photoScope, editOpen, editTab, mapHiddenIds, photoState.photos, photoOverlay]);
+  usePhotoMarkers(map, photoMarkers, { onOpen: setOpenPhotoId, activeId: photoOverlay?.activeId ?? openPhotoId });
 
   return (
     <div className="app-shell">
@@ -1471,10 +1475,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
               photos={{
                 photos: photoState.photos,
                 error: photoState.error,
-                onChanged: photoState.reload,
-                onReplace: photoState.replace,
-                onRemove: photoState.remove,
-                onPreview: setPhotoPreview,
+                onOverlay: setPhotoOverlay,
               }}
               onTabChange={setEditTab}
               onClose={closeEditWindow}

@@ -811,12 +811,40 @@ export async function listPhotos(of: { activity: string } | { story: string }, s
  *  nothing was stored, and it goes again with the user's `routeAt`. */
 export class PhotoNeedsPlaceError extends Error {}
 
-/** `POST /v1/photos` — a photo already resized by `photoPrep.ts`, with what its EXIF said, and
- *  where on the track the user put it when the server couldn't (`routeAt`, RFC 3339). */
+/** What a photo's EXIF said, as the placement fields `POST /v1/photos` and its check take. */
+export interface PhotoExifFields {
+  takenAt?: string;
+  takenLocal?: string;
+  lat?: number;
+  lon?: number;
+}
+
+/** `POST /v1/photos/place` — where an upload of a photo with this EXIF would be placed (`routeAt`,
+ *  RFC 3339), storing nothing; `PhotoNeedsPlaceError` when the server can't tell. */
+export async function checkPhotoPlace(activityId: string, exif: PhotoExifFields): Promise<{ routeAt: string }> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/photos/place`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ activity_id: activityId, taken_at: exif.takenAt, taken_local: exif.takenLocal, lat: exif.lat, lon: exif.lon }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    const message = messageFromErrorBody(text, t('common.request_failed', { status: res.status }));
+    if (res.status === 422 && text.includes('"photo_needs_place"')) throw new PhotoNeedsPlaceError(message);
+    throw new Error(message);
+  }
+  return { routeAt: ((await res.json()) as { route_at: string }).route_at };
+}
+
+/** `POST /v1/photos` — a photo already resized by `photoPrep.ts`, with what its EXIF said, where
+ *  on the track it goes (`routeAt`, RFC 3339 — the placement check's answer or the user's), and
+ *  its caption. */
 export async function uploadPhoto(
   activityId: string,
-  photo: { file: Blob; thumb: Blob; exif: { takenAt?: string; takenLocal?: string; lat?: number; lon?: number } },
+  photo: { file: Blob; thumb: Blob; exif: PhotoExifFields },
   routeAt?: string,
+  caption?: string,
 ): Promise<Photo> {
   const form = new FormData();
   form.set('activity_id', activityId);
@@ -830,6 +858,7 @@ export async function uploadPhoto(
     form.set('lon', String(lon));
   }
   if (routeAt) form.set('route_at', routeAt);
+  if (caption) form.set('caption', caption);
   const res = await fetch(`${API_BASE_URL}${API_V1}/photos`, { method: 'POST', credentials: 'include', body: form });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -842,7 +871,7 @@ export async function uploadPhoto(
 
 /** `PATCH /v1/photos/{id}` — a field present changes. `routeAt` (RFC 3339) is the photo's new
  *  moment on its track; the server clamps it to the track. */
-export async function updatePhoto(id: string, change: { caption?: string; routeAt?: string }): Promise<Photo> {
+export async function updatePhoto(id: string, change: { caption?: string | undefined; routeAt?: string | undefined }): Promise<Photo> {
   const res = await fetch(`${API_BASE_URL}${API_V1}/photos/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
