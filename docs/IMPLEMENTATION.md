@@ -426,6 +426,32 @@ CREATE TABLE spot_captures (
 );
 ```
 
+### 3.22 `activity_photos`
+
+Activity photos (§4.27, FR-16, ADR-0024) — `migrations/0012_activity_photos.sql`. One row per photo; the images themselves are in object storage at `photos/{user_id}/{id}` and `photos/{user_id}/{id}-thumb`. A row goes with its account or its activity.
+
+```sql
+CREATE TABLE activity_photos (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id             UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    activity_id         UUID NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+    taken_at            TIMESTAMPTZ,            -- the file's EXIF capture time; NULL when it had none
+    route_at            TIMESTAMPTZ,            -- where on the track; NULL = not placed
+    content_type        VARCHAR(32) NOT NULL,   -- image/jpeg | image/webp, sniffed
+    thumb_content_type  VARCHAR(32) NOT NULL,
+    width               INT NOT NULL,
+    height              INT NOT NULL,
+    bytes               INT NOT NULL,           -- the resized copy and its thumbnail together
+    caption             TEXT,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_activity_photos_activity ON activity_photos (activity_id);
+CREATE INDEX idx_activity_photos_user ON activity_photos (user_id);
+```
+
+**No position column.** `route_at` is a moment on the activity's `trajectory`, whose M dimension is epoch seconds (§3.3); the position is that moment's point on the track, worked out on every read. A stored point would go stale when Edit track (§4.7.7) or a Private location change (§7) rebuilds the track, and would keep a position a Private location added later should hide. `taken_at` is kept apart from `route_at` because moving a photo by hand changes only where it sits, not when it was taken.
+
 ---
 
 ## 4. Core Technical Workflows
