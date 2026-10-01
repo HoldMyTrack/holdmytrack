@@ -1551,6 +1551,139 @@ button.activities-panel__story-badge:hover {
   color: var(--fm-ink-secondary);
 }
 
+/* PhotoStrip.tsx (FR-16): the selected activity's photos along the bottom of the map, clear of
+   MapLibre's scale bar and attribution in the bottom corners. */
+.photo-strip {
+  position: absolute;
+  bottom: 36px;
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fm-space-8);
+  width: 520px;
+  max-width: calc(100% - 20px);
+  box-sizing: border-box;
+  padding: var(--fm-space-10) var(--fm-space-12);
+  border-radius: var(--fm-radius-lg);
+  background: rgb(var(--fm-surface-rgb) / 96%);
+  box-shadow: var(--fm-shadow-md);
+  color: var(--fm-ink);
+  transform: translateX(-50%);
+}
+
+.photo-strip__head {
+  display: flex;
+  align-items: center;
+  gap: var(--fm-space-6);
+  min-height: 28px;
+  font-size: var(--fm-text-md);
+}
+
+.photo-strip__title {
+  font-weight: var(--fm-weight-bold);
+}
+
+.photo-strip__count {
+  color: var(--fm-ink-secondary);
+}
+
+.photo-strip__spacer {
+  flex: 1;
+}
+
+.photo-strip__status {
+  font-size: var(--fm-text-sm);
+  color: var(--fm-ink-secondary);
+}
+
+.photo-strip__add {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fm-space-6);
+  padding: var(--fm-space-4) var(--fm-space-10);
+  border: 1px solid var(--fm-border-strong);
+  border-radius: var(--fm-radius-sm);
+  background: var(--fm-surface);
+  color: var(--fm-ink);
+  font: inherit;
+  font-size: var(--fm-text-md);
+  font-weight: var(--fm-weight-semibold);
+  cursor: pointer;
+}
+
+.photo-strip__add:hover:not(:disabled) {
+  background: var(--fm-surface-tint);
+}
+
+.photo-strip__add:disabled {
+  cursor: not-allowed;
+  color: var(--fm-ink-muted);
+}
+
+.photo-strip__list {
+  display: flex;
+  gap: var(--fm-space-6);
+  margin: 0;
+  padding: 0 0 var(--fm-space-2);
+  overflow-x: auto;
+  list-style: none;
+}
+
+.photo-strip__thumb {
+  position: relative;
+  display: block;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--fm-radius-sm);
+  overflow: hidden;
+  background: var(--fm-surface-tint-strong);
+  cursor: pointer;
+}
+
+.photo-strip__thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-strip__thumb:focus-visible {
+  outline: 2px solid var(--fm-accent);
+  outline-offset: 2px;
+}
+
+/* A photo with no place on the map. */
+.photo-strip__badge {
+  position: absolute;
+  right: var(--fm-space-2);
+  bottom: var(--fm-space-2);
+  display: flex;
+  padding: var(--fm-space-2);
+  border-radius: var(--fm-radius-pill);
+  background: rgb(var(--fm-surface-rgb) / 92%);
+  color: var(--fm-ink-secondary);
+}
+
+.photo-strip__hint,
+.photo-strip__error,
+.photo-strip__failures {
+  margin: 0;
+  font-size: var(--fm-text-sm);
+  color: var(--fm-ink-secondary);
+}
+
+.photo-strip__error,
+.photo-strip__failures {
+  color: var(--fm-danger);
+}
+
+.photo-strip__failures {
+  padding-left: var(--fm-space-16);
+}
+
 /* ZoomLevelNotice.tsx — which level Fog/Heatmap is drawing at, fading out after a few seconds.
    A line of its own in .map-toggles (flex-basis 100%), so it sits under the toggles however many
    rows they wrap to on a narrow screen. Takes no pointer events, like .map-toggles itself. */

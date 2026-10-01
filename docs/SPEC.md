@@ -1334,3 +1334,14 @@ Deliberately out of scope, not a "not yet" — built and then cut, not planned t
 **Behavior**:
 1. `DELETE /v1/photos/{id}` deletes the photo and both its images, answering `204`; a photo that isn't the caller's → `404`, a demo session → `403`.
 2. Deleting an activity deletes its photos (FR-5.11). A duplicate's photos move to the copy that's kept (FR-3.7).
+
+### FR-16.6 The photo strip (web)
+
+**Preconditions**: Normal mode, an activity selected (FR-5.5), the Edit window closed.
+
+**Behavior**:
+1. A strip along the bottom of the map shows the selected activity's photos as thumbnails, in FR-16.3's order; a photo with no place on the map carries a badge saying so. With none, a line invites adding some.
+2. Add photos opens the browser's file picker for any number of images. Each is read for its EXIF capture time (with its zone, when the file has one or a GPS clock to derive it from) and position, redrawn at most 2048 px on its long side plus a 320 px thumbnail, upright per its EXIF orientation, and uploaded (FR-16.1) — one at a time, with "Uploading n of m…" while it runs; each lands in the strip when done.
+3. A file that fails is listed by name with the reason — one the browser can't open (most HEIC files outside Safari), or the server's refusal — and the rest carry on.
+4. The strip's photos refresh when an Edit track or a Private location change has been reprocessed (FR-5.14, FR-8.1).
+5. For a demo session Add photos is disabled, with a tooltip saying why.

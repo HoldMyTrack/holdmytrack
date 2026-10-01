@@ -35,6 +35,7 @@ import { EditActivityWindow, type EditWindowResult } from '../ui/EditActivityWin
 import { ExportControl } from '../ui/ExportControl';
 import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
 import { OverlaysMenu } from '../ui/OverlaysMenu';
+import { PhotoStrip } from '../ui/PhotoStrip';
 import { ShowInArea } from '../ui/ShowInArea';
 import { ZoomLevelNotice } from '../ui/ZoomLevelNotice';
 import { SpotPopup } from '../ui/SpotPopup';
@@ -42,6 +43,7 @@ import { todayLocal, type DateRange } from '../ui/dateMath';
 import { useUnitSystem } from '../ui/units';
 import { useActivityDays } from '../ui/useActivityDays';
 import { useActivityList } from '../ui/useActivityList';
+import { usePhotos, type PhotoScope } from '../ui/usePhotos';
 import { useStories } from '../ui/useStories';
 import { useStory } from '../ui/useStory';
 import { currentTheme, useTheme } from '../ui/useTheme';
@@ -236,6 +238,14 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // by Back/Forward; closed by leaving the tab.
   const [storyId, setStoryId] = useState<string | null>(storyParam);
   const storyState = useStory(storyId);
+
+  // Photos (FR-16): the focused activity's, in Normal mode — the one activity a person is
+  // looking at. Neither Fog nor Heatmap focuses one.
+  const photoScope = useMemo<PhotoScope>(
+    () => (mapMode === 'normal' && focusedActivityId !== null ? { activity: focusedActivityId } : null),
+    [mapMode, focusedActivityId],
+  );
+  const photoState = usePhotos(photoScope, trackMetricsVersion);
   const storiesList = useStories(panelTab === 'stories');
 
   // TYPE/DISTANCE facets — pure client-side filters over
@@ -1411,6 +1421,19 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
               trackUnavailable={editTrackUnavailable}
               onStartTrack={startEditTrack}
               onClose={closeEditWindow}
+            />
+          )}
+          {map && !editOpen && photoScope !== null && (
+            <PhotoStrip
+              photos={photoState.photos}
+              error={photoState.error}
+              activityId={focusedActivityId}
+              readOnly={isDemo}
+              onUploaded={photoState.reload}
+              onOpen={(id) => {
+                const photo = photoState.photos.find((p) => p.id === id);
+                if (photo?.lon != null && photo.lat != null) map.easeTo({ center: [photo.lon, photo.lat] });
+              }}
             />
           )}
           {!editOpen && (

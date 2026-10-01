@@ -742,3 +742,113 @@ export async function getSpotCaptures(signal?: AbortSignal): Promise<SpotCapture
   }
   return ((await res.json()) as { captures: SpotCapture[] }).captures;
 }
+
+/** One photo on an activity (FR-16). `lon`/`lat` are null when it has no place on the map —
+ *  not placed, a moment the track no longer covers, or inside a Private location. `url` and
+ *  `thumbUrl` are API paths (`/v1/photos/…`) — callers prefix `API_BASE_URL`. */
+export interface Photo {
+  id: string;
+  activityId: string;
+  takenAt: string | null;
+  routeAt: string | null;
+  lon: number | null;
+  lat: number | null;
+  caption: string | null;
+  width: number;
+  height: number;
+  url: string;
+  thumbUrl: string;
+}
+
+interface PhotoBody {
+  id: string;
+  activity_id: string;
+  taken_at: string | null;
+  route_at: string | null;
+  lon: number | null;
+  lat: number | null;
+  caption: string | null;
+  width: number;
+  height: number;
+  url: string;
+  thumb_url: string;
+}
+
+function toPhoto(b: PhotoBody): Photo {
+  return {
+    id: b.id,
+    activityId: b.activity_id,
+    takenAt: b.taken_at,
+    routeAt: b.route_at,
+    lon: b.lon,
+    lat: b.lat,
+    caption: b.caption,
+    width: b.width,
+    height: b.height,
+    url: b.url,
+    thumbUrl: b.thumb_url,
+  };
+}
+
+/** `GET /v1/photos` — one activity's photos, or every photo in a Story; placed ones in route
+ *  order, then unplaced ones. */
+export async function listPhotos(of: { activity: string } | { story: string }, signal?: AbortSignal): Promise<Photo[]> {
+  const params = new URLSearchParams(of);
+  const res = await fetch(`${API_BASE_URL}${API_V1}/photos?${params}`, {
+    ...(signal ? { signal } : {}),
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
+  }
+  return ((await res.json()) as { photos: PhotoBody[] }).photos.map(toPhoto);
+}
+
+/** `POST /v1/photos` — a photo already resized by `photoPrep.ts`, with what its EXIF said. */
+export async function uploadPhoto(
+  activityId: string,
+  photo: { file: Blob; thumb: Blob; exif: { takenAt?: string; takenLocal?: string; lat?: number; lon?: number } },
+): Promise<Photo> {
+  const form = new FormData();
+  form.set('activity_id', activityId);
+  form.set('file', photo.file, 'photo');
+  form.set('thumb', photo.thumb, 'thumb');
+  const { takenAt, takenLocal, lat, lon } = photo.exif;
+  if (takenAt) form.set('taken_at', takenAt);
+  else if (takenLocal) form.set('taken_local', takenLocal);
+  if (lat !== undefined && lon !== undefined) {
+    form.set('lat', String(lat));
+    form.set('lon', String(lon));
+  }
+  const res = await fetch(`${API_BASE_URL}${API_V1}/photos`, { method: 'POST', credentials: 'include', body: form });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
+  }
+  return toPhoto((await res.json()) as PhotoBody);
+}
+
+/** `PATCH /v1/photos/{id}` — a field present changes. `position` snaps to the track's nearest
+ *  point; null takes the photo off the map. */
+export async function updatePhoto(
+  id: string,
+  change: { caption?: string; position?: { lon: number; lat: number } | null },
+): Promise<Photo> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/photos/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(change),
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
+  }
+  return toPhoto((await res.json()) as PhotoBody);
+}
+
+/** `DELETE /v1/photos/{id}`. */
+export async function deletePhoto(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/photos/${id}`, { method: 'DELETE', credentials: 'include' });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
+  }
+}
