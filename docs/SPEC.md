@@ -953,7 +953,7 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 
 **Behavior**:
 1. `GET /about` returns the page. It is also the site's front page: a visit to `/` without a session gets the same page (titled "HoldMyTrack — Every journey, mapped."), and both carry a canonical link to `/`, so search engines index the one URL. With a session, `/` is the map (FR-4).
-2. It has sections for: what HoldMyTrack is, why someone might want it, what it isn't, how it is funded (section id `funding`), and a pointer to Contacts (FR-10.3).
+2. It has sections for: what HoldMyTrack is and what it is for, how it works (three numbered steps: bring what you already recorded, see it on one map, go somewhere new), why someone might want it, what it isn't, how it is funded (section id `funding`), and a pointer to Contacts (FR-10.3).
 3. "Try the demo — no signup" links to `/signin`, where the demo starts from its own button (FR-2.1). The page never starts a demo session itself.
 4. About, Help and Contacts are reachable from every page's header and footer (FR-10.4) — the map and the sign-in pages included.
 5. `/robots.txt` allows crawling except for `/v1/` and `/tiles/`, and points to `/sitemap.xml`, which lists `/`, `/help` and `/contacts` (`/about` is the same page as `/`).

@@ -2,7 +2,7 @@
 
 [![codecov](https://codecov.io/gh/HoldMyTrack/holdmytrack/graph/badge.svg)](https://codecov.io/gh/HoldMyTrack/holdmytrack)
 
-A free, community-funded platform for tracking outdoor activities and seeing the accumulated shape of where you have been. It aggregates the activity history you already have — from watches, from cloud services, from files — and turns it into maps and exploration stats worth looking at. It is not a fitness tracker (the Android app can record a plain GPS track for a casual walk or drive, nothing more), it is not a health or fitness advisor, and it has no social graph. See [`docs/VISION.md` §1](docs/VISION.md#1-executive-summary).
+A free, community-funded platform for tracking outdoor activities and seeing the accumulated shape of where you have been. It aggregates the activity history you already have — from watches, from cloud services, from files — and turns it into maps and exploration stats worth looking at. The point is to see, on one map, every place you have already been — and, just as clearly, the streets, parks and trails nearby that you haven't, so the next walk, run or ride can go somewhere new. It is not a fitness tracker (the Android app can record a plain GPS track for a casual walk or drive, nothing more), it is not a health or fitness advisor, and it has no social graph. See [`docs/VISION.md` §1](docs/VISION.md#1-executive-summary).
 
 ## Layout
 
