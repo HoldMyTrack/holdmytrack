@@ -72,3 +72,32 @@ export function fractionAt(track: PhotoTrack, t: number): number {
   if (total === 0) return (t - points[0]!.t) / (points[points.length - 1]!.t - points[0]!.t);
   return (along[i - 1]! + (along[i]! - along[i - 1]!) * k) / total;
 }
+
+/** What a photo waiting for a place was picked after: a photo the server placed (its moment), one
+ *  that waited too (its key, placed or skipped since), or nothing — the first of its batch. */
+export type PlaceAnchor = { t: number } | { waiting: string } | null;
+
+/** How far past the previous photo a waiting one's slider starts: just after it, so photos
+ *  picked in the order they were taken walk forward along the route. */
+export const NEXT_PHOTO_STEP = 0.01;
+
+/**
+ * Where a waiting photo's slider starts (FR-16.6): just after the photo picked before it, which
+ * is where the next picture of a walk usually is. A previous one that waited is followed by
+ * where the user put it (`placed`), or past it to its own predecessor if it was skipped (null).
+ * The first of a batch, or one after nothing placed at all, starts at the beginning of the route.
+ */
+export function startFraction(
+  track: PhotoTrack,
+  anchor: PlaceAnchor,
+  placed: ReadonlyMap<string, number | null>,
+  anchors: ReadonlyMap<string, PlaceAnchor>,
+): number {
+  for (let seen = 0; anchor !== null && seen <= anchors.size; seen++) {
+    if ('t' in anchor) return Math.min(1, fractionAt(track, anchor.t) + NEXT_PHOTO_STEP);
+    const at = placed.get(anchor.waiting);
+    if (at !== undefined && at !== null) return Math.min(1, at + NEXT_PHOTO_STEP);
+    anchor = anchors.get(anchor.waiting) ?? null;
+  }
+  return 0;
+}

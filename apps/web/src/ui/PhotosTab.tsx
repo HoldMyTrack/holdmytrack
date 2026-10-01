@@ -13,7 +13,7 @@ import {
 import { lang, t } from '../i18n';
 import type { PhotoMarkerItem } from '../map/photos';
 import { ConfirmDialog } from './ConfirmDialog';
-import { fractionAt, photoTrack, pointAt, type PhotoTrack } from './photoTrack';
+import { fractionAt, photoTrack, pointAt, startFraction, type PhotoTrack, type PlaceAnchor } from './photoTrack';
 import { preparePhoto, UnreadablePhotoError, type PreparedPhoto } from './photoPrep';
 
 /** Mirrors photos.go's maxPhotoCaptionLen. */
@@ -41,7 +41,9 @@ interface Unplaced {
   name: string;
   prepared: PreparedPhoto;
   thumbSrc: string;
-  fraction: number;
+  /** Null until it's the one with the slider out — its start depends on where the photo before
+   *  it ended up, which may itself still be waiting. */
+  fraction: number | null;
 }
 
 interface Editing {
@@ -81,6 +83,10 @@ export function PhotosTab({ activity, photos, error, active, onChanged, onReplac
   const [rowBusy, setRowBusy] = useState(false);
   const [rowError, setRowError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Photo | null>(null);
+  // What each waiting photo was picked after, and where each one that waited ended up (null:
+  // skipped) — what a waiting photo's slider starts from (startFraction).
+  const anchors = useRef(new Map<string, PlaceAnchor>());
+  const placedAt = useRef(new Map<string, number | null>());
   // The row being edited, scrolled into the list's view as it opens — its slider and buttons
   // are below its summary, past the list's bottom edge for a photo near the end.
   const editRow = useRef<HTMLLIElement>(null);
@@ -110,6 +116,12 @@ export function PhotosTab({ activity, photos, error, active, onChanged, onReplac
   // The photo whose slider is out — the first waiting one, else the one being edited — moves on
   // the map with it.
   const waiting = unplaced[0] ?? null;
+  // A waiting photo's slider starts just after the photo picked before it.
+  useEffect(() => {
+    if (!waiting || waiting.fraction !== null || !track) return;
+    const fraction = startFraction(track, anchors.current.get(waiting.key) ?? null, placedAt.current, anchors.current);
+    setUnplaced((list) => list.map((u) => (u.key === waiting.key ? { ...u, fraction } : u)));
+  }, [waiting, track]);
   const editingPhoto = editing ? photos.find((p) => p.id === editing.id) ?? null : null;
   useEffect(() => {
     if (!active || !track) {
@@ -117,6 +129,7 @@ export function PhotosTab({ activity, photos, error, active, onChanged, onReplac
       return;
     }
     if (waiting) {
+      if (waiting.fraction === null) return;
       const at = pointAt(track, waiting.fraction);
       onPreview({ id: waiting.key, lon: at.lon, lat: at.lat, thumbSrc: waiting.thumbSrc, caption: null });
     } else if (editing && editingPhoto) {
@@ -131,18 +144,23 @@ export function PhotosTab({ activity, photos, error, active, onChanged, onReplac
   async function add(files: File[]) {
     const failed: string[] = [];
     setFailures([]);
+    // The photo picked before this one, for where a waiting one's slider starts.
+    let previous: PlaceAnchor = null;
     for (let i = 0; i < files.length; i++) {
       const file = files[i]!;
       setProgress({ done: i, total: files.length });
       let prepared: PreparedPhoto | null = null;
       try {
         prepared = await preparePhoto(file);
-        await uploadPhoto(activity.id, prepared);
+        const photo = await uploadPhoto(activity.id, prepared);
+        previous = { t: Date.parse(photo.routeAt) / 1000 };
         onChanged();
       } catch (err) {
         if (err instanceof PhotoNeedsPlaceError && prepared) {
           const thumbSrc = URL.createObjectURL(prepared.thumb);
-          const entry: Unplaced = { key: `unplaced-${Date.now()}-${i}`, name: file.name, prepared, thumbSrc, fraction: 0.5 };
+          const entry: Unplaced = { key: `unplaced-${Date.now()}-${i}`, name: file.name, prepared, thumbSrc, fraction: null };
+          anchors.current.set(entry.key, previous);
+          previous = { waiting: entry.key };
           setUnplaced((list) => [...list, entry]);
           continue;
         }
@@ -154,19 +172,20 @@ export function PhotosTab({ activity, photos, error, active, onChanged, onReplac
     setProgress(null);
   }
 
-  function dropWaiting(entry: Unplaced) {
+  function dropWaiting(entry: Unplaced, at: number | null = null) {
+    placedAt.current.set(entry.key, at);
     URL.revokeObjectURL(entry.thumbSrc);
     setUnplaced((list) => list.filter((u) => u.key !== entry.key));
     setRowError(null);
   }
 
   async function placeWaiting(entry: Unplaced) {
-    if (!track) return;
+    if (!track || entry.fraction === null) return;
     setRowBusy(true);
     setRowError(null);
     try {
       await uploadPhoto(activity.id, entry.prepared, iso(pointAt(track, entry.fraction).t));
-      dropWaiting(entry);
+      dropWaiting(entry, entry.fraction);
       onChanged();
     } catch (err) {
       setRowError(err instanceof Error ? err.message : String(err));
@@ -278,7 +297,7 @@ export function PhotosTab({ activity, photos, error, active, onChanged, onReplac
               <span className="photos-tab__meta">{t('photos.needs_place')}</span>
             </span>
           </div>
-          {slider(waiting.fraction, (fraction) => setUnplaced((list) => list.map((u) => (u.key === waiting.key ? { ...u, fraction } : u))), t('photos.slider'))}
+          {slider(waiting.fraction ?? 0, (fraction) => setUnplaced((list) => list.map((u) => (u.key === waiting.key ? { ...u, fraction } : u))), t('photos.slider'))}
           {rowError && <p className="edit-track__error">{rowError}</p>}
           <div className="photos-tab__actions">
             {unplaced.length > 1 && <span className="photos-tab__meta">{t('photos.more_waiting', { n: unplaced.length - 1 })}</span>}
@@ -289,7 +308,7 @@ export function PhotosTab({ activity, photos, error, active, onChanged, onReplac
             <button
               type="button"
               className="edit-track__btn edit-track__btn--primary"
-              disabled={rowBusy || !track}
+              disabled={rowBusy || !track || waiting.fraction === null}
               onClick={() => void placeWaiting(waiting)}
               data-testid="photo-place-here"
             >

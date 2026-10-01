@@ -44,3 +44,19 @@ test('a track with no length goes by time', () => {
   assert.equal(pointAt(still, 0.5).t, T0 + 50);
   assert.equal(fractionAt(still, T0 + 25), 0.25);
 });
+
+test('a waiting photo starts just after the one picked before it', async () => {
+  const { startFraction, NEXT_PHOTO_STEP } = await import('../src/ui/photoTrack.ts');
+  const none = new Map();
+  // First of its batch: the start of the route.
+  assert.equal(startFraction(track, null, none, none), 0);
+  // After a photo the server placed at a quarter of the way.
+  assert.ok(Math.abs(startFraction(track, { t: T0 + 50 }, none, none) - (0.25 + NEXT_PHOTO_STEP)) < 1e-9);
+  // After one that waited and was put at 0.6.
+  assert.ok(Math.abs(startFraction(track, { waiting: 'a' }, new Map([['a', 0.6]]), new Map([['a', null]])) - (0.6 + NEXT_PHOTO_STEP)) < 1e-9);
+  // After one that was skipped: past it, to what came before it.
+  const anchors = new Map([['a', { t: T0 + 450 }], ['b', { waiting: 'a' }]]);
+  assert.ok(Math.abs(startFraction(track, { waiting: 'b' }, new Map([['a', null], ['b', null]]), anchors) - (0.75 + NEXT_PHOTO_STEP)) < 1e-9);
+  // Never past the end.
+  assert.equal(startFraction(track, { t: T0 + 500 }, none, none), 1);
+});
