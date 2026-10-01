@@ -18,7 +18,7 @@ GOLD, OCHRE, GREEN = '#E4B867', '#93691F', '#1C2520'  # --fm-accent-strong (dark
 src = open(os.path.join(BRAND, 'logo.svg')).read()
 inner = src[src.index('<defs>'):src.rindex('</svg>')].strip()
 # The mark's ink bounds in logo.svg's own units, strokes included.
-X0, X1, Y0, Y1 = 12.25, 106.25, 7.75, 100.75
+X0, X1, Y0, Y1 = 12.25, 106, 7.75, 100.75
 CX, CY, W = (X0 + X1) / 2, (Y0 + Y1) / 2, max(X1 - X0, Y1 - Y0)
 
 
