@@ -4,6 +4,21 @@
 
 A free, community-funded platform for tracking outdoor activities and seeing the accumulated shape of where you have been. It aggregates the activity history you already have — from watches, from cloud services, from files — and turns it into maps and exploration stats worth looking at. The point is to see, on one map, every place you have already been — and, just as clearly, the streets, parks and trails nearby that you haven't, so the next walk, run or ride can go somewhere new. It is not a fitness tracker (the Android app can record a plain GPS track for a casual walk or drive, nothing more), it is not a health or fitness advisor, and it has no social graph. See [`docs/VISION.md` §1](docs/VISION.md#1-executive-summary).
 
+Live at [holdmytrack.com](https://holdmytrack.com), with a no-signup demo account to explore.
+
+## What it does
+
+Each feature links to the part of [`docs/SPEC.md`](docs/SPEC.md) that defines its behavior.
+
+- **Bring your whole history.** GPX, FIT and TCX files, `.zip` archives and Google Takeout exports, plus Health Connect sync and plain GPS recording from the Android app — all through one ingest pipeline, with cross-source deduplication ([FR-3](docs/SPEC.md#5-fr-3--activity-upload--ingestion)).
+- **One map, three views.** Every track drawn together; Fog of War, which clears wherever you have ever been; and a heatmap of the last year. Pick a track and it is colored by pace ([FR-4](docs/SPEC.md#6-fr-4--map-visualization)).
+- **Somewhere new, close to home.** The fog shows exactly which streets, parks and trails nearby you haven't been to yet.
+- **Points of interest.** Playgrounds, dog parks, monuments, viewpoints and historic sites from OpenStreetMap, with what OSM knows about each; the Android app captures one when you stand in it for 30 seconds ([FR-15](docs/SPEC.md#17-fr-15--spots)).
+- **Stories.** Hand-picked sets of activities — a multi-day hike, a holiday, a race weekend — each with its own name, map and totals ([FR-14](docs/SPEC.md#16-fr-14--stories)).
+- **Activity graph and trends.** A private, GitHub-style daily grid of your activity, and weekly or monthly totals of the ground you covered ([FR-7](docs/SPEC.md#9-fr-7--activity-graph-profile), [FR-9](docs/SPEC.md#11-fr-9--trends)).
+- **Private by default.** Nobody else sees your map. Private locations hide where tracks start and end near home or work, and no heart rate or other health data is ever read or stored ([FR-8](docs/SPEC.md#10-fr-8--privacy-controls), [ADR-0017](docs/adr/0017-no-health-data.md)).
+- **Share an image, not your map.** Frame any view and export it as a high-resolution image, sized for social media if you like ([FR-4.10](docs/SPEC.md#fr-410-interactive-frame-and-capture-map-export)).
+
 ## Layout
 
 ```
