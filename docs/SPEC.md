@@ -1353,12 +1353,10 @@ Deliberately out of scope, not a "not yet" — built and then cut, not planned t
 7. A file that fails is listed by name with the reason — one the browser can't open (most HEIC files outside Safari), or the server's refusal — and the rest carry on.
 8. The Edit window isn't available to a demo session (FR-5.10), so neither is the tab.
 
-### FR-16.7 On the map, and the viewer (web)
+### FR-16.7 On the map (web)
 
 **Behavior**:
 1. Whenever an activity is selected (FR-5.5) — and while the Edit window is open on one — each of its photos is drawn on its route as its thumbnail in a round frame, over the tracks. With no activity selected and a Story open (FR-14), every photo of the Story's activities is. None show in Fog of War or Heatmap, for an activity hidden on the map (FR-5.8), or while the Edit window's Track tab has the map. The photo being moved in the Photos tab is drawn larger.
 2. The photos follow the track: they're refetched when an Edit track or a Private location change has been reprocessed (FR-5.14, FR-8.1), and sit at the track's nearest end when their stretch was cut away (FR-16.2).
-3. Clicking a photo's marker opens it in the viewer, over the page. A marker's click doesn't change the selection.
-4. The viewer shows the photo as large as the window allows; its position in the list ("2 of 4"); and when it was taken, if known. ← and →, or the arrows on the photo, step through the photos in route order; Escape, the close button or a click outside closes it. The photo open in the viewer is drawn larger on the map.
-5. The owner can write a caption, saved when the field loses focus or on Enter (FR-16.4), and delete the photo after a confirmation (FR-16.5); the viewer then shows the next photo, else the previous, else closes. Show on map closes the viewer and flies the map to the photo.
-6. For a demo session the caption is read-only and Delete is disabled with a tooltip saying why.
+3. Clicking a photo's marker opens a popup at it, on the map rather than over the page: the picture, its caption, when it was taken (if known), and Full size, which opens the stored copy in a new browser tab. It opens on whichever side of the marker it fits, moves with the map, and closes with its ×; its marker is drawn larger meanwhile. A marker's click doesn't change the selection. A demo session sees the same.
+4. Changing or deleting a photo is the Photos tab's (FR-16.6), not the popup's.

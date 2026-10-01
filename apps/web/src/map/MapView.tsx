@@ -36,7 +36,7 @@ import { EditActivityWindow, type EditTab, type EditWindowResult } from '../ui/E
 import { ExportControl } from '../ui/ExportControl';
 import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
 import { OverlaysMenu } from '../ui/OverlaysMenu';
-import { PhotoViewer } from '../ui/PhotoViewer';
+import { PhotoPopup } from '../ui/PhotoPopup';
 import { ShowInArea } from '../ui/ShowInArea';
 import { ZoomLevelNotice } from '../ui/ZoomLevelNotice';
 import { SpotPopup } from '../ui/SpotPopup';
@@ -254,8 +254,10 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // A Story's photos change with its members too.
   const storyMembers = storyState.story?.activityIds.join(',') ?? '';
   const photoState = usePhotos(photoScope, `${trackMetricsVersion}|${storyMembers}`);
-  // The photo the viewer has open; closed whenever the photos in view change hands.
+  // The photo whose popup is open (its marker was clicked); closed whenever the photos in view
+  // change hands, or it's gone from them.
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
+  const openPhoto = photoState.photos.find((p) => p.id === openPhotoId) ?? null;
   // The photo the Photos tab is moving or placing, where its slider has it (PhotosTab.tsx).
   const [photoPreview, setPhotoPreview] = useState<PhotoMarkerItem | null>(null);
   // Which tab the Edit window shows: its Track tab hides the photos.
@@ -1478,21 +1480,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
               onClose={closeEditWindow}
             />
           )}
-          {map && openPhotoId !== null && (
-            <PhotoViewer
-              photos={photoState.photos}
-              id={openPhotoId}
-              readOnly={isDemo}
-              onNavigate={setOpenPhotoId}
-              onChanged={photoState.replace}
-              onDeleted={photoState.remove}
-              onShowOnMap={(photo) => {
-                setOpenPhotoId(null);
-                map.flyTo({ center: [photo.lon!, photo.lat!], zoom: Math.max(map.getZoom(), 16) });
-              }}
-              onClose={() => setOpenPhotoId(null)}
-            />
-          )}
+          {map && openPhoto && <PhotoPopup map={map} photo={openPhoto} onClose={() => setOpenPhotoId(null)} />}
           {!editOpen && (
             <div className="map-toggles">
               <div className="map-mode-toggle" role="group" aria-label={t('map.mode')} data-testid="map-mode-toggle">
