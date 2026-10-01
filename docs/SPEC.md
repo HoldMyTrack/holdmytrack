@@ -1345,3 +1345,12 @@ Deliberately out of scope, not a "not yet" — built and then cut, not planned t
 3. A file that fails is listed by name with the reason — one the browser can't open (most HEIC files outside Safari), or the server's refusal — and the rest carry on.
 4. The strip's photos refresh when an Edit track or a Private location change has been reprocessed (FR-5.14, FR-8.1).
 5. For a demo session Add photos is disabled, with a tooltip saying why.
+
+### FR-16.7 On the map, and the viewer (web)
+
+**Behavior**:
+1. Each of the selected activity's photos with a place on the map (FR-16.2) is drawn as its thumbnail in a round frame at that point, over the tracks. They're hidden while the Edit window is open.
+2. Clicking a photo's marker, or its thumbnail in the strip, opens it in the viewer, over the page. A marker's click doesn't change the selection.
+3. The viewer shows the photo as large as the window allows; its position in the list ("2 of 4"); when it was taken, if known; and a note when it has no place on the map. ← and →, or the arrows on the photo, step through the photos in the strip's order; Escape, the close button or a click outside closes it. The photo open in the viewer is drawn larger on the map.
+4. The owner can write a caption, saved when the field loses focus or on Enter (FR-16.4), and delete the photo after a confirmation (FR-16.5); the viewer then shows the next photo, else the previous, else closes. Show on map closes the viewer and flies the map to the photo.
+5. For a demo session the caption is read-only and Delete is disabled with a tooltip saying why.

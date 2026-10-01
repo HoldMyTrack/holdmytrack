@@ -1684,6 +1684,205 @@ button.activities-panel__story-badge:hover {
   padding-left: var(--fm-space-16);
 }
 
+/* A photo's marker on the map (map/photos.ts): its thumbnail in a round white frame. The one
+   the viewer has open is larger, ringed in the accent and above the rest. */
+.photo-marker {
+  display: block;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 2px solid var(--fm-surface);
+  border-radius: var(--fm-radius-pill);
+  overflow: hidden;
+  background: var(--fm-surface-tint-strong);
+  box-shadow: var(--fm-shadow-md);
+  cursor: pointer;
+  transition: width 0.12s ease, height 0.12s ease;
+}
+
+.photo-marker img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.photo-marker:hover,
+.photo-marker:focus-visible {
+  border-color: var(--fm-accent);
+  outline: none;
+}
+
+.photo-marker--active {
+  z-index: 1;
+  width: 52px;
+  height: 52px;
+  border-color: var(--fm-accent);
+}
+
+/* PhotoViewer.tsx: one photo, as large as the window allows, with a bar under it. */
+.photo-viewer {
+  width: min(1100px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--fm-radius-lg);
+  overflow: hidden;
+  background: var(--fm-surface);
+  color: var(--fm-ink);
+  box-shadow: var(--fm-shadow-xl);
+}
+
+.photo-viewer[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.photo-viewer::backdrop {
+  background: rgb(0 0 0 / 80%);
+}
+
+.photo-viewer__stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  background: #111;
+}
+
+.photo-viewer__image {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: calc(100dvh - 32px - 150px);
+  object-fit: contain;
+}
+
+.photo-viewer__close,
+.photo-viewer__nav {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--fm-space-6);
+  border: 0;
+  border-radius: var(--fm-radius-pill);
+  background: rgb(0 0 0 / 45%);
+  color: #fff;
+  cursor: pointer;
+}
+
+.photo-viewer__close:hover,
+.photo-viewer__nav:hover {
+  background: rgb(0 0 0 / 65%);
+}
+
+.photo-viewer__close {
+  top: var(--fm-space-10);
+  right: var(--fm-space-10);
+}
+
+.photo-viewer__nav {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.photo-viewer__nav--prev {
+  left: var(--fm-space-10);
+}
+
+.photo-viewer__nav--next {
+  right: var(--fm-space-10);
+}
+
+.photo-viewer__bar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fm-space-8);
+  padding: var(--fm-space-12) var(--fm-space-16);
+}
+
+.photo-viewer__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fm-space-4) var(--fm-space-12);
+  font-size: var(--fm-text-sm);
+  color: var(--fm-ink-secondary);
+}
+
+.photo-viewer__position {
+  font-weight: var(--fm-weight-semibold);
+}
+
+.photo-viewer__unplaced {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fm-space-4);
+}
+
+.photo-viewer__caption {
+  padding: var(--fm-space-6) var(--fm-space-10);
+  border: 1px solid var(--fm-border-strong);
+  border-radius: var(--fm-radius-sm);
+  background: var(--fm-surface);
+  color: var(--fm-ink);
+  font: inherit;
+  font-size: var(--fm-text-lg);
+}
+
+.photo-viewer__caption[readonly] {
+  border-color: transparent;
+  padding-left: 0;
+}
+
+.photo-viewer__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--fm-space-8);
+}
+
+.photo-viewer__spacer {
+  flex: 1;
+}
+
+.photo-viewer__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fm-space-6);
+  padding: var(--fm-space-6) var(--fm-space-12);
+  border: 1px solid var(--fm-border-strong);
+  border-radius: var(--fm-radius-sm);
+  background: var(--fm-surface);
+  color: var(--fm-ink);
+  font: inherit;
+  font-size: var(--fm-text-md);
+  font-weight: var(--fm-weight-semibold);
+  cursor: pointer;
+}
+
+.photo-viewer__btn:hover:not(:disabled) {
+  background: var(--fm-surface-tint);
+}
+
+.photo-viewer__btn:disabled {
+  cursor: not-allowed;
+  color: var(--fm-ink-muted);
+}
+
+.photo-viewer__btn--danger:not(:disabled) {
+  color: var(--fm-danger);
+}
+
+.photo-viewer__error {
+  margin: 0;
+  font-size: var(--fm-text-sm);
+  color: var(--fm-danger);
+}
+
 /* ZoomLevelNotice.tsx — which level Fog/Heatmap is drawing at, fading out after a few seconds.
    A line of its own in .map-toggles (flex-basis 100%), so it sits under the toggles however many
    rows they wrap to on a narrow screen. Takes no pointer events, like .map-toggles itself. */

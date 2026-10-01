@@ -11,6 +11,7 @@ import { ensureHeatmapLayer } from './heatmap';
 import { setMapMode, type MapMode } from './mapMode';
 import { loadOverlays, saveOverlays, type Overlays } from './overlays';
 import { setPathsVisible } from './paths';
+import { usePhotoMarkers } from './photos';
 import { setSatelliteVisible } from './satellite';
 import { ensureSpotsLayer, setSpotClickHandler, setSpotsCaptured, setSpotsVisible, type Spot, type SpotCategory } from './spots';
 import { labelInsertionPoint } from './layers';
@@ -36,6 +37,7 @@ import { ExportControl } from '../ui/ExportControl';
 import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
 import { OverlaysMenu } from '../ui/OverlaysMenu';
 import { PhotoStrip } from '../ui/PhotoStrip';
+import { PhotoViewer } from '../ui/PhotoViewer';
 import { ShowInArea } from '../ui/ShowInArea';
 import { ZoomLevelNotice } from '../ui/ZoomLevelNotice';
 import { SpotPopup } from '../ui/SpotPopup';
@@ -246,6 +248,10 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     [mapMode, focusedActivityId],
   );
   const photoState = usePhotos(photoScope, trackMetricsVersion);
+  // The photo the viewer has open; closed whenever the photos in view change hands.
+  const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
+  const photoScopeKey = photoScope === null ? null : JSON.stringify(photoScope);
+  useEffect(() => setOpenPhotoId(null), [photoScopeKey]);
   const storiesList = useStories(panelTab === 'stories');
 
   // TYPE/DISTANCE facets — pure client-side filters over
@@ -1328,6 +1334,10 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     };
   }, [map, pinned]);
 
+  // Off the map while the Edit window is open: its Track tab edits on the map, and the photos
+  // would sit over the very points being cut.
+  usePhotoMarkers(map, editOpen ? [] : photoState.photos, { onOpen: setOpenPhotoId, activeId: openPhotoId });
+
   return (
     <div className="app-shell">
       <div className="app-body">
@@ -1430,10 +1440,22 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
               activityId={focusedActivityId}
               readOnly={isDemo}
               onUploaded={photoState.reload}
-              onOpen={(id) => {
-                const photo = photoState.photos.find((p) => p.id === id);
-                if (photo?.lon != null && photo.lat != null) map.easeTo({ center: [photo.lon, photo.lat] });
+              onOpen={setOpenPhotoId}
+            />
+          )}
+          {map && openPhotoId !== null && (
+            <PhotoViewer
+              photos={photoState.photos}
+              id={openPhotoId}
+              readOnly={isDemo}
+              onNavigate={setOpenPhotoId}
+              onChanged={photoState.replace}
+              onDeleted={photoState.remove}
+              onShowOnMap={(photo) => {
+                setOpenPhotoId(null);
+                map.flyTo({ center: [photo.lon!, photo.lat!], zoom: Math.max(map.getZoom(), 16) });
               }}
+              onClose={() => setOpenPhotoId(null)}
             />
           )}
           {!editOpen && (
