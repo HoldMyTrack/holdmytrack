@@ -166,6 +166,7 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	// would collide with /activities/track-points/{id} and the other fixed segments above.
 	s.mux.HandleFunc(route("GET", "/photos"), s.requireVerified(s.handleListPhotos))
 	s.mux.HandleFunc(route("POST", "/photos"), s.requireNotDemo(s.handleUploadPhoto))
+	s.mux.HandleFunc(route("POST", "/photos/place"), s.requireNotDemo(s.handlePlacePhoto))
 	s.mux.HandleFunc(route("GET", "/photos/{id}"), s.requireVerified(s.handleGetPhoto))
 	s.mux.HandleFunc(route("GET", "/photos/{id}/thumb"), s.requireVerified(s.handleGetPhotoThumb))
 	s.mux.HandleFunc(route("PATCH", "/photos/{id}"), s.requireNotDemo(s.handleUpdatePhoto))

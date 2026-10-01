@@ -243,7 +243,7 @@ func readPhotoPart(r *http.Request, name string, maxBytes int64, maxSide int) (p
 // copy, and `thumb`, its thumbnail; and what the browser read from the original's EXIF before
 // resizing, all optional: `taken_at` (RFC 3339, when the file says its time zone or carries a
 // GPS time) or `taken_local` (`2006-01-02T15:04:05`, a camera clock with no zone), and
-// `lat`/`lon`; and `route_at` (RFC 3339), where on the track the user put it. Answers 201 with
+// `lat`/`lon`; `route_at` (RFC 3339), where on the track the user put it; and `caption`. Answers 201 with
 // the photo, placed by placePhoto. One it can't place is refused with 422 and the error code
 // photo_needs_place, and the client sends it again with the user's `route_at`.
 func (s *Server) handleUploadPhoto(w http.ResponseWriter, r *http.Request) {
@@ -287,40 +287,12 @@ func (s *Server) handleUploadPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clock, err := parsePhotoClock(r.FormValue("taken_at"), r.FormValue("taken_local"))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	caption, ok := photoCaption(w, r, r.FormValue("caption"))
+	if !ok {
 		return
 	}
-	at, err := parsePhotoPosition(r.FormValue("lon"), r.FormValue("lat"))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	var chosen *time.Time
-	if v := r.FormValue("route_at"); v != "" {
-		t, err := time.Parse(time.RFC3339, v)
-		if err != nil {
-			http.Error(w, `invalid "route_at", want RFC 3339`, http.StatusBadRequest)
-			return
-		}
-		chosen = &t
-	}
-	takenAt, routeAt, err := s.placePhoto(ctx, activityID, clock, locationFromContext(ctx), at, chosen)
-	if errors.Is(err, errPhotoNoTrack) {
-		httpErrorT(w, r, http.StatusConflict, "error.photo_no_track")
-		return
-	}
-	if err != nil {
-		s.log.Error("photo upload: placement failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	if routeAt == nil {
-		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{
-			"error":   photoNeedsPlaceCode,
-			"message": i18n.Get(requestLang(r)).T("error.photo_needs_place"),
-		})
+	takenAt, routeAt, ok := s.placeFromFields(w, r, activityID, r.FormValue)
+	if !ok {
 		return
 	}
 
@@ -335,9 +307,9 @@ func (s *Server) handleUploadPhoto(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(ctx)
 	var photoID string
 	if err := tx.QueryRow(ctx, `
-		INSERT INTO activity_photos (user_id, activity_id, taken_at, route_at, content_type, thumb_content_type, width, height, bytes)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id
-	`, userID, activityID, takenAt, routeAt, photo.contentType, thumb.contentType, photo.width, photo.height,
+		INSERT INTO activity_photos (user_id, activity_id, taken_at, route_at, caption, content_type, thumb_content_type, width, height, bytes)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id
+	`, userID, activityID, takenAt, routeAt, caption, photo.contentType, thumb.contentType, photo.width, photo.height,
 		len(photo.data)+len(thumb.data)).Scan(&photoID); err != nil {
 		s.log.Error("photo upload: insert failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -368,6 +340,113 @@ func (s *Server) handleUploadPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, p)
+}
+
+// placeFromFields places a photo from what the client read of its EXIF and where the user put
+// it — `taken_at` or `taken_local`, `lat`/`lon`, `route_at`, read through get — writing the
+// response itself when it can't: 400 for a field that doesn't parse, 409 for an activity with no
+// track, and 422 photo_needs_place when nothing places it. The upload and the placement check
+// (handlePlacePhoto) share it, so the check's answer is the upload's.
+func (s *Server) placeFromFields(w http.ResponseWriter, r *http.Request, activityID string, get func(string) string) (takenAt, routeAt *time.Time, ok bool) {
+	ctx := r.Context()
+	clock, err := parsePhotoClock(get("taken_at"), get("taken_local"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return nil, nil, false
+	}
+	at, err := parsePhotoPosition(get("lon"), get("lat"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return nil, nil, false
+	}
+	var chosen *time.Time
+	if v := get("route_at"); v != "" {
+		t, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			http.Error(w, `invalid "route_at", want RFC 3339`, http.StatusBadRequest)
+			return nil, nil, false
+		}
+		chosen = &t
+	}
+	takenAt, routeAt, err = s.placePhoto(ctx, activityID, clock, locationFromContext(ctx), at, chosen)
+	if errors.Is(err, errPhotoNoTrack) {
+		httpErrorT(w, r, http.StatusConflict, "error.photo_no_track")
+		return nil, nil, false
+	}
+	if err != nil {
+		s.log.Error("photo placement failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return nil, nil, false
+	}
+	if routeAt == nil {
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{
+			"error":   photoNeedsPlaceCode,
+			"message": i18n.Get(requestLang(r)).T("error.photo_needs_place"),
+		})
+		return nil, nil, false
+	}
+	return takenAt, routeAt, true
+}
+
+// photoCaption trims a caption, empty meaning none, refusing one over maxPhotoCaptionLen with a
+// 400 it writes itself.
+func photoCaption(w http.ResponseWriter, r *http.Request, caption string) (*string, bool) {
+	trimmed := strings.TrimSpace(caption)
+	if trimmed == "" {
+		return nil, true
+	}
+	if utf8.RuneCountInString(trimmed) > maxPhotoCaptionLen {
+		httpErrorT(w, r, http.StatusBadRequest, "error.photo_caption_too_long", "max", maxPhotoCaptionLen)
+		return nil, false
+	}
+	return &trimmed, true
+}
+
+// placeRequest is `POST /v1/photos/place`'s body: the upload's placement fields, as JSON.
+type placeRequest struct {
+	ActivityID string   `json:"activity_id"`
+	TakenAt    string   `json:"taken_at"`
+	TakenLocal string   `json:"taken_local"`
+	Lat        *float64 `json:"lat"`
+	Lon        *float64 `json:"lon"`
+}
+
+type placeResponse struct {
+	RouteAt time.Time  `json:"route_at"`
+	TakenAt *time.Time `json:"taken_at"`
+}
+
+// handlePlacePhoto serves `POST /v1/photos/place` — where an upload with these fields would be
+// placed, storing nothing: `{route_at, taken_at}`, or the upload's own refusals (placeFromFields).
+// The Edit window asks it as photos are picked, so it can ask the user about the ones that need a
+// place and upload all of them only on Save, each with the place it settled on.
+func (s *Server) handlePlacePhoto(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
+	var req placeRequest
+	if err := json.NewDecoder(io.LimitReader(r.Body, 16<<10)).Decode(&req); err != nil {
+		http.Error(w, errPhotoInvalidJSON.Error(), http.StatusBadRequest)
+		return
+	}
+	if ok, err := s.ownsActivity(r.Context(), userID, req.ActivityID); err != nil {
+		s.log.Error("photo place: activity lookup failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	} else if !ok {
+		http.Error(w, "activity not found", http.StatusNotFound)
+		return
+	}
+	coord := func(v *float64) string {
+		if v == nil {
+			return ""
+		}
+		return strconv.FormatFloat(*v, 'f', -1, 64)
+	}
+	fields := map[string]string{"taken_at": req.TakenAt, "taken_local": req.TakenLocal, "lat": coord(req.Lat), "lon": coord(req.Lon)}
+	takenAt, routeAt, ok := s.placeFromFields(w, r, req.ActivityID, func(k string) string { return fields[k] })
+	if !ok {
+		return
+	}
+	writeJSON(w, http.StatusOK, placeResponse{RouteAt: *routeAt, TakenAt: takenAt})
 }
 
 // photoClock is what the browser read of a photo's capture time: an instant, when the file
@@ -605,14 +684,8 @@ func (s *Server) handleUpdatePhoto(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, errPhotoInvalidJSON.Error(), http.StatusBadRequest)
 			return
 		}
-		var value *string
-		if caption != nil {
-			if trimmed := strings.TrimSpace(*caption); trimmed != "" {
-				value = &trimmed
-			}
-		}
-		if value != nil && utf8.RuneCountInString(*value) > maxPhotoCaptionLen {
-			httpErrorT(w, r, http.StatusBadRequest, "error.photo_caption_too_long", "max", maxPhotoCaptionLen)
+		value, ok := photoCaption(w, r, deref(caption))
+		if !ok {
 			return
 		}
 		if _, err := s.pool.Exec(ctx, `UPDATE activity_photos SET caption = $2 WHERE id = $1`, photoID, value); err != nil {
@@ -686,6 +759,13 @@ func (s *Server) activityPhotoIDs(ctx context.Context, activityID string) ([]str
 		return nil, err
 	}
 	return pgx.CollectRows(rows, pgx.RowTo[string])
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 // removePhotoObjects removes a photo's two images, logging rather than failing.

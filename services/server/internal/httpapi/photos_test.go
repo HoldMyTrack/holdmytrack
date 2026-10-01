@@ -393,3 +393,62 @@ func TestStoryPhotos(t *testing.T) {
 		t.Errorf("no activity or story: %d, want 400", rec.Code)
 	}
 }
+
+func TestPhotoPlaceCheck(t *testing.T) {
+	d := newDBTestWithS3(t, newMemS3())
+	me := d.newAccount(false)
+	walk := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, startedAt: photoTrackStart, at: &[2]float64{10, 50}})
+	bare := d.newActivity(me, testActivity{activityType: "walking"})
+	lon, lat := 10.0006, 50.0004
+
+	cases := []struct {
+		name string
+		body map[string]any
+		want int
+		at   time.Time
+	}{
+		{"capture time", map[string]any{"activity_id": walk, "taken_at": "2026-05-01T10:00:30Z"}, http.StatusOK, photoTrackStart.Add(30 * time.Second)},
+		{"position", map[string]any{"activity_id": walk, "lon": lon, "lat": lat}, http.StatusOK, photoTrackStart.Add(30 * time.Second)},
+		{"nothing to go by", map[string]any{"activity_id": walk}, http.StatusUnprocessableEntity, time.Time{}},
+		{"no track", map[string]any{"activity_id": bare, "taken_at": "2026-05-01T10:00:30Z"}, http.StatusConflict, time.Time{}},
+		{"someone else's activity", map[string]any{"activity_id": d.newActivity(d.newAccount(false), testActivity{activityType: "walking"})}, http.StatusNotFound, time.Time{}},
+		{"bad capture time", map[string]any{"activity_id": walk, "taken_at": "noon"}, http.StatusBadRequest, time.Time{}},
+	}
+	for _, c := range cases {
+		rec := d.do(me, "POST", "/v1/photos/place", c.body)
+		if rec.Code != c.want {
+			t.Errorf("%s: %d, want %d: %s", c.name, rec.Code, c.want, strings.TrimSpace(rec.Body.String()))
+			continue
+		}
+		if c.want == http.StatusOK {
+			var got placeResponse
+			d.decode(rec, http.StatusOK, &got)
+			if !got.RouteAt.Equal(c.at) {
+				t.Errorf("%s: route_at %v, want %v", c.name, got.RouteAt, c.at)
+			}
+		}
+	}
+	// It stores nothing.
+	var list photosResponse
+	d.decode(d.do(me, "GET", "/v1/photos?activity="+walk, nil), http.StatusOK, &list)
+	if len(list.Photos) != 0 {
+		t.Errorf("the check stored %d photos", len(list.Photos))
+	}
+	if rec := d.do(d.newAccount(true), "POST", "/v1/photos/place", map[string]any{"activity_id": walk}); rec.Code != http.StatusForbidden {
+		t.Errorf("demo: %d, want 403", rec.Code)
+	}
+
+	// An upload carries its caption, trimmed.
+	var p photoJSON
+	d.decode(d.uploadPhoto(me, testJPEG(t, 40, 30), testJPEG(t, 8, 6), map[string]string{
+		"activity_id": walk, "route_at": "2026-05-01T10:00:30Z", "caption": "  The bridge  ",
+	}), http.StatusCreated, &p)
+	if p.Caption == nil || *p.Caption != "The bridge" {
+		t.Errorf("uploaded caption %v", p.Caption)
+	}
+	if rec := d.uploadPhoto(me, testJPEG(t, 40, 30), testJPEG(t, 8, 6), map[string]string{
+		"activity_id": walk, "route_at": "2026-05-01T10:00:30Z", "caption": strings.Repeat("x", maxPhotoCaptionLen+1),
+	}); rec.Code != http.StatusBadRequest {
+		t.Errorf("long uploaded caption: %d, want 400", rec.Code)
+	}
+}

@@ -1287,15 +1287,16 @@ Deliberately out of scope, not a "not yet" — built and then cut, not planned t
 ### FR-16.1 Upload
 
 **Behavior**:
-1. `POST /v1/photos` takes a multipart body: `activity_id`; `file`, the resized photo, and `thumb`, its thumbnail, each a JPEG or WebP; and optionally what the client read from the original's EXIF — `taken_at` (RFC 3339) or `taken_local` (`YYYY-MM-DDTHH:MM:SS`, a capture time with no time zone), and `lat`/`lon`; and optionally `route_at` (RFC 3339), the place on the track the user chose. It answers `201` with the photo (FR-16.3), placed per FR-16.2.
+1. `POST /v1/photos` takes a multipart body: `activity_id`; `file`, the resized photo, and `thumb`, its thumbnail, each a JPEG or WebP; and optionally what the client read from the original's EXIF — `taken_at` (RFC 3339) or `taken_local` (`YYYY-MM-DDTHH:MM:SS`, a capture time with no time zone), and `lat`/`lon`; and optionally `route_at` (RFC 3339), the place on the track the user chose, and `caption` (trimmed, at most 500 characters). It answers `201` with the photo (FR-16.3), placed per FR-16.2.
 2. Each image's type is read from its bytes, never from its filename or declared type.
 3. An account holds at most 2,000 photos.
+4. `POST /v1/photos/place` takes the same placement fields as JSON — `{activity_id, taken_at, taken_local, lat, lon}` — and answers where an upload with them would be placed, `{route_at, taken_at}`, storing nothing. It refuses as the upload does: `photo_needs_place` (`422`), no track (`409`), a field that doesn't parse (`400`), another account's activity (`404`), a demo session (`403`).
 
 **Error cases**:
 - No session → `401`. A demo session → `403` (`demo_read_only`).
 - An activity that isn't the caller's, or a missing or malformed `activity_id` → `404`.
 - The account already holds 2,000 photos → `409`.
-- A missing `file` or `thumb` → `400`; a `taken_at`, `taken_local`, `lat`/`lon` or `route_at` that doesn't parse → `400`.
+- A missing `file` or `thumb` → `400`; a `taken_at`, `taken_local`, `lat`/`lon` or `route_at` that doesn't parse → `400`; a caption over 500 characters → `400`.
 - An activity with no track → `409`: a photo needs a place on one.
 - A photo FR-16.2 can't place → `422` with the error code `photo_needs_place` and a message; nothing is stored. The client asks the user where it goes and sends it again with `route_at`.
 - An image that isn't a decodable JPEG or WebP → `415`.
