@@ -343,3 +343,31 @@ func TestPhotosFollowTheirActivity(t *testing.T) {
 	}
 	d.decode(d.do(me, "GET", p.URL, nil), http.StatusNotFound, nil)
 }
+
+func TestStoryPhotos(t *testing.T) {
+	d := newDBTestWithS3(t, newMemS3())
+	me := d.newAccount(false)
+	file, thumb := testJPEG(t, 40, 30), testJPEG(t, 8, 6)
+	day1 := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, startedAt: photoTrackStart, at: &[2]float64{10, 50}})
+	day2 := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, startedAt: photoTrackStart.Add(24 * time.Hour), at: &[2]float64{11, 50}})
+	elsewhere := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, startedAt: photoTrackStart.Add(48 * time.Hour), at: &[2]float64{12, 50}})
+	for _, a := range []string{day2, day1, elsewhere} {
+		d.decode(d.uploadPhoto(me, file, thumb, map[string]string{"activity_id": a}), http.StatusCreated, nil)
+	}
+	var st story
+	d.decode(d.do(me, "POST", "/v1/stories", map[string]any{"name": "Trip", "activity_ids": []string{day1, day2}}), http.StatusCreated, &st)
+
+	var list photosResponse
+	d.decode(d.do(me, "GET", "/v1/photos?story="+st.ID, nil), http.StatusOK, &list)
+	if len(list.Photos) != 2 || list.Photos[0].ActivityID != day2 || list.Photos[1].ActivityID != day1 {
+		t.Errorf("story photos %+v, want day 2's then day 1's (by upload; neither placed)", list.Photos)
+	}
+	for _, path := range []string{"/v1/photos?story=" + st.ID, "/v1/photos?story=nope"} {
+		if rec := d.do(d.newAccount(false), "GET", path, nil); rec.Code != http.StatusNotFound {
+			t.Errorf("%s from another account: %d, want 404", path, rec.Code)
+		}
+	}
+	if rec := d.do(me, "GET", "/v1/photos", nil); rec.Code != http.StatusBadRequest {
+		t.Errorf("no activity or story: %d, want 400", rec.Code)
+	}
+}

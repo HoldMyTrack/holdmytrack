@@ -1313,11 +1313,11 @@ Deliberately out of scope, not a "not yet" — built and then cut, not planned t
 ### FR-16.3 Listing and images
 
 **Behavior**:
-1. `GET /v1/photos?activity={id}` answers `{photos}`: the activity's photos as `{id, activity_id, taken_at, route_at, lon, lat, caption, width, height, url, thumb_url}`, placed ones in route order, then unplaced ones by capture time and upload. `width`/`height` are the stored copy's.
+1. `GET /v1/photos?activity={id}` answers `{photos}`: the activity's photos as `{id, activity_id, taken_at, route_at, lon, lat, caption, width, height, url, thumb_url}`, placed ones in route order, then unplaced ones by capture time and upload. `width`/`height` are the stored copy's. `GET /v1/photos?story={id}` answers the same for every activity in a Story (FR-14) that isn't a superseded duplicate, in the same order across all of them.
 2. `GET /v1/photos/{id}` and `GET /v1/photos/{id}/thumb` serve the stored copy and its thumbnail with their sniffed content type, to their owner only, cacheable for good (a photo's images never change).
 
 **Error cases**:
-- A missing `activity` → `400`. An activity, or a photo, that isn't the caller's, or a malformed id → `404`.
+- Neither `activity` nor `story` → `400`. An activity, Story or photo that isn't the caller's, or a malformed id → `404`.
 
 ### FR-16.4 Editing
 

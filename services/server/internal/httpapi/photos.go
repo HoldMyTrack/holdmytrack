@@ -139,24 +139,34 @@ func (s *Server) loadPhoto(ctx context.Context, userID, photoID string) (photoJS
 	return photos[0], nil
 }
 
-// handleListPhotos serves `GET /v1/photos?activity={id}` — one activity's photos.
+// handleListPhotos serves `GET /v1/photos?activity={id}` — one activity's photos — and
+// `?story={id}`, the photos of every live activity in a Story (§4.23), for its map.
 func (s *Server) handleListPhotos(w http.ResponseWriter, r *http.Request) {
 	userID := userIDFromContext(r.Context())
 	ctx := r.Context()
-	activityID := r.URL.Query().Get("activity")
-	if activityID == "" {
-		http.Error(w, `missing "activity"`, http.StatusBadRequest)
+	q := r.URL.Query()
+	var where, id string
+	var owns func(context.Context, string, string) (bool, error)
+	switch {
+	case q.Get("activity") != "":
+		id, owns = q.Get("activity"), s.ownsActivity
+		where = "p.activity_id = $2"
+	case q.Get("story") != "":
+		id, owns = q.Get("story"), s.ownsStory
+		where = `a.superseded_by IS NULL AND p.activity_id IN (SELECT activity_id FROM story_activities WHERE story_id = $2)`
+	default:
+		http.Error(w, `missing "activity" or "story"`, http.StatusBadRequest)
 		return
 	}
-	if ok, err := s.ownsActivity(ctx, userID, activityID); err != nil {
-		s.log.Error("photo list: activity lookup failed", "err", err)
+	if ok, err := owns(ctx, userID, id); err != nil {
+		s.log.Error("photo list: owner lookup failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	} else if !ok {
-		http.Error(w, "activity not found", http.StatusNotFound)
+		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
-	photos, err := s.loadPhotos(ctx, "p.activity_id = $2", userID, activityID)
+	photos, err := s.loadPhotos(ctx, where, userID, id)
 	if err != nil {
 		s.log.Error("photo list failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -173,6 +183,17 @@ func (s *Server) ownsActivity(ctx context.Context, userID, activityID string) (b
 	var ok bool
 	err := s.pool.QueryRow(ctx,
 		`SELECT EXISTS(SELECT 1 FROM activities WHERE id = $1 AND user_id = $2)`, activityID, userID,
+	).Scan(&ok)
+	return ok, err
+}
+
+func (s *Server) ownsStory(ctx context.Context, userID, storyID string) (bool, error) {
+	if !uuidPattern.MatchString(storyID) {
+		return false, nil
+	}
+	var ok bool
+	err := s.pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM stories WHERE id = $1 AND user_id = $2)`, storyID, userID,
 	).Scan(&ok)
 	return ok, err
 }
