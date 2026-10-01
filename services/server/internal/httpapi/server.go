@@ -162,6 +162,14 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(route("DELETE", "/stories/{id}"), s.requireNotDemo(s.handleDeleteStory))
 	s.mux.HandleFunc(route("POST", "/stories/{id}/activities"), s.requireNotDemo(s.handleAddStoryActivities))
 	s.mux.HandleFunc(route("DELETE", "/stories/{id}/activities"), s.requireNotDemo(s.handleRemoveStoryActivities))
+	// Activity photos (photos.go) — under /photos rather than /activities/{id}/photos, which
+	// would collide with /activities/track-points/{id} and the other fixed segments above.
+	s.mux.HandleFunc(route("GET", "/photos"), s.requireVerified(s.handleListPhotos))
+	s.mux.HandleFunc(route("POST", "/photos"), s.requireNotDemo(s.handleUploadPhoto))
+	s.mux.HandleFunc(route("GET", "/photos/{id}"), s.requireVerified(s.handleGetPhoto))
+	s.mux.HandleFunc(route("GET", "/photos/{id}/thumb"), s.requireVerified(s.handleGetPhotoThumb))
+	s.mux.HandleFunc(route("PATCH", "/photos/{id}"), s.requireNotDemo(s.handleUpdatePhoto))
+	s.mux.HandleFunc(route("DELETE", "/photos/{id}"), s.requireNotDemo(s.handleDeletePhoto))
 	s.mux.HandleFunc(route("GET", "/uploads"), s.requireVerified(s.handleListUploads))
 	s.mux.HandleFunc(route("GET", "/uploads/active"), s.requireVerified(s.handleActiveUploads))
 	s.mux.HandleFunc(route("GET", "/coverage/status"), s.requireVerified(s.handleCoverageStatus))

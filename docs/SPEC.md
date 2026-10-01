@@ -15,7 +15,7 @@ This document specifies HoldMyTrack's functional behavior as currently implement
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web and in the Android app, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, pace-colored segments, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date slider, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), the interface language — English or Russian (FR-13), Stories on the web and in the Android app (FR-14), and Spots' places on the web and in the Android app (FR-15).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web and in the Android app, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, pace-colored segments, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date slider, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), the interface language — English or Russian (FR-13), Stories on the web and in the Android app (FR-14), Spots' places on the web and in the Android app (FR-15), and photos on an activity, on the web (FR-16).
 
 **Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), the rest of "Export" (animated reveals — high-resolution map export itself is built, FR-4.10 below), and marking a Spots place visited (ADR-0021). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace stays as per-activity route context (FR-4.8) rather than an analysed, all-time performance record. So is any health data at all: heart rate is never read, stored or shown (ADR-0017), and the pace/heart-rate + elevation profile (FR-4.9) was built and then removed for that reason. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
@@ -1279,3 +1279,57 @@ The following are named in `VISION.md`'s roadmap but have no functional requirem
 - Dark-theme variant of the Fog of War veil (the theme parameter is accepted but currently has no visual effect on the veil itself)
 
 Deliberately out of scope, not a "not yet" — built and then cut, not planned to return: Oura and other recovery-data sources (sleep, HRV, readiness), best-effort curves, personal bests, power curves, and training load. Also deliberately out of scope, never built: explorer-tile scoring — Fog of War is the exploration mechanic (ADR-0018). And splitting a track that passes through a Private location mid-way (FR-8.1 hides only the leading and trailing portions, by design). `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor; pace stays as per-activity route context (FR-4.8), not an analysed, all-time performance record, and heart rate and every other health measurement are out of scope entirely — never read, stored or shown (ADR-0017). The pace/heart-rate + elevation profile (FR-4.9) was built and then removed on those grounds.
+
+## 21. FR-16 — Activity photos
+
+**Description**: The user's own photos added to an activity, each placed at the point of its route where it was taken, so an activity — and a Story — shows its pictures on the map (`VISION.md` §4.2, ADR-0024). Stored as a resized copy and a thumbnail with no EXIF; private to the account. The web adds and shows them; the Android app doesn't yet.
+
+### FR-16.1 Upload
+
+**Behavior**:
+1. `POST /v1/photos` takes a multipart body: `activity_id`; `file`, the resized photo, and `thumb`, its thumbnail, each a JPEG or WebP; and optionally what the client read from the original's EXIF — `taken_at` (RFC 3339) or `taken_local` (`YYYY-MM-DDTHH:MM:SS`, a capture time with no time zone), and `lat`/`lon`. It answers `201` with the photo (FR-16.3), placed per FR-16.2.
+2. Each image's type is read from its bytes, never from its filename or declared type.
+3. An account holds at most 2,000 photos.
+
+**Error cases**:
+- No session → `401`. A demo session → `403` (`demo_read_only`).
+- An activity that isn't the caller's, or a missing or malformed `activity_id` → `404`.
+- The account already holds 2,000 photos → `409`.
+- A missing `file` or `thumb` → `400`; a `taken_at`, `taken_local` or `lat`/`lon` that doesn't parse → `400`.
+- An image that isn't a decodable JPEG or WebP → `415`.
+- `file` larger than 3 MiB or `thumb` larger than 256 KiB (or the body over its limit) → `413`.
+- `file` larger than 2560 px, or `thumb` larger than 640 px, on either side → `422`: an original must be resized first.
+
+### FR-16.2 Placement
+
+**Behavior**:
+1. A photo is placed by a moment on its activity's track (`route_at`), never by a stored position; its position is that moment's point on the track, worked out on every read.
+2. Placed at its capture time when that falls within the track; a capture time up to 5 minutes before the track starts or after it ends places it at that end.
+3. A `taken_local` time is read in the account's time zone; if that misses the track, in the UTC offset (in 15-minute steps, −12:00 to +14:00) nearest the account's own that puts it on the track. `taken_at` (FR-16.3) is the instant it resolved to.
+4. Without a capture time that places it, an EXIF position within 500 m of the track places it at the track's nearest point.
+5. Otherwise the photo is kept unplaced (`route_at` null).
+6. A placed photo has no position (`lon`/`lat` null) when its moment is outside the track's current span — cut off by Private locations or Edit track — or its point is inside any of the account's Private locations, including one added after the upload. It keeps its `route_at`, and gets its position back if the track or the Private locations change to allow it.
+
+### FR-16.3 Listing and images
+
+**Behavior**:
+1. `GET /v1/photos?activity={id}` answers `{photos}`: the activity's photos as `{id, activity_id, taken_at, route_at, lon, lat, caption, width, height, url, thumb_url}`, placed ones in route order, then unplaced ones by capture time and upload. `width`/`height` are the stored copy's.
+2. `GET /v1/photos/{id}` and `GET /v1/photos/{id}/thumb` serve the stored copy and its thumbnail with their sniffed content type, to their owner only, cacheable for good (a photo's images never change).
+
+**Error cases**:
+- A missing `activity` → `400`. An activity, or a photo, that isn't the caller's, or a malformed id → `404`.
+
+### FR-16.4 Editing
+
+**Behavior**:
+1. `PATCH /v1/photos/{id}` takes a JSON object; a field present changes, a field absent doesn't. `caption`: trimmed; empty or null clears it; at most 500 characters. `position`: `{lon, lat}` places the photo at the track's nearest point to it, at any distance; null takes it off the map (`route_at` null). It answers `200` with the photo.
+
+**Error cases**:
+- A body that isn't a JSON object, or a `position` without numeric `lon` and `lat` within ±180/±90 → `400`. A caption over 500 characters → `400`.
+- A `position` for an activity with no track → `409`.
+- A photo that isn't the caller's → `404`. A demo session → `403`.
+
+### FR-16.5 Deleting
+
+**Behavior**:
+1. `DELETE /v1/photos/{id}` deletes the photo and both its images, answering `204`; a photo that isn't the caller's → `404`, a demo session → `403`.

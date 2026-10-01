@@ -36,6 +36,13 @@ type dbTest struct {
 
 func newDBTest(t *testing.T) *dbTest {
 	t.Helper()
+	return newDBTestWithS3(t, http.HandlerFunc(emptyS3))
+}
+
+// newDBTestWithS3 is newDBTest over s3 as the object store, for a test that reads back what it
+// stores (memS3, photos_test.go).
+func newDBTestWithS3(t *testing.T, s3Handler http.Handler) *dbTest {
+	t.Helper()
 	url := os.Getenv("TEST_DATABASE_URL")
 	if url == "" {
 		t.Skip("TEST_DATABASE_URL not set")
@@ -49,7 +56,7 @@ func newDBTest(t *testing.T) *dbTest {
 	if err := db.Migrate(ctx, pool); err != nil {
 		t.Fatalf("migrate test database: %v", err)
 	}
-	s3 := httptest.NewServer(http.HandlerFunc(emptyS3))
+	s3 := httptest.NewServer(s3Handler)
 	t.Cleanup(s3.Close)
 	store, err := storage.New(s3.URL, "test", "test", "test")
 	if err != nil {
