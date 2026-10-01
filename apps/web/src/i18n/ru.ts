@@ -291,6 +291,7 @@ export const ru: Record<MessageKey, string> & Record<string, string> = {
   'photos.take_off': 'Убрать с карты',
   'photos.place_hint': 'Нажмите на трек там, где была снята эта фотография.',
   'photos.place_hint_move': 'Перетащите фотографию вдоль трека или нажмите там, где она была снята.',
+  'photos.story_hint': 'Выберите занятие из истории, чтобы добавить к нему фотографии.',
   'activity_type.alpine_skiing': 'Горные лыжи',
   'activity_type.biking': 'Велосипед',
   'activity_type.biking_stationary': 'Велотренажёр',

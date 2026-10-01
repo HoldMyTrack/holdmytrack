@@ -21,11 +21,12 @@ function scopeKey(scope: PhotoScope): string | null {
 /**
  * The photos (FR-16) of the focused activity or the open Story — `GET /v1/photos`, refetched
  * whenever the scope or `version` changes or `reload` is called (after an upload). `version` is
- * MapView's `trackMetricsVersion`, bumped when a track edit or a Private location change has
- * been reprocessed — either can move a photo, or take it off the map. A new scope starts empty
+ * whatever else should refetch them: MapView's `trackMetricsVersion`, bumped when a track edit
+ * or a Private location change has been reprocessed — either can move a photo, or take it off
+ * the map — and an open Story's members. A new scope starts empty
  * rather than showing the last one's photos while it loads.
  */
-export function usePhotos(scope: PhotoScope, version = 0): PhotosState {
+export function usePhotos(scope: PhotoScope, version: number | string = 0): PhotosState {
   const key = scopeKey(scope);
   const [photos, setPhotos] = useState<readonly Photo[]>([]);
   const [error, setError] = useState<string | null>(null);

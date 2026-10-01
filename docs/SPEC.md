@@ -1337,19 +1337,20 @@ Deliberately out of scope, not a "not yet" — built and then cut, not planned t
 
 ### FR-16.6 The photo strip (web)
 
-**Preconditions**: Normal mode, an activity selected (FR-5.5), the Edit window closed.
+**Preconditions**: Normal mode, an activity selected (FR-5.5) or a Story open (FR-14), the Edit window closed.
 
 **Behavior**:
-1. A strip along the bottom of the map shows the selected activity's photos as thumbnails, in FR-16.3's order; a photo with no place on the map carries a badge saying so. With none, a line invites adding some.
-2. Add photos opens the browser's file picker for any number of images. Each is read for its EXIF capture time (with its zone, when the file has one or a GPS clock to derive it from) and position, redrawn at most 2048 px on its long side plus a 320 px thumbnail, upright per its EXIF orientation, and uploaded (FR-16.1) — one at a time, with "Uploading n of m…" while it runs; each lands in the strip when done.
-3. A file that fails is listed by name with the reason — one the browser can't open (most HEIC files outside Safari), or the server's refusal — and the rest carry on.
-4. The strip's photos refresh when an Edit track or a Private location change has been reprocessed (FR-5.14, FR-8.1).
-5. For a demo session Add photos is disabled, with a tooltip saying why.
+1. A strip along the bottom of the map shows the selected activity's photos as thumbnails, in FR-16.3's order; with none selected and a Story open, every photo of the Story's activities. A photo with no place on the map carries a badge saying so. With none, a line invites adding some.
+2. A Story's strip has no Add photos, since a photo belongs to one activity; it says to select one of the Story's activities, which narrows the strip to that activity's photos and offers Add photos.
+3. Add photos opens the browser's file picker for any number of images. Each is read for its EXIF capture time (with its zone, when the file has one or a GPS clock to derive it from) and position, redrawn at most 2048 px on its long side plus a 320 px thumbnail, upright per its EXIF orientation, and uploaded (FR-16.1) — one at a time, with "Uploading n of m…" while it runs; each lands in the strip when done.
+4. A file that fails is listed by name with the reason — one the browser can't open (most HEIC files outside Safari), or the server's refusal — and the rest carry on.
+5. The strip's photos refresh when an Edit track or a Private location change has been reprocessed (FR-5.14, FR-8.1).
+6. For a demo session Add photos is disabled, with a tooltip saying why.
 
 ### FR-16.7 On the map, and the viewer (web)
 
 **Behavior**:
-1. Each of the selected activity's photos with a place on the map (FR-16.2) is drawn as its thumbnail in a round frame at that point, over the tracks. They're hidden while the Edit window is open.
+1. Each of the strip's photos (FR-16.6) with a place on the map (FR-16.2) is drawn as its thumbnail in a round frame at that point, over the tracks. They're hidden while the Edit window is open.
 2. Clicking a photo's marker, or its thumbnail in the strip, opens it in the viewer, over the page. A marker's click doesn't change the selection.
 3. The viewer shows the photo as large as the window allows; its position in the list ("2 of 4"); when it was taken, if known; and a note when it has no place on the map. ← and →, or the arrows on the photo, step through the photos in the strip's order; Escape, the close button or a click outside closes it. The photo open in the viewer is drawn larger on the map.
 4. The owner can write a caption, saved when the field loses focus or on Enter (FR-16.4), and delete the photo after a confirmation (FR-16.5); the viewer then shows the next photo, else the previous, else closes. Show on map closes the viewer and flies the map to the photo.

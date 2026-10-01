@@ -242,13 +242,18 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   const [storyId, setStoryId] = useState<string | null>(storyParam);
   const storyState = useStory(storyId);
 
-  // Photos (FR-16): the focused activity's, in Normal mode — the one activity a person is
-  // looking at. Neither Fog nor Heatmap focuses one.
-  const photoScope = useMemo<PhotoScope>(
-    () => (mapMode === 'normal' && focusedActivityId !== null ? { activity: focusedActivityId } : null),
-    [mapMode, focusedActivityId],
-  );
-  const photoState = usePhotos(photoScope, trackMetricsVersion);
+  // Photos (FR-16), in Normal mode — neither Fog nor Heatmap focuses an activity or opens a
+  // Story: the focused activity's, the one a person is looking at; else the open Story's, the
+  // whole trip's pictures along its days.
+  const photoScope = useMemo<PhotoScope>(() => {
+    if (mapMode !== 'normal') return null;
+    if (focusedActivityId !== null) return { activity: focusedActivityId };
+    if (storyId !== null) return { story: storyId };
+    return null;
+  }, [mapMode, focusedActivityId, storyId]);
+  // A Story's photos change with its members too.
+  const storyMembers = storyState.story?.activityIds.join(',') ?? '';
+  const photoState = usePhotos(photoScope, `${trackMetricsVersion}|${storyMembers}`);
   // The photo the viewer has open; closed whenever the photos in view change hands.
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
   // The photo being placed on the map by hand (FR-16.8): a click on the map, or a drag of its
@@ -1494,6 +1499,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
               photos={photoState.photos}
               error={photoState.error}
               activityId={focusedActivityId}
+              addHint={t('photos.story_hint')}
               readOnly={isDemo}
               onUploaded={photoState.reload}
               onOpen={setOpenPhotoId}

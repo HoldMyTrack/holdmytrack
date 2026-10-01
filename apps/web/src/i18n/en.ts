@@ -270,6 +270,7 @@ export const en = {
   'photos.take_off': 'Take off the map',
   'photos.place_hint': 'Click the track where this photo was taken.',
   'photos.place_hint_move': 'Drag the photo along the track, or click where it was taken.',
+  'photos.story_hint': 'Select one of the story\'s activities to add photos to it.',
   'activity_type.alpine_skiing': 'Alpine Skiing',
   'activity_type.biking': 'Biking',
   'activity_type.biking_stationary': 'Stationary Biking',
