@@ -110,8 +110,8 @@ code {
   color: var(--fm-ink-secondary);
 }
 
-/* About's "How it works": three numbered steps in a row, the number drawn from the list's
-   own counter so the markup stays a plain <ol>. */
+/* About's "How it works": three numbered steps in a row, each number inline before its
+   heading, drawn from the list's own counter so the markup stays a plain <ol>. */
 .page-steps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -126,26 +126,28 @@ code {
   counter-increment: step;
 }
 
-.page-steps li::before {
-  content: counter(step);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  margin-bottom: 10px;
-  border-radius: 50%;
-  background: var(--fm-accent);
-  color: var(--fm-on-accent);
-  font-family: var(--fm-font-serif);
-  font-weight: 600;
-}
-
 .page-steps h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin: 0 0 6px;
   font-family: var(--fm-font-serif);
   font-size: 18px;
   font-weight: 600;
+}
+
+.page-steps h3::before {
+  content: counter(step);
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--fm-accent);
+  color: var(--fm-on-accent);
+  font-size: 15px;
 }
 
 .page-steps p {
