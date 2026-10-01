@@ -32,8 +32,11 @@
 
 .page-header__logo {
   display: block;
+  flex: none;
   height: 42px;
   width: auto;
+  aspect-ratio: 99 / 98;
+  color: var(--fm-accent-strong);
 }
 
 .page-header__wordmark-light {

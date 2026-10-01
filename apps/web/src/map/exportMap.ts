@@ -215,8 +215,8 @@ function stripMetrics(canvas: HTMLCanvasElement): { fontPx: number; margin: numb
  * its colors follow the basemap instead: the header's own dark ink/amber on light flavors,
  * light counterparts on `dark`/`black` and satellite imagery (`isDarkBase`).
  *
- * The logo is the same bundled `logo.png` the header uses, so it's same-origin and drawing it
- * doesn't taint the canvas `toBlob()` reads. The serif font is awaited first because canvas
+ * The logo is the bundled `logo.png`, the header's mark in gold (brand/make_icons.py), so it's
+ * same-origin and drawing it doesn't taint the canvas `toBlob()` reads. The serif font is awaited first because canvas
  * `fillText` doesn't wait for a web font — it just uses the fallback if the font isn't loaded
  * yet. Neither wait can fail the export: a font that never loads falls back to `serif`, and a
  * logo that fails to decode leaves the wordmark on its own.

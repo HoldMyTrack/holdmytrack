@@ -61,7 +61,8 @@ mono = write('brand/source/android-monochrome.svg', svg(mark('#FFFFFF', 46 / 108
 favicon_svg = svg(mark('currentColor', 0.94)).replace(
     '<g transform', f'<style>g{{color:{OCHRE}}}@media (prefers-color-scheme:dark){{g{{color:{GOLD}}}}}</style><g transform', 1)
 
-# The header's and the map export's logo: the gold mark alone, cropped to its ink.
+# The map export's watermark logo and the README's: the gold mark alone, cropped to its ink.
+# The page header draws logo.svg inline instead (templates/header.html), so it follows the theme.
 logo = write('brand/source/logo-cropped.svg', src.replace('viewBox="10 5 99 98"', f'viewBox="{X0 - 1} {Y0 - 1} {X1 - X0 + 2} {Y1 - Y0 + 2}"'))
 for path in ('services/server/internal/web/static/logo.png', 'apps/web/src/assets/logo.png'):
     png(logo, path, 512, round(512 * (Y1 - Y0 + 2) / (X1 - X0 + 2)))
