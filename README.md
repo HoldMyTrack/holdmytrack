@@ -1,4 +1,4 @@
-# <img src="services/server/internal/web/static/logo.png" alt="" height="48" align="bottom"> HoldMyTrack
+# <picture><source media="(prefers-color-scheme: dark)" srcset="brand/logo-on-dark.png"><img src="brand/logo-on-light.png" alt="" height="48" align="bottom"></picture> HoldMyTrack
 
 [![codecov](https://codecov.io/gh/HoldMyTrack/holdmytrack/graph/badge.svg)](https://codecov.io/gh/HoldMyTrack/holdmytrack)
 
@@ -29,7 +29,7 @@ holdmytrack/
 │   ├── DEVELOPMENT.md           # running it locally, verification, gotchas, commands
 │   └── DEPLOY.md                # the production deployment runbook
 ├── AGENTS.md                    # orientation for coding agents
-├── brand/                       # logo.svg, the mark's master; make_icons.py renders every logo and icon from it
+├── brand/                       # logo.svg, the mark's master; make_icons.py renders every logo and icon from it, the README's included
 ├── apps/
 │   ├── android/                 # Kotlin — Phase 2. Health Connect sync + in-app GPS recording; own docs/
 │   ├── ios/                     # Swift — Phase 2, HealthKit ingest. Placeholder

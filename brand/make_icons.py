@@ -61,11 +61,19 @@ mono = write('brand/source/android-monochrome.svg', svg(mark('#FFFFFF', 46 / 108
 favicon_svg = svg(mark('currentColor', 0.94)).replace(
     '<g transform', f'<style>g{{color:{OCHRE}}}@media (prefers-color-scheme:dark){{g{{color:{GOLD}}}}}</style><g transform', 1)
 
-# The map export's watermark logo and the README's: the gold mark alone, cropped to its ink.
-# The page header draws logo.svg inline instead (templates/header.html), so it follows the theme.
-logo = write('brand/source/logo-cropped.svg', src.replace('viewBox="10 5 99 98"', f'viewBox="{X0 - 1} {Y0 - 1} {X1 - X0 + 2} {Y1 - Y0 + 2}"'))
-for path in ('services/server/internal/web/static/logo.png', 'apps/web/src/assets/logo.png'):
-    png(logo, path, 512, round(512 * (Y1 - Y0 + 2) / (X1 - X0 + 2)))
+# The mark alone, cropped to its ink, one PNG per background it sits on: the README's (GitHub's
+# light and dark themes) and the map export watermark's (exportMap.ts, light and dark basemaps,
+# in the color of the wordmark's "Track" beside it). The page header draws logo.svg inline
+# instead (templates/header.html), so it follows the theme.
+cropped = src.replace('viewBox="10 5 99 98"', f'viewBox="{X0 - 1} {Y0 - 1} {X1 - X0 + 2} {Y1 - Y0 + 2}"')
+for color, name, path in [
+    (OCHRE, 'logo-on-light', 'brand/logo-on-light.png'),
+    (GOLD, 'logo-on-dark', 'brand/logo-on-dark.png'),
+    ('#9A6B1E', 'watermark-on-light', 'apps/web/src/assets/logo-on-light.png'),
+    ('#E0A84A', 'watermark-on-dark', 'apps/web/src/assets/logo-on-dark.png'),
+]:
+    s = write(f'brand/source/{name}.svg', cropped.replace(f'stroke="{GOLD}"', f'stroke="{color}"'))
+    png(s, path, 512, round(512 * (Y1 - Y0 + 2) / (X1 - X0 + 2)))
 
 # Web: apps/web/public, served by Caddy's @static list (apps/web/docker/Caddyfile).
 web = 'apps/web/public'

@@ -1,6 +1,7 @@
 import { Map as MapLibreMap } from 'maplibre-gl';
 import { API_BASE_URL, type ActivityQuery } from '../api';
-import logoUrl from '../assets/logo.png';
+import logoOnDarkUrl from '../assets/logo-on-dark.png';
+import logoOnLightUrl from '../assets/logo-on-light.png';
 import { basemapOrigin, satelliteSource } from './config';
 import { withApiCredentials } from './requestCredentials';
 import { customOutputSize } from './exportPresets';
@@ -215,9 +216,10 @@ function stripMetrics(canvas: HTMLCanvasElement): { fontPx: number; margin: numb
  * its colors follow the basemap instead: the header's own dark ink/amber on light flavors,
  * light counterparts on `dark`/`black` and satellite imagery (`isDarkBase`).
  *
- * The logo is the bundled `logo.png`, the header's mark in gold (brand/make_icons.py), so it's
- * same-origin and drawing it doesn't taint the canvas `toBlob()` reads. The serif font is awaited first because canvas
- * `fillText` doesn't wait for a web font — it just uses the fallback if the font isn't loaded
+ * The logo is the header's mark, bundled as one PNG per base (brand/make_icons.py) in the same
+ * color as "Track" beside it. Bundled, it's same-origin, so drawing it doesn't taint the
+ * canvas `toBlob()` reads. The serif font is awaited first because canvas `fillText`
+ * doesn't wait for a web font — it just uses the fallback if the font isn't loaded
  * yet. Neither wait can fail the export: a font that never loads falls back to `serif`, and a
  * logo that fails to decode leaves the wordmark on its own.
  */
@@ -233,7 +235,7 @@ async function drawWatermark(canvas: HTMLCanvasElement, bottomY: number, dark: b
   const boldFont = `800 ${fontPx}px Fraunces, serif`;
 
   const [logo] = await Promise.all([
-    loadImage(logoUrl).catch(() => null),
+    loadImage(dark ? logoOnDarkUrl : logoOnLightUrl).catch(() => null),
     document.fonts?.load(lightFont).catch(() => undefined),
     document.fonts?.load(boldFont).catch(() => undefined),
   ]);
