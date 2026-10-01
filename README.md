@@ -29,6 +29,7 @@ holdmytrack/
 │   ├── DEVELOPMENT.md           # running it locally, verification, gotchas, commands
 │   └── DEPLOY.md                # the production deployment runbook
 ├── AGENTS.md                    # orientation for coding agents
+├── brand/                       # logo.svg, the mark's master; make_icons.py renders every logo and icon from it
 ├── apps/
 │   ├── android/                 # Kotlin — Phase 2. Health Connect sync + in-app GPS recording; own docs/
 │   ├── ios/                     # Swift — Phase 2, HealthKit ingest. Placeholder

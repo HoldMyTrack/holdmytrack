@@ -38,7 +38,7 @@
 	# it doesn't know. A new file in apps/web/public/ needs adding to this list. /download/* is
 	# not from the build: it's a host directory bind-mounted in (compose.prod.yml), holding the
 	# Android APK (docs/DEPLOY.md §10).
-	@static path /assets/* /basemap/* /download/* /favicon.png /apple-touch-icon.png /robots.txt /sitemap.xml
+	@static path /assets/* /basemap/* /download/* /favicon.ico /favicon.svg /favicon.png /apple-touch-icon.png /icon-192.png /icon-512.png /icon-maskable-512.png /site.webmanifest /robots.txt /sitemap.xml
 	handle @static {
 		root * /srv/web
 		# The app's two entry files keep fixed names so the Go server can reference them
