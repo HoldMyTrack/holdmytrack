@@ -149,6 +149,7 @@ func TestPhotoPlacement(t *testing.T) {
 		{"capture time, mid-track", map[string]string{"taken_at": "2026-05-01T10:00:30Z"}, 10.0005, 50.0005},
 		{"capture time just before the start clamps to it", map[string]string{"taken_at": "2026-05-01T09:57:00Z"}, 10, 50},
 		{"capture time well off the track", map[string]string{"taken_at": "2026-05-01T12:00:00Z"}, 0, 0},
+		{"capture time well before the track", map[string]string{"taken_at": "2026-05-01T08:00:00Z"}, 0, 0},
 		{"wall clock in the account's zone", map[string]string{"taken_local": "2026-05-01T12:00:30"}, 10.0005, 50.0005},
 		{"wall clock in another zone", map[string]string{"taken_local": "2026-05-01T19:00:30"}, 10.0005, 50.0005},
 		{"position only, near the track", map[string]string{"lon": "10.0006", "lat": "50.0004"}, 10.0005, 50.0005},
@@ -178,6 +179,20 @@ func TestPhotoPlacement(t *testing.T) {
 	d.decode(d.do(me, "GET", "/v1/photos?activity="+walk, nil), http.StatusOK, &list)
 	if len(list.Photos) != len(cases) {
 		t.Fatalf("listed %d photos, want %d", len(list.Photos), len(cases))
+	}
+	// Placed ones in route order, then unplaced ones — one taken before the walk started too.
+	for i, p := range list.Photos {
+		if p.RouteAt == nil {
+			for _, rest := range list.Photos[i:] {
+				if rest.RouteAt != nil {
+					t.Errorf("a placed photo after an unplaced one: %+v", list.Photos)
+				}
+			}
+			break
+		}
+		if i > 0 && p.RouteAt.Before(*list.Photos[i-1].RouteAt) {
+			t.Errorf("placed photos out of route order: %+v", list.Photos)
+		}
 	}
 	first := list.Photos[0]
 	if first.Width != 400 || first.Height != 300 || first.URL != "/v1/photos/"+first.ID {

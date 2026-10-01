@@ -107,7 +107,7 @@ LEFT JOIN LATERAL (
 	)
 ) pos ON true
 WHERE p.user_id = $1 AND %s
-ORDER BY COALESCE(p.route_at, p.taken_at, p.created_at), p.created_at`
+ORDER BY p.route_at IS NULL, COALESCE(p.route_at, p.taken_at, p.created_at), p.created_at`
 
 func (s *Server) loadPhotos(ctx context.Context, where string, args ...any) ([]photoJSON, error) {
 	rows, err := s.pool.Query(ctx, fmt.Sprintf(photoSelect, where), args...)
