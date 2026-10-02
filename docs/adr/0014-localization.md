@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Accepted. Its decision that only a signed-in account can pin a language is superseded by ADR-0025, which added a language menu to the header for everyone, remembered in a cookie.
 
 ## Context
 
