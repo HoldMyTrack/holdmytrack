@@ -210,6 +210,8 @@ CREATE TABLE jobs (
 CREATE INDEX idx_jobs_runnable ON jobs (run_after, id) WHERE state = 'pending';
 ```
 
+**A running job is still `pending`; `locked_at` is what marks it taken** (`internal/worker/worker.go`). The claim takes the first runnable row whose `locked_at` is unset or older than `claimLease` (30 minutes) under `FOR UPDATE SKIP LOCKED`, stamps `locked_at` and increments `attempts` in that same short transaction, then runs the job outside it — the row lock alone ends at that commit, so a fresh `locked_at` is what keeps a second worker off a job still running. A stale one means the worker that claimed it died mid-run, and the job is claimable again. Attempts count at claim, so a job claimed `maxAttempts` (3) times without finishing is failed on its next claim (`internal`, "worker stopped while running this job 3 times") rather than handed out first on every restart. A panic inside a job is recovered and fails that job alone. A job cut off by shutdown is released — `locked_at` cleared and its attempt given back — so the next start picks it up at once; outcomes are written on a context that outlives the shutdown. A failed job is not retried.
+
 ### 3.9 `sessions`
 
 Added with §4.9's real accounts (`migrations/0001_users_and_auth.sql`) — appended here rather than renumbered in among 3.1–3.8 so every existing cross-reference to those numbers elsewhere in this document stays correct.
