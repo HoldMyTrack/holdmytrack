@@ -1841,7 +1841,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Whether the basemap reads dark — the dark flavor, or satellite imagery over either —
-     *  which picks Fog's veil (`MapOverlays.setDarkVeil`), the web's `isDarkBase`. */
+     *  which picks Fog's veil and Heatmap's wash (`MapOverlays.setDarkVeil`), the web's `isDarkBase`. */
     private fun darkBase(style: Style): Boolean =
         isNight() || (MapSatellite.isOn(this) && MapSatellite.isAvailable(style))
 

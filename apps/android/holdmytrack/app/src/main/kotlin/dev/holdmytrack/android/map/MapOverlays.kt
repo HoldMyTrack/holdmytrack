@@ -7,6 +7,7 @@ import dev.holdmytrack.android.net.TrackMetricPoint
 import dev.holdmytrack.android.recording.RecordedPoint
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
+import org.maplibre.android.style.layers.BackgroundLayer
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.style.layers.LineLayer
@@ -76,6 +77,9 @@ object MapOverlays {
     private const val REGION_FOG_LAYER_ID = "region-fog-fill"
     private const val REGION_HEATMAP_SOURCE_ID = "region-heatmap"
     private const val REGION_HEATMAP_LAYER_ID = "region-heatmap-fill"
+
+    /** Heatmap mode's wash over the basemap, beneath the heat — the web's `heatmap-dim`. */
+    private const val HEATMAP_DIM_LAYER_ID = "heatmap-dim"
 
     /** Must match `ST_AsMVT(t, 'countries'/'regions', ...)` in the backend's own tile queries. */
     private const val COUNTRIES_SOURCE_LAYER = "countries"
@@ -170,8 +174,8 @@ object MapOverlays {
     private const val FOG_FILL_COLOR_DARK = "#f7f4ec"
     private const val FOG_FILL_OPACITY_DARK = 0.6f
 
-    /** Whether the style [attach] last drew on is the dark flavor — which veil [addCoverage]
-     *  uses, and keeps using across a [refreshCoverage]. */
+    /** Whether the style [attach] last drew on is the dark flavor — which veil and wash
+     *  [addCoverage] uses, and keeps using across a [refreshCoverage]. */
     private var darkVeil = false
 
     /** The heatmap ramp's own base colour (the server's `heatmapRamp`, the deep red a single
@@ -180,13 +184,21 @@ object MapOverlays {
     private const val HEATMAP_FILL_COLOR = "#b3261e"
     private const val HEATMAP_FILL_OPACITY = 0.55f
 
+    /** The wash's two colors, the web's `LIGHT_DIM` and `DARK_DIM` (`heatmap.ts`): the heat
+     *  reads against a quieter map, as Fog mode quiets the labels. Cream on the light flavor,
+     *  black on the dark one and satellite — the fog veils' own pairing, lightened. */
+    private const val HEATMAP_DIM_COLOR = "#f7f4ec"
+    private const val HEATMAP_DIM_OPACITY = 0.45f
+    private const val HEATMAP_DIM_COLOR_DARK = "#000000"
+    private const val HEATMAP_DIM_OPACITY_DARK = 0.35f
+
     /** How far Fog mode mutes basemap labels — the web's `FOG_LABEL_OPACITY`: dim enough to
      *  recede behind the veil, still readable enough to orient by. */
     private const val FOG_LABEL_OPACITY = 0.4f
 
     /** Every user layer [attach] adds — what [setRecording] hides wholesale. */
     private val USER_LAYER_IDS = listOf(
-        FOG_LAYER_ID, HEATMAP_LAYER_ID,
+        HEATMAP_DIM_LAYER_ID, FOG_LAYER_ID, HEATMAP_LAYER_ID,
         COUNTRY_FOG_LAYER_ID, COUNTRY_HEATMAP_LAYER_ID,
         REGION_FOG_LAYER_ID, REGION_HEATMAP_LAYER_ID,
     ) + TRACK_LAYER_IDS + BAND_LAYER_ID
@@ -211,7 +223,7 @@ object MapOverlays {
      * set and selection are applied on the client, as layer filters ([setTrackFilter]).
      *
      * [dark] says the basemap reads dark — the dark flavor, or satellite imagery — so Fog gets
-     * the cream veil ([setDarkVeil]); [story] is
+     * the cream veil and Heatmap the black wash ([setDarkVeil]); [story] is
      * the open Story, or null ([setTrackStory]).
      */
     fun attach(style: Style, mode: MapMode, range: DateRange?, dark: Boolean, story: String?) {
@@ -258,8 +270,17 @@ object MapOverlays {
 
     fun clearTrackBands(style: Style) = setTrackBands(style, emptyList())
 
-    /** Fog and Heatmap at every tier, each inserted below [beforeId]. */
+    /** Fog and Heatmap at every tier, each inserted below [beforeId] — Heatmap's wash first,
+     *  so every heat layer added after it lands above it. */
     private fun addCoverage(style: Style, beforeId: String?) {
+        if (style.getLayer(HEATMAP_DIM_LAYER_ID) == null) {
+            val dim = BackgroundLayer(HEATMAP_DIM_LAYER_ID).withProperties(
+                PropertyFactory.backgroundColor(if (darkVeil) HEATMAP_DIM_COLOR_DARK else HEATMAP_DIM_COLOR),
+                PropertyFactory.backgroundOpacity(if (darkVeil) HEATMAP_DIM_OPACITY_DARK else HEATMAP_DIM_OPACITY),
+                PropertyFactory.visibility(Property.NONE),
+            )
+            insert(style, dim, beforeId)
+        }
         val fogUrl = coverageUrl("fog", "png").let { if (darkVeil) it + (if ('?' in it) "&" else "?") + "theme=dark" else it }
         val fogColor = if (darkVeil) FOG_FILL_COLOR_DARK else FOG_FILL_COLOR
         val fogOpacity = if (darkVeil) FOG_FILL_OPACITY_DARK else FOG_FILL_OPACITY
@@ -284,7 +305,7 @@ object MapOverlays {
     }
 
     /**
-     * Switches Fog to the other veil when the basemap under it changes lightness without a
+     * Switches Fog to the other veil, and Heatmap to the other wash, when the basemap under it changes lightness without a
      * style reload — satellite imagery (`MapSatellite`) reads dark, so it takes the dark
      * flavor's cream veil, like the web's `isDarkBase`. Re-adds the coverage layers the way
      * [refreshCoverage] does, since their colors and tile URLs are fixed when added.
@@ -309,11 +330,13 @@ object MapOverlays {
      */
     fun refreshCoverage(style: Style) {
         if (style.getLayer(FOG_LAYER_ID) == null) return
-        val visibility = COVERAGE_LAYERS.associate { (layer, _) -> layer to style.getLayer(layer)?.visibility?.value }
+        val visibility = (COVERAGE_LAYERS.map { it.first } + HEATMAP_DIM_LAYER_ID)
+            .associateWith { style.getLayer(it)?.visibility?.value }
         COVERAGE_LAYERS.forEach { (layer, source) ->
             style.getLayer(layer)?.let(style::removeLayer)
             style.removeSource(source)
         }
+        style.getLayer(HEATMAP_DIM_LAYER_ID)?.let(style::removeLayer)
         val beforeId = if (style.getLayer(TRACKS_CASING_LAYER_ID) != null) TRACKS_CASING_LAYER_ID else labelInsertionPoint(style)
         addCoverage(style, beforeId)
         visibility.forEach { (layer, value) ->
@@ -379,6 +402,7 @@ object MapOverlays {
         setVisible(style, FOG_LAYER_ID, mode == MapMode.FOG)
         setVisible(style, COUNTRY_FOG_LAYER_ID, mode == MapMode.FOG)
         setVisible(style, REGION_FOG_LAYER_ID, mode == MapMode.FOG)
+        setVisible(style, HEATMAP_DIM_LAYER_ID, mode == MapMode.HEATMAP)
         setVisible(style, HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
         setVisible(style, COUNTRY_HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
         setVisible(style, REGION_HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
