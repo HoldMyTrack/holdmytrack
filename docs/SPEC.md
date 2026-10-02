@@ -1221,7 +1221,7 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 
 **Inputs** (`GET /v1/spots`): `bbox` — `west,south,east,north` in degrees, west below east and south below north (clamped to the world); `categories` — one or more of `playground`, `dog_park`, `monument`, `viewpoint`, `history`, comma-separated.
 
-**Outputs**: `{spots, total}`: `spots`, up to 2,000 places whose anchor is inside the box, each with `id`, `category`, `lon`, `lat` and the text fields of FR-15.4's `spots` layer (absent when none); `total`, how many the box holds in those categories.
+**Outputs**: `{spots, total}`: `spots`, up to 2,000 places whose anchor is inside the box — a retired one (FR-15.1) only for an account that captured it — each with `id`, `category`, `lon`, `lat` and the text fields of FR-15.4's `spots` layer (absent when none); `total`, how many of those the box holds in those categories.
 
 **Error cases**:
 - A missing or malformed `bbox`, a box with west at or past east (the antimeridian), or a missing or unknown category → `400`.
@@ -1231,10 +1231,10 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 
 **Inputs**: `z`, `x`, `y`; `cv`, the tile version (FR-4.11).
 
-**Outputs**: A vector tile with two layers. `spots`: a point per place whose anchor falls in the tile, with `id`, `category` (`playground`, `dog_park`, `monument`, `viewpoint` or `history`), `lon`, `lat`, and `name`, `address`, `description`, `inscription`, `memorial`, `start_date` and `wikipedia`, each absent when the place has none. `spot_areas`: each place's area that reaches into the tile, clipped to it, with `id`, `category` and `circle` (`true` for the 30 m circle of a place mapped as a point). Below zoom 13, an empty tile.
+**Outputs**: A vector tile with two layers. `spots`: a point per place whose anchor falls in the tile, with `id`, `category` (`playground`, `dog_park`, `monument`, `viewpoint` or `history`), `lon`, `lat`, `retired` (`true` for a retired place, FR-15.1), and `name`, `address`, `description`, `inscription`, `memorial`, `start_date` and `wikipedia`, each absent when the place has none. `spot_areas`: each place's area that reaches into the tile, clipped to it, with `id`, `category`, `circle` (`true` for the 30 m circle of a place mapped as a point) and `retired`. Below zoom 13, an empty tile.
 
 **Behavior**:
-1. The same places for every account, behind the session like every other map tile, and cached like them (FR-4.11). A load that changes the places moves every account's tile version (FR-15.1).
+1. The same places for every account, behind the session like every other map tile, and cached like them (FR-4.11) — retired ones included, flagged, for the map to hide unless the account captured them (FR-15.2). A load that changes the places moves every account's tile version (FR-15.1).
 
 **Error cases**:
 - No session → `401`. A demo session sees the places too.
@@ -1245,14 +1245,15 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 **Description**: A place an account has captured by staying inside it for 30 seconds with the Android app's capture mode on (`apps/android/docs/SPEC.md` FR-2.8, ADR-0023). Only the app captures; the web and the app both show what's captured (FR-15.2, FR-15.3). A capture is separate from a visit (ADR-0021), which isn't built.
 
 **Behavior**:
-1. `GET /v1/spots/{id}` answers one place: the fields of FR-15.5's places, `area` — its whole area as a GeoJSON MultiPolygon — and `captured_at` when the caller has captured it (absent otherwise).
+1. `GET /v1/spots/{id}` answers one place: the fields of FR-15.5's places, `area` — its whole area as a GeoJSON MultiPolygon — and `captured_at` when the caller has captured it (absent otherwise). A retired place (FR-15.1) is answered only to an account that captured it.
 2. `GET /v1/spots/captures` answers `{captures}`: the caller's captured places as `{spot_id, captured_at}`, newest first; an empty list when there are none.
 3. `POST /v1/spots/{id}/captures` takes `{lat, lon}`, the position the phone last measured inside the place. The position must be inside the place's area, or within 10 m of it. The first capture of a place is kept: a new one answers `201`, a repeat `200` with the first one's `captured_at`, both as `{spot_id, captured_at}`.
-4. A capture belongs to its account and is deleted with it, or with its place.
+4. A capture belongs to its account and is deleted with it. A retired place keeps its captures (FR-15.1).
 
 **Error cases**:
-- An unknown place, or an `id` that isn't a positive number → `404`.
+- An unknown place, or an `id` that isn't a positive number → `404`. So is a retired place, from `GET /v1/spots/{id}`, for an account that hasn't captured it.
 - A body without numeric `lat` and `lon`, or outside ±90/±180 → `400`.
+- Capturing a retired place → `410`, for every account, captured or not.
 - A position farther than 10 m outside the place → `422`.
 - No session → `401`. A demo session can read but not capture → `403` (`demo_read_only`).
 
