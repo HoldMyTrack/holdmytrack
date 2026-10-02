@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent, type RefObject } from 'react';
 import { t } from '../i18n';
 
 /**
@@ -11,7 +11,8 @@ import { t } from '../i18n';
  * click. `onConfirm` is async and owned entirely here, the same self-contained shape
  * `EditActivityWindow.tsx`'s own Save button uses, rather than pushing busy/error
  * state onto whichever caller happens to render this — the dialog closes itself once
- * `onConfirm` actually resolves, not before.
+ * `onConfirm` actually resolves, not before. While it runs, nothing closes it — not Escape, not
+ * the backdrop — so a failure always has somewhere to show.
  */
 export interface ConfirmDialogProps {
   title: string;
@@ -23,6 +24,30 @@ export interface ConfirmDialogProps {
   busyLabel?: string;
   onConfirm: () => Promise<void>;
   onClose: () => void;
+}
+
+/**
+ * Closes a modal `<dialog>` on a click on its backdrop: pressed and released outside the dialog's
+ * box. The target alone doesn't tell them apart — the `<dialog>` is also the target of a click on
+ * its own padding, and of a drag that starts in a field inside it and ends outside.
+ */
+export function useBackdropClose(ref: RefObject<HTMLDialogElement | null>, close: () => void) {
+  const pressedOutside = useRef(false);
+  const outside = (event: MouseEvent) => {
+    const el = ref.current;
+    if (!el || event.target !== el) return false;
+    const box = el.getBoundingClientRect();
+    return event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom;
+  };
+  return {
+    onPointerDown: (event: MouseEvent) => {
+      pressedOutside.current = outside(event);
+    },
+    onClick: (event: MouseEvent) => {
+      if (pressedOutside.current && outside(event)) close();
+      pressedOutside.current = false;
+    },
+  };
 }
 
 export function ConfirmDialog({
@@ -37,6 +62,9 @@ export function ConfirmDialog({
   const ref = useRef<HTMLDialogElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const backdrop = useBackdropClose(ref, () => {
+    if (!busy) ref.current?.close();
+  });
 
   useEffect(() => {
     const el = ref.current;
@@ -62,9 +90,10 @@ export function ConfirmDialog({
       className="confirm-dialog"
       data-testid="confirm-dialog"
       onClose={onClose}
-      onClick={(event) => {
-        if (event.target === ref.current) ref.current?.close();
+      onCancel={(event) => {
+        if (busy) event.preventDefault();
       }}
+      {...backdrop}
     >
       <h2 className="confirm-dialog__title">{title}</h2>
       <p className="confirm-dialog__message">{message}</p>

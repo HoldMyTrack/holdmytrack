@@ -774,7 +774,7 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 1. Clicking the toolbar's Delete icon opens a confirmation dialog naming its target — how many activities are checked, or the focused activity's own name or date/time — and their combined distance, stating plainly that this can't be undone; nothing is deleted until the user confirms.
 2. Confirming removes every activity in the target and everything derived from each one: its recorded stream data, its rendered coverage masks, and its photos (FR-16).
 3. The Fog-of-War/Heatmap view updates to reflect the deletion — coverage a deleted activity was the only source for reverts to unrevealed, not left showing stale coverage for data that no longer exists. An open page picks this up on its own once the background re-render finishes, without a reload.
-4. Canceling the confirmation, or dismissing it, leaves every activity untouched.
+4. Canceling the confirmation, or dismissing it, leaves every activity untouched. While the deletes run, the confirmation can't be dismissed. If one fails, the confirmation stays open with the error; the activities already deleted leave the list and the target, and confirming again deletes the rest.
 
 **Outputs**: Every deleted activity, and everything derived from it, no longer exists; every list, filter, total, and aggregate that previously included it reflects the removal, in one combined refresh rather than once per deleted activity.
 

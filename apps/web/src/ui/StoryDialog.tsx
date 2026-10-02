@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createStory, STORY_MAX_DESCRIPTION_LEN, STORY_MAX_NAME_LEN, updateStory, type Story } from '../api';
 import { t } from '../i18n';
+import { useBackdropClose } from './ConfirmDialog';
 
 /**
  * A Story's Name, required, and optional Description, in one of two uses:
@@ -11,7 +12,7 @@ import { t } from '../i18n';
  *
  * A modal `<dialog>` like ConfirmDialog.tsx, and like it owns its busy and error state and closes
  * itself once the request has succeeded; `onSaved` gets the Story as the server returned it,
- * before `onClose` runs.
+ * before `onClose` runs. Nothing closes it while the request runs, Escape included.
  *
  * A `<form>`, so Enter in the Name field saves; the Description is a textarea, where Enter is
  * a new line.
@@ -36,6 +37,9 @@ export function StoryDialog(props: StoryDialogProps) {
   const [description, setDescription] = useState(props.mode === 'edit' ? props.story.description : '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const backdrop = useBackdropClose(ref, () => {
+    if (!busy) ref.current?.close();
+  });
 
   useEffect(() => {
     const el = ref.current;
@@ -67,9 +71,10 @@ export function StoryDialog(props: StoryDialogProps) {
       data-testid="story-dialog"
       aria-labelledby="story-dialog-title"
       onClose={onClose}
-      onClick={(event) => {
-        if (event.target === ref.current && !busy) ref.current?.close();
+      onCancel={(event) => {
+        if (busy) event.preventDefault();
       }}
+      {...backdrop}
     >
       <form onSubmit={(event) => void handleSubmit(event)}>
         <h2 className="confirm-dialog__title" id="story-dialog-title">
