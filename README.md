@@ -62,7 +62,7 @@ holdmytrack/
         ├── README.md            # the serve/work/migrate contract and the open decisions
         ├── Dockerfile
         ├── cmd/holdmytrack/     # main.go: serve / work / migrate
-        ├── internal/            # config, db, fog, geo, httpapi, ingest, mail, mapstyle, parse, storage, tilemath, web, worker
+        ├── internal/            # config, db, fog, geo, httpapi, i18n, ingest, mail, mapstyle, parse, spots, storage, takeout, tilemath, web, worker
         └── migrations/          # embedded *.sql, applied in order by `cmd/holdmytrack migrate`
 ```
 

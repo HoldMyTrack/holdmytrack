@@ -462,7 +462,7 @@ They differ only in how bytes arrive. All converge on §4.1 step 2.
 
 ```mermaid
 flowchart LR
-    subgraph P1["Path 1 — cloud-to-cloud"]
+    subgraph P1["Path 1 — cloud-to-cloud (not built)"]
         prov["Provider<br/>(Garmin .FIT, JSON)"] -->|webhook| wh["POST /v1/webhooks/{provider}<br/>200 OK, nothing fetched inline"]
         wh --> ps[["provider_sync job<br/>(+ resumable backfill at connect)"]]
     end
@@ -480,7 +480,7 @@ flowchart LR
     job --> parse["§4.1 step 2: parse<br/>(shared from here on)"] --> rest["steps 3–5<br/>clip · coverage · simplify"] --> persist[("§4.1 step 6: activities<br/>ON CONFLICT DO NOTHING")]
 ```
 
-**Path 1 — cloud-to-cloud.** OAuth connect, then webhook-driven where the provider supports it. Never poll on a schedule: a webhook returns `200 OK` in milliseconds and enqueues a `provider_sync` job; nothing is fetched inline. Providers deliver either a file (Garmin pushes `.FIT`) or structured JSON, so the parse step is per-provider and everything after it is shared. Backfill of history at connect time is a separate, rate-limited, resumable job — it is the largest single fetch the system ever performs.
+**Path 1 — cloud-to-cloud. Not built yet** (`docs/ROADMAP.md`, "Path 1"); this is the design it is to follow, and only its `connections` table (§3.2) exists. OAuth connect, then webhook-driven where the provider supports it. Never poll on a schedule: a webhook returns `200 OK` in milliseconds and enqueues a `provider_sync` job; nothing is fetched inline. Providers deliver either a file (Garmin pushes `.FIT`) or structured JSON, so the parse step is per-provider and everything after it is shared. Backfill of history at connect time is a separate, rate-limited, resumable job — it is the largest single fetch the system ever performs.
 
 **Path 2 — on-device sync.** A native app reads the platform health store and uploads normalized points.
 
@@ -494,7 +494,7 @@ flowchart LR
 ```http
 POST /v1/activities/upload        # multipart, Path 3
 POST /v1/sync/activities          # batched normalized points, Path 2
-POST /v1/webhooks/{provider}      # Path 1
+POST /v1/webhooks/{provider}      # Path 1, not built yet
 ```
 
 All three are idempotent on `(user_id, source, external_id)`, and this is a hard invariant, not an optimization: whatever arrives twice from any source — a re-uploaded file, a redelivered webhook, a re-synced batch — must be processed at most once, not once per arrival. Retries are normal, not exceptional — mobile uploads get interrupted and providers redeliver webhooks. The guarantee has to hold under concurrent duplicates, not just sequential ones: a receive-time existence check (§4.1 step 1) is a fast path, not the enforcement. The actual guarantee is `idx_activities_dedupe` (§3.3) plus an upsert-on-conflict at persist time (§4.1 step 6), so two copies of the same activity racing through two separate jobs still land as one row.
