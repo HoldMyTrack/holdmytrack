@@ -60,11 +60,17 @@ android {
     buildTypes {
         // AGP's built-in JaCoCo: `createDebugUnitTestCoverageReport` runs the unit tests and
         // writes the XML report CI uploads to Codecov (.github/workflows/ci.yml).
+        // The burger menu's Donate (MainActivity.showMenu). The release build is the Play build,
+        // and Play's Payments policy doesn't allow pointing users at a payment method outside
+        // Play's billing (apps/android/docs/ROADMAP.md Phase 6); the debug build is the APK the
+        // website offers (docs/DEPLOY.md), which keeps it.
         debug {
             enableUnitTestCoverage = true
+            buildConfigField("boolean", "DONATE_LINK", "true")
         }
         release {
             isMinifyEnabled = false
+            buildConfigField("boolean", "DONATE_LINK", "false")
         }
     }
     compileOptions {
