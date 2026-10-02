@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The zoom-level notice (map/ZoomLevelNotice), the web's .zoom-level-notice__pill: a surface
+     card with the large radius. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/hmt_surface" />
+    <corners android:radius="@dimen/hmt_radius_lg" />
+</shape>

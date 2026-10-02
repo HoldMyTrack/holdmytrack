@@ -53,6 +53,7 @@ import dev.holdmytrack.android.map.PhotoMarkers
 import dev.holdmytrack.android.map.PhotoPopup
 import dev.holdmytrack.android.map.ShowInArea
 import dev.holdmytrack.android.map.SpotPopup
+import dev.holdmytrack.android.map.ZoomLevelNotice
 import dev.holdmytrack.android.net.Activity
 import dev.holdmytrack.android.net.Photo
 import dev.holdmytrack.android.net.ApiException
@@ -212,6 +213,7 @@ class MainActivity : AppCompatActivity() {
     /** Re-reads the list while any of it is Pending, the web's `EDIT_PENDING_POLL_MS`. */
     private val pendingPoll = Runnable { reloadList() }
     private lateinit var dateFooter: View
+    private lateinit var zoomLevelNotice: ZoomLevelNotice
     private lateinit var dateSlider: DateRangeSlider
     private lateinit var activityDays: ActivityDays
 
@@ -447,6 +449,7 @@ class MainActivity : AppCompatActivity() {
 
         bottomChrome = findViewById(R.id.bottom_chrome)
         dateFooter = findViewById(R.id.date_footer)
+        zoomLevelNotice = ZoomLevelNotice(findViewById(R.id.zoom_level_notice))
         sheet = findViewById(R.id.activities_sheet)
         panel = ActivitiesPanel(
             sheet,
@@ -524,6 +527,11 @@ class MainActivity : AppCompatActivity() {
             attributionBaseMarginBottom = savedInstanceState.getInt(STATE_ATTRIBUTION_MARGIN)
             attributionBaseCaptured = true
         }
+        // Carried through a recreation (a theme or language change), since the mode buttons
+        // restore their own checked state and would otherwise show a mode the map isn't in.
+        savedInstanceState?.getString(STATE_MODE)?.let { saved ->
+            MapMode.entries.firstOrNull { it.name == saved }?.let { mode = it }
+        }
         setMode(mode)
 
         insetSystemBars()
@@ -564,6 +572,7 @@ class MainActivity : AppCompatActivity() {
                 MapSpots.setInArea(style?.takeIf { overlaysAttached }, spots)
             }.apply { setCategories(MapSpots.get(this@MainActivity)) }
             instance.addOnCameraIdleListener { showInArea?.onCameraIdle() }
+            instance.addOnCameraIdleListener { zoomLevelNotice.onCameraIdle(instance.cameraPosition.zoom) }
             loadStyle()
         }
     }
@@ -1187,6 +1196,13 @@ class MainActivity : AppCompatActivity() {
         if (!modeBarReady) return
         modeBar.visibility = if (isRecording() || editWindow.isOpen) View.GONE else View.VISIBLE
         layersPanel.visibility = View.VISIBLE
+        renderZoomLevelNotice()
+    }
+
+    /** Names Fog's and Heatmap's level in view — once the session allows, and not while
+     *  recording, which draws neither. */
+    private fun renderZoomLevelNotice() {
+        zoomLevelNotice.render(mode, active = modeBarReady && !isRecording())
     }
 
     /** Layers and Record, on the second row under the chrome row: away while the Edit window or
@@ -1815,6 +1831,7 @@ class MainActivity : AppCompatActivity() {
             button.isChecked = active
         }
         style?.takeIf { overlaysAttached }?.let { MapOverlays.setMode(it, next) }
+        renderZoomLevelNotice()
         renderDateFooter()
         refreshPhotos(force = false)
     }
@@ -1841,7 +1858,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Whether the basemap reads dark — the dark flavor, or satellite imagery over either —
-     *  which picks Fog's veil (`MapOverlays.setDarkVeil`), the web's `isDarkBase`. */
+     *  which picks Fog's veil and Heatmap's wash (`MapOverlays.setDarkVeil`), the web's `isDarkBase`. */
     private fun darkBase(style: Style): Boolean =
         isNight() || (MapSatellite.isOn(this) && MapSatellite.isAvailable(style))
 
@@ -1979,6 +1996,7 @@ class MainActivity : AppCompatActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         mapView.onSaveInstanceState(outState)
+        outState.putString(STATE_MODE, mode.name)
         // The panel comes back on its Activities tab; an open Story never changed the range.
         selectedRange?.let {
             outState.putString(STATE_RANGE_FROM, it.from)
@@ -2076,6 +2094,7 @@ class MainActivity : AppCompatActivity() {
 
         /** The default range's length in activity days (`docs/SPEC.md` FR-6.1). */
         private const val DEFAULT_RANGE_DAYS = 5
+        private const val STATE_MODE = "mode"
         private const val STATE_RANGE_FROM = "range_from"
         private const val STATE_RANGE_TO = "range_to"
         private const val STATE_RANGE_CHOSEN = "range_chosen"

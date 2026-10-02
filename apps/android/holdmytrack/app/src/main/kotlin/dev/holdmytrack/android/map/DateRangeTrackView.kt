@@ -108,7 +108,7 @@ class DateRangeTrackView @JvmOverloads constructor(
     }
 
     // A drag is a gesture over the whole track, not a click; the Earlier/Later buttons and each
-    // knob's date in the labels under it are what TalkBack reads (Phase 5's Accessibility item).
+    // knob's date in the labels under it are what TalkBack reads.
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (!isEnabled || slots == 0) return false
