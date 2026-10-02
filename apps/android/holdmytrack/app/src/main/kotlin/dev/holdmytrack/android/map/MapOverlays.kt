@@ -32,6 +32,10 @@ import org.maplibre.geojson.Point
  */
 enum class MapMode { NORMAL, FOG, HEATMAP }
 
+/** The three levels Fog and Heatmap draw at by zoom (`docs/IMPLEMENTATION.md` §4.2.4): whole
+ *  countries, then whole states or provinces, then exactly where you've been. */
+enum class ZoomTier { COUNTRY, REGION, CITY }
+
 /**
  * The three user layers that sit on top of the served basemap: the live tracks MVT layer and
  * the two server-rendered raster masks.
@@ -95,6 +99,15 @@ object MapOverlays {
     private const val REGION_MIN_ZOOM = 3f
     private const val REGION_MAX_ZOOM = 7f
     private const val CITY_MIN_ZOOM = 7f
+
+    /** Which [ZoomTier] Fog and Heatmap draw at [zoom] — the same bands the layers switch on (a
+     *  layer shows at minZoom <= zoom < maxZoom), the web's `zoomTier`, for what has to name the
+     *  level in view (`ZoomLevelNotice`). */
+    fun zoomTier(zoom: Double): ZoomTier = when {
+        zoom < COUNTRY_MAX_ZOOM -> ZoomTier.COUNTRY
+        zoom < REGION_MAX_ZOOM -> ZoomTier.REGION
+        else -> ZoomTier.CITY
+    }
 
     /**
      * Tracks draw from z4 inward — not [CITY_MIN_ZOOM]: Normal mode has no Country/Region

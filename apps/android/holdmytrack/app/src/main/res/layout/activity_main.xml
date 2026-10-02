@@ -313,6 +313,20 @@
             </LinearLayout>
         </FrameLayout>
 
+        <!-- Which level Fog and Heatmap draw at (map/ZoomLevelNotice), the web's
+             .zoom-level-notice: a line of its own under the second row, faded out a few seconds
+             after it shows. Not clickable, so the map still takes touches through it. -->
+        <TextView
+            android:id="@+id/zoom_level_notice"
+            style="@style/Widget.HoldMyTrack.ZoomLevelNotice"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/hmt_space_12"
+            android:layout_marginEnd="@dimen/hmt_space_12"
+            android:layout_marginBottom="@dimen/hmt_space_8"
+            android:accessibilityLiveRegion="polite"
+            android:visibility="gone" />
+
         <!-- The map's notice: the map chrome's own panel, after the web's on-map banner
              (.version-banner) — a message, a smaller detail line, and one action. -->
         <LinearLayout

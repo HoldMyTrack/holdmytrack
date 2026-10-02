@@ -466,6 +466,20 @@
     <!-- "Show in this area" (map/ShowInArea), the web's .show-in-area: a surface pill centred
          under the chrome, its map-pin before the label; semibold as a button, regular and
          secondary as the line saying what loaded. -->
+    <!-- The web's .zoom-level-notice__pill. -->
+    <style name="Widget.HoldMyTrack.ZoomLevelNotice" parent="">
+        <item name="android:background">@drawable/bg_zoom_level_notice</item>
+        <item name="android:elevation">3dp</item>
+        <item name="android:maxWidth">352dp</item>
+        <item name="android:paddingStart">@dimen/hmt_space_12</item>
+        <item name="android:paddingEnd">@dimen/hmt_space_12</item>
+        <item name="android:paddingTop">@dimen/hmt_space_8</item>
+        <item name="android:paddingBottom">@dimen/hmt_space_8</item>
+        <item name="android:lineSpacingMultiplier">1.15</item>
+        <item name="android:textSize">@dimen/hmt_text_sm</item>
+        <item name="android:textColor">@color/hmt_ink</item>
+    </style>
+
     <style name="Widget.HoldMyTrack.ShowInArea" parent="">
         <item name="android:background">@drawable/bg_show_in_area</item>
         <item name="android:elevation">3dp</item>

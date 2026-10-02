@@ -101,6 +101,12 @@
     <string name="mode_normal">Normal</string>
     <string name="mode_fog">Fog</string>
     <string name="mode_heatmap">Heatmap</string>
+    <string name="map_level_fog_city">City view — cleared exactly where you\'ve been</string>
+    <string name="map_level_fog_country">Country view — a whole country clears once you\'ve been anywhere in it</string>
+    <string name="map_level_fog_region">Region view — a whole state or province clears once you\'ve been anywhere in it</string>
+    <string name="map_level_heatmap_city">City view — the more often you go somewhere, the hotter it glows</string>
+    <string name="map_level_heatmap_country">Country view — every country you\'ve been to in the last year is highlighted</string>
+    <string name="map_level_heatmap_region">Region view — every state or province you\'ve been to in the last year is highlighted</string>
     <string name="layers_button">Layers</string>
     <string name="layers_basemap">Base map</string>
     <string name="layers_basemap_map">Map</string>
