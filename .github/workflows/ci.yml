@@ -65,8 +65,14 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
       - run: npm run typecheck
-      - run: npm run test:unit
+      # test:unit under c8, which counts every file in src, not only the ones a test imports.
+      - run: npm run test:coverage
       - run: npm run verify:style
+      - uses: codecov/codecov-action@v5
+        with:
+          files: apps/web/coverage/lcov.info
+          flags: typescript
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   android:
     name: Android unit tests
