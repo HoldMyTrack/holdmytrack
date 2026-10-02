@@ -19,10 +19,3 @@ FR-9 behavior 3 says the Profile page renders the trailing 12 months as one bar 
 
 - [ ] Trust `X-Forwarded-For` only from the proxy — Caddy sets it; take its client address when `RemoteAddr` is the `web` container (or a configured trusted proxy), and fall back to `RemoteAddr` otherwise, so a direct caller still can't spoof it.
 - [ ] Verify against a local `compose.prod.yml`-shaped stack: two different client addresses should each get their own five demo starts an hour.
-
-### Android: the Activities panel sometimes needs a second tap to expand
-
-A tap on the collapsed panel's chevron flips the panel's state — the chevron turns and its spoken label changes — but the sheet stays at its collapsed height; a second tap expands it. Seen on the emulator on the first expand after launch, and again after a row tap had collapsed the sheet and flown the camera; reproduced on `main` before the photos work, so it isn't that. `ActivitiesPanel.setExpanded` animates `layoutParams.height` from `applyHeight`, which returns early while `peekHeight` (the tab row's bottom) is 0 and when the height already equals the target — one of those, or a layout pass resetting the height mid-animation, is the likely cause; not yet traced.
-
-- [ ] Find why the first `applyHeight` after those states doesn't take, and fix it so one tap always expands.
-- [ ] Check on the emulator: launch and expand once; tap a row (which collapses and flies), then expand once.
