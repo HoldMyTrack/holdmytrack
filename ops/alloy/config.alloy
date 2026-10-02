@@ -1,0 +1,168 @@
+// Grafana Alloy for compose.prod.yml's `alloy` service (docs/DEPLOY.md §13, IMPLEMENTATION.md
+// §5.8): ships the stack's container logs to Grafana Cloud Loki and its metrics to Grafana
+// Cloud Prometheus. Every value that differs per deployment comes from the environment.
+
+// ---- Logs -------------------------------------------------------------------------------
+
+// This Compose project's containers only, each labeled with its service name.
+discovery.docker "containers" {
+	host = "unix:///var/run/docker.sock"
+
+	filter {
+		name   = "label"
+		values = ["com.docker.compose.project=" + sys.env("COMPOSE_PROJECT")]
+	}
+}
+
+discovery.relabel "containers" {
+	targets = []
+
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		target_label  = "service"
+	}
+}
+
+loki.source.docker "containers" {
+	host          = "unix:///var/run/docker.sock"
+	targets       = discovery.docker.containers.targets
+	relabel_rules = discovery.relabel.containers.rules
+	forward_to    = [loki.process.scrub.receiver]
+}
+
+// What must not leave the server (docs/ROADMAP.md, the monitoring item's audit): the app logs
+// ids, job kinds and errors, but three sources can carry more.
+loki.process "scrub" {
+	forward_to = [loki.write.grafanacloud.receiver]
+
+	// api, worker and the one-off commands log JSON (slog). The level becomes a label, so
+	// alerts and searches can pick out errors without parsing every line.
+	stage.match {
+		selector = "{service=~\"api|worker|migrate\"}"
+
+		stage.json {
+			expressions = {level = "level", msg = "msg"}
+		}
+
+		// internal/mail logs the recipient, and off a real deployment the message itself (a
+		// reset link), when SMTP_HOST is unset. Never meant to happen here; dropped if it does.
+		stage.drop {
+			source              = "msg"
+			expression          = "^mail: "
+			drop_counter_reason = "mail"
+		}
+
+		stage.labels {
+			values = {level = ""}
+		}
+	}
+
+	// Postgres follows a constraint error with a DETAIL line quoting the values involved, an
+	// email address for a duplicate account.
+	stage.match {
+		selector = "{service=\"db\"}"
+
+		stage.drop {
+			expression          = "DETAIL:"
+			drop_counter_reason = "postgres_detail"
+		}
+	}
+
+	// Caddy's error logs carry the client's address.
+	stage.match {
+		selector = "{service=\"web\"}"
+
+		stage.replace {
+			expression = "\"(?:remote_ip|client_ip|remote_addr)\":\"([^\"]*)\""
+			replace    = "redacted"
+		}
+
+		stage.replace {
+			expression = "(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})"
+			replace    = "redacted"
+		}
+	}
+}
+
+loki.write "grafanacloud" {
+	endpoint {
+		url = sys.env("GRAFANA_CLOUD_LOKI_URL")
+
+		basic_auth {
+			username = sys.env("GRAFANA_CLOUD_LOKI_USER")
+			password = sys.env("GRAFANA_CLOUD_TOKEN")
+		}
+	}
+
+	external_labels = {deployment = sys.env("DOMAIN")}
+}
+
+// ---- Metrics ----------------------------------------------------------------------------
+
+// api's and worker's own (internal/metrics), on the Docker network only.
+prometheus.scrape "app" {
+	targets = [
+		{"__address__" = "api:9100", "service" = "api"},
+		{"__address__" = "worker:9100", "service" = "worker"},
+	]
+	scrape_interval = "60s"
+	forward_to      = [prometheus.remote_write.grafanacloud.receiver]
+}
+
+// The host, through its /proc, /sys and / mounted read-only into this container. Only the
+// collectors the dashboards and alerts use, to stay well inside the free tier's series. The
+// textfile collector reads what backup.sh and restore-drill.sh write about their last run.
+prometheus.exporter.unix "host" {
+	procfs_path    = "/host/proc"
+	sysfs_path     = "/host/sys"
+	rootfs_path    = "/host/root"
+	set_collectors = ["cpu", "diskstats", "filesystem", "loadavg", "meminfo", "netdev", "pressure", "vmstat", "textfile"]
+
+	filesystem {
+		mount_points_exclude = "^/(dev|proc|run|sys|var/lib/docker/.+)($|/)"
+		fs_types_exclude     = "^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|erofs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tmpfs|tracefs|virtiofs)$"
+	}
+
+	textfile {
+		directory = "/textfile"
+	}
+}
+
+prometheus.scrape "host" {
+	targets         = prometheus.exporter.unix.host.targets
+	scrape_interval = "60s"
+	forward_to      = [prometheus.remote_write.grafanacloud.receiver]
+}
+
+// A URL, which the exporter insists on, so the user and password are escaped (keep the
+// password free of spaces: one is escaped as "+", which a URL reads back as a plus). Only the
+// database-wide collectors: the per-table ones add about 15 series for each of some 60 tables,
+// PostGIS's own included, which is most of the free tier's budget for nothing an alert reads.
+prometheus.exporter.postgres "db" {
+	data_source_names = [string.format(
+		"postgresql://%s:%s@db:5432/%s?sslmode=disable",
+		encoding.url_encode(sys.env("POSTGRES_USER")),
+		encoding.url_encode(sys.env("POSTGRES_PASSWORD")),
+		sys.env("POSTGRES_DB"),
+	)]
+	enabled_collectors = ["database", "locks", "long_running_transactions", "stat_bgwriter", "stat_database", "wal"]
+}
+
+prometheus.scrape "db" {
+	targets         = prometheus.exporter.postgres.db.targets
+	scrape_interval = "60s"
+	forward_to      = [prometheus.remote_write.grafanacloud.receiver]
+}
+
+prometheus.remote_write "grafanacloud" {
+	endpoint {
+		url = sys.env("GRAFANA_CLOUD_PROMETHEUS_URL")
+
+		basic_auth {
+			username = sys.env("GRAFANA_CLOUD_PROMETHEUS_USER")
+			password = sys.env("GRAFANA_CLOUD_TOKEN")
+		}
+	}
+
+	external_labels = {deployment = sys.env("DOMAIN")}
+}
