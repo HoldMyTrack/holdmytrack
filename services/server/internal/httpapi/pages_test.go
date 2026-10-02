@@ -267,6 +267,9 @@ func TestLanguageMenu(t *testing.T) {
 	if rec := post("ru", ""); rec.Header().Get("Location") != "/" {
 		t.Errorf("no Referer: back to %q, want /", rec.Header().Get("Location"))
 	}
+	if c := post("", "https://app.example/help").Result().Cookies(); len(c) != 1 || c[0].Name != i18n.CookieName || c[0].MaxAge >= 0 {
+		t.Errorf("Automatic: cookie %+v, want %s cleared", c, i18n.CookieName)
+	}
 
 	req := httptest.NewRequest(http.MethodGet, "/help", nil)
 	req.Header.Set("Accept-Language", "en-US")
@@ -279,6 +282,9 @@ func TestLanguageMenu(t *testing.T) {
 	}
 	if !strings.Contains(body, `value="en" lang="en" aria-checked="false">English</button>`) {
 		t.Errorf("the language menu doesn't offer English by its own name")
+	}
+	if !strings.Contains(body, `name="lang" value="">Автоматически (как в браузере)</button>`) {
+		t.Errorf("the language menu doesn't offer Automatic in the page's language")
 	}
 }
 

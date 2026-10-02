@@ -4,10 +4,11 @@ import { ru } from './ru';
 /**
  * The map app's localization (ADR-0014, IMPLEMENTATION.md §4.21) — the client-side twin of
  * services/server/internal/i18n. The app doesn't choose its language: the server already did
- * (the account's Language setting, else the browser's Accept-Language, else English) when it
- * rendered the app shell, and wrote the answer into `<html lang>`. Reading it back keeps the
- * two from ever disagreeing, and makes the language a constant for the page's lifetime — a
- * change in Settings is a navigation away and back, a fresh page load.
+ * (the account's Language setting, else the header menu's cookie, else the browser's
+ * Accept-Language, else English) when it rendered the app shell, and wrote the answer into
+ * `<html lang>`. Reading it back keeps the two from ever disagreeing, and makes the language
+ * a constant for the page's lifetime — a choice in the header's language menu is a form POST
+ * and a fresh page load.
  *
  * Catalogs are flat `key → message` objects. `{name}` in a message is filled from `vars`; a
  * count's message is `key.one` / `key.few` / `key.many` / `key.other`, of which `tn` picks the

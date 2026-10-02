@@ -26,15 +26,12 @@ type settingsForm struct {
 	DisplayName string
 	Country     string
 	Timezone    string
-	// Locale is the account's language, "" for automatic; Languages what it can be.
-	Locale    string
-	Countries []web.Country
-	Timezones []web.TimezoneGroup
-	Languages []web.Country
+	Countries   []web.Country
+	Timezones   []web.TimezoneGroup
 	// LocalTime is the current date and time in Timezone, shown under the field ("" when it
 	// can't be computed); the page's script keeps it current as the selection changes.
 	LocalTime string
-	// Error belongs to the Name/Country/Timezone/Language form, AvatarError to the avatar's;
+	// Error belongs to the Name/Country/Timezone form, AvatarError to the avatar's;
 	// Notice is a PRG confirmation (?saved, ?avatar, ?avatar-removed).
 	Error       string
 	AvatarError string
@@ -67,9 +64,6 @@ func (s *Server) renderSettings(w http.ResponseWriter, r *http.Request, status i
 	now := time.Now()
 	form.Timezones = web.TimezoneGroups(now, form.Timezone)
 	form.LocalTime = web.LocalTime(l, now, web.CurrentTimezoneName(form.Timezone))
-	for _, code := range i18n.Supported {
-		form.Languages = append(form.Languages, web.Country{Code: code, Name: i18n.Names[code]})
-	}
 	if form.NoticeKey != "" {
 		form.Notice = l.T(form.NoticeKey)
 	}
@@ -82,7 +76,7 @@ func (s *Server) renderSettings(w http.ResponseWriter, r *http.Request, status i
 
 // formWithSaved is the form showing the account's saved values.
 func formWithSaved(acct *pageAccount) settingsForm {
-	return settingsForm{DisplayName: acct.profile.DisplayName, Country: acct.profile.Country, Timezone: acct.profile.Timezone, Locale: acct.info.locale}
+	return settingsForm{DisplayName: acct.profile.DisplayName, Country: acct.profile.Country, Timezone: acct.profile.Timezone}
 }
 
 // GET /settings.
@@ -108,17 +102,18 @@ func (s *Server) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
 // fields disabled, so this is only reached by a hand-made request.
 var errDemoSettings = accountFailure(http.StatusForbidden, "error.demo_settings")
 
-// POST /settings — Name, Country, Timezone and Language together, as one save. The page
-// renders in the language just saved, so its own "Saved." is already in it.
+// POST /settings — Name, Country and Timezone together, as one save. The account's language
+// isn't on this page: the header's language menu sets it (POST /language), so the save leaves
+// it as it is.
 func (s *Server) handleSettingsForm(w http.ResponseWriter, r *http.Request) {
 	acct := s.settingsAccount(w, r)
 	if acct == nil {
 		return
 	}
-	form := settingsForm{DisplayName: r.PostFormValue("display_name"), Country: r.PostFormValue("country"), Timezone: r.PostFormValue("timezone"), Locale: r.PostFormValue("locale")}
+	form := settingsForm{DisplayName: r.PostFormValue("display_name"), Country: r.PostFormValue("country"), Timezone: r.PostFormValue("timezone")}
 	err := errDemoSettings
 	if !acct.info.isDemo {
-		err = s.saveSettings(r.Context(), acct.info.userID, form.DisplayName, form.Country, form.Timezone, &form.Locale)
+		err = s.saveSettings(r.Context(), acct.info.userID, form.DisplayName, form.Country, form.Timezone, nil)
 	}
 	if err != nil {
 		status, msg := s.settingsError("save settings", err, pageLang(acct, r))
@@ -126,9 +121,6 @@ func (s *Server) handleSettingsForm(w http.ResponseWriter, r *http.Request) {
 		s.renderSettings(w, r, status, acct, form)
 		return
 	}
-	// The browser's own choice (the header's language menu) follows the setting, so
-	// "Automatic" after signing out still means the browser's language, not a stale pick.
-	s.setLanguageCookie(w, form.Locale)
 	// First run ends here: on to the map, which Country and Timezone now make sense of.
 	if acct.profile.Country == "" {
 		http.Redirect(w, r, "/", http.StatusSeeOther)

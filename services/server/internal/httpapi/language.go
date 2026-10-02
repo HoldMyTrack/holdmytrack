@@ -14,19 +14,21 @@ import (
 const languageCookieAge = 365 * 24 * time.Hour
 
 // handleLanguageForm serves `POST /language` — the header's language menu, on every page,
-// signed in or not (ADR-0014). It remembers the choice on this browser (i18n.CookieName),
-// so a visitor without an account can read the site in a language their browser doesn't ask
-// for. A signed-in real account's Language setting is saved too, since that setting outranks
-// the cookie (i18n.Resolve) and would otherwise undo the choice; a demo account can't save
-// settings, so it gets the cookie alone. Then back to the page the menu was on.
+// signed in or not (ADR-0025), and the web's only language control. It remembers the choice
+// on this browser (i18n.CookieName), so a visitor without an account can read the site in a
+// language their browser doesn't ask for. A signed-in real account's Language setting is
+// saved too, since that setting outranks the cookie (i18n.Resolve) and would otherwise undo
+// the choice; a demo account can't save settings, so it gets the cookie alone. An empty lang
+// is "Automatic": the cookie is cleared and the setting set back to NULL, so the browser's
+// own language decides again. Then back to the page the menu was on.
 func (s *Server) handleLanguageForm(w http.ResponseWriter, r *http.Request) {
 	lang := r.PostFormValue("lang")
-	if !i18n.IsSupported(lang) {
+	if lang != "" && !i18n.IsSupported(lang) {
 		http.Error(w, "unsupported language", http.StatusBadRequest)
 		return
 	}
 	if acct := s.pageAccount(r); acct != nil && !acct.info.isDemo {
-		if _, err := s.pool.Exec(r.Context(), `UPDATE users SET locale = $2 WHERE id = $1`, acct.info.userID, lang); err != nil {
+		if _, err := s.pool.Exec(r.Context(), `UPDATE users SET locale = NULLIF($2, '') WHERE id = $1`, acct.info.userID, lang); err != nil {
 			s.log.Error("language save failed", "err", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return

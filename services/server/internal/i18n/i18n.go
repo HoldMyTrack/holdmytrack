@@ -31,7 +31,7 @@ const Default = "en"
 // Supported are the languages with a catalog, in the order Settings lists them.
 var Supported = []string{"en", "ru"}
 
-// Names are each language's name in itself — what Settings' Language list shows, never
+// Names are each language's name in itself — what the header's language menu shows, never
 // translated, so someone can find their own language whatever the page is in.
 var Names = map[string]string{"en": "English", "ru": "Русский"}
 

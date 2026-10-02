@@ -196,11 +196,19 @@
 }
 
 .language-menu__dropdown {
-  min-width: 9rem;
+  min-width: 12rem;
 }
 
 .header-menu__item[aria-checked='true'] {
   font-weight: 600;
+}
+
+/* "Automatic" isn't a language but a return to the browser's: set apart under a rule. */
+.language-menu__auto {
+  margin-top: 4px;
+  border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
+  border-radius: 0 0 6px 6px;
+  white-space: nowrap;
 }
 
 .info-menu__trigger {
@@ -519,6 +527,12 @@
   /* The code alone: "EN" is narrower than the globe beside it, and says more. */
   .language-menu__trigger svg {
     display: none;
+  }
+
+  /* Right-aligned under a trigger mid-header, a one-line "Automatic" would push the menu off
+     the screen's left edge at 320px: it may wrap here. */
+  .language-menu__auto {
+    white-space: normal;
   }
 
   .info-menu__trigger svg,
