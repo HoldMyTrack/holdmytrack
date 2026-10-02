@@ -86,11 +86,11 @@ export function SpotPopup({ map, spot, capturedAt, onClose }: SpotPopupProps) {
   }, [copied]);
 
   const copy = () => {
-    navigator.clipboard.writeText(spotAddress(spot)).then(
+    // No navigator.clipboard at all on an insecure origin; a refusal (permission denied) rejects.
+    // Either way there's nothing to show for it.
+    navigator.clipboard?.writeText(spotAddress(spot)).then(
       () => setCopied(true),
-      () => {
-        // Clipboard refused (an insecure origin, or permission denied): nothing to show for it.
-      },
+      () => {},
     );
   };
 
