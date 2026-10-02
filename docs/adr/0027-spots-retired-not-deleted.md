@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted; not built yet (`ROADMAP.md` Phase 1, Spots places refresh). Amends ADR-0021, whose places were only ever added and updated.
+Accepted. Built: the import retires (`IMPLEMENTATION.md` §4.25, `docs/DEPLOY.md` §6), and the server and both maps hide retired places (`SPEC.md` FR-15.1–FR-15.6, `apps/android/docs/SPEC.md` FR-2.8). Visits, which follow the same rule, aren't built yet. Amends ADR-0021, whose places were only ever added and updated.
 
 ## Context
 

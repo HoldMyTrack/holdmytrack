@@ -49,18 +49,13 @@ Spots' places are on the web map (`SPEC.md` FR-15); marking one visited isn't bu
 
 - [ ] A `spot_visits` table, matching in the ingest job and every reprocess (a track edit, a Private location change), and a backfill job over existing activities after an import — with tests for a stay just under and just over five minutes, a drive past, a point-mapped place's circle, and a place inside a Private location a track passes through.
 - [ ] A per-account `visited` flag in the spots tiles, a filled badge for a visited place, and the visited state in the popup.
+- [ ] Retired places (ADR-0027) keep the visits they have and are matched against no new activity: the matching skips a place with `retired_at` set.
 
 ### Spots places refresh — planned
 
-The places are seeded and refreshed by hand: an operator filters an OSM extract off-box and runs `import-spots` (`docs/DEPLOY.md` §6), once for the planet and then quarterly. Only the United States is loaded so far, and a re-import today never removes a place OSM no longer has. The work below makes a re-run safe: a place gone from OSM is retired, never deleted — hidden from everyone who hasn't captured it, still shown to those who have, and no longer capturable.
+The places are seeded and refreshed by hand: an operator filters an OSM extract off-box and runs `import-spots` (`docs/DEPLOY.md` §6), once for the planet and then quarterly with `--planet`, which retires the places OSM no longer has (ADR-0027). Only the United States is loaded so far.
 
-- [ ] Seed the planet on `holdmytrack.com` — `docs/DEPLOY.md` §6's two osmium commands over the planet file on a machine with ~100 GB free, then `import-spots` on the server; record the place count and how long the import took on the 1 vCPU / 2 GB box, which has only had the US so far.
-- [ ] Retire, never delete — `spots` gains `last_seen_import` and `retired_at`; every upsert stamps the run and clears `retired_at`, so a place back in OSM returns. After a complete import, places the run didn't see get `retired_at`, but only when the operator passes a flag saying the file is the whole planet (a regional file must never retire the rest of the world), and the import stops with a message instead if that would retire more than ~1% of live places (a truncated file). `spot_captures` keeps its foreign key; nothing is deleted, so no capture cascades away.
-- [ ] Hide retired places on the server — the spots tiles carry a `retired` flag and stay the same for every account (ADR-0023); `GET /v1/spots` and `GET /v1/spots/{id}` return a retired place only to an account that captured it; `POST /v1/spots/{id}/captures` answers `410 Gone` for one.
-- [ ] Hide retired places in the clients — the web (`apps/web/src/map/spots.ts`) and the Android app leave out a retired place's badge and area unless its id is in the account's captured ids, the list both already load for the filled badge.
-- [ ] Bump tile versions only when something changed — count the rows an import actually changed or retired (an upsert `WHERE … IS DISTINCT FROM`) and skip the every-account tile version bump when there are none, so a quiet refresh doesn't make every client refetch its tiles.
-- [ ] Visits follow the same rule — once Spots visits (above) are built, a retired place keeps the visits it has and is matched against no new activity.
-- [ ] Document it — an ADR for retire-not-delete; `SPEC.md` FR-15 and `IMPLEMENTATION.md` §4.25; `docs/DEPLOY.md` §6 as the quarterly refresh runbook, the planet flag included.
+- [ ] Seed the planet on `holdmytrack.com` — `docs/DEPLOY.md` §6's two osmium commands over the planet file on a machine with ~100 GB free, then `import-spots --planet` on the server; record the place count and how long the import took on the 1 vCPU / 2 GB box, which has only had the US so far.
 
 ### Sign in with Facebook — built, not live
 
