@@ -17,14 +17,15 @@ import (
 const spotCaptureSlackM = 10
 
 // spotDetailQuery is one place with its whole area and the caller's capture of it, if any —
-// what the Android app's capture mode measures a position against (FR-15.6).
+// what the Android app's capture mode measures a position against (FR-15.6). A retired place
+// (ADR-0027) is there only for an account that captured it.
 const spotDetailQuery = `
 SELECT s.id, s.category, s.name, s.address, s.description, s.inscription, s.memorial,
        s.start_date, s.wikipedia, ST_X(p.pt), ST_Y(p.pt), ST_AsGeoJSON(s.geom, 7), c.captured_at
 FROM spots s
 CROSS JOIN LATERAL (SELECT ST_PointOnSurface(s.geom) AS pt) p
 LEFT JOIN spot_captures c ON c.spot_id = s.id AND c.user_id = $2
-WHERE s.id = $1`
+WHERE s.id = $1 AND (s.retired_at IS NULL OR c.user_id IS NOT NULL)`
 
 // spotDetailJSON is `GET /v1/spots/{id}`: the place as "Show in this area" has it, its area as a
 // GeoJSON MultiPolygon, and when the caller captured it (absent when they haven't).
@@ -112,7 +113,8 @@ func (s *Server) handleListSpotCaptures(w http.ResponseWriter, r *http.Request) 
 // handleCaptureSpot serves `POST /v1/spots/{id}/captures` (FR-15.6): the phone has held the caller
 // inside the place for 30 s, and sends the last position it measured. The server checks that
 // position against the area once more, within spotCaptureSlackM, and keeps the first capture —
-// 201 for a new one, 200 with the earlier one's time when the place was already captured.
+// 201 for a new one, 200 with the earlier one's time when the place was already captured. A
+// retired place (ADR-0027) can't be captured: 410.
 func (s *Server) handleCaptureSpot(w http.ResponseWriter, r *http.Request) {
 	id, ok := spotIDFromPath(w, r)
 	if !ok {
@@ -125,10 +127,11 @@ func (s *Server) handleCaptureSpot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	var inside bool
+	var inside, retired bool
 	err := s.pool.QueryRow(ctx,
-		`SELECT ST_DWithin(geom::geography, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4) FROM spots WHERE id = $1`,
-		id, *req.Lon, *req.Lat, spotCaptureSlackM).Scan(&inside)
+		`SELECT ST_DWithin(geom::geography, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4), retired_at IS NOT NULL
+		 FROM spots WHERE id = $1`,
+		id, *req.Lon, *req.Lat, spotCaptureSlackM).Scan(&inside, &retired)
 	if errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "spot not found", http.StatusNotFound)
 		return
@@ -136,6 +139,10 @@ func (s *Server) handleCaptureSpot(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.log.Error("spot capture check failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if retired {
+		http.Error(w, "the spot is no longer on the map", http.StatusGone)
 		return
 	}
 	if !inside {

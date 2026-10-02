@@ -123,11 +123,16 @@ function imageName(category: SpotCategory, captured: boolean): string {
   return captured ? `spot-captured-${category}` : `spot-${category}`;
 }
 
+/** Whether a feature's id is among the account's captures. */
+function isCaptured(captured: readonly number[]): ExpressionSpecification {
+  return ['in', ['to-number', ['get', 'id']], ['literal', [...captured]]];
+}
+
 /** Each badge's image: the captured one when its id is among the account's captures. */
 function iconImage(captured: readonly number[]): ExpressionSpecification {
   return [
     'case',
-    ['in', ['to-number', ['get', 'id']], ['literal', [...captured]]],
+    isCaptured(captured),
     ['concat', 'spot-captured-', ['get', 'category']],
     ['concat', 'spot-', ['get', 'category']],
   ];
@@ -317,20 +322,26 @@ function addAreaLayers(map: MapLibreMap): void {
 
 /**
  * Shows the chosen categories (the Layers menu, overlays.ts) and hides the rest — a filter on
- * every layer, and every layer hidden when none is chosen. Diffs first, like mapMode.ts's
- * setVisible: a bare setLayoutProperty or setFilter would start the styledata loop its comment
- * describes.
+ * every layer, and every layer hidden when none is chosen. The tiles' layers also leave out a
+ * retired place (ADR-0027) unless the account captured it; "Show in this area" gets only those
+ * from the server already. Diffs first, like mapMode.ts's setVisible: a bare setLayoutProperty or
+ * setFilter would start the styledata loop its comment describes.
  */
 export function setSpotsVisible(map: MapLibreMap, categories: readonly SpotCategory[]): void {
   spotsWanted.set(map, categories);
   const visibility = categories.length > 0 ? 'visible' : 'none';
   const byCategory: FilterSpecification = ['in', ['get', 'category'], ['literal', [...categories]]];
+  const shown: FilterSpecification = [
+    'all',
+    byCategory,
+    ['any', ['!', ['to-boolean', ['get', 'retired']]], isCaptured(capturedIds.get(map) ?? [])],
+  ];
   const filters: Record<string, FilterSpecification> = {
-    [SPOTS_AREA_FILL_LAYER_ID]: byCategory,
-    [SPOTS_AREA_LINE_LAYER_ID]: ['all', ['!', ['get', 'circle']], byCategory],
-    [SPOTS_CIRCLE_LINE_LAYER_ID]: ['all', ['get', 'circle'], byCategory],
+    [SPOTS_AREA_FILL_LAYER_ID]: shown,
+    [SPOTS_AREA_LINE_LAYER_ID]: ['all', ['!', ['get', 'circle']], shown],
+    [SPOTS_CIRCLE_LINE_LAYER_ID]: ['all', ['get', 'circle'], shown],
     [SPOTS_IN_AREA_LAYER_ID]: byCategory,
-    [SPOTS_LAYER_ID]: byCategory,
+    [SPOTS_LAYER_ID]: shown,
   };
   for (const id of SPOTS_LAYER_IDS) {
     if (!map.getLayer(id)) continue;
@@ -339,7 +350,8 @@ export function setSpotsVisible(map: MapLibreMap, categories: readonly SpotCateg
   }
 }
 
-/** Draws the account's captured places (FR-15.6) with the captured badge, the rest plain. */
+/** Draws the account's captured places (FR-15.6) with the captured badge, the rest plain, and
+ *  shows the retired ones among them (setSpotsVisible). */
 export function setSpotsCaptured(map: MapLibreMap, captured: readonly number[]): void {
   capturedIds.set(map, captured);
   const image = iconImage(captured);
@@ -349,6 +361,8 @@ export function setSpotsCaptured(map: MapLibreMap, captured: readonly number[]):
       map.setLayoutProperty(id, 'icon-image', image);
     }
   }
+  const categories = spotsWanted.get(map);
+  if (categories) setSpotsVisible(map, categories);
 }
 
 /** Draws "Show in this area"'s places (ShowInArea.tsx), replacing the last ones; null clears. */

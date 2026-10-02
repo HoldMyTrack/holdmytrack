@@ -176,7 +176,10 @@ class CaptureMode(
     private fun load(target: Spot) {
         HoldMyTrackApi.spotDetail(target.id) { result ->
             if (spot?.id != target.id) return@spotDetail
-            val detail = result.getOrElse {
+            val detail = result.getOrElse { error ->
+                // A place retired since the map loaded it (ADR-0027) is a 404 to anyone who
+                // hasn't captured it — the only accounts capture mode starts for.
+                if (error is ApiException && error.code == 404) return@spotDetail gone()
                 this.detail.setText(R.string.spots_capture_load_failed)
                 banner.postDelayed(retryLoad, RETRY_MS)
                 return@spotDetail
@@ -267,7 +270,9 @@ class CaptureMode(
                 detail.isVisible = target.name != null
                 banner.postDelayed(finish, DONE_MS)
             }.onFailure { error ->
-                if (error is ApiException && error.code == 422) {
+                if (error is ApiException && error.code == 410) {
+                    gone()
+                } else if (error is ApiException && error.code == 422) {
                     // The server saw the position outside: hold again.
                     saving = false
                     capture?.reset()
@@ -279,6 +284,19 @@ class CaptureMode(
                 }
             }
         }
+    }
+
+    /** The place is gone from OpenStreetMap and retired (ADR-0027): there's nothing to capture.
+     *  Says so, and ends capture mode a moment later. */
+    private fun gone() {
+        capture = null // so resume() doesn't start listening again
+        stopListening()
+        MapSpots.setGuide(style(), null, null)
+        arrow.isVisible = false
+        progress.isVisible = false
+        title.setText(R.string.spots_capture_gone)
+        detail.isVisible = false
+        banner.postDelayed(finish, GONE_MS)
     }
 
     private fun render(state: SpotCapture.State?) {
@@ -345,6 +363,9 @@ class CaptureMode(
 
         /** How long "Captured!" stays before capture mode ends by itself. */
         const val DONE_MS = 2500L
+
+        /** How long "no longer on the map" stays: long enough to read. */
+        const val GONE_MS = 4000L
         const val FEET_PER_M = 3.28084
         const val FEET_LIMIT_M = 160.9344
     }

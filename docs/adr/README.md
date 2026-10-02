@@ -35,6 +35,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0024](0024-activity-photos-resized-and-route-bound.md) | An activity can carry the user's photos, kept as resized copies on our own storage, each placed on the route by the time it was taken |
 | [0025](0025-language-menu-for-everyone.md) | A language menu in the header for everyone, remembered in a cookie; signed in, it also saves the account's setting |
 | [0026](0026-material-3-on-views.md) | Android's UI is Material 3 on the existing Views, not Compose, without dynamic color |
+| [0027](0027-spots-retired-not-deleted.md) | A place gone from OpenStreetMap is retired, never deleted, and still shown to the accounts that captured it |
 
 ## Writing a new one
 

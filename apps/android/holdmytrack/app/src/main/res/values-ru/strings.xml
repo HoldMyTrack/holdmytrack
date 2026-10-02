@@ -153,6 +153,7 @@
     <string name="spots_capture_retrying">Не удалось сохранить — пробуем ещё раз…</string>
     <string name="spots_capture_outside">Вы ещё не совсем внутри — продолжайте</string>
     <string name="spots_capture_load_failed">Не удалось загрузить место — пробуем ещё раз…</string>
+    <string name="spots_capture_gone">Этого места больше нет на карте</string>
     <string name="spots_capture_stop">Стоп</string>
     <string name="spots_capture_needs_location">Для захвата нужен доступ к точному местоположению</string>
     <string name="spots_capture_unit_m">%1$d м</string>

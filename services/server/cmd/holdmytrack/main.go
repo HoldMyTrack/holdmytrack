@@ -240,25 +240,33 @@ func main() {
 		log.Info("seed-admin-boundaries: done")
 
 	case "import-spots":
-		// One-time (upserted — safe to re-run) load of the Spots places from an OpenStreetMap
-		// extract made off-box (docs/DEPLOY.md). See internal/spots.Import's doc comment.
-		if len(os.Args) != 3 {
-			fmt.Fprintln(os.Stderr, "usage: holdmytrack import-spots <file.geojsonseq>")
+		// The load, and each quarterly refresh, of the Spots places from an OpenStreetMap extract
+		// made off-box (docs/DEPLOY.md §6) — upserted, so safe to re-run. --planet says the file
+		// is the whole planet, so the places it doesn't have are retired (ADR-0027). See
+		// internal/spots.Import's doc comment.
+		args := os.Args[2:]
+		planet := len(args) > 0 && args[0] == "--planet"
+		if planet {
+			args = args[1:]
+		}
+		if len(args) != 1 {
+			fmt.Fprintln(os.Stderr, "usage: holdmytrack import-spots [--planet] <file.geojsonseq>")
 			os.Exit(2)
 		}
-		f, err := os.Open(os.Args[2])
+		f, err := os.Open(args[0])
 		if err != nil {
 			log.Error("import-spots", "err", err)
 			os.Exit(1)
 		}
-		log.Info("import-spots: starting", "file", os.Args[2])
-		stats, err := spots.Import(ctx, pool, log, f)
+		log.Info("import-spots: starting", "file", args[0], "planet", planet)
+		stats, err := spots.Import(ctx, pool, log, f, planet)
 		f.Close()
 		if err != nil {
-			log.Error("import-spots", "err", err, "imported", stats.Imported)
+			log.Error("import-spots", "err", err, "imported", stats.Imported, "changed", stats.Changed)
 			os.Exit(1)
 		}
-		log.Info("import-spots: done", "imported", stats.Imported, "skipped", stats.Skipped)
+		log.Info("import-spots: done", "imported", stats.Imported, "changed", stats.Changed,
+			"retired", stats.Retired, "skipped", stats.Skipped)
 
 	case "set-admin":
 		// Grants or revokes the admin panel (/admin, FR-12) — deliberately a shell-only

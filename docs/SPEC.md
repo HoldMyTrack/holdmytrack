@@ -1185,7 +1185,9 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 1. A place is an OpenStreetMap feature in one of five categories: **Playground** (`leisure=playground`), **Dog park** (`leisure=dog_park`), **Monument** (`historic=monument` or `memorial`), **Mesmerizing view** (`tourism=viewpoint`) and **History** (`historic=castle`, `ruins`, `fort` or `archaeological_site`). A feature tagged for two is the first of History, Monument, Mesmerizing view, Dog park, Playground.
 2. A place has, each only when OSM has it: a name; an address built from its `addr:*` tags — `addr:full`, or a house number, street (or `addr:place`), city and postcode — when it has at least a street or place; a description; an inscription; a memorial type (a statue, a plaque, a war memorial…); a start date as OSM writes it (a year, a date, "~1850"); and a Wikipedia article, from a `wikipedia` tag in OSM's "language:Title" form (any other form is left out).
 3. A place's area is its OSM outline, or a 30 m circle around a place mapped as a single point.
-4. The operator loads the places with `holdmytrack import-spots <file>`, from an extract made off the server (`docs/DEPLOY.md` §6). Loading the same place again updates it rather than adding a second one; a place missing from a newer extract stays.
+4. The operator loads the places with `holdmytrack import-spots [--planet] <file>`, from an extract made off the server (`docs/DEPLOY.md` §6), and refreshes them the same way. Loading the same place again updates it rather than adding a second one.
+5. A place is never deleted. With `--planet`, a place missing from the file is **retired** (ADR-0027): from then on it is shown only to the accounts that captured it (FR-15.4–FR-15.6), and no one can capture it. A place that comes back to OSM is live again at the next load. A load without `--planet` retires nothing. A `--planet` load that would retire more than 1% of the live places stops with an error and retires none of them; the places it read are still updated.
+6. A load moves every account's tile version (FR-4.11) only if it added, changed, brought back or retired a place.
 
 ### FR-15.2 Points of interest
 
@@ -1197,6 +1199,7 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 3. From zoom 13 up, under each badge its area is shaded faintly in gold: the place's outline from OpenStreetMap, edged with a solid line, or — for a place mapped only as a point — its 30 m circle, edged with a dashed line. Clicking an area does nothing, and a track under it can still be clicked.
 4. Badges and areas are drawn over everything else, the Fog veil and map labels included, and Fog doesn't dim them.
 5. They hide during an Edit track session (FR-5.14) and come back after it.
+6. A retired place (FR-15.1) — its badge and its area — is drawn only for an account that captured it, with the captured badge; everyone else's map leaves it out, at every zoom and in Show in this area (FR-15.5), on the web and in the Android app alike.
 
 ### FR-15.3 The popup
 
@@ -1219,7 +1222,7 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 
 **Inputs** (`GET /v1/spots`): `bbox` — `west,south,east,north` in degrees, west below east and south below north (clamped to the world); `categories` — one or more of `playground`, `dog_park`, `monument`, `viewpoint`, `history`, comma-separated.
 
-**Outputs**: `{spots, total}`: `spots`, up to 2,000 places whose anchor is inside the box, each with `id`, `category`, `lon`, `lat` and the text fields of FR-15.4's `spots` layer (absent when none); `total`, how many the box holds in those categories.
+**Outputs**: `{spots, total}`: `spots`, up to 2,000 places whose anchor is inside the box — a retired one (FR-15.1) only for an account that captured it — each with `id`, `category`, `lon`, `lat` and the text fields of FR-15.4's `spots` layer (absent when none); `total`, how many of those the box holds in those categories.
 
 **Error cases**:
 - A missing or malformed `bbox`, a box with west at or past east (the antimeridian), or a missing or unknown category → `400`.
@@ -1229,10 +1232,10 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 
 **Inputs**: `z`, `x`, `y`; `cv`, the tile version (FR-4.11).
 
-**Outputs**: A vector tile with two layers. `spots`: a point per place whose anchor falls in the tile, with `id`, `category` (`playground`, `dog_park`, `monument`, `viewpoint` or `history`), `lon`, `lat`, and `name`, `address`, `description`, `inscription`, `memorial`, `start_date` and `wikipedia`, each absent when the place has none. `spot_areas`: each place's area that reaches into the tile, clipped to it, with `id`, `category` and `circle` (`true` for the 30 m circle of a place mapped as a point). Below zoom 13, an empty tile.
+**Outputs**: A vector tile with two layers. `spots`: a point per place whose anchor falls in the tile, with `id`, `category` (`playground`, `dog_park`, `monument`, `viewpoint` or `history`), `lon`, `lat`, `retired` (`true` for a retired place, FR-15.1), and `name`, `address`, `description`, `inscription`, `memorial`, `start_date` and `wikipedia`, each absent when the place has none. `spot_areas`: each place's area that reaches into the tile, clipped to it, with `id`, `category`, `circle` (`true` for the 30 m circle of a place mapped as a point) and `retired`. Below zoom 13, an empty tile.
 
 **Behavior**:
-1. The same places for every account, behind the session like every other map tile, and cached like them (FR-4.11). Loading places moves every account's tile version.
+1. The same places for every account, behind the session like every other map tile, and cached like them (FR-4.11) — retired ones included, flagged, for the map to hide unless the account captured them (FR-15.2). A load that changes the places moves every account's tile version (FR-15.1).
 
 **Error cases**:
 - No session → `401`. A demo session sees the places too.
@@ -1243,14 +1246,15 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 **Description**: A place an account has captured by staying inside it for 30 seconds with the Android app's capture mode on (`apps/android/docs/SPEC.md` FR-2.8, ADR-0023). Only the app captures; the web and the app both show what's captured (FR-15.2, FR-15.3). A capture is separate from a visit (ADR-0021), which isn't built.
 
 **Behavior**:
-1. `GET /v1/spots/{id}` answers one place: the fields of FR-15.5's places, `area` — its whole area as a GeoJSON MultiPolygon — and `captured_at` when the caller has captured it (absent otherwise).
+1. `GET /v1/spots/{id}` answers one place: the fields of FR-15.5's places, `area` — its whole area as a GeoJSON MultiPolygon — and `captured_at` when the caller has captured it (absent otherwise). A retired place (FR-15.1) is answered only to an account that captured it.
 2. `GET /v1/spots/captures` answers `{captures}`: the caller's captured places as `{spot_id, captured_at}`, newest first; an empty list when there are none.
 3. `POST /v1/spots/{id}/captures` takes `{lat, lon}`, the position the phone last measured inside the place. The position must be inside the place's area, or within 10 m of it. The first capture of a place is kept: a new one answers `201`, a repeat `200` with the first one's `captured_at`, both as `{spot_id, captured_at}`.
-4. A capture belongs to its account and is deleted with it, or with its place.
+4. A capture belongs to its account and is deleted with it. A retired place keeps its captures (FR-15.1).
 
 **Error cases**:
-- An unknown place, or an `id` that isn't a positive number → `404`.
+- An unknown place, or an `id` that isn't a positive number → `404`. So is a retired place, from `GET /v1/spots/{id}`, for an account that hasn't captured it.
 - A body without numeric `lat` and `lon`, or outside ±90/±180 → `400`.
+- Capturing a retired place → `410`, for every account, captured or not.
 - A position farther than 10 m outside the place → `422`.
 - No session → `401`. A demo session can read but not capture → `403` (`demo_read_only`).
 

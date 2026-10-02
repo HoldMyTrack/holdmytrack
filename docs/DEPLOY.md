@@ -111,7 +111,7 @@ docker compose -f compose.prod.yml --env-file .env.prod run --rm api set-admin y
 
 `false` in place of `true` revokes it. This is the only way to grant or revoke admin; nothing on the web can.
 
-Spots (`SPEC.md` FR-15) needs its places loaded once; until then the Layers menu's points of interest show none. The extract is made **off the server**: filtering the planet file takes more memory and disk than this box has. On any machine with [osmium-tool](https://osmcode.org/osmium-tool/), about 100 GB of free disk and the current [planet file](https://planet.openstreetmap.org/pbf/):
+Spots (`SPEC.md` FR-15) needs its places loaded, and then refreshed about once a quarter, the same way each time; until the first load the Layers menu's points of interest show none. The extract is made **off the server**: filtering the planet file takes more memory and disk than this box has. On any machine with [osmium-tool](https://osmcode.org/osmium-tool/), about 100 GB of free disk and the current [planet file](https://planet.openstreetmap.org/pbf/):
 
 ```
 osmium tags-filter planet-latest.osm.pbf \
@@ -126,10 +126,10 @@ osmium export spots.osm.pbf -f geojsonseq -u type_id --geometry-types=point,poly
 
 ```
 mkdir -p /tmp/spots && chmod 755 /tmp/spots   # put spots.geojsonseq here, world-readable
-docker compose -f compose.prod.yml --env-file .env.prod run --rm -v /tmp/spots:/data:ro api import-spots /data/spots.geojsonseq
+docker compose -f compose.prod.yml --env-file .env.prod run --rm -v /tmp/spots:/data:ro api import-spots --planet /data/spots.geojsonseq
 ```
 
-It upserts every place by its OSM id, so a re-run with a newer extract updates the places already there (it doesn't remove ones the newer extract lacks). It then moves every account's tile version, so browsers fetch the new places (`IMPLEMENTATION.md` §4.25).
+It upserts every place by its OSM id, so a re-run with a newer extract updates the places already there. `--planet` says the file is the whole planet: after the upserts, every place the file didn't have is retired — hidden from everyone who hasn't captured it, never deleted (ADR-0027). Leave `--planet` off for a regional extract, or it would retire the rest of the world. If a planet run would retire more than 1% of the places on the map, it stops with `the file is missing too many places to be the whole planet` and retires nothing: the file is likelier cut short or mis-filtered than OSM down that much, so check the export (its line count against the last run's) before running again. The log's last line counts the places `imported`, `changed` (new, different, or back in OSM), `retired` and `skipped`. Only when something changed or was retired does it move every account's tile version, so browsers fetch the new places (`IMPLEMENTATION.md` §4.25); a refresh that changed nothing leaves their cached tiles alone. Delete `/tmp/spots` afterwards.
 
 ## 7. Maintenance mode
 

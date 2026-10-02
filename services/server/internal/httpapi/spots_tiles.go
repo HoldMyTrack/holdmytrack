@@ -18,6 +18,9 @@ const spotsMinZoom = 13
 //     filters both layers by it) and `circle` for the 30 m circle a place mapped as a single
 //     node stands in with, rather than an outline OSM has.
 //
+// Both carry `retired` (ADR-0027): a place gone from OSM is still in the tiles, which are the
+// same for every account, and each map hides it unless the account captured it.
+//
 // The two layers are separate ST_AsMVT calls concatenated, which is a valid tile: a tile is a
 // list of layers.
 const spotsQuery = `
@@ -31,13 +34,14 @@ SELECT
     (SELECT ST_AsMVT(t, 'spots', 4096, 'geom') FROM (
         SELECT h.id, h.category, h.name, h.address, h.description, h.inscription, h.memorial,
                h.start_date, h.wikipedia, ST_X(h.pt) AS lon, ST_Y(h.pt) AS lat,
+               h.retired_at IS NOT NULL AS retired,
                ST_AsMVTGeom(ST_Transform(h.pt, 3857), env.e3857, 4096, 0, true) AS geom
         FROM here h, env
         WHERE ST_Intersects(h.pt, env.e)
     ) t)
     ||
     (SELECT ST_AsMVT(t, 'spot_areas', 4096, 'geom') FROM (
-        SELECT h.id, h.category, h.osm_type = 'node' AS circle,
+        SELECT h.id, h.category, h.osm_type = 'node' AS circle, h.retired_at IS NOT NULL AS retired,
                ST_AsMVTGeom(ST_Transform(h.geom, 3857), env.e3857, 4096, 64, true) AS geom
         FROM here h, env
     ) t);`

@@ -15,8 +15,8 @@ const spotsAreaLimit = 2000
 
 var spotCategories = []string{"playground", "dog_park", "monument", "viewpoint", "history"}
 
-// spotsAreaQuery is the places in a bounding box, in the chosen categories, at most $6 of them.
-// Named places first — the ones worth a popup — then by a hash of the id: a stable order that's
+// spotsAreaQuery is the places in a bounding box, in the chosen categories, at most $6 of them,
+// leaving out a retired place (ADR-0027) unless the account $7 captured it. Named places first — the ones worth a popup — then by a hash of the id: a stable order that's
 // spread evenly over the area, so a cut-off leaves a thinner map rather than an empty corner.
 const spotsAreaQuery = `
 WITH box AS (SELECT ST_MakeEnvelope($1, $2, $3, $4, 4326) AS b)
@@ -25,13 +25,15 @@ SELECT s.id, s.category, s.name, s.address, s.description, s.inscription, s.memo
 FROM box, spots s
 CROSS JOIN LATERAL (SELECT ST_PointOnSurface(s.geom) AS pt) p
 WHERE s.geom && box.b AND s.category = ANY($5) AND ST_Intersects(p.pt, box.b)
+  AND (s.retired_at IS NULL OR EXISTS (SELECT 1 FROM spot_captures c WHERE c.spot_id = s.id AND c.user_id = $7))
 ORDER BY s.name IS NULL, md5(s.id::text)
 LIMIT $6`
 
 const spotsAreaCountQuery = `
 SELECT count(*) FROM spots s
 WHERE s.geom && ST_MakeEnvelope($1, $2, $3, $4, 4326) AND s.category = ANY($5)
-  AND ST_Intersects(ST_PointOnSurface(s.geom), ST_MakeEnvelope($1, $2, $3, $4, 4326))`
+  AND ST_Intersects(ST_PointOnSurface(s.geom), ST_MakeEnvelope($1, $2, $3, $4, 4326))
+  AND (s.retired_at IS NULL OR EXISTS (SELECT 1 FROM spot_captures c WHERE c.spot_id = s.id AND c.user_id = $6))`
 
 // spotJSON is one place as "Show in this area" returns it — the tiles' `spots` layer's
 // properties (§4.25), with a field absent when OSM has none.
@@ -58,7 +60,8 @@ type spotsAreaResponse struct {
 
 // handleSpotsInArea serves `GET /v1/spots?bbox=west,south,east,north&categories=a,b` — "Show in
 // this area" below the zoom the spots tiles start at (FR-15.5). The places are the same for
-// everyone; it's behind the session like the tiles.
+// everyone but the retired ones, which only an account that captured one gets back; it's behind
+// the session like the tiles.
 func (s *Server) handleSpotsInArea(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	box, ok := parseBBox(q.Get("bbox"))
@@ -77,12 +80,13 @@ func (s *Server) handleSpotsInArea(w http.ResponseWriter, r *http.Request) {
 
 	resp := spotsAreaResponse{Spots: []spotJSON{}}
 	ctx := r.Context()
-	if err := s.pool.QueryRow(ctx, spotsAreaCountQuery, box[0], box[1], box[2], box[3], categories).Scan(&resp.Total); err != nil {
+	userID := userIDFromContext(ctx)
+	if err := s.pool.QueryRow(ctx, spotsAreaCountQuery, box[0], box[1], box[2], box[3], categories, userID).Scan(&resp.Total); err != nil {
 		s.log.Error("spots area count failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	rows, err := s.pool.Query(ctx, spotsAreaQuery, box[0], box[1], box[2], box[3], categories, spotsAreaLimit)
+	rows, err := s.pool.Query(ctx, spotsAreaQuery, box[0], box[1], box[2], box[3], categories, spotsAreaLimit, userID)
 	if err != nil {
 		s.log.Error("spots area query failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
