@@ -1070,9 +1070,9 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   const handleStoryEdited = useCallback(
     (story: Story) => {
       storiesList.replace(story);
-      if (story.id === storyId) storyState.set(story);
+      storyState.set(story); // only if it's still the open one (useStory)
     },
-    [storiesList.replace, storyId, storyState.set],
+    [storiesList.replace, storyState.set],
   );
   // A deleted Story's activities stay, but their Story badges change. Deleting the open one
   // opens the next newest, in its place in the history; deleting the last leaves none open.
