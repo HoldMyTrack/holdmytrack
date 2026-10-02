@@ -18,14 +18,17 @@ import (
 	"log/slog"
 	"net/http"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mail"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mapstyle"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/metrics"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 )
@@ -64,7 +67,7 @@ const maxZipEntryBytes = maxUploadBytes
 var allowedExt = map[string]bool{".gpx": true, ".fit": true, ".tcx": true}
 
 // corsAllowedOrigins lists the origins a credentialed cross-origin request may come from —
-// needed now that sessions are cookies (see ServeHTTP's own doc comment for why "*" no
+// needed now that sessions are cookies (see serve's own doc comment for why "*" no
 // longer works once a request carries credentials). apps/web's dev server (5173), plus the
 // dev servers apps/web/tests/smoke.mjs and build.mjs spawn for themselves (5180, 4183) so
 // those suites can sign in the same way a real browser does; a production origin gets added
@@ -248,7 +251,67 @@ func (s *Server) registerPages() {
 	s.mux.HandleFunc("/", s.notFound)
 }
 
-// ServeHTTP sets CORS headers before delegating to the mux. This has to happen here, not
+// ServeHTTP is serve with each response counted and timed for internal/metrics, and a
+// handler's panic recovered into a 500.
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	rec := &statusRecorder{ResponseWriter: w}
+	start := time.Now()
+	defer func() {
+		// A handler's panic is answered here rather than by net/http, which would only drop
+		// the connection and print a plain-text line the log shipping can't parse. Recorded
+		// as a 500 like any other, and counted on its own for the alert.
+		if p := recover(); p != nil {
+			if p == http.ErrAbortHandler {
+				panic(p)
+			}
+			metrics.HTTPPanics.Inc()
+			s.log.Error("handler panicked", "method", r.Method, "route", r.Pattern, "panic", p, "stack", string(debug.Stack()))
+			if !rec.wroteHeader {
+				http.Error(rec, "internal error", http.StatusInternalServerError)
+			}
+			rec.status = http.StatusInternalServerError
+		}
+		// r.Pattern is the ServeMux pattern that matched (set by s.mux.ServeHTTP on this same
+		// request), never the path itself, so the label has one value per route.
+		route := r.Pattern
+		if route == "" {
+			route = "unmatched"
+		}
+		status := rec.status
+		if status == 0 {
+			status = http.StatusOK
+		}
+		metrics.HTTPRequests.WithLabelValues(route, metrics.StatusClass(status)).Inc()
+		metrics.HTTPDuration.WithLabelValues(route).Observe(time.Since(start).Seconds())
+	}()
+	s.serve(rec, r)
+}
+
+// statusRecorder keeps the status a handler answered with, for ServeHTTP's metrics. Unwrap
+// lets http.ResponseController reach the real writer's Flush and deadlines through it.
+type statusRecorder struct {
+	http.ResponseWriter
+	status      int
+	wroteHeader bool
+}
+
+func (r *statusRecorder) WriteHeader(status int) {
+	if !r.wroteHeader {
+		r.status, r.wroteHeader = status, true
+	}
+	r.ResponseWriter.WriteHeader(status)
+}
+
+func (r *statusRecorder) Write(b []byte) (int, error) {
+	if !r.wroteHeader {
+		r.status, r.wroteHeader = http.StatusOK, true
+	}
+	return r.ResponseWriter.Write(b)
+}
+
+func (r *statusRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
+
+// serve sets CORS headers before delegating to the mux. This has to happen here, not
 // just as a nice-to-have: apps/web (:5173) and this server (:8080) are different origins in
 // dev, and a cross-origin POST with a multipart/form-data body is a CORS "simple request" —
 // the browser sends it through with no preflight, the server processes it fully, but without
@@ -263,7 +326,7 @@ func (s *Server) registerPages() {
 // reflects the request's own Origin back when it's on the allowlist instead — the standard
 // pattern for "credentialed CORS from a known set of origins" — rather than accepting any
 // origin with credentials, which would let any site ride a visitor's session.
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	setSecurityHeaders(w.Header())
 	if origin := r.Header.Get("Origin"); corsAllowedOrigins[origin] {
 		w.Header().Set("Access-Control-Allow-Origin", origin)

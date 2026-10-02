@@ -151,6 +151,9 @@ services:
       FACEBOOK_APP_ID: ${FACEBOOK_APP_ID:-}
       FACEBOOK_APP_SECRET: ${FACEBOOK_APP_SECRET:-}
       FACEBOOK_REDIRECT_URL: ${FACEBOOK_REDIRECT_URL:-}
+      # GET /metrics for monitoring (internal/metrics), as in compose.prod.yml. Not published;
+      # from the host: docker run --rm --network holdmytrack_default curlimages/curl api:9100/metrics
+      METRICS_ADDR: ":9100"
     depends_on:
       db: { condition: service_healthy }
 

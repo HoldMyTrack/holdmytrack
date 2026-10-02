@@ -28,6 +28,7 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mail"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mapstyle"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/metrics"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/spots"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
@@ -127,6 +128,8 @@ func main() {
 			ReadHeaderTimeout: 10 * time.Second,
 			IdleTimeout:       2 * time.Minute,
 		}
+		metrics.RegisterQueue(pool, log)
+		metrics.Serve(ctx, cfg.MetricsAddr, log)
 		log.Info("serve: listening", "addr", cfg.ListenAddr)
 		ln, err := net.Listen("tcp", cfg.ListenAddr)
 		if err != nil {
@@ -144,6 +147,7 @@ func main() {
 			log.Error("storage", "err", err)
 			os.Exit(1)
 		}
+		metrics.Serve(ctx, cfg.MetricsAddr, log)
 		log.Info("work: polling")
 		if err := worker.Run(ctx, pool, store, log); err != nil {
 			log.Error("work", "err", err)

@@ -18,6 +18,9 @@ type Config struct {
 	S3SecretKey string
 	// ListenAddr is only read by `serve`.
 	ListenAddr string
+	// MetricsAddr is where `serve` and `work` answer GET /metrics (internal/metrics). Empty,
+	// the default, serves none; compose.prod.yml sets it for the Alloy service to scrape.
+	MetricsAddr string
 	// SMTP* are all optional — an empty SMTPHost is what selects internal/mail's log-only
 	// sender instead of a real one (see its own doc comment for why that's a valid default,
 	// not a placeholder). Only read by `serve`, same as ListenAddr.
@@ -86,6 +89,7 @@ func Load() (Config, error) {
 		S3AccessKey:  env("S3_ACCESS_KEY", ""),
 		S3SecretKey:  env("S3_SECRET_KEY", ""),
 		ListenAddr:   env("LISTEN_ADDR", ":8080"),
+		MetricsAddr:  env("METRICS_ADDR", ""),
 		SMTPHost:     env("SMTP_HOST", ""),
 		SMTPPort:     env("SMTP_PORT", "587"),
 		SMTPUsername: env("SMTP_USERNAME", ""),
