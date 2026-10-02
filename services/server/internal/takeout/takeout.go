@@ -300,15 +300,31 @@ func Open(zr *zip.Reader) (*Archive, error) {
 	return a, nil
 }
 
+// maxEntryBytes bounds one exercise log or GPS day file once decompressed. A day of 1 Hz
+// fixes is a few MB and a real export's exercise logs are smaller still, so this is far past
+// anything genuine — it's what stops a few-MB zip whose entry inflates to gigabytes from
+// taking the API process down with it.
+const maxEntryBytes = 128 << 20
+
+// ErrEntryTooLarge is an entry past maxEntryBytes, by its declared size or by what it actually
+// decompressed to (a declared size is the archive's own claim, and can lie).
+var ErrEntryTooLarge = errors.New("takeout: entry too large")
+
 func readEntry(f *zip.File) ([]byte, error) {
+	if f.UncompressedSize64 > maxEntryBytes {
+		return nil, fmt.Errorf("%s: %w", f.Name, ErrEntryTooLarge)
+	}
 	rc, err := f.Open()
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", f.Name, err)
 	}
 	defer rc.Close()
-	data, err := io.ReadAll(rc)
+	data, err := io.ReadAll(io.LimitReader(rc, maxEntryBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", f.Name, err)
+	}
+	if len(data) > maxEntryBytes {
+		return nil, fmt.Errorf("%s: %w", f.Name, ErrEntryTooLarge)
 	}
 	return data, nil
 }
