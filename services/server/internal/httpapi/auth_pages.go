@@ -281,7 +281,12 @@ func (s *Server) handleVerifyPendingPage(w http.ResponseWriter, r *http.Request)
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	form := authForm{Email: acct.user.Email}
+	email, err := s.pendingEmail(r.Context(), acct.info.userID)
+	if err != nil {
+		s.log.Error("verify-pending address lookup failed", "err", err)
+		email = acct.user.Email
+	}
+	form := authForm{Email: email}
 	switch {
 	case r.URL.Query().Has("sent"):
 		form.NoticeKey = "verify_pending.sent"

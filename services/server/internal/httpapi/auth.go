@@ -331,8 +331,8 @@ func (s *Server) sendVerificationEmail(ctx context.Context, userID, email, lang 
 	expiresAt := time.Now().Add(emailVerificationTTL)
 	var tokenID string
 	if err := s.pool.QueryRow(ctx,
-		`INSERT INTO email_verifications (user_id, expires_at) VALUES ($1, $2) RETURNING id`,
-		userID, expiresAt,
+		`INSERT INTO email_verifications (user_id, email, expires_at) VALUES ($1, $2, $3) RETURNING id`,
+		userID, email, expiresAt,
 	).Scan(&tokenID); err != nil {
 		return err
 	}
@@ -623,29 +623,67 @@ func (s *Server) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
 	s.writeSession(w, r, userID, sessionTTL, http.StatusOK)
 }
 
-// verifyEmail is the verification core (the JSON endpoint and the /verify page): marks the
-// token's account verified and returns its id, for the caller to start a session.
+// verifyEmail is the verification core (the JSON endpoint and the /verify page): confirms the
+// address the token was sent to, makes it the account's own if it was a pending change, and
+// returns the account id, for the caller to start a session.
+//
+// One transaction with the account row locked, the token's address applied rather than just a
+// flag set: a token sent to the account's old address can't confirm a new one changed to
+// meanwhile, however the two requests interleave.
 func (s *Server) verifyEmail(ctx context.Context, token string) (string, error) {
-	var userID string
-	err := s.pool.QueryRow(ctx,
-		`SELECT user_id FROM email_verifications WHERE id = $1 AND expires_at > NOW()`, token,
-	).Scan(&userID)
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
+
+	var userID, email, current string
+	err = tx.QueryRow(ctx, `
+		SELECT ev.user_id, ev.email, u.email
+		FROM email_verifications ev JOIN users u ON u.id = ev.user_id
+		WHERE ev.id = $1 AND ev.expires_at > NOW()
+		FOR UPDATE OF u
+	`, token).Scan(&userID, &email, &current)
 	if errors.Is(err, pgx.ErrNoRows) || isInvalidTextRepresentation(err) {
 		return "", accountFailure(http.StatusBadRequest, "error.verify_link_invalid")
 	}
 	if err != nil {
 		return "", err
 	}
-	if _, err := s.pool.Exec(ctx, `UPDATE users SET email_verified = true WHERE id = $1`, userID); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE users SET email = $2, email_verified = true WHERE id = $1`, userID, email); err != nil {
+		if isUniqueViolation(err) {
+			// Another account took the address while this change was pending.
+			return "", accountFailure(http.StatusConflict, "error.email_taken")
+		}
 		return "", err
 	}
 	// Every outstanding token for this account, not just the one used — mirrors
 	// resetPassword's own "close every other still-live link too" reasoning, applied to a
 	// resend that arrived after this one was already clicked.
-	if _, err := s.pool.Exec(ctx, `DELETE FROM email_verifications WHERE user_id = $1`, userID); err != nil {
-		s.log.Error("verification token cleanup failed", "err", err)
+	if _, err := tx.Exec(ctx, `DELETE FROM email_verifications WHERE user_id = $1`, userID); err != nil {
+		return "", err
 	}
-	return userID, nil
+	// A reset link mailed to the address the account just left must stop working with it.
+	if email != current {
+		if _, err := tx.Exec(ctx, `DELETE FROM password_resets WHERE user_id = $1`, userID); err != nil {
+			return "", err
+		}
+	}
+	return userID, tx.Commit(ctx)
+}
+
+// pendingEmail is the address the account's newest live verification link went to — a
+// pending change's new address, or the account's own — falling back to the account's
+// address when no link is outstanding. It's where a resend goes, and what /verify-pending
+// says it sent a link to.
+func (s *Server) pendingEmail(ctx context.Context, userID string) (string, error) {
+	var email string
+	err := s.pool.QueryRow(ctx, `
+		SELECT COALESCE(
+			(SELECT email FROM email_verifications WHERE user_id = $1 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1),
+			(SELECT email FROM users WHERE id = $1))
+	`, userID).Scan(&email)
+	return email, err
 }
 
 // handleResendVerification serves `POST /v1/auth/resend-verification` — plain requireAuth,
@@ -676,8 +714,8 @@ func (s *Server) resendVerification(ctx context.Context, info authInfo, lang str
 	if !resendVerificationLimiter.allow(info.userID) {
 		return accountFailure(http.StatusTooManyRequests, "error.rate_limited")
 	}
-	var email string
-	if err := s.pool.QueryRow(ctx, `SELECT email FROM users WHERE id = $1`, info.userID).Scan(&email); err != nil {
+	email, err := s.pendingEmail(ctx, info.userID)
+	if err != nil {
 		return err
 	}
 	return s.sendVerificationEmail(ctx, info.userID, email, lang)
@@ -694,9 +732,8 @@ type changeEmailRequest struct {
 // handleChangeEmail serves `PATCH /v1/auth/email` — plain requireAuth like
 // handleResendVerification, reachable before verification specifically so a mistyped signup
 // email can be corrected (docs/ROADMAP.md: "resend alone doesn't help someone who typed the
-// address wrong in the first place"). Any change resets email_verified to false and sends a
-// fresh verification email to the new address, whether or not the account was already
-// verified — an unconfirmed address is unconfirmed regardless of how it got there.
+// address wrong in the first place"). The change is pending until the link sent to the new
+// address is clicked (changeEmail); the response is the account as it stands meanwhile.
 func (s *Server) handleChangeEmail(w http.ResponseWriter, r *http.Request) {
 	info := authInfoFromContext(r.Context())
 	var req changeEmailRequest
@@ -719,6 +756,13 @@ func (s *Server) handleChangeEmail(w http.ResponseWriter, r *http.Request) {
 
 // changeEmail is the change-email core (the JSON endpoint and the /verify-pending page). lang
 // is the verification email's language.
+//
+// The new address is not the account's until its owner clicks the link sent there
+// (verifyEmail applies it); the account keeps its current address, and its verified state,
+// meanwhile. Applied at once, any account could take an address nobody had proven: the real
+// owner couldn't sign up with it, and a password reset by them would hand them an account
+// whose Google or Facebook sign-in still belonged to whoever made the change. Rate-limited
+// with resends, since each call mails an address of the caller's choosing.
 func (s *Server) changeEmail(ctx context.Context, info authInfo, rawEmail, lang string) error {
 	if info.isDemo {
 		return accountFailure(http.StatusBadRequest, "error.demo_no_email_change")
@@ -727,18 +771,22 @@ func (s *Server) changeEmail(ctx context.Context, info authInfo, rawEmail, lang 
 	if err != nil {
 		return err
 	}
-	if _, err := s.pool.Exec(ctx,
-		`UPDATE users SET email = $2, email_verified = false WHERE id = $1`, info.userID, email,
-	); err != nil {
-		if isUniqueViolation(err) {
-			return accountFailure(http.StatusConflict, "error.email_taken")
-		}
+	var taken bool
+	if err := s.pool.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM users WHERE email = $1 AND id <> $2)`, email, info.userID,
+	).Scan(&taken); err != nil {
 		return err
 	}
-	// Old tokens pointed at a verification link that would still verify an address this
-	// account no longer holds, if the new address ever unluckily collided with a stale one.
+	if taken {
+		return accountFailure(http.StatusConflict, "error.email_taken")
+	}
+	if !resendVerificationLimiter.allow(info.userID) {
+		return accountFailure(http.StatusTooManyRequests, "error.rate_limited")
+	}
+	// One pending address at a time: a link sent before this change, to either address,
+	// stops working.
 	if _, err := s.pool.Exec(ctx, `DELETE FROM email_verifications WHERE user_id = $1`, info.userID); err != nil {
-		s.log.Error("verification token cleanup failed", "err", err)
+		return err
 	}
 	if err := s.sendVerificationEmail(ctx, info.userID, email, lang); err != nil {
 		s.log.Error("change-email verification send failed", "err", err)

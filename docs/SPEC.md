@@ -198,19 +198,20 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 **Preconditions**: An active session for a real account whose email is not yet verified.
 
 **Behavior**:
-1. On signup (FR-1.1) and whenever the email address changes (step 4 below), the server emails a link containing a verification token (valid 24 hours, single-use) to the address on file.
-2. The link opens `/verify?token=…`, which verifies the token the same way `POST /v1/auth/verify-email` does. The Android app doesn't call that endpoint: the link is opened in a browser, and the app finds out by asking `GET /v1/auth/me` again (`apps/android/docs/SPEC.md` FR-1.4). A missing, expired, used or malformed token shows "This verification link is invalid or has expired." On success, the server marks the account verified, invalidates every other outstanding verification token for it, and creates a fresh session for whichever browser opened the link — regardless of whether that browser already held a session of its own, so the link works from any device.
-3. While waiting, the account holder can request another copy of the link (`POST /v1/auth/resend-verification`, rate-limited to 5 per hour per account) without needing to already know it was lost or expired.
-4. The account holder can also change the address on file (`PATCH /v1/auth/email`) before ever verifying — correcting a typo the original signup made, since a resend alone cannot fix a wrong address. Any change resets the account back to unverified and sends a new link to the new address, whether or not the account was already verified.
+1. On signup (FR-1.1) and on an email change (step 4 below), the server emails a link containing a verification token (valid 24 hours, single-use) to the address it confirms: the address on file, or the new address a change asked for.
+2. The link opens `/verify?token=…`, which verifies the token the same way `POST /v1/auth/verify-email` does. The Android app doesn't call that endpoint: the link is opened in a browser, and the app finds out by asking `GET /v1/auth/me` again (`apps/android/docs/SPEC.md` FR-1.4). A missing, expired, used or malformed token shows "This verification link is invalid or has expired." A link confirms only the address it was sent to. On success, the server makes that address the account's own if it was a pending change (or answers `409 Conflict` if another account has taken it meanwhile), marks the account verified, invalidates every other outstanding verification token for it — and, when the address changed, every outstanding password-reset link — and creates a fresh session for whichever browser opened the link — regardless of whether that browser already held a session of its own, so the link works from any device.
+3. While waiting, the account holder can request another copy of the link (`POST /v1/auth/resend-verification`) without needing to already know it was lost or expired. It goes to the address the newest outstanding link went to.
+4. The account holder can also change the address (`PATCH /v1/auth/email`) before ever verifying — correcting a typo the original signup made, since a resend alone cannot fix a wrong address. The change is pending until the link sent to the new address is opened: until then the account keeps its address on file and its verified state, the new address stays free for anyone else, and any link sent before the change stops working. `/verify-pending` names the address the newest link went to. Resends and changes together are rate-limited to 5 per hour per account.
 5. Once verified, the account continues to FR-1.7's first-run Settings page, not straight to the map, until Country and Timezone have been saved once.
 6. Until verified, every route other than `GET /v1/auth/me`, `POST /v1/auth/logout`, and the three endpoints above returns `403 Forbidden` with a distinguishable error rather than the normal response.
 
-**Outputs**: `verify-email` and `reset-password` both return a valid session cookie for the account on success. `resend-verification` and `change-email` return a confirmation; `change-email` also returns the account's current (now-unverified) profile.
+**Outputs**: `verify-email` and `reset-password` both return a valid session cookie for the account on success. `resend-verification` and `change-email` return a confirmation; `change-email` also returns the account's profile as it stands, still with its address on file.
 
 **Error cases**:
 - Verification token missing, already used, or expired → `400 Bad Request` with a generic message, same non-distinguishing reasoning as FR-1.6's reset token.
 - `change-email`/`resend-verification` attempted by a demo account → `400 Bad Request` (neither concept applies to one).
-- More than 5 resend requests for the same account within an hour → `429 Too Many Requests`.
+- `change-email` to an address another account has → `409 Conflict`.
+- More than 5 resend or change-email requests for the same account within an hour → `429 Too Many Requests`.
 
 **Notes**: This reverses an earlier, deliberately simpler version of FR-1 that had no email verification at all — added once real Health Connect/cloud sync made an unrecoverable, mistyped-email account a real cost (server-side ingest work stranded on an account nobody can get back into), not because the original simplicity was a mistake.
 
