@@ -1,4 +1,5 @@
-# Codecov settings for .github/workflows/ci.yml's Go coverage upload. Coverage is reported,
+# Codecov settings for .github/workflows/ci.yml's coverage uploads, Go (flag `go`) and the
+# Android app's Kotlin (flag `kotlin`). Coverage is reported,
 # not enforced: this project verifies most behavior live rather than through unit tests
 # (docs/DEVELOPMENT.md, "Verification"), so a percentage threshold would gate on the wrong
 # thing. Both status checks stay informational and never block a merge.
@@ -15,6 +16,8 @@ comment:
   layout: "condensed_header, diff, flags"
   require_changes: true
 
-# Paths are reported relative to the repo root; the Go module lives in services/server.
+# Paths are reported relative to the repo root; the Go module lives in services/server, and
+# JaCoCo reports the Android sources by package path alone.
 fixes:
   - "github.com/HoldMyTrack/holdmytrack/services/server/::services/server/"
+  - "dev/holdmytrack/android/::apps/android/holdmytrack/app/src/main/kotlin/dev/holdmytrack/android/"

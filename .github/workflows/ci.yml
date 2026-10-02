@@ -68,6 +68,30 @@ jobs:
       - run: npm run test:unit
       - run: npm run verify:style
 
+  android:
+    name: Android unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/android/holdmytrack
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      # The runner's preinstalled Android SDK (ANDROID_HOME) has its licenses accepted, so
+      # AGP downloads whatever platform compileSdk names that isn't there yet.
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew :app:createDebugUnitTestCoverageReport
+      # JaCoCo coverage of the JUnit tests in app/src/test, under its own `kotlin` flag so
+      # the README's Kotlin badge reads it apart from Go's. Informational, like Go's.
+      - uses: codecov/codecov-action@v5
+        with:
+          files: apps/android/holdmytrack/app/build/reports/coverage/test/debug/report.xml
+          flags: kotlin
+          token: ${{ secrets.CODECOV_TOKEN }}
+
   # `make verify verify-build`: the whole dev stack (db, rustfs, migrate, api) plus headless
   # Chromium, exactly as it runs locally.
   e2e:

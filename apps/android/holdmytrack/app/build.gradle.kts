@@ -58,6 +58,11 @@ android {
     }
 
     buildTypes {
+        // AGP's built-in JaCoCo: `createDebugUnitTestCoverageReport` runs the unit tests and
+        // writes the XML report CI uploads to Codecov (.github/workflows/ci.yml).
+        debug {
+            enableUnitTestCoverage = true
+        }
         release {
             isMinifyEnabled = false
         }
