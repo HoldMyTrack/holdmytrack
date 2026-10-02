@@ -26,14 +26,18 @@ type ReprivacyJob struct {
 // ends exactly on its edge — both must still count as touching it.
 const zoneMarginM = 25
 
-// AffectedActivities returns the live activities of userID whose display trajectory comes
-// within a circle's radius (plus zoneMarginM) of its center: every activity a location placed,
-// or previously placed, there could clip. Run inside the caller's transaction, alongside the
+// AffectedActivities returns the activities of userID whose display trajectory comes within a
+// circle's radius (plus zoneMarginM) of its center: every activity a location placed, or
+// previously placed, there could clip. Run inside the caller's transaction, alongside the
 // privacy_zones change itself.
+//
+// Duplicate copies hidden behind a better one (superseded_by set) are included. Dedupe can
+// make one live again without reprocessing it — when the copy displacing it is deleted, or a
+// later copy re-ranks the group — so it has to be clipped with the current locations already.
 func AffectedActivities(ctx context.Context, tx pgx.Tx, userID string, lat, lon float64, radiusM int) ([]string, error) {
 	rows, err := tx.Query(ctx, `
 		SELECT id FROM activities
-		WHERE user_id = $1 AND superseded_by IS NULL AND raw_payload_key IS NOT NULL
+		WHERE user_id = $1 AND raw_payload_key IS NOT NULL
 		  AND trajectory IS NOT NULL
 		  AND ST_DWithin(trajectory::geography, ST_SetSRID(ST_MakePoint($3, $2), 4326)::geography, $4)
 	`, userID, lat, lon, radiusM+zoneMarginM)
@@ -45,11 +49,12 @@ func AffectedActivities(ctx context.Context, tx pgx.Tx, userID string, lat, lon 
 
 // AffectedHiddenActivities is AffectedActivities for the activities a location change can
 // bring back but that have no trajectory to search by — those entirely inside Private
-// locations. There are few, and reprocessing one that stays hidden changes nothing.
+// locations. There are few, and reprocessing one that stays hidden changes nothing. Hidden
+// duplicates are included for the same reason as there.
 func AffectedHiddenActivities(ctx context.Context, tx pgx.Tx, userID string) ([]string, error) {
 	rows, err := tx.Query(ctx, `
 		SELECT id FROM activities
-		WHERE user_id = $1 AND superseded_by IS NULL AND raw_payload_key IS NOT NULL
+		WHERE user_id = $1 AND raw_payload_key IS NOT NULL
 		  AND trajectory IS NULL
 	`, userID)
 	if err != nil {
