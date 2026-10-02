@@ -236,6 +236,7 @@ It's served with `Cache-Control: no-cache`, so a replaced file is never masked b
 6. Rotate that log, which otherwise grows a little every night (more on the first run, which lists every object it copies), in `/etc/logrotate.d/holdmytrack-backup`:
    ```
    /var/log/holdmytrack-backup.log {
+       su root root
        monthly
        rotate 6
        compress
@@ -243,7 +244,7 @@ It's served with `Cache-Control: no-cache`, so a replaced file is never masked b
        notifempty
    }
    ```
-   `logrotate -d /etc/logrotate.d/holdmytrack-backup` checks it without rotating anything.
+   `su` is needed on Ubuntu, whose `/var/log` is group-writable by `syslog`: without it, logrotate skips the file as insecure. `logrotate -d /etc/logrotate.d/holdmytrack-backup` checks the rule without rotating anything.
 
 **What's in the backup bucket.** `postgres/daily/` holds each night's dump for 14 days, and `postgres/weekly/` holds Sunday's for 8 weeks. `objects/` mirrors the app bucket's keys. When the sync would delete or overwrite an object there, it moves the old copy into `objects-deleted/<UTC stamp of that run>/` instead, where it stays for 30 days. An account deleted on request therefore stays in the backups for up to 8 weeks.
 
