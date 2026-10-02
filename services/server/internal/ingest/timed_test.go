@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"errors"
+	"math"
 	"testing"
 	"time"
 
@@ -39,4 +40,25 @@ func TestKeepTimed(t *testing.T) {
 			t.Fatalf("got %d points, err %v; want %d, nil", len(got), err, len(in))
 		}
 	})
+}
+
+func TestKeepValid(t *testing.T) {
+	t0 := time.Date(2026, 9, 1, 8, 0, 0, 0, time.UTC)
+	inf := float32(math.Inf(1))
+	ok := pt(40, -83, t0)
+	ok.Elevation = &inf
+	in := []parse.Point{
+		pt(math.NaN(), -83, t0), pt(40, math.Inf(-1), t0), pt(90.5, 0, t0), pt(0, 180.5, t0),
+		ok, pt(-90, 180, t0),
+	}
+	got := keepValid(in)
+	if len(got) != 2 || got[0].Lat != 40 || got[1].Lat != -90 {
+		t.Fatalf("got %+v, want the two points with a place on Earth", got)
+	}
+	if got[0].Elevation != nil {
+		t.Errorf("infinite elevation kept: %v", *got[0].Elevation)
+	}
+	if in[4].Elevation == nil {
+		t.Error("input was modified")
+	}
 }
