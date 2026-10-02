@@ -6,92 +6,23 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
-	"io"
 	"math"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage/storagetest"
 )
 
-// memS3 is an object store that keeps what's put in it, enough for minio-go's single-part
-// PUT, GET and DELETE of one object and its bucket-location lookup.
-type memS3 struct {
-	mu      sync.Mutex
-	objects map[string][]byte
-}
+// memS3 is storagetest's in-memory object store.
+type memS3 = storagetest.MemS3
 
-func newMemS3() *memS3 { return &memS3{objects: map[string][]byte{}} }
-
-func (m *memS3) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if _, ok := r.URL.Query()["location"]; ok {
-		w.Header().Set("Content-Type", "application/xml")
-		io.WriteString(w, `<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`)
-		return
-	}
-	key := strings.TrimPrefix(r.URL.Path, "/test/")
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	switch r.Method {
-	case http.MethodPut:
-		body, _ := io.ReadAll(r.Body)
-		if strings.HasPrefix(r.Header.Get("X-Amz-Content-Sha256"), "STREAMING-") {
-			body = decodeAWSChunked(body)
-		}
-		m.objects[key] = body
-		w.Header().Set("ETag", `"0"`)
-	case http.MethodGet, http.MethodHead:
-		body, ok := m.objects[key]
-		if !ok {
-			w.Header().Set("Content-Type", "application/xml")
-			w.WriteHeader(http.StatusNotFound)
-			io.WriteString(w, `<Error><Code>NoSuchKey</Code></Error>`)
-			return
-		}
-		w.Header().Set("ETag", `"0"`)
-		w.Header().Set("Last-Modified", time.Now().UTC().Format(http.TimeFormat))
-		w.Header().Set("Content-Length", strconv.Itoa(len(body)))
-		if r.Method == http.MethodGet {
-			w.Write(body)
-		}
-	case http.MethodDelete:
-		delete(m.objects, key)
-		w.WriteHeader(http.StatusNoContent)
-	}
-}
-
-// decodeAWSChunked strips the chunk framing minio-go signs a plain-HTTP upload with:
-// "<hex size>;chunk-signature=…\r\n<data>\r\n", ending with a zero-size chunk.
-func decodeAWSChunked(body []byte) []byte {
-	var out []byte
-	for len(body) > 0 {
-		line, rest, ok := bytes.Cut(body, []byte("\r\n"))
-		if !ok {
-			break
-		}
-		sizeHex, _, _ := bytes.Cut(line, []byte(";"))
-		size, err := strconv.ParseInt(string(sizeHex), 16, 64)
-		if err != nil || size == 0 || int64(len(rest)) < size {
-			break
-		}
-		out = append(out, rest[:size]...)
-		body = bytes.TrimPrefix(rest[size:], []byte("\r\n"))
-	}
-	return out
-}
-
-func (m *memS3) has(key string) bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	_, ok := m.objects[key]
-	return ok
-}
+func newMemS3() *memS3 { return storagetest.New() }
 
 func testJPEG(t *testing.T, w, h int) []byte {
 	t.Helper()
@@ -273,11 +204,11 @@ func TestPhotoEditsAndTrackChanges(t *testing.T) {
 	}
 
 	// Deleting removes both images.
-	if !s3.has(photoKey(me.id, p.ID)) || !s3.has(photoThumbKey(me.id, p.ID)) {
+	if !s3.Has(photoKey(me.id, p.ID)) || !s3.Has(photoThumbKey(me.id, p.ID)) {
 		t.Fatalf("images not stored")
 	}
 	d.decode(d.do(me, "DELETE", p.URL, nil), http.StatusNoContent, nil)
-	if s3.has(photoKey(me.id, p.ID)) || s3.has(photoThumbKey(me.id, p.ID)) {
+	if s3.Has(photoKey(me.id, p.ID)) || s3.Has(photoThumbKey(me.id, p.ID)) {
 		t.Errorf("images left behind after delete")
 	}
 	d.decode(d.do(me, "GET", p.URL, nil), http.StatusNotFound, nil)
@@ -357,7 +288,7 @@ func TestPhotosFollowTheirActivity(t *testing.T) {
 
 	// Deleting the activity deletes its photos, images and all.
 	d.decode(d.do(me, "DELETE", "/v1/activities/"+tracked, nil), http.StatusNoContent, nil)
-	if s3.has(photoKey(me.id, p.ID)) || s3.has(photoThumbKey(me.id, p.ID)) {
+	if s3.Has(photoKey(me.id, p.ID)) || s3.Has(photoThumbKey(me.id, p.ID)) {
 		t.Errorf("images left behind after the activity's delete")
 	}
 	d.decode(d.do(me, "GET", p.URL, nil), http.StatusNotFound, nil)
@@ -475,5 +406,36 @@ func TestPhotoUpdateRefusedLeavesCaptionAlone(t *testing.T) {
 	}
 	if caption != nil {
 		t.Fatalf("caption = %q, want unchanged (none)", *caption)
+	}
+}
+
+// Uploads racing each other at the last free place stop at the limit: each counts again under
+// a per-account lock before inserting.
+func TestPhotoLimitHoldsUnderConcurrency(t *testing.T) {
+	d := newDBTestWithS3(t, newMemS3())
+	me := d.newAccount(false)
+	act := d.newActivity(me, testActivity{activityType: "walk", startedAt: photoTrackStart, durationSecs: 60, at: &[2]float64{10, 50}})
+	if _, err := d.pool.Exec(context.Background(), `
+		INSERT INTO activity_photos (user_id, activity_id, route_at, content_type, thumb_content_type, width, height, bytes)
+		SELECT $1, $2, $3, 'image/jpeg', 'image/jpeg', 40, 30, 1 FROM generate_series(1, $4)
+	`, me.id, act, photoTrackStart, maxPhotosPerAccount-1); err != nil {
+		t.Fatal(err)
+	}
+	file, thumb := testJPEG(t, 40, 30), testJPEG(t, 8, 6)
+	var wg sync.WaitGroup
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			d.uploadPhoto(me, file, thumb, map[string]string{"activity_id": act, "taken_at": "2026-05-01T10:00:00Z"})
+		}()
+	}
+	wg.Wait()
+	var n int
+	if err := d.pool.QueryRow(context.Background(), `SELECT count(*) FROM activity_photos WHERE user_id = $1`, me.id).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != maxPhotosPerAccount {
+		t.Fatalf("%d photos, want %d", n, maxPhotosPerAccount)
 	}
 }
