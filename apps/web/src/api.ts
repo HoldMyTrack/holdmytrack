@@ -361,6 +361,8 @@ export interface TrackMetricPoint {
   lon: number;
   lat: number;
   speedMps: number;
+  /** The point's moment, epoch seconds — what the Photos tab's slider saves (§4.27). */
+  timeS: number;
 }
 
 export interface ActivityTrackMetrics {
@@ -372,6 +374,7 @@ interface TrackMetricPointBody {
   lon: number;
   lat: number;
   speed_mps: number;
+  time_s: number;
 }
 
 interface ActivityTrackMetricsBody {
@@ -399,7 +402,7 @@ export async function getActivityTrackMetrics(
   const body = (await res.json()) as ActivityTrackMetricsBody;
   return {
     activityId: body.activity_id,
-    points: body.points.map((p) => ({ lon: p.lon, lat: p.lat, speedMps: p.speed_mps })),
+    points: body.points.map((p) => ({ lon: p.lon, lat: p.lat, speedMps: p.speed_mps, timeS: p.time_s })),
   };
 }
 
@@ -741,4 +744,150 @@ export async function getSpotCaptures(signal?: AbortSignal): Promise<SpotCapture
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
   return ((await res.json()) as { captures: SpotCapture[] }).captures;
+}
+
+/** One photo on an activity (FR-16), always with a place on its track (`routeAt`, a moment on
+ *  it). `lon`/`lat` are null only for an activity with no track left at all. `url` and
+ *  `thumbUrl` are API paths (`/v1/photos/…`) — callers prefix `API_BASE_URL`. */
+export interface Photo {
+  id: string;
+  activityId: string;
+  takenAt: string | null;
+  routeAt: string;
+  lon: number | null;
+  lat: number | null;
+  caption: string | null;
+  width: number;
+  height: number;
+  url: string;
+  thumbUrl: string;
+}
+
+interface PhotoBody {
+  id: string;
+  activity_id: string;
+  taken_at: string | null;
+  route_at: string;
+  lon: number | null;
+  lat: number | null;
+  caption: string | null;
+  width: number;
+  height: number;
+  url: string;
+  thumb_url: string;
+}
+
+function toPhoto(b: PhotoBody): Photo {
+  return {
+    id: b.id,
+    activityId: b.activity_id,
+    takenAt: b.taken_at,
+    routeAt: b.route_at,
+    lon: b.lon,
+    lat: b.lat,
+    caption: b.caption,
+    width: b.width,
+    height: b.height,
+    url: b.url,
+    thumbUrl: b.thumb_url,
+  };
+}
+
+/** `GET /v1/photos` — one activity's photos, or every photo in a Story; placed ones in route
+ *  order, then unplaced ones. */
+export async function listPhotos(of: { activity: string } | { story: string }, signal?: AbortSignal): Promise<Photo[]> {
+  const params = new URLSearchParams(of);
+  const res = await fetch(`${API_BASE_URL}${API_V1}/photos?${params}`, {
+    ...(signal ? { signal } : {}),
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
+  }
+  return ((await res.json()) as { photos: PhotoBody[] }).photos.map(toPhoto);
+}
+
+/** The server couldn't tell where on the track a photo was taken (`photo_needs_place`, FR-16.1):
+ *  nothing was stored, and it goes again with the user's `routeAt`. */
+export class PhotoNeedsPlaceError extends Error {}
+
+/** What a photo's EXIF said, as the placement fields `POST /v1/photos` and its check take. */
+export interface PhotoExifFields {
+  takenAt?: string;
+  takenLocal?: string;
+  lat?: number;
+  lon?: number;
+}
+
+/** `POST /v1/photos/place` — where an upload of a photo with this EXIF would be placed (`routeAt`,
+ *  RFC 3339), storing nothing; `PhotoNeedsPlaceError` when the server can't tell. */
+export async function checkPhotoPlace(activityId: string, exif: PhotoExifFields): Promise<{ routeAt: string }> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/photos/place`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ activity_id: activityId, taken_at: exif.takenAt, taken_local: exif.takenLocal, lat: exif.lat, lon: exif.lon }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    const message = messageFromErrorBody(text, t('common.request_failed', { status: res.status }));
+    if (res.status === 422 && text.includes('"photo_needs_place"')) throw new PhotoNeedsPlaceError(message);
+    throw new Error(message);
+  }
+  return { routeAt: ((await res.json()) as { route_at: string }).route_at };
+}
+
+/** `POST /v1/photos` — a photo already resized by `photoPrep.ts`, with what its EXIF said, where
+ *  on the track it goes (`routeAt`, RFC 3339 — the placement check's answer or the user's), and
+ *  its caption. */
+export async function uploadPhoto(
+  activityId: string,
+  photo: { file: Blob; thumb: Blob; exif: PhotoExifFields },
+  routeAt?: string,
+  caption?: string,
+): Promise<Photo> {
+  const form = new FormData();
+  form.set('activity_id', activityId);
+  form.set('file', photo.file, 'photo');
+  form.set('thumb', photo.thumb, 'thumb');
+  const { takenAt, takenLocal, lat, lon } = photo.exif;
+  if (takenAt) form.set('taken_at', takenAt);
+  else if (takenLocal) form.set('taken_local', takenLocal);
+  if (lat !== undefined && lon !== undefined) {
+    form.set('lat', String(lat));
+    form.set('lon', String(lon));
+  }
+  if (routeAt) form.set('route_at', routeAt);
+  if (caption) form.set('caption', caption);
+  const res = await fetch(`${API_BASE_URL}${API_V1}/photos`, { method: 'POST', credentials: 'include', body: form });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    const message = messageFromErrorBody(text, t('common.request_failed', { status: res.status }));
+    if (res.status === 422 && text.includes('"photo_needs_place"')) throw new PhotoNeedsPlaceError(message);
+    throw new Error(message);
+  }
+  return toPhoto((await res.json()) as PhotoBody);
+}
+
+/** `PATCH /v1/photos/{id}` — a field present changes. `routeAt` (RFC 3339) is the photo's new
+ *  moment on its track; the server clamps it to the track. */
+export async function updatePhoto(id: string, change: { caption?: string | undefined; routeAt?: string | undefined }): Promise<Photo> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/photos/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ caption: change.caption, route_at: change.routeAt }),
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
+  }
+  return toPhoto((await res.json()) as PhotoBody);
+}
+
+/** `DELETE /v1/photos/{id}`. */
+export async function deletePhoto(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/photos/${id}`, { method: 'DELETE', credentials: 'include' });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
+  }
 }

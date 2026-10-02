@@ -1,6 +1,7 @@
 import type { FilterSpecification, Map as MapLibreMap, VectorTileSource } from 'maplibre-gl';
 import { API_BASE_URL, TILES_V1, type ActivityQuery } from '../api';
 import { getTileVersion } from './coverageVersion';
+import { PHOTO_MARKER_CLASS } from './photos';
 import { spotAt } from './spots';
 
 /**
@@ -248,6 +249,8 @@ function attachTrackInteractivity(map: MapLibreMap): void {
     // A spot's icon sits on top of the tracks; a click on one opens its popup (spots.ts) and
     // means nothing to the track underneath.
     if (spotAt(map, e.point)) return;
+    // Nor does a click on a photo's marker (photos.ts), which opens the photo.
+    if ((e.originalEvent.target as Element | null)?.closest?.(`.${PHOTO_MARKER_CLASS}`)) return;
     const { x, y } = e.point;
     const tolerance = isTouch(e.originalEvent) ? TAP_TOLERANCE_PX : CLICK_TOLERANCE_PX;
     const box: [[number, number], [number, number]] = [

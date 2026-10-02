@@ -188,6 +188,14 @@ func ResolveDuplicates(
 	`, winner.id, losers); err != nil {
 		return nil, fmt.Errorf("ingest: mark superseded: %w", err)
 	}
+	// A hidden copy's photos (§4.27) move to the copy that's shown: they were added to the trip,
+	// not to one recording of it, and a photo's place is a moment on the track, which the winner
+	// covers too (and a moment just past the winner's ends reads at its nearest end).
+	if _, err := pool.Exec(ctx, `
+		UPDATE activity_photos SET activity_id = $1 WHERE activity_id = ANY($2::uuid[])
+	`, winner.id, losers); err != nil {
+		return nil, fmt.Errorf("ingest: move photos to winner: %w", err)
+	}
 	// The winner may itself have been superseded by an earlier, poorer decision — a richer
 	// copy arriving third has to be able to take the place back.
 	if _, err := pool.Exec(ctx, `

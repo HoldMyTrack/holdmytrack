@@ -57,3 +57,11 @@ Most privacy laws outside the EU (Brazil's LGPD, Australia's Privacy Act APP 8, 
 * The takeout export (`internal/takeout`) plus a matching import would move an account between regions.
 * Each region is a fixed monthly cost against donation funding (`VISION.md` §6), so the alternative for a localization country with few users is declining signups there rather than running a stack for them.
 * Until then, the only cost is not closing the door: keep each deployment fully configured by env, and ask whether any new cross-account query would still work split by region.
+
+### Photos as links to the user's own cloud storage
+
+ADR-0024 keeps a resized copy of each photo on our own storage. If photos ever become a material share of the bill, the alternative it names is to keep only our thumbnail and link to the original wherever the user already keeps it — Google Drive, Dropbox, OneDrive — so the map and Stories keep working on our thumbnails and the full image is a click out.
+
+* Roughly a fifteenth of today's storage per photo, at the cost of an OAuth integration per provider, a photo that only opens once the user shares it "with anyone with the link", and a broken link every time the user tidies their files.
+* Google Photos can't serve as one: its API hands out image URLs that expire within the hour.
+* Decide only once cost-per-user is measured (`ROADMAP.md` Phase 5) and photos show up in it.

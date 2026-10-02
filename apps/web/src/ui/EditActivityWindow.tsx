@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { saveActivityTrackEdit, updateActivity, type Activity, type TrackEdit } from '../api';
+import { deletePhoto, saveActivityTrackEdit, updateActivity, updatePhoto, uploadPhoto, type Activity, type Photo, type TrackEdit } from '../api';
+import type { PhotoMarkerOverlay } from '../map/photos';
+import { draftIsEmpty, draftSize, EMPTY_DRAFT, isoSeconds, waitingPhotos, type PhotoDraft } from './photoDraft';
 import type { TypeFacet } from './activityFacets';
 import { ActivityTypePicker } from './ActivityTypePicker';
+import { ConfirmDialog } from './ConfirmDialog';
 import { formatStartedAt } from './format';
+import { MAX_PHOTO_CAPTION_LEN, PhotosTab } from './PhotosTab';
 import { TrackEditor } from './TrackEditor';
 import { t, tn } from '../i18n';
 
@@ -14,7 +18,7 @@ const MAX_ACTIVITY_TYPE_LEN = 50;
 const MAX_NAME_LEN = 200;
 const MAX_DESCRIPTION_LEN = 2000;
 
-type Tab = 'activity' | 'track';
+export type EditTab = 'activity' | 'track' | 'photos';
 
 /**
  * The Edit window (§4.7.4, §4.7.7) — reached from the header toolbar's Edit button
@@ -31,6 +35,10 @@ type Tab = 'activity' | 'track';
  *    first time starts MapView's track session (`onStartTrack`: the other tracks hidden, the
  *    camera on this one), which then lasts until the window closes; the editor stays mounted
  *    behind the Activity tab, so switching back and forth loses nothing.
+ *  - **Photos** — PhotosTab.tsx, over exactly one activity with a track; `photosUnavailable`
+ *    names why not otherwise. Its changes are a draft (photoDraft.ts) kept here, like the track
+ *    edit: new photos prepared in the browser with their places settled, moves, captions and
+ *    deletes, written by the same Save. Mounted on first open and kept.
  *
  * Save writes what changed — the fields first (skipped when they're as they were), then the
  * track edit (skipped when the Track tab did nothing) — and closes. If a later write fails after earlier ones landed, the window stays open with the
@@ -61,6 +69,17 @@ export interface EditActivityWindowProps {
   /** Why the Track tab is disabled, or null when `activities` is one editable track. */
   trackUnavailable: string | null;
   onStartTrack: (activity: Activity) => void;
+  /** Why the Photos tab is disabled, or null when `activities` is one activity with a track. */
+  photosUnavailable: string | null;
+  /** The single activity's saved photos — MapView owns them, since they're also its markers —
+   *  and where to report how the draft changes the markers. */
+  photos: {
+    photos: readonly Photo[];
+    error: string | null;
+    onOverlay: (overlay: PhotoMarkerOverlay | null) => void;
+  };
+  /** The tab showing changed — MapView hides the photo markers on the Track tab. */
+  onTabChange: (tab: EditTab) => void;
   /** `saved`: something was written, so the list reloads. `trackApplied`: a track edit was sent, so the row now reads
    *  Pending until its reprocess lands. */
   onClose: (result: EditWindowResult) => void;
@@ -69,12 +88,39 @@ export interface EditActivityWindowProps {
 export interface EditWindowResult {
   saved: boolean;
   trackApplied: boolean;
+  /** Photos were uploaded, changed or deleted, so MapView refetches them. */
+  photosSaved: boolean;
 }
 
-export function EditActivityWindow({ map, activities, knownTypes, trackUnavailable, onStartTrack, onClose }: EditActivityWindowProps) {
+export function EditActivityWindow({
+  map,
+  activities,
+  knownTypes,
+  trackUnavailable,
+  onStartTrack,
+  photosUnavailable,
+  photos,
+  onTabChange,
+  onClose,
+}: EditActivityWindowProps) {
   const single = activities.length === 1 ? activities[0]! : null;
-  const [tab, setTab] = useState<Tab>('activity');
+  const [tab, setTab] = useState<EditTab>('activity');
   const [trackStarted, setTrackStarted] = useState(false);
+  const [photosStarted, setPhotosStarted] = useState(false);
+  const [photoDraft, setPhotoDraft] = useState<PhotoDraft>(EMPTY_DRAFT);
+  const [photoProgress, setPhotoProgress] = useState<{ done: number; total: number } | null>(null);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  // Any photo write landed — a later failure or Cancel still has to report it.
+  const photosSaved = useRef(false);
+  // New photos' local thumbnails are object URLs; whatever's left unsaved goes with the window.
+  const draftRef = useRef(photoDraft);
+  draftRef.current = photoDraft;
+  useEffect(() => () => draftRef.current.added.forEach((p) => URL.revokeObjectURL(p.thumbSrc)), []);
+  // A change to the photos answers whatever Save last refused about them — but not mid-Save,
+  // when the draft shrinks as each write lands.
+  useEffect(() => {
+    if (!saving) setError(null);
+  }, [photoDraft]);
   // A group whose activities share one type starts on it; a mixed group starts empty ("Mixed
   // types"), and stays that way unless a type is picked — empty keeps each activity's own type.
   const mixedTypes = activities.some((a) => a.activityType !== activities[0]!.activityType);
@@ -94,20 +140,45 @@ export function EditActivityWindow({ map, activities, knownTypes, trackUnavailab
   }, []);
 
   const cancel = useCallback(() => {
-    onClose({ saved: fieldsSaved.current, trackApplied: false });
+    onClose({ saved: fieldsSaved.current, trackApplied: false, photosSaved: photosSaved.current });
   }, [onClose]);
 
   useEffect(() => {
     if (saving) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !event.defaultPrevented) cancel();
+      // Not an Escape meant for a dialog of its own, such as the discard confirmation below.
+      if ((event.target as Element | null)?.closest?.('dialog')) return;
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      // Escape is a reflex, and photo changes can be a lot of picking and sliding: ask first.
+      // preventDefault, or the browser's own Escape handling closes the confirmation the moment
+      // it opens — it's the topmost dialog by the time this key's default action runs.
+      if (!draftIsEmpty(draftRef.current)) {
+        event.preventDefault();
+        setConfirmDiscard(true);
+      } else cancel();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [saving, cancel]);
 
-  function openTab(next: Tab) {
+  // Leaving the page — a reload, a closed tab, a link in the header — would lose unsaved photo
+  // changes with no way back, so the browser asks first while there are any, or while they're
+  // being written.
+  const photosAtRisk = saving || !draftIsEmpty(photoDraft);
+  useEffect(() => {
+    if (!photosAtRisk) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [photosAtRisk]);
+
+  function openTab(next: EditTab) {
     setTab(next);
+    onTabChange(next);
+    if (next === 'photos') setPhotosStarted(true);
     if (next === 'track' && !trackStarted && single) {
       setTrackStarted(true);
       onStartTrack(single);
@@ -128,7 +199,22 @@ export function EditActivityWindow({ map, activities, knownTypes, trackUnavailab
             : null;
     if (invalid) {
       setError(invalid);
-      setTab('activity');
+      openTab('activity');
+      return;
+    }
+    // Every photo needs its place before anything is written, and a caption within bounds.
+    const captions = [
+      ...photoDraft.added.map((p) => p.caption),
+      ...Object.values(photoDraft.changed).flatMap((c) => (c.caption === undefined ? [] : [c.caption])),
+    ];
+    const photosInvalid = waitingPhotos(photoDraft).length > 0
+      ? t('photos.place_first')
+      : captions.some((c) => c.trim().length > MAX_PHOTO_CAPTION_LEN)
+        ? t('photos.caption_too_long', { max: MAX_PHOTO_CAPTION_LEN })
+        : null;
+    if (photosInvalid) {
+      setError(photosInvalid);
+      openTab('photos');
       return;
     }
     const fieldsChanged = single
@@ -157,19 +243,64 @@ export function EditActivityWindow({ map, activities, knownTypes, trackUnavailab
         }
         fieldsSaved.current = true;
       }
+      if (single && !draftIsEmpty(photoDraft)) await savePhotos(single.id, photoDraft);
       if (single && trackPending) {
         await saveActivityTrackEdit(single.id, trackPending.edit);
-        onClose({ saved: true, trackApplied: true });
+        onClose({ saved: true, trackApplied: true, photosSaved: photosSaved.current });
         return;
       }
-      onClose({ saved: fieldsSaved.current, trackApplied: false });
+      onClose({ saved: fieldsSaved.current, trackApplied: false, photosSaved: photosSaved.current });
     } catch (err) {
       setError(err instanceof Error ? err.message : t('edit.save_failed'));
       setSaving(false);
+      setPhotoProgress(null);
+    }
+  }
+
+  // Writes the photo draft, one request at a time: uploads (each at the place it settled on),
+  // then moves and captions, then deletes. Each write that lands leaves the draft, so a retry
+  // after a failure picks up where it stopped.
+  async function savePhotos(activityId: string, draft: PhotoDraft) {
+    const total = draftSize(draft);
+    let done = 0;
+    const step = () => setPhotoProgress({ done: ++done, total });
+    setPhotoProgress({ done, total });
+    for (const photo of draft.added) {
+      await uploadPhoto(activityId, photo.prepared, isoSeconds(photo.routeAt!), photo.caption.trim() || undefined);
+      photosSaved.current = true;
+      URL.revokeObjectURL(photo.thumbSrc);
+      setPhotoDraft((d) => ({ ...d, added: d.added.filter((p) => p.key !== photo.key) }));
+      step();
+    }
+    for (const [id, change] of Object.entries(draft.changed)) {
+      if (draft.deleted.includes(id)) continue;
+      await updatePhoto(id, {
+        caption: change.caption?.trim(),
+        routeAt: change.routeAt === undefined ? undefined : isoSeconds(change.routeAt),
+      });
+      photosSaved.current = true;
+      setPhotoDraft((d) => {
+        const changed = { ...d.changed };
+        delete changed[id];
+        return { ...d, changed };
+      });
+      step();
+    }
+    for (const id of draft.deleted) {
+      await deletePhoto(id);
+      photosSaved.current = true;
+      setPhotoDraft((d) => {
+        const changed = { ...d.changed };
+        delete changed[id];
+        return { ...d, changed, deleted: d.deleted.filter((x) => x !== id) };
+      });
+      step();
     }
   }
 
   const namedFieldsDisabledReason = single ? undefined : t('edit.multi_reason');
+  // As Save would leave them.
+  const photoCount = photos.photos.length - photoDraft.deleted.length + photoDraft.added.length;
 
   return (
     <section className="edit-track edit-window" aria-label={t('edit.title_one')} data-testid="edit-activity-window">
@@ -203,6 +334,20 @@ export function EditActivityWindow({ map, activities, knownTypes, trackUnavailab
         >
           {t('edit.tab_track')}
           {trackPending && <span className="edit-window__tab-dot" aria-hidden="true" />}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className="edit-window__tab"
+          aria-selected={tab === 'photos'}
+          disabled={photosUnavailable !== null}
+          title={photosUnavailable ?? undefined}
+          onClick={() => openTab('photos')}
+          data-testid="edit-tab-photos"
+        >
+          {t('photos.tab')}
+          {photosUnavailable === null && photoCount > 0 && <span className="edit-window__tab-count">{photoCount}</span>}
+          {!draftIsEmpty(photoDraft) && <span className="edit-window__tab-dot" aria-hidden="true" />}
         </button>
       </div>
 
@@ -257,6 +402,21 @@ export function EditActivityWindow({ map, activities, knownTypes, trackUnavailab
         </div>
       )}
 
+      {photosStarted && single && photosUnavailable === null && (
+        <div className="edit-window__panel" role="tabpanel" hidden={tab !== 'photos'}>
+          <PhotosTab
+            activity={single}
+            photos={photos.photos}
+            error={photos.error}
+            draft={photoDraft}
+            setDraft={setPhotoDraft}
+            active={tab === 'photos'}
+            busy={saving}
+            onOverlay={photos.onOverlay}
+          />
+        </div>
+      )}
+
       {error && <p className="edit-track__error">{error}</p>}
       <div className="edit-track__row edit-track__row--footer">
         <span className="edit-track__spacer" aria-hidden="true" />
@@ -270,9 +430,23 @@ export function EditActivityWindow({ map, activities, knownTypes, trackUnavailab
           onClick={() => void save()}
           data-testid="edit-save"
         >
-          {saving ? t('common.saving') : t('common.save')}
+          {saving && photoProgress
+            ? t('photos.saving_n', { n: Math.min(photoProgress.done + 1, photoProgress.total), total: photoProgress.total })
+            : saving
+              ? t('common.saving')
+              : t('common.save')}
         </button>
       </div>
+      {confirmDiscard && (
+        <ConfirmDialog
+          title={t('photos.discard_title')}
+          message={t('photos.discard_message')}
+          confirmLabel={t('photos.discard')}
+          cancelLabel={t('photos.keep_editing')}
+          onConfirm={async () => cancel()}
+          onClose={() => setConfirmDiscard(false)}
+        />
+      )}
     </section>
   );
 }

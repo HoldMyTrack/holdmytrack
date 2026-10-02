@@ -15,7 +15,7 @@ This document specifies HoldMyTrack's functional behavior as currently implement
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web and in the Android app, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, pace-colored segments, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date slider, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), the interface language — English or Russian (FR-13), Stories on the web and in the Android app (FR-14), and Spots' places on the web and in the Android app (FR-15).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web and in the Android app, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, pace-colored segments, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date slider, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), the interface language — English or Russian (FR-13), Stories on the web and in the Android app (FR-14), Spots' places on the web and in the Android app (FR-15), and photos on an activity, on the web (FR-16).
 
 **Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), the rest of "Export" (animated reveals — high-resolution map export itself is built, FR-4.10 below), and marking a Spots place visited (ADR-0021). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace stays as per-activity route context (FR-4.8) rather than an analysed, all-time performance record. So is any health data at all: heart rate is never read, stored or shown (ADR-0017), and the pace/heart-rate + elevation profile (FR-4.9) was built and then removed for that reason. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
@@ -445,7 +445,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Behavior**:
 1. On ingest, a new activity is compared against the account's existing ones by time: two activities are the same one when their time ranges overlap for at least 80% of the longer one's duration. Activity type and distance are not compared, since sources routinely disagree on both for the same activity ("walking" vs "hiking", a few percent of distance). Two activities that only touch — back-to-back recordings with a few seconds of clock skew — or where one is a small part of the other (a short auto-detected walk inside a long hike, a day hike inside a multi-day recording) stay separate. An activity with no duration is never matched.
 2. A match is resolved by keeping the richer record (route geometry over none; then elevation data over none) and marking the other `superseded_by` the winner, rather than deleting it.
-3. Every user-facing read — the Activities list, totals, histogram, day pages, trends, graph stats, map tiles, and both Fog of War and Heatmap composites — excludes superseded activities automatically.
+3. Every user-facing read — the Activities list, totals, histogram, day pages, trends, graph stats, map tiles, and both Fog of War and Heatmap composites — excludes superseded activities automatically. A superseded copy's photos (FR-16) move to the kept copy, at the same moment on its track.
 4. Deleting the kept copy of a matched pair promotes the next-richest superseded copy back to live, rather than leaving both gone.
 
 **Outputs**: At most one live `Activity` per real-world activity, regardless of how many sources reported it.
@@ -773,7 +773,7 @@ Removed on 2026-09-27 (ADR-0017). It was a floating card beside FR-4.8's bands: 
 
 **Behavior**:
 1. Clicking the toolbar's Delete icon opens a confirmation dialog naming its target — how many activities are checked, or the focused activity's own name or date/time — and their combined distance, stating plainly that this can't be undone; nothing is deleted until the user confirms.
-2. Confirming removes every activity in the target and everything derived from each one: its recorded stream data and its rendered coverage masks.
+2. Confirming removes every activity in the target and everything derived from each one: its recorded stream data, its rendered coverage masks, and its photos (FR-16).
 3. The Fog-of-War/Heatmap view updates to reflect the deletion — coverage a deleted activity was the only source for reverts to unrevealed, not left showing stale coverage for data that no longer exists. An open page picks this up on its own once the background re-render finishes, without a reload.
 4. Canceling the confirmation, or dismissing it, leaves every activity untouched.
 
@@ -1279,3 +1279,88 @@ The following are named in `VISION.md`'s roadmap but have no functional requirem
 - Dark-theme variant of the Fog of War veil (the theme parameter is accepted but currently has no visual effect on the veil itself)
 
 Deliberately out of scope, not a "not yet" — built and then cut, not planned to return: Oura and other recovery-data sources (sleep, HRV, readiness), best-effort curves, personal bests, power curves, and training load. Also deliberately out of scope, never built: explorer-tile scoring — Fog of War is the exploration mechanic (ADR-0018). And splitting a track that passes through a Private location mid-way (FR-8.1 hides only the leading and trailing portions, by design). `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor; pace stays as per-activity route context (FR-4.8), not an analysed, all-time performance record, and heart rate and every other health measurement are out of scope entirely — never read, stored or shown (ADR-0017). The pace/heart-rate + elevation profile (FR-4.9) was built and then removed on those grounds.
+
+## 21. FR-16 — Activity photos
+
+**Description**: The user's own photos added to an activity, each placed at the point of its route where it was taken, so an activity — and a Story — shows its pictures on the map (`VISION.md` §4.2, ADR-0024). Stored as a resized copy and a thumbnail with no EXIF; private to the account. The web adds and shows them; the Android app doesn't yet.
+
+### FR-16.1 Upload
+
+**Behavior**:
+1. `POST /v1/photos` takes a multipart body: `activity_id`; `file`, the resized photo, and `thumb`, its thumbnail, each a JPEG or WebP; and optionally what the client read from the original's EXIF — `taken_at` (RFC 3339) or `taken_local` (`YYYY-MM-DDTHH:MM:SS`, a capture time with no time zone), and `lat`/`lon`; and optionally `route_at` (RFC 3339), the place on the track the user chose, and `caption` (trimmed, at most 500 characters). It answers `201` with the photo (FR-16.3), placed per FR-16.2.
+2. Each image's type is read from its bytes, never from its filename or declared type.
+3. An account holds at most 2,000 photos.
+4. `POST /v1/photos/place` takes the same placement fields as JSON — `{activity_id, taken_at, taken_local, lat, lon}` — and answers where an upload with them would be placed, `{route_at, taken_at}`, storing nothing. It refuses as the upload does: `photo_needs_place` (`422`), no track (`409`), a field that doesn't parse (`400`), another account's activity (`404`), a demo session (`403`).
+
+**Error cases**:
+- No session → `401`. A demo session → `403` (`demo_read_only`).
+- An activity that isn't the caller's, or a missing or malformed `activity_id` → `404`.
+- The account already holds 2,000 photos → `409`.
+- A missing `file` or `thumb` → `400`; a `taken_at`, `taken_local`, `lat`/`lon` or `route_at` that doesn't parse → `400`; a caption over 500 characters → `400`.
+- An activity with no track → `409`: a photo needs a place on one.
+- A photo FR-16.2 can't place → `422` with the error code `photo_needs_place` and a message; nothing is stored. The client asks the user where it goes and sends it again with `route_at`.
+- An image that isn't a decodable JPEG or WebP → `415`.
+- `file` larger than 3 MiB or `thumb` larger than 256 KiB (or the body over its limit) → `413`.
+- `file` larger than 2560 px, or `thumb` larger than 640 px, on either side → `422`: an original must be resized first.
+
+### FR-16.2 Placement
+
+**Behavior**:
+1. Every photo has a place on its activity's track: a moment on it (`route_at`), never a stored position. Its position is that moment's point on the track, worked out on every read.
+2. A `route_at` the user chose places it there, clamped to the track's first and last moment.
+3. Otherwise it's placed at its capture time when that falls within the track; a capture time up to 5 minutes before the track starts or after it ends places it at that end.
+4. A `taken_local` time is read in the account's time zone; if that misses the track, in the UTC offset (in 15-minute steps, −12:00 to +14:00) nearest the account's own that puts it on the track. `taken_at` (FR-16.3) is the instant it resolved to.
+5. Without a capture time that places it, an EXIF position within 500 m of the track places it at the track's nearest point.
+6. With none of these, the upload is refused for the user to choose (FR-16.1).
+7. A photo is always on the track as it's drawn: a moment the track no longer covers — cut off by Edit track or a Private location at its start or end — reads as the track's nearest end, and `route_at` is kept, so the photo returns to its moment if the track does. A track that passes through a Private location is drawn whole (FR-8.1), so a photo on that stretch shows nothing the track doesn't.
+
+### FR-16.3 Listing and images
+
+**Behavior**:
+1. `GET /v1/photos?activity={id}` answers `{photos}`: the activity's photos as `{id, activity_id, taken_at, route_at, lon, lat, caption, width, height, url, thumb_url}`, in route order (by `route_at`, then upload). `lon`/`lat` are null only when the activity has no track left at all. `width`/`height` are the stored copy's. `GET /v1/photos?story={id}` answers the same for every activity in a Story (FR-14) that isn't a superseded duplicate, in the same order across all of them.
+2. `GET /v1/photos/{id}` and `GET /v1/photos/{id}/thumb` serve the stored copy and its thumbnail with their sniffed content type, to their owner only, cacheable for good (a photo's images never change).
+
+**Error cases**:
+- Neither `activity` nor `story` → `400`. An activity, Story or photo that isn't the caller's, or a malformed id → `404`.
+
+### FR-16.4 Editing
+
+**Behavior**:
+1. `PATCH /v1/photos/{id}` takes a JSON object; a field present changes, a field absent doesn't. `caption`: trimmed; empty or null clears it; at most 500 characters. `route_at`: RFC 3339, the photo's new moment on the track, clamped to it. A photo can't be taken off the track. It answers `200` with the photo.
+2. `GET /v1/activities/track-metrics/{id}` (FR-4.8) carries each display point's moment as `time_s` (epoch seconds), so a client can turn a place on the track into a `route_at`.
+
+**Error cases**:
+- A body that isn't a JSON object, or a `route_at` that is null or not an RFC 3339 time → `400`. A caption over 500 characters → `400`.
+- A `route_at` for an activity with no track → `409`.
+- A photo that isn't the caller's → `404`. A demo session → `403`.
+
+### FR-16.5 Deleting
+
+**Behavior**:
+1. `DELETE /v1/photos/{id}` deletes the photo and both its images, answering `204`; a photo that isn't the caller's → `404`, a demo session → `403`.
+2. Deleting an activity deletes its photos (FR-5.11). A duplicate's photos move to the copy that's kept (FR-3.7).
+
+### FR-16.6 The Photos tab (web)
+
+**Preconditions**: The Edit window (FR-5.10) open on exactly one activity, which has a track; otherwise the tab is disabled, with a tooltip saying why.
+
+**Behavior**:
+1. The Edit window's Photos tab, beside Activity and Track, lists the activity's photos in route order (FR-16.3): each with its thumbnail, its caption (or "Photo n"), the time of its place on the route, Edit and Delete. Its label shows how many photos Save would leave, and a dot while it holds unsaved changes.
+2. Nothing on the tab is written until the window's Save, which writes the activity's fields, then the photos, then a track edit; Cancel throws every photo change away, new photos included. Escape asks first while there are photo changes ("Discard photo changes?" — Discard or Keep editing; Escape in the question keeps editing), and closes at once when there are none. While there are photo changes, or while they're being written, leaving the page — a reload, closing the tab, following a link — has the browser ask first. While the photos are written the Save button reads "Saving photos n of m…". If a write fails, the window stays open with the error, and Save again carries on from the first unwritten change; whatever was written stays written even if the window is then cancelled.
+3. Add photos opens the browser's file picker for any number of images. Each is read for its EXIF capture time (with its zone, when the file has one or a GPS clock to derive it from) and position, redrawn at most 2048 px on its long side plus a 320 px thumbnail, upright per its EXIF orientation, and its place asked of the placement check (FR-16.1), with "Preparing n of m…" while it runs. One the check places joins the list, marked New, and the map.
+4. A photo the check can't place (FR-16.2) waits at the top of the list, saying so, with a slider along the route and its thumbnail on the map where the slider has it. Place here puts it there, joining the list as New; Remove drops it. Several wait their turn, one slider at a time. A waiting photo's slider starts just after the photo picked before it — where the check placed that one, or where the user put it (past a removed one, to the one before) — 1% of the route further on; the first of a batch with nothing before it starts at the beginning of the route. Photos picked in the order they were taken so walk forward along the route. Save is refused while any photo waits, with a message, on the Photos tab.
+5. Edit opens a photo's slider, at its place, and its caption; Done closes it. Moving the slider moves the photo along the route on the map, with the time at that point shown. A saved photo with a change is marked Changed; changing it back unmarks it. The list keeps its order while a photo is open and takes up the new order when it closes.
+6. The slider runs along the track as drawn, by distance, so a stop takes up none of it; the place is kept as that point's moment.
+7. Delete marks a saved photo Will be deleted, struck through and off the map, with a button to keep it after all; on a New photo it simply removes it. No confirmation: Cancel undoes it all.
+8. A file that fails is listed by name with the reason — one the browser can't open (most HEIC files outside Safari), or the server's refusal — and the rest carry on.
+9. The Edit window isn't available to a demo session (FR-5.10), so neither is the tab.
+
+### FR-16.7 On the map (web)
+
+**Behavior**:
+1. Whenever an activity is selected (FR-5.5) — and while the Edit window is open on one, as its Photos tab would leave them — each of its photos is drawn on its route as its thumbnail in a round frame, over the tracks. With no activity selected and a Story open (FR-14), every photo of the Story's activities is. None show in Fog of War or Heatmap, for an activity hidden on the map (FR-5.8), or while the Edit window's Track tab has the map. The photo in hand in the Photos tab is drawn larger.
+2. Photos whose markers would overlap at the current zoom — a whole trip seen zoomed out, or several taken at one spot — share one marker: the first of them in route order, stacked, with their count. The groups are worked out again after every move of the map, so zooming in splits them. The photo in hand in the Photos tab is never grouped.
+3. The photos follow the track: they're refetched when an Edit track or a Private location change has been reprocessed (FR-5.14, FR-8.1), and sit at the track's nearest end when their stretch was cut away (FR-16.2).
+4. Clicking a group's marker zooms the map in to fit its photos (to at most z19) when they lie more than 15 m apart; when they don't — photos taken at one spot, which no zoom separates — it opens the popup on the first of them, with ‹ › and "n of m" to step through the rest in route order, the popup staying where it opened.
+5. Clicking a photo's marker opens a popup at it, on the map rather than over the page: the picture, its caption, when it was taken (if known), and Full size, which opens the stored copy in a new browser tab. It opens on whichever side of the marker it fits, moves with the map, and closes with its ×; its marker is drawn larger meanwhile. A marker's click doesn't change the selection. A demo session sees the same.
+6. Changing or deleting a photo is the Photos tab's (FR-16.6), not the popup's.

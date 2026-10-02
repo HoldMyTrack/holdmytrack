@@ -32,6 +32,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0021](0021-spots-from-osm-visits-from-tracks.md) | Spots are bulk-imported from OpenStreetMap, and a visit is five minutes inside one, worked out from tracks |
 | [0022](0022-satellite-imagery-optional-base-map.md) | Satellite imagery is an optional base map, opt-in per deployment, drawn under the vector roads and labels |
 | [0023](0023-spots-captured-live-on-the-phone.md) | A spot can be captured live in the Android app, by staying 30 seconds inside it, and the capture is kept on the server |
+| [0024](0024-activity-photos-resized-and-route-bound.md) | An activity can carry the user's photos, kept as resized copies on our own storage, each placed on the route by the time it was taken |
 
 ## Writing a new one
 

@@ -1551,6 +1551,163 @@ button.activities-panel__story-badge:hover {
   color: var(--fm-ink-secondary);
 }
 
+/* A photo's marker on the map (map/photos.ts): its thumbnail in a round white frame. The one
+   the viewer has open is larger, ringed in the accent and above the rest. */
+.photo-marker {
+  display: block;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 2px solid var(--fm-surface);
+  border-radius: var(--fm-radius-pill);
+  overflow: hidden;
+  background: var(--fm-surface-tint-strong);
+  box-shadow: var(--fm-shadow-md);
+  cursor: pointer;
+  transition: width 0.12s ease, height 0.12s ease;
+}
+
+.photo-marker img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.photo-marker:hover,
+.photo-marker:focus-visible {
+  border-color: var(--fm-accent);
+  outline: none;
+}
+
+/* A group of photos that would overlap: its first photo, with two cards' edges showing behind it
+   and the count on its corner. */
+.photo-marker--group {
+  overflow: visible;
+  box-shadow:
+    3px -3px 0 -1px var(--fm-surface),
+    3px -3px 0 0 rgb(var(--fm-shadow-rgb) / 25%),
+    6px -6px 0 -1px var(--fm-surface),
+    6px -6px 0 0 rgb(var(--fm-shadow-rgb) / 25%),
+    var(--fm-shadow-md);
+}
+
+.photo-marker--group img {
+  border-radius: var(--fm-radius-pill);
+}
+
+.photo-marker__count {
+  position: absolute;
+  top: -8px;
+  right: -10px;
+  min-width: 18px;
+  padding: 0 var(--fm-space-4);
+  border-radius: var(--fm-radius-pill);
+  background: var(--fm-accent);
+  color: var(--fm-on-accent);
+  font-size: var(--fm-text-xs);
+  font-weight: var(--fm-weight-bold);
+  line-height: 18px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.photo-marker--active {
+  z-index: 1;
+  width: 52px;
+  height: 52px;
+  border-color: var(--fm-accent);
+}
+
+/* PhotoPopup.tsx: a photo's popup at its marker — the spot popup's frame (.spot-popup), with
+   the picture at the popup's width. */
+.photo-popup .maplibregl-popup-content {
+  padding: var(--fm-space-8);
+}
+
+.photo-popup__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fm-space-6);
+  width: 260px;
+}
+
+.photo-popup__image-link {
+  display: block;
+  border-radius: var(--fm-radius-sm);
+  overflow: hidden;
+  background: var(--fm-surface-tint-strong);
+}
+
+.photo-popup__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 260px;
+  object-fit: contain;
+}
+
+.photo-popup__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.photo-popup__position {
+  font-size: var(--fm-text-sm);
+  font-weight: var(--fm-weight-semibold);
+  color: var(--fm-ink-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.photo-popup__step {
+  display: flex;
+  padding: var(--fm-space-4);
+  border: 0;
+  border-radius: var(--fm-radius-sm);
+  background: var(--fm-surface-tint);
+  color: var(--fm-ink);
+  cursor: pointer;
+}
+
+.photo-popup__step:hover:not(:disabled) {
+  background: var(--fm-surface-tint-strong);
+}
+
+.photo-popup__step:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.photo-popup__caption {
+  margin: 0;
+  font-size: var(--fm-text-md);
+  font-weight: var(--fm-weight-semibold);
+}
+
+.photo-popup__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fm-space-4) var(--fm-space-10);
+  font-size: var(--fm-text-sm);
+  color: var(--fm-ink-secondary);
+}
+
+.photo-popup__full {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fm-space-4);
+  color: var(--fm-accent-strong);
+  text-decoration: none;
+}
+
+.photo-popup__full:hover {
+  text-decoration: underline;
+}
+
 /* ZoomLevelNotice.tsx — which level Fog/Heatmap is drawing at, fading out after a few seconds.
    A line of its own in .map-toggles (flex-basis 100%), so it sits under the toggles however many
    rows they wrap to on a narrow screen. Takes no pointer events, like .map-toggles itself. */
@@ -1854,6 +2011,198 @@ button.activities-panel__story-badge:hover {
   display: flex;
   flex-direction: column;
   gap: var(--fm-space-10);
+}
+
+/* The Photos tab's count of photos, beside its name. */
+.edit-window__tab-count {
+  font-weight: var(--fm-weight-regular);
+  color: var(--fm-ink-secondary);
+}
+
+/* PhotosTab.tsx (FR-16.6): Add photos, then the photos as rows — a thumbnail, a name, Edit and
+   Delete — one of which may be open with its slider and caption. The list scrolls inside the
+   window rather than growing it past the map. */
+.photos-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fm-space-8);
+  min-height: 0;
+}
+
+.photos-tab__head {
+  display: flex;
+  align-items: center;
+  gap: var(--fm-space-10);
+}
+
+.photos-tab__head .edit-track__btn,
+.photos-tab__actions .edit-track__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fm-space-6);
+}
+
+.photos-tab__status,
+.photos-tab__note,
+.photos-tab__meta {
+  font-size: var(--fm-text-sm);
+  color: var(--fm-ink-secondary);
+}
+
+.photos-tab__note {
+  margin: 0;
+}
+
+.photos-tab__failures {
+  margin: 0;
+  padding-left: var(--fm-space-16);
+  font-size: var(--fm-text-sm);
+  color: var(--fm-danger);
+}
+
+.photos-tab__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fm-space-4);
+  max-height: min(360px, 45dvh);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.photos-tab__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fm-space-8);
+  padding: var(--fm-space-6);
+  border-radius: var(--fm-radius-sm);
+}
+
+.photos-tab__row--editing {
+  background: var(--fm-surface-tint);
+}
+
+.photos-tab__row--deleted .photos-tab__thumb,
+.photos-tab__row--deleted .photos-tab__title {
+  opacity: 0.45;
+}
+
+.photos-tab__row--deleted .photos-tab__title {
+  text-decoration: line-through;
+}
+
+/* New, Changed, Will be deleted: what Save will do to the row. */
+.photos-tab__badge {
+  margin-left: var(--fm-space-6);
+  padding: 0 var(--fm-space-6);
+  border-radius: var(--fm-radius-pill);
+  background: rgb(var(--fm-accent-rgb) / 15%);
+  color: var(--fm-accent-strong);
+  font-size: var(--fm-text-2xs);
+  font-weight: var(--fm-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.photos-tab__badge--deleted {
+  background: rgb(var(--fm-danger-rgb) / 12%);
+  color: var(--fm-danger);
+}
+
+.photos-tab__icon[aria-pressed='true'] {
+  background: rgb(var(--fm-accent-rgb) / 20%);
+  color: var(--fm-accent-strong);
+}
+
+.photos-tab__row--waiting {
+  border: 1px solid rgb(var(--fm-accent-rgb) / 45%);
+}
+
+.photos-tab__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--fm-space-10);
+  min-width: 0;
+}
+
+.photos-tab__thumb {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--fm-radius-sm);
+  object-fit: cover;
+  background: var(--fm-surface-tint-strong);
+}
+
+.photos-tab__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--fm-space-2);
+  min-width: 0;
+}
+
+.photos-tab__title {
+  overflow: hidden;
+  font-size: var(--fm-text-md);
+  font-weight: var(--fm-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.photos-tab__icon {
+  display: flex;
+  padding: var(--fm-space-6);
+  border: 0;
+  border-radius: var(--fm-radius-sm);
+  background: none;
+  color: var(--fm-ink-secondary);
+  cursor: pointer;
+}
+
+.photos-tab__icon:hover:not(:disabled) {
+  background: var(--fm-surface-tint-strong);
+  color: var(--fm-ink);
+}
+
+.photos-tab__icon--danger:hover:not(:disabled) {
+  color: var(--fm-danger);
+}
+
+.photos-tab__icon:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.photos-tab__slider {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fm-space-4);
+}
+
+.photos-tab__slider-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--fm-text-sm);
+  font-weight: var(--fm-weight-semibold);
+  color: var(--fm-ink-secondary);
+}
+
+.photos-tab__slider-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--fm-ink);
+}
+
+.photos-tab__slider input {
+  width: 100%;
+  accent-color: var(--fm-accent);
+}
+
+.photos-tab__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--fm-space-8);
 }
 
 .edit-window__panel[hidden] {

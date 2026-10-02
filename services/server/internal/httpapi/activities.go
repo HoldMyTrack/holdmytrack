@@ -386,6 +386,15 @@ func (s *Server) handleDeleteActivity(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.RemoveByPrefix(ctx, "activity-masks/"+activityID+"/"); err != nil {
 		s.log.Error("activity delete: mask cleanup failed, deleting row anyway", "activity_id", activityID, "err", err)
 	}
+	// The activity's photos (§4.27) go with it; the cascade takes their rows, so their images
+	// have to be removed explicitly.
+	if photoIDs, err := s.activityPhotoIDs(ctx, activityID); err != nil {
+		s.log.Error("activity delete: photo lookup failed, deleting row anyway", "activity_id", activityID, "err", err)
+	} else {
+		for _, photoID := range photoIDs {
+			s.removePhotoObjects(ctx, userID, photoID)
+		}
+	}
 	if rawKey != nil {
 		// raw_payload_key is content-addressed (raw/{userID}/{sha256(bytes)}{ext}), not
 		// scoped by source — two distinct activities can share one key if their raw bytes are
@@ -1080,6 +1089,9 @@ type trackMetricPoint struct {
 	Lon      float64 `json:"lon"`
 	Lat      float64 `json:"lat"`
 	SpeedMps float64 `json:"speed_mps"`
+	// TimeS is the point's moment, epoch seconds — what the Edit window's photo slider (§4.27)
+	// turns a place on the track into.
+	TimeS int64 `json:"time_s"`
 }
 
 type trackMetricsResponse struct {
@@ -1128,7 +1140,7 @@ func (s *Server) handleActivityTrackMetrics(w http.ResponseWriter, r *http.Reque
 
 	points := make([]trackMetricPoint, n)
 	for i := range points {
-		points[i] = trackMetricPoint{Lon: lons[i], Lat: lats[i], SpeedMps: speed[i]}
+		points[i] = trackMetricPoint{Lon: lons[i], Lat: lats[i], SpeedMps: speed[i], TimeS: int64(ms[i])}
 	}
 
 	w.Header().Set("Cache-Control", "no-store")

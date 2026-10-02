@@ -11,6 +11,7 @@ import { ensureHeatmapLayer } from './heatmap';
 import { setMapMode, type MapMode } from './mapMode';
 import { loadOverlays, saveOverlays, type Overlays } from './overlays';
 import { setPathsVisible } from './paths';
+import { usePhotoMarkers, type PhotoMarkerItem, type PhotoMarkerOverlay } from './photos';
 import { setSatelliteVisible } from './satellite';
 import { ensureSpotsLayer, setSpotClickHandler, setSpotsCaptured, setSpotsVisible, type Spot, type SpotCategory } from './spots';
 import { labelInsertionPoint } from './layers';
@@ -27,14 +28,15 @@ import {
 import { useCoverageRefresh } from './useCoverageRefresh';
 import { useMapInstance } from './useMapInstance';
 import { flavorForTheme, parseHash, pinnedFlavor, replaceHash, type HashState, type ViewState } from './viewState';
-import { getActivityTrackMetrics, getSpotCaptures, type Activity, type ActivityTrackMetrics, type SpotCapture, type Story } from '../api';
+import { API_BASE_URL, getActivityTrackMetrics, getSpotCaptures, type Activity, type ActivityTrackMetrics, type SpotCapture, type Story } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
 import { ActivitiesPanel, type PanelTab, type StoriesPanel } from '../ui/ActivitiesPanel';
-import { EditActivityWindow, type EditWindowResult } from '../ui/EditActivityWindow';
+import { EditActivityWindow, type EditTab, type EditWindowResult } from '../ui/EditActivityWindow';
 import { ExportControl } from '../ui/ExportControl';
 import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
 import { OverlaysMenu } from '../ui/OverlaysMenu';
+import { PhotoPopup } from '../ui/PhotoPopup';
 import { ShowInArea } from '../ui/ShowInArea';
 import { ZoomLevelNotice } from '../ui/ZoomLevelNotice';
 import { SpotPopup } from '../ui/SpotPopup';
@@ -42,6 +44,7 @@ import { todayLocal, type DateRange } from '../ui/dateMath';
 import { useUnitSystem } from '../ui/units';
 import { useActivityDays } from '../ui/useActivityDays';
 import { useActivityList } from '../ui/useActivityList';
+import { usePhotos, type PhotoScope } from '../ui/usePhotos';
 import { useStories } from '../ui/useStories';
 import { useStory } from '../ui/useStory';
 import { currentTheme, useTheme } from '../ui/useTheme';
@@ -107,6 +110,15 @@ function frameSize(
   const maxH = Math.min(fit?.heightPx ?? Infinity, container.height * 0.8);
   const ratio = preset.widthPx / preset.heightPx;
   return maxW / maxH >= ratio ? { widthPx: maxH * ratio, heightPx: maxH } : { widthPx: maxW, heightPx: maxW / ratio };
+}
+
+/** How far apart, in metres, a group's photos must be for zooming in to separate them (§4.27). */
+const GROUP_SPREAD_M = 15;
+
+function haversineM(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const rad = Math.PI / 180;
+  const h = Math.sin(((lat2 - lat1) * rad) / 2) ** 2 + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(((lon2 - lon1) * rad) / 2) ** 2;
+  return 2 * 6_371_008.8 * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
 export function MapView({ initialPrivateLocationsOpen = false, initialActivity = null }: MapViewProps) {
@@ -236,6 +248,35 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // by Back/Forward; closed by leaving the tab.
   const [storyId, setStoryId] = useState<string | null>(storyParam);
   const storyState = useStory(storyId);
+
+  // Photos (FR-16), in Normal mode — neither Fog nor Heatmap focuses an activity or opens a
+  // Story: the one activity the Edit window is open on, whose Photos tab manages them; else the
+  // focused activity's, the route a person is looking at; else the open Story's, the whole
+  // trip's pictures along its days.
+  const photoScope = useMemo<PhotoScope>(() => {
+    if (mapMode !== 'normal') return null;
+    if (editWindowIds !== null) return editWindowIds.length === 1 ? { activity: editWindowIds[0]! } : null;
+    if (focusedActivityId !== null) return { activity: focusedActivityId };
+    if (storyId !== null) return { story: storyId };
+    return null;
+  }, [mapMode, editWindowIds, focusedActivityId, storyId]);
+  // A Story's photos change with its members too.
+  const storyMembers = storyState.story?.activityIds.join(',') ?? '';
+  const photoState = usePhotos(photoScope, `${trackMetricsVersion}|${storyMembers}`);
+  // The photos whose popup is open — one, or a group's, stepped through — from a marker's click;
+  // closed whenever the photos in view change hands, and showing only those still there.
+  const [openGroup, setOpenGroup] = useState<{ ids: string[]; index: number } | null>(null);
+  // Only saved photos open; a photo the Photos tab hasn't saved yet has nothing to show.
+  const openPhotos = useMemo(
+    () => (openGroup ? openGroup.ids.flatMap((id) => photoState.photos.filter((p) => p.id === id)) : []),
+    [openGroup, photoState.photos],
+  );
+  // The Photos tab's unsaved changes as they alter the markers (PhotosTab.tsx).
+  const [photoOverlay, setPhotoOverlay] = useState<PhotoMarkerOverlay | null>(null);
+  // Which tab the Edit window shows: its Track tab hides the photos.
+  const [editTab, setEditTab] = useState<EditTab>('activity');
+  const photoScopeKey = photoScope === null ? null : JSON.stringify(photoScope);
+  useEffect(() => setOpenGroup(null), [photoScopeKey]);
   const storiesList = useStories(panelTab === 'stories');
 
   // TYPE/DISTANCE facets — pure client-side filters over
@@ -1102,14 +1143,16 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // enough on its own.
   const awaitingEditIdsRef = useRef<Set<string>>(new Set());
   const closeEditWindow = useCallback(
-    ({ saved, trackApplied }: EditWindowResult) => {
+    ({ saved, trackApplied, photosSaved }: EditWindowResult) => {
       if (trackApplied && editingActivityId !== null) awaitingEditIdsRef.current.add(editingActivityId);
       setEditWindowIds(null);
       setEditingActivityId(null);
       // A track edit leaves the row Pending — the effects below poll until the reprocess lands.
       if (saved) reloadActivities();
+      // The Photos tab's draft was written; the markers are the saved photos again.
+      if (photosSaved) photoState.reload();
     },
-    [editingActivityId, reloadActivities],
+    [editingActivityId, reloadActivities, photoState.reload],
   );
   // A saved or deleted Private location reprocesses every activity it could clip. The list
   // reload shows those rows Pending right away, and the Pending poll below refreshes the map
@@ -1147,6 +1190,19 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
         : editWindowActivities[0]!.bbox === null
           ? t('activities.no_track')
           : null;
+
+  // Photos belong to one activity, and need a track to sit on (FR-16.6).
+  const editPhotosUnavailable =
+    editWindowActivities === null || editWindowActivities.length !== 1
+      ? t('photos.check_one')
+      : editWindowActivities[0]!.bbox === null
+        ? t('photos.no_track')
+        : null;
+  // The Edit window opens on its Activity tab, with nothing being moved on the map.
+  useEffect(() => {
+    setEditTab('activity');
+    setPhotoOverlay(null);
+  }, [editOpen]);
 
   // While any row is pending, re-read the list every few seconds. Keyed on `activities`
   // itself, so each landed reload schedules the next and polling stops by itself once nothing
@@ -1318,6 +1374,48 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     };
   }, [map, pinned]);
 
+  // Every photo of the activity in view is on its route whenever the route is drawn selected
+  // (FR-16.7): not while the Edit window's Track tab has the map, nor while the route itself is
+  // hidden. The one the Photos tab is moving sits where its slider has it; one it is placing
+  // before upload is drawn from its local thumbnail.
+  const photoMarkers = useMemo<PhotoMarkerItem[]>(() => {
+    if (photoScope === null || (editOpen && editTab === 'track')) return [];
+    if ('activity' in photoScope && mapHiddenIds.has(photoScope.activity)) return [];
+    const items: PhotoMarkerItem[] = photoState.photos
+      .filter((p) => p.lon !== null && p.lat !== null && !mapHiddenIds.has(p.activityId))
+      .map((p) => ({ id: p.id, lon: p.lon!, lat: p.lat!, thumbSrc: API_BASE_URL + p.thumbUrl, caption: p.caption }));
+    if (photoOverlay === null) return items;
+    const upserts = new Map(photoOverlay.upserts.map((item) => [item.id, item]));
+    const kept = items.filter((item) => !photoOverlay.hidden.includes(item.id)).map((item) => upserts.get(item.id) ?? item);
+    const keptIds = new Set(kept.map((item) => item.id));
+    return [...kept, ...photoOverlay.upserts.filter((item) => !keptIds.has(item.id))];
+  }, [photoScope, editOpen, editTab, mapHiddenIds, photoState.photos, photoOverlay]);
+  // A marker's click (FR-16.7): one photo opens its popup. A group the map can separate — its
+  // photos more than GROUP_SPREAD_M apart — zooms in to fit them, at most to z19, where that
+  // spread is wider than a marker; one it can't (several taken at one spot) opens the popup on
+  // its first photo, to step through the rest.
+  const openPhotoMarker = useCallback(
+    (ids: string[]) => {
+      if (!map) return;
+      const group = photoMarkers.filter((item) => ids.includes(item.id));
+      const spread = Math.max(0, ...group.flatMap((a) => group.map((b) => haversineM(a.lat, a.lon, b.lat, b.lon))));
+      if (group.length > 1 && spread > GROUP_SPREAD_M) {
+        const lons = group.map((p) => p.lon);
+        const lats = group.map((p) => p.lat);
+        map.fitBounds([Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)], { padding: 80, maxZoom: 19 });
+        return;
+      }
+      setOpenGroup({ ids, index: 0 });
+    },
+    [map, photoMarkers],
+  );
+  const openPhotoId = openPhotos.length > 0 && openGroup ? openPhotos[Math.min(openGroup.index, openPhotos.length - 1)]!.id : null;
+  usePhotoMarkers(map, photoMarkers, {
+    onOpen: openPhotoMarker,
+    activeId: photoOverlay?.activeId ?? openPhotoId,
+    loneId: photoOverlay?.activeId ?? null,
+  });
+
   return (
     <div className="app-shell">
       <div className="app-body">
@@ -1410,7 +1508,23 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
               knownTypes={facets}
               trackUnavailable={editTrackUnavailable}
               onStartTrack={startEditTrack}
+              photosUnavailable={editPhotosUnavailable}
+              photos={{
+                photos: photoState.photos,
+                error: photoState.error,
+                onOverlay: setPhotoOverlay,
+              }}
+              onTabChange={setEditTab}
               onClose={closeEditWindow}
+            />
+          )}
+          {map && openGroup && openPhotos.length > 0 && (
+            <PhotoPopup
+              map={map}
+              photos={openPhotos}
+              index={Math.min(openGroup.index, openPhotos.length - 1)}
+              onIndex={(index) => setOpenGroup({ ...openGroup, index })}
+              onClose={() => setOpenGroup(null)}
             />
           )}
           {!editOpen && (
