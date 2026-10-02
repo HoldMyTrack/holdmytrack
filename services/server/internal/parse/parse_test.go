@@ -166,3 +166,55 @@ func TestByExtensionJSON(t *testing.T) {
 		t.Fatalf("want 2 points, got %d", len(act.Points))
 	}
 }
+
+// The track's first point is where ClipEnds starts trimming a Private location from, so a
+// waypoint written ahead of the <trk>, a return leg listed before the outbound one, or a
+// point with no readable position must not end up first.
+func TestParseGPXPointsAreTheTrackInTimeOrder(t *testing.T) {
+	const gpx = `<?xml version="1.0"?>
+<gpx>
+<wpt lat="10" lon="10"><time>2026-01-01T11:00:00Z</time><name>Viewpoint</name></wpt>
+<rte><rtept lat="20" lon="20"></rtept></rte>
+<trk>
+<trkseg>
+<trkpt lat="1.3" lon="1.3"><time>2026-01-01T13:00:00Z</time></trkpt>
+<trkpt lat="1.4" lon="1.4"><time>2026-01-01T13:00:10Z</time></trkpt>
+</trkseg>
+<trkseg>
+<trkpt lon="5"><time>2026-01-01T11:59:00Z</time></trkpt>
+<trkpt lat="x" lon="5"><time>2026-01-01T11:59:30Z</time></trkpt>
+<trkpt lat="1.1" lon="1.1"><time>2026-01-01T12:00:00Z</time></trkpt>
+<trkpt lat="1.2" lon="1.2"><time>2026-01-01T12:00:10Z</time></trkpt>
+</trkseg>
+</trk>
+</gpx>`
+	act, err := ParseGPX(strings.NewReader(gpx))
+	if err != nil {
+		t.Fatalf("ParseGPX: %v", err)
+	}
+	var got []float64
+	for _, p := range act.Points {
+		got = append(got, p.Lat)
+	}
+	want := []float64{1.1, 1.2, 1.3, 1.4}
+	if len(got) != len(want) {
+		t.Fatalf("lats = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("lats = %v, want %v", got, want)
+		}
+	}
+}
+
+// A file with only a route still parses, from its route points.
+func TestParseGPXRouteOnly(t *testing.T) {
+	const gpx = `<gpx><rte><rtept lat="1" lon="2"><time>2026-01-01T12:00:00Z</time></rtept><rtept lat="1.1" lon="2.1"><time>2026-01-01T12:00:10Z</time></rtept></rte></gpx>`
+	act, err := ParseGPX(strings.NewReader(gpx))
+	if err != nil {
+		t.Fatalf("ParseGPX: %v", err)
+	}
+	if len(act.Points) != 2 {
+		t.Fatalf("points = %d, want 2", len(act.Points))
+	}
+}
