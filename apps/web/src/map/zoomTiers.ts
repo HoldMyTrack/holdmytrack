@@ -9,10 +9,10 @@
  * mode's tracks don't use it — they have no Country/Region fallback, so they draw from a much
  * lower zoom of their own (tracks.ts's TRACKS_MIN_ZOOM).
  */
-export const COUNTRY_MAX_ZOOM = 5;
-export const REGION_MIN_ZOOM = 5;
-export const REGION_MAX_ZOOM = 8;
-export const CITY_MIN_ZOOM = 8;
+export const COUNTRY_MAX_ZOOM = 3;
+export const REGION_MIN_ZOOM = 3;
+export const REGION_MAX_ZOOM = 7;
+export const CITY_MIN_ZOOM = 7;
 
 /** Which of the three tiers Fog and Heatmap draw at `zoom` — the same bands the layers above
  *  switch on (a layer shows at minzoom <= zoom < maxzoom), for anything that has to name the

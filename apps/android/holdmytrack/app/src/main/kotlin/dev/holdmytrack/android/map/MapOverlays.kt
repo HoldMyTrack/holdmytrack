@@ -87,15 +87,15 @@ object MapOverlays {
      * the boundary can't drift between the two clients. Adopted starting bands, tunable
      * visually, not scientifically derived.
      */
-    private const val COUNTRY_MAX_ZOOM = 5f
-    private const val REGION_MIN_ZOOM = 5f
-    private const val REGION_MAX_ZOOM = 8f
-    private const val CITY_MIN_ZOOM = 8f
+    private const val COUNTRY_MAX_ZOOM = 3f
+    private const val REGION_MIN_ZOOM = 3f
+    private const val REGION_MAX_ZOOM = 7f
+    private const val CITY_MIN_ZOOM = 7f
 
     /**
      * Tracks draw from z4 inward — not [CITY_MIN_ZOOM]: Normal mode has no Country/Region
-     * fallback, so hiding tracks below z8 left an empty map, and a road trip too long to fit
-     * at z8 had nothing drawn once the camera fit it. Mirrors `apps/web/src/map/tracks.ts`'s
+     * fallback, so hiding tracks below z7 left an empty map, and a road trip too long to fit
+     * at z7 had nothing drawn once the camera fit it. Mirrors `apps/web/src/map/tracks.ts`'s
      * `TRACKS_MIN_ZOOM` (`docs/IMPLEMENTATION.md` §5.3 has the tile-size measurement).
      */
     private const val TRACKS_MIN_ZOOM = 4f

@@ -23,7 +23,7 @@ var seedData embed.FS
 
 // Natural Earth's own 1:50m Admin-0 (country) and 1:10m Admin-1 (state/province) exports,
 // trimmed to the properties this package reads and coordinate-simplified for their role here
-// (a whole-polygon fill that only ever renders below z8 — see docs/adr/0008 for why 1:10m,
+// (a whole-polygon fill that only ever renders below z7 — see docs/adr/0008 for why 1:10m,
 // not 1:50m, for regions specifically: the 1:50m Admin-1 export only covers 9 of 242
 // countries, whereas 1:10m covers every one of them).
 const (
