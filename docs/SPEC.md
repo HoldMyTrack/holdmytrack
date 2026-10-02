@@ -125,6 +125,7 @@ The JSON endpoints in this section are refused (`403`) the same way when a brows
 1. Client calls `GET /v1/auth/me` with whatever session cookie it currently holds.
 2. If the cookie names a live, unexpired session, the server returns the account's identity (`200 OK`).
 3. Otherwise the server returns `401 Unauthorized`, and the client shows the sign-in screen. On the web the pages check the session themselves: `/profile` and `/settings` redirect a visitor with no session to `/signin` (at `/` they get the front page, FR-10.1), and a signed-in real account whose email isn't verified to `/verify-pending`.
+4. If the check gets no answer at all — the server unreachable, or failing with a `5xx` — the map app says it couldn't load the account, with the reason and Try again, rather than treating the visitor as signed out.
 
 **Notes**: A session's validity is checked in the database on every request (not trusted from the cookie's own stated expiry), so a session ended server-side (FR-1.3, or invalidated by a password reset, FR-1.6) stops working immediately even if the browser still holds the cookie. Sessions last 30 days from creation. The response also reports whether the account's email is verified (always `true` for a demo account) — the client uses this to decide whether to show the map or FR-1.8's verify screen.
 

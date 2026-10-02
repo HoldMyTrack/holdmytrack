@@ -41,6 +41,13 @@ body {
   min-height: 0;
 }
 
+/* App.tsx's "couldn't load your account" — the session check itself failed. */
+.app-load-error {
+  margin: auto;
+  padding: var(--fm-space-20);
+  text-align: center;
+}
+
 /* ConfirmDialog.tsx — a real <dialog>/showModal(), sized for
    a short title+message rather than a form. Generic, not delete-specific, but the one caller
    today (§4.7.5's Delete button) is what the red confirm button is tuned for — a future

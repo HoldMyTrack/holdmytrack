@@ -6,6 +6,8 @@ import type { MessageKey } from './en';
  * .one (1, 21), .few (2–4, 22–24), .many (0, 5–20, 25…), and .other for a fraction.
  */
 export const ru: Record<MessageKey, string> & Record<string, string> = {
+  'app.load_failed': 'Не удалось загрузить аккаунт: {message}',
+  'app.try_again': 'Попробовать снова',
   'common.bad_response': 'Не удалось прочитать ответ сервера.',
   'common.cancel': 'Отмена',
   'common.confirm': 'Подтвердить',
