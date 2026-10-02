@@ -524,6 +524,11 @@ class MainActivity : AppCompatActivity() {
             attributionBaseMarginBottom = savedInstanceState.getInt(STATE_ATTRIBUTION_MARGIN)
             attributionBaseCaptured = true
         }
+        // Carried through a recreation (a theme or language change), since the mode buttons
+        // restore their own checked state and would otherwise show a mode the map isn't in.
+        savedInstanceState?.getString(STATE_MODE)?.let { saved ->
+            MapMode.entries.firstOrNull { it.name == saved }?.let { mode = it }
+        }
         setMode(mode)
 
         insetSystemBars()
@@ -1979,6 +1984,7 @@ class MainActivity : AppCompatActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         mapView.onSaveInstanceState(outState)
+        outState.putString(STATE_MODE, mode.name)
         // The panel comes back on its Activities tab; an open Story never changed the range.
         selectedRange?.let {
             outState.putString(STATE_RANGE_FROM, it.from)
@@ -2076,6 +2082,7 @@ class MainActivity : AppCompatActivity() {
 
         /** The default range's length in activity days (`docs/SPEC.md` FR-6.1). */
         private const val DEFAULT_RANGE_DAYS = 5
+        private const val STATE_MODE = "mode"
         private const val STATE_RANGE_FROM = "range_from"
         private const val STATE_RANGE_TO = "range_to"
         private const val STATE_RANGE_CHOSEN = "range_chosen"
