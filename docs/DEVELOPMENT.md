@@ -150,7 +150,7 @@ Run `npm run build` before `npm run verify:build`.
 "Everything in Docker" is a real trade, not a free win:
 
 - **The IDE still needs a host `node_modules`.** Roughly 300 MB of darwin-only packages the container never touches, kept only so tsserver works, refreshed by hand when the lockfile changes.
-- **Adding a dependency is a three-step operation** — install in the container, rebuild the image, then install on the host for the IDE. Previously one command.
+- **Adding a dependency is a three-step operation** — install in the container, rebuild the image, then install on the host for the IDE.
 - **`vite build` copies the 326 MB archive through VirtioFS** instead of letting APFS `clonefile` it. Near-instant becomes a few seconds.
 - **Playwright renders on SwiftShader, not Metal.** The verification suites assert against a rasteriser no user will ever have — a genuine fidelity loss in exactly the tests written to catch rendering bugs.
 - **HMR gains a failure mode that doesn't exist on the host.** When it goes deaf the question is about VirtioFS, not the code.
