@@ -264,6 +264,7 @@ func (s *Server) registerPages() {
 // pattern for "credentialed CORS from a known set of origins" — rather than accepting any
 // origin with credentials, which would let any site ride a visitor's session.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	setSecurityHeaders(w.Header())
 	if origin := r.Header.Get("Origin"); corsAllowedOrigins[origin] {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -280,6 +281,19 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mux.ServeHTTP(w, r)
+}
+
+// setSecurityHeaders applies to every response. No page here is meant to be framed, so none
+// may be (frame-ancestors, and X-Frame-Options for browsers without CSP): framed invisibly by
+// another site, a signed-in page's buttons could be clicked through — and the click is
+// same-origin, so neither SameSite nor the Origin checks would stop it. nosniff keeps a
+// browser from reading a response as a type other than the one it's served as. HSTS is
+// Caddy's (apps/web/docker/Caddyfile), which terminates TLS.
+func setSecurityHeaders(h http.Header) {
+	h.Set("Content-Security-Policy", "frame-ancestors 'none'")
+	h.Set("X-Frame-Options", "DENY")
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 }
 
 // crossSiteAPIWrite reports a state-changing /v1/ request a browser sent from another site.

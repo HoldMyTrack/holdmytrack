@@ -212,6 +212,20 @@ func TestAuthFormsRequireSameOrigin(t *testing.T) {
 	}
 }
 
+// Every response forbids framing — a framed page's buttons could be clicked through from
+// another site — and type sniffing.
+func TestResponsesCarrySecurityHeaders(t *testing.T) {
+	s := newPagesTestServer(t)
+	for _, path := range []string{"/signin", "/v1/auth/me", "/no-such-page"} {
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		h := rec.Header()
+		if h.Get("Content-Security-Policy") != "frame-ancestors 'none'" || h.Get("X-Frame-Options") != "DENY" || h.Get("X-Content-Type-Options") != "nosniff" {
+			t.Errorf("%s: headers %v", path, h)
+		}
+	}
+}
+
 // A browser's write to the JSON API from another site is refused before any handler runs —
 // a text/plain form shaped into JSON signed a victim into an attacker's account. Same-origin
 // requests and the native apps' (which send no Origin) still reach the handler, here as the
