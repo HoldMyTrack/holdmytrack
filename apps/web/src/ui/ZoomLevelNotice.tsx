@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import type { MapMode } from '../map/mapMode';
 import { zoomTier } from '../map/zoomTiers';
@@ -26,7 +26,6 @@ export function ZoomLevelNotice({ map, mode }: ZoomLevelNoticeProps) {
   const [tier, setTier] = useState(() => zoomTier(map.getZoom()));
   const [shown, setShown] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
-  const lastKey = useRef<string | null>(null);
 
   useEffect(() => {
     const onZoomEnd = () => setTier(zoomTier(map.getZoom()));
@@ -38,13 +37,9 @@ export function ZoomLevelNotice({ map, mode }: ZoomLevelNoticeProps) {
 
   useEffect(() => {
     if (mode === 'normal') {
-      lastKey.current = null;
       setVisible(false);
       return;
     }
-    const key = `${mode}.${tier}`;
-    if (key === lastKey.current) return;
-    lastKey.current = key;
     setShown(t(`map.level.${mode}.${tier}`));
     setVisible(true);
     const timer = window.setTimeout(() => setVisible(false), SHOW_MS);
