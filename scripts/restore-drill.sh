@@ -30,6 +30,13 @@ BACKUP_DIR=$(env_value BACKUP_DIR)
 BACKUP_DIR=${BACKUP_DIR:-/srv/holdmytrack-backups}
 
 log() { echo "$(date -u +%FT%TZ) $*"; }
+
+# The heartbeat monitor (docs/DEPLOY.md §13): its URL after a run that finished, its /fail
+# from the exit trap after one that didn't, so a failure alerts at once rather than when the
+# missing ping is noticed.
+heartbeat=$(env_value RESTORE_DRILL_HEARTBEAT_URL)
+ping() { [[ -z "$heartbeat" ]] || curl -fsS -m 10 --retry 3 -o /dev/null "$heartbeat${1:-}" || log "heartbeat ping failed"; }
+
 fail() { log "DRILL FAILED: $*"; exit 1; }
 rclone() { "${COMPOSE[@]}" run --rm -T rclone "$@"; }
 drill_psql() { docker exec "$CONTAINER" psql -U postgres -d restored -v ON_ERROR_STOP=1 -At -c "$1"; }
@@ -37,7 +44,7 @@ live_psql() { "${COMPOSE[@]}" exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$PO
 
 mkdir -p "$BACKUP_DIR"
 work=$(mktemp -d "$BACKUP_DIR/drill.XXXXXX")
-trap 'docker rm -fv "$CONTAINER" > /dev/null 2>&1 || true; rm -rf "$work"' EXIT
+trap 'status=$?; docker rm -fv "$CONTAINER" > /dev/null 2>&1 || true; rm -rf "$work"; (( status == 0 )) || ping /fail' EXIT
 docker rm -fv "$CONTAINER" > /dev/null 2>&1 || true
 
 latest=$(rclone lsf --files-only backup:postgres/daily | sort | tail -n 1)
@@ -101,8 +108,5 @@ if [[ -s "$work/lost" ]]; then
   fail "$(wc -l < "$work/lost" | tr -d ' ') objects the restored database refers to aren't in the backup"
 fi
 
-heartbeat=$(env_value RESTORE_DRILL_HEARTBEAT_URL)
-if [[ -n "$heartbeat" ]]; then
-  curl -fsS -m 10 --retry 3 -o /dev/null "$heartbeat" || log "heartbeat ping failed"
-fi
+ping
 log "drill passed: $latest restores, and every object it refers to is backed up"
