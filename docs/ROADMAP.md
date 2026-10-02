@@ -109,9 +109,9 @@ The shipped UI so far is functional scaffolding, not a finished product. Partly 
 - [ ] An animation/transition pass — micro-interactions (hover, focus, panel open/close, loading states) that are currently almost entirely absent.
 - [ ] Mobile browser support, folded into this same pass rather than treated separately — the phone layout exists (`index.css`'s `@media (max-width: 768px)` layer, `IMPLEMENTATION.md` §5.9, `SPEC.md` §19) and was reported directly as unusable on a real phone; four causes emulation can't show have since been fixed (§5.9's **Real-device fixes**), but nothing has been checked on an actual device yet.
   - [ ] Walk the core flows on a real iPhone (Safari) and Android phone (Chrome) — sign in, the three map modes, tap a track, expand and collapse the sheet, the date slider, edit an activity's name — and record any symptom concretely (device, browser, screen, what happened), not as "unusable".
-- [ ] Design freeze: once this pass lands, declare the visual design final and communicate it as such — the explicit milestone this phase produces, not an open-ended polish effort.
+- [x] Design freeze, declared 2026-10-02: the visual design is final — the `--fm-*` tokens, Inter and Fraunces (Source Serif 4 for Russian headings), and Lucide — on the web and Android alike (`apps/android/docs/ROADMAP.md` Phase 5).
 
-This pass is where HoldMyTrack's palette, typography and icon set come from for the product as a whole, not for the web alone. The Android app carries only a provisional theme (the web's current tokens — palette, fonts and scales — and Lucide icons, in Material 3) and its own phase for landing this output on the platform (`apps/android/docs/ROADMAP.md`, Phase 5) — it inherits the freeze rather than deciding a second visual design, since two clients that each invented their own would not read as one product.
+This pass is where HoldMyTrack's palette, typography and icon set come from for the product as a whole, not for the web alone. The Android app carries the same design — the web's tokens, palette, fonts and scales, and Lucide icons, in Material 3 — landed by its own phase (`apps/android/docs/ROADMAP.md`, Phase 5); it inherits the freeze rather than deciding a second visual design, since two clients that each invented their own would not read as one product.
 
 ---
 
