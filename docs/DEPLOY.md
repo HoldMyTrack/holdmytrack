@@ -1,6 +1,6 @@
 # Deploying HoldMyTrack — minimal single-VPS setup
 
-The smallest deployment that's actually production-shaped: one small VPS running `compose.prod.yml` (Postgres+PostGIS, `api`, `worker`, and Caddy in front of the built frontend), plus Cloudflare R2 for object storage. See `docs/VISION.md` §4.3 for the cost model this is built around, and `docs/ROADMAP.md`'s "Production deployment" section for what's still open on the operational side (log rotation, monitoring); spend caps and the compliance work (DPIA, EU-region hosting) are that file's Phases 5 and 6. This document only covers getting a working deployment live, not everything a real public launch needs.
+The smallest deployment that's actually production-shaped: one small VPS running `compose.prod.yml` (Postgres+PostGIS, `api`, `worker`, and Caddy in front of the built frontend), plus Cloudflare R2 for object storage. See `docs/VISION.md` §4.3 for the cost model this is built around, and `docs/ROADMAP.md`'s "Production deployment" section for what's still open on the operational side; spend caps and the compliance work (DPIA, EU-region hosting) are that file's Phases 5 and 6. This document only covers getting a working deployment live, not everything a real public launch needs.
 
 ## 1. Provision the VPS
 
@@ -226,7 +226,7 @@ It's served with `Cache-Control: no-cache`, so a replaced file is never masked b
 
 1. Create a second private R2 bucket (e.g. `holdmytrack-backups`), and an R2 API token with **Object Read & Write** on that bucket only. Don't use the app's token, and don't give this one access to the app bucket. Then a leaked app token can't delete the backups, and a mistaken command with this token can't touch the live data.
 2. Fill in `.env.prod`'s `BACKUP_*` values (`.env.prod.example` explains each). Leave `BACKUP_S3_ENDPOINT` empty when both buckets are in the same Cloudflare account.
-3. Optionally, create two checks on an uptime service that expects a ping, such as healthchecks.io: one expecting a ping daily and one monthly. Put their URLs in `BACKUP_HEARTBEAT_URL` and `RESTORE_DRILL_HEARTBEAT_URL`. Each script pings its URL only after a successful run, so the check alerts when a run fails or never happens.
+3. Optionally, give each script a heartbeat check (§13): put the checks' ping URLs in `BACKUP_HEARTBEAT_URL` and `RESTORE_DRILL_HEARTBEAT_URL`. Each script pings its URL after a successful run, and the URL's `/fail` when it fails, so the check alerts at once on a failure and, past its grace time, on a run that never happened.
 4. Run both scripts once by hand: `./scripts/backup.sh`, then `./scripts/restore-drill.sh`. The first backup copies every object, so it takes longest.
 5. Schedule them in `/etc/cron.d/holdmytrack-backup`:
    ```
@@ -287,6 +287,32 @@ apt-config dump | grep Automatic-Reboot
 
 **Secrets readable by root only.** `chmod 600 .env.prod`. `backup.sh` itself keeps `BACKUP_DIR` at `700` and writes its dumps as `600` (§11).
 
+## 13. Monitoring
+
+Three things watch the deployment, all on free plans, and all alert by email:
+
+- **An uptime check from outside**, on `https://<your-domain>/healthz`. It answers `200` with `"status":"ok"` while `api` can reach the database, and `503` when it can't. Being outside, it also catches what nothing on the server can report: the droplet, Caddy or the certificate being down.
+- **`scripts/monitor.sh`**, every five minutes from cron, checks from the inside: that `db`, `api`, `worker` and `web` are running; that no runnable job has waited more than 30 minutes (the worker is stuck or gone); errors on our side in the last five minutes, meaning any `ERROR` line or Go panic in `api`'s log (every `500` logs one) and any job that failed for a reason other than the user's file (`jobs.error_code` `internal`, or a non-ingest job); the disk under 85% full; and nothing killed by the kernel's OOM killer, which on a 2 GB box is how Postgres dies. It sends its report to a heartbeat check, as the body of a ping to the URL when all is well and to the URL's `/fail` when something isn't. The limits are constants at the top of the script.
+- **Heartbeat checks** for `monitor.sh`, `backup.sh` and `restore-drill.sh` (§11). A check alerts when its script pings `/fail`, and when no ping arrives within its period plus grace time, so a script that stops running is noticed too, as is the whole box going quiet.
+
+**Set up the uptime check** on [UptimeRobot](https://uptimerobot.com): **Add New Monitor**, type **Keyword**, URL `https://<your-domain>/healthz`, keyword `"status":"ok"`, alert when the keyword **doesn't exist**, interval 5 minutes. If the keyword type isn't on the free plan, a plain **HTTP(s)** monitor works too, since `/healthz` answers `503` when the database is down. `/healthz` is exempt from maintenance mode (§7), so the check stays green through a deploy unless `api` itself is down.
+
+**Set up the heartbeat checks** on [healthchecks.io](https://healthchecks.io), one per script, each with the server's time zone (UTC):
+
+| Check | Schedule | Grace | `.env.prod` |
+| :-- | :-- | :-- | :-- |
+| monitor | Simple, every 5 minutes | 10 minutes | `MONITOR_HEARTBEAT_URL` |
+| backup | Cron `17 3 * * *` | 2 hours | `BACKUP_HEARTBEAT_URL` |
+| restore drill | Cron `47 4 1 * *` | 2 hours | `RESTORE_DRILL_HEARTBEAT_URL` |
+
+Copy each check's ping URL (`https://hc-ping.com/<uuid>`) into `.env.prod`, then run `./scripts/monitor.sh` by hand: it prints its report and exits non-zero on a problem, and the check should turn green. Then schedule it, adding a line to `/etc/cron.d/holdmytrack-backup` (§11):
+
+```
+*/5 * * * * root /srv/holdmytrack/scripts/monitor.sh > /dev/null 2>&1
+```
+
+The report a failing run sends shows under the check's last ping on healthchecks.io, with the last few error lines when errors were what failed it. Expect an alert during a deploy that recreates containers if a run lands mid-restart (§7); the next run, five minutes later, clears it.
+
 ## What this doesn't cover
 
-Per `docs/ROADMAP.md`, still open beyond this minimal setup: log rotation and monitoring (its "Production deployment" section), per-user quotas and rate limits with a spend cap (Phase 5), and the compliance work (DPIA, EU-region hosting — Phase 6) a genuine public launch needs regardless of how small the deployment is. This document gets you to "it's live," not to "it's ready for the public."
+Per `docs/ROADMAP.md`, still open beyond this minimal setup: per-user quotas and rate limits with a spend cap (Phase 5), and the compliance work (DPIA, EU-region hosting — Phase 6) a genuine public launch needs regardless of how small the deployment is. This document gets you to "it's live," not to "it's ready for the public."
