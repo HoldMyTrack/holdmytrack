@@ -192,13 +192,18 @@ object MapOverlays {
     private const val HEATMAP_DIM_COLOR_DARK = "#000000"
     private const val HEATMAP_DIM_OPACITY_DARK = 0.35f
 
+    /** Whether the wash is drawn. It's shown and hidden by its opacity, not its visibility:
+     *  MapLibre Native draws a background layer that has once been hidden no more when it's
+     *  made visible again (measured on the emulator: the second switch to Heatmap had none). */
+    private var dimShown = false
+
     /** How far Fog mode mutes basemap labels — the web's `FOG_LABEL_OPACITY`: dim enough to
      *  recede behind the veil, still readable enough to orient by. */
     private const val FOG_LABEL_OPACITY = 0.4f
 
     /** Every user layer [attach] adds — what [setRecording] hides wholesale. */
     private val USER_LAYER_IDS = listOf(
-        HEATMAP_DIM_LAYER_ID, FOG_LAYER_ID, HEATMAP_LAYER_ID,
+        FOG_LAYER_ID, HEATMAP_LAYER_ID,
         COUNTRY_FOG_LAYER_ID, COUNTRY_HEATMAP_LAYER_ID,
         REGION_FOG_LAYER_ID, REGION_HEATMAP_LAYER_ID,
     ) + TRACK_LAYER_IDS + BAND_LAYER_ID
@@ -276,10 +281,9 @@ object MapOverlays {
         if (style.getLayer(HEATMAP_DIM_LAYER_ID) == null) {
             val dim = BackgroundLayer(HEATMAP_DIM_LAYER_ID).withProperties(
                 PropertyFactory.backgroundColor(if (darkVeil) HEATMAP_DIM_COLOR_DARK else HEATMAP_DIM_COLOR),
-                PropertyFactory.backgroundOpacity(if (darkVeil) HEATMAP_DIM_OPACITY_DARK else HEATMAP_DIM_OPACITY),
-                PropertyFactory.visibility(Property.NONE),
             )
             insert(style, dim, beforeId)
+            setDim(style, dimShown)
         }
         val fogUrl = coverageUrl("fog", "png").let { if (darkVeil) it + (if ('?' in it) "&" else "?") + "theme=dark" else it }
         val fogColor = if (darkVeil) FOG_FILL_COLOR_DARK else FOG_FILL_COLOR
@@ -326,12 +330,11 @@ object MapOverlays {
      * Every Fog and Heatmap tile fetched again, once the server has re-rendered them
      * (`CoverageWatch`) — the web's `refreshFogLayers`/`refreshHeatmapLayers`. Replaced, not
      * updated, for the same reason as [setTrackRange], each at the same place in the stack —
-     * under the tracks — and with its old visibility.
+     * under the tracks — and with its old visibility (the wash, with [dimShown]).
      */
     fun refreshCoverage(style: Style) {
         if (style.getLayer(FOG_LAYER_ID) == null) return
-        val visibility = (COVERAGE_LAYERS.map { it.first } + HEATMAP_DIM_LAYER_ID)
-            .associateWith { style.getLayer(it)?.visibility?.value }
+        val visibility = COVERAGE_LAYERS.associate { (layer, _) -> layer to style.getLayer(layer)?.visibility?.value }
         COVERAGE_LAYERS.forEach { (layer, source) ->
             style.getLayer(layer)?.let(style::removeLayer)
             style.removeSource(source)
@@ -402,7 +405,7 @@ object MapOverlays {
         setVisible(style, FOG_LAYER_ID, mode == MapMode.FOG)
         setVisible(style, COUNTRY_FOG_LAYER_ID, mode == MapMode.FOG)
         setVisible(style, REGION_FOG_LAYER_ID, mode == MapMode.FOG)
-        setVisible(style, HEATMAP_DIM_LAYER_ID, mode == MapMode.HEATMAP)
+        setDim(style, mode == MapMode.HEATMAP)
         setVisible(style, HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
         setVisible(style, COUNTRY_HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
         setVisible(style, REGION_HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
@@ -434,6 +437,7 @@ object MapOverlays {
     fun setRecording(style: Style, recording: Boolean, mode: MapMode) {
         if (recording) {
             USER_LAYER_IDS.forEach { setVisible(style, it, false) }
+            setDim(style, false)
             setLabelOpacity(style, 1f)
         } else {
             setMode(style, mode)
@@ -580,6 +584,13 @@ object MapOverlays {
 
     private fun insert(style: Style, layer: org.maplibre.android.style.layers.Layer, beforeId: String?) {
         if (beforeId != null) style.addLayerBelow(layer, beforeId) else style.addLayer(layer)
+    }
+
+    /** See [dimShown]. */
+    private fun setDim(style: Style, shown: Boolean) {
+        dimShown = shown
+        val opacity = if (darkVeil) HEATMAP_DIM_OPACITY_DARK else HEATMAP_DIM_OPACITY
+        style.getLayer(HEATMAP_DIM_LAYER_ID)?.setProperties(PropertyFactory.backgroundOpacity(if (shown) opacity else 0f))
     }
 
     private fun setVisible(style: Style, layerId: String, visible: Boolean) {
