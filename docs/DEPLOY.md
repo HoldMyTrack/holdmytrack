@@ -83,6 +83,8 @@ GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-f
 
 This builds all four images, runs `migrate` once (api/worker wait for it to finish, exactly like the dev stack's own `migrate` service), and starts `db`, `api`, `worker`, and `web` (Caddy). Caddy requests its Let's Encrypt certificate for `DOMAIN` on first start — watch `docker compose -f compose.prod.yml logs web` if it doesn't come up within a minute or two.
 
+Container logs are bounded in `compose.prod.yml` (`x-logging`): Docker's `local` driver, compressed, at most 5 files of 10 MB per container. Docker's default `json-file` driver never rotates, so without the limit `api`, `worker` and Caddy logs would grow until the disk filled. `docker compose -f compose.prod.yml logs <service>` reads them as usual, but only back to the oldest file kept. A change to the logging settings only applies to a recreated container, which the next `up -d` does.
+
 On a new (or recreated) database, seed it once `api` is up — `migrate` creates the Demo Customer's account row but none of its activities, and nothing in `up` runs these. An **existing** database needs the same step once when a deploy first brings in a seed it has never had: a database created before the Country/Region zoom tiers shipped has no boundary rows until `seed-admin-boundaries` runs, and nothing fails loudly — the tiers just render blank:
 
 ```
@@ -231,6 +233,17 @@ It's served with `Cache-Control: no-cache`, so a replaced file is never masked b
    17 3 * * * root /srv/holdmytrack/scripts/backup.sh >> /var/log/holdmytrack-backup.log 2>&1
    47 4 1 * * root /srv/holdmytrack/scripts/restore-drill.sh >> /var/log/holdmytrack-backup.log 2>&1
    ```
+6. Rotate that log, which otherwise grows a little every night (more on the first run, which lists every object it copies), in `/etc/logrotate.d/holdmytrack-backup`:
+   ```
+   /var/log/holdmytrack-backup.log {
+       monthly
+       rotate 6
+       compress
+       missingok
+       notifempty
+   }
+   ```
+   `logrotate -d /etc/logrotate.d/holdmytrack-backup` checks it without rotating anything.
 
 **What's in the backup bucket.** `postgres/daily/` holds each night's dump for 14 days, and `postgres/weekly/` holds Sunday's for 8 weeks. `objects/` mirrors the app bucket's keys. When the sync would delete or overwrite an object there, it moves the old copy into `objects-deleted/<UTC stamp of that run>/` instead, where it stays for 30 days. An account deleted on request therefore stays in the backups for up to 8 weeks.
 

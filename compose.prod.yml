@@ -15,11 +15,22 @@
 # unless-stopped` everywhere so a VPS reboot brings the whole stack back without manual
 # intervention.
 
+# Every service's container logs, bounded (docs/DEPLOY.md §6). Docker's default json-file
+# driver never rotates, so api/worker/Caddy logs would grow until the disk filled. `local` is
+# Docker's own compressed, rotating format, and `docker compose logs` reads it as before: at
+# most 5 files of 10 MB per container, about 50 MB for each of the five.
+x-logging: &logging
+  driver: local
+  options:
+    max-size: 10m
+    max-file: "5"
+
 services:
   db:
     # Before moving to an image on Debian 13 or later, see docs/DEPLOY.md §9 (time zones).
     image: postgis/postgis:16-3.4
     restart: unless-stopped
+    logging: *logging
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -52,6 +63,7 @@ services:
       args:
         GIT_SHA: ${GIT_SHA:-unknown}
     restart: "no"
+    logging: *logging
     command: ["migrate"]
     environment: &server-env
       POSTGRES_USER: ${POSTGRES_USER}
@@ -101,6 +113,7 @@ services:
     image: holdmytrack-server
     build: *server-build
     restart: unless-stopped
+    logging: *logging
     command: ["serve"]
     environment: *server-env
     depends_on:
@@ -113,6 +126,7 @@ services:
     image: holdmytrack-server
     build: *server-build
     restart: unless-stopped
+    logging: *logging
     command: ["work"]
     environment: *server-env
     depends_on:
@@ -143,6 +157,7 @@ services:
         # VersionBanner.tsx can compare its own build against /healthz's version field.
         GIT_SHA: ${GIT_SHA:-unknown}
     restart: unless-stopped
+    logging: *logging
     ports:
       - "80:80"
       - "443:443"
