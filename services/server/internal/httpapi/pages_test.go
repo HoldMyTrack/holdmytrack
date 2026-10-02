@@ -226,6 +226,18 @@ func TestResponsesCarrySecurityHeaders(t *testing.T) {
 	}
 }
 
+// A JSON body past maxJSONBodyBytes is cut off before the handler decodes it: an over-long
+// email reads as a malformed body, not as an email checked once fully in memory.
+func TestAPIBodiesAreBounded(t *testing.T) {
+	s := newPagesTestServer(t)
+	body := `{"email":"` + strings.Repeat("a", maxJSONBodyBytes) + `@example.com","password":"long-enough"}`
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/auth/login", strings.NewReader(body)))
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "invalid request body") {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 // A browser's write to the JSON API from another site is refused before any handler runs —
 // a text/plain form shaped into JSON signed a victim into an attacker's account. Same-origin
 // requests and the native apps' (which send no Origin) still reach the handler, here as the

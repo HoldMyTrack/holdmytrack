@@ -280,7 +280,25 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "cross-origin request refused", http.StatusForbidden)
 		return
 	}
+	if strings.HasPrefix(r.URL.Path, apiPrefix+"/") && !setsOwnBodyLimit(r) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxJSONBodyBytes)
+	}
 	s.mux.ServeHTTP(w, r)
+}
+
+// maxJSONBodyBytes bounds every /v1/ request body that doesn't set a limit of its own. The
+// handlers decode JSON straight from the body and check lengths after, so without it one huge
+// "name", or a track edit's list of millions of point indexes, was held whole in memory first.
+// The largest legitimate body, a Story's 10,000 activity ids or a 10,000-entry track edit, is a
+// few hundred KB.
+const maxJSONBodyBytes = 1 << 20
+
+// setsOwnBodyLimit reports the requests whose handler bounds the body itself, at a size above
+// maxJSONBodyBytes: every multipart upload (a file, an archive, a photo, an avatar) and a
+// phone sync's batch of activities.
+func setsOwnBodyLimit(r *http.Request) bool {
+	return strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") ||
+		r.URL.Path == apiPrefix+"/sync/activities"
 }
 
 // setSecurityHeaders applies to every response. No page here is meant to be framed, so none
