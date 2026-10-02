@@ -82,7 +82,7 @@ The JSON endpoints in this section are refused (`403`) the same way when a brows
 **Outputs**: A valid session cookie; the account's email and its (unverified) status are returned to the client.
 
 **Error cases**:
-- Invalid email format → `400 Bad Request`.
+- Invalid email format → `400 Bad Request`. Only a bare address is accepted: a display name or comment (`Name <a@b.c>`, `a@b.c (x)`) is invalid.
 - Password shorter than 8 characters → `400 Bad Request`.
 - Email already registered to a different, real account → `409 Conflict`.
 

@@ -255,9 +255,15 @@ func (s *Server) writeSession(w http.ResponseWriter, r *http.Request, userID str
 // normalizeEmail is decodeAuthRequest's own validation, pulled out so handleForgotPassword
 // (which has no password field to validate alongside it) can reuse it without duplicating
 // the trim/lowercase/parse sequence.
+//
+// Only a bare address is accepted. mail.ParseAddress also takes "Name <a@b.c>", "<a@b.c>" and
+// "a@b.c (comment)", which stored as typed let one mailbox register several times under the
+// email-unique index (and the Google/Facebook email matching built on it), and then failed as
+// an SMTP recipient, so the account could never be verified or reset.
 func normalizeEmail(raw string) (string, error) {
 	email := strings.TrimSpace(strings.ToLower(raw))
-	if _, err := mail.ParseAddress(email); err != nil {
+	addr, err := mail.ParseAddress(email)
+	if err != nil || addr.Name != "" || addr.Address != email {
 		return "", accountFailure(http.StatusBadRequest, "error.invalid_email")
 	}
 	return email, nil

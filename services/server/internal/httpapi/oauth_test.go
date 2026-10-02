@@ -107,3 +107,19 @@ func TestClientIP(t *testing.T) {
 		}
 	}
 }
+
+func TestNormalizeEmailTakesOnlyABareAddress(t *testing.T) {
+	for in, want := range map[string]string{
+		" Someone@Example.com ":          "someone@example.com",
+		"bob <victim@example.com>":       "",
+		"<victim@example.com>":           "",
+		"victim@example.com (x)":         "",
+		"not-an-email":                   "",
+		"first.last+tag@sub.example.org": "first.last+tag@sub.example.org",
+	} {
+		got, err := normalizeEmail(in)
+		if (want == "") != (err != nil) || got != want {
+			t.Errorf("normalizeEmail(%q) = %q, %v; want %q", in, got, err, want)
+		}
+	}
+}
