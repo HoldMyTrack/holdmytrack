@@ -13,7 +13,8 @@ RUN CGO_ENABLED=0 go build -ldflags "-X main.gitSHA=${GIT_SHA}" -o /out/holdmytr
 
 # distroless/static: the one binary is pure Go (CGO_ENABLED=0 above) and runs nothing else —
 # the Takeout reader that used to be a Rust subprocess is internal/takeout now — so it needs
-# no libc. No shell and no package manager.
-FROM gcr.io/distroless/static-debian12 AS dev
+# no libc. No shell and no package manager. :nonroot runs it as uid 65532: it binds :8080 and
+# writes nothing but multipart temp files under /tmp, so it has no use for root.
+FROM gcr.io/distroless/static-debian12:nonroot AS dev
 COPY --from=build /out/holdmytrack /usr/local/bin/holdmytrack
 ENTRYPOINT ["/usr/local/bin/holdmytrack"]
