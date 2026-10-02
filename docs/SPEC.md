@@ -707,7 +707,7 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 
 **Description**: The user can narrow the visible activities to a minimum/maximum distance range via a slider, bounded by the shortest and longest activity in the current date range. Same scope as FR-5.2 (client-side, narrows the same things). Standalone and always visible, between the date slider and the header toolbar — not folded into the Type dropdown or hidden behind any toggle.
 
-**Behavior**: Each knob reaches the exact shortest and longest distance at its end of the track, so the activities at either end are inside the filter there. With both knobs back at their ends there is no distance filter: the readout says "any distance" and nothing is filtered out by distance.
+**Behavior**: Each knob reaches the exact shortest and longest distance at its end of the track, so the activities at either end are inside the filter there. With both knobs back at their ends there is no distance filter: the readout says "any distance" and nothing is filtered out by distance. The slider isn't shown while the date range's activities don't span a range of distances (none, or all the same length); a distance filter set before they stopped doing so — activities deleted down to one, say — is cleared, rather than left filtering with no slider or Reset to clear it.
 
 ### FR-5.4 Row hover preview
 

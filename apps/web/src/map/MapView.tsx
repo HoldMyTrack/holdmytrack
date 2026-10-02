@@ -448,6 +448,13 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   const pendingIds = useMemo(() => activities.filter((a) => a.pending).map((a) => a.id), [activities]);
 
   const activityDistanceBounds = useMemo(() => distanceBounds(activities), [activities]);
+  // The slider, and its Reset, only show while the loaded activities span a range of distances.
+  // A band left set when they stop doing so — deleted down to one, say — would go on filtering
+  // with nothing on screen to clear it.
+  const distanceSliderShown = activityDistanceBounds !== null && activityDistanceBounds.min < activityDistanceBounds.max;
+  useEffect(() => {
+    if (!distanceSliderShown) setDistanceFilter(null);
+  }, [distanceSliderShown]);
   const facets = useMemo(() => typeFacets(activities, distanceFilter), [activities, distanceFilter]);
   const filteredActivities = useMemo(
     () => activities.filter((a) => passesFilters(a, excludedTypes, distanceFilter)),
