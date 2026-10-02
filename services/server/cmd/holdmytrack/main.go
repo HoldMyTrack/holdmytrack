@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 	// Embeds Go's own copy of the IANA timezone database into the binary — needed for
@@ -93,7 +94,13 @@ func main() {
 		if smtpFrom == "" {
 			smtpFrom = cfg.SMTPUsername
 		}
-		mailer := mail.New(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUsername, cfg.SMTPPassword, smtpFrom, log)
+		// Bodies go to the log only off a real deployment; on one, an unset SMTP_HOST is a
+		// misconfiguration worth a warning at start, not a reason to log live account links.
+		realDeployment := strings.HasPrefix(cfg.AppBaseURL, "https://")
+		if realDeployment && cfg.SMTPHost == "" {
+			log.Warn("serve: SMTP_HOST not set; reset and verification emails will not be sent")
+		}
+		mailer := mail.New(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUsername, cfg.SMTPPassword, smtpFrom, !realDeployment, log)
 		webFS, webReload := web.Embedded(), false
 		if cfg.WebDevDir != "" {
 			webFS, webReload = os.DirFS(cfg.WebDevDir), true

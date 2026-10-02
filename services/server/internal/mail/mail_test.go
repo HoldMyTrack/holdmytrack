@@ -1,6 +1,9 @@
 package mail
 
 import (
+	"bytes"
+	"context"
+	"log/slog"
 	"strings"
 	"testing"
 )
@@ -22,5 +25,20 @@ func TestMessageEncodesSubject(t *testing.T) {
 	}
 	if !strings.HasSuffix(ru, "\r\n\r\nТело\r\n") {
 		t.Errorf("body not sent as is:\n%s", ru)
+	}
+}
+
+// Without SMTP, a real deployment's log never carries a message body: it holds a live reset or
+// verification link.
+func TestLogSenderKeepsBodiesOutOfARealDeploymentsLog(t *testing.T) {
+	for _, logBodies := range []bool{false, true} {
+		var buf bytes.Buffer
+		s := New("", "", "", "", "", logBodies, slog.New(slog.NewTextHandler(&buf, nil)))
+		if err := s.Send(context.Background(), "a@x", "Reset", "https://app.example/reset?token=secret"); err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Contains(buf.String(), "secret"); got != logBodies {
+			t.Errorf("logBodies %v: body in log = %v\n%s", logBodies, got, buf.String())
+		}
 	}
 }
