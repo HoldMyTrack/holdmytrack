@@ -32,6 +32,7 @@ Checkboxes are the source of truth for progress; re-check them against the three
 - [x] `docs/DEPLOY.md` §8's verification holds on this box — `/healthz` answers `ok` with the deployed build's SHA, and real Health Connect history synced since the move shows on the map, which goes through the whole path: `api` saves each raw payload to the `holdmytrack-data` R2 bucket, then `worker` processes it and writes fog/heatmap tiles back to R2.
 - [x] CDN in front of the basemap `.pmtiles` archive (`VISION.md` §4.3) — the planet archive, fonts and sprites are served through Cloudflare from the public R2 bucket's custom domain `tiles.holdmytrack.com` (`IMPLEMENTATION.md` §5.4 covers what the free plan does and doesn't edge-cache).
 - [x] Load the Spots places on `holdmytrack.com` — the United States, 266,272 places from Geofabrik's 2026-09-28 US extract, filtered off-box and loaded with `import-spots` (`docs/DEPLOY.md` §6); outside the US the Layers menu's points of interest (`SPEC.md` FR-15) show no places yet.
+- [ ] Seed the planet's Spots places on `holdmytrack.com` — `docs/DEPLOY.md` §6's two osmium commands over the planet file on a machine with ~100 GB free, then `import-spots --planet` on the server, which from then on is the quarterly refresh too (ADR-0027); record the place count and how long the import took on the 1 vCPU / 2 GB box.
 - [ ] Backups (Postgres, object storage) and a restore drill — **the most urgent of these gaps now that real personal data (synced Health Connect history) is starting to land on this box**, not just disposable dev fixtures. Also the gate for auto-deploy on merge: CI (`.github/workflows/ci.yml`) deliberately only checks, since deploying every merge onto the one uncopied copy of real synced health data, with no restore path if a bad deploy corrupts something, is a bigger risk than the manual deploy step it would replace.
 - [ ] Host hardening — a firewall allowing only 22/80/443, key-only SSH with password login disabled, unattended security updates, and `.env.prod` readable only by the deploying user.
 - [ ] Bound Docker's container logs — the default `json-file` driver never rotates, so `api`/`worker`/Caddy logs grow without limit on a 50 GB disk; set `max-size`/`max-file` in `/etc/docker/daemon.json` or per service in `compose.prod.yml`.
@@ -42,12 +43,6 @@ Checkboxes are the source of truth for progress; re-check them against the three
 
 - [ ] Stand up the funding page (Open Collective, public ledger — `VISION.md` §6.1) before any public launch, not retrofitted after. The app side is built (`IMPLEMENTATION.md` §4.16), and the `holdmytrack` collective applied to Open Source Collective as fiscal host on 2026-09-24; what's left: once approved, set the slug — `services/server/internal/web/web.go`'s `OpenCollectiveSlug` — and replace the About page template's "donations are not open yet" line with a link to it.
 - [ ] Post concept renders to r/running, r/cycling, r/Garmin, r/Strava, r/FogOfWorld (`VISION.md` §5.1, §8.1) — validate "free forever, funded by users" as credible before building further.
-
-### Spots places refresh — planned
-
-The places are seeded and refreshed by hand: an operator filters an OSM extract off-box and runs `import-spots` (`docs/DEPLOY.md` §6), once for the planet and then quarterly with `--planet`, which retires the places OSM no longer has (ADR-0027). Only the United States is loaded so far.
-
-- [ ] Seed the planet on `holdmytrack.com` — `docs/DEPLOY.md` §6's two osmium commands over the planet file on a machine with ~100 GB free, then `import-spots --planet` on the server; record the place count and how long the import took on the 1 vCPU / 2 GB box, which has only had the US so far.
 
 ### Sign in with Facebook — built, not live
 
