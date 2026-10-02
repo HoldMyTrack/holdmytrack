@@ -338,26 +338,34 @@ object MapSpots {
         return Expression.interpolate(Expression.linear(), Expression.zoom(), Expression.stop(MIN_ZOOM, width(1f)), Expression.stop(17, width(2f)))
     }
 
+    /** Whether a feature's id is among the account's captures. */
+    private fun isCaptured(): Expression =
+        Expression.`in`(Expression.toNumber(Expression.get("id")), Expression.literal(captured.keys.map { it.toDouble() }.toTypedArray<Any>()))
+
     /** Each badge's image: `spot-captured-{category}` for a captured place, `spot-{category}`
      *  otherwise. */
     private fun iconImage(): Expression = Expression.switchCase(
-        Expression.`in`(Expression.toNumber(Expression.get("id")), Expression.literal(captured.keys.map { it.toDouble() }.toTypedArray<Any>())),
+        isCaptured(),
         Expression.concat(Expression.literal("spot-captured-"), Expression.get("category")),
         Expression.concat(Expression.literal("spot-"), Expression.get("category")),
     )
 
     /** Every layer filtered to the wanted categories and shown, or all hidden with none wanted
-     *  or a track being edited; the badges drawn captured or not. */
+     *  or a track being edited; the badges drawn captured or not. The tiles' layers also leave
+     *  out a retired place (ADR-0027) unless the account captured it; "Show in this area" gets
+     *  only those from the server already. */
     private fun apply(style: Style) {
         val shown = wanted.isNotEmpty() && !editing
         val visibility = PropertyFactory.visibility(if (shown) Property.VISIBLE else Property.NONE)
         val byCategory = Expression.`in`(Expression.get("category"), Expression.literal(wanted.map { it.wire }.toTypedArray<Any>()))
+        val live = Expression.any(Expression.not(Expression.toBool(Expression.get("retired"))), isCaptured())
+        val fromTiles = Expression.all(byCategory, live)
         val filters = mapOf(
-            AREA_FILL_LAYER_ID to byCategory,
-            AREA_LINE_LAYER_ID to Expression.all(Expression.not(Expression.toBool(Expression.get("circle"))), byCategory),
-            CIRCLE_LINE_LAYER_ID to Expression.all(Expression.toBool(Expression.get("circle")), byCategory),
+            AREA_FILL_LAYER_ID to fromTiles,
+            AREA_LINE_LAYER_ID to Expression.all(Expression.not(Expression.toBool(Expression.get("circle"))), fromTiles),
+            CIRCLE_LINE_LAYER_ID to Expression.all(Expression.toBool(Expression.get("circle")), fromTiles),
             IN_AREA_LAYER_ID to byCategory,
-            LAYER_ID to byCategory,
+            LAYER_ID to fromTiles,
         )
         val capturing = target?.let { id -> Expression.eq(Expression.toNumber(Expression.get("id")), Expression.literal(id.toDouble())) }
         style.getLayer(GUIDE_LAYER_ID)?.setProperties(PropertyFactory.visibility(if (shown && target != null) Property.VISIBLE else Property.NONE))

@@ -1199,7 +1199,7 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 3. From zoom 13 up, under each badge its area is shaded faintly in gold: the place's outline from OpenStreetMap, edged with a solid line, or — for a place mapped only as a point — its 30 m circle, edged with a dashed line. Clicking an area does nothing, and a track under it can still be clicked.
 4. Badges and areas are drawn over everything else, the Fog veil and map labels included, and Fog doesn't dim them.
 5. They hide during an Edit track session (FR-5.14) and come back after it.
-6. A retired place (FR-15.1) — its badge and its area — is drawn only for an account that captured it, with the captured badge; everyone else's map leaves it out, at every zoom and in Show in this area (FR-15.5). Built on the web; the Android app draws them like any other place for now (`apps/android/docs/ROADMAP.md` Phase 11).
+6. A retired place (FR-15.1) — its badge and its area — is drawn only for an account that captured it, with the captured badge; everyone else's map leaves it out, at every zoom and in Show in this area (FR-15.5), on the web and in the Android app alike.
 
 ### FR-15.3 The popup
 

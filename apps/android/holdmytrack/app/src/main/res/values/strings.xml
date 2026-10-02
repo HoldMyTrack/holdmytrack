@@ -146,6 +146,7 @@
     <string name="spots_capture_retrying">Couldn\'t save — retrying…</string>
     <string name="spots_capture_outside">Not quite inside yet — keep going</string>
     <string name="spots_capture_load_failed">Couldn\'t load this place — retrying…</string>
+    <string name="spots_capture_gone">This place is no longer on the map</string>
     <string name="spots_capture_stop">Stop</string>
     <string name="spots_capture_needs_location">Capture needs precise location access</string>
     <string name="spots_capture_unit_m">%1$d m</string>
