@@ -5,6 +5,7 @@ import type { PhotoMarkerOverlay } from '../map/photos';
 import { draftIsEmpty, draftSize, EMPTY_DRAFT, isoSeconds, waitingPhotos, type PhotoDraft } from './photoDraft';
 import type { TypeFacet } from './activityFacets';
 import { ActivityTypePicker } from './ActivityTypePicker';
+import { ConfirmDialog } from './ConfirmDialog';
 import { formatStartedAt } from './format';
 import { MAX_PHOTO_CAPTION_LEN, PhotosTab } from './PhotosTab';
 import { TrackEditor } from './TrackEditor';
@@ -108,6 +109,7 @@ export function EditActivityWindow({
   const [photosStarted, setPhotosStarted] = useState(false);
   const [photoDraft, setPhotoDraft] = useState<PhotoDraft>(EMPTY_DRAFT);
   const [photoProgress, setPhotoProgress] = useState<{ done: number; total: number } | null>(null);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   // Any photo write landed — a later failure or Cancel still has to report it.
   const photosSaved = useRef(false);
   // New photos' local thumbnails are object URLs; whatever's left unsaved goes with the window.
@@ -144,13 +146,34 @@ export function EditActivityWindow({
   useEffect(() => {
     if (saving) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      // Not an Escape meant for a dialog of its own, such as the Photos tab's delete confirmation.
+      // Not an Escape meant for a dialog of its own, such as the discard confirmation below.
       if ((event.target as Element | null)?.closest?.('dialog')) return;
-      if (event.key === 'Escape' && !event.defaultPrevented) cancel();
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      // Escape is a reflex, and photo changes can be a lot of picking and sliding: ask first.
+      // preventDefault, or the browser's own Escape handling closes the confirmation the moment
+      // it opens — it's the topmost dialog by the time this key's default action runs.
+      if (!draftIsEmpty(draftRef.current)) {
+        event.preventDefault();
+        setConfirmDiscard(true);
+      } else cancel();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [saving, cancel]);
+
+  // Leaving the page — a reload, a closed tab, a link in the header — would lose unsaved photo
+  // changes with no way back, so the browser asks first while there are any, or while they're
+  // being written.
+  const photosAtRisk = saving || !draftIsEmpty(photoDraft);
+  useEffect(() => {
+    if (!photosAtRisk) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [photosAtRisk]);
 
   function openTab(next: EditTab) {
     setTab(next);
@@ -414,6 +437,16 @@ export function EditActivityWindow({
               : t('common.save')}
         </button>
       </div>
+      {confirmDiscard && (
+        <ConfirmDialog
+          title={t('photos.discard_title')}
+          message={t('photos.discard_message')}
+          confirmLabel={t('photos.discard')}
+          cancelLabel={t('photos.keep_editing')}
+          onConfirm={async () => cancel()}
+          onClose={() => setConfirmDiscard(false)}
+        />
+      )}
     </section>
   );
 }
