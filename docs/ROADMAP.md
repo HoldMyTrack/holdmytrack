@@ -43,14 +43,6 @@ Checkboxes are the source of truth for progress; re-check them against the three
 - [ ] Stand up the funding page (Open Collective, public ledger — `VISION.md` §6.1) before any public launch, not retrofitted after. The app side is built (`IMPLEMENTATION.md` §4.16), and the `holdmytrack` collective applied to Open Source Collective as fiscal host on 2026-09-24; what's left: once approved, set the slug — `services/server/internal/web/web.go`'s `OpenCollectiveSlug` — and replace the About page template's "donations are not open yet" line with a link to it.
 - [ ] Post concept renders to r/running, r/cycling, r/Garmin, r/Strava, r/FogOfWorld (`VISION.md` §5.1, §8.1) — validate "free forever, funded by users" as credible before building further.
 
-### Spots visits — planned
-
-Spots' places are on the web map (`SPEC.md` FR-15); marking one visited isn't built. ADR-0021 has the design and why: an activity visits a place when its points add up to five minutes inside the place's area, worked out from tracks on the server, after Private locations and track edits.
-
-- [ ] A `spot_visits` table, matching in the ingest job and every reprocess (a track edit, a Private location change), and a backfill job over existing activities after an import — with tests for a stay just under and just over five minutes, a drive past, a point-mapped place's circle, and a place inside a Private location a track passes through.
-- [ ] A per-account `visited` flag in the spots tiles, a filled badge for a visited place, and the visited state in the popup.
-- [ ] Retired places (ADR-0027) keep the visits they have and are matched against no new activity: the matching skips a place with `retired_at` set.
-
 ### Spots places refresh — planned
 
 The places are seeded and refreshed by hand: an operator filters an OSM extract off-box and runs `import-spots` (`docs/DEPLOY.md` §6), once for the planet and then quarterly with `--planet`, which retires the places OSM no longer has (ADR-0027). Only the United States is loaded so far.

@@ -36,6 +36,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0025](0025-language-menu-for-everyone.md) | A language menu in the header for everyone, remembered in a cookie; signed in, it also saves the account's setting |
 | [0026](0026-material-3-on-views.md) | Android's UI is Material 3 on the existing Views, not Compose, without dynamic color |
 | [0027](0027-spots-retired-not-deleted.md) | A place gone from OpenStreetMap is retired, never deleted, and still shown to the accounts that captured it |
+| [0028](0028-spots-capture-only-no-visits.md) | Spots have one mark, the capture; visits worked out from tracks are dropped |
 
 ## Writing a new one
 
