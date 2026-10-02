@@ -12,3 +12,9 @@ FR-9 behavior 3 says the Profile page renders the trailing 12 months as one bar 
 
 - [ ] Fill the gaps — in the query (`generate_series` over the window's buckets, left-joined) or in each client — so every week or month of the window has a bar, at the 2px minimum when empty, and the axis shows the window's ends.
 - [ ] Check the web page and the Android screen against an account with a few active weeks months apart.
+
+### Photo prep decodes a picked photo at full size before shrinking it
+
+`preparePhoto` (`apps/web/src/ui/photoPrep.ts`) decodes the whole picture with `createImageBitmap` (about 4 bytes a pixel) and only then draws it at 2048 px and 320 px. A 100–200 MP panorama or drone image needs 400–800 MB for that one bitmap, which can kill a phone's tab and the unsaved Edit window with it. Found in the frontend audit; not yet reproduced on a device.
+
+- [ ] Decode at the target size (`createImageBitmap`'s `resizeWidth`/`resizeHeight`, which need the oriented dimensions first), and check that an EXIF-rotated portrait still comes out upright and undistorted in Chrome, Firefox and Safari.

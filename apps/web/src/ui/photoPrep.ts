@@ -209,11 +209,15 @@ async function encode(bitmap: ImageBitmap, maxSide: number): Promise<Blob> {
   return jpeg;
 }
 
+/** How much of a file readExif sees: a JPEG's metadata segments come before its image data,
+ *  each at most 64 KB, so the Exif block sits well inside this — and a large photo isn't read
+ *  into memory whole just for it. */
+const EXIF_SCAN_BYTES = 1 << 20;
+
 export async function preparePhoto(file: File): Promise<PreparedPhoto> {
-  const buf = await file.arrayBuffer();
   let exif: PhotoExif = {};
   try {
-    exif = readExif(buf);
+    exif = readExif(await file.slice(0, EXIF_SCAN_BYTES).arrayBuffer());
   } catch {
     // A malformed EXIF block isn't a reason to refuse the picture; it just goes unplaced.
   }
@@ -221,7 +225,7 @@ export async function preparePhoto(file: File): Promise<PreparedPhoto> {
   try {
     // 'from-image' turns a portrait photo the way its EXIF Orientation says, before the
     // redraw drops that tag.
-    bitmap = await createImageBitmap(new Blob([buf], { type: file.type }), { imageOrientation: 'from-image' });
+    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
   } catch {
     throw new UnreadablePhotoError();
   }
