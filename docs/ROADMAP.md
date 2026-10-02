@@ -42,7 +42,7 @@ Checkboxes are the source of truth for progress; re-check them against the three
 - [ ] An `alloy` service in `compose.prod.yml` that ships the containers' logs, host metrics (CPU, memory, swap, disk, OOM kills, container restarts), Postgres metrics and the `/metrics` endpoints to Grafana Cloud. Measure its memory on the 2 GB box.
 - [ ] Backup freshness as a metric: `backup.sh` records when it last succeeded, so an alert can fire when that's over 26 hours ago, and likewise the drill's.
 - [ ] Dashboards and alert rules: `ERROR` lines and panics, queue age, disk, memory and OOM kills, container restarts, and backup freshness. Send them to a contact point that's proven to arrive (Telegram, or email checked with a test alert).
-- [ ] An external uptime check on `/healthz` (UptimeRobot, `docs/DEPLOY.md` §13), the one signal nothing on the box can give: the box, Caddy or the certificate being down.
+- [ ] An external uptime check on `/healthz` with Grafana Cloud's Synthetic Monitoring (`docs/DEPLOY.md` §13), probing from several locations. It's the one signal nothing on the box can give: the box, Caddy or the certificate being down. UptimeRobot no longer has a free plan.
 - [ ] Retire `scripts/monitor.sh` and the healthchecks.io pings once the alerts above are proven, and update `docs/DEPLOY.md` §11 and §13.
 - [ ] Size up from sandbox hardware once real traffic is expected — 1 vCPU / 2 GB RAM is good enough for real pre-release testing, not sized for this being called Production. RAM is the real constraint: it's below `docs/DEPLOY.md`'s recommended 4 GB, and Postgres, the Go server and a Takeout import running at once can trigger the kernel OOM killer, which may kill Postgres. Until then, swap is the cheap stopgap.
 
