@@ -109,7 +109,9 @@ func RerenderActivityMasks(ctx context.Context, pool *pgxpool.Pool, store *stora
 	}
 	var newTiles [][2]int
 	if points != nil {
-		newTiles = computeTouchedTiles(points, FogZoom)
+		if newTiles, err = computeTouchedTiles(points, FogZoom); err != nil {
+			return err
+		}
 		if err := fog.RenderActivityMasks(ctx, pool, store, activityID, points, newTiles); err != nil {
 			return fmt.Errorf("render masks: %w", err)
 		}

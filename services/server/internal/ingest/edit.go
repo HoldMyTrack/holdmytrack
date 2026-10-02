@@ -355,7 +355,9 @@ func reprocessActivity(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 	// track still crosses never goes through a moment with no mask for this activity.
 	var newTiles [][2]int
 	if points != nil {
-		newTiles = computeTouchedTiles(points, FogZoom)
+		if newTiles, err = computeTouchedTiles(points, FogZoom); err != nil {
+			return err
+		}
 		if err := fog.RenderActivityMasks(ctx, pool, store, activityID, points, newTiles); err != nil {
 			return fmt.Errorf("render activity masks: %w", err)
 		}

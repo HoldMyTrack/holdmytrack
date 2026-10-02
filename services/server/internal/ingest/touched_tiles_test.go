@@ -1,6 +1,7 @@
 package ingest
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -38,7 +39,11 @@ func TestComputeTouchedTilesBuffersStrokeWidth(t *testing.T) {
 		{Lat: lat2, Lon: lon, Time: time.Unix(1, 0)},
 	}
 
-	got := touchedTileSet(computeTouchedTiles(points, zoom))
+	tiles, err := computeTouchedTiles(points, zoom)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := touchedTileSet(tiles)
 	for _, want := range [][2]int{{100, 100}, {101, 100}} {
 		if !got[want] {
 			t.Errorf("expected tile %v touched (margin %v px), got %v", want, fog.TileMarginPx, got)
@@ -61,8 +66,28 @@ func TestComputeTouchedTilesFarFromEdgeStaysSingleTile(t *testing.T) {
 		{Lat: lat2, Lon: lon, Time: time.Unix(1, 0)},
 	}
 
-	got := touchedTileSet(computeTouchedTiles(points, zoom))
+	tiles, err := computeTouchedTiles(points, zoom)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := touchedTileSet(tiles)
 	if len(got) != 1 || !got[[2]int{100, 100}] {
 		t.Errorf("expected only tile {100,100}, got %v", got)
+	}
+}
+
+// A track whose segments cross more than maxActivityTiles tiles is refused as it's walked —
+// here a zigzag between two far-apart longitudes, every segment thousands of tiles long.
+func TestComputeTouchedTilesRefusesTooManyTiles(t *testing.T) {
+	var points []parse.Point
+	for i := 0; i < 50; i++ {
+		lat := 10 + float64(i)*0.05
+		points = append(points, parse.Point{Lat: lat, Lon: 0}, parse.Point{Lat: lat, Lon: 60})
+	}
+	if _, err := computeTouchedTiles(points, FogZoom); !errors.Is(err, errTooManyTiles) {
+		t.Fatalf("err = %v, want errTooManyTiles", err)
+	}
+	if FailureCode(errTooManyTiles) != FailTooLarge {
+		t.Fatalf("FailureCode = %q, want %q", FailureCode(errTooManyTiles), FailTooLarge)
 	}
 }

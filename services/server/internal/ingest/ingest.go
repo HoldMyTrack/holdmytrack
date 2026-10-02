@@ -80,7 +80,12 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	startedAt := act.Points[0].Time
 
 	var pp preparedTrack
+	var tiles [][2]int
 	if !hidden {
+		// Before anything is persisted, so a track too large to draw fails cleanly.
+		if tiles, err = computeTouchedTiles(points, FogZoom); err != nil {
+			return Result{}, err
+		}
 		if pp, err = prepareTrack(ctx, pool, points); err != nil {
 			return Result{}, err
 		}
@@ -161,7 +166,6 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	// the user never actually visited. Rendering first, dirty-marking second: dirty is what
 	// tells `render_fog` this tile's aggregate needs recompositing, so the mask it would
 	// composite in should already exist by the time that runs.
-	tiles := computeTouchedTiles(points, FogZoom)
 	if err := fog.RenderActivityMasks(ctx, pool, store, activityID, points, tiles); err != nil {
 		return Result{}, fmt.Errorf("ingest: render activity masks: %w", err)
 	}
@@ -374,18 +378,31 @@ const FogZoom = 14
 // render a mask for) and MarkFogTilesDirty (which tiles to flag for aggregate rebuild) — the
 // two need to agree exactly, or a rendered mask could sit in a tile never marked dirty (never
 // composited in) or vice versa.
-func computeTouchedTiles(points []parse.Point, zoom int) [][2]int {
+//
+// It fails with errTooManyTiles past maxActivityTiles, checked as it goes: each tile is a
+// mask rendered and stored, and a track zigzagging between far-apart points (a crafted file,
+// or a corrupt one) could otherwise reach millions of them, held in memory here and then
+// rendered one by one on the single worker.
+func computeTouchedTiles(points []parse.Point, zoom int) ([][2]int, error) {
 	seen := map[[2]int]struct{}{}
-	add := func(x, y int) { seen[[2]int{x, y}] = struct{}{} }
+	add := func(tiles [][2]int) error {
+		for _, t := range tiles {
+			seen[t] = struct{}{}
+		}
+		if len(seen) > maxActivityTiles {
+			return errTooManyTiles
+		}
+		return nil
+	}
 
 	if len(points) == 1 {
-		for _, t := range tilemath.SegmentTilesBuffered(points[0].Lon, points[0].Lat, points[0].Lon, points[0].Lat, zoom, fog.TileMarginPx, fog.TileSize) {
-			add(t[0], t[1])
+		if err := add(tilemath.SegmentTilesBuffered(points[0].Lon, points[0].Lat, points[0].Lon, points[0].Lat, zoom, fog.TileMarginPx, fog.TileSize)); err != nil {
+			return nil, err
 		}
 	}
 	for i := 1; i < len(points); i++ {
-		for _, t := range tilemath.SegmentTilesBuffered(points[i-1].Lon, points[i-1].Lat, points[i].Lon, points[i].Lat, zoom, fog.TileMarginPx, fog.TileSize) {
-			add(t[0], t[1])
+		if err := add(tilemath.SegmentTilesBuffered(points[i-1].Lon, points[i-1].Lat, points[i].Lon, points[i].Lat, zoom, fog.TileMarginPx, fog.TileSize)); err != nil {
+			return nil, err
 		}
 	}
 
@@ -393,8 +410,15 @@ func computeTouchedTiles(points []parse.Point, zoom int) [][2]int {
 	for t := range seen {
 		out = append(out, t)
 	}
-	return out
+	return out, nil
 }
+
+// maxActivityTiles bounds how many z14 tiles (about 2.4 km across) one activity may touch. A
+// 10,000 km road trip, buffered on both sides, is around 12,000.
+const maxActivityTiles = 20000
+
+// errTooManyTiles fails a track that covers more ground than maxActivityTiles allows.
+var errTooManyTiles = fmt.Errorf("the track touches more than %d map tiles", maxActivityTiles)
 
 // MarkFogTilesDirty upserts a fog_tiles row (dirty = true) for every given z14 tile —
 // computeTouchedTiles' result for a fresh ingest, a deleted activity's own already-rendered
