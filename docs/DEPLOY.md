@@ -1,6 +1,6 @@
 # Deploying HoldMyTrack — minimal single-VPS setup
 
-The smallest deployment that's actually production-shaped: one small VPS running `compose.prod.yml` (Postgres+PostGIS, `api`, `worker`, and Caddy in front of the built frontend), plus Cloudflare R2 for object storage. See `docs/VISION.md` §4.3 for the cost model this is built around, and `docs/ROADMAP.md`'s "Production deployment" section for what's still open on the operational side (host hardening, monitoring); spend caps and the compliance work (DPIA, EU-region hosting) are that file's Phases 5 and 6. This document only covers getting a working deployment live, not everything a real public launch needs.
+The smallest deployment that's actually production-shaped: one small VPS running `compose.prod.yml` (Postgres+PostGIS, `api`, `worker`, and Caddy in front of the built frontend), plus Cloudflare R2 for object storage. See `docs/VISION.md` §4.3 for the cost model this is built around, and `docs/ROADMAP.md`'s "Production deployment" section for what's still open on the operational side (log rotation, monitoring); spend caps and the compliance work (DPIA, EU-region hosting) are that file's Phases 5 and 6. This document only covers getting a working deployment live, not everything a real public launch needs.
 
 ## 1. Provision the VPS
 
@@ -248,6 +248,31 @@ docker compose -f compose.prod.yml --env-file .env.prod exec -T db sh -c 'pg_res
 
 Recreating the database from `template0` keeps the image's own PostGIS setup from colliding with the dump's. On a new server, bring up `db` alone first (`up -d db`), then run the same two commands. If objects were lost too, copy them back with `run --rm rclone copy backup:objects data:`. Use `copy`, never `sync`: `copy` doesn't delete anything in the app bucket. An object removed by mistake within the last 30 days is in `objects-deleted/`, under the stamp of the first backup that ran after it was removed. Then `GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod up -d`, which also runs any migrations newer than the dump. If tiles were lost, or the database is older than them, also run `run --rm api rerender-coverage --masks` (§6). Check `/healthz` and the map, and finish with `./scripts/maintenance.sh off`.
 
+## 12. Host hardening
+
+Only 22, 80 and 443 should be reachable, SSH should take keys only, and security updates should install themselves. On DigitalOcean's Ubuntu 24.04 image, password login is already off (`50-cloud-init.conf`), and `unattended-upgrades` is installed and on. What's left is the following.
+
+**A firewall in front of the server, not on it.** Docker publishes `web`'s ports through its own iptables rules, ahead of `ufw`'s, so `ufw` can't close a port a container publishes. If a service ever published a port by mistake, `ufw` would show it closed while it was open. Use the provider's firewall instead, which filters before traffic reaches the server. On DigitalOcean: **Networking → Firewalls → Create Firewall**. Set the inbound rules to SSH (TCP 22), HTTP (TCP 80) and HTTPS (TCP 443), all from any IPv4 and IPv6 address. Keep the default outbound rules: the server needs to reach R2, Let's Encrypt, the package mirrors and the SMTP host. Apply it to the droplet. Restricting 22 to your own address is tighter, but a home address changes and the only fallback is then the provider's web console. With keys only, an open 22 is a small risk. To check, from another machine: `nc -zv -w 3 <your-domain> 22 80 443` connects, and `nc -zv -w 3 <your-domain> 5432` times out.
+
+**SSH: keys only, root included.** Ubuntu leaves `PermitRootLogin yes`. Root can't log in by password while `PasswordAuthentication` is off, but a later drop-in that turns it back on would reopen that. sshd takes the first value it reads for each setting, and it reads `/etc/ssh/sshd_config.d/` in name order, so the `00-` prefix makes this file win over cloud-init's `50-`:
+
+```
+printf 'PermitRootLogin prohibit-password\nPasswordAuthentication no\nKbdInteractiveAuthentication no\n' > /etc/ssh/sshd_config.d/00-holdmytrack.conf
+sshd -t && systemctl reload ssh
+sshd -T | grep -Ei '^(permitrootlogin|passwordauthentication|kbdinteractiveauthentication) '
+```
+
+`sshd -t` checks the configuration before the reload, so a typo can't stop sshd. The last command should print `prohibit-password`, `no` and `no`. Keep the current session open, and confirm that a new `ssh` still gets in before closing it.
+
+**Reboot when an update needs it.** `unattended-upgrades` installs security updates daily, but a new kernel or a patched system library only takes effect after a reboot, and by default it never reboots. The stack comes back on its own after one (`restart: unless-stopped`). 05:30 server time falls after `backup.sh` (03:17) and the monthly drill (04:47):
+
+```
+printf 'Unattended-Upgrade::Automatic-Reboot "true";\nUnattended-Upgrade::Automatic-Reboot-Time "05:30";\n' > /etc/apt/apt.conf.d/52holdmytrack-reboot
+apt-config dump | grep Automatic-Reboot
+```
+
+**Secrets readable by root only.** `chmod 600 .env.prod`. `backup.sh` itself keeps `BACKUP_DIR` at `700` and writes its dumps as `600` (§11).
+
 ## What this doesn't cover
 
-Per `docs/ROADMAP.md`, still open beyond this minimal setup: host hardening, log rotation and monitoring (its "Production deployment" section), per-user quotas and rate limits with a spend cap (Phase 5), and the compliance work (DPIA, EU-region hosting — Phase 6) a genuine public launch needs regardless of how small the deployment is. This document gets you to "it's live," not to "it's ready for the public."
+Per `docs/ROADMAP.md`, still open beyond this minimal setup: log rotation and monitoring (its "Production deployment" section), per-user quotas and rate limits with a spend cap (Phase 5), and the compliance work (DPIA, EU-region hosting — Phase 6) a genuine public launch needs regardless of how small the deployment is. This document gets you to "it's live," not to "it's ready for the public."
