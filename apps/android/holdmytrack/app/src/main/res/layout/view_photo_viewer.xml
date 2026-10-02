@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The photo viewer (map/PhotoViewer, apps/android/docs/SPEC.md FR-2.10), the web's
+     .photo-viewer: the picture over the whole screen on a dark ground, whatever the theme, with
+     its caption, capture time and Close along the top, and along the bottom ‹ "n of m" › for a
+     group and Zoom out, Zoom in and Fit to screen. Both bars are inset from the system bars by
+     PhotoViewer. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/hmt_photo_viewer_bg">
+
+    <dev.holdmytrack.android.map.ZoomImageView
+        android:id="@+id/photo_viewer_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <ProgressBar
+        android:id="@+id/photo_viewer_loading"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:indeterminateTint="@color/hmt_photo_viewer_ink" />
+
+    <TextView
+        android:id="@+id/photo_viewer_error"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="@string/photos_unavailable"
+        android:textColor="@color/hmt_photo_viewer_ink"
+        android:textSize="@dimen/hmt_text_md"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/photo_viewer_top"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:background="@color/hmt_photo_viewer_bar"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/hmt_space_16"
+        android:paddingEnd="@dimen/hmt_space_4">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/photo_viewer_caption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="2"
+                android:ellipsize="end"
+                android:textColor="@color/hmt_photo_viewer_ink"
+                android:textSize="@dimen/hmt_text_lg"
+                android:textStyle="bold"
+                tools:text="Detroit Avenue" />
+
+            <TextView
+                android:id="@+id/photo_viewer_taken"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/hmt_photo_viewer_ink_secondary"
+                android:textSize="@dimen/hmt_text_sm"
+                tools:text="Taken Oct 1, 2026, 11:20 AM" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/photo_viewer_close"
+            style="@style/Widget.HoldMyTrack.Button.PhotoViewer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/photos_close"
+            app:icon="@drawable/ic_x" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/photo_viewer_bottom"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="@color/hmt_photo_viewer_bar"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/hmt_space_4"
+        android:paddingEnd="@dimen/hmt_space_4">
+
+        <Button
+            android:id="@+id/photo_viewer_previous"
+            style="@style/Widget.HoldMyTrack.Button.PhotoViewer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/photos_previous"
+            app:icon="@drawable/ic_chevron_left" />
+
+        <TextView
+            android:id="@+id/photo_viewer_position"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFeatureSettings="tnum"
+            android:textColor="@color/hmt_photo_viewer_ink"
+            android:textSize="@dimen/hmt_text_md"
+            android:textStyle="bold"
+            tools:text="2 of 5" />
+
+        <Button
+            android:id="@+id/photo_viewer_next"
+            style="@style/Widget.HoldMyTrack.Button.PhotoViewer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/photos_next"
+            app:icon="@drawable/ic_chevron_right" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <Button
+            android:id="@+id/photo_viewer_zoom_out"
+            style="@style/Widget.HoldMyTrack.Button.PhotoViewer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/photos_zoom_out"
+            app:icon="@drawable/ic_zoom_out" />
+
+        <Button
+            android:id="@+id/photo_viewer_zoom_in"
+            style="@style/Widget.HoldMyTrack.Button.PhotoViewer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/photos_zoom_in"
+            app:icon="@drawable/ic_zoom_in" />
+
+        <Button
+            android:id="@+id/photo_viewer_fit"
+            style="@style/Widget.HoldMyTrack.Button.PhotoViewer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/photos_zoom_fit"
+            app:icon="@drawable/ic_maximize" />
+    </LinearLayout>
+</FrameLayout>

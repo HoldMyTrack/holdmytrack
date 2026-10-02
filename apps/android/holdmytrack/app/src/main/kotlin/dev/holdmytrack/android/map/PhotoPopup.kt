@@ -1,10 +1,7 @@
 package dev.holdmytrack.android.map
 
-import android.app.Dialog
-import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.BitmapDrawable
 import android.view.View
-import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.view.isVisible
@@ -20,8 +17,9 @@ import org.maplibre.android.maps.MapLibreMap
  * A photo's popup (`docs/SPEC.md` FR-16.7), the web's `PhotoPopup.tsx`: [view]
  * (`view_photo_popup`) over the map at the photo's marker — above it, or under it when there's
  * no room above, below [top] — following it as the camera moves ([place]). The picture, its
- * caption, when it was taken, and Full size, which shows the stored copy filling the screen —
- * in the app, since a browser tab would have no session to fetch it with. Opened on a group
+ * caption, when it was taken, and Full size, which opens the stored copy over the whole screen
+ * to zoom into ([PhotoViewer]) — in the app, since a browser tab would have no session to fetch
+ * it with. A tap on the picture opens it too. Opened on a group
  * (photos taken at one spot, which no zoom separates), it steps through it with ‹ › and
  * "2 of 5", staying anchored at the group's first photo so it doesn't jump between them.
  * Changing a photo is the Edit window's Photos tab's job, not this.
@@ -45,6 +43,7 @@ class PhotoPopup(private val view: View, private val top: () -> Int, private val
     private var photos: List<Photo> = emptyList()
     private var index = 0
     private var generation = 0
+    private var viewer: PhotoViewer? = null
 
     /** The photos open, in route order; empty when closed. */
     val openIds: List<String>
@@ -58,8 +57,8 @@ class PhotoPopup(private val view: View, private val top: () -> Int, private val
         view.findViewById<View>(R.id.photo_popup_close).setOnClickListener { close() }
         previous.setOnClickListener { step(-1) }
         next.setOnClickListener { step(1) }
-        view.findViewById<View>(R.id.photo_popup_full).setOnClickListener { photos.getOrNull(index)?.let(::showFullSize) }
-        image.setOnClickListener { photos.getOrNull(index)?.let(::showFullSize) }
+        view.findViewById<View>(R.id.photo_popup_full).setOnClickListener { openViewer() }
+        image.setOnClickListener { openViewer() }
         // Placed again once it has its size — the picture arrives after the first placing.
         view.addOnLayoutChangeListener { _, _, t, _, b, _, oldT, _, oldB ->
             if (b - t != oldB - oldT) place()
@@ -90,12 +89,14 @@ class PhotoPopup(private val view: View, private val top: () -> Int, private val
         val showing = showingId
         photos = kept
         index = kept.indexOfFirst { it.id == showing }.coerceAtLeast(0)
+        viewer?.update(photos, index)
         render()
     }
 
     fun close() {
         if (photos.isEmpty()) return
         generation += 1
+        viewer?.dismiss()
         photos = emptyList()
         image.setImageDrawable(null)
         view.isVisible = false
@@ -120,8 +121,11 @@ class PhotoPopup(private val view: View, private val top: () -> Int, private val
         view.translationY = if (above >= top()) above else point.y + offset
     }
 
-    private fun step(by: Int) {
-        val to = (index + by).coerceIn(0, photos.size - 1)
+    private fun step(by: Int) = showAt(index + by)
+
+    /** The viewer stepped: the popup follows. */
+    private fun showAt(at: Int) {
+        val to = at.coerceIn(0, photos.size - 1)
         if (to == index) return
         index = to
         render()
@@ -150,21 +154,22 @@ class PhotoPopup(private val view: View, private val top: () -> Int, private val
         onChange(photo.id)
     }
 
-    /** The stored copy filling the screen, over black; a tap anywhere, or Back, closes it. */
-    private fun showFullSize(photo: Photo) {
-        val dialog = Dialog(context, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
-        val full = ImageView(context).apply {
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            contentDescription = photo.caption ?: res.getString(R.string.photos_marker)
-            setImageDrawable(image.drawable)
-            setOnClickListener { dialog.dismiss() }
-        }
-        dialog.setContentView(full, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.BLACK))
-        dialog.show()
-        val metrics = res.displayMetrics
-        HoldMyTrackApi.image(photo.url, maxSide = maxOf(metrics.widthPixels, metrics.heightPixels)) { result ->
-            if (dialog.isShowing) result.getOrNull()?.let(full::setImageBitmap)
+    /** The viewer on the photo showing, starting from the copy the popup already holds (or its
+     *  thumbnail) while the stored copy loads. */
+    private fun openViewer() {
+        if (photos.isEmpty()) return
+        viewer?.dismiss()
+        viewer = PhotoViewer(
+            context,
+            photos,
+            index,
+            preview = { photo ->
+                (image.drawable as? BitmapDrawable)?.bitmap?.takeIf { photo.id == showingId } ?: PhotoImages.cached(photo.thumbUrl)
+            },
+            onIndex = ::showAt,
+        ).apply {
+            setOnDismissListener { if (viewer === this) viewer = null }
+            show()
         }
     }
 

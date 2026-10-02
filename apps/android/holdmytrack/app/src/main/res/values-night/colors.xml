@@ -36,4 +36,11 @@
 
     <!-- The floating map chrome's background: the surface at 92%, as on the light side. -->
     <color name="hmt_map_chrome">#EB1C2520</color>
+
+    <!-- The photo viewer (map/PhotoViewer): dark in both themes, as the web's .photo-viewer is,
+         since a picture is best seen on a dark ground — so the same values in both files. -->
+    <color name="hmt_photo_viewer_bg">#0F1311</color>
+    <color name="hmt_photo_viewer_bar">#B30F1311</color>
+    <color name="hmt_photo_viewer_ink">#ECE6D8</color>
+    <color name="hmt_photo_viewer_ink_secondary">#A8B2A9</color>
 </resources>
