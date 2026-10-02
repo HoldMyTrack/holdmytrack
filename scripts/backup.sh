@@ -18,6 +18,9 @@
 # three from the database and raw/ (DEPLOY.md §11's restore steps).
 #
 set -euo pipefail
+# A dump is the whole database, so it's root's alone like .env.prod: nothing written here is
+# readable by anyone else (docs/DEPLOY.md §12).
+umask 077
 
 cd "$(dirname "$0")/.."
 
@@ -45,6 +48,7 @@ rclone() { "${COMPOSE[@]}" run --rm -T rclone "$@"; }
 stamp=$(date -u +%Y%m%d-%H%M)
 name="holdmytrack-$stamp.dump"
 mkdir -p "$BACKUP_DIR/postgres"
+chmod 700 "$BACKUP_DIR"
 partial="$BACKUP_DIR/postgres/$name.partial"
 trap 'rm -f "$partial"' EXIT
 

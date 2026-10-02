@@ -12,6 +12,7 @@
 # Exits non-zero, and doesn't ping RESTORE_DRILL_HEARTBEAT_URL, when anything fails.
 #
 set -euo pipefail
+umask 077  # the downloaded dump is the whole database (backup.sh)
 
 cd "$(dirname "$0")/.."
 
