@@ -149,7 +149,7 @@ func markPendingTilesDirty(ctx context.Context, tx pgx.Tx, userID string, activi
 		SELECT DISTINCT $1::uuid, m.zoom, m.tile_x, m.tile_y, true
 		FROM activity_tile_masks m
 		WHERE m.activity_id = ANY($2::uuid[]) AND m.zoom = $3
-		ON CONFLICT (user_id, zoom, tile_x, tile_y) DO UPDATE SET dirty = true
+		ON CONFLICT (user_id, zoom, tile_x, tile_y) DO UPDATE SET dirty = true, dirty_gen = fog_tiles.dirty_gen + 1
 	`, userID, activityIDs, FogZoom)
 	return err
 }

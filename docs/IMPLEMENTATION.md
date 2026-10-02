@@ -161,11 +161,14 @@ CREATE TABLE fog_tiles (
                               -- dirty together, from the same ingest events, every time
     dirty             BOOLEAN NOT NULL DEFAULT TRUE,
     rendered_at       TIMESTAMPTZ,
+    dirty_gen         BIGINT NOT NULL DEFAULT 0,  -- bumped on every mark (0014), see below
     PRIMARY KEY (user_id, zoom, tile_x, tile_y)
 );
 
 CREATE INDEX idx_fog_dirty ON fog_tiles (user_id) WHERE dirty;
 ```
+
+Every write that marks a tile dirty also increments `dirty_gen`. A render reads `dirty_gen` before gathering what it draws from, and clears `dirty` only if the value is unchanged when it stores the tile (`fog.upsertTileRendered`): a change landing mid-render — an activity deleted while its mask was being composited in — leaves the tile dirty for the render that change enqueued, rather than keeping the deleted track in Fog/Heatmap until something else touches the tile.
 
 ### 3.7 `privacy_zones`
 
@@ -619,7 +622,7 @@ Rendering a tile needs the *raw* points of every activity crossing it — `activ
 
 **Re-rendering after a drawing change.** A change to how tiles are drawn (this pyramid, the stroke, the Heatmap coloring) doesn't reach tiles already rendered, or browsers that cached them. `rerender-coverage [--masks] [--user <id>]` (`ingest.RerenderCoverage`) marks every account's z14 tiles dirty and queues one `render_fog` job per account; the worker re-renders each and its pyramid and bumps its tile version (§4.2.6). Queued rather than rendered in the command, so it never races the worker over the same tiles; run once per such deploy (`docs/DEPLOY.md`). A change to the stroke itself also needs every activity's stored masks redrawn: `--masks` first runs `ingest.RerenderActivityMasks` for each activity — the points it's shown with (`DisplayedPoints`: the upload clipped to Private locations, its track edit applied), drawn at the current stroke, masks dropped for tiles it no longer reaches, old and new tiles marked dirty. It re-parses every upload, so it's slow; Pending activities, and any without a stored upload, are logged and left for their own reprocess.
 
-**Invalidation.** Ingest marks touched tiles `dirty`; a worker re-renders them and walks the pyramid upward. A new activity dirties a handful of z14 tiles, so incremental cost is near-constant regardless of history size.
+**Invalidation.** Ingest marks touched tiles `dirty`; a worker re-renders them and walks the pyramid upward. The walk runs off the same flag: storing a tile marks its parent dirty in the same transaction, and `RenderUser` renders every dirty tile at z14, then at each level up to z0. A pass cut off partway leaves the parents of what it rendered dirty, so the next one finishes the pyramid. A new activity dirties a handful of z14 tiles, so incremental cost is near-constant regardless of history size.
 
 **Touched-tile membership is buffered by the stroke's own drawn width, not just where a bare coordinate floors to.** `internal/ingest.computeTouchedTiles` (step 4 above) and `internal/fog.RenderActivityMasks` (§4.2.3) both walk `tilemath.SegmentTilesBuffered`, not the coordinate-only `tilemath.SegmentTiles`: a point or segment within `fog.TileMarginPx` (`strokeRadiusPx + featherPx`, 13 tile-local px at z14, ~62 m) of a tile boundary gets the neighboring tile(s) across that boundary added to the touched set too, not just whichever tile its bare coordinate floors into. Without this, a route running close enough to a z14 boundary has part of its drawn stroke geometrically inside a tile no mask was ever rendered for, and `gg`'s rasterizer silently clips that overflow at the canvas edge instead of it appearing next door. Found live on the Demo Customer account (a Dog Walk on 2026-09-17, two consecutive trajectory points sitting at tile-local x ≈ 511.6 of 512, right on the z14 4471/4472 boundary, with the segment between them running the full length of that boundary). Confirmed fixed the same way live: re-seeded the account and re-rendered — the activity's own crisp mask now covers both 4471 and 4472 (previously only 4471), with real stroke pixels along the *left* edge of 4472 where that edge was previously fully blank. Covered by `internal/tilemath/tilemath_test.go` and `internal/ingest/touched_tiles_test.go`.
 

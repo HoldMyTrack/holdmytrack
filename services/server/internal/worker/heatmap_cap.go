@@ -62,7 +62,7 @@ func recomputeHeatmapCaps(ctx context.Context, pool *pgxpool.Pool, log *slog.Log
 		// created the first time an activity touches it) — marking all of them dirty, rather
 		// than recomputing the account's full touched-tile list again, is simpler and exactly
 		// as correct.
-		if _, err := pool.Exec(ctx, `UPDATE fog_tiles SET dirty = true WHERE user_id = $1`, userID); err != nil {
+		if _, err := pool.Exec(ctx, `UPDATE fog_tiles SET dirty = true, dirty_gen = dirty_gen + 1 WHERE user_id = $1`, userID); err != nil {
 			log.Error("heatmap cap: mark dirty failed", "user_id", userID, "err", err)
 			continue
 		}
