@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -109,7 +110,10 @@ func TestInterruptedIngestResumes(t *testing.T) {
 }
 
 // A zip larger than the in-memory multipart threshold is read from the temp file it spilled
-// to, not copied into memory, and still unpacks.
+// to, not copied into memory, and still unpacks. Measured as what the request allocates, which
+// stays a fixed multiple of the threshold (the multipart reader's own buffer, grown to it before
+// spilling) however large the archive; keeping the part in memory and copying it whole grew
+// with the archive, here to about 500 MiB.
 func TestLargeZipUploadIsReadInPlace(t *testing.T) {
 	d := newDBTestWithS3(t, newMemS3())
 	me := d.newAccount(false)
@@ -119,7 +123,7 @@ func TestLargeZipUploadIsReadInPlace(t *testing.T) {
 	w, _ := zw.CreateHeader(&zip.FileHeader{Name: "ride.gpx", Method: zip.Store})
 	w.Write([]byte(resumeGPX))
 	pad, _ := zw.CreateHeader(&zip.FileHeader{Name: "padding.bin", Method: zip.Store})
-	pad.Write(make([]byte, multipartMemoryBytes+1))
+	pad.Write(make([]byte, 3*multipartMemoryBytes))
 	zw.Close()
 
 	var body bytes.Buffer
@@ -131,10 +135,17 @@ func TestLargeZipUploadIsReadInPlace(t *testing.T) {
 	req.Header.Set("Content-Type", mw.FormDataContentType())
 	req.Header.Set("Authorization", bearerPrefix+me.session)
 	rec := httptest.NewRecorder()
+	var before, after runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&before)
 	d.srv.ServeHTTP(rec, req)
+	runtime.ReadMemStats(&after)
 
 	var resp zipUploadResponse
 	d.decode(rec, http.StatusAccepted, &resp)
+	if allocated := after.TotalAlloc - before.TotalAlloc; allocated > 6*multipartMemoryBytes {
+		t.Errorf("the request allocated %d MiB for a %d MiB archive", allocated>>20, archive.Len()>>20)
+	}
 	statuses := map[string]string{}
 	for _, f := range resp.Files {
 		statuses[f.Filename] = f.Status
