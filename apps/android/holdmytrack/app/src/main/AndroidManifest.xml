@@ -11,10 +11,10 @@
       out: a route needs the session and its geometry, nothing else. Declaring types the product
       does not use is also a known Play rejection cause (docs/VISION.md §7).
 
-      READ_HEALTH_DATA_IN_BACKGROUND is deliberately absent. Phase 1 measured that it buys
+      READ_HEALTH_DATA_IN_BACKGROUND is deliberately absent. Measured on a device, it buys
       nothing for routes — the same 46 sessions returned 23 routes in the foreground and 0 in
-      the background with it granted — so requesting it would be asking the user for an
-      alarming permission that cannot change what the app can do.
+      the background with it granted (docs/IMPLEMENTATION.md §4.0) — so requesting it would
+      be asking the user for an alarming permission that cannot change what the app can do.
 
       READ_EXERCISE_ROUTES cannot be requested programmatically at all: the platform only
       grants it from Health Connect's own settings, two screens below the app's permission
@@ -116,7 +116,7 @@
         <!-- Exported, unlike SignInActivity, because Health Connect itself launches it: the
              rationale intent below is how the platform shows the user why this app wants
              their exercise data, and without that filter the permission dialog can refuse to
-             appear at all (found in the Phase 1 PoC). This screen is the rationale — it says
+             appear at all (found on a device). This screen is the rationale — it says
              what is read and what it is used for before asking for anything. -->
         <activity
             android:name=".SyncActivity"

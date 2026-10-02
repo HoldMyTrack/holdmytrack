@@ -42,7 +42,7 @@ data class SyncProgress(val scanned: Int, val synced: Int)
  *
  * **Foreground-only is a platform constraint, not a design preference** (`docs/IMPLEMENTATION.md`
  * §4.0). Routes written by other apps read back as `ConsentRequired` in the background even
- * with "Always allow" granted — Phase 1 measured the same 46 sessions returning 23 routes in
+ * with "Always allow" granted — measured on a device, the same 46 sessions returned 23 routes in
  * the foreground and none in the background. Nothing here schedules itself: the caller runs it
  * from a foreground screen and cancels it when that screen stops, and because the watermark
  * only moves on confirmed records, a run cut off mid-way simply resumes next time.
@@ -55,8 +55,8 @@ data class SyncProgress(val scanned: Int, val synced: Int)
  *    point would otherwise be read and confirmed while this one is quietly left behind — the
  *    exact "complete in every respect except the map" failure §4.0 warns about.
  *
- * **A session with no route is terminal, not a failure.** Half the sessions Phase 1 measured
- * had none, and the reason is ordinary: a gym session, a swim or a rowing machine has no
+ * **A session with no route is terminal, not a failure.** Half the sessions measured on a
+ * device had none, and the reason is ordinary: a gym session, a swim or a rowing machine has no
  * trajectory by its nature. HoldMyTrack's scope is outdoor GPS tracking (`docs/VISION.md` §1.1), so
  * these are skipped by design rather than retried forever or represented as gaps.
  */
