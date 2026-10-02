@@ -409,7 +409,7 @@ func TestPhotoUpdateRefusedLeavesCaptionAlone(t *testing.T) {
 	}
 }
 
-// Uploads racing each other at the last free place stop at the limit: each counts again under
+// Uploads racing each other for the last free place stop at the limit: each counts again under
 // a per-account lock before inserting.
 func TestPhotoLimitHoldsUnderConcurrency(t *testing.T) {
 	d := newDBTestWithS3(t, newMemS3())
@@ -422,8 +422,9 @@ func TestPhotoLimitHoldsUnderConcurrency(t *testing.T) {
 		t.Fatal(err)
 	}
 	file, thumb := testJPEG(t, 40, 30), testJPEG(t, 8, 6)
+	// Thirty, not a handful: with five the requests rarely overlapped enough to race at all.
 	var wg sync.WaitGroup
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 30; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
