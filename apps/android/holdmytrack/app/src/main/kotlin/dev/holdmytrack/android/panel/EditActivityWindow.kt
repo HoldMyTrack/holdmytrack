@@ -4,13 +4,16 @@ import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.TextView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import androidx.appcompat.widget.TooltipCompat
 import dev.holdmytrack.android.R
 import dev.holdmytrack.android.map.EditPreview
+import dev.holdmytrack.android.map.PhotoMarkerOverlay
 import dev.holdmytrack.android.net.Activity
 import dev.holdmytrack.android.net.HoldMyTrackApi
+import dev.holdmytrack.android.net.Photo
 import dev.holdmytrack.android.net.TrackPoint
 import dev.holdmytrack.android.recording.ActivityTypePicker
 import dev.holdmytrack.android.recording.RecordingTypes
@@ -18,8 +21,8 @@ import dev.holdmytrack.android.recording.TypeCount
 
 /**
  * The Edit window, after the web's `apps/web/src/ui/EditActivityWindow.tsx` (`docs/SPEC.md`
- * FR-5.10, FR-5.14): a card over the top of the map, opened from the Activities toolbar's Edit
- * over its target, with two tabs behind one Save and Cancel.
+ * FR-5.10, FR-5.14, FR-16.6): a card over the top of the map, opened from the Activities
+ * toolbar's Edit over its target, with three tabs behind one Save and Cancel.
  *
  *  - **Activity**: one activity edits Type, Name and Description; several edit Type only —
  *    Name and Description have nothing to set consistently across different activities, so
@@ -27,13 +30,15 @@ import dev.holdmytrack.android.recording.TypeCount
  *  - **Track** ([TrackEditor]): one activity with a finished track, else disabled saying why.
  *    Opening it the first time starts the map's track session ([onStartTrack]: the other
  *    tracks away, the camera on this one), which lasts until the window closes.
+ *  - **Photos** ([PhotosTab]): one activity with a track, else disabled saying why. Its
+ *    changes are a draft, like the track edit, written by the same Save.
  *
  * Save writes what changed — the fields first (one `PATCH /v1/activities/{id}` each, one after
- * another, a group's resending each activity's own name and description), then the track
- * edit — and closes; a
- * refusal keeps the window open with the server's reason, a retried Save skips what already
- * went, and a later step failing still reports the earlier ones saved. Cancel, or Back, writes
- * nothing.
+ * another, a group's resending each activity's own name and description), then the photos,
+ * then the track edit — and closes; a refusal keeps the window open with the server's reason,
+ * a retried Save skips what already went, and a later step failing still reports the earlier
+ * ones saved. Cancel writes nothing; Back does the same, but asks first while there are photo
+ * changes, which can be a lot of picking and sliding to lose to a reflex.
  */
 class EditActivityWindow(
     private val card: View,
@@ -41,11 +46,18 @@ class EditActivityWindow(
     private val onStartTrack: (Activity) -> Unit,
     /** The track editor's overlay — see [TrackEditor]. */
     onDrawTrack: (visible: List<TrackPoint>?, lo: Int, hi: Int, preview: EditPreview) -> Unit,
-    /** Called once the window closes: whether anything was written, and whether that
-     *  included a track edit, which leaves the activity Pending until its reprocess lands. */
-    private val onClose: (saved: Boolean, trackApplied: Boolean) -> Unit,
+    /** Add photos: open the system photo picker, and hand what's picked to [photosTab]. */
+    onPickPhotos: () -> Unit,
+    /** The Photos tab's draft on the map — see [PhotosTab]. */
+    onPhotoOverlay: (PhotoMarkerOverlay?) -> Unit,
+    /** The tab showing changed — the map hides the photos while the Track tab has it. */
+    private val onTabChanged: () -> Unit,
+    /** Called once the window closes: whether anything was written, whether that included a
+     *  track edit, which leaves the activity Pending until its reprocess lands, and whether any
+     *  photo was written, so the map reads them again. */
+    private val onClose: (saved: Boolean, trackApplied: Boolean, photosSaved: Boolean) -> Unit,
 ) {
-    private enum class Tab { ACTIVITY, TRACK }
+    private enum class Tab { ACTIVITY, TRACK, PHOTOS }
     private val context = card.context
     private val res = context.resources
 
@@ -64,17 +76,31 @@ class EditActivityWindow(
     private val tabActivity: TextView = card.findViewById(R.id.edit_tab_activity)
     private val tabTrack: TextView = card.findViewById(R.id.edit_tab_track)
     private val trackDot: View = card.findViewById(R.id.edit_tab_track_dot)
+    private val tabPhotos: TextView = card.findViewById(R.id.edit_tab_photos)
+    private val photosCount: TextView = card.findViewById(R.id.edit_tab_photos_count)
+    private val photosDot: View = card.findViewById(R.id.edit_tab_photos_dot)
     private val activityPanel: View = card.findViewById(R.id.edit_activity_panel)
     private val trackPanel: View = card.findViewById(R.id.edit_track_panel)
+    private val photosPanel: View = card.findViewById(R.id.edit_photos_panel)
 
     /** The Track tab's editor — `MainActivity` hands it Delete point's map taps. */
     val trackEditor = TrackEditor(trackPanel, onDrawTrack) { renderTabs() }
+
+    /** The Photos tab — `MainActivity` hands it the saved photos and what the picker returns. */
+    val photosTab = PhotosTab(photosPanel, onPickPhotos, onPhotoOverlay) {
+        renderTabs()
+        // A change to the photos answers whatever Save last refused about them.
+        if (!saving) showError(null)
+    }
 
     private var tab = Tab.ACTIVITY
     private var trackStarted = false
 
     /** Why the Track tab can't open, or null when it can. */
     private var trackUnavailable: String? = null
+
+    /** Why the Photos tab can't open, or null when it can. */
+    private var photosUnavailable: String? = null
     private var activities: List<Activity> = emptyList()
     private var known: List<TypeCount> = emptyList()
 
@@ -86,12 +112,23 @@ class EditActivityWindow(
     private var mixedTypes = false
     private var saving = false
 
+    /** "Saving photos n of m…" while the photos are written. */
+    private var photoProgress: Pair<Int, Int>? = null
+
     /** Set once the fields are written, so a Save retried after a failure doesn't write them
      *  twice, and a Cancel after one still reports that something changed. */
     private var fieldsSaved = false
 
     val isOpen: Boolean
         get() = card.visibility == View.VISIBLE
+
+    /** The Track tab is the one showing — the photos are off the map meanwhile. */
+    val showingTrack: Boolean
+        get() = isOpen && tab == Tab.TRACK
+
+    /** The one activity the window is open on, or null for a group. */
+    val single: Activity?
+        get() = activities.singleOrNull()?.takeIf { isOpen }
 
     init {
         typeField.setOnClickListener { openTypePicker() }
@@ -100,10 +137,12 @@ class EditActivityWindow(
         save.setOnClickListener { save() }
         tabActivity.setOnClickListener { showTab(Tab.ACTIVITY) }
         tabTrack.setOnClickListener { showTab(Tab.TRACK) }
+        tabPhotos.setOnClickListener { showTab(Tab.PHOTOS) }
     }
 
     private fun showTab(next: Tab) {
         if (next == Tab.TRACK && trackUnavailable != null) return
+        if (next == Tab.PHOTOS && photosUnavailable != null) return
         tab = next
         if (next == Tab.TRACK) {
             val single = activities.single()
@@ -115,19 +154,23 @@ class EditActivityWindow(
         } else {
             trackEditor.hide()
         }
+        if (next == Tab.PHOTOS) photosTab.open(activities.single())
+        photosTab.active = next == Tab.PHOTOS
         hideKeyboard()
         renderTabs()
+        onTabChanged()
     }
 
-    /** The selected tab underlined, the other dimmed; Track dimmer still, saying why, when it
-     *  can't apply — the web's disabled tab and its title. */
+    /** The selected tab underlined, the others dimmed; one that can't apply dimmer still,
+     *  saying why — the web's disabled tab and its title. */
     private fun renderTabs() {
-        for ((view, which) in listOf(tabActivity to Tab.ACTIVITY, tabTrack to Tab.TRACK)) {
+        val unavailable = mapOf(Tab.TRACK to trackUnavailable, Tab.PHOTOS to photosUnavailable)
+        for ((view, which) in listOf(tabActivity to Tab.ACTIVITY, tabTrack to Tab.TRACK, tabPhotos to Tab.PHOTOS)) {
             val selected = tab == which
             if (selected) view.setBackgroundResource(R.drawable.bg_panel_tab_selected) else view.background = null
             view.alpha = when {
                 selected -> 1f
-                which == Tab.TRACK && trackUnavailable != null -> DISABLED_TAB_ALPHA
+                unavailable[which] != null -> DISABLED_TAB_ALPHA
                 else -> UNSELECTED_TAB_ALPHA
             }
             view.isSelected = selected
@@ -137,8 +180,24 @@ class EditActivityWindow(
             ?: if (trackEditor.changed) res.getString(R.string.edit_track_unsaved) else null
         TooltipCompat.setTooltipText(tabTrack, trackUnavailable)
         trackDot.visibility = if (trackEditor.changed) View.VISIBLE else View.GONE
+
+        val photosChanged = !photosTab.draft.isEmpty
+        val count = photosTab.count
+        tabPhotos.isEnabled = photosUnavailable == null
+        tabPhotos.contentDescription = photosUnavailable?.let { res.getString(R.string.photos_tab) + ". " + it }
+            ?: listOfNotNull(
+                res.getString(if (photosChanged) R.string.photos_unsaved else R.string.photos_tab),
+                count.takeIf { it > 0 }?.toString(),
+            ).joinToString(", ")
+        TooltipCompat.setTooltipText(tabPhotos, photosUnavailable)
+        photosCount.text = count.toString()
+        photosCount.visibility = if (photosUnavailable == null && count > 0) View.VISIBLE else View.GONE
+        photosCount.alpha = tabPhotos.alpha
+        photosDot.visibility = if (photosChanged) View.VISIBLE else View.GONE
+
         activityPanel.visibility = if (tab == Tab.ACTIVITY) View.VISIBLE else View.GONE
         trackPanel.visibility = if (tab == Tab.TRACK) View.VISIBLE else View.GONE
+        photosPanel.visibility = if (tab == Tab.PHOTOS) View.VISIBLE else View.GONE
     }
 
     /**
@@ -152,6 +211,7 @@ class EditActivityWindow(
         val single = group.singleOrNull()
         fieldsSaved = false
         saving = false
+        photoProgress = null
         mixedTypes = group.any { it.activityType != group.first().activityType }
         activityType = if (mixedTypes) "" else group.first().activityType
         title.text = if (single != null) {
@@ -181,6 +241,12 @@ class EditActivityWindow(
             single.bbox == null -> res.getString(R.string.edit_track_no_track)
             else -> null
         }
+        // Photos belong to one activity, each with a place on its track.
+        photosUnavailable = when {
+            single == null -> res.getString(R.string.photos_check_one)
+            single.bbox == null -> res.getString(R.string.photos_no_track)
+            else -> null
+        }
         trackStarted = false
         tab = Tab.ACTIVITY
         showError(null)
@@ -189,10 +255,29 @@ class EditActivityWindow(
         card.visibility = View.VISIBLE
     }
 
+    /** The saved photos of the one activity the window is open on, or why they couldn't be read
+     *  — `MainActivity` owns them, since they're also the map's markers. */
+    fun setPhotos(photos: List<Photo>, failure: String?) = photosTab.setPhotos(photos, failure)
+
     /** Cancel: nothing more is written. */
     fun close() {
         if (saving) return
         finish(trackApplied = false)
+    }
+
+    /** Back: Cancel, but asking first while there are photo changes. */
+    fun back() {
+        if (saving) return
+        if (photosTab.draft.isEmpty) {
+            close()
+            return
+        }
+        MaterialAlertDialogBuilder(context, R.style.ThemeOverlay_HoldMyTrack_Dialog_Destructive)
+            .setTitle(R.string.photos_discard_title)
+            .setMessage(R.string.photos_discard_message)
+            .setPositiveButton(R.string.photos_discard) { _, _ -> close() }
+            .setNegativeButton(R.string.photos_keep_editing, null)
+            .show()
     }
 
     private fun openTypePicker() {
@@ -221,13 +306,19 @@ class EditActivityWindow(
             showTab(Tab.ACTIVITY)
             return
         }
+        // Every new photo needs its place before anything is written, and a caption in bounds.
+        photosTab.invalid()?.let {
+            showError(it)
+            showTab(Tab.PHOTOS)
+            return
+        }
         val changed = if (single != null) {
             type != single.activityType || name != single.name.orEmpty() || description != single.description.orEmpty()
         } else {
             type.isNotEmpty() && activities.any { it.activityType != type }
         }
         if (!changed || fieldsSaved) {
-            saveTrack()
+            savePhotos()
             return
         }
         saving = true
@@ -248,7 +339,7 @@ class EditActivityWindow(
     private fun writeNext(writes: List<Triple<String, String, String>>, index: Int, type: String) {
         if (index == writes.size) {
             fieldsSaved = true
-            saveTrack()
+            savePhotos()
             return
         }
         val (id, name, description) = writes[index]
@@ -265,7 +356,33 @@ class EditActivityWindow(
         }
     }
 
-    /** The track edit, once the fields are in — when the Track tab changed anything. */
+    /** The photo draft, once the fields are in — when the Photos tab changed anything. */
+    private fun savePhotos() {
+        val single = activities.singleOrNull()
+        if (single == null || photosTab.draft.isEmpty) {
+            saveTrack()
+            return
+        }
+        saving = true
+        showError(null)
+        hideKeyboard()
+        renderBusy()
+        photosTab.save(single.id, onProgress = { done, total ->
+            photoProgress = done to total
+            renderBusy()
+        }) { failure ->
+            photoProgress = null
+            if (failure == null) {
+                saveTrack()
+                return@save
+            }
+            saving = false
+            renderBusy()
+            showError(failure.message?.takeIf { it.isNotBlank() } ?: res.getString(R.string.edit_save_failed))
+        }
+    }
+
+    /** The track edit, once the fields and photos are in — when the Track tab changed anything. */
     private fun saveTrack() {
         val single = activities.singleOrNull()
         if (single == null || !trackEditor.changed) {
@@ -288,18 +405,26 @@ class EditActivityWindow(
         saving = false
         hideKeyboard()
         trackEditor.close()
+        val photosSaved = photosTab.photosSaved
+        photosTab.close()
         card.visibility = View.GONE
-        onClose(fieldsSaved || trackApplied, trackApplied)
+        onClose(fieldsSaved || trackApplied, trackApplied, photosSaved)
     }
 
     private fun renderBusy() {
         save.isEnabled = !saving
         cancel.isEnabled = !saving
-        save.setText(if (saving) R.string.edit_saving else R.string.edit_save)
+        val progress = photoProgress
+        save.text = when {
+            progress != null -> res.getString(R.string.photos_saving_n, minOf(progress.first + 1, progress.second), progress.second)
+            saving -> res.getString(R.string.edit_saving)
+            else -> res.getString(R.string.edit_save)
+        }
         typeLayout.isEnabled = !saving
         nameField.isEnabled = !saving && activities.size == 1
         descriptionField.isEnabled = !saving && activities.size == 1
         trackEditor.busy = saving
+        photosTab.busy = saving
     }
 
     private fun showError(message: String?) {

@@ -24,6 +24,7 @@ import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -46,9 +47,14 @@ import dev.holdmytrack.android.map.LayersMenu
 import dev.holdmytrack.android.map.MapPaths
 import dev.holdmytrack.android.map.MapSatellite
 import dev.holdmytrack.android.map.MapSpots
+import dev.holdmytrack.android.map.PhotoMarkerItem
+import dev.holdmytrack.android.map.PhotoMarkerOverlay
+import dev.holdmytrack.android.map.PhotoMarkers
+import dev.holdmytrack.android.map.PhotoPopup
 import dev.holdmytrack.android.map.ShowInArea
 import dev.holdmytrack.android.map.SpotPopup
 import dev.holdmytrack.android.net.Activity
+import dev.holdmytrack.android.net.Photo
 import dev.holdmytrack.android.net.ApiException
 import dev.holdmytrack.android.net.TrackMetrics
 import dev.holdmytrack.android.net.TrackPoint
@@ -130,6 +136,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var modeButtons: Map<MapMode, MaterialButton>
     private lateinit var layersMenu: LayersMenu
     private lateinit var spotPopup: SpotPopup
+    private lateinit var photoMarkers: PhotoMarkers
+    private lateinit var photoPopup: PhotoPopup
     private lateinit var captureMode: CaptureMode
     /** Created with the map instance it reads the camera of. */
     private var showInArea: ShowInArea? = null
@@ -164,7 +172,7 @@ class MainActivity : AppCompatActivity() {
 
     /** Back closes the Edit window before it leaves the map. */
     private val closeEditOnBack = object : OnBackPressedCallback(false) {
-        override fun handleOnBackPressed() = editWindow.close()
+        override fun handleOnBackPressed() = editWindow.back()
     }
 
     /** Fog and Heatmap fetched again once the server has re-rendered them after a delete or a
@@ -343,6 +351,29 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** The Photos tab's Add photos: Android's photo picker, any number of images, with no
+     *  storage permission. What's picked goes to the tab to prepare and place. */
+    private val photoPickLauncher = registerForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
+        if (editWindow.isOpen) editWindow.photosTab.add(uris)
+    }
+
+    /**
+     * Whose photos the map shows (`docs/SPEC.md` FR-16.7), the web's `photoScope` — in Normal
+     * mode only: the one activity the Edit window is open on, whose Photos tab manages them (none
+     * for a group); else the selected activity's, the route a person is looking at; else the open
+     * Story's, the whole trip's pictures along its days. As `"activity:<id>"` or `"story:<id>"`.
+     */
+    private var photoScope: String? = null
+
+    /** The scope's saved photos, in route order, and why they couldn't be read. */
+    private var photos: List<Photo> = emptyList()
+    private var photosError: String? = null
+    private var photosLoaded = false
+    private var photoGeneration = 0
+
+    /** The Photos tab's unsaved changes as they alter the markers, while it shows. */
+    private var photoOverlay: PhotoMarkerOverlay? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Before any layout or MapView exists, so a signed-out launch never draws a map at all.
@@ -386,6 +417,8 @@ class MainActivity : AppCompatActivity() {
             onSpots = ::setSpots,
         )
         spotPopup = SpotPopup(findViewById(R.id.spot_popup), { topChrome.bottom }, ::onCaptureTap)
+        photoMarkers = PhotoMarkers(findViewById(R.id.photo_markers), ::openPhotoMarker)
+        photoPopup = PhotoPopup(findViewById(R.id.photo_popup), { topChrome.bottom }) { renderPhotoMarkers() }
         captureMode = CaptureMode(
             this, findViewById(R.id.capture_banner), { map }, { style?.takeIf { overlaysAttached } },
             frame = ::flyTo,
@@ -433,7 +466,11 @@ class MainActivity : AppCompatActivity() {
             onCloseStory = ::exitStory,
             // A Story just made opens straight away, on the Stories tab.
             onStoryCreated = { story -> enterStory(story.id) },
-            onStoriesChanged = { reloadList() },
+            onStoriesChanged = {
+                reloadList()
+                // A Story's photos change with its members.
+                refreshPhotos(force = true)
+            },
             onRemovedFromStory = ::onRemovedFromStory,
         )
         privacyTab = PrivacyTab(
@@ -460,6 +497,14 @@ class MainActivity : AppCompatActivity() {
             findViewById(R.id.edit_window),
             onStartTrack = ::startEditTrack,
             onDrawTrack = ::drawTrackEdit,
+            onPickPhotos = {
+                photoPickLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            },
+            onPhotoOverlay = { overlay ->
+                photoOverlay = overlay
+                renderPhotoMarkers()
+            },
+            onTabChanged = ::renderPhotoMarkers,
             onClose = ::onEditClosed,
         )
         onBackPressedDispatcher.addCallback(this, closeEditOnBack)
@@ -508,7 +553,13 @@ class MainActivity : AppCompatActivity() {
             applyAttributionMargin()
             mapView.post { enlargeAttributionTarget() }
             instance.addOnMapClickListener { point -> onMapTap(instance, point) }
-            instance.addOnCameraMoveListener { spotPopup.place() }
+            instance.addOnCameraMoveListener {
+                spotPopup.place()
+                photoMarkers.place()
+                photoPopup.place()
+            }
+            // What overlaps depends on the zoom: the photo groups again once the camera rests.
+            instance.addOnCameraIdleListener { photoMarkers.regroup() }
             showInArea = ShowInArea(findViewById(R.id.show_in_area), instance) { spots ->
                 MapSpots.setInArea(style?.takeIf { overlaysAttached }, spots)
             }.apply { setCategories(MapSpots.get(this@MainActivity)) }
@@ -999,6 +1050,7 @@ class MainActivity : AppCompatActivity() {
      *  a selection on it goes. The tile version moved with the change, and the tiles follow. */
     private fun onRemovedFromStory(activityId: String) {
         if (panelState.focused == activityId) panel.clearFocus()
+        refreshPhotos(force = true)
         checkTileVersion()
         style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
         reloadList()
@@ -1010,6 +1062,8 @@ class MainActivity : AppCompatActivity() {
         panel.dismissPopups()
         panel.hold(true)
         editWindow.open(group, ActivityFacets.typeFacets(panelState.activities, null))
+        // The photos follow the window: its one activity's, which its Photos tab manages.
+        refreshPhotos(force = false)
         closeEditOnBack.isEnabled = true
         editLock.visibility = View.VISIBLE
         placeEditWindow()
@@ -1039,7 +1093,10 @@ class MainActivity : AppCompatActivity() {
         if (visible == null) TrackEditOverlay.clear(loaded) else TrackEditOverlay.set(loaded, visible, lo, hi, preview)
     }
 
-    private fun onEditClosed(saved: Boolean, trackApplied: Boolean) {
+    private fun onEditClosed(saved: Boolean, trackApplied: Boolean, photosSaved: Boolean) {
+        photoOverlay = null
+        // Back to the selection's or the Story's photos — read again when any was written.
+        refreshPhotos(force = photosSaved)
         editingTrackId?.let { id ->
             if (trackApplied) awaitingEditIds += id
             style?.let(TrackEditOverlay::clear)
@@ -1096,6 +1153,7 @@ class MainActivity : AppCompatActivity() {
             reloadList()
             activityDays.reload()
             updateTrackMetrics(refetch = true)
+            refreshPhotos(force = true)
             panel.storiesTab.reloadOpen()
         }
     }
@@ -1119,6 +1177,7 @@ class MainActivity : AppCompatActivity() {
         activityDays.reload()
         coverageWatch.watch()
         panel.storiesTab.reloadOpen()
+        refreshPhotos(force = true)
     }
 
     /** The mode toggle: shown once the session allows, away while recording or editing. Layers
@@ -1143,6 +1202,7 @@ class MainActivity : AppCompatActivity() {
     private fun applyTrackFilter() {
         style?.takeIf { overlaysAttached }?.let { MapOverlays.setTrackFilter(it, panelState.mapHidden, panelState.focused) }
         updateTrackMetrics(refetch = false)
+        refreshPhotos(force = false)
     }
 
     /**
@@ -1162,6 +1222,8 @@ class MainActivity : AppCompatActivity() {
             renderTrackMetrics()
             return
         }
+        // A reprocess can move a photo along its track, or take its stretch away.
+        if (refetch) refreshPhotos(force = true)
         trackMetricsFor = focused
         if (!refetch) trackMetrics = null
         renderTrackMetrics()
@@ -1186,6 +1248,107 @@ class MainActivity : AppCompatActivity() {
         } else {
             MapOverlays.clearTrackBands(loaded)
         }
+    }
+
+    /**
+     * The photos for whatever the map now shows ([photoScope]) — read when the scope moves to
+     * another activity or Story, or with [force] when they may have changed under it (a save
+     * from the Photos tab, a reprocess, a Story's members). A new scope starts empty rather than
+     * showing the last one's photos while it loads.
+     */
+    private fun refreshPhotos(force: Boolean) {
+        val single = editWindow.single
+        val next = when {
+            mode != MapMode.NORMAL -> null
+            editWindow.isOpen -> single?.let { "activity:${it.id}" }
+            panelState.focused != null -> "activity:${panelState.focused}"
+            storyId != null -> "story:$storyId"
+            else -> null
+        }
+        if (next == photoScope && !force) {
+            if (photosLoaded && single != null) editWindow.setPhotos(photos, photosError)
+            renderPhotoMarkers()
+            return
+        }
+        if (next != photoScope) {
+            photos = emptyList()
+            photosError = null
+            photosLoaded = false
+            photoPopup.close()
+        }
+        photoScope = next
+        val gen = ++photoGeneration
+        renderPhotoMarkers()
+        if (next == null) return
+        val (kind, id) = next.split(':', limit = 2)
+        HoldMyTrackApi.photos(activity = id.takeIf { kind == "activity" }, story = id.takeIf { kind == "story" }) { result ->
+            if (gen != photoGeneration) return@photos
+            photos = result.getOrDefault(emptyList())
+            photosLoaded = true
+            photosError = result.exceptionOrNull()?.let { it.message?.takeIf { m -> m.isNotBlank() } ?: getString(R.string.map_unreachable) }
+            if (photosError != null) Log.w(TAG, "could not load photos", result.exceptionOrNull())
+            if (single != null && editWindow.single?.id == single.id) editWindow.setPhotos(photos, photosError)
+            photoPopup.retain(photos)
+            renderPhotoMarkers()
+        }
+    }
+
+    /**
+     * The photo markers (`docs/SPEC.md` FR-16.7): the scope's photos on their tracks, with the
+     * Photos tab's unsaved changes merged in while it shows — not while the Track tab has the
+     * map, nor for a route hidden on the map.
+     */
+    private fun renderPhotoMarkers() {
+        if (!::photoMarkers.isInitialized) return
+        val scope = photoScope
+        val activityScope = scope?.removePrefix("activity:")?.takeIf { scope.startsWith("activity:") }
+        val shown = scope != null && !isRecording() && !editWindow.showingTrack && activityScope !in panelState.mapHidden
+        var items = if (!shown) emptyList() else photos.mapNotNull { p ->
+            val lat = p.lat ?: return@mapNotNull null
+            val lon = p.lon ?: return@mapNotNull null
+            if (p.activityId in panelState.mapHidden) return@mapNotNull null
+            PhotoMarkerItem(p.id, lon, lat, p.caption, thumbPath = p.thumbUrl)
+        }
+        val overlay = photoOverlay
+        if (shown && overlay != null) {
+            val upserts = overlay.upserts.associateBy { it.id }
+            val kept = items.filter { it.id !in overlay.hidden }.map { upserts[it.id] ?: it }
+            val keptIds = kept.mapTo(HashSet()) { it.id }
+            items = kept + overlay.upserts.filter { it.id !in keptIds }
+        }
+        if (!shown) photoPopup.close()
+        photoMarkers.set(map, items, overlay?.activeId ?: photoPopup.showingId, overlay?.activeId)
+    }
+
+    /**
+     * A marker's tap (FR-16.7): one photo opens its popup. A group the map can separate — its
+     * photos more than [PHOTO_GROUP_SPREAD_M] apart — zooms in to fit them, at most to z19, where
+     * that spread is wider than a marker; one it can't (several taken at one spot) opens the
+     * popup on its first photo, to step through the rest. Only saved photos open: one the Photos
+     * tab hasn't uploaded has nothing to show yet.
+     */
+    private fun openPhotoMarker(ids: List<String>) {
+        val instance = map ?: return
+        val located = ids.mapNotNull { id -> photos.firstOrNull { it.id == id }?.takeIf { it.lat != null && it.lon != null } }
+        val spread = located.maxOfOrNull { a -> located.maxOf { b -> haversineM(a.lat!!, a.lon!!, b.lat!!, b.lon!!) } } ?: 0.0
+        if (located.size > 1 && spread > PHOTO_GROUP_SPREAD_M) {
+            flyTo(
+                doubleArrayOf(located.minOf { it.lon!! }, located.minOf { it.lat!! }, located.maxOf { it.lon!! }, located.maxOf { it.lat!! }),
+                maxZoom = PHOTO_GROUP_MAX_ZOOM,
+            )
+            return
+        }
+        if (located.isEmpty()) return
+        spotPopup.close()
+        photoPopup.show(instance, located)
+    }
+
+    private fun haversineM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val rad = Math.PI / 180
+        val dLat = (lat2 - lat1) * rad
+        val dLon = (lon2 - lon1) * rad
+        val h = Math.sin(dLat / 2).let { it * it } + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2).let { it * it }
+        return 2 * 6_371_008.8 * Math.asin(minOf(1.0, Math.sqrt(h)))
     }
 
     /** Frames every one of [activities] that has a track — nothing, for none. */
@@ -1431,6 +1594,8 @@ class MainActivity : AppCompatActivity() {
         locatePanel.visibility = if (active) View.GONE else View.VISIBLE
         renderDateFooter()
         updateNoticeVisibility()
+        // Like every history layer, the photos give the map to the live track.
+        renderPhotoMarkers()
 
         val loaded = style ?: return
         if (overlaysAttached) MapOverlays.setRecording(loaded, active, mode)
@@ -1651,6 +1816,7 @@ class MainActivity : AppCompatActivity() {
         }
         style?.takeIf { overlaysAttached }?.let { MapOverlays.setMode(it, next) }
         renderDateFooter()
+        refreshPhotos(force = false)
     }
 
     /** The Layers menu's Points of interest. Unticking the open popup's category closes it. */
@@ -1716,7 +1882,7 @@ class MainActivity : AppCompatActivity() {
      * has a near-zero extent, and fitting the camera to that box lands well past the basemap's
      * z14 data, on a grey rectangle.
      */
-    private fun flyTo(box: DoubleArray) {
+    private fun flyTo(box: DoubleArray, maxZoom: Double = MAX_FRAME_ZOOM) {
         val instance = map ?: return
         val bounds = LatLngBounds.from(box[3], box[2], box[1], box[0])
         // Into the map left showing between the chrome row and the panel, not under either.
@@ -1736,7 +1902,7 @@ class MainActivity : AppCompatActivity() {
         val padding = intArrayOf(FRAME_PADDING_PX, top, FRAME_PADDING_PX, bottom)
         val fitted = instance.getCameraForLatLngBounds(bounds, padding) ?: return
         val target = CameraPosition.Builder(fitted)
-            .zoom(minOf(fitted.zoom, MAX_FRAME_ZOOM))
+            .zoom(minOf(fitted.zoom, maxZoom))
             .build()
         instance.animateCamera(CameraUpdateFactory.newCameraPosition(target), FRAME_DURATION_MS)
     }
@@ -1851,6 +2017,13 @@ class MainActivity : AppCompatActivity() {
         private const val POP_HALF_MS = 100L
         private const val FRAME_PADDING_PX = 64
         private const val MAX_FRAME_ZOOM = 15.0
+
+        /** A photo group whose photos lie further apart than this zooms in to split them; one
+         *  closer opens its popup, since no zoom would — the web's `GROUP_SPREAD_M`. */
+        private const val PHOTO_GROUP_SPREAD_M = 15.0
+
+        /** How far a photo group's tap zooms in, where its 15 m is wider than a marker. */
+        private const val PHOTO_GROUP_MAX_ZOOM = 19.0
 
         /** How far from a tap a track still counts as tapped — the web's `TAP_TOLERANCE_PX`. */
         private const val TAP_TOLERANCE_DP = 14

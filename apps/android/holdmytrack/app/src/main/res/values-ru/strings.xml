@@ -455,6 +455,60 @@
         <item quantity="other">Редактировать %1$d занятия</item>
     </plurals>
 
+    <!-- Photos (photos/, panel/PhotosTab.kt, map/PhotoMarkers.kt, map/PhotoPopup.kt), after the
+         web's photos.* messages. -->
+    <string name="photos_tab">Фото</string>
+    <string name="photos_unsaved">Фото, есть несохранённые изменения</string>
+    <string name="photos_check_one">Фотографии относятся к одному занятию — отметьте только одно, чтобы добавить или изменить их.</string>
+    <string name="photos_no_track">У этого занятия нет трека, на который можно поместить фотографии.</string>
+    <string name="photos_add">Добавить фото</string>
+    <string name="photos_preparing">Подготовка %1$d из %2$d…</string>
+    <string name="photos_loading">Загрузка фотографий…</string>
+    <string name="photos_empty">Фотографий пока нет. Добавьте снимки с этого занятия — каждый встанет на маршрут там, где был сделан.</string>
+    <string name="photos_upload_failed">%1$s: %2$s</string>
+    <string name="photos_unreadable">Этот файл не открывается как фотография.</string>
+    <string name="photos_needs_place">Не удалось определить, где снята фотография. Передвиньте ползунок к её месту на маршруте.</string>
+    <string name="photos_slider">Место на маршруте</string>
+    <plurals name="photos_more_waiting">
+        <item quantity="one">Ещё %1$d ждёт места</item>
+        <item quantity="few">Ещё %1$d ждут места</item>
+        <item quantity="many">Ещё %1$d ждут места</item>
+        <item quantity="other">Ещё %1$d ждут места</item>
+    </plurals>
+    <string name="photos_remove">Убрать</string>
+    <string name="photos_place_here">Поставить сюда</string>
+    <string name="photos_photo_n">Фото %1$d</string>
+    <string name="photos_new">Новая</string>
+    <string name="photos_changed">Изменена</string>
+    <string name="photos_deleted">Будет удалена</string>
+    <string name="photos_edit">Изменить</string>
+    <string name="photos_edit_one">Изменить: %1$s</string>
+    <string name="photos_delete_one">Удалить: %1$s</string>
+    <string name="photos_undo_delete">Оставить фотографию</string>
+    <string name="photos_caption">Подпись</string>
+    <string name="photos_caption_placeholder">Добавить подпись</string>
+    <string name="photos_caption_too_long">Подпись должна быть не длиннее %1$d символов.</string>
+    <string name="photos_done">Готово</string>
+    <string name="photos_place_first">Перед сохранением поставьте каждую новую фотографию на маршрут.</string>
+    <string name="photos_saving_n">Сохранение фото %1$d из %2$d…</string>
+    <string name="photos_discard_title">Отменить изменения фотографий?</string>
+    <string name="photos_discard_message">Фотографии, которые вы добавили, переместили или удалили в этом окне, ещё не сохранены.</string>
+    <string name="photos_discard">Отменить изменения</string>
+    <string name="photos_keep_editing">Продолжить</string>
+    <string name="photos_marker">Фотография</string>
+    <plurals name="photos_marker_group">
+        <item quantity="one">%1$d фотография</item>
+        <item quantity="few">%1$d фотографии</item>
+        <item quantity="many">%1$d фотографий</item>
+        <item quantity="other">%1$d фотографии</item>
+    </plurals>
+    <string name="photos_taken">Снято %1$s</string>
+    <string name="photos_full_size">Полный размер</string>
+    <string name="photos_previous">Предыдущая фотография</string>
+    <string name="photos_next">Следующая фотография</string>
+    <string name="photos_position">%1$d из %2$d</string>
+    <string name="photos_close">Закрыть</string>
+
     <!-- The panel's Privacy tab (panel/PrivacyTab.kt), after the web's private.* messages. -->
     <string name="panel_tab_privacy">Приватность</string>
     <string name="private_subtitle">Треки никогда не начинаются и не заканчиваются внутри этих кругов.</string>

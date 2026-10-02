@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The Edit window (panel/EditActivityWindow.kt), after the web's EditActivityWindow.tsx at phone
      width: a card floating over the top of the map, under the chrome row (its top margin is set
-     in MainActivity), rather than a modal dialog, so its Track tab can edit on the map. The title
-     and whose it is, the Activity and Track tabs — Type, Name and Description on the first, the
-     track editor (panel/TrackEditor) on the second — then an error line, and Cancel and Save.
-     Clickable, so a touch on it never reaches the map. -->
+     in MainActivity), rather than a modal dialog, so its Track and Photos tabs can edit on the
+     map. The title and whose it is, the Activity, Track and Photos tabs — Type, Name and
+     Description on the first, the track editor (panel/TrackEditor) on the second, the photos
+     (panel/PhotosTab) on the third — then an error line, and Cancel and Save. Clickable, so a
+     touch on it never reaches the map. -->
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -88,6 +89,47 @@
                     <!-- Unsaved track changes (.edit-window__tab-dot). -->
                     <View
                         android:id="@+id/edit_tab_track_dot"
+                        android:layout_width="6dp"
+                        android:layout_height="6dp"
+                        android:layout_gravity="center_vertical"
+                        android:layout_marginStart="@dimen/hmt_space_6"
+                        android:background="@drawable/bg_panel_dot"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/edit_tab_photos"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/hmt_space_16"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:minHeight="40dp"
+                        android:gravity="center_vertical"
+                        android:paddingBottom="@dimen/hmt_space_6"
+                        android:text="@string/photos_tab"
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleSmall" />
+
+                    <!-- How many photos Save would leave (.edit-window__tab-count). -->
+                    <TextView
+                        android:id="@+id/edit_tab_photos_count"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_vertical"
+                        android:layout_marginStart="@dimen/hmt_space_6"
+                        android:layout_marginBottom="@dimen/hmt_space_6"
+                        android:background="@drawable/bg_panel_badge"
+                        android:importantForAccessibility="no"
+                        android:paddingStart="@dimen/hmt_space_6"
+                        android:paddingEnd="@dimen/hmt_space_6"
+                        android:textColor="@color/hmt_accent_strong"
+                        android:textFontWeight="700"
+                        android:textSize="@dimen/hmt_text_xs"
+                        android:visibility="gone"
+                        tools:text="4" />
+
+                    <!-- Unsaved photo changes. -->
+                    <View
+                        android:id="@+id/edit_tab_photos_dot"
                         android:layout_width="6dp"
                         android:layout_height="6dp"
                         android:layout_gravity="center_vertical"
@@ -178,6 +220,8 @@
             </LinearLayout>
 
             <include layout="@layout/include_track_editor" />
+
+            <include layout="@layout/include_photos_tab" />
 
             <TextView
                 android:id="@+id/edit_error"
