@@ -90,6 +90,8 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 
 	// ingest_complete stays false until every step after this insert has run (the end of
 	// this function): a hidden track has none, so it is complete as inserted.
+	// in_heatmap_window is decided from started_at here, against the same window
+	// heatmap_aging.go sweeps with: an import of years-old history isn't current heat.
 	var activityID string
 	var inserted, complete bool
 	err = pool.QueryRow(ctx, `
@@ -98,13 +100,15 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 				user_id, source, source_detail, external_id,
 				activity_type, distance_meters, duration_seconds, moving_seconds,
 				elevation_gain_m, avg_speed_mps, started_at,
-				trajectory, raw_payload_key, name, description, ingest_complete
+				trajectory, raw_payload_key, name, description, ingest_complete,
+				in_heatmap_window
 			) VALUES (
 				$1, $2, $3, $4,
 				$5, $6, $7, $8,
 				$9, $10, $11,
 				`+trajectorySQL("$12", "$13", "$14")+`,
-				$15, NULLIF($16, ''), NULLIF($17, ''), $18
+				$15, NULLIF($16, ''), NULLIF($17, ''), $18,
+				$11 >= NOW() - make_interval(days => $19)
 			)
 			ON CONFLICT (user_id, source, external_id) WHERE external_id IS NOT NULL DO NOTHING -- $15 = raw_payload_key
 			RETURNING id
@@ -121,6 +125,7 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 		m.elevationGainM, m.avgSpeedMps, startedAt,
 		pp.simpLons, pp.simpLats, pp.simpTs,
 		job.RawPayloadKey, act.Name, act.Description, hidden,
+		fog.HeatmapWindowDays,
 	).Scan(&activityID, &inserted, &complete)
 	if err != nil {
 		return Result{}, fmt.Errorf("ingest: persist activity: %w", err)

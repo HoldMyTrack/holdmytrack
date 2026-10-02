@@ -72,6 +72,16 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 	heatmapCapTicker := time.NewTicker(heatmapCapInterval)
 	defer heatmapCapTicker.Stop()
 
+	// A ticker's first tick is a whole interval away, so the daily sweeps also run once at
+	// start: a worker restarted more often than daily (every deploy) would otherwise never
+	// reach them.
+	if err := ageOutHeatmapWindow(ctx, pool, log); err != nil {
+		log.Error("heatmap aging error", "err", err)
+	}
+	if err := recomputeHeatmapCaps(ctx, pool, log); err != nil {
+		log.Error("heatmap cap error", "err", err)
+	}
+
 	for {
 		select {
 		case <-ctx.Done():

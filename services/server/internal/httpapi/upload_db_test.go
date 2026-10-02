@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
@@ -173,5 +174,26 @@ func TestActivityStatusIsPerAccount(t *testing.T) {
 	d.decode(d.do(other, http.MethodGet, "/v1/activities/status/"+resp.ExternalID, nil), http.StatusOK, &theirs)
 	if mine.Status != "processing" || theirs.Status != "unknown" {
 		t.Fatalf("owner sees %q, another account %q; want processing, unknown", mine.Status, theirs.Status)
+	}
+}
+
+// An activity older than Heatmap's window is out of it from the moment it's ingested, not
+// only after the next daily sweep.
+func TestOldActivityIngestsOutsideTheHeatmapWindow(t *testing.T) {
+	d := newDBTestWithS3(t, newMemS3())
+	me := d.newAccount(false)
+	old := strings.ReplaceAll(resumeGPX, "2026-05-01", "2019-05-01")
+	d.uploadFile(me, "old.gpx", []byte(old))
+	res, err := ingest.Process(context.Background(), d.pool, d.srv.store, d.latestIngestJob(me))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var inWindow bool
+	if err := d.pool.QueryRow(context.Background(),
+		`SELECT in_heatmap_window FROM activities WHERE id = $1`, res.ActivityID).Scan(&inWindow); err != nil {
+		t.Fatal(err)
+	}
+	if inWindow {
+		t.Fatal("a 2019 activity was ingested inside the heatmap window")
 	}
 }
