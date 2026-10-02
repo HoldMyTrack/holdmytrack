@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mapstyle"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 )
@@ -231,6 +232,74 @@ func TestPagesFollowAcceptLanguage(t *testing.T) {
 		}
 		if other := get(path, "de-DE"); !strings.Contains(other, `<html lang="en">`) {
 			t.Errorf("%s: an unsupported language didn't fall back to English", path)
+		}
+	}
+}
+
+// TestLanguageMenu is the header's language menu signed out: the choice is remembered on the
+// browser, the browser goes back where it was, and later pages follow the choice over
+// Accept-Language.
+func TestLanguageMenu(t *testing.T) {
+	s := newPagesTestServer(t)
+	post := func(lang, referer string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/language", strings.NewReader("lang="+lang))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", "https://app.example")
+		if referer != "" {
+			req.Header.Set("Referer", referer)
+		}
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, req)
+		return rec
+	}
+
+	rec := post("ru", "https://app.example/reset?token=abc")
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/reset?token=abc" {
+		t.Fatalf("POST /language: %d to %q, want 303 back to /reset?token=abc", rec.Code, rec.Header().Get("Location"))
+	}
+	cookie := rec.Result().Cookies()
+	if len(cookie) != 1 || cookie[0].Name != i18n.CookieName || cookie[0].Value != "ru" || cookie[0].MaxAge <= 0 || !cookie[0].HttpOnly {
+		t.Fatalf("POST /language: cookie %+v, want a lasting %s=ru", cookie, i18n.CookieName)
+	}
+	if rec := post("de", ""); rec.Code != http.StatusBadRequest {
+		t.Errorf("unsupported language: %d, want 400", rec.Code)
+	}
+	if rec := post("ru", ""); rec.Header().Get("Location") != "/" {
+		t.Errorf("no Referer: back to %q, want /", rec.Header().Get("Location"))
+	}
+	if c := post("", "https://app.example/help").Result().Cookies(); len(c) != 1 || c[0].Name != i18n.CookieName || c[0].MaxAge >= 0 {
+		t.Errorf("Automatic: cookie %+v, want %s cleared", c, i18n.CookieName)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/help", nil)
+	req.Header.Set("Accept-Language", "en-US")
+	req.AddCookie(cookie[0])
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	body := rec.Body.String()
+	if !strings.Contains(body, `<html lang="ru">`) || !strings.Contains(body, `value="ru" lang="ru" aria-checked="true">Русский</button>`) {
+		t.Errorf("an English browser that picked Russian didn't get a Russian page with Русский checked")
+	}
+	if !strings.Contains(body, `value="en" lang="en" aria-checked="false">English</button>`) {
+		t.Errorf("the language menu doesn't offer English by its own name")
+	}
+	if !strings.Contains(body, `name="lang" value="">Автоматически (как в браузере)</button>`) {
+		t.Errorf("the language menu doesn't offer Automatic in the page's language")
+	}
+}
+
+func TestLanguageReturnPath(t *testing.T) {
+	for referer, want := range map[string]string{
+		"https://app.example/settings?saved": "/settings?saved",
+		"https://app.example/":               "/",
+		"":                                   "/",
+		"https://app.example//evil.example/": "/",
+		`https://app.example/\evil.example`:  "/",
+	} {
+		req := httptest.NewRequest(http.MethodPost, "/language", nil)
+		req.Header.Set("Referer", referer)
+		if got := languageReturnPath(req); got != want {
+			t.Errorf("Referer %q: back to %q, want %q", referer, got, want)
 		}
 	}
 }

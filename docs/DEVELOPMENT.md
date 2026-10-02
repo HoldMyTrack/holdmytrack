@@ -34,7 +34,7 @@ Every piece of text a person reads is a catalog key, in English and Russian (`IM
 
 A count needs every plural form its language uses: `.one`/`.other` in English, `.one`/`.few`/`.many`/`.other` in Russian (the tests list what's missing). Keep placeholders identical across languages. `go test ./internal/i18n` and `npm run test:unit` check both.
 
-To see a page in Russian, set the browser's language, or send the header: `curl -H 'Accept-Language: ru' localhost:5173/help`. A signed-in account's Language setting beats the header. The dev server never caches pages, so there's no stale language to clear; production caches each signed-out page per language.
+To see a page in Russian, use the header's language menu, set the browser's language, or send the header: `curl -H 'Accept-Language: ru' localhost:5173/help`. The menu's `hmt_lang` cookie beats the header, and a signed-in account's Language setting beats both. The dev server never caches pages, so there's no stale language to clear; production caches each signed-out page per language.
 
 Adding a *language* is a catalog on each surface, `about`/`help` translations, its plural rule (`i18n.PluralForm`) and separators (`Localizer.separators`), and its code in `i18n.Supported`/`Names`, `locales_config.xml` and `build.gradle.kts`'s `localeFilters`. ADR-0014 lists the rest.
 

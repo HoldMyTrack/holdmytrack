@@ -28,7 +28,7 @@ const pageRoutes = [
   '^/sync(\\?|$)',
   '^/admin(/|\\?|$)',
   '^/settings(/|\\?|$)',
-  '^/(about|help|contacts|logout|signin|signup|demo|forgot|reset|verify)(\\?|$)',
+  '^/(about|help|contacts|logout|language|signin|signup|demo|forgot|reset|verify)(\\?|$)',
   '^/verify-pending(/|\\?|$)',
   '^/static/',
   '^/v1/',

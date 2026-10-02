@@ -31,7 +31,7 @@ const Default = "en"
 // Supported are the languages with a catalog, in the order Settings lists them.
 var Supported = []string{"en", "ru"}
 
-// Names are each language's name in itself — what Settings' Language list shows, never
+// Names are each language's name in itself — what the header's language menu shows, never
 // translated, so someone can find their own language whatever the page is in.
 var Names = map[string]string{"en": "English", "ru": "Русский"}
 
@@ -242,13 +242,30 @@ func Negotiate(header string) string {
 	return best
 }
 
+// CookieName is the cookie the header's language control sets (POST /language): a language
+// someone picked on this browser, signed in or not.
+const CookieName = "hmt_lang"
+
+// Chosen is the language r's cookie picked, or "" when it has none (or one no longer
+// supported).
+func Chosen(r *http.Request) string {
+	c, err := r.Cookie(CookieName)
+	if err != nil || !IsSupported(c.Value) {
+		return ""
+	}
+	return c.Value
+}
+
 // Resolve is the language a request gets: the account's own setting when it has one, or else
-// what the browser asks for, or else English.
+// the one picked on this browser (Chosen), or else what the browser asks for, or else English.
 func Resolve(accountLang string, r *http.Request) string {
 	if IsSupported(accountLang) {
 		return accountLang
 	}
 	if r != nil {
+		if lang := Chosen(r); lang != "" {
+			return lang
+		}
 		if lang := Negotiate(r.Header.Get("Accept-Language")); lang != "" {
 			return lang
 		}

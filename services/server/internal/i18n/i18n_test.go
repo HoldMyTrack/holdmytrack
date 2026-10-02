@@ -1,6 +1,7 @@
 package i18n
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"regexp"
 	"slices"
@@ -136,6 +137,19 @@ func TestResolve(t *testing.T) {
 	}
 	if got := Resolve("xx", nil); got != Default {
 		t.Errorf("unknown setting, no request: %s", got)
+	}
+	r.AddCookie(&http.Cookie{Name: CookieName, Value: "en"})
+	if got := Resolve("", r); got != "en" {
+		t.Errorf("the browser's picked language should beat its header: %s", got)
+	}
+	if got := Resolve("ru", r); got != "ru" {
+		t.Errorf("account setting should beat the cookie: %s", got)
+	}
+	r = httptest.NewRequest("GET", "/", nil)
+	r.Header.Set("Accept-Language", "ru")
+	r.AddCookie(&http.Cookie{Name: CookieName, Value: "xx"})
+	if got := Resolve("", r); got != "ru" {
+		t.Errorf("an unsupported cookie should be ignored: %s", got)
 	}
 }
 

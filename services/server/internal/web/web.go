@@ -44,6 +44,13 @@ type Link struct {
 	LabelKey string
 }
 
+// Language is one entry of the header's language menu: its code, and its name in itself
+// (i18n.Names), never translated, so someone can find their own language whatever the page is in.
+type Language struct {
+	Code string
+	Name string
+}
+
 // InfoLinks is the header's Info menu. apps/web/src/ui/InfoMenu.tsx repeats it for the map
 // page's React header until that header is this one (ADR-0012); keep the two in step.
 var InfoLinks = []Link{
@@ -91,6 +98,8 @@ type PageData struct {
 	Page any
 
 	InfoLinks []Link
+	// Languages is the header's language menu (POST /language), in i18n.Supported's order.
+	Languages []Language
 	DonateURL string
 	Canonical string
 	// SiteURL is APP_BASE_URL — for the absolute URLs link previews and structured data need.
@@ -291,6 +300,10 @@ func (r *Renderer) fill(data *PageData) {
 		data.Lang = i18n.Default
 	}
 	data.InfoLinks = InfoLinks
+	data.Languages = make([]Language, 0, len(i18n.Supported))
+	for _, code := range i18n.Supported {
+		data.Languages = append(data.Languages, Language{Code: code, Name: i18n.Names[code]})
+	}
 	data.DonateURL = "/about#funding"
 	if OpenCollectiveSlug != "" {
 		data.DonateURL = "https://opencollective.com/" + url.PathEscape(OpenCollectiveSlug) + "/donate"

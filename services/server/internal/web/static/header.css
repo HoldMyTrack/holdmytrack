@@ -175,6 +175,42 @@
   margin: 0;
 }
 
+/* The language menu (POST /language): a globe and the page's language code, open to everyone.
+   Each choice is a submit button in one form, named in its own language; the current one bold. */
+.language-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fm-ink);
+}
+
+.language-menu__trigger:hover,
+.language-menu[open] .language-menu__trigger {
+  background: rgb(var(--fm-ink-rgb) / 6%);
+}
+
+.language-menu__dropdown {
+  min-width: 12rem;
+}
+
+.header-menu__item[aria-checked='true'] {
+  font-weight: 600;
+}
+
+/* "Automatic" isn't a language but a return to the browser's: set apart under a rule. */
+.language-menu__auto {
+  margin-top: 4px;
+  border-top: 1px solid rgb(var(--fm-ink-rgb) / 8%);
+  border-radius: 0 0 6px 6px;
+  white-space: nowrap;
+}
+
 .info-menu__trigger {
   display: inline-flex;
   align-items: center;
@@ -361,6 +397,7 @@
 }
 
 .info-menu__trigger svg,
+.language-menu__trigger svg,
 .upload-menu__trigger svg,
 .sync-link svg {
   flex: none;
@@ -482,8 +519,20 @@
 
   /* Every control must still fit beside the brand on a 320px screen: they go back to compact,
      icons alone — 16px icons, a 32px avatar. */
-  .info-menu__trigger {
+  .info-menu__trigger,
+  .language-menu__trigger {
     padding: 6px;
+  }
+
+  /* The code alone: "EN" is narrower than the globe beside it, and says more. */
+  .language-menu__trigger svg {
+    display: none;
+  }
+
+  /* Right-aligned under a trigger mid-header, a one-line "Automatic" would push the menu off
+     the screen's left edge at 320px: it may wrap here. */
+  .language-menu__auto {
+    white-space: normal;
   }
 
   .info-menu__trigger svg,
