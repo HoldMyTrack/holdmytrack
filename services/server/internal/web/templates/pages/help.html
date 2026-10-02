@@ -6,11 +6,13 @@
     <nav class="help__toc" aria-label="On this page">
       <a href="#map">The map</a>
       <a href="#dates">Choosing dates</a>
+      <a href="#edit">Editing and deleting</a>
       <a href="#stories">Stories</a>
       <a href="#photos">Photos</a>
       <a href="#places">Points of interest</a>
       <a href="#sync">Getting your activities in</a>
       <a href="#export">Exporting a map image</a>
+      <a href="#profile">Your profile</a>
       <a href="#settings">Settings and privacy</a>
     </nav>
   </section>
@@ -38,6 +40,14 @@
     </ul>
     <p>Whenever you switch to Fog of War or Heatmap, or zoom into another of these levels, a note under the mode switch says which one you're looking at — Country, Region or City view — and fades after a few seconds.</p>
     <p>Normal mode doesn't do this: it draws tracks until a few states fit on screen, and shows the plain map when you zoom out further.</p>
+
+    <h3>Layers</h3>
+    <p>The <strong>Layers</strong> button on the map changes what is drawn under your activities. Your browser remembers your choices, and they work the same in all three modes.</p>
+    <ul class="page-list">
+      <li><strong>Base map:</strong> <strong>Map</strong>, or <strong>Satellite</strong> to see aerial imagery with the roads and place names drawn over it, where it's available.</li>
+      <li><strong>Paths:</strong> <strong>Trails</strong>, <strong>Tracks</strong> (dirt, farm and forest roads) and <strong>Bike paths</strong>, each drawn as a line of its own so it stands out from the streets once you zoom in to a neighborhood.</li>
+      <li><strong>Points of interest:</strong> see <a href="#places">below</a>.</li>
+    </ul>
   </section>
 
   <section class="page-section" id="dates">
@@ -49,6 +59,18 @@
       <li><strong>Go back through your history</strong> with the Earlier and Later buttons, five days per press, or hold one down. A knob parked on that edge comes along, which is how a selection grows beyond fifteen days; otherwise your selection stays as it was.</li>
     </ul>
     <p>Choosing new dates clears your filters, hidden tracks and selected activities, since they described the old ones. The Stories and Privacy tabs don't use dates, and neither do Fog of War and Heatmap, so the slider is only on the Activities tab. On a phone it sits at the bottom of the screen, under the panel.</p>
+  </section>
+
+  <section class="page-section" id="edit">
+    <h2>Editing and deleting activities</h2>
+    <p>Select an activity on the Activities tab, or check several, and use the toolbar above the list.</p>
+    <ul class="page-list">
+      <li><strong>Edit</strong> (the pencil) opens the Edit window. On its <strong>Activity</strong> tab you can change an activity's type and give it a name and a description; with several checked, you can set one type for all of them.</li>
+      <li><strong>Fixing a track:</strong> the <strong>Track</strong> tab, for a single activity, removes the points you don't want — say, the half hour your watch kept recording after you got home. <strong>Chop</strong> keeps only the part between the slider's two knobs, <strong>Cut</strong> removes the part between them, and <strong>Delete point</strong> removes the points you click on the map. <strong>Undo</strong> steps back, and <strong>Reset</strong> returns the track to how it was recorded. When you save, the distance, times and your Fog of War are worked out again from the edited track. Your original recording is never changed, so an edit can always be undone.</li>
+      <li>The window's <strong>Save</strong> saves its Activity, Track and Photos tabs together; <strong>Cancel</strong> throws all of it away.</li>
+      <li><strong>Hide</strong> (the eye) takes activities off the map without deleting them, until you show them again.</li>
+      <li><strong>Delete</strong> (the bin) deletes the activities for good, with their photos and their part of your Fog of War and Heatmap. You're asked first, since it can't be undone.</li>
+    </ul>
   </section>
 
   <section class="page-section" id="stories">
@@ -99,7 +121,7 @@
     <p>If your history lives with Fitbit or Google, download it with <a href="https://takeout.google.com">Google Takeout</a>: select your Fitbit data, create the export, and download the <strong>.zip</strong> it gives you (Google's own guide: <a href="https://support.google.com/accounts/answer/3024190">How to download your Google data</a>). Upload that .zip as it is, without unpacking it; it shows as one row in the Upload menu, counting its activities as they're processed. HoldMyTrack recognizes a Takeout export by itself and imports every activity that has a GPS route; activities without one, like a logged swim, are skipped.</p>
 
     <h3>The Android app</h3>
-    <p>The HoldMyTrack Android app syncs your workouts from Health Connect, where most Android watches and fitness apps store them. Open it and tap <strong>Sync Now</strong>: the new activities show in the Upload menu while they're processed, then on the Sync page and on your map. Workouts without a route can't be placed on a map, so they're skipped: indoor ones, and Samsung Galaxy Watch workouts, whose routes Samsung doesn't share with Health Connect. The app can also record a walk, hike or drive by itself when you just want the route; recordings stay on your phone until you choose to sync them.</p>
+    <p><a href="/download/holdmytrack.apk">Download the Android app</a> and open the file on your phone to install it. It isn't on Google Play yet, so your phone asks you to allow installing it from your browser first. The app syncs your workouts from Health Connect, where most Android watches and fitness apps store them. Open it and tap <strong>Sync Now</strong>: the new activities show in the Upload menu while they're processed, then on the Sync page and on your map. Workouts without a route can't be placed on a map, so they're skipped: indoor ones, and Samsung Galaxy Watch workouts, whose routes Samsung doesn't share with Health Connect. The app can also record a walk, hike or drive by itself when you just want the route; recordings stay on your phone until you choose to sync them.</p>
 
     <h3>Importing twice is safe</h3>
     <ul class="page-list">
@@ -114,15 +136,26 @@
     <p>The image shows the map as you see it: your tracks in Normal mode, your coverage in Fog of War, your year in Heatmap (a focused track's pace coloring isn't included). It carries the map's required credit to OpenStreetMap and a small HoldMyTrack logo in its bottom corners.</p>
   </section>
 
+  <section class="page-section" id="profile">
+    <h2>Your profile</h2>
+    <p>Open <a href="/profile">Profile</a> from the menu under your avatar to see your history at a glance. Only you can see it.</p>
+    <ul class="page-list">
+      <li><strong>The activity grid</strong> has a square for every day, one block per year, darker the more you did that day.</li>
+      <li><strong>Totals</strong> for your whole history and for each year: activities, distance, active days, and your longest streak of days in a row.</li>
+      <li><strong>Trends</strong> shows the last 12 months as one bar per week or per month. Hover a bar, or tap it, to see its distance, number of activities, moving time and climb.</li>
+    </ul>
+  </section>
+
   <section class="page-section" id="settings">
     <h2>Settings and privacy</h2>
 
-    <h3>Country, timezone and language</h3>
+    <h3>Country, timezone, language and theme</h3>
     <p>Open <a href="/settings">Settings</a> from the menu under your avatar.</p>
     <ul class="page-list">
       <li><strong>Country</strong> sets your units: miles and feet in the United States, Liberia and Myanmar, kilometers and meters everywhere else.</li>
       <li><strong>Timezone</strong> decides which calendar day an activity counts on, everywhere the app groups by day: the date slider, the activity grid on your Profile, and trends. It is set from your browser when you sign up; change it if you have moved.</li>
       <li><strong>Language</strong> is the language of the pages, the map and our emails. It starts on automatic: whatever your browser is set to.</li>
+      <li><strong>Theme</strong> is light or dark, or follows your device. It is kept by this browser only, so each device can have its own.</li>
     </ul>
     <p>When you first sign up, HoldMyTrack asks for your country and timezone before showing your map.</p>
 
