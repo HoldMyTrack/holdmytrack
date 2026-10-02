@@ -42,6 +42,12 @@ const maxUploadBytes = 64 << 20 // 64 MiB
 // so this is deliberately much larger than a single activity file ever needs to be.
 const maxZipUploadBytes = 512 << 20 // 512 MiB
 
+// multipartMemoryBytes is how much of an upload's multipart body ParseMultipartForm keeps in
+// memory; a larger file part goes to a temp file. Passing maxZipUploadBytes here instead kept
+// a whole archive in RAM, and the zip branch then copied it again — about 1 GiB per upload,
+// so two or three large exports at once could get the API killed for out-of-memory.
+const multipartMemoryBytes = 32 << 20
+
 // maxZipEntries bounds how many files inside one archive handleZipUpload will process — not
 // a claim that a real import can't have more, just where this server stops rather than
 // enqueueing an unbounded number of jobs from one request. §5.1's "one bad file in a bulk
@@ -332,10 +338,11 @@ type uploadResponse struct {
 // rejecting it, not what it ultimately accepts.
 func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxZipUploadBytes+1<<20) // +1MiB of multipart overhead
-	if err := r.ParseMultipartForm(maxZipUploadBytes); err != nil {
+	if err := r.ParseMultipartForm(multipartMemoryBytes); err != nil {
 		httpErrorT(w, r, http.StatusRequestEntityTooLarge, "error.upload_too_large")
 		return
 	}
+	defer r.MultipartForm.RemoveAll() //nolint:errcheck // best effort; net/http also cleans up
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		httpErrorT(w, r, http.StatusBadRequest, "error.avatar_missing")
@@ -345,20 +352,18 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	if ext == ".zip" {
-		// zip.NewReader needs an io.ReaderAt, which an HTTP body doesn't provide, so there is
-		// no streaming alternative here the way ingest.Process manages for a single file —
-		// read fully into memory (bounded by maxZipUploadBytes above), once, regardless of
-		// which zip-shaped branch below ends up handling it.
-		data, err := io.ReadAll(io.LimitReader(file, maxZipUploadBytes))
-		if err != nil {
-			httpErrorT(w, r, http.StatusBadRequest, "error.avatar_read")
-			return
-		}
-		if len(data) == 0 {
+		// zip.NewReader reads the part where ParseMultipartForm left it — in memory when
+		// small, a temp file otherwise — rather than a second copy of the whole archive.
+		if header.Size == 0 {
 			httpErrorT(w, r, http.StatusBadRequest, "error.upload_empty")
 			return
 		}
-		zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+		ra, ok := file.(io.ReaderAt)
+		if !ok {
+			httpErrorT(w, r, http.StatusBadRequest, "error.avatar_read")
+			return
+		}
+		zr, err := zip.NewReader(ra, header.Size)
 		if err != nil {
 			httpErrorT(w, r, http.StatusBadRequest, "error.upload_bad_zip")
 			return
@@ -375,6 +380,12 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Refused rather than cut off at the limit, which would have been ingested as a file
+	// that ends mid-track, or reported as unreadable.
+	if header.Size > maxUploadBytes {
+		httpErrorT(w, r, http.StatusRequestEntityTooLarge, "error.upload_too_large")
+		return
+	}
 	// Read once into memory (bounded by maxUploadBytes above) so the same bytes can be
 	// hashed and then uploaded with a known Content-Length. See the maxUploadBytes doc
 	// comment for why this is a deliberate, bounded exception to "never buffer a file."

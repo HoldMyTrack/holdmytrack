@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -102,5 +103,60 @@ func TestInterruptedIngestResumes(t *testing.T) {
 	}
 	if !complete || streams != 1 || masks == 0 {
 		t.Fatalf("after resume: complete %v, streams %d, masks %d", complete, streams, masks)
+	}
+}
+
+// A zip larger than the in-memory multipart threshold is read from the temp file it spilled
+// to, not copied into memory, and still unpacks.
+func TestLargeZipUploadIsReadInPlace(t *testing.T) {
+	d := newDBTestWithS3(t, newMemS3())
+	me := d.newAccount(false)
+
+	var archive bytes.Buffer
+	zw := zip.NewWriter(&archive)
+	w, _ := zw.CreateHeader(&zip.FileHeader{Name: "ride.gpx", Method: zip.Store})
+	w.Write([]byte(resumeGPX))
+	pad, _ := zw.CreateHeader(&zip.FileHeader{Name: "padding.bin", Method: zip.Store})
+	pad.Write(make([]byte, multipartMemoryBytes+1))
+	zw.Close()
+
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	part, _ := mw.CreateFormFile("file", "export.zip")
+	part.Write(archive.Bytes())
+	mw.Close()
+	req := httptest.NewRequest(http.MethodPost, "/v1/activities/upload", &body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Authorization", bearerPrefix+me.session)
+	rec := httptest.NewRecorder()
+	d.srv.ServeHTTP(rec, req)
+
+	var resp zipUploadResponse
+	d.decode(rec, http.StatusAccepted, &resp)
+	statuses := map[string]string{}
+	for _, f := range resp.Files {
+		statuses[f.Filename] = f.Status
+	}
+	if statuses["ride.gpx"] != "enqueued" || statuses["padding.bin"] != "skipped" {
+		t.Fatalf("files = %+v", resp.Files)
+	}
+}
+
+// A single file over maxUploadBytes is refused, not silently cut off at the limit.
+func TestOversizedFileUploadIsRefused(t *testing.T) {
+	d := newDBTest(t)
+	me := d.newAccount(false)
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	part, _ := mw.CreateFormFile("file", "huge.gpx")
+	part.Write(make([]byte, maxUploadBytes+1))
+	mw.Close()
+	req := httptest.NewRequest(http.MethodPost, "/v1/activities/upload", &body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Authorization", bearerPrefix+me.session)
+	rec := httptest.NewRecorder()
+	d.srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status %d, want 413", rec.Code)
 	}
 }
