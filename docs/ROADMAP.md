@@ -78,28 +78,6 @@ Native apps whose core job is exporting device-recorded health data to HoldMyTra
 
 ---
 
-## Phase 3 — Finalized design + mobile browser support
-
-The pass that finished the UI, across both desktop and mobile: icons are one Lucide set (`IMPLEMENTATION.md` §4.17), type is Inter with Fraunces for headings, colors are `--fm-*` custom properties, and spacing, radius, type, weight and elevation are token scales too (`IMPLEMENTATION.md` §4.18). It ended in an explicit design freeze: "this is how it will look — no more changes."
-
-- [x] A real icon set — Lucide (`lucide-react`) replaces every hand-drawn inline SVG icon and text-glyph caret on the web (`IMPLEMENTATION.md` §4.17); Android uses the same set (`apps/android/docs/IMPLEMENTATION.md` §1.3).
-- [x] Real typography — Inter for text, Fraunces for headings and the wordmark, with Source Serif 4 for Russian headings since Fraunces has no Cyrillic (`--fm-font-sans`/`--fm-font-serif`, loaded from Google Fonts in `index.html`).
-- [x] An actual design system — the `--fm-*` palette plus spacing, radius, type, weight and elevation scales in one shared `tokens.css` (served by the Go server, loaded by every page and the map app), used by every declaration except a few deliberate literals (`IMPLEMENTATION.md` §4.18). The one literal color left in use is `#fff` (12 uses), plus two single-use colors.
-- [x] Server-rendered pages sharing one header, React kept for the map page ([ADR-0012](adr/0012-server-rendered-pages-react-for-the-map.md), `IMPLEMENTATION.md` §4.19), in shippable steps:
-  - [x] Import moves out of the header into the Activities panel's Sync tab (`IMPLEMENTATION.md` §4.0.1).
-  - [x] The rendering foundation (`internal/web`, the shared header, Sign out as a same-origin-checked form) with About, Help and Contacts as its first pages (`IMPLEMENTATION.md` §4.14).
-  - [x] Sign-in, sign-up, password reset, email verification and demo start as pages, replacing `AuthGate.tsx`; email links move to `/verify?token=`/`/reset?token=`, with the old `/?…_token=` forms still redirected (`IMPLEMENTATION.md` §4.19).
-  - [x] The map page served by Go with the shared header, replacing `Header.tsx`/`UserMenu.tsx`/`InfoMenu.tsx`/`DonateButton.tsx`; Export becomes a map control; Caddy sends everything but static files to Go; Profile and Settings get URLs (`/profile`, `/settings`) as views in the same shell (`IMPLEMENTATION.md` §4.19). The first-run gate stays in React until Settings is a page.
-  - [x] Settings as a page (`/settings`), a plain form with native selects; the first-run gate moves server-side with it (`IMPLEMENTATION.md` §4.12).
-  - [x] Profile as a page (`/profile`), the year grids and trends rendered server-side (`IMPLEMENTATION.md` §4.8).
-- [x] Localization — English and Russian across the server's pages, emails and messages, the map app and Android, with a Language setting that falls back to the browser's ([ADR-0014](adr/0014-localization.md), `IMPLEMENTATION.md` §4.21, `SPEC.md` FR-13). Left: running the Android app in Russian on a real device, a native speaker's review of the Russian, and `KNOWN_ISSUES.md`'s two entries (a Cyrillic heading font, and the server messages still in English).
-- [x] Mobile browser support, folded into this same pass rather than treated separately — the phone layout (`index.css`'s `@media (max-width: 768px)` layer, `IMPLEMENTATION.md` §5.9, `SPEC.md` §19), with the four fixes for what emulation can't show (§5.9's **Real-device fixes**).
-- [x] Design freeze, declared 2026-10-02: the visual design is final — the `--fm-*` tokens, Inter and Fraunces (Source Serif 4 for Russian headings), and Lucide — on the web and Android alike (`apps/android/docs/IMPLEMENTATION.md` §1.3).
-
-This pass is where HoldMyTrack's palette, typography and icon set come from for the product as a whole, not for the web alone. The Android app carries the same design — the web's tokens, palette, fonts and scales, and Lucide icons, in Material 3 (`apps/android/docs/IMPLEMENTATION.md` §1.3, [ADR-0026](adr/0026-material-3-on-views.md)); it inherits the freeze rather than deciding a second visual design, since two clients that each invented their own would not read as one product.
-
----
-
 ## Phase 4 — Cloud sources
 
 Connecting the app to third-party services.
@@ -155,4 +133,5 @@ Non-negotiable, GDPR Art. 9 special-category data (`VISION.md` §7).
 
 ## Ongoing, not phase-bound
 
+- [ ] Check the Russian translation — run the Android app in Russian on a real device, and have a native speaker review the Russian across the web, the server's pages and emails, and the app (`IMPLEMENTATION.md` §4.21, ADR-0014).
 - [ ] Re-measure the funding-model assumptions (`VISION.md` §4.3, §6.3) against real usage once any real users exist, rather than assuming the estimates hold.
