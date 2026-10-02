@@ -258,6 +258,19 @@ type updateActivityRequest struct {
 	Description  string `json:"description"`
 }
 
+// activityIDFromPath is the {id} of an /activities/…/{id} route, lowercased, or a 404 for one
+// that isn't a UUID. Postgres refuses a malformed uuid with an error, which reached the client
+// as a 500; and it accepts an uppercase one, which would then miss object keys built from the
+// id (the delete's mask prefix) while still matching the row.
+func activityIDFromPath(w http.ResponseWriter, r *http.Request) (string, bool) {
+	id := r.PathValue("id")
+	if !uuidPattern.MatchString(id) {
+		http.Error(w, "activity not found", http.StatusNotFound)
+		return "", false
+	}
+	return strings.ToLower(id), true
+}
+
 // handleUpdateActivity serves `PATCH /v1/activities/{id}` (§4.7.4) — the "rename a
 // mis-tagged upload" / "describe a non-sport GPS trace" feature. §4.7.2 already resolved
 // activity_type as free-form, not a controlled vocabulary, so a manual rename here is
@@ -271,9 +284,8 @@ type updateActivityRequest struct {
 // column is NOT NULL — an empty value is rejected outright rather than silently kept
 // unchanged.
 func (s *Server) handleUpdateActivity(w http.ResponseWriter, r *http.Request) {
-	activityID := r.PathValue("id")
-	if activityID == "" {
-		http.Error(w, "missing activity id", http.StatusBadRequest)
+	activityID, ok := activityIDFromPath(w, r)
+	if !ok {
 		return
 	}
 	userID := userIDFromContext(r.Context())
@@ -350,9 +362,8 @@ func (s *Server) handleUpdateActivity(w http.ResponseWriter, r *http.Request) {
 // actual tile re-render at the end goes through it, the same render_fog job ingest already
 // relies on.
 func (s *Server) handleDeleteActivity(w http.ResponseWriter, r *http.Request) {
-	activityID := r.PathValue("id")
-	if activityID == "" {
-		http.Error(w, "missing activity id", http.StatusBadRequest)
+	activityID, ok := activityIDFromPath(w, r)
+	if !ok {
 		return
 	}
 	userID := userIDFromContext(r.Context())
@@ -1106,9 +1117,8 @@ type trackMetricsResponse struct {
 // here: a non-owned or nonexistent id is indistinguishable from "not found," nothing new to
 // invent.
 func (s *Server) handleActivityTrackMetrics(w http.ResponseWriter, r *http.Request) {
-	activityID := r.PathValue("id")
-	if activityID == "" {
-		http.Error(w, "missing activity id", http.StatusBadRequest)
+	activityID, ok := activityIDFromPath(w, r)
+	if !ok {
 		return
 	}
 

@@ -221,3 +221,21 @@ func TestSyncRejectsAnUnsafeExternalID(t *testing.T) {
 		}
 	}
 }
+
+// An activity route given an id that isn't a UUID answers 404, not the 500 Postgres's refusal
+// to parse it used to become.
+func TestActivityRoutesRefuseMalformedIDs(t *testing.T) {
+	d := newDBTest(t)
+	me := d.newAccount(false)
+	for _, tc := range []struct{ method, path string }{
+		{http.MethodPatch, "/v1/activities/not-a-uuid"},
+		{http.MethodDelete, "/v1/activities/not-a-uuid"},
+		{http.MethodGet, "/v1/activities/track-metrics/not-a-uuid"},
+		{http.MethodGet, "/v1/activities/track-points/not-a-uuid"},
+		{http.MethodPost, "/v1/activities/track-edit/not-a-uuid"},
+	} {
+		if rec := d.do(me, tc.method, tc.path, map[string]any{}); rec.Code != http.StatusNotFound {
+			t.Errorf("%s %s: %d, want 404", tc.method, tc.path, rec.Code)
+		}
+	}
+}
