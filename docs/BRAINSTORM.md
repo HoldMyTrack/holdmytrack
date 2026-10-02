@@ -72,4 +72,4 @@ Deploys to `holdmytrack.com` are run by hand over SSH (`docs/DEPLOY.md` §6). Wh
 
 * A GitHub Actions job would need an SSH key to the server in the repository's secrets, which is a new way in to the box; that key should only be able to run the deploy, not get a shell (`restrict,command="…"` in root's `authorized_keys`, since the server takes SSH as root by key only, `docs/DEPLOY.md` §12).
 * A deploy with a migration needs `backup.sh` and maintenance mode around it (`docs/DEPLOY.md` §7), and the job can't tell in advance whether a migration is going to go wrong.
-* The build runs on the 1 vCPU / 2 GB box itself, so every merge would mean several minutes of high load there; building images in CI and pulling them would avoid that but needs a container registry.
+* The build runs on the 2 vCPU / 4 GB box itself, so every merge would mean several minutes of high load there; building images in CI and pulling them would avoid that but needs a container registry.
