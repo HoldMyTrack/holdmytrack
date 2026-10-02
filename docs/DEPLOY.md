@@ -1,6 +1,6 @@
 # Deploying HoldMyTrack — minimal single-VPS setup
 
-The smallest deployment that's actually production-shaped: one small VPS running `compose.prod.yml` (Postgres+PostGIS, `api`, `worker`, and Caddy in front of the built frontend), plus Cloudflare R2 for object storage. See `docs/VISION.md` §4.3 for the cost model this is built around, and `docs/ROADMAP.md`'s "Production deployment" section for what's still open on the operational side (backups, host hardening, monitoring); spend caps and the compliance work (DPIA, EU-region hosting) are that file's Phases 5 and 6. This document only covers getting a working deployment live, not everything a real public launch needs.
+The smallest deployment that's actually production-shaped: one small VPS running `compose.prod.yml` (Postgres+PostGIS, `api`, `worker`, and Caddy in front of the built frontend), plus Cloudflare R2 for object storage. See `docs/VISION.md` §4.3 for the cost model this is built around, and `docs/ROADMAP.md`'s "Production deployment" section for what's still open on the operational side (host hardening, monitoring); spend caps and the compliance work (DPIA, EU-region hosting) are that file's Phases 5 and 6. This document only covers getting a working deployment live, not everything a real public launch needs.
 
 ## 1. Provision the VPS
 
@@ -136,12 +136,13 @@ It upserts every place by its OSM id, so a re-run with a newer extract updates t
 DigitalOcean (and most VPS providers) have no Droplet-level maintenance toggle, so this lives in the app stack instead. Before a deploy that touches migrations or involves manual DB work — i.e. before step 6's `up -d --build` — put the site into maintenance mode so visitors see a friendly page instead of Caddy's raw `502`s while `api` is mid-restart:
 
 ```
+./scripts/backup.sh
 ./scripts/maintenance.sh on
 GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod up -d --build
 ./scripts/maintenance.sh off
 ```
 
-`maintenance.sh on`/`off` flip `MAINTENANCE_MODE` in `.env.prod` and recreate only the `web` (Caddy) container — a couple of seconds, no rebuild. `/healthz` is deliberately exempt from maintenance mode (see `apps/web/docker/Caddyfile`), so `curl https://<your-domain>/healthz` still reflects `api`/`db`'s real status; wait for it to return `200` before running `maintenance.sh off`. `./scripts/maintenance.sh status` prints the current value.
+Running `backup.sh` (§11) first means a migration that goes wrong can be undone from a dump taken minutes earlier, not last night's. `maintenance.sh on`/`off` flip `MAINTENANCE_MODE` in `.env.prod` and recreate only the `web` (Caddy) container — a couple of seconds, no rebuild. `/healthz` is deliberately exempt from maintenance mode (see `apps/web/docker/Caddyfile`), so `curl https://<your-domain>/healthz` still reflects `api`/`db`'s real status; wait for it to return `200` before running `maintenance.sh off`. `./scripts/maintenance.sh status` prints the current value.
 
 ## 8. Verify
 
@@ -215,6 +216,38 @@ The APK carries its own version — `versionName` (the release number) and the c
 
 It's served with `Cache-Control: no-cache`, so a replaced file is never masked by a cached copy. There's no release signing config yet, so this is a debug-signed APK: installable by sideloading, but not a Play Store build, and a later release-signed APK can't install over it without uninstalling first. Google sign-in works in it only if that debug key's SHA-1 has an Android OAuth client (step 4).
 
+## 11. Backups and the restore drill
+
+`scripts/backup.sh` runs nightly: it dumps Postgres, keeps the dump in `/srv/holdmytrack-backups/postgres/` for a week, and copies it to a second R2 bucket. It then syncs the app bucket's `raw/`, `photos/` and `avatars/` into the same bucket. `fog/`, `heatmap/` and `activity-masks/` aren't copied, because `rerender-coverage --masks` rebuilds them (ADR-0029). `scripts/restore-drill.sh` runs monthly and proves the copies restore. Both run rclone from `compose.prod.yml`'s `rclone` service, which `up` never starts, so nothing needs installing on the host.
+
+**Set up.**
+
+1. Create a second private R2 bucket (e.g. `holdmytrack-backups`), and an R2 API token with **Object Read & Write** on that bucket only. Don't use the app's token, and don't give this one access to the app bucket. Then a leaked app token can't delete the backups, and a mistaken command with this token can't touch the live data.
+2. Fill in `.env.prod`'s `BACKUP_*` values (`.env.prod.example` explains each). Leave `BACKUP_S3_ENDPOINT` empty when both buckets are in the same Cloudflare account.
+3. Optionally, create two checks on an uptime service that expects a ping, such as healthchecks.io: one expecting a ping daily and one monthly. Put their URLs in `BACKUP_HEARTBEAT_URL` and `RESTORE_DRILL_HEARTBEAT_URL`. Each script pings its URL only after a successful run, so the check alerts when a run fails or never happens.
+4. Run both scripts once by hand: `./scripts/backup.sh`, then `./scripts/restore-drill.sh`. The first backup copies every object, so it takes longest.
+5. Schedule them in `/etc/cron.d/holdmytrack-backup`:
+   ```
+   17 3 * * * root /srv/holdmytrack/scripts/backup.sh >> /var/log/holdmytrack-backup.log 2>&1
+   47 4 1 * * root /srv/holdmytrack/scripts/restore-drill.sh >> /var/log/holdmytrack-backup.log 2>&1
+   ```
+
+**What's in the backup bucket.** `postgres/daily/` holds each night's dump for 14 days, and `postgres/weekly/` holds Sunday's for 8 weeks. `objects/` mirrors the app bucket's keys. When the sync would delete or overwrite an object there, it moves the old copy into `objects-deleted/<UTC stamp of that run>/` instead, where it stays for 30 days. An account deleted on request therefore stays in the backups for up to 8 weeks.
+
+**The drill** takes the newest dump from the bucket and restores it into a throwaway container of the live `db` image, which has no network and is removed afterwards. It prints row counts next to the live database's. It then checks every object key the restored database refers to: each activity's raw payload, each photo and its thumbnail, each avatar. Every one must be in `objects/`, or in `objects-deleted/` if the app removed it after the dump. It fails, and skips the heartbeat ping, if the newest dump is more than 36 hours old, if `pg_restore` fails, if the restored database has no users, or if any object is missing. When an object is missing, it also says whether the object is gone from the app bucket too. That would mean the database already pointed at nothing before the backup ran. Run the drill by hand after changing `backup.sh`, or after adding anything that stores objects under a new key.
+
+**Restoring for real.** Take a manual `./scripts/backup.sh` first if the live database still runs, so the current state is kept too. Then:
+
+```
+./scripts/maintenance.sh on
+docker compose -f compose.prod.yml --env-file .env.prod stop api worker
+# The newest local dump, or fetch one: … run --rm rclone copyto backup:postgres/daily/<name> /backups/<name>
+docker compose -f compose.prod.yml --env-file .env.prod exec -T db sh -c 'dropdb -U "$POSTGRES_USER" "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" -T template0 "$POSTGRES_DB"'
+docker compose -f compose.prod.yml --env-file .env.prod exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --exit-on-error --no-owner' < /srv/holdmytrack-backups/postgres/<name>
+```
+
+Recreating the database from `template0` keeps the image's own PostGIS setup from colliding with the dump's. On a new server, bring up `db` alone first (`up -d db`), then run the same two commands. If objects were lost too, copy them back with `run --rm rclone copy backup:objects data:`. Use `copy`, never `sync`: `copy` doesn't delete anything in the app bucket. An object removed by mistake within the last 30 days is in `objects-deleted/`, under the stamp of the first backup that ran after it was removed. Then `GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod up -d`, which also runs any migrations newer than the dump. If tiles were lost, or the database is older than them, also run `run --rm api rerender-coverage --masks` (§6). Check `/healthz` and the map, and finish with `./scripts/maintenance.sh off`.
+
 ## What this doesn't cover
 
-Per `docs/ROADMAP.md`, still open beyond this minimal setup: backups and a restore drill, host hardening, log rotation and monitoring (its "Production deployment" section), per-user quotas and rate limits with a spend cap (Phase 5), and the compliance work (DPIA, EU-region hosting — Phase 6) a genuine public launch needs regardless of how small the deployment is. This document gets you to "it's live," not to "it's ready for the public."
+Per `docs/ROADMAP.md`, still open beyond this minimal setup: host hardening, log rotation and monitoring (its "Production deployment" section), per-user quotas and rate limits with a spend cap (Phase 5), and the compliance work (DPIA, EU-region hosting — Phase 6) a genuine public launch needs regardless of how small the deployment is. This document gets you to "it's live," not to "it's ready for the public."
