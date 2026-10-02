@@ -557,7 +557,7 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 **Preconditions**: Active session.
 
 **Behavior**:
-1. If the URL carries a saved or shared position (`#map=...`), it wins outright — restored on load, ahead of every fallback below.
+1. If the URL carries a saved or shared position (`#map=<zoom>/<lat>/<lon>`), it wins outright — restored on load, ahead of every fallback below. One with a part missing or out of range (zoom 0–24, latitude ±90, longitude ±180) is ignored, as if there were none.
 2. Otherwise, the account's own most recent activity determines the opening view: the camera flies to fit that single activity, not the full default date-range selection (FR-6.1) — an account with scattered recent history (one activity in another country yesterday, one locally today) would otherwise fly to a near-world view that reads as broken rather than just generic.
 3. An account with no activity history at all falls back to its Country setting (FR-1.7), at that country's own view, if one is set.
 4. If none of the above applies — no saved position, no activity history, no Country set — the camera opens on a fixed, deliberately zoomed-out world view.
