@@ -78,6 +78,8 @@ export function PrivateLocationsPanel({ map, readOnly, onChanged, onEditorOpen }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<PrivateLocation | null>(null);
+  // A location picked while the open one has unsaved changes — waiting on "Discard changes?".
+  const [switchTo, setSwitchTo] = useState<PrivateLocation | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -105,13 +107,28 @@ export function PrivateLocationsPanel({ map, readOnly, onChanged, onEditorOpen }
   useEffect(() => () => clearPrivateLocations(map), [map]);
 
   // For the demo, "opening" one only highlights it — there's no editor to open.
-  const open = useCallback(
+  const openNow = useCallback(
     (location: PrivateLocation) => {
       setDraft(toDraft(location));
       setError(null);
       if (!readOnly) onEditorOpen();
     },
     [readOnly, onEditorOpen],
+  );
+  // Picking another location asks before it throws the open one's unsaved changes away, and
+  // waits out a Save in flight, whose success closes the editor. Picking the open one again
+  // keeps its changes.
+  const editorState = useRef({ draft, dirty: false, busy });
+  const open = useCallback(
+    (location: PrivateLocation) => {
+      const { draft, dirty, busy } = editorState.current;
+      if (busy) return;
+      if (draft?.id === location.id) {
+        if (!readOnly) onEditorOpen();
+      } else if (dirty) setSwitchTo(location);
+      else openNow(location);
+    },
+    [readOnly, onEditorOpen, openNow],
   );
 
   function create() {
@@ -152,6 +169,7 @@ export function PrivateLocationsPanel({ map, readOnly, onChanged, onEditorOpen }
 
   const saved = draft?.id === undefined ? undefined : locations?.find((l) => l.id === draft.id);
   const dirty = draft !== null && !sameDraft(draft, saved);
+  editorState.current = { draft, dirty, busy };
 
   async function save() {
     if (!draft) return;
@@ -314,6 +332,17 @@ export function PrivateLocationsPanel({ map, readOnly, onChanged, onEditorOpen }
           </section>,
           windowHost,
         )}
+
+      {switchTo && (
+        <ConfirmDialog
+          title={t('edit.discard_title')}
+          message={t('edit.discard_message')}
+          confirmLabel={t('edit.discard')}
+          cancelLabel={t('edit.keep_editing')}
+          onConfirm={async () => openNow(switchTo)}
+          onClose={() => setSwitchTo(null)}
+        />
+      )}
 
       {deleting && (
         <ConfirmDialog
