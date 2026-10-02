@@ -1273,8 +1273,6 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 
 ## 19. Mobile Browser Support
 
-**Known issue**: The behavior below is what was designed and implemented, but the actual mobile experience has been reported directly as unusable, not just rough. Four causes a phone has and desktop emulation doesn't were found and fixed (items 4–6 below); the behavior is still unverified on a real device, so treat it as unconfirmed until it is — see `docs/ROADMAP.md`'s "Mobile browser support" item (Phase 3).
-
 **Description**: The application is usable in a phone-sized mobile browser, not just at desktop widths. This is a cross-cutting behavior, not a separate feature — it modifies how several of the FRs above render and are interacted with, rather than adding new ones.
 
 **Behavior**:

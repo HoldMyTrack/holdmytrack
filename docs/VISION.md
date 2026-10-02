@@ -238,7 +238,7 @@ Sequenced so the unconditional ingest path ships first and the ones that depend 
 * Cross-source deduplication — unavoidable the moment a second source exists, so it arrived with Health Connect sync rather than waiting for Phase 4's connectors.
 
 ### 5.4 Phase 3: Finalized design + mobile browser support
-* The first shipped UI is functional scaffolding. This pass finishes it — one icon set, deliberate typography, design tokens, motion — across desktop and phone browsers, and ends in a declared design freeze.
+* The first shipped UI was functional scaffolding. This pass finished it — one icon set, deliberate typography, design tokens — across desktop and phone browsers, and ended in a design freeze, declared 2026-10-02: the `--fm-*` tokens, Inter and Fraunces (Source Serif 4 for Russian headings), and Lucide icons.
 * The mobile apps inherit that freeze rather than inventing a second visual language: two clients that each chose their own would not read as one product.
 
 ### 5.5 Phase 4: Cloud Sources

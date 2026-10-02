@@ -32,6 +32,7 @@ Checkboxes are the source of truth for progress; re-check them against the three
 - [x] `docs/DEPLOY.md` §8's verification holds on this box — `/healthz` answers `ok` with the deployed build's SHA, and real Health Connect history synced since the move shows on the map, which goes through the whole path: `api` saves each raw payload to the `holdmytrack-data` R2 bucket, then `worker` processes it and writes fog/heatmap tiles back to R2.
 - [x] CDN in front of the basemap `.pmtiles` archive (`VISION.md` §4.3) — the planet archive, fonts and sprites are served through Cloudflare from the public R2 bucket's custom domain `tiles.holdmytrack.com` (`IMPLEMENTATION.md` §5.4 covers what the free plan does and doesn't edge-cache).
 - [x] Load the Spots places on `holdmytrack.com` — the United States, 266,272 places from Geofabrik's 2026-09-28 US extract, filtered off-box and loaded with `import-spots` (`docs/DEPLOY.md` §6); outside the US the Layers menu's points of interest (`SPEC.md` FR-15) show no places yet.
+- [ ] Seed the planet's Spots places on `holdmytrack.com` — `docs/DEPLOY.md` §6's two osmium commands over the planet file on a machine with ~100 GB free, then `import-spots --planet` on the server, which from then on is the quarterly refresh too (ADR-0027); record the place count and how long the import took on the 1 vCPU / 2 GB box.
 - [ ] Backups (Postgres, object storage) and a restore drill — **the most urgent of these gaps now that real personal data (synced Health Connect history) is starting to land on this box**, not just disposable dev fixtures. Also the gate for auto-deploy on merge: CI (`.github/workflows/ci.yml`) deliberately only checks, since deploying every merge onto the one uncopied copy of real synced health data, with no restore path if a bad deploy corrupts something, is a bigger risk than the manual deploy step it would replace.
 - [ ] Host hardening — a firewall allowing only 22/80/443, key-only SSH with password login disabled, unattended security updates, and `.env.prod` readable only by the deploying user.
 - [ ] Bound Docker's container logs — the default `json-file` driver never rotates, so `api`/`worker`/Caddy logs grow without limit on a 50 GB disk; set `max-size`/`max-file` in `/etc/docker/daemon.json` or per service in `compose.prod.yml`.
@@ -42,12 +43,6 @@ Checkboxes are the source of truth for progress; re-check them against the three
 
 - [ ] Stand up the funding page (Open Collective, public ledger — `VISION.md` §6.1) before any public launch, not retrofitted after. The app side is built (`IMPLEMENTATION.md` §4.16), and the `holdmytrack` collective applied to Open Source Collective as fiscal host on 2026-09-24; what's left: once approved, set the slug — `services/server/internal/web/web.go`'s `OpenCollectiveSlug` — and replace the About page template's "donations are not open yet" line with a link to it.
 - [ ] Post concept renders to r/running, r/cycling, r/Garmin, r/Strava, r/FogOfWorld (`VISION.md` §5.1, §8.1) — validate "free forever, funded by users" as credible before building further.
-
-### Spots places refresh — planned
-
-The places are seeded and refreshed by hand: an operator filters an OSM extract off-box and runs `import-spots` (`docs/DEPLOY.md` §6), once for the planet and then quarterly with `--planet`, which retires the places OSM no longer has (ADR-0027). Only the United States is loaded so far.
-
-- [ ] Seed the planet on `holdmytrack.com` — `docs/DEPLOY.md` §6's two osmium commands over the planet file on a machine with ~100 GB free, then `import-spots --planet` on the server; record the place count and how long the import took on the 1 vCPU / 2 GB box, which has only had the US so far.
 
 ### Sign in with Facebook — built, not live
 
@@ -75,30 +70,6 @@ Native apps whose core job is exporting device-recorded health data to HoldMyTra
 - [ ] Confirm `HKWorkoutRoute` access with a throwaway iOS app (`VISION.md` §4.1) — due diligence before committing engineering effort to the full iOS build, not resolving a real unknown: Apple's docs already say this works.
 - [ ] iOS app: HealthKit sync, `HKWorkoutRoute` for full GPS geometry — the stronger of the two on-device paths, and the one that inherits the payload and sync-cursor design Android settles.
 - [ ] In-app GPS recording, iOS half — inherits the Android build's wire shape and `source` convention once the iOS app itself exists (see the iOS Path 2 item above, which this depends on).
-
----
-
-## Phase 3 — Finalized design + mobile browser support
-
-The shipped UI so far is functional scaffolding, not a finished product. Partly addressed since this phase was written: icons are one Lucide set (`IMPLEMENTATION.md` §4.17), type is Inter with Fraunces for headings, and colors are `--fm-*` custom properties. Spacing, radius, type, weight and elevation are token scales too (`IMPLEMENTATION.md` §4.18). What's left is almost no animation — 5 `transition:`/`animation:`/`@keyframes` occurrences in the ~3,600-line `index.css` — and real-device mobile browser support. This phase is the pass that finishes it, across both desktop and mobile, ending in an explicit design freeze: "this is how it will look — no more changes."
-
-- [x] A real icon set — Lucide (`lucide-react`) replaces every hand-drawn inline SVG icon and text-glyph caret on the web (`IMPLEMENTATION.md` §4.17); Android uses the same set (`apps/android/docs/IMPLEMENTATION.md` §1.3).
-- [x] Real typography — Inter for text, Fraunces for headings and the wordmark, with Source Serif 4 for Russian headings since Fraunces has no Cyrillic (`--fm-font-sans`/`--fm-font-serif`, loaded from Google Fonts in `index.html`).
-- [x] An actual design system — the `--fm-*` palette plus spacing, radius, type, weight and elevation scales in one shared `tokens.css` (served by the Go server, loaded by every page and the map app), used by every declaration except a few deliberate literals (`IMPLEMENTATION.md` §4.18). The one literal color left in use is `#fff` (12 uses), plus two single-use colors.
-- [x] Server-rendered pages sharing one header, React kept for the map page ([ADR-0012](adr/0012-server-rendered-pages-react-for-the-map.md), `IMPLEMENTATION.md` §4.19), in shippable steps:
-  - [x] Import moves out of the header into the Activities panel's Sync tab (`IMPLEMENTATION.md` §4.0.1).
-  - [x] The rendering foundation (`internal/web`, the shared header, Sign out as a same-origin-checked form) with About, Help and Contacts as its first pages (`IMPLEMENTATION.md` §4.14).
-  - [x] Sign-in, sign-up, password reset, email verification and demo start as pages, replacing `AuthGate.tsx`; email links move to `/verify?token=`/`/reset?token=`, with the old `/?…_token=` forms still redirected (`IMPLEMENTATION.md` §4.19).
-  - [x] The map page served by Go with the shared header, replacing `Header.tsx`/`UserMenu.tsx`/`InfoMenu.tsx`/`DonateButton.tsx`; Export becomes a map control; Caddy sends everything but static files to Go; Profile and Settings get URLs (`/profile`, `/settings`) as views in the same shell (`IMPLEMENTATION.md` §4.19). The first-run gate stays in React until Settings is a page.
-  - [x] Settings as a page (`/settings`), a plain form with native selects; the first-run gate moves server-side with it (`IMPLEMENTATION.md` §4.12).
-  - [x] Profile as a page (`/profile`), the year grids and trends rendered server-side (`IMPLEMENTATION.md` §4.8).
-- [x] Localization — English and Russian across the server's pages, emails and messages, the map app and Android, with a Language setting that falls back to the browser's ([ADR-0014](adr/0014-localization.md), `IMPLEMENTATION.md` §4.21, `SPEC.md` FR-13). Left: running the Android app in Russian on a real device, a native speaker's review of the Russian, and `KNOWN_ISSUES.md`'s two entries (a Cyrillic heading font, and the server messages still in English).
-- [ ] An animation/transition pass — micro-interactions (hover, focus, panel open/close, loading states) that are currently almost entirely absent.
-- [ ] Mobile browser support, folded into this same pass rather than treated separately — the phone layout exists (`index.css`'s `@media (max-width: 768px)` layer, `IMPLEMENTATION.md` §5.9, `SPEC.md` §19) and was reported directly as unusable on a real phone; four causes emulation can't show have since been fixed (§5.9's **Real-device fixes**), but nothing has been checked on an actual device yet.
-  - [ ] Walk the core flows on a real iPhone (Safari) and Android phone (Chrome) — sign in, the three map modes, tap a track, expand and collapse the sheet, the date slider, edit an activity's name — and record any symptom concretely (device, browser, screen, what happened), not as "unusable".
-- [x] Design freeze, declared 2026-10-02: the visual design is final — the `--fm-*` tokens, Inter and Fraunces (Source Serif 4 for Russian headings), and Lucide — on the web and Android alike (`apps/android/docs/IMPLEMENTATION.md` §1.3).
-
-This pass is where HoldMyTrack's palette, typography and icon set come from for the product as a whole, not for the web alone. The Android app carries the same design — the web's tokens, palette, fonts and scales, and Lucide icons, in Material 3 (`apps/android/docs/IMPLEMENTATION.md` §1.3, [ADR-0026](adr/0026-material-3-on-views.md)); it inherits the freeze rather than deciding a second visual design, since two clients that each invented their own would not read as one product.
 
 ---
 
@@ -157,4 +128,5 @@ Non-negotiable, GDPR Art. 9 special-category data (`VISION.md` §7).
 
 ## Ongoing, not phase-bound
 
+- [ ] Check the Russian translation — run the Android app in Russian on a real device, and have a native speaker review the Russian across the web, the server's pages and emails, and the app (`IMPLEMENTATION.md` §4.21, ADR-0014).
 - [ ] Re-measure the funding-model assumptions (`VISION.md` §4.3, §6.3) against real usage once any real users exist, rather than assuming the estimates hold.
