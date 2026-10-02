@@ -279,3 +279,33 @@ func TestPrivateLocationLimitHoldsUnderConcurrency(t *testing.T) {
 		t.Fatalf("%d locations, want %d", n, maxPrivateLocations)
 	}
 }
+
+// Adding a Private location reprocesses the duplicate copies dedupe hid as well as the live
+// one: deleting the live copy would otherwise bring a hidden one back with its old, unclipped
+// start.
+func TestPrivateLocationReprocessesHiddenDuplicates(t *testing.T) {
+	d := newDBTest(t)
+	me := d.newAccount(false)
+	live := d.newActivity(me, testActivity{activityType: "ride", durationSecs: 60, at: &[2]float64{10, 50}})
+	hidden := d.newActivity(me, testActivity{activityType: "ride", durationSecs: 60, at: &[2]float64{10, 50}, supersededBy: live})
+	if _, err := d.pool.Exec(context.Background(),
+		`UPDATE activities SET raw_payload_key = 'raw/' || id || '.gpx' WHERE id = ANY($1::uuid[])`, []string{live, hidden}); err != nil {
+		t.Fatal(err)
+	}
+
+	d.decode(d.do(me, http.MethodPost, "/v1/private-locations", map[string]any{"lat": 50.0, "lon": 10.0, "radius_m": 200}), http.StatusCreated, nil)
+
+	var ids []string
+	if err := d.pool.QueryRow(context.Background(), `
+		SELECT ARRAY(SELECT jsonb_array_elements_text(payload->'activity_ids'))
+		FROM jobs WHERE user_id = $1 AND kind = 'reprivacy' ORDER BY id DESC LIMIT 1`, me.id).Scan(&ids); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, id := range ids {
+		got[id] = true
+	}
+	if !got[live] || !got[hidden] {
+		t.Fatalf("reprocessing %v, want both the live copy %s and the hidden one %s", ids, live, hidden)
+	}
+}
