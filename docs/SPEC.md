@@ -1185,7 +1185,9 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 1. A place is an OpenStreetMap feature in one of five categories: **Playground** (`leisure=playground`), **Dog park** (`leisure=dog_park`), **Monument** (`historic=monument` or `memorial`), **Mesmerizing view** (`tourism=viewpoint`) and **History** (`historic=castle`, `ruins`, `fort` or `archaeological_site`). A feature tagged for two is the first of History, Monument, Mesmerizing view, Dog park, Playground.
 2. A place has, each only when OSM has it: a name; an address built from its `addr:*` tags — `addr:full`, or a house number, street (or `addr:place`), city and postcode — when it has at least a street or place; a description; an inscription; a memorial type (a statue, a plaque, a war memorial…); a start date as OSM writes it (a year, a date, "~1850"); and a Wikipedia article, from a `wikipedia` tag in OSM's "language:Title" form (any other form is left out).
 3. A place's area is its OSM outline, or a 30 m circle around a place mapped as a single point.
-4. The operator loads the places with `holdmytrack import-spots <file>`, from an extract made off the server (`docs/DEPLOY.md` §6). Loading the same place again updates it rather than adding a second one; a place missing from a newer extract stays.
+4. The operator loads the places with `holdmytrack import-spots [--planet] <file>`, from an extract made off the server (`docs/DEPLOY.md` §6), and refreshes them the same way. Loading the same place again updates it rather than adding a second one.
+5. A place is never deleted. With `--planet`, a place missing from the file is **retired** (ADR-0027): from then on it is shown only to the accounts that captured it (FR-15.4–FR-15.6), and no one can capture it. A place that comes back to OSM is live again at the next load. A load without `--planet` retires nothing. A `--planet` load that would retire more than 1% of the live places stops with an error and retires none of them; the places it read are still updated.
+6. A load moves every account's tile version (FR-4.11) only if it added, changed, brought back or retired a place.
 
 ### FR-15.2 Points of interest
 
@@ -1232,7 +1234,7 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 **Outputs**: A vector tile with two layers. `spots`: a point per place whose anchor falls in the tile, with `id`, `category` (`playground`, `dog_park`, `monument`, `viewpoint` or `history`), `lon`, `lat`, and `name`, `address`, `description`, `inscription`, `memorial`, `start_date` and `wikipedia`, each absent when the place has none. `spot_areas`: each place's area that reaches into the tile, clipped to it, with `id`, `category` and `circle` (`true` for the 30 m circle of a place mapped as a point). Below zoom 13, an empty tile.
 
 **Behavior**:
-1. The same places for every account, behind the session like every other map tile, and cached like them (FR-4.11). Loading places moves every account's tile version.
+1. The same places for every account, behind the session like every other map tile, and cached like them (FR-4.11). A load that changes the places moves every account's tile version (FR-15.1).
 
 **Error cases**:
 - No session → `401`. A demo session sees the places too.
