@@ -126,6 +126,9 @@ func (s *Server) handleSettingsForm(w http.ResponseWriter, r *http.Request) {
 		s.renderSettings(w, r, status, acct, form)
 		return
 	}
+	// The browser's own choice (the header's language menu) follows the setting, so
+	// "Automatic" after signing out still means the browser's language, not a stale pick.
+	s.setLanguageCookie(w, form.Locale)
 	// First run ends here: on to the map, which Country and Timezone now make sense of.
 	if acct.profile.Country == "" {
 		http.Redirect(w, r, "/", http.StatusSeeOther)

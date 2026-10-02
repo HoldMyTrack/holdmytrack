@@ -212,6 +212,7 @@ func (s *Server) registerPages() {
 	s.mux.HandleFunc("GET /contacts", s.staticPage("contacts", "meta.contacts_title", "meta.contacts_description", ""))
 	s.mux.Handle("GET /static/", s.pages.StaticHandler())
 	s.mux.HandleFunc("POST /logout", s.sameOrigin(s.handleLogoutPage))
+	s.mux.HandleFunc("POST /language", s.sameOrigin(s.handleLanguageForm)) // language.go
 	// auth_pages.go — every POST is a form, so every POST is behind sameOrigin.
 	s.mux.HandleFunc("GET /signin", s.handleSignInPage)
 	s.mux.HandleFunc("POST /signin", s.sameOrigin(s.handleSignInForm))

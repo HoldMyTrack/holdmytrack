@@ -1051,16 +1051,31 @@ A read-only view of every account and every account's activities, for the people
 **Description**: HoldMyTrack's interface is in English or Russian. Every page, the map, the emails, and the error messages the web and Android apps show come in one language per request.
 
 **Behavior**:
-1. The language is, in order: the account's Language setting (FR-1.7) when it is English or Русский; otherwise the language the browser or app asks for (`Accept-Language`, its most preferred supported language, matching `ru-RU` as Russian); otherwise English. A signed-out visitor gets their browser's language, or English — there is no switcher, cookie, or URL parameter for it.
+1. The language is, in order: the account's Language setting (FR-1.7) when it is English or Русский; otherwise the language last chosen on this browser with the header's language menu (FR-13.2); otherwise the language the browser or app asks for (`Accept-Language`, its most preferred supported language, matching `ru-RU` as Russian); otherwise English. URLs don't change with language.
 2. The whole page is in that language: the shared header and footer (FR-10.4), every page including About and Help, the map app, `<html lang>`, the page title and description. The map app always shows the language the page around it is in.
 3. Numbers and dates follow the language: `1,234.5 km` and `Sep 8` in English, `1 234,5 км` and `8 сент.` in Russian. Units are unchanged by language — they follow Country (FR-1.7).
 4. Counts take the language's plural forms (`1 занятие`, `2 занятия`, `5 занятий`).
 5. The verification and password-reset emails (FR-1.8, FR-1.5) are in the account's language, or when it has none set, the language of the request that sent them.
 6. Error messages a person can see (a wrong password, a taken email, a rejected upload or track edit) are full sentences in the request's language, in page forms and in the JSON API's plain-text and `message` bodies alike. Machine-readable codes (`email_not_verified`, `demo_read_only`) never change with language. An import's failure reason, in the upload history, and the Android app's per-activity sync rejections are in the language of the request reading them, however long ago the import failed.
-7. Saving a different Language in Settings takes effect from that save's own reload onward, everywhere; other open pages change on their next load.
+7. Saving a different Language in Settings takes effect from that save's own reload onward, everywhere; other open pages change on their next load. The save also becomes this browser's choice (FR-13.2), so the page stays in that language after signing out; saving "Automatic" forgets the browser's choice too.
 8. The Android app follows the phone's language, or its own per-app language (Android's Settings → Apps → HoldMyTrack → Language). It doesn't read the account's setting, and sends its language as `Accept-Language`, so the server's messages match it.
 
 **Not translated**: activity names and descriptions people type, place names on the map, activity types outside the common set (shown as recorded), and the reason a `.zip` entry was skipped.
+
+### FR-13.2 The language menu
+
+**Description**: Anyone can choose the language, signed in or not, from the shared header (ADR-0025).
+
+**Inputs**: `POST /language` with `lang`, `en` or `ru`, from a page of this site.
+
+**Behavior**:
+1. The browser remembers the choice for a year (cookie `hmt_lang`), and every later page and request from it is in that language, unless a signed-in account's own Language setting says otherwise (FR-13.1).
+2. Signed in to a real account, the choice is also saved as the account's Language setting (FR-1.7), on every device. A demo account's choice is remembered on the browser only.
+3. The browser goes back to the page it was on, query string included, now in the chosen language.
+
+**Errors**:
+- A language other than `en` or `ru` → `400`.
+- A POST from another site (no matching `Origin` or `Referer`) → `403`, like every page form.
 
 ## 16. FR-14 — Stories
 
