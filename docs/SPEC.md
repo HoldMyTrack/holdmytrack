@@ -1298,7 +1298,7 @@ Deliberately out of scope, not a "not yet" — built and then cut, not planned t
 
 ## 21. FR-16 — Activity photos
 
-**Description**: The user's own photos added to an activity, each placed at the point of its route where it was taken, so an activity — and a Story — shows its pictures on the map (`VISION.md` §4.2, ADR-0024). Stored as a resized copy and a thumbnail with no EXIF; private to the account. The web adds and shows them; the Android app doesn't yet.
+**Description**: The user's own photos added to an activity, each placed at the point of its route where it was taken, so an activity — and a Story — shows its pictures on the map (`VISION.md` §4.2, ADR-0024). Stored as a resized copy and a thumbnail with no EXIF; private to the account. The web and the Android app add and show them (`apps/android/docs/SPEC.md` FR-2.10); FR-16.6 and FR-16.7 are the web's.
 
 ### FR-16.1 Upload
 

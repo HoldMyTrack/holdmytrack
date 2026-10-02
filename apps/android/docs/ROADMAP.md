@@ -93,15 +93,6 @@ Prepare the app for testing and store publication.
 
 ---
 
-## Phase 10: Photos
-
-The web's activity photos (root `docs/SPEC.md` FR-16, `docs/IMPLEMENTATION.md` §4.27, [ADR-0024](../../../docs/adr/0024-activity-photos-resized-and-route-bound.md)) on Android, the client half of root `docs/ROADMAP.md` Phase 2's "Photos on Android". The server side is done, so this is client work only.
-
-- [ ] **On the map** — an activity's and an open Story's photos as markers on the route, with a popup, as on the web (root `docs/SPEC.md` FR-16.7).
-- [ ] **A Photos tab in the Edit window** — adding photos from the photo picker with the web's EXIF reading and resizing (`photoPrep.ts`), and a slider for a photo the server can't place and for moving one (root `docs/SPEC.md` FR-16.1–FR-16.6).
-
----
-
 ## Phase 11: Spots places refresh
 
 Root `docs/ROADMAP.md` Phase 1's "Spots places refresh": a place gone from OpenStreetMap is retired, never deleted — hidden from everyone who hasn't captured it, still shown to those who have.
