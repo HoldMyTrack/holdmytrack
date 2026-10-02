@@ -10,8 +10,9 @@ appcompat = "1.7.1"
 # version the theme was built and verified against on device.
 material = "1.13.0"
 # The Health Connect client (Path 2's on-device read). 1.1.0 is the current stable; 1.2.0 is
-# alpha only, and the PoC that measured this platform's behaviour ran against 1.1.0, so the
-# app ships against the same API surface those findings were observed on.
+# alpha only, and the device measurements of this platform's behaviour
+# (docs/IMPLEMENTATION.md §4.0) ran against 1.1.0, so the app ships against the same API
+# surface those findings were observed on.
 healthConnect = "1.1.0"
 lifecycle = "2.9.4"
 coroutines = "1.10.2"

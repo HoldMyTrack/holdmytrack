@@ -14,9 +14,9 @@ import androidx.health.connect.client.records.ExerciseSessionRecord
  * this file exists rather than a single "request permissions" call:
  *
  *  - `READ_EXERCISE` is an ordinary runtime permission. The system dialog grants it.
- *  - `READ_EXERCISE_ROUTES` **cannot be requested programmatically**. Phase 1 measured this
- *    directly: asking for it alongside the others grants the others and silently omits it —
- *    it never even acquires a `USER_SET` flag. The user grants it at Health Connect → the app
+ *  - `READ_EXERCISE_ROUTES` **cannot be requested programmatically**. Measured on a device:
+ *    asking for it alongside the others grants the others and silently omits it — it never
+ *    even acquires a `USER_SET` flag. The user grants it at Health Connect → the app
  *    → *Additional access* → *Access exercise routes* → *Always allow*, a screen two levels
  *    below the app's main permission page and not linked from it. So the onboarding flow has
  *    to send the user there and say what to tap; "grant permissions" is not one flow here.

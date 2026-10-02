@@ -44,7 +44,7 @@ import kotlinx.coroutines.launch
  *
  * **Granting access is two flows, not one, and the second cannot be automated.** Reading
  * sessions is an ordinary runtime permission. Reading their routes is not requestable at all:
- * Phase 1 measured that asking for it simply returns without it, and the user has to grant it
+ * measured on a device, asking for it simply returns without it, and the user has to grant it
  * inside Health Connect, on a screen two levels below the app's own permission page and not
  * linked from it. So this screen names the taps rather than saying "grant permissions".
  *
@@ -236,7 +236,7 @@ class SyncActivity : AppCompatActivity() {
             HealthConnect.Readiness.NEEDS_ROUTES_PERMISSION -> {
                 showStatus(getString(R.string.sync_needs_routes_permission))
                 // The one place this app spells out another app's menu path. It is not
-                // hand-holding: Phase 1 found the screen is two levels down and unlinked, so a
+                // hand-holding: on a device the screen proved is two levels down and unlinked, so a
                 // user sent to Health Connect without it has no reason to find it.
                 instructions.setText(R.string.sync_routes_steps)
                 instructions.visibility = View.VISIBLE
