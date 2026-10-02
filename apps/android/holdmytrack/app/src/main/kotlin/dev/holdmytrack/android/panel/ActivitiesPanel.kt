@@ -139,6 +139,9 @@ class ActivitiesPanel(
      *  or an edit window over the map; the sheet comes back as it was. */
     private var held = false
     private var heightAnimator: ValueAnimator? = null
+
+    /** Where [heightAnimator] is taking the sheet. */
+    private var heightTarget = 0
     private var typePopup: PopupWindow? = null
 
     /** Add to story's menu while it's open, and the target it was opened over — a different
@@ -158,8 +161,14 @@ class ActivitiesPanel(
         tabActivities.setOnClickListener { selectTab(PanelTab.ACTIVITIES) }
         tabStories.setOnClickListener { selectTab(PanelTab.STORIES) }
         tabPrivacy.setOnClickListener { selectTab(PanelTab.PRIVACY) }
-        // The collapsed height is the tab row's bottom edge, whatever the font scale makes of it.
-        head.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyHeight(animate = false) }
+        // The collapsed height is the tab row's bottom edge, whatever the font scale makes of it —
+        // applied when that height changes, and after the layout pass rather than inside it: a
+        // new height set mid-layout isn't laid out until something else asks for a layout, which
+        // left an expand started by the chevron (whose own icon change re-lays out the row) at
+        // the collapsed height until the next tap.
+        head.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+            if (bottom - top != oldBottom - oldTop || right - left != oldRight - oldLeft) head.post { applyHeight(animate = false) }
+        }
 
         typeTrigger.setOnClickListener { showTypeFilter() }
         distanceSlider.addOnChangeListener { slider, _, fromUser ->
@@ -303,7 +312,10 @@ class ActivitiesPanel(
         val target = if (expanded && !held) maxOf(expandedHeight(), peek) else peek
         val params = sheet.layoutParams
         if (params.height == target) return
+        // Already on its way there: let it arrive rather than jump.
+        if (heightAnimator?.isRunning == true && heightTarget == target) return
         heightAnimator?.cancel()
+        heightTarget = target
         if (!animate || params.height <= 0) {
             params.height = target
             sheet.layoutParams = params
