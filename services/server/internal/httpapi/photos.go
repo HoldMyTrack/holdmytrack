@@ -305,6 +305,24 @@ func (s *Server) handleUploadPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(ctx)
+	// The count above turns most uploads past the limit away before the images are read; this
+	// one, under a per-account lock held to commit, is what holds when several uploads race
+	// past it together. An advisory lock rather than the users row, which a render's tile
+	// version bump also writes.
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('activity_photos:' || $1))`, userID); err != nil {
+		s.log.Error("photo upload: lock failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM activity_photos WHERE user_id = $1`, userID).Scan(&count); err != nil {
+		s.log.Error("photo upload: count failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if count >= maxPhotosPerAccount {
+		httpErrorT(w, r, http.StatusConflict, "error.photo_limit", "max", maxPhotosPerAccount)
+		return
+	}
 	var photoID string
 	if err := tx.QueryRow(ctx, `
 		INSERT INTO activity_photos (user_id, activity_id, taken_at, route_at, caption, content_type, thumb_content_type, width, height, bytes)

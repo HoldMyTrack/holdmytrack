@@ -117,6 +117,11 @@ func (s *Server) handleCreatePrivateLocation(w http.ResponseWriter, r *http.Requ
 
 	var created privateLocation
 	err := s.changePrivateLocations(r.Context(), userID, func(tx pgx.Tx) ([]circle, error) {
+		// Two creates at once each counted the other's row as not there yet and both
+		// inserted; this lock makes one wait for the other's commit, so the count is exact.
+		if _, err := tx.Exec(r.Context(), `SELECT pg_advisory_xact_lock(hashtext('privacy_zones:' || $1))`, userID); err != nil {
+			return nil, err
+		}
 		var count int
 		if err := tx.QueryRow(r.Context(), `SELECT count(*) FROM privacy_zones WHERE user_id = $1`, userID).Scan(&count); err != nil {
 			return nil, err

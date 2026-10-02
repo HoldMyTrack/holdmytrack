@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
@@ -254,5 +255,27 @@ func TestTileRoutesRefuseOutOfRangeCoordinates(t *testing.T) {
 	}
 	if rec := d.do(me, http.MethodGet, "/tiles/v1/tracks/2/3/3.mvt", nil); rec.Code != http.StatusOK {
 		t.Errorf("a real tile: %d, want 200", rec.Code)
+	}
+}
+
+// Creates racing each other still stop at the limit: each counts under a per-account lock.
+func TestPrivateLocationLimitHoldsUnderConcurrency(t *testing.T) {
+	d := newDBTest(t)
+	me := d.newAccount(false)
+	var wg sync.WaitGroup
+	for i := 0; i < maxPrivateLocations+10; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			d.do(me, http.MethodPost, "/v1/private-locations", map[string]any{"lat": 10 + float64(i)*0.01, "lon": 20, "radius_m": 200})
+		}(i)
+	}
+	wg.Wait()
+	var n int
+	if err := d.pool.QueryRow(context.Background(), `SELECT count(*) FROM privacy_zones WHERE user_id = $1`, me.id).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != maxPrivateLocations {
+		t.Fatalf("%d locations, want %d", n, maxPrivateLocations)
 	}
 }
