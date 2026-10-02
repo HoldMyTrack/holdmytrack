@@ -47,4 +47,11 @@
          status pill beside it — the same in both themes, as the button's are. -->
     <color name="hmt_record">#FFE53935</color>
     <color name="hmt_record_paused">#FFFFB300</color>
+
+    <!-- The photo viewer (map/PhotoViewer): dark in both themes, as the web's .photo-viewer is,
+         since a picture is best seen on a dark ground — so the same values in both files. -->
+    <color name="hmt_photo_viewer_bg">#0F1311</color>
+    <color name="hmt_photo_viewer_bar">#B30F1311</color>
+    <color name="hmt_photo_viewer_ink">#ECE6D8</color>
+    <color name="hmt_photo_viewer_ink_secondary">#A8B2A9</color>
 </resources>

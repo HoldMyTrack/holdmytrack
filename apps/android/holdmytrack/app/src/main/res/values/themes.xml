@@ -332,6 +332,20 @@
         <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
     </style>
 
+    <!-- The photo viewer's window (map/PhotoViewer): the whole screen, edge to edge, its own dark
+         ground behind the system bars. -->
+    <style name="Theme.HoldMyTrack.PhotoViewer" parent="Base.Theme.HoldMyTrack">
+        <item name="windowNoTitle">true</item>
+        <item name="windowActionBar">false</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowBackground">@color/hmt_photo_viewer_bg</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">always</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
     <!-- Screens designed as the web's auth card (sign-in, "check your email"): no action bar,
          the title inside the card as on the web. -->
     <style name="Theme.HoldMyTrack.NoActionBar" parent="Base.Theme.HoldMyTrack">
@@ -418,6 +432,15 @@
 
     <!-- An icon action on a list row (Edit, Delete): a 48dp touch target around the 24dp icon,
          in ink unless the button says otherwise. -->
+    <!-- The photo viewer's buttons (map/PhotoViewer): RowIcon's 48dp target, in the viewer's
+         light ink on its dark bars. -->
+    <style name="Widget.HoldMyTrack.Button.PhotoViewer" parent="Widget.Material3.Button.IconButton">
+        <item name="iconTint">@color/hmt_photo_viewer_ink</item>
+        <item name="iconSize">22dp</item>
+        <item name="android:minWidth">48dp</item>
+        <item name="android:minHeight">48dp</item>
+    </style>
+
     <style name="Widget.HoldMyTrack.Button.RowIcon" parent="Widget.Material3.Button.IconButton">
         <item name="iconTint">@color/hmt_ink</item>
         <item name="android:minWidth">48dp</item>

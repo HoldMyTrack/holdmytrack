@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { API_BASE_URL, type Photo } from '../api';
 import { t } from '../i18n';
 import { formatStartedAt } from './format';
+import { PhotoViewer } from './PhotoViewer';
 
 export interface PhotoPopupProps {
   map: MapLibreMap;
@@ -18,7 +19,8 @@ export interface PhotoPopupProps {
 /**
  * A photo's popup (FR-16.7), opened from its marker: the picture, its caption and when it was
  * taken, anchored at its place on the route so it moves with the map — no window over the page.
- * Full size opens the stored copy in a browser tab. Opened from a group's marker (photos taken
+ * Clicking the picture opens it over the page to zoom into (PhotoViewer.tsx, FR-16.8); Full size
+ * opens the stored copy in a browser tab. Opened from a group's marker (photos taken
  * at one spot, which no zoom separates), it steps through the group with ‹ › and "2 of 5",
  * staying anchored at the group's first photo so it doesn't jump between them. Changing a photo
  * is the Edit window's Photos tab's job, not this. A MapLibre popup with React rendered into it
@@ -30,6 +32,7 @@ export function PhotoPopup({ map, photos, index, onIndex, onClose }: PhotoPopupP
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const popupRef = useRef<Popup | null>(null);
+  const [viewing, setViewing] = useState(false);
   const { lon, lat } = photos[0]!;
 
   useEffect(() => {
@@ -62,9 +65,9 @@ export function PhotoPopup({ map, photos, index, onIndex, onClose }: PhotoPopupP
 
   if (!container) return null;
   const full = API_BASE_URL + photo.url;
-  return createPortal(
+  const body = createPortal(
     <div className="photo-popup__body" data-testid="photo-popup">
-      <a href={full} target="_blank" rel="noopener noreferrer" className="photo-popup__image-link">
+      <button type="button" className="photo-popup__image-link" aria-label={t('photos.view')} onClick={() => setViewing(true)} data-testid="photo-popup-view">
         <img
           className="photo-popup__image"
           src={full}
@@ -74,7 +77,7 @@ export function PhotoPopup({ map, photos, index, onIndex, onClose }: PhotoPopupP
           decoding="async"
           onLoad={reanchor}
         />
-      </a>
+      </button>
       {photos.length > 1 && (
         <div className="photo-popup__nav">
           <button type="button" className="photo-popup__step" aria-label={t('photos.previous')} disabled={index === 0} onClick={() => onIndex(index - 1)}>
@@ -103,5 +106,11 @@ export function PhotoPopup({ map, photos, index, onIndex, onClose }: PhotoPopupP
       </div>
     </div>,
     container,
+  );
+  return (
+    <>
+      {body}
+      {viewing && <PhotoViewer photos={photos} index={index} onIndex={onIndex} onClose={() => setViewing(false)} />}
+    </>
   );
 }

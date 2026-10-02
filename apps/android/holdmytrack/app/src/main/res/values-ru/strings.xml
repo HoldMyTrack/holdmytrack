@@ -508,6 +508,10 @@
     <string name="photos_next">Следующая фотография</string>
     <string name="photos_position">%1$d из %2$d</string>
     <string name="photos_close">Закрыть</string>
+    <string name="photos_zoom_in">Увеличить</string>
+    <string name="photos_zoom_out">Уменьшить</string>
+    <string name="photos_zoom_fit">Вписать в экран</string>
+    <string name="photos_unavailable">Не удалось загрузить фотографию.</string>
 
     <!-- The panel's Privacy tab (panel/PrivacyTab.kt), after the web's private.* messages. -->
     <string name="panel_tab_privacy">Приватность</string>
