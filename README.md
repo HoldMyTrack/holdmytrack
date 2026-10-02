@@ -1,6 +1,6 @@
 # <picture><source media="(prefers-color-scheme: dark)" srcset="brand/logo-on-dark.png"><img src="brand/logo-on-light.png" alt="" height="48" align="bottom"></picture> HoldMyTrack
 
-[![codecov](https://codecov.io/gh/HoldMyTrack/holdmytrack/graph/badge.svg)](https://codecov.io/gh/HoldMyTrack/holdmytrack)
+[![Go coverage](https://img.shields.io/codecov/c/github/HoldMyTrack/holdmytrack?flag=go&logo=go&logoColor=white&label=Go%20coverage)](https://app.codecov.io/gh/HoldMyTrack/holdmytrack?flags%5B0%5D=go) [![Kotlin coverage](https://img.shields.io/codecov/c/github/HoldMyTrack/holdmytrack?flag=kotlin&logo=kotlin&logoColor=white&label=Kotlin%20coverage)](https://app.codecov.io/gh/HoldMyTrack/holdmytrack?flags%5B0%5D=kotlin)
 
 A free, community-funded platform for tracking outdoor activities and seeing the accumulated shape of where you have been. It aggregates the activity history you already have — from watches, from cloud services, from files — and turns it into maps and exploration stats worth looking at. The point is to see, on one map, every place you have already been — and, just as clearly, the streets, parks and trails nearby that you haven't, so the next walk, run or ride can go somewhere new. It is not a fitness tracker (the Android app can record a plain GPS track for a casual walk or drive, nothing more), it is not a health or fitness advisor, and it has no social graph. See [`docs/VISION.md` §1](docs/VISION.md#1-executive-summary).
 
@@ -27,7 +27,7 @@ holdmytrack/
 ├── compose.yaml                 # single entry point for local dev
 ├── compose.prod.yml             # minimal single-VPS production deployment
 ├── Makefile                     # thin wrapper over compose; `make help`, `make test`
-├── codecov.yml                  # Go coverage reporting; informational, never a merge gate
+├── codecov.yml                  # Go and Kotlin coverage reporting; informational, never a merge gate
 ├── .github/workflows/ci.yml     # every test suite on push and PR (docs/DEVELOPMENT.md, "CI")
 ├── scripts/maintenance.sh       # flips the deployment's maintenance page (docs/DEPLOY.md §7)
 ├── .env.example                 # Compose interpolation only — never VITE_*
