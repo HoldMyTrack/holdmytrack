@@ -223,8 +223,11 @@ func runJobSafely(ctx context.Context, pool *pgxpool.Pool, store *storage.Store,
 			err = fmt.Errorf("panic: %v", r)
 		}
 	}()
-	return runJob(ctx, pool, store, j)
+	return jobRunner(ctx, pool, store, j)
 }
+
+// jobRunner is runJob; a test swaps in a job that blocks until shutdown.
+var jobRunner = runJob
 
 func runJob(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, j job) error {
 	switch j.kind {

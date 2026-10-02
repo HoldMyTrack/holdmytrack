@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/db"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 )
 
 // These read TEST_DATABASE_URL and skip without it, like internal/httpapi's database tests
@@ -53,11 +54,16 @@ type jobRow struct {
 
 func insertJob(t *testing.T, pool *pgxpool.Pool, userID, runAfter string, attempts int, lockedAt *time.Time) int64 {
 	t.Helper()
+	return insertJobOfKind(t, pool, userID, "test_unknown", `{}`, runAfter, attempts, lockedAt)
+}
+
+func insertJobOfKind(t *testing.T, pool *pgxpool.Pool, userID, kind, payload, runAfter string, attempts int, lockedAt *time.Time) int64 {
+	t.Helper()
 	var id int64
 	if err := pool.QueryRow(context.Background(), `
 		INSERT INTO jobs (kind, user_id, payload, run_after, attempts, locked_at)
-		VALUES ('test_unknown', $1, '{}', $2, $3, $4) RETURNING id
-	`, userID, runAfter, attempts, lockedAt).Scan(&id); err != nil {
+		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id
+	`, kind, userID, payload, runAfter, attempts, lockedAt).Scan(&id); err != nil {
 		t.Fatalf("insert job: %v", err)
 	}
 	return id
@@ -109,5 +115,53 @@ func TestClaimSkipsAJobStillRunningAndFailsOneThatKeptCrashing(t *testing.T) {
 	}
 	if r := readJob(t, pool, running); r.state != "pending" {
 		t.Errorf("running job = %+v, want still pending", r)
+	}
+}
+
+// A job that panics fails on its own instead of taking the worker down with it. An ingest
+// job over a nil object store panics on its first fetch — the same kind of nil dereference or
+// index out of range a malformed file used to cause inside a parser.
+func TestPanickingJobFailsAlone(t *testing.T) {
+	pool, userID := testPool(t)
+	payload := fmt.Sprintf(`{"user_id":%q,"source":"upload","source_detail":"x.gpx","external_id":"panic-test","raw_payload_key":"raw/none.gpx"}`, userID)
+	id := insertJobOfKind(t, pool, userID, "ingest", payload, "2000-01-01T00:00:00Z", 0, nil)
+
+	if processed, err := claimAndRunOne(context.Background(), pool, nil, slog.New(slog.DiscardHandler)); err != nil || !processed {
+		t.Fatalf("processed=%v err=%v", processed, err)
+	}
+	r := readJob(t, pool, id)
+	if r.state != "failed" || !strings.HasPrefix(r.lastError, "panic:") || r.attempts != 1 {
+		t.Fatalf("job = %+v, want failed with the panic as its error", r)
+	}
+}
+
+// A job cut off by shutdown is handed back for the next start: still pending, unlocked, its
+// attempt not counted against it.
+func TestShutdownReleasesTheRunningJob(t *testing.T) {
+	pool, userID := testPool(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	running := make(chan struct{})
+	jobRunner = func(ctx context.Context, _ *pgxpool.Pool, _ *storage.Store, _ job) error {
+		close(running)
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	t.Cleanup(func() { jobRunner = runJob })
+	id := insertJob(t, pool, userID, "2000-01-01T00:00:00Z", 0, nil)
+
+	go func() {
+		<-running
+		cancel()
+	}()
+	if processed, err := claimAndRunOne(ctx, pool, nil, slog.New(slog.DiscardHandler)); err != nil || !processed {
+		t.Fatalf("processed=%v err=%v", processed, err)
+	}
+	var lockedAt *time.Time
+	r := readJob(t, pool, id)
+	if err := pool.QueryRow(context.Background(), `SELECT locked_at FROM jobs WHERE id = $1`, id).Scan(&lockedAt); err != nil {
+		t.Fatal(err)
+	}
+	if r.state != "pending" || r.attempts != 0 || lockedAt != nil {
+		t.Fatalf("job = %+v locked_at %v, want pending, unlocked, no attempt counted", r, lockedAt)
 	}
 }
