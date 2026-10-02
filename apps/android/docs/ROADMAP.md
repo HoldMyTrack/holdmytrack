@@ -48,8 +48,8 @@ One throwaway app, one physical device, both platform questions answered togethe
 
 Prepare the app for testing and store publication.
 
-- [ ] **Physical device / Health Connect testing**
-  - End-to-end testing on a physical device with the Health Connect toolbox on the host.
+- [x] **Physical device / Health Connect testing**
+  - Done end to end on a physical device, with the Health Connect toolbox on the host.
 - [ ] **Play Store Health Connect data-type declarations**
   - The list is settled and is as short as it can be: **one data type, Exercise** (`READ_EXERCISE`), plus `READ_EXERCISE_ROUTES` and `READ_HEALTH_DATA_HISTORY`, neither of which is an additional type — routes are part of an exercise session, and history is a time window over it. Confirmed on the device: Health Connect's own permission dialog for HoldMyTrack offers exactly one toggle. No heart rate, distance, calories, sleep or weight; the product draws outdoor GPS routes, so anything else would be requesting more than it demonstrably uses, which is a known rejection cause (`docs/VISION.md` §7; root `ROADMAP.md` Phase 6). What remains is filling in the Play Console declaration itself.
 - [ ] **Location-permission Play Console declarations**
