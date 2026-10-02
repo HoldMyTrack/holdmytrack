@@ -320,3 +320,26 @@ func TestPrivateLocationReprocessesHiddenDuplicates(t *testing.T) {
 		t.Fatalf("reprocessing %v, want both the live copy %s and the hidden one %s", ids, live, hidden)
 	}
 }
+
+// Ingest drops a point no place on Earth has before it reaches the stored track: one
+// latitude past the pole otherwise ended up in the trajectory, the tile index and the stats.
+func TestIngestDropsImpossiblePoints(t *testing.T) {
+	d := newDBTestWithS3(t, newMemS3())
+	me := d.newAccount(false)
+	gpx := strings.Replace(resumeGPX, `<trkpt lat="50.0010" lon="10.0010">`, `<trkpt lat="95" lon="10.0010">`, 1)
+	d.uploadFile(me, "pole.gpx", []byte(gpx))
+	res, err := ingest.Process(context.Background(), d.pool, d.srv.store, d.latestIngestJob(me))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var points int
+	var maxLat float64
+	if err := d.pool.QueryRow(context.Background(), `
+		SELECT s.point_count, ST_YMax(a.trajectory)
+		FROM activities a JOIN activity_streams s ON s.activity_id = a.id WHERE a.id = $1`, res.ActivityID).Scan(&points, &maxLat); err != nil {
+		t.Fatal(err)
+	}
+	if points != 2 || maxLat > 90 {
+		t.Fatalf("%d points, max latitude %v; want the 2 real points", points, maxLat)
+	}
+}
