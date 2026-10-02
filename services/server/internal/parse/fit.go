@@ -97,28 +97,39 @@ func ParseFIT(r io.Reader) (Activity, error) {
 			act.ActivityType = sportName(sport, subSport)
 
 		case 20: // record — the point stream
+			// A field's width comes from the file's own definition, so each read checks it
+			// first: a field narrower than its type is treated as absent rather than read past
+			// its end. So is FIT's "invalid" value for each type, which encoders write for a
+			// record with no position yet (before GPS lock, through a dropout) — read as a
+			// coordinate it would put the point at about (180, 180).
 			p := Point{}
 			haveLat, haveLon := false, false
 			for _, f := range def.fields {
 				raw := fields[f.num]
 				switch f.num {
 				case 0: // position_lat, sint32 semicircles
-					v := int32(def.order.Uint32(raw))
-					p.Lat = float64(v) * (180.0 / math.Pow(2, 31))
-					haveLat = true
+					if v, ok := fitSint32(def.order, raw); ok {
+						p.Lat = float64(v) * (180.0 / math.Pow(2, 31))
+						haveLat = true
+					}
 				case 1: // position_long
-					v := int32(def.order.Uint32(raw))
-					p.Lon = float64(v) * (180.0 / math.Pow(2, 31))
-					haveLon = true
+					if v, ok := fitSint32(def.order, raw); ok {
+						p.Lon = float64(v) * (180.0 / math.Pow(2, 31))
+						haveLon = true
+					}
 				case 2: // altitude, uint16, scale 5, offset 500
-					v := def.order.Uint16(raw)
-					if v != 0xFFFF {
-						e := float32(v)/5 - 500
-						p.Elevation = &e
+					if len(raw) >= 2 {
+						if v := def.order.Uint16(raw); v != 0xFFFF {
+							e := float32(v)/5 - 500
+							p.Elevation = &e
+						}
 					}
 				case 253: // timestamp, uint32 seconds since FIT epoch
-					v := def.order.Uint32(raw)
-					p.Time = time.Unix(int64(v)+fitEpoch, 0).UTC()
+					if len(raw) >= 4 {
+						if v := def.order.Uint32(raw); v != 0xFFFFFFFF {
+							p.Time = time.Unix(int64(v)+fitEpoch, 0).UTC()
+						}
+					}
 				}
 			}
 			if haveLat && haveLon {
@@ -135,6 +146,16 @@ func ParseFIT(r io.Reader) (Activity, error) {
 		return Activity{}, fmt.Errorf("parse fit: %w", ErrNoPoints)
 	}
 	return act, nil
+}
+
+// fitSint32 reads a sint32 field, reporting false for one too short to hold it and for FIT's
+// invalid value, 0x7FFFFFFF.
+func fitSint32(order binary.ByteOrder, raw []byte) (int32, bool) {
+	if len(raw) < 4 {
+		return 0, false
+	}
+	v := int32(order.Uint32(raw))
+	return v, v != math.MaxInt32
 }
 
 type fitField struct {
