@@ -70,7 +70,6 @@ ADR-0024 keeps a resized copy of each photo on our own storage. If photos ever b
 
 Deploys to `holdmytrack.com` are run by hand over SSH (`docs/DEPLOY.md` §6). What held back deploying every merge to `main` was that the server held the only copy of real synced history; nightly backups and a monthly restore drill now exist (ADR-0029), so a bad deploy can be undone.
 
-* A GitHub Actions job would need an SSH key to the server in the repository's secrets, which is a new way in to the box; that key should only be able to run the deploy, not get a shell.
+* A GitHub Actions job would need an SSH key to the server in the repository's secrets, which is a new way in to the box; that key should only be able to run the deploy, not get a shell (`restrict,command="…"` in root's `authorized_keys`, since the server takes SSH as root by key only, `docs/DEPLOY.md` §12).
 * A deploy with a migration needs `backup.sh` and maintenance mode around it (`docs/DEPLOY.md` §7), and the job can't tell in advance whether a migration is going to go wrong.
 * The build runs on the 1 vCPU / 2 GB box itself, so every merge would mean several minutes of high load there; building images in CI and pulling them would avoid that but needs a container registry.
-* The server takes SSH by key only, as root (`docs/DEPLOY.md` §12). A key for CI should be limited in `authorized_keys` (`command="…"`, `restrict`) to running the deploy, or belong to a separate user with no shell.
