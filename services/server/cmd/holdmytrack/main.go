@@ -110,18 +110,34 @@ func main() {
 		}, httpapi.FacebookOAuthConfig{
 			AppID: cfg.FacebookAppID, AppSecret: cfg.FacebookAppSecret, RedirectURL: cfg.FacebookRedirectURL,
 		}, pages)
-		httpSrv := &http.Server{Addr: cfg.ListenAddr, Handler: srv}
+		// No ReadTimeout or WriteTimeout: a 512 MiB archive over a slow uplink is a legitimate
+		// request that takes minutes. ReadHeaderTimeout and IdleTimeout still free a connection
+		// that sends nothing useful.
+		httpSrv := &http.Server{
+			Addr:              cfg.ListenAddr,
+			Handler:           srv,
+			ReadHeaderTimeout: 10 * time.Second,
+			IdleTimeout:       2 * time.Minute,
+		}
 		log.Info("serve: listening", "addr", cfg.ListenAddr)
+		// ListenAndServe returns as soon as Shutdown starts, so main waits for the drain to end
+		// before returning and closing the pool under requests still running. 8 s fits inside
+		// docker stop's default 10 s grace.
+		drained := make(chan struct{})
 		go func() {
+			defer close(drained)
 			<-ctx.Done()
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 			defer cancel()
-			_ = httpSrv.Shutdown(shutdownCtx)
+			if err := httpSrv.Shutdown(shutdownCtx); err != nil {
+				log.Error("serve: shutdown", "err", err)
+			}
 		}()
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Error("serve", "err", err)
 			os.Exit(1)
 		}
+		<-drained
 
 	case "work":
 		store, err := storage.New(cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3Bucket)
