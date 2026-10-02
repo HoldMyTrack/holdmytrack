@@ -40,7 +40,7 @@ Checkboxes are the source of truth for progress; re-check them against the three
 
 ### Pre-launch validation — gates any public launch, regardless of which paths are live
 
-- [ ] Stand up the funding page (Open Collective, public ledger — `VISION.md` §6.1) before any public launch, not retrofitted after The app side is built (`IMPLEMENTATION.md` §4.16); what's left: create the `holdmytrack` collective on opencollective.com and apply to Open Source Collective as fiscal host, then once approved set the slug — `apps/web/src/funding.ts`'s `OPEN_COLLECTIVE_SLUG` and `services/server/internal/web/web.go`'s `OpenCollectiveSlug` — and replace the About page template's "donations are not open yet" line with a link to it.
+- [ ] Stand up the funding page (Open Collective, public ledger — `VISION.md` §6.1) before any public launch, not retrofitted after. The app side is built (`IMPLEMENTATION.md` §4.16), and the `holdmytrack` collective applied to Open Source Collective as fiscal host on 2026-09-24; what's left: once approved, set the slug — `services/server/internal/web/web.go`'s `OpenCollectiveSlug` — and replace the About page template's "donations are not open yet" line with a link to it.
 - [ ] Post concept renders to r/running, r/cycling, r/Garmin, r/Strava, r/FogOfWorld (`VISION.md` §5.1, §8.1) — validate "free forever, funded by users" as credible before building further.
 
 ### Spots visits — planned
