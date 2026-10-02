@@ -62,13 +62,15 @@ There is no multi-tenancy beyond per-account data isolation. The admin panel is 
 
 A failed form comes back as the same page, at the failure's status (`400`, `401`, `409`, `429`), with the server's message and the typed email kept. A successful one redirects: to `/verify-pending` for a real account that hasn't verified its email, otherwise to the map (`/`). A visit to `/signin` or `/signup` with a real account already signed in redirects the same way; a demo session can still sign in, or sign up (FR-2.3). The JSON endpoints named below are what the Android app calls and what these pages share their behavior with. Links in emails sent before the pages existed pointed at `/?reset_token=` and `/?verify_token=`, and a failed Google sign-in at `/?auth_error=google`; `/` forwards those to `/reset`, `/verify` and `/signin?error=google`, before any session check.
 
+The JSON endpoints in this section are refused (`403`) the same way when a browser sends them from another site: every `POST`, `PATCH` or `DELETE` under `/v1/` whose `Origin` is not the app's own. A request with no `Origin` — the Android app's — is not refused.
+
 ### FR-1.1 Sign up
 
 **Description**: An anonymous visitor creates a new registered account.
 
 **Preconditions**: No active session, or an active demo session (see note below).
 
-**Inputs**: Email address, password (minimum 8 characters); the browser's own IANA timezone, sent automatically (not user-entered) and optional — see step 3.
+**Inputs**: Email address, password (8 characters to 72 bytes); the browser's own IANA timezone, sent automatically (not user-entered) and optional — see step 3.
 
 **Behavior**:
 1. Client submits email + password + its own detected timezone to `POST /v1/auth/signup` (the web's `/signup` form fills the timezone from the browser with a one-line script; without it the account starts on UTC).
@@ -80,8 +82,8 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 **Outputs**: A valid session cookie; the account's email and its (unverified) status are returned to the client.
 
 **Error cases**:
-- Invalid email format → `400 Bad Request`.
-- Password shorter than 8 characters → `400 Bad Request`.
+- Invalid email format → `400 Bad Request`. Only a bare address is accepted: a display name or comment (`Name <a@b.c>`, `a@b.c (x)`) is invalid.
+- Password shorter than 8 characters, or longer than 72 bytes (bcrypt's limit) → `400 Bad Request`.
 - Email already registered to a different, real account → `409 Conflict`.
 
 ### FR-1.2 Sign in
@@ -101,6 +103,7 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 
 **Error cases**:
 - Email not found, account with no password set (never claimed, or Google- or Facebook-only — FR-1.9, FR-1.10), or password mismatch → `401 Unauthorized` with a single generic message ("invalid email or password") in every case — the system does not distinguish these to a caller, so it cannot be used to discover which emails are registered.
+- After 10 failed sign-ins for one email, or 50 from one address, within 15 minutes → `429 Too Many Requests`, checked before the password, so even the right one is refused until the window passes.
 
 ### FR-1.3 Sign out
 
@@ -148,7 +151,7 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 
 **Preconditions**: A valid, unexpired, unused reset token (normally reached by clicking the emailed link, which the client recognizes independently of whatever session state currently exists — see note).
 
-**Inputs**: Reset token, new password (minimum 8 characters).
+**Inputs**: Reset token, new password (8 characters to 72 bytes).
 
 **Behavior**:
 1. Client submits the token and new password to `POST /v1/auth/reset-password`.
@@ -161,7 +164,7 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 
 **Error cases**:
 - Token missing, already used, or expired → `400 Bad Request` with a generic message (the system does not distinguish "never existed" from "expired" from "already used").
-- Password shorter than 8 characters → `400 Bad Request`.
+- Password shorter than 8 characters, or longer than 72 bytes (bcrypt's limit) → `400 Bad Request`.
 
 **Note — reset link takes priority**: if the client detects a reset token in its own URL (the emailed link), it presents the reset screen unconditionally, ahead of whatever session state `GET /v1/auth/me` would otherwise report — including an already-signed-in session. This is the one flow reachable without first checking authentication state.
 
@@ -198,19 +201,20 @@ A failed form comes back as the same page, at the failure's status (`400`, `401`
 **Preconditions**: An active session for a real account whose email is not yet verified.
 
 **Behavior**:
-1. On signup (FR-1.1) and whenever the email address changes (step 4 below), the server emails a link containing a verification token (valid 24 hours, single-use) to the address on file.
-2. The link opens `/verify?token=…`, which verifies the token the same way `POST /v1/auth/verify-email` does. The Android app doesn't call that endpoint: the link is opened in a browser, and the app finds out by asking `GET /v1/auth/me` again (`apps/android/docs/SPEC.md` FR-1.4). A missing, expired, used or malformed token shows "This verification link is invalid or has expired." On success, the server marks the account verified, invalidates every other outstanding verification token for it, and creates a fresh session for whichever browser opened the link — regardless of whether that browser already held a session of its own, so the link works from any device.
-3. While waiting, the account holder can request another copy of the link (`POST /v1/auth/resend-verification`, rate-limited to 5 per hour per account) without needing to already know it was lost or expired.
-4. The account holder can also change the address on file (`PATCH /v1/auth/email`) before ever verifying — correcting a typo the original signup made, since a resend alone cannot fix a wrong address. Any change resets the account back to unverified and sends a new link to the new address, whether or not the account was already verified.
+1. On signup (FR-1.1) and on an email change (step 4 below), the server emails a link containing a verification token (valid 24 hours, single-use) to the address it confirms: the address on file, or the new address a change asked for.
+2. The link opens `/verify?token=…`, which verifies the token the same way `POST /v1/auth/verify-email` does. The Android app doesn't call that endpoint: the link is opened in a browser, and the app finds out by asking `GET /v1/auth/me` again (`apps/android/docs/SPEC.md` FR-1.4). A missing, expired, used or malformed token shows "This verification link is invalid or has expired." A link confirms only the address it was sent to. On success, the server makes that address the account's own if it was a pending change (or answers `409 Conflict` if another account has taken it meanwhile), marks the account verified, invalidates every other outstanding verification token for it — and, when the address changed, every outstanding password-reset link — and creates a fresh session for whichever browser opened the link, so the link works from any device — unless that browser is already signed in to a different account, which it stays signed in to.
+3. While waiting, the account holder can request another copy of the link (`POST /v1/auth/resend-verification`) without needing to already know it was lost or expired. It goes to the address the newest outstanding link went to.
+4. The account holder can also change the address (`PATCH /v1/auth/email`) before ever verifying — correcting a typo the original signup made, since a resend alone cannot fix a wrong address. The change is pending until the link sent to the new address is opened: until then the account keeps its address on file and its verified state, the new address stays free for anyone else, and any link sent before the change stops working. `/verify-pending` names the address the newest link went to. Resends and changes together are rate-limited to 5 per hour per account.
 5. Once verified, the account continues to FR-1.7's first-run Settings page, not straight to the map, until Country and Timezone have been saved once.
 6. Until verified, every route other than `GET /v1/auth/me`, `POST /v1/auth/logout`, and the three endpoints above returns `403 Forbidden` with a distinguishable error rather than the normal response.
 
-**Outputs**: `verify-email` and `reset-password` both return a valid session cookie for the account on success. `resend-verification` and `change-email` return a confirmation; `change-email` also returns the account's current (now-unverified) profile.
+**Outputs**: `verify-email` and `reset-password` both return a valid session cookie for the account on success. `resend-verification` and `change-email` return a confirmation; `change-email` also returns the account's profile as it stands, still with its address on file.
 
 **Error cases**:
 - Verification token missing, already used, or expired → `400 Bad Request` with a generic message, same non-distinguishing reasoning as FR-1.6's reset token.
 - `change-email`/`resend-verification` attempted by a demo account → `400 Bad Request` (neither concept applies to one).
-- More than 5 resend requests for the same account within an hour → `429 Too Many Requests`.
+- `change-email` to an address another account has → `409 Conflict`.
+- More than 5 resend or change-email requests for the same account within an hour → `429 Too Many Requests`.
 
 **Notes**: This reverses an earlier, deliberately simpler version of FR-1 that had no email verification at all — added once real Health Connect/cloud sync made an unrecoverable, mistyped-email account a real cost (server-side ingest work stranded on an account nobody can get back into), not because the original simplicity was a mistake.
 
@@ -314,7 +318,7 @@ A new account made this way is unverified, like one made on the web; the Android
 
 **Preconditions**: An active demo session.
 
-**Inputs**: Email address, password (minimum 8 characters) — the same inputs as FR-1.1.
+**Inputs**: Email address, password (8 characters to 72 bytes) — the same inputs as FR-1.1.
 
 **Behavior**:
 1. From the account menu, which shows the demo account's name ("Demo User") where a real account shows its email, the user selects "Create your own account," which opens the same sign-up page a new visitor sees (`/signup`, FR-1.1), with "← Back to the map" in place of the sign-in page's "try demo" option (starting a second demo while already in one would abandon the first).
@@ -474,7 +478,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Outputs**: One new `Activity` per successfully synced recording, titled and described from the moment it's created if the user set a name or description in Edit — the one ingest path where that's possible (every other path leaves both fields unset at ingest). Reported through the same `GET /v1/uploads` history FR-3.4 already describes.
 
-**Error cases**: A too-long custom activity type (over 50 characters, the column's own bound) is rejected by the sync endpoint with a clear reason rather than failing as a raw database error at insert time. A row that fails to sync (network error, server rejection) is left on the device, so a retried "Sync now" tries it again without the user doing anything.
+**Error cases**: A too-long custom activity type (over 50 characters, the column's own bound) is rejected by the sync endpoint with a clear reason rather than failing as a raw database error at insert time. So is an `external_id` that isn't 1–200 letters, digits, `.`, `_` or `-` (not starting with `.`). A row that fails to sync (network error, server rejection) is left on the device, so a retried "Sync now" tries it again without the user doing anything.
 
 **Not yet built**: a discard confirmation before Stop finalizes a save; the iOS half (`docs/ROADMAP.md` Phase 2 tracks it as a combined Android/iOS item; Android's half is what this FR describes).
 
@@ -1337,7 +1341,7 @@ Deliberately out of scope, not a "not yet", and not planned: Oura and other reco
 ### FR-16.4 Editing
 
 **Behavior**:
-1. `PATCH /v1/photos/{id}` takes a JSON object; a field present changes, a field absent doesn't. `caption`: trimmed; empty or null clears it; at most 500 characters. `route_at`: RFC 3339, the photo's new moment on the track, clamped to it. A photo can't be taken off the track. It answers `200` with the photo.
+1. `PATCH /v1/photos/{id}` takes a JSON object; a field present changes, a field absent doesn't. `caption`: trimmed; empty or null clears it; at most 500 characters. `route_at`: RFC 3339, the photo's new moment on the track, clamped to it. A photo can't be taken off the track. A request refused for either field changes neither. It answers `200` with the photo.
 2. `GET /v1/activities/track-metrics/{id}` (FR-4.8) carries each display point's moment as `time_s` (epoch seconds), so a client can turn a place on the track into a `route_at`.
 
 **Error cases**:

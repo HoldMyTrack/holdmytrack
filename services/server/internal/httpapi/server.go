@@ -42,6 +42,12 @@ const maxUploadBytes = 64 << 20 // 64 MiB
 // so this is deliberately much larger than a single activity file ever needs to be.
 const maxZipUploadBytes = 512 << 20 // 512 MiB
 
+// multipartMemoryBytes is how much of an upload's multipart body ParseMultipartForm keeps in
+// memory; a larger file part goes to a temp file. Passing maxZipUploadBytes here instead kept
+// a whole archive in RAM, and the zip branch then copied it again — about 1 GiB per upload,
+// so two or three large exports at once could get the API killed for out-of-memory.
+const multipartMemoryBytes = 32 << 20
+
 // maxZipEntries bounds how many files inside one archive handleZipUpload will process — not
 // a claim that a real import can't have more, just where this server stops rather than
 // enqueueing an unbounded number of jobs from one request. §5.1's "one bad file in a bulk
@@ -258,6 +264,7 @@ func (s *Server) registerPages() {
 // pattern for "credentialed CORS from a known set of origins" — rather than accepting any
 // origin with credentials, which would let any site ride a visitor's session.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	setSecurityHeaders(w.Header())
 	if origin := r.Header.Get("Origin"); corsAllowedOrigins[origin] {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -269,7 +276,64 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	if s.crossSiteAPIWrite(r) {
+		http.Error(w, "cross-origin request refused", http.StatusForbidden)
+		return
+	}
+	if strings.HasPrefix(r.URL.Path, apiPrefix+"/") && !setsOwnBodyLimit(r) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxJSONBodyBytes)
+	}
 	s.mux.ServeHTTP(w, r)
+}
+
+// maxJSONBodyBytes bounds every /v1/ request body that doesn't set a limit of its own. The
+// handlers decode JSON straight from the body and check lengths after, so without it one huge
+// "name", or a track edit's list of millions of point indexes, was held whole in memory first.
+// The largest legitimate body, a Story's 10,000 activity ids or a 10,000-entry track edit, is a
+// few hundred KB.
+const maxJSONBodyBytes = 1 << 20
+
+// setsOwnBodyLimit reports the requests whose handler bounds the body itself, at a size above
+// maxJSONBodyBytes: every multipart upload (a file, an archive, a photo, an avatar) and a
+// phone sync's batch of activities.
+func setsOwnBodyLimit(r *http.Request) bool {
+	return strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") ||
+		r.URL.Path == apiPrefix+"/sync/activities"
+}
+
+// setSecurityHeaders applies to every response. No page here is meant to be framed, so none
+// may be (frame-ancestors, and X-Frame-Options for browsers without CSP): framed invisibly by
+// another site, a signed-in page's buttons could be clicked through — and the click is
+// same-origin, so neither SameSite nor the Origin checks would stop it. nosniff keeps a
+// browser from reading a response as a type other than the one it's served as. HSTS is
+// Caddy's (apps/web/docker/Caddyfile), which terminates TLS.
+func setSecurityHeaders(h http.Header) {
+	h.Set("Content-Security-Policy", "frame-ancestors 'none'")
+	h.Set("X-Frame-Options", "DENY")
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+}
+
+// crossSiteAPIWrite reports a state-changing /v1/ request a browser sent from another site.
+// SameSite=Lax keeps the session cookie off such a request, but not off the response: a
+// hostile page's auto-submitted form to /v1/auth/login, with an enctype="text/plain" body
+// shaped into valid JSON, set the attacker's session in the victim's browser, so whatever the
+// victim uploaded next went to the attacker's account. A browser always sends Origin on a
+// POST, PATCH or DELETE, so one naming a different origin than this app's (or the dev
+// allowlist's) is refused. The native apps send no Origin, and pass.
+func (s *Server) crossSiteAPIWrite(r *http.Request) bool {
+	switch r.Method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return false
+	}
+	if !strings.HasPrefix(r.URL.Path, apiPrefix+"/") {
+		return false
+	}
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return false
+	}
+	return !corsAllowedOrigins[origin] && !s.isSameOrigin(r)
 }
 
 type healthzResponse struct {
@@ -306,10 +370,11 @@ type uploadResponse struct {
 // rejecting it, not what it ultimately accepts.
 func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxZipUploadBytes+1<<20) // +1MiB of multipart overhead
-	if err := r.ParseMultipartForm(maxZipUploadBytes); err != nil {
+	if err := r.ParseMultipartForm(multipartMemoryBytes); err != nil {
 		httpErrorT(w, r, http.StatusRequestEntityTooLarge, "error.upload_too_large")
 		return
 	}
+	defer r.MultipartForm.RemoveAll() //nolint:errcheck // best effort; net/http also cleans up
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		httpErrorT(w, r, http.StatusBadRequest, "error.avatar_missing")
@@ -319,20 +384,18 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	if ext == ".zip" {
-		// zip.NewReader needs an io.ReaderAt, which an HTTP body doesn't provide, so there is
-		// no streaming alternative here the way ingest.Process manages for a single file —
-		// read fully into memory (bounded by maxZipUploadBytes above), once, regardless of
-		// which zip-shaped branch below ends up handling it.
-		data, err := io.ReadAll(io.LimitReader(file, maxZipUploadBytes))
-		if err != nil {
-			httpErrorT(w, r, http.StatusBadRequest, "error.avatar_read")
-			return
-		}
-		if len(data) == 0 {
+		// zip.NewReader reads the part where ParseMultipartForm left it — in memory when
+		// small, a temp file otherwise — rather than a second copy of the whole archive.
+		if header.Size == 0 {
 			httpErrorT(w, r, http.StatusBadRequest, "error.upload_empty")
 			return
 		}
-		zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+		ra, ok := file.(io.ReaderAt)
+		if !ok {
+			httpErrorT(w, r, http.StatusBadRequest, "error.avatar_read")
+			return
+		}
+		zr, err := zip.NewReader(ra, header.Size)
 		if err != nil {
 			httpErrorT(w, r, http.StatusBadRequest, "error.upload_bad_zip")
 			return
@@ -349,6 +412,12 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Refused rather than cut off at the limit, which would have been ingested as a file
+	// that ends mid-track, or reported as unreadable.
+	if header.Size > maxUploadBytes {
+		httpErrorT(w, r, http.StatusRequestEntityTooLarge, "error.upload_too_large")
+		return
+	}
 	// Read once into memory (bounded by maxUploadBytes above) so the same bytes can be
 	// hashed and then uploaded with a known Content-Length. See the maxUploadBytes doc
 	// comment for why this is a deliberate, bounded exception to "never buffer a file."
@@ -435,9 +504,10 @@ func (s *Server) persistAndEnqueue(ctx context.Context, p uploadFileParams) (ext
 	// this check. Scoped by the same `source` the job itself will carry, matching the
 	// activities table's own `(user_id, source, external_id)` unique index — a Takeout import
 	// and a plain upload are different provenance even if (implausibly) they hashed the same.
+	// An activity whose ingest never finished isn't a repeat: uploading it again resumes it.
 	var exists bool
 	if err := s.pool.QueryRow(ctx,
-		`SELECT EXISTS (SELECT 1 FROM activities WHERE user_id = $1 AND source = $2 AND external_id = $3)`,
+		`SELECT EXISTS (SELECT 1 FROM activities WHERE user_id = $1 AND source = $2 AND external_id = $3 AND ingest_complete)`,
 		p.UserID, p.Source, externalID,
 	).Scan(&exists); err != nil {
 		return "", false, fmt.Errorf("dedupe check: %w", err)

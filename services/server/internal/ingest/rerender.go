@@ -50,7 +50,7 @@ func RerenderCoverage(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 				return fmt.Errorf("masks for %s: %w", id, err)
 			}
 		}
-		tag, err := pool.Exec(ctx, `UPDATE fog_tiles SET dirty = true WHERE user_id = $1 AND zoom = $2`, id, FogZoom)
+		tag, err := pool.Exec(ctx, `UPDATE fog_tiles SET dirty = true, dirty_gen = dirty_gen + 1 WHERE user_id = $1 AND zoom = $2`, id, FogZoom)
 		if err != nil {
 			return fmt.Errorf("mark %s dirty: %w", id, err)
 		}
@@ -109,7 +109,9 @@ func RerenderActivityMasks(ctx context.Context, pool *pgxpool.Pool, store *stora
 	}
 	var newTiles [][2]int
 	if points != nil {
-		newTiles = computeTouchedTiles(points, FogZoom)
+		if newTiles, err = computeTouchedTiles(points, FogZoom); err != nil {
+			return err
+		}
 		if err := fog.RenderActivityMasks(ctx, pool, store, activityID, points, newTiles); err != nil {
 			return fmt.Errorf("render masks: %w", err)
 		}

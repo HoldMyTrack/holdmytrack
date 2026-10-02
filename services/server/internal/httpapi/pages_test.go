@@ -212,6 +212,60 @@ func TestAuthFormsRequireSameOrigin(t *testing.T) {
 	}
 }
 
+// Every response forbids framing — a framed page's buttons could be clicked through from
+// another site — and type sniffing.
+func TestResponsesCarrySecurityHeaders(t *testing.T) {
+	s := newPagesTestServer(t)
+	for _, path := range []string{"/signin", "/v1/auth/me", "/no-such-page"} {
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		h := rec.Header()
+		if h.Get("Content-Security-Policy") != "frame-ancestors 'none'" || h.Get("X-Frame-Options") != "DENY" || h.Get("X-Content-Type-Options") != "nosniff" {
+			t.Errorf("%s: headers %v", path, h)
+		}
+	}
+}
+
+// A JSON body past maxJSONBodyBytes is cut off before the handler decodes it: an over-long
+// email reads as a malformed body, not as an email checked once fully in memory.
+func TestAPIBodiesAreBounded(t *testing.T) {
+	s := newPagesTestServer(t)
+	body := `{"email":"` + strings.Repeat("a", maxJSONBodyBytes) + `@example.com","password":"long-enough"}`
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/auth/login", strings.NewReader(body)))
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "invalid request body") {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// A browser's write to the JSON API from another site is refused before any handler runs —
+// a text/plain form shaped into JSON signed a victim into an attacker's account. Same-origin
+// requests and the native apps' (which send no Origin) still reach the handler, here as the
+// 400 a malformed body gets.
+func TestAPIWritesRefuseForeignOrigins(t *testing.T) {
+	s := newPagesTestServer(t)
+	for _, tc := range []struct {
+		origin string
+		want   int
+	}{
+		{"https://evil.example", http.StatusForbidden},
+		{"null", http.StatusForbidden},
+		{"https://app.example", http.StatusBadRequest},
+		{"", http.StatusBadRequest},
+	} {
+		req := httptest.NewRequest(http.MethodPost, "/v1/auth/login", strings.NewReader("not json"))
+		req.Header.Set("Content-Type", "text/plain")
+		if tc.origin != "" {
+			req.Header.Set("Origin", tc.origin)
+		}
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, req)
+		if rec.Code != tc.want {
+			t.Errorf("origin %q: status %d, want %d", tc.origin, rec.Code, tc.want)
+		}
+	}
+}
+
 // A signed-out visitor gets the language their browser asks for — and the next visitor, asking
 // for another, isn't served the first one's cached copy.
 func TestPagesFollowAcceptLanguage(t *testing.T) {

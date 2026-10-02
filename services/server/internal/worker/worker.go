@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"runtime/debug"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -20,6 +21,19 @@ import (
 )
 
 const pollInterval = 500 * time.Millisecond
+
+// claimLease is how long a claimed job stays out of other claims. A job keeps state =
+// 'pending' while it runs (the handlers that show progress count on that), so locked_at is
+// what marks it taken: a fresh one excludes the row, a stale one means the worker that took
+// it died mid-run (killed, out of memory) and the job is up for grabs again. Far longer than
+// any job should run, so a slow one isn't handed to a second worker while the first is busy.
+const claimLease = 30 * time.Minute
+
+// maxAttempts bounds how many times a job is claimed without finishing. Attempts count at
+// claim time, so a job that kills its worker every time it runs (a file that panics a parser
+// below the recover, or exhausts memory) is failed on its next claim instead of being handed
+// out first again on every restart, stalling the queue for every account behind it.
+const maxAttempts = 3
 
 // demoPurgeInterval is far coarser than pollInterval — expired demo accounts (business_
 // plan.md §8.2, demo_purge.go) are bounded by demoSessionTTL (hours), not something that
@@ -44,10 +58,10 @@ type job struct {
 	payload []byte
 }
 
-// Run polls until ctx is cancelled. Each job is claimed, run, and marked done/failed in its
-// own transaction so FOR UPDATE SKIP LOCKED lets multiple worker processes share the queue
-// safely — not exercised by this task's single-worker verification, but the point of using
-// SKIP LOCKED at all rather than a plain SELECT ... FOR UPDATE.
+// Run polls until ctx is cancelled. Each job is claimed in its own short transaction (FOR
+// UPDATE SKIP LOCKED, then locked_at stamped), run outside it, and marked done/failed after.
+// The fresh locked_at, not the row lock, is what keeps a second worker process off a job
+// that is still running (claimLease).
 func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger) error {
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
@@ -57,6 +71,16 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 	defer heatmapTicker.Stop()
 	heatmapCapTicker := time.NewTicker(heatmapCapInterval)
 	defer heatmapCapTicker.Stop()
+
+	// A ticker's first tick is a whole interval away, so the daily sweeps also run once at
+	// start: a worker restarted more often than daily (every deploy) would otherwise never
+	// reach them.
+	if err := ageOutHeatmapWindow(ctx, pool, log); err != nil {
+		log.Error("heatmap aging error", "err", err)
+	}
+	if err := recomputeHeatmapCaps(ctx, pool, log); err != nil {
+		log.Error("heatmap cap error", "err", err)
+	}
 
 	for {
 		select {
@@ -97,13 +121,15 @@ func claimAndRunOne(ctx context.Context, pool *pgxpool.Pool, store *storage.Stor
 	defer tx.Rollback(ctx) //nolint:errcheck // no-op if already committed
 
 	var j job
+	var attempts int
 	err = tx.QueryRow(ctx, `
-		SELECT id, kind, payload FROM jobs
+		SELECT id, kind, payload, attempts FROM jobs
 		WHERE state = 'pending' AND run_after <= NOW()
+		  AND (locked_at IS NULL OR locked_at < NOW() - make_interval(secs => $1))
 		ORDER BY run_after, id
 		FOR UPDATE SKIP LOCKED
 		LIMIT 1
-	`).Scan(&j.id, &j.kind, &j.payload)
+	`, claimLease.Seconds()).Scan(&j.id, &j.kind, &j.payload, &attempts)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
@@ -111,39 +137,93 @@ func claimAndRunOne(ctx context.Context, pool *pgxpool.Pool, store *storage.Stor
 		return false, fmt.Errorf("worker: claim: %w", err)
 	}
 
-	if _, err := tx.Exec(ctx, `UPDATE jobs SET locked_at = NOW() WHERE id = $1`, j.id); err != nil {
+	if attempts >= maxAttempts {
+		// Every earlier claim ended without the job being marked done or failed: the worker
+		// running it died each time.
+		log.Error("job abandoned", "job_id", j.id, "kind", j.kind, "attempts", attempts)
+		if _, err := tx.Exec(ctx, `
+			UPDATE jobs SET state = 'failed', last_error = $2, error_code = $3, finished_at = NOW()
+			WHERE id = $1
+		`, j.id, fmt.Sprintf("worker stopped while running this job %d times", attempts), failureCode(j.kind, nil)); err != nil {
+			return false, fmt.Errorf("worker: mark abandoned: %w", err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return false, fmt.Errorf("worker: commit abandoned: %w", err)
+		}
+		return true, nil
+	}
+
+	if _, err := tx.Exec(ctx, `UPDATE jobs SET locked_at = NOW(), attempts = attempts + 1 WHERE id = $1`, j.id); err != nil {
 		return false, fmt.Errorf("worker: mark locked: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return false, fmt.Errorf("worker: commit claim: %w", err)
 	}
 
-	runErr := runJob(ctx, pool, store, j)
+	runErr := runJobSafely(ctx, pool, store, log, j)
+
+	// The rest records the outcome on a context that outlives a shutdown: a job that finished
+	// as SIGTERM arrived is still done, and one cut off by it is still owed a release.
+	wctx := context.WithoutCancel(ctx)
+
+	// The worker is shutting down (a deploy, SIGTERM): the job didn't fail, it was cut off.
+	// Hand it back for the next start rather than failing it or leaving it locked for a whole
+	// lease.
+	if runErr != nil && ctx.Err() != nil {
+		_, uerr := pool.Exec(wctx, `
+			UPDATE jobs SET locked_at = NULL, attempts = attempts - 1 WHERE id = $1 AND state = 'pending'
+		`, j.id)
+		if uerr != nil {
+			return true, fmt.Errorf("worker: release on shutdown: %w", uerr)
+		}
+		return true, nil
+	}
 
 	if runErr != nil {
 		log.Error("job failed", "job_id", j.id, "kind", j.kind, "err", runErr)
-		// Only an ingest job's failure reaches a person (the upload history), so only it gets
-		// a code to be translated from; the other kinds' failures are for the logs.
-		var code *string
-		if j.kind == "ingest" {
-			c := ingest.FailureCode(runErr)
-			code = &c
-		}
-		_, uerr := pool.Exec(ctx, `
-			UPDATE jobs SET state = 'failed', attempts = attempts + 1, last_error = $2, error_code = $3, finished_at = NOW()
+		_, uerr := pool.Exec(wctx, `
+			UPDATE jobs SET state = 'failed', last_error = $2, error_code = $3, finished_at = NOW()
 			WHERE id = $1
-		`, j.id, runErr.Error(), code)
+		`, j.id, runErr.Error(), failureCode(j.kind, runErr))
 		if uerr != nil {
 			return true, fmt.Errorf("worker: mark failed: %w", uerr)
 		}
 		return true, nil // the queue made progress even though this job failed
 	}
 
-	if _, err := pool.Exec(ctx, `UPDATE jobs SET state = 'done', finished_at = NOW() WHERE id = $1`, j.id); err != nil {
+	if _, err := pool.Exec(wctx, `UPDATE jobs SET state = 'done', finished_at = NOW() WHERE id = $1`, j.id); err != nil {
 		return true, fmt.Errorf("worker: mark done: %w", err)
 	}
 	log.Info("job done", "job_id", j.id, "kind", j.kind)
 	return true, nil
+}
+
+// failureCode is the error_code a failed job is stored with. Only an ingest job's failure
+// reaches a person (the upload history), so only it gets a code to be translated from; the
+// other kinds' failures are for the logs. A nil err is a failure that isn't the file's own
+// (the abandoned-job path), so FailInternal.
+func failureCode(kind string, err error) *string {
+	if kind != "ingest" {
+		return nil
+	}
+	c := ingest.FailInternal
+	if err != nil {
+		c = ingest.FailureCode(err)
+	}
+	return &c
+}
+
+// runJobSafely is runJob with a panic turned into the job's error. One malformed file must
+// fail its own job, not take the worker process down with it — a crash would leave the job
+// claimed and hand it straight back out on restart.
+func runJobSafely(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, j job) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error("job panicked", "job_id", j.id, "kind", j.kind, "panic", r, "stack", string(debug.Stack()))
+			err = fmt.Errorf("panic: %v", r)
+		}
+	}()
+	return runJob(ctx, pool, store, j)
 }
 
 func runJob(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, j job) error {

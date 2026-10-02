@@ -23,18 +23,27 @@ type Sender interface {
 // instead when it isn't — an empty SMTP_HOST is a valid, intentional default (dev/test never
 // need real mail delivery to exercise the reset flow end to end; the log line carries the
 // same reset link a real email would), not a placeholder demanding to be filled in.
-func New(host, port, username, password, from string, log *slog.Logger) Sender {
+//
+// logBodies says whether that log line carries the body. The caller passes false for a real
+// deployment (an https APP_BASE_URL): a body holds a live reset or verification link, and
+// written to the logs it would open the account to anyone who can read them.
+func New(host, port, username, password, from string, logBodies bool, log *slog.Logger) Sender {
 	if host == "" {
-		return &logSender{log: log}
+		return &logSender{log: log, logBodies: logBodies}
 	}
 	return &smtpSender{host: host, port: port, username: username, password: password, from: from}
 }
 
 type logSender struct {
-	log *slog.Logger
+	log       *slog.Logger
+	logBodies bool
 }
 
 func (s *logSender) Send(_ context.Context, to, subject, body string) error {
+	if !s.logBodies {
+		s.log.Warn("mail: SMTP_HOST not configured, message not sent", "to", to, "subject", subject)
+		return nil
+	}
 	s.log.Info("mail: SMTP_HOST not configured, logging instead of sending", "to", to, "subject", subject, "body", body)
 	return nil
 }

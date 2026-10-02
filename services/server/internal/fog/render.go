@@ -17,11 +17,16 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/tilemath"
 )
 
-// RenderUser is the `render_fog` job body: re-render every z14 tile currently marked dirty
-// for this user, then walk the pyramid upward from whatever changed. Idempotent and
-// complete per tile, not incremental — each render gathers *every* activity intersecting a
-// tile, not just whichever one triggered the dirty flag, because a tile's mask has to
-// represent the user's entire history through it every time, not just the newest activity.
+// RenderUser is the `render_fog` job body: re-render every tile currently marked dirty for
+// this user, z14 first and then each pyramid level up to z0. Idempotent and complete per
+// tile, not incremental — each render gathers *every* activity intersecting a tile, not just
+// whichever one triggered the dirty flag, because a tile's mask has to represent the user's
+// entire history through it every time, not just the newest activity.
+//
+// Rendering a tile marks its parent dirty, so the pyramid's pending work is in the database,
+// not in memory: a pass cut off partway (a storage error, a deploy) leaves the parents of
+// what it rendered dirty, and the next pass finishes them rather than leaving z13 and above
+// stale until something else happens to touch the same tiles.
 //
 // A pass that stored anything ends by bumping map_version (BumpMapVersion), a failed one
 // too — its tiles are already overwritten — so a client never keeps a cached tile past it.
@@ -31,7 +36,8 @@ func RenderUser(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, u
 		if !rendered {
 			return
 		}
-		if berr := BumpMapVersion(ctx, pool, userID); berr != nil && err == nil {
+		// On a context a shutdown hasn't cancelled: the tiles stored before it are new either way.
+		if berr := BumpMapVersion(context.WithoutCancel(ctx), pool, userID); berr != nil && err == nil {
 			err = fmt.Errorf("fog: bump map version: %w", berr)
 		}
 	}()
@@ -41,36 +47,23 @@ func RenderUser(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, u
 		return fmt.Errorf("fog: load heatmap cap: %w", err)
 	}
 
-	dirty, err := dirtyTiles(ctx, pool, userID, Zoom)
-	if err != nil {
-		return fmt.Errorf("fog: list dirty tiles: %w", err)
-	}
-
-	changed := make(map[[2]int]struct{}, len(dirty))
-	for _, t := range dirty {
-		rendered = true
-		if err := renderAndStoreTile(ctx, pool, store, userID, Zoom, t[0], t[1], heatmapCap); err != nil {
-			return fmt.Errorf("fog: render z%d/%d/%d: %w", Zoom, t[0], t[1], err)
+	// Above z14 the client overzooms the z14 raster directly (§4.2) — no pyramid needed there.
+	for z := Zoom; z >= 0; z-- {
+		dirty, err := dirtyTiles(ctx, pool, userID, z)
+		if err != nil {
+			return fmt.Errorf("fog: list dirty z%d tiles: %w", z, err)
 		}
-		changed[t] = struct{}{}
-	}
-
-	// Pyramid: z13 down to z0, each level built from whichever tiles at the level below
-	// actually changed. Above z14 the client overzooms the z14 raster directly (§4.2) —
-	// no pyramid needed there.
-	for z := Zoom - 1; z >= 0 && len(changed) > 0; z-- {
-		parents := map[[2]int]struct{}{}
-		for t := range changed {
-			parents[[2]int{t[0] / 2, t[1] / 2}] = struct{}{}
-		}
-		next := make(map[[2]int]struct{}, len(parents))
-		for p := range parents {
-			if err := renderPyramidLevel(ctx, pool, store, userID, z, p[0], p[1]); err != nil {
-				return fmt.Errorf("fog: render pyramid z%d/%d/%d: %w", z, p[0], p[1], err)
+		for _, t := range dirty {
+			rendered = true
+			if z == Zoom {
+				err = renderAndStoreTile(ctx, pool, store, userID, z, t[0], t[1], heatmapCap)
+			} else {
+				err = renderPyramidLevel(ctx, pool, store, userID, z, t[0], t[1])
 			}
-			next[p] = struct{}{}
+			if err != nil {
+				return fmt.Errorf("fog: render z%d/%d/%d: %w", z, t[0], t[1], err)
+			}
 		}
-		changed = next
 	}
 	return nil
 }
@@ -133,6 +126,10 @@ func dirtyTiles(ctx context.Context, pool *pgxpool.Pool, userID string, zoom int
 // ones, or mid-rewrite. The reprocess marks its tiles dirty when it goes Pending and renders
 // them again after clearing the flag, so it drops out of both rasters for the duration.
 func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID string, zoom, x, y int, heatmapCap float64) error {
+	gen, err := tileDirtyGen(ctx, pool, userID, zoom, x, y)
+	if err != nil {
+		return err
+	}
 	rows, err := pool.Query(ctx, `
 		SELECT m.mask_object_key, a.in_heatmap_window
 		FROM activity_tile_masks m
@@ -189,7 +186,7 @@ func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.
 	if err := storeTilePNG(ctx, store, heatmapObjectKey(userID, zoom, x, y), heatmapMask); err != nil {
 		return err
 	}
-	return upsertTileRendered(ctx, pool, userID, zoom, x, y,
+	return upsertTileRendered(ctx, pool, userID, zoom, x, y, gen,
 		fogObjectKey(userID, zoom, x, y), heatmapObjectKey(userID, zoom, x, y))
 }
 
@@ -308,6 +305,10 @@ func projectToTile(points []parse.Point, tileX, tileY, zoom int) []pixelPoint {
 // here together — they change together, from the same z14 renders, so there is no case
 // where one needs a pyramid rebuild and the other doesn't.
 func renderPyramidLevel(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID string, zoom, x, y int) error {
+	gen, err := tileDirtyGen(ctx, pool, userID, zoom, x, y)
+	if err != nil {
+		return err
+	}
 	coords := [4][2]int{{x * 2, y * 2}, {x*2 + 1, y * 2}, {x * 2, y*2 + 1}, {x*2 + 1, y*2 + 1}}
 	var fogChildren, heatmapChildren [4]*image.Gray
 	for i, c := range coords {
@@ -331,7 +332,7 @@ func renderPyramidLevel(ctx context.Context, pool *pgxpool.Pool, store *storage.
 	if err := storeTilePNG(ctx, store, heatmapObjectKey(userID, zoom, x, y), heatmapMask); err != nil {
 		return err
 	}
-	return upsertTileRendered(ctx, pool, userID, zoom, x, y,
+	return upsertTileRendered(ctx, pool, userID, zoom, x, y, gen,
 		fogObjectKey(userID, zoom, x, y), heatmapObjectKey(userID, zoom, x, y))
 }
 
@@ -393,18 +394,55 @@ func heatmapObjectKey(userID string, zoom, x, y int) string {
 	return fmt.Sprintf("heatmap/%s/%d/%d/%d.png", userID, zoom, x, y)
 }
 
-// upsertTileRendered records a fresh render of *both* rasters in one write. INSERT ...
-// ON CONFLICT, not a plain UPDATE: a pyramid tile (z13..z0) may have no fog_tiles row yet
-// the first time it's built, unlike a z14 tile, which always has one already from ingest's
-// dirty-marking upsert. One write, not two, because the two rasters are never rendered
-// independently (§4.2.2) — there is no state where one is fresh and the other stale.
-func upsertTileRendered(ctx context.Context, pool *pgxpool.Pool, userID string, zoom, x, y int, fogKey, heatmapKey string) error {
-	_, err := pool.Exec(ctx, `
+// tileDirtyGen is a tile's dirty_gen as a render starts, read before anything it draws from:
+// upsertTileRendered clears dirty only if no one has marked the tile again since. 0 for a
+// tile with no row yet.
+func tileDirtyGen(ctx context.Context, pool *pgxpool.Pool, userID string, zoom, x, y int) (int64, error) {
+	var gen int64
+	err := pool.QueryRow(ctx,
+		`SELECT dirty_gen FROM fog_tiles WHERE user_id = $1 AND zoom = $2 AND tile_x = $3 AND tile_y = $4`,
+		userID, zoom, x, y,
+	).Scan(&gen)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, nil
+	}
+	return gen, err
+}
+
+// upsertTileRendered records a fresh render of *both* rasters in one write, and marks the
+// tile's parent dirty in the same transaction (RenderUser walks the pyramid off that flag).
+// INSERT ... ON CONFLICT, not a plain UPDATE: a pyramid tile (z13..z0) may have no fog_tiles
+// row yet the first time it's built. One write, not two, because the two rasters are never
+// rendered independently (§4.2.2) — there is no state where one is fresh and the other stale.
+//
+// dirty clears only if dirty_gen is still gen, the value read before the render gathered its
+// masks. A change that lands mid-render — an activity deleted while its old mask was being
+// composited in — marks the tile again (bumping dirty_gen), and the tile stays dirty for the
+// render the change enqueued, instead of keeping the deleted track until something else
+// touches that tile.
+func upsertTileRendered(ctx context.Context, pool *pgxpool.Pool, userID string, zoom, x, y int, gen int64, fogKey, heatmapKey string) error {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
+	if _, err := tx.Exec(ctx, `
 		INSERT INTO fog_tiles (user_id, zoom, tile_x, tile_y, object_key, heatmap_object_key, dirty, rendered_at)
 		VALUES ($1, $2, $3, $4, $5, $6, false, NOW())
 		ON CONFLICT (user_id, zoom, tile_x, tile_y)
 		DO UPDATE SET object_key = EXCLUDED.object_key, heatmap_object_key = EXCLUDED.heatmap_object_key,
-			dirty = false, rendered_at = NOW()
-	`, userID, zoom, x, y, fogKey, heatmapKey)
-	return err
+			dirty = fog_tiles.dirty_gen <> $7, rendered_at = NOW()
+	`, userID, zoom, x, y, fogKey, heatmapKey, gen); err != nil {
+		return err
+	}
+	if zoom > 0 {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO fog_tiles (user_id, zoom, tile_x, tile_y, dirty)
+			VALUES ($1, $2, $3, $4, true)
+			ON CONFLICT (user_id, zoom, tile_x, tile_y) DO UPDATE SET dirty = true, dirty_gen = fog_tiles.dirty_gen + 1
+		`, userID, zoom-1, x/2, y/2); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }

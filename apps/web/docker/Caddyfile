@@ -13,6 +13,12 @@
 # fetch is never a cross-origin request, so CORS never applies to it. Only reconsider that
 # if the frontend and API are ever split onto different origins.
 {$DOMAIN} {
+	# HSTS is set here, where TLS is terminated: every visit after the first goes straight to
+	# https. The Go server sets its own security headers (frame-ancestors, nosniff and the
+	# rest, httpapi.setSecurityHeaders); nosniff is repeated for the files served below.
+	header Strict-Transport-Security "max-age=31536000"
+	header @static X-Content-Type-Options "nosniff"
+
 	# Toggled via scripts/maintenance.sh (docs/DEPLOY.md), which flips MAINTENANCE_MODE in
 	# .env.prod and recreates just this container. /healthz is deliberately exempt so it
 	# keeps reflecting api/db's real status — that's what the script polls to know when

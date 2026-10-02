@@ -305,6 +305,24 @@ func (s *Server) handleUploadPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(ctx)
+	// The count above turns most uploads past the limit away before the images are read; this
+	// one, under a per-account lock held to commit, is what holds when several uploads race
+	// past it together. An advisory lock rather than the users row, which a render's tile
+	// version bump also writes.
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('activity_photos:' || $1))`, userID); err != nil {
+		s.log.Error("photo upload: lock failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM activity_photos WHERE user_id = $1`, userID).Scan(&count); err != nil {
+		s.log.Error("photo upload: count failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if count >= maxPhotosPerAccount {
+		httpErrorT(w, r, http.StatusConflict, "error.photo_limit", "max", maxPhotosPerAccount)
+		return
+	}
 	var photoID string
 	if err := tx.QueryRow(ctx, `
 		INSERT INTO activity_photos (user_id, activity_id, taken_at, route_at, caption, content_type, thumb_content_type, width, height, bytes)
@@ -678,21 +696,22 @@ func (s *Server) handleUpdatePhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Both fields are checked before either is written, and then written together: a request
+	// refused for its route_at must not have changed the caption.
+	setCaption, setRouteAt := false, false
+	var caption *string
+	var routeAt time.Time
 	if raw, ok := req["caption"]; ok {
-		var caption *string
-		if err := json.Unmarshal(raw, &caption); err != nil {
+		var in *string
+		if err := json.Unmarshal(raw, &in); err != nil {
 			http.Error(w, errPhotoInvalidJSON.Error(), http.StatusBadRequest)
 			return
 		}
-		value, ok := photoCaption(w, r, deref(caption))
+		value, ok := photoCaption(w, r, deref(in))
 		if !ok {
 			return
 		}
-		if _, err := s.pool.Exec(ctx, `UPDATE activity_photos SET caption = $2 WHERE id = $1`, photoID, value); err != nil {
-			s.log.Error("photo update: caption failed", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
+		caption, setCaption = value, true
 	}
 
 	if raw, ok := req["route_at"]; ok {
@@ -711,8 +730,17 @@ func (s *Server) handleUpdatePhoto(w http.ResponseWriter, r *http.Request) {
 			httpErrorT(w, r, http.StatusConflict, "error.photo_no_track")
 			return
 		}
-		if _, err := s.pool.Exec(ctx, `UPDATE activity_photos SET route_at = $2 WHERE id = $1`, photoID, clampToSpan(*at, start, end)); err != nil {
-			s.log.Error("photo update: route_at failed", "err", err)
+		routeAt, setRouteAt = clampToSpan(*at, start, end), true
+	}
+
+	if setCaption || setRouteAt {
+		if _, err := s.pool.Exec(ctx, `
+			UPDATE activity_photos SET
+				caption = CASE WHEN $2 THEN $3 ELSE caption END,
+				route_at = CASE WHEN $4 THEN $5::timestamptz ELSE route_at END
+			WHERE id = $1
+		`, photoID, setCaption, caption, setRouteAt, routeAt); err != nil {
+			s.log.Error("photo update failed", "err", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}

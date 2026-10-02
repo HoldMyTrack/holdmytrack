@@ -175,7 +175,7 @@ func (s *Server) handleSignInPage(w http.ResponseWriter, r *http.Request) {
 // POST /signin.
 func (s *Server) handleSignInForm(w http.ResponseWriter, r *http.Request) {
 	email := r.PostFormValue("email")
-	userID, err := s.checkPassword(r.Context(), email, r.PostFormValue("password"))
+	userID, err := s.checkPassword(r.Context(), clientIP(r), email, r.PostFormValue("password"))
 	if err != nil {
 		s.renderAuthError(w, r, "sign in", "signin", "signin.title", false, authForm{Email: email, Google: s.google.enabled(), Facebook: s.facebook.enabled()}, err)
 		return
@@ -260,10 +260,19 @@ func (s *Server) handleResetForm(w http.ResponseWriter, r *http.Request) {
 // GET /verify?token= — the link in the verification email. A GET with an effect, because
 // it's a link someone clicks in their inbox; the effect is idempotent (verifying twice
 // verifies once, and the token is single-use), which is what makes that acceptable.
+//
+// A browser already signed in to a different account stays signed in to it: the link still
+// verifies, but doesn't replace that session. Otherwise anyone could send their own account's
+// link to someone signed in here and switch them silently into the sender's account, where
+// whatever they uploaded next would land.
 func (s *Server) handleVerifyPage(w http.ResponseWriter, r *http.Request) {
 	userID, err := s.verifyEmail(r.Context(), r.URL.Query().Get("token"))
 	if err != nil {
 		s.renderAuthError(w, r, "verify email", "verify", "verify.title", true, authForm{}, err)
+		return
+	}
+	if acct := s.pageAccount(r); acct != nil && acct.info.userID != userID {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 	s.signIn(w, r, userID)
@@ -281,7 +290,12 @@ func (s *Server) handleVerifyPendingPage(w http.ResponseWriter, r *http.Request)
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	form := authForm{Email: acct.user.Email}
+	email, err := s.pendingEmail(r.Context(), acct.info.userID)
+	if err != nil {
+		s.log.Error("verify-pending address lookup failed", "err", err)
+		email = acct.user.Email
+	}
+	form := authForm{Email: email}
 	switch {
 	case r.URL.Query().Has("sent"):
 		form.NoticeKey = "verify_pending.sent"

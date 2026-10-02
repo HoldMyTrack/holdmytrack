@@ -4,8 +4,6 @@ import (
 	"errors"
 	"image/png"
 	"net/http"
-	"strconv"
-	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -33,11 +31,8 @@ import (
 // individually ages out — see that file's own comment for why per-activity and daily, rather
 // than a weekly whole-account sweep.
 func (s *Server) handleHeatmapTile(w http.ResponseWriter, r *http.Request) {
-	z, errZ := strconv.Atoi(r.PathValue("z"))
-	x, errX := strconv.Atoi(r.PathValue("x"))
-	y, errY := strconv.Atoi(strings.TrimSuffix(r.PathValue("y"), ".png"))
-	if errZ != nil || errX != nil || errY != nil {
-		http.Error(w, "invalid tile coordinates", http.StatusBadRequest)
+	z, x, y, ok := tileCoords(w, r, ".png")
+	if !ok {
 		return
 	}
 	ctx := r.Context()

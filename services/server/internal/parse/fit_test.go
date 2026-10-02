@@ -3,6 +3,8 @@ package parse
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
+	"math"
 	"testing"
 )
 
@@ -161,5 +163,45 @@ func TestParseFITNoSession(t *testing.T) {
 	}
 	if act.ActivityType != "unknown" {
 		t.Fatalf("want activity type unknown (no session message in this fixture), got %q", act.ActivityType)
+	}
+}
+
+// A field declared narrower than its type is skipped, not read past its end: a 1-byte
+// position_lat panicked the worker, and with it every account's queue.
+func TestParseFITShortFieldIsSkipped(t *testing.T) {
+	var data bytes.Buffer
+	data.WriteByte(0x40)
+	data.Write([]byte{0x00, 0x00})
+	binary.Write(&data, binary.LittleEndian, uint16(20))
+	data.WriteByte(4)
+	data.Write([]byte{0x00, 1, 0x85}) // position_lat, 1 byte
+	data.Write([]byte{0x01, 4, 0x85})
+	data.Write([]byte{0x02, 1, 0x84}) // altitude, 1 byte
+	data.Write([]byte{0xFD, 2, 0x86}) // timestamp, 2 bytes
+	data.WriteByte(0x00)
+	data.WriteByte(0x01)
+	binary.Write(&data, binary.LittleEndian, int32(1))
+	data.WriteByte(0x02)
+	data.Write([]byte{0x03, 0x04})
+	body := data.Bytes()
+	var hdr bytes.Buffer
+	hdr.WriteByte(12)
+	hdr.WriteByte(0x10)
+	binary.Write(&hdr, binary.LittleEndian, uint16(100))
+	binary.Write(&hdr, binary.LittleEndian, uint32(len(body)))
+	hdr.WriteString(".FIT")
+
+	_, err := ParseFIT(bytes.NewReader(append(hdr.Bytes(), body...)))
+	if !errors.Is(err, ErrNoPoints) {
+		t.Fatalf("err = %v, want ErrNoPoints (the record has no readable latitude)", err)
+	}
+}
+
+// FIT's invalid position, written for records logged before GPS lock, is no position at all —
+// not a point near (180, 180) ahead of the real start.
+func TestParseFITInvalidPositionIsDropped(t *testing.T) {
+	raw := buildMinimalFIT(t, math.MaxInt32, math.MaxInt32, 1000000000)
+	if _, err := ParseFIT(bytes.NewReader(raw)); !errors.Is(err, ErrNoPoints) {
+		t.Fatalf("err = %v, want ErrNoPoints", err)
 	}
 }

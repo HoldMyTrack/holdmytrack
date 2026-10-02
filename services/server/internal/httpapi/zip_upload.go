@@ -40,10 +40,10 @@ type zipUploadResponse struct {
 // takeout_upload.go — since it has no standalone .gpx/.fit/.tcx entries to walk this way at
 // all.
 //
-// The caller (handleUpload) has already read the archive fully into memory and opened it as
-// a *zip.Reader — zip.NewReader needs an io.ReaderAt, which an HTTP body doesn't provide, so
-// there is no streaming alternative here the way ingest.Process manages for a single file.
-// This function owns everything from there: walking entries under §5.1's zip-bomb defenses.
+// The caller (handleUpload) has already opened the archive as a *zip.Reader over the uploaded
+// part — zip.NewReader needs an io.ReaderAt, which the multipart part (a temp file for
+// anything large) provides and a bare HTTP body doesn't. This function owns everything from
+// there: walking entries under §5.1's zip-bomb defenses.
 func (s *Server) handleZipUpload(w http.ResponseWriter, r *http.Request, zr *zip.Reader, filename string) {
 	ctx := r.Context()
 	userID := userIDFromContext(ctx)

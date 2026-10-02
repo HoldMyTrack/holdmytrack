@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 	// Embeds Go's own copy of the IANA timezone database into the binary — needed for
@@ -93,7 +94,13 @@ func main() {
 		if smtpFrom == "" {
 			smtpFrom = cfg.SMTPUsername
 		}
-		mailer := mail.New(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUsername, cfg.SMTPPassword, smtpFrom, log)
+		// Bodies go to the log only off a real deployment; on one, an unset SMTP_HOST is a
+		// misconfiguration worth a warning at start, not a reason to log live account links.
+		realDeployment := strings.HasPrefix(cfg.AppBaseURL, "https://")
+		if realDeployment && cfg.SMTPHost == "" {
+			log.Warn("serve: SMTP_HOST not set; reset and verification emails will not be sent")
+		}
+		mailer := mail.New(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUsername, cfg.SMTPPassword, smtpFrom, !realDeployment, log)
 		webFS, webReload := web.Embedded(), false
 		if cfg.WebDevDir != "" {
 			webFS, webReload = os.DirFS(cfg.WebDevDir), true
@@ -110,18 +117,34 @@ func main() {
 		}, httpapi.FacebookOAuthConfig{
 			AppID: cfg.FacebookAppID, AppSecret: cfg.FacebookAppSecret, RedirectURL: cfg.FacebookRedirectURL,
 		}, pages)
-		httpSrv := &http.Server{Addr: cfg.ListenAddr, Handler: srv}
+		// No ReadTimeout or WriteTimeout: a 512 MiB archive over a slow uplink is a legitimate
+		// request that takes minutes. ReadHeaderTimeout and IdleTimeout still free a connection
+		// that sends nothing useful.
+		httpSrv := &http.Server{
+			Addr:              cfg.ListenAddr,
+			Handler:           srv,
+			ReadHeaderTimeout: 10 * time.Second,
+			IdleTimeout:       2 * time.Minute,
+		}
 		log.Info("serve: listening", "addr", cfg.ListenAddr)
+		// ListenAndServe returns as soon as Shutdown starts, so main waits for the drain to end
+		// before returning and closing the pool under requests still running. 8 s fits inside
+		// docker stop's default 10 s grace.
+		drained := make(chan struct{})
 		go func() {
+			defer close(drained)
 			<-ctx.Done()
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 			defer cancel()
-			_ = httpSrv.Shutdown(shutdownCtx)
+			if err := httpSrv.Shutdown(shutdownCtx); err != nil {
+				log.Error("serve: shutdown", "err", err)
+			}
 		}()
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Error("serve", "err", err)
 			os.Exit(1)
 		}
+		<-drained
 
 	case "work":
 		store, err := storage.New(cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3Bucket)

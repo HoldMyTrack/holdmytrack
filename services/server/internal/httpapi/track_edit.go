@@ -27,7 +27,10 @@ type trackPointsResponse struct {
 // the raw payload still holds the hidden ends, and returning them would hand the client the
 // very places those locations exist to hide.
 func (s *Server) handleActivityTrackPoints(w http.ResponseWriter, r *http.Request) {
-	activityID := r.PathValue("id")
+	activityID, ok := activityIDFromPath(w, r)
+	if !ok {
+		return
+	}
 	userID := userIDFromContext(r.Context())
 	ctx := r.Context()
 
@@ -101,7 +104,10 @@ const maxTrackEditEntries = 10000
 // work ingest does, so it goes through the job queue, never inline. Responds 202; the
 // activity list reports `pending` until the job finishes.
 func (s *Server) handleActivityTrackEdit(w http.ResponseWriter, r *http.Request) {
-	activityID := r.PathValue("id")
+	activityID, ok := activityIDFromPath(w, r)
+	if !ok {
+		return
+	}
 	userID := userIDFromContext(r.Context())
 
 	var req trackEditRequest

@@ -15,18 +15,11 @@ func ParseTCX(r io.Reader) (Activity, error) {
 	dec := xml.NewDecoder(r)
 	act := Activity{ActivityType: "unknown"}
 
+	// cur is set only between a Trackpoint's start and end, so it is what says an element is
+	// inside one. path is only for the innermost element's name: scanning it for "Trackpoint"
+	// on every text token made a deeply nested file quadratic to parse.
 	var cur *Point
-	// path tracks nesting, so an element is only read inside a Trackpoint.
 	var path []string
-
-	inTrackpoint := func() bool {
-		for _, p := range path {
-			if p == "Trackpoint" {
-				return true
-			}
-		}
-		return false
-	}
 
 	for {
 		tok, err := dec.Token()
@@ -51,7 +44,7 @@ func ParseTCX(r io.Reader) (Activity, error) {
 				cur = &Point{}
 			}
 		case xml.CharData:
-			if cur == nil || !inTrackpoint() {
+			if cur == nil {
 				continue
 			}
 			text := strings.TrimSpace(string(t))

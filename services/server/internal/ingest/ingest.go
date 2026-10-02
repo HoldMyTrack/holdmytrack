@@ -80,7 +80,12 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	startedAt := act.Points[0].Time
 
 	var pp preparedTrack
+	var tiles [][2]int
 	if !hidden {
+		// Before anything is persisted, so a track too large to draw fails cleanly.
+		if tiles, err = computeTouchedTiles(points, FogZoom); err != nil {
+			return Result{}, err
+		}
 		if pp, err = prepareTrack(ctx, pool, points); err != nil {
 			return Result{}, err
 		}
@@ -88,28 +93,34 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	}
 	m := pp.m
 
+	// ingest_complete stays false until every step after this insert has run (the end of
+	// this function): a hidden track has none, so it is complete as inserted.
+	// in_heatmap_window is decided from started_at here, against the same window
+	// heatmap_aging.go sweeps with: an import of years-old history isn't current heat.
 	var activityID string
-	var inserted bool
+	var inserted, complete bool
 	err = pool.QueryRow(ctx, `
 		WITH ins AS (
 			INSERT INTO activities (
 				user_id, source, source_detail, external_id,
 				activity_type, distance_meters, duration_seconds, moving_seconds,
 				elevation_gain_m, avg_speed_mps, started_at,
-				trajectory, raw_payload_key, name, description
+				trajectory, raw_payload_key, name, description, ingest_complete,
+				in_heatmap_window
 			) VALUES (
 				$1, $2, $3, $4,
 				$5, $6, $7, $8,
 				$9, $10, $11,
 				`+trajectorySQL("$12", "$13", "$14")+`,
-				$15, NULLIF($16, ''), NULLIF($17, '')
+				$15, NULLIF($16, ''), NULLIF($17, ''), $18,
+				$11 >= NOW() - make_interval(days => $19)
 			)
 			ON CONFLICT (user_id, source, external_id) WHERE external_id IS NOT NULL DO NOTHING -- $15 = raw_payload_key
 			RETURNING id
 		)
-		SELECT id, true FROM ins
+		SELECT id, true, $18 FROM ins
 		UNION ALL
-		SELECT id, false FROM activities
+		SELECT id, false, ingest_complete FROM activities
 		WHERE user_id = $1 AND source = $2 AND external_id = $4
 		  AND NOT EXISTS (SELECT 1 FROM ins)
 		LIMIT 1
@@ -118,19 +129,22 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 		act.ActivityType, m.distanceM, m.durationS, m.movingS,
 		m.elevationGainM, m.avgSpeedMps, startedAt,
 		pp.simpLons, pp.simpLats, pp.simpTs,
-		job.RawPayloadKey, act.Name, act.Description,
-	).Scan(&activityID, &inserted)
+		job.RawPayloadKey, act.Name, act.Description, hidden,
+		fog.HeatmapWindowDays,
+	).Scan(&activityID, &inserted, &complete)
 	if err != nil {
 		return Result{}, fmt.Errorf("ingest: persist activity: %w", err)
 	}
 
-	if !inserted {
+	if !inserted && complete {
 		// Idempotency requirement: a duplicate that reached persist is a no-op, not an
 		// error, and the stream write is skipped along with it — the row from the first
 		// successful ingest already has its streams. Fog is skipped too: nothing new
 		// happened, so no tile needs marking dirty again.
 		return Result{ActivityID: activityID, Persisted: false}, nil
 	}
+	// Otherwise this is a new row, or one an earlier run of this ingest inserted and then
+	// didn't finish (cut off, or failed partway): every step below is safe to run again.
 	if hidden {
 		// No streams, masks, tiles or regions: there is nothing visible to derive them from.
 		return Result{ActivityID: activityID, Persisted: true}, nil
@@ -139,6 +153,7 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	_, err = pool.Exec(ctx, `
 		INSERT INTO activity_streams (activity_id, point_count, elapsed_s, elevation_m, dist_m)
 		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (activity_id) DO NOTHING
 	`, activityID, len(points), pp.elapsedS, pp.elevM, pp.distM)
 	if err != nil {
 		return Result{}, fmt.Errorf("ingest: persist streams: %w", err)
@@ -151,7 +166,6 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	// the user never actually visited. Rendering first, dirty-marking second: dirty is what
 	// tells `render_fog` this tile's aggregate needs recompositing, so the mask it would
 	// composite in should already exist by the time that runs.
-	tiles := computeTouchedTiles(points, FogZoom)
 	if err := fog.RenderActivityMasks(ctx, pool, store, activityID, points, tiles); err != nil {
 		return Result{}, fmt.Errorf("ingest: render activity masks: %w", err)
 	}
@@ -184,6 +198,9 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	if err := EnqueueRenderFog(ctx, pool, job.UserID); err != nil {
 		return Result{}, fmt.Errorf("ingest: enqueue render_fog: %w", err)
 	}
+	if _, err := pool.Exec(ctx, `UPDATE activities SET ingest_complete = true WHERE id = $1`, activityID); err != nil {
+		return Result{}, fmt.Errorf("ingest: mark complete: %w", err)
+	}
 
 	return Result{ActivityID: activityID, Persisted: true}, nil
 }
@@ -208,7 +225,7 @@ func loadClippedPoints(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 	if err != nil {
 		return parse.Activity{}, nil, nil, parseError{err}
 	}
-	if act.Points, err = keepTimed(act.Points); err != nil {
+	if act.Points, err = keepTimed(keepValid(act.Points)); err != nil {
 		return parse.Activity{}, nil, nil, err
 	}
 	if len(act.Points) < 2 {
@@ -220,6 +237,28 @@ func loadClippedPoints(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 		return parse.Activity{}, nil, nil, fmt.Errorf("ingest: load private locations: %w", err)
 	}
 	return act, ClipEnds(act.Points, zones), zones, nil
+}
+
+// keepValid drops the points no place on Earth has — a NaN or infinite coordinate, a latitude
+// past a pole, a longitude past the antimeridian — and an elevation that isn't finite. No
+// parser checks ranges (a GPX attribute reads "Inf" as readily as a number, and a phone sync
+// sends whatever it sends), and one such point anywhere breaks everything downstream: the
+// tracks tile query's ST_Transform fails for every tile its bounding box covers, mask
+// rasterizing walks a line out to the edge of the world, and an infinite elevation gain makes
+// every stats response unencodable as JSON. As a first or last point it would also sit
+// outside every Private location, so ClipEnds would clip nothing.
+func keepValid(points []parse.Point) []parse.Point {
+	valid := points[:0:0]
+	for _, p := range points {
+		if !(p.Lat >= -90 && p.Lat <= 90 && p.Lon >= -180 && p.Lon <= 180) { // false for NaN too
+			continue
+		}
+		if p.Elevation != nil && (math.IsNaN(float64(*p.Elevation)) || math.IsInf(float64(*p.Elevation), 0)) {
+			p.Elevation = nil
+		}
+		valid = append(valid, p)
+	}
+	return valid
 }
 
 // errNoTimestamps fails a file whose points carry no time at all — a planned route exported
@@ -339,18 +378,31 @@ const FogZoom = 14
 // render a mask for) and MarkFogTilesDirty (which tiles to flag for aggregate rebuild) — the
 // two need to agree exactly, or a rendered mask could sit in a tile never marked dirty (never
 // composited in) or vice versa.
-func computeTouchedTiles(points []parse.Point, zoom int) [][2]int {
+//
+// It fails with errTooManyTiles past maxActivityTiles, checked as it goes: each tile is a
+// mask rendered and stored, and a track zigzagging between far-apart points (a crafted file,
+// or a corrupt one) could otherwise reach millions of them, held in memory here and then
+// rendered one by one on the single worker.
+func computeTouchedTiles(points []parse.Point, zoom int) ([][2]int, error) {
 	seen := map[[2]int]struct{}{}
-	add := func(x, y int) { seen[[2]int{x, y}] = struct{}{} }
+	add := func(tiles [][2]int) error {
+		for _, t := range tiles {
+			seen[t] = struct{}{}
+		}
+		if len(seen) > maxActivityTiles {
+			return errTooManyTiles
+		}
+		return nil
+	}
 
 	if len(points) == 1 {
-		for _, t := range tilemath.SegmentTilesBuffered(points[0].Lon, points[0].Lat, points[0].Lon, points[0].Lat, zoom, fog.TileMarginPx, fog.TileSize) {
-			add(t[0], t[1])
+		if err := add(tilemath.SegmentTilesBuffered(points[0].Lon, points[0].Lat, points[0].Lon, points[0].Lat, zoom, fog.TileMarginPx, fog.TileSize)); err != nil {
+			return nil, err
 		}
 	}
 	for i := 1; i < len(points); i++ {
-		for _, t := range tilemath.SegmentTilesBuffered(points[i-1].Lon, points[i-1].Lat, points[i].Lon, points[i].Lat, zoom, fog.TileMarginPx, fog.TileSize) {
-			add(t[0], t[1])
+		if err := add(tilemath.SegmentTilesBuffered(points[i-1].Lon, points[i-1].Lat, points[i].Lon, points[i].Lat, zoom, fog.TileMarginPx, fog.TileSize)); err != nil {
+			return nil, err
 		}
 	}
 
@@ -358,8 +410,15 @@ func computeTouchedTiles(points []parse.Point, zoom int) [][2]int {
 	for t := range seen {
 		out = append(out, t)
 	}
-	return out
+	return out, nil
 }
+
+// maxActivityTiles bounds how many z14 tiles (about 2.4 km across) one activity may touch. A
+// 10,000 km road trip, buffered on both sides, is around 12,000.
+const maxActivityTiles = 20000
+
+// errTooManyTiles fails a track that covers more ground than maxActivityTiles allows.
+var errTooManyTiles = fmt.Errorf("the track touches more than %d map tiles", maxActivityTiles)
 
 // MarkFogTilesDirty upserts a fog_tiles row (dirty = true) for every given z14 tile —
 // computeTouchedTiles' result for a fresh ingest, a deleted activity's own already-rendered
@@ -384,7 +443,7 @@ func MarkFogTilesDirty(ctx context.Context, pool *pgxpool.Pool, userID string, t
 		INSERT INTO fog_tiles (user_id, zoom, tile_x, tile_y, dirty)
 		SELECT $1, $2, x, y, true
 		FROM unnest($3::int[], $4::int[]) AS t(x, y)
-		ON CONFLICT (user_id, zoom, tile_x, tile_y) DO UPDATE SET dirty = true
+		ON CONFLICT (user_id, zoom, tile_x, tile_y) DO UPDATE SET dirty = true, dirty_gen = fog_tiles.dirty_gen + 1
 	`, userID, FogZoom, xs, ys)
 	return err
 }

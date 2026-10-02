@@ -3,6 +3,8 @@ package takeout
 import (
 	"archive/zip"
 	"bytes"
+	"compress/flate"
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -246,6 +248,44 @@ func TestGPXFloatMatchesRustDisplay(t *testing.T) {
 	} {
 		if got := gpxFloat(in); got != want {
 			t.Errorf("gpxFloat(%v) = %s, want %s", in, got, want)
+		}
+	}
+}
+
+// A zip entry that inflates past maxEntryBytes is refused, whether its declared size says so
+// or lies (archive/zip itself fails a read past the declared size): read whole, a few-MB
+// archive could take gigabytes of the API's memory.
+func TestReadEntryRefusesAZipBomb(t *testing.T) {
+	var compressed bytes.Buffer
+	fw, _ := flate.NewWriter(&compressed, flate.BestSpeed)
+	chunk := make([]byte, 1<<20)
+	for written := 0; written <= maxEntryBytes; written += len(chunk) {
+		fw.Write(chunk)
+	}
+	fw.Close()
+
+	for _, declared := range []uint64{maxEntryBytes + 1, 100} {
+		var archive bytes.Buffer
+		zw := zip.NewWriter(&archive)
+		w, err := zw.CreateRaw(&zip.FileHeader{
+			Name: "Takeout/Google Health/Global Export Data/exercise-0.json", Method: zip.Deflate,
+			CompressedSize64: uint64(compressed.Len()), UncompressedSize64: declared,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.Write(compressed.Bytes())
+		zw.Close()
+		zr, err := zip.NewReader(bytes.NewReader(archive.Bytes()), int64(archive.Len()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := readEntry(zr.File[0])
+		if err == nil || len(data) > 0 {
+			t.Errorf("declared %d bytes: read %d bytes, err %v; want an error", declared, len(data), err)
+		}
+		if declared > maxEntryBytes && !errors.Is(err, ErrEntryTooLarge) {
+			t.Errorf("declared %d bytes: err = %v, want ErrEntryTooLarge", declared, err)
 		}
 	}
 }

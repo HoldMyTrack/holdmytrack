@@ -44,12 +44,12 @@ func (s *Server) handleLogoutPage(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-// sameOrigin guards the pages' form POSTs against cross-site request forgery. The JSON API
-// never needed this: a cross-site form can't send a JSON body or a PATCH/DELETE, and the
-// session cookie's SameSite=Lax already keeps it off cross-site subrequests. A plain
-// urlencoded form POST is exactly what a hostile page *can* send, so page forms also require
-// the browser's Origin header (or, from an older browser that omits it, Referer) to be this
-// app's own origin (APP_BASE_URL). A request that carries neither is refused too.
+// sameOrigin guards the pages' form POSTs against cross-site request forgery. A plain
+// urlencoded form POST is exactly what a hostile page can send, so page forms require the
+// browser's Origin header (or, from an older browser that omits it, Referer) to be this app's
+// own origin (APP_BASE_URL). A request that carries neither is refused too. The JSON API's
+// writes get the looser check in ServeHTTP (crossSiteAPIWrite), which lets a request with no
+// Origin through, since the native apps send none.
 func (s *Server) sameOrigin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !s.isSameOrigin(r) {
