@@ -80,7 +80,7 @@ Native apps whose core job is exporting device-recorded health data to HoldMyTra
 
 ## Phase 3 — Finalized design + mobile browser support
 
-The shipped UI so far is functional scaffolding, not a finished product. Partly addressed since this phase was written: icons are one Lucide set (`IMPLEMENTATION.md` §4.17), type is Inter with Fraunces for headings, and colors are `--fm-*` custom properties. Spacing, radius, type, weight and elevation are token scales too (`IMPLEMENTATION.md` §4.18). What's left is almost no animation — 5 `transition:`/`animation:`/`@keyframes` occurrences in the ~3,600-line `index.css` — and real-device mobile browser support. This phase is the pass that finishes it, across both desktop and mobile, ending in an explicit design freeze: "this is how it will look — no more changes."
+The pass that finished the UI, across both desktop and mobile: icons are one Lucide set (`IMPLEMENTATION.md` §4.17), type is Inter with Fraunces for headings, colors are `--fm-*` custom properties, and spacing, radius, type, weight and elevation are token scales too (`IMPLEMENTATION.md` §4.18). It ended in an explicit design freeze: "this is how it will look — no more changes."
 
 - [x] A real icon set — Lucide (`lucide-react`) replaces every hand-drawn inline SVG icon and text-glyph caret on the web (`IMPLEMENTATION.md` §4.17); Android uses the same set (`apps/android/docs/IMPLEMENTATION.md` §1.3).
 - [x] Real typography — Inter for text, Fraunces for headings and the wordmark, with Source Serif 4 for Russian headings since Fraunces has no Cyrillic (`--fm-font-sans`/`--fm-font-serif`, loaded from Google Fonts in `index.html`).
@@ -93,7 +93,6 @@ The shipped UI so far is functional scaffolding, not a finished product. Partly 
   - [x] Settings as a page (`/settings`), a plain form with native selects; the first-run gate moves server-side with it (`IMPLEMENTATION.md` §4.12).
   - [x] Profile as a page (`/profile`), the year grids and trends rendered server-side (`IMPLEMENTATION.md` §4.8).
 - [x] Localization — English and Russian across the server's pages, emails and messages, the map app and Android, with a Language setting that falls back to the browser's ([ADR-0014](adr/0014-localization.md), `IMPLEMENTATION.md` §4.21, `SPEC.md` FR-13). Left: running the Android app in Russian on a real device, a native speaker's review of the Russian, and `KNOWN_ISSUES.md`'s two entries (a Cyrillic heading font, and the server messages still in English).
-- [ ] An animation/transition pass — micro-interactions (hover, focus, panel open/close, loading states) that are currently almost entirely absent.
 - [x] Mobile browser support, folded into this same pass rather than treated separately — the phone layout (`index.css`'s `@media (max-width: 768px)` layer, `IMPLEMENTATION.md` §5.9, `SPEC.md` §19), with the four fixes for what emulation can't show (§5.9's **Real-device fixes**).
 - [x] Design freeze, declared 2026-10-02: the visual design is final — the `--fm-*` tokens, Inter and Fraunces (Source Serif 4 for Russian headings), and Lucide — on the web and Android alike (`apps/android/docs/IMPLEMENTATION.md` §1.3).
 
