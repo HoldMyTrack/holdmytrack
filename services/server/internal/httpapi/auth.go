@@ -836,14 +836,33 @@ func (l *fixedWindowLimiter) allow(key string) bool {
 	return true
 }
 
-// clientIP takes r.RemoteAddr's host part rather than trusting X-Forwarded-For — no reverse
-// proxy sits in front of this server today (compose.yaml publishes api's port directly), so
-// that header would just be an unverified value any caller could set to defeat demoLimiter
-// entirely. Revisit the day a proxy actually terminates connections in front of this.
+// clientIP is the address a per-caller limit keys on. In production every request arrives
+// through Caddy (apps/web/docker/Caddyfile; api publishes no port), so RemoteAddr is Caddy's
+// container address for every visitor, and a limit keyed on it was one limit shared by the
+// whole site. Caddy, trusting no proxy ahead of it, discards any X-Forwarded-For a client
+// sends and sets its own, the address it was connected from; the last entry is taken, so a
+// proxy that appends instead would still be read correctly. The header is believed only from
+// a private or loopback peer — the proxy on the container network; a caller reaching this
+// server directly gets its own RemoteAddr and can't claim a different one.
 func clientIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		return r.RemoteAddr
+		host = r.RemoteAddr
+	}
+	peer := net.ParseIP(host)
+	if peer == nil || !(peer.IsPrivate() || peer.IsLoopback()) {
+		return host
+	}
+	values := r.Header.Values("X-Forwarded-For")
+	if len(values) == 0 {
+		return host
+	}
+	last := values[len(values)-1]
+	if i := strings.LastIndex(last, ","); i >= 0 {
+		last = last[i+1:]
+	}
+	if ip := net.ParseIP(strings.TrimSpace(last)); ip != nil {
+		return ip.String()
 	}
 	return host
 }

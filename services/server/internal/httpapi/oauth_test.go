@@ -83,3 +83,27 @@ func TestAuthHandoffRejectsMalformed(t *testing.T) {
 		t.Errorf("bad JSON: status %d, want 400", rec.Code)
 	}
 }
+
+// Behind the proxy, each visitor is its own X-Forwarded-For address — the last one, the one
+// Caddy itself appended — and only a private or loopback peer is believed about it.
+func TestClientIP(t *testing.T) {
+	for _, tc := range []struct {
+		remote, xff, want string
+	}{
+		{"172.18.0.5:41234", "203.0.113.7", "203.0.113.7"},
+		{"172.18.0.5:41234", "1.2.3.4, 203.0.113.7", "203.0.113.7"},
+		{"127.0.0.1:5000", "2001:db8::1", "2001:db8::1"},
+		{"172.18.0.5:41234", "", "172.18.0.5"},
+		{"172.18.0.5:41234", "not-an-ip", "172.18.0.5"},
+		{"198.51.100.9:443", "203.0.113.7", "198.51.100.9"},
+	} {
+		r := httptest.NewRequest(http.MethodPost, "/v1/auth/demo", nil)
+		r.RemoteAddr = tc.remote
+		if tc.xff != "" {
+			r.Header.Set("X-Forwarded-For", tc.xff)
+		}
+		if got := clientIP(r); got != tc.want {
+			t.Errorf("RemoteAddr %s, X-Forwarded-For %q: %s, want %s", tc.remote, tc.xff, got, tc.want)
+		}
+	}
+}
