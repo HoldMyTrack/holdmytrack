@@ -43,6 +43,13 @@ BACKUP_DIR=$(env_value BACKUP_DIR)
 BACKUP_DIR=${BACKUP_DIR:-/srv/holdmytrack-backups}
 
 log() { echo "$(date -u +%FT%TZ) $*"; }
+
+# The heartbeat monitor (docs/DEPLOY.md §13): its URL after a run that finished, its /fail
+# from the exit trap after one that didn't, so a failure alerts at once rather than when the
+# missing ping is noticed.
+heartbeat=$(env_value BACKUP_HEARTBEAT_URL)
+ping() { [[ -z "$heartbeat" ]] || curl -fsS -m 10 --retry 3 -o /dev/null "$heartbeat${1:-}" || log "heartbeat ping failed"; }
+
 rclone() { "${COMPOSE[@]}" run --rm -T rclone "$@"; }
 
 stamp=$(date -u +%Y%m%d-%H%M)
@@ -50,7 +57,7 @@ name="holdmytrack-$stamp.dump"
 mkdir -p "$BACKUP_DIR/postgres"
 chmod 700 "$BACKUP_DIR"
 partial="$BACKUP_DIR/postgres/$name.partial"
-trap 'rm -f "$partial"' EXIT
+trap 'status=$?; rm -f "$partial"; (( status == 0 )) || ping /fail' EXIT
 
 log "dumping Postgres to $BACKUP_DIR/postgres/$name"
 "${COMPOSE[@]}" exec -T db sh -c 'pg_dump -Fc -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > "$partial"
@@ -82,8 +89,5 @@ for dir in $(rclone lsf --dirs-only backup:objects-deleted); do
   if [[ "${dir%/}" < "$cutoff" ]]; then rclone purge "backup:objects-deleted/${dir%/}"; fi
 done
 
-heartbeat=$(env_value BACKUP_HEARTBEAT_URL)
-if [[ -n "$heartbeat" ]]; then
-  curl -fsS -m 10 --retry 3 -o /dev/null "$heartbeat" || log "heartbeat ping failed"
-fi
+ping
 log "backup done"
