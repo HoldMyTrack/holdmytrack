@@ -17,7 +17,7 @@ This document specifies HoldMyTrack's functional behavior as currently implement
 
 **In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web and in the Android app, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, pace-colored segments, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), Private locations (FR-8.1), the date slider, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help and Contacts pages (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), the interface language — English or Russian (FR-13), Stories on the web and in the Android app (FR-14), Spots' places on the web and in the Android app (FR-15), and photos on an activity, on the web (FR-16).
 
-**Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), the rest of "Export" (animated reveals — high-resolution map export itself is built, FR-4.10 below), and marking a Spots place visited (ADR-0021). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace stays as per-activity route context (FR-4.8) rather than an analysed, all-time performance record. So is any health data at all: heart rate is never read, stored or shown (ADR-0017). This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
+**Out of scope**: functionality named in `VISION.md`'s roadmap (§5.3 onward) but not yet built — Path 1 cloud-provider connectors (Garmin/Wahoo/COROS), Path 2 on-device sync's iOS/HealthKit half (no iOS app exists yet; Android's Health Connect half shipped — FR-3.6), the rest of "Export" (animated reveals — high-resolution map export itself is built, FR-4.10 below). Also deliberately out of scope, not a "not yet" — best-effort curves, personal bests, power curves, and training load were built and then cut: `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and pace stays as per-activity route context (FR-4.8) rather than an analysed, all-time performance record. So is any health data at all: heart rate is never read, stored or shown (ADR-0017). This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
 ### 1.3 Intended audience
 
@@ -1167,7 +1167,7 @@ A Story is a hand-picked, private set of the account's activities — a hike, a 
 
 ## 17. FR-15 — Spots
 
-Outdoor places from OpenStreetMap on the map, in five categories, with what OSM says about each (`VISION.md` §4.2, ADR-0021). Built on the web and in the Android app (`apps/android/docs/SPEC.md` FR-2.8); the places are loaded by the operator (FR-15.1), not by users. Places aren't yet marked visited — `ROADMAP.md` Phase 1.
+Outdoor places from OpenStreetMap on the map, in five categories, with what OSM says about each (`VISION.md` §4.2, ADR-0021). Built on the web and in the Android app (`apps/android/docs/SPEC.md` FR-2.8); the places are loaded by the operator (FR-15.1), not by users. A place's only mark is a capture (FR-15.6, ADR-0028).
 
 | Endpoint | Purpose |
 | :-- | :-- |
@@ -1243,7 +1243,7 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 
 ### FR-15.6 Captures
 
-**Description**: A place an account has captured by staying inside it for 30 seconds with the Android app's capture mode on (`apps/android/docs/SPEC.md` FR-2.8, ADR-0023). Only the app captures; the web and the app both show what's captured (FR-15.2, FR-15.3). A capture is separate from a visit (ADR-0021), which isn't built.
+**Description**: A place an account has captured by staying inside it for 30 seconds with the Android app's capture mode on (`apps/android/docs/SPEC.md` FR-2.8, ADR-0023). Only the app captures; the web and the app both show what's captured (FR-15.2, FR-15.3).
 
 **Behavior**:
 1. `GET /v1/spots/{id}` answers one place: the fields of FR-15.5's places, `area` — its whole area as a GeoJSON MultiPolygon — and `captured_at` when the caller has captured it (absent otherwise). A retired place (FR-15.1) is answered only to an account that captured it.
@@ -1295,7 +1295,6 @@ The following are named in `VISION.md`'s roadmap but have no functional requirem
 - Path 1 cloud-provider connectors (Garmin, Wahoo, COROS)
 - Path 2 on-device sync's iOS half (Apple HealthKit — Android's Health Connect half is FR-3.6)
 - The rest of "Export" — animated reveals (high-resolution map export itself is built, FR-4.10)
-- Marking a Spots place visited once an activity spends five minutes inside it (ADR-0021, `ROADMAP.md` Phase 1)
 - Dark-theme variant of the Fog of War veil (the theme parameter is accepted but currently has no visual effect on the veil itself)
 
 Deliberately out of scope, not a "not yet", and not planned: Oura and other recovery-data sources (sleep, HRV, readiness), best-effort curves, personal bests, power curves, and training load. Also deliberately out of scope, never built: explorer-tile scoring — Fog of War is the exploration mechanic (ADR-0018). And splitting a track that passes through a Private location mid-way (FR-8.1 hides only the leading and trailing portions, by design). `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor; pace stays as per-activity route context (FR-4.8), not an analysed, all-time performance record, and heart rate and every other health measurement are out of scope entirely — never read, stored or shown (ADR-0017).

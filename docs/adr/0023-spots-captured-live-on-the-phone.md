@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Built: the server and the web show captures (`SPEC.md` FR-15.6, `IMPLEMENTATION.md` §4.25), and the Android app captures (`apps/android/docs/SPEC.md` FR-2.8). Amends ADR-0021, whose visits it leaves as they are.
+Accepted. Built: the server and the web show captures (`SPEC.md` FR-15.6, `IMPLEMENTATION.md` §4.25), and the Android app captures (`apps/android/docs/SPEC.md` FR-2.8). Amends ADR-0021. ADR-0028 later dropped ADR-0021's visits, so the capture is the only mark a place carries and this ADR's lines about visits no longer apply.
 
 ## Context
 
