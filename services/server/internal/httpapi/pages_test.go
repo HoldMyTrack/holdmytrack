@@ -288,7 +288,7 @@ func TestLanguageReturnPath(t *testing.T) {
 		"https://app.example/":               "/",
 		"":                                   "/",
 		"https://app.example//evil.example/": "/",
-		`https://app.example/\evil.example`: "/",
+		`https://app.example/\evil.example`:  "/",
 	} {
 		req := httptest.NewRequest(http.MethodPost, "/language", nil)
 		req.Header.Set("Referer", referer)
