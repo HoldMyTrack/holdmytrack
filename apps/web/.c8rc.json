@@ -1,0 +1,8 @@
+{
+  "all": true,
+  "src": ["src"],
+  "include": ["src/**"],
+  "extension": [".ts", ".tsx"],
+  "reporter": ["text-summary", "lcov"],
+  "reports-dir": "coverage"
+}

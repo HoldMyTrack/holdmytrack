@@ -32,6 +32,7 @@ npm run dev
 | `npm run basemap` | Re-cut the `.pmtiles` extract |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run test:unit` | Plain `node --test` unit tests (the track editor's edit ops) |
+| `npm run test:coverage` | `test:unit` under c8, counting every file in `src/`; the report lands in `coverage/` |
 | `npm run build:style` | Regenerate the style documents the API serves (`services/server/internal/mapstyle/styles`) from `src/map/style.ts` |
 | `npm run verify:style` | Fail if those committed style documents have drifted from `style.ts` |
 

@@ -10,6 +10,9 @@ dist/
 # apps/web/scripts/build-basemap.sh in about half a minute.
 **/public/basemap/*.pmtiles
 
+# c8's coverage report from `npm run test:coverage` (apps/web/.c8rc.json).
+/apps/web/coverage/
+
 # Playwright output from `npm run verify:map` and `npm run verify:build`.
 **/tests/screenshots/
 
