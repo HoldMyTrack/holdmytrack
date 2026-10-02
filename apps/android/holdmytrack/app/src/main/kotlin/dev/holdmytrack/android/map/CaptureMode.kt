@@ -129,6 +129,8 @@ class CaptureMode(
         load(target)
     }
 
+    // Only turns off the dot showLocationDot turned on, which needed location granted.
+    @SuppressLint("MissingPermission")
     fun stop() {
         if (spot == null) return
         spot = null
