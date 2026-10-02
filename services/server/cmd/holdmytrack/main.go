@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -127,24 +128,15 @@ func main() {
 			IdleTimeout:       2 * time.Minute,
 		}
 		log.Info("serve: listening", "addr", cfg.ListenAddr)
-		// ListenAndServe returns as soon as Shutdown starts, so main waits for the drain to end
-		// before returning and closing the pool under requests still running. 8 s fits inside
-		// docker stop's default 10 s grace.
-		drained := make(chan struct{})
-		go func() {
-			defer close(drained)
-			<-ctx.Done()
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-			defer cancel()
-			if err := httpSrv.Shutdown(shutdownCtx); err != nil {
-				log.Error("serve: shutdown", "err", err)
-			}
-		}()
-		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		ln, err := net.Listen("tcp", cfg.ListenAddr)
+		if err != nil {
 			log.Error("serve", "err", err)
 			os.Exit(1)
 		}
-		<-drained
+		if err := serveUntilDone(ctx, httpSrv, ln, 8*time.Second, log); err != nil {
+			log.Error("serve", "err", err)
+			os.Exit(1)
+		}
 
 	case "work":
 		store, err := storage.New(cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3Bucket)
@@ -307,4 +299,27 @@ func retry(ctx context.Context, log *slog.Logger, what string, fn func() error) 
 		}
 	}
 	return fmt.Errorf("%s: giving up after %d attempts: %w", what, attempts, err)
+}
+
+// serveUntilDone serves on ln until ctx is cancelled, then shuts down, returning once requests
+// still running have finished or drain has passed. Serve returns as soon as Shutdown starts,
+// so this waits for the drain itself: returning then let main close the pool under requests
+// still running, and the process exit cut them off. 8 s (main's drain) fits inside docker
+// stop's default 10 s grace.
+func serveUntilDone(ctx context.Context, srv *http.Server, ln net.Listener, drain time.Duration, log *slog.Logger) error {
+	drained := make(chan struct{})
+	go func() {
+		defer close(drained)
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), drain)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			log.Error("serve: shutdown", "err", err)
+		}
+	}()
+	if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
+		return err
+	}
+	<-drained
+	return nil
 }

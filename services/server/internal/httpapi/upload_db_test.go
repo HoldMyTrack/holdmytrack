@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -109,7 +110,10 @@ func TestInterruptedIngestResumes(t *testing.T) {
 }
 
 // A zip larger than the in-memory multipart threshold is read from the temp file it spilled
-// to, not copied into memory, and still unpacks.
+// to, not copied into memory, and still unpacks. Measured as what the request allocates, which
+// stays a fixed multiple of the threshold (the multipart reader's own buffer, grown to it before
+// spilling) however large the archive; keeping the part in memory and copying it whole grew
+// with the archive, here to about 500 MiB.
 func TestLargeZipUploadIsReadInPlace(t *testing.T) {
 	d := newDBTestWithS3(t, newMemS3())
 	me := d.newAccount(false)
@@ -119,7 +123,7 @@ func TestLargeZipUploadIsReadInPlace(t *testing.T) {
 	w, _ := zw.CreateHeader(&zip.FileHeader{Name: "ride.gpx", Method: zip.Store})
 	w.Write([]byte(resumeGPX))
 	pad, _ := zw.CreateHeader(&zip.FileHeader{Name: "padding.bin", Method: zip.Store})
-	pad.Write(make([]byte, multipartMemoryBytes+1))
+	pad.Write(make([]byte, 3*multipartMemoryBytes))
 	zw.Close()
 
 	var body bytes.Buffer
@@ -131,10 +135,17 @@ func TestLargeZipUploadIsReadInPlace(t *testing.T) {
 	req.Header.Set("Content-Type", mw.FormDataContentType())
 	req.Header.Set("Authorization", bearerPrefix+me.session)
 	rec := httptest.NewRecorder()
+	var before, after runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&before)
 	d.srv.ServeHTTP(rec, req)
+	runtime.ReadMemStats(&after)
 
 	var resp zipUploadResponse
 	d.decode(rec, http.StatusAccepted, &resp)
+	if allocated := after.TotalAlloc - before.TotalAlloc; allocated > 6*multipartMemoryBytes {
+		t.Errorf("the request allocated %d MiB for a %d MiB archive", allocated>>20, archive.Len()>>20)
+	}
 	statuses := map[string]string{}
 	for _, f := range resp.Files {
 		statuses[f.Filename] = f.Status
@@ -277,5 +288,58 @@ func TestPrivateLocationLimitHoldsUnderConcurrency(t *testing.T) {
 	}
 	if n != maxPrivateLocations {
 		t.Fatalf("%d locations, want %d", n, maxPrivateLocations)
+	}
+}
+
+// Adding a Private location reprocesses the duplicate copies dedupe hid as well as the live
+// one: deleting the live copy would otherwise bring a hidden one back with its old, unclipped
+// start.
+func TestPrivateLocationReprocessesHiddenDuplicates(t *testing.T) {
+	d := newDBTest(t)
+	me := d.newAccount(false)
+	live := d.newActivity(me, testActivity{activityType: "ride", durationSecs: 60, at: &[2]float64{10, 50}})
+	hidden := d.newActivity(me, testActivity{activityType: "ride", durationSecs: 60, at: &[2]float64{10, 50}, supersededBy: live})
+	if _, err := d.pool.Exec(context.Background(),
+		`UPDATE activities SET raw_payload_key = 'raw/' || id || '.gpx' WHERE id = ANY($1::uuid[])`, []string{live, hidden}); err != nil {
+		t.Fatal(err)
+	}
+
+	d.decode(d.do(me, http.MethodPost, "/v1/private-locations", map[string]any{"lat": 50.0, "lon": 10.0, "radius_m": 200}), http.StatusCreated, nil)
+
+	var ids []string
+	if err := d.pool.QueryRow(context.Background(), `
+		SELECT ARRAY(SELECT jsonb_array_elements_text(payload->'activity_ids'))
+		FROM jobs WHERE user_id = $1 AND kind = 'reprivacy' ORDER BY id DESC LIMIT 1`, me.id).Scan(&ids); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, id := range ids {
+		got[id] = true
+	}
+	if !got[live] || !got[hidden] {
+		t.Fatalf("reprocessing %v, want both the live copy %s and the hidden one %s", ids, live, hidden)
+	}
+}
+
+// Ingest drops a point no place on Earth has before it reaches the stored track: one
+// latitude past the pole otherwise ended up in the trajectory, the tile index and the stats.
+func TestIngestDropsImpossiblePoints(t *testing.T) {
+	d := newDBTestWithS3(t, newMemS3())
+	me := d.newAccount(false)
+	gpx := strings.Replace(resumeGPX, `<trkpt lat="50.0010" lon="10.0010">`, `<trkpt lat="95" lon="10.0010">`, 1)
+	d.uploadFile(me, "pole.gpx", []byte(gpx))
+	res, err := ingest.Process(context.Background(), d.pool, d.srv.store, d.latestIngestJob(me))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var points int
+	var maxLat float64
+	if err := d.pool.QueryRow(context.Background(), `
+		SELECT s.point_count, ST_YMax(a.trajectory)
+		FROM activities a JOIN activity_streams s ON s.activity_id = a.id WHERE a.id = $1`, res.ActivityID).Scan(&points, &maxLat); err != nil {
+		t.Fatal(err)
+	}
+	if points != 2 || maxLat > 90 {
+		t.Fatalf("%d points, max latitude %v; want the 2 real points", points, maxLat)
 	}
 }

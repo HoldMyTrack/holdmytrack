@@ -2,9 +2,13 @@ package httpapi
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -129,5 +133,56 @@ func TestSignInFailuresAreLimitedPerEmail(t *testing.T) {
 	}
 	if code := login("right-password"); code != http.StatusTooManyRequests {
 		t.Fatalf("right password after 10 failures: %d, want 429", code)
+	}
+}
+
+// The emailed /verify link verifies whoever's link it is, but doesn't switch a browser signed
+// in to a different account over to that one — a link someone sent from their own inbox would
+// otherwise move the reader into the sender's account.
+func TestVerifyLinkKeepsAnotherAccountsSession(t *testing.T) {
+	d := newDBTest(t)
+	d.srv.mailer = &sentMail{}
+	reader, sender := d.newAccount(false), d.newAccount(false)
+	if _, err := d.pool.Exec(context.Background(), `UPDATE users SET email_verified = false WHERE id = $1`, sender.id); err != nil {
+		t.Fatal(err)
+	}
+	email, _ := d.email(sender)
+	if err := d.srv.sendVerificationEmail(context.Background(), sender.id, email, "en"); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := d.do(reader, http.MethodGet, "/verify?token="+d.verificationToken(sender), nil)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status %d, want a redirect", rec.Code)
+	}
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == sessionCookieName {
+			t.Fatalf("set a session cookie for the sender's account: %v", c)
+		}
+	}
+	if _, verified := d.email(sender); !verified {
+		t.Fatal("the sender's address wasn't verified")
+	}
+}
+
+// One address trying many accounts' passwords is stopped after 50 failures, even though no
+// single email reaches its own limit.
+func TestSignInFailuresAreLimitedPerAddress(t *testing.T) {
+	d := newDBTest(t)
+	login := func(i int) int {
+		body := fmt.Sprintf(`{"email":"nobody-%d-%d@holdmytrack.invalid","password":"wrong-password"}`, time.Now().UnixNano(), i)
+		req := httptest.NewRequest(http.MethodPost, "/v1/auth/login", strings.NewReader(body))
+		req.RemoteAddr = "198.51.100.77:4321"
+		rec := httptest.NewRecorder()
+		d.srv.ServeHTTP(rec, req)
+		return rec.Code
+	}
+	for i := 0; i < 50; i++ {
+		if code := login(i); code != http.StatusUnauthorized {
+			t.Fatalf("attempt %d: %d, want 401", i+1, code)
+		}
+	}
+	if code := login(50); code != http.StatusTooManyRequests {
+		t.Fatalf("attempt 51: %d, want 429", code)
 	}
 }
