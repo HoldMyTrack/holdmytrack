@@ -239,3 +239,20 @@ func TestActivityRoutesRefuseMalformedIDs(t *testing.T) {
 		}
 	}
 }
+
+// Coordinates that aren't a tile are a 400, not ST_TileEnvelope's error surfacing as a 500.
+func TestTileRoutesRefuseOutOfRangeCoordinates(t *testing.T) {
+	d := newDBTest(t)
+	me := d.newAccount(false)
+	for _, path := range []string{
+		"/tiles/v1/tracks/-1/0/0.mvt", "/tiles/v1/tracks/2/4/0.mvt", "/tiles/v1/tracks/2/0/-1.mvt",
+		"/tiles/v1/tracks/40/0/0.mvt", "/tiles/v1/fog/3/8/0.png", "/tiles/v1/heatmap/1/0/2.png",
+	} {
+		if rec := d.do(me, http.MethodGet, path, nil); rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: %d, want 400", path, rec.Code)
+		}
+	}
+	if rec := d.do(me, http.MethodGet, "/tiles/v1/tracks/2/3/3.mvt", nil); rec.Code != http.StatusOK {
+		t.Errorf("a real tile: %d, want 200", rec.Code)
+	}
+}

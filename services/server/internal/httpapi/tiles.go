@@ -35,6 +35,26 @@ FROM (
 
 const dateLayout = "2006-01-02"
 
+// maxTileZoom is past any zoom the clients ask for (the Fog and Heatmap rasters stop at z14
+// and are overzoomed above it).
+const maxTileZoom = 24
+
+// tileCoords reads a tile route's {z}/{x}/{y}, with ext trimmed off {y}, or answers 400 for
+// coordinates that aren't a tile: not numbers, a zoom outside 0..maxTileZoom, or an x or y
+// outside 0..2^z-1. Passed to ST_TileEnvelope, an out-of-range tile was a query error, a 500
+// and an error-level log line per request.
+func tileCoords(w http.ResponseWriter, r *http.Request, ext string) (z, x, y int, ok bool) {
+	z, errZ := strconv.Atoi(r.PathValue("z"))
+	x, errX := strconv.Atoi(r.PathValue("x"))
+	y, errY := strconv.Atoi(strings.TrimSuffix(r.PathValue("y"), ext))
+	if errZ != nil || errX != nil || errY != nil || z < 0 || z > maxTileZoom ||
+		x < 0 || y < 0 || x >= 1<<z || y >= 1<<z {
+		http.Error(w, "invalid tile coordinates", http.StatusBadRequest)
+		return 0, 0, 0, false
+	}
+	return z, x, y, true
+}
+
 // handleTracksTile serves §4.3's live MVT query. Unlike fog, tracks are never precomputed:
 // they have to answer filters (date range, activity type) that can't be baked into a raster
 // ahead of time, so this runs the query per request rather than reading a stored tile.
@@ -44,11 +64,8 @@ const dateLayout = "2006-01-02"
 // must occupy a whole path segment, so a literal suffix glued onto "{y}" is not a pattern
 // stdlib supports. The ".mvt" suffix is trimmed from the captured segment by hand instead.
 func (s *Server) handleTracksTile(w http.ResponseWriter, r *http.Request) {
-	z, errZ := strconv.Atoi(r.PathValue("z"))
-	x, errX := strconv.Atoi(r.PathValue("x"))
-	y, errY := strconv.Atoi(strings.TrimSuffix(r.PathValue("y"), ".mvt"))
-	if errZ != nil || errX != nil || errY != nil {
-		http.Error(w, "invalid tile coordinates", http.StatusBadRequest)
+	z, x, y, ok := tileCoords(w, r, ".mvt")
+	if !ok {
 		return
 	}
 

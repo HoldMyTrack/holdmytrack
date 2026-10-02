@@ -2,8 +2,6 @@ package httpapi
 
 import (
 	"net/http"
-	"strconv"
-	"strings"
 )
 
 // countryFogQuery answers "is this country still veiled" per docs/IMPLEMENTATION.md §4.2.4 —
@@ -71,11 +69,8 @@ func (s *Server) handleCountryHeatmapTile(w http.ResponseWriter, r *http.Request
 // ServeMux wildcard has to occupy a whole path segment, so the suffix is trimmed by hand here
 // too.
 func (s *Server) serveAdminTile(w http.ResponseWriter, r *http.Request, query string) {
-	z, errZ := strconv.Atoi(r.PathValue("z"))
-	x, errX := strconv.Atoi(r.PathValue("x"))
-	y, errY := strconv.Atoi(strings.TrimSuffix(r.PathValue("y"), ".mvt"))
-	if errZ != nil || errX != nil || errY != nil {
-		http.Error(w, "invalid tile coordinates", http.StatusBadRequest)
+	z, x, y, ok := tileCoords(w, r, ".mvt")
+	if !ok {
 		return
 	}
 

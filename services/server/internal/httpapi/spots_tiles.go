@@ -2,8 +2,6 @@ package httpapi
 
 import (
 	"net/http"
-	"strconv"
-	"strings"
 )
 
 // spotsMinZoom is the lowest zoom the spots tiles carry anything at: a neighbourhood or two in
@@ -49,11 +47,8 @@ SELECT
 // under the account's tile version (setTileCacheControl), which the Spots import bumps for every
 // account.
 func (s *Server) handleSpotsTile(w http.ResponseWriter, r *http.Request) {
-	z, errZ := strconv.Atoi(r.PathValue("z"))
-	x, errX := strconv.Atoi(r.PathValue("x"))
-	y, errY := strconv.Atoi(strings.TrimSuffix(r.PathValue("y"), ".mvt"))
-	if errZ != nil || errX != nil || errY != nil {
-		http.Error(w, "invalid tile coordinates", http.StatusBadRequest)
+	z, x, y, ok := tileCoords(w, r, ".mvt")
+	if !ok {
 		return
 	}
 

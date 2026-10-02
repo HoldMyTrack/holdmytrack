@@ -4,8 +4,6 @@ import (
 	"errors"
 	"image/png"
 	"net/http"
-	"strconv"
-	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -25,11 +23,8 @@ import (
 // `?theme=dark` picks the cream veil drawn over dark basemaps; anything else gets the dark ink
 // veil (fog.VeilForTheme). The theme is part of the URL, so a cached tile is one theme's.
 func (s *Server) handleFogTile(w http.ResponseWriter, r *http.Request) {
-	z, errZ := strconv.Atoi(r.PathValue("z"))
-	x, errX := strconv.Atoi(r.PathValue("x"))
-	y, errY := strconv.Atoi(strings.TrimSuffix(r.PathValue("y"), ".png"))
-	if errZ != nil || errX != nil || errY != nil {
-		http.Error(w, "invalid tile coordinates", http.StatusBadRequest)
+	z, x, y, ok := tileCoords(w, r, ".png")
+	if !ok {
 		return
 	}
 	ctx := r.Context()
