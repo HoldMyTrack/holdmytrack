@@ -52,8 +52,12 @@ type TrackDateRange = Pick<ActivityQuery, 'from' | 'to' | 'story'>;
  * Sent alongside the tile version (`cv`, coverageVersion.ts), which is what lets the browser
  * keep a tracks tile: this one only tells refreshes apart within the page, so a refresh after
  * a change the page hasn't read a new tile version for yet (a type edit) still asks again.
+ * Prefixed with when the page loaded: the server marks a tile with the caller's own `cv`
+ * cacheable for good, so a bare counter, which every page starts again from 1, would have one
+ * tab's refresh hit the tile another tab cached under the same `cv` and `v` before the change.
  */
 let tracksVersion = 0;
+const pageLoaded = Date.now().toString(36);
 
 /**
  * `GET /tiles/v1/tracks/{z}/{x}/{y}.mvt?from=&to=` — the backend already applies this
@@ -69,7 +73,7 @@ function trackTileURL(range: TrackDateRange): string {
   if (range.to) params.set('to', range.to);
   if (range.story) params.set('story', range.story);
   if (getTileVersion()) params.set('cv', getTileVersion());
-  if (tracksVersion > 0) params.set('v', String(tracksVersion));
+  if (tracksVersion > 0) params.set('v', `${pageLoaded}.${tracksVersion}`);
   const qs = params.toString();
   return `${API_BASE_URL}${TILES_V1}/tracks/{z}/{x}/{y}.mvt${qs ? `?${qs}` : ''}`;
 }
