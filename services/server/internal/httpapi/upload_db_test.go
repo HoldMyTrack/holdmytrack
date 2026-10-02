@@ -197,3 +197,27 @@ func TestOldActivityIngestsOutsideTheHeatmapWindow(t *testing.T) {
 		t.Fatal("a 2019 activity was ingested inside the heatmap window")
 	}
 }
+
+// A synced activity's external_id becomes part of an object key and of two VARCHAR(255)
+// columns, so one that could nest the key or overflow them is rejected up front.
+func TestSyncRejectsAnUnsafeExternalID(t *testing.T) {
+	d := newDBTestWithS3(t, newMemS3())
+	me := d.newAccount(false)
+	points := []map[string]any{
+		{"lat": 50.0, "lon": 10.0, "time": "2026-05-01T10:00:00Z"},
+		{"lat": 50.001, "lon": 10.001, "time": "2026-05-01T10:01:00Z"},
+	}
+	ids := []string{"../other", "a/b", strings.Repeat("x", 201), "3f2c9a1e-7b4d-4e8a-9c1f-2b6d8e0a4c57"}
+	var acts []map[string]any
+	for _, id := range ids {
+		acts = append(acts, map[string]any{"external_id": id, "activity_type": "walk", "points": points})
+	}
+	var resp syncActivitiesResponse
+	d.decode(d.do(me, http.MethodPost, "/v1/sync/activities", map[string]any{"source": "healthconnect", "activities": acts}), http.StatusOK, &resp)
+	want := []string{"rejected", "rejected", "rejected", "enqueued"}
+	for i, r := range resp.Results {
+		if r.Status != want[i] {
+			t.Errorf("%.20q: %s (%s), want %s", ids[i], r.Status, r.Error, want[i])
+		}
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
@@ -17,6 +18,13 @@ import (
 // (webhooks) and Path 3 (upload) have their own endpoints and their own `source` values, so
 // this list doesn't need to anticipate those.
 var syncSources = map[string]bool{"healthconnect": true, "healthkit": true, "recorded": true}
+
+// syncExternalIDPattern is what a synced activity's external_id may be: a Health Connect or
+// HealthKit record UUID, or the UUID GPS-Logger mints, fits easily. The id goes into the raw
+// payload's object key and into two VARCHAR(255) columns (source_detail as id + ".json"), so
+// a "/" or ".." would nest or escape the key, and an over-long id was accepted as "enqueued"
+// only for the worker's insert to fail on it.
+var syncExternalIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-][A-Za-z0-9._-]{0,199}$`)
 
 // maxSyncBatchActivities bounds one request to a reasonable page of a foreground sync run, not
 // a claim that a real sync history can't be larger — ROADMAP.md's own "resumable retry"
@@ -121,6 +129,10 @@ func (s *Server) syncOneActivity(ctx context.Context, l *i18n.Localizer, userID,
 
 	if act.ExternalID == "" {
 		result.Status, result.Error = "rejected", l.T("error.sync_external_id_required")
+		return result
+	}
+	if !syncExternalIDPattern.MatchString(act.ExternalID) {
+		result.Status, result.Error = "rejected", l.T("error.sync_external_id_invalid")
 		return result
 	}
 	// Same >= 2 raw points floor ingest.Process itself enforces on the raw points

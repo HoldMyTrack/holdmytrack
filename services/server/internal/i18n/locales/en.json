@@ -275,6 +275,7 @@
   "error.story_name_too_long": "Name must be {max} characters or fewer.",
   "error.story_description_too_long": "Description must be {max} characters or fewer.",
   "error.sync_external_id_required": "Every activity needs an external_id.",
+  "error.sync_external_id_invalid": "An external_id may only use letters, digits, “.”, “_” and “-”, up to 200 of them.",
   "error.sync_too_few_points": "An activity needs at least two GPS points.",
   "error.sync_too_many_points": "Too many GPS points ({n}); at most {max}.",
   "imports.source.upload": "Uploaded file",

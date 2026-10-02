@@ -279,6 +279,7 @@
   "error.story_name_too_long": "Название должно быть не длиннее {max} символов.",
   "error.story_description_too_long": "Описание должно быть не длиннее {max} символов.",
   "error.sync_external_id_required": "У каждого занятия должен быть external_id.",
+  "error.sync_external_id_invalid": "external_id может состоять только из латинских букв, цифр, «.», «_» и «-», не длиннее 200 символов.",
   "error.sync_too_few_points": "В занятии должно быть не меньше двух GPS-точек.",
   "error.sync_too_many_points": "Слишком много GPS-точек ({n}), допускается не больше {max}.",
   "imports.source.upload": "Загруженный файл",
