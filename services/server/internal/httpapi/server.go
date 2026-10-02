@@ -461,9 +461,10 @@ func (s *Server) persistAndEnqueue(ctx context.Context, p uploadFileParams) (ext
 	// this check. Scoped by the same `source` the job itself will carry, matching the
 	// activities table's own `(user_id, source, external_id)` unique index — a Takeout import
 	// and a plain upload are different provenance even if (implausibly) they hashed the same.
+	// An activity whose ingest never finished isn't a repeat: uploading it again resumes it.
 	var exists bool
 	if err := s.pool.QueryRow(ctx,
-		`SELECT EXISTS (SELECT 1 FROM activities WHERE user_id = $1 AND source = $2 AND external_id = $3)`,
+		`SELECT EXISTS (SELECT 1 FROM activities WHERE user_id = $1 AND source = $2 AND external_id = $3 AND ingest_complete)`,
 		p.UserID, p.Source, externalID,
 	).Scan(&exists); err != nil {
 		return "", false, fmt.Errorf("dedupe check: %w", err)

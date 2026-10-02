@@ -88,28 +88,30 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	}
 	m := pp.m
 
+	// ingest_complete stays false until every step after this insert has run (the end of
+	// this function): a hidden track has none, so it is complete as inserted.
 	var activityID string
-	var inserted bool
+	var inserted, complete bool
 	err = pool.QueryRow(ctx, `
 		WITH ins AS (
 			INSERT INTO activities (
 				user_id, source, source_detail, external_id,
 				activity_type, distance_meters, duration_seconds, moving_seconds,
 				elevation_gain_m, avg_speed_mps, started_at,
-				trajectory, raw_payload_key, name, description
+				trajectory, raw_payload_key, name, description, ingest_complete
 			) VALUES (
 				$1, $2, $3, $4,
 				$5, $6, $7, $8,
 				$9, $10, $11,
 				`+trajectorySQL("$12", "$13", "$14")+`,
-				$15, NULLIF($16, ''), NULLIF($17, '')
+				$15, NULLIF($16, ''), NULLIF($17, ''), $18
 			)
 			ON CONFLICT (user_id, source, external_id) WHERE external_id IS NOT NULL DO NOTHING -- $15 = raw_payload_key
 			RETURNING id
 		)
-		SELECT id, true FROM ins
+		SELECT id, true, $18 FROM ins
 		UNION ALL
-		SELECT id, false FROM activities
+		SELECT id, false, ingest_complete FROM activities
 		WHERE user_id = $1 AND source = $2 AND external_id = $4
 		  AND NOT EXISTS (SELECT 1 FROM ins)
 		LIMIT 1
@@ -118,19 +120,21 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 		act.ActivityType, m.distanceM, m.durationS, m.movingS,
 		m.elevationGainM, m.avgSpeedMps, startedAt,
 		pp.simpLons, pp.simpLats, pp.simpTs,
-		job.RawPayloadKey, act.Name, act.Description,
-	).Scan(&activityID, &inserted)
+		job.RawPayloadKey, act.Name, act.Description, hidden,
+	).Scan(&activityID, &inserted, &complete)
 	if err != nil {
 		return Result{}, fmt.Errorf("ingest: persist activity: %w", err)
 	}
 
-	if !inserted {
+	if !inserted && complete {
 		// Idempotency requirement: a duplicate that reached persist is a no-op, not an
 		// error, and the stream write is skipped along with it — the row from the first
 		// successful ingest already has its streams. Fog is skipped too: nothing new
 		// happened, so no tile needs marking dirty again.
 		return Result{ActivityID: activityID, Persisted: false}, nil
 	}
+	// Otherwise this is a new row, or one an earlier run of this ingest inserted and then
+	// didn't finish (cut off, or failed partway): every step below is safe to run again.
 	if hidden {
 		// No streams, masks, tiles or regions: there is nothing visible to derive them from.
 		return Result{ActivityID: activityID, Persisted: true}, nil
@@ -139,6 +143,7 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	_, err = pool.Exec(ctx, `
 		INSERT INTO activity_streams (activity_id, point_count, elapsed_s, elevation_m, dist_m)
 		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (activity_id) DO NOTHING
 	`, activityID, len(points), pp.elapsedS, pp.elevM, pp.distM)
 	if err != nil {
 		return Result{}, fmt.Errorf("ingest: persist streams: %w", err)
@@ -183,6 +188,9 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 
 	if err := EnqueueRenderFog(ctx, pool, job.UserID); err != nil {
 		return Result{}, fmt.Errorf("ingest: enqueue render_fog: %w", err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE activities SET ingest_complete = true WHERE id = $1`, activityID); err != nil {
+		return Result{}, fmt.Errorf("ingest: mark complete: %w", err)
 	}
 
 	return Result{ActivityID: activityID, Persisted: true}, nil
