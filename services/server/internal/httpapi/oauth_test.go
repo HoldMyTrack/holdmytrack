@@ -123,3 +123,22 @@ func TestNormalizeEmailTakesOnlyABareAddress(t *testing.T) {
 		}
 	}
 }
+
+// A password past bcrypt's 72 bytes is a validation error, not the 500 GenerateFromPassword's
+// refusal used to become.
+func TestPasswordLength(t *testing.T) {
+	for _, tc := range []struct {
+		password string
+		ok       bool
+	}{
+		{"short", false},
+		{"eight888", true},
+		{strings.Repeat("a", maxPasswordBytes), true},
+		{strings.Repeat("a", maxPasswordBytes+1), false},
+		{strings.Repeat("я", maxPasswordBytes/2+1), false},
+	} {
+		if err := checkPasswordLength(tc.password); (err == nil) != tc.ok {
+			t.Errorf("%d bytes: err %v, want ok=%v", len(tc.password), err, tc.ok)
+		}
+	}
+}

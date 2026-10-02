@@ -218,6 +218,7 @@
   "error.internal": "Something went wrong on our side. Please try again.",
   "error.invalid_email": "Invalid email address.",
   "error.password_too_short": "Password must be at least {min} characters.",
+  "error.password_too_long": "Password must be at most {max} bytes. A letter or digit is one byte; most other characters are two or more.",
   "error.email_taken": "An account with this email already exists.",
   "error.invalid_credentials": "Invalid email or password.",
   "error.handoff_invalid": "This sign-in link has expired or was already used. Please try again.",

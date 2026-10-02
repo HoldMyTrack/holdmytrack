@@ -181,10 +181,25 @@ func validateCredentials(rawEmail, password string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if len(password) < minPasswordLength {
-		return "", accountFailure(http.StatusBadRequest, "error.password_too_short", "min", minPasswordLength)
+	if err := checkPasswordLength(password); err != nil {
+		return "", err
 	}
 	return email, nil
+}
+
+// maxPasswordBytes is bcrypt's own input limit: GenerateFromPassword refuses anything longer,
+// which surfaced as a 500 to someone pasting a password manager's long passphrase.
+const maxPasswordBytes = 72
+
+// checkPasswordLength is the length rule a new password (signup, reset) and a sign-in share.
+func checkPasswordLength(password string) error {
+	if len(password) < minPasswordLength {
+		return accountFailure(http.StatusBadRequest, "error.password_too_short", "min", minPasswordLength)
+	}
+	if len(password) > maxPasswordBytes {
+		return accountFailure(http.StatusBadRequest, "error.password_too_long", "max", maxPasswordBytes)
+	}
+	return nil
 }
 
 // accountError is a failure the person should see — wrong password, a taken email, an expired
@@ -588,8 +603,8 @@ func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 // resetPassword is the reset core (the JSON endpoint and the /reset page): sets the new
 // password and returns the account id, for the caller to start the fresh session.
 func (s *Server) resetPassword(ctx context.Context, token, password string) (string, error) {
-	if len(password) < minPasswordLength {
-		return "", accountFailure(http.StatusBadRequest, "error.password_too_short", "min", minPasswordLength)
+	if err := checkPasswordLength(password); err != nil {
+		return "", err
 	}
 	var userID string
 	err := s.pool.QueryRow(ctx,

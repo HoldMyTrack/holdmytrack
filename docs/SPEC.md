@@ -70,7 +70,7 @@ The JSON endpoints in this section are refused (`403`) the same way when a brows
 
 **Preconditions**: No active session, or an active demo session (see note below).
 
-**Inputs**: Email address, password (minimum 8 characters); the browser's own IANA timezone, sent automatically (not user-entered) and optional — see step 3.
+**Inputs**: Email address, password (8 characters to 72 bytes); the browser's own IANA timezone, sent automatically (not user-entered) and optional — see step 3.
 
 **Behavior**:
 1. Client submits email + password + its own detected timezone to `POST /v1/auth/signup` (the web's `/signup` form fills the timezone from the browser with a one-line script; without it the account starts on UTC).
@@ -83,7 +83,7 @@ The JSON endpoints in this section are refused (`403`) the same way when a brows
 
 **Error cases**:
 - Invalid email format → `400 Bad Request`. Only a bare address is accepted: a display name or comment (`Name <a@b.c>`, `a@b.c (x)`) is invalid.
-- Password shorter than 8 characters → `400 Bad Request`.
+- Password shorter than 8 characters, or longer than 72 bytes (bcrypt's limit) → `400 Bad Request`.
 - Email already registered to a different, real account → `409 Conflict`.
 
 ### FR-1.2 Sign in
@@ -151,7 +151,7 @@ The JSON endpoints in this section are refused (`403`) the same way when a brows
 
 **Preconditions**: A valid, unexpired, unused reset token (normally reached by clicking the emailed link, which the client recognizes independently of whatever session state currently exists — see note).
 
-**Inputs**: Reset token, new password (minimum 8 characters).
+**Inputs**: Reset token, new password (8 characters to 72 bytes).
 
 **Behavior**:
 1. Client submits the token and new password to `POST /v1/auth/reset-password`.
@@ -164,7 +164,7 @@ The JSON endpoints in this section are refused (`403`) the same way when a brows
 
 **Error cases**:
 - Token missing, already used, or expired → `400 Bad Request` with a generic message (the system does not distinguish "never existed" from "expired" from "already used").
-- Password shorter than 8 characters → `400 Bad Request`.
+- Password shorter than 8 characters, or longer than 72 bytes (bcrypt's limit) → `400 Bad Request`.
 
 **Note — reset link takes priority**: if the client detects a reset token in its own URL (the emailed link), it presents the reset screen unconditionally, ahead of whatever session state `GET /v1/auth/me` would otherwise report — including an already-signed-in session. This is the one flow reachable without first checking authentication state.
 
@@ -318,7 +318,7 @@ A new account made this way is unverified, like one made on the web; the Android
 
 **Preconditions**: An active demo session.
 
-**Inputs**: Email address, password (minimum 8 characters) — the same inputs as FR-1.1.
+**Inputs**: Email address, password (8 characters to 72 bytes) — the same inputs as FR-1.1.
 
 **Behavior**:
 1. From the account menu, which shows the demo account's name ("Demo User") where a real account shows its email, the user selects "Create your own account," which opens the same sign-up page a new visitor sees (`/signup`, FR-1.1), with "← Back to the map" in place of the sign-in page's "try demo" option (starting a second demo while already in one would abandon the first).
