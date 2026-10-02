@@ -54,6 +54,11 @@ export function PhotosTab({ activity, photos, error, draft, setDraft, active, bu
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [failures, setFailures] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Where the open row's slider was last put. A place is kept as a moment, and fractionAt reads
+  // a moment back as the first point that has it, so on a stretch where points share a second
+  // the slider would jump back under the pointer; it stays where it was put while that's still
+  // the moment it was put at, and the photo shows where the moment really is.
+  const [slidTo, setSlidTo] = useState<{ id: string; fraction: number } | null>(null);
   // The waiting photo's slider: which photo it's for, and where it is.
   const [waitingAt, setWaitingAt] = useState<{ key: string; fraction: number } | null>(null);
   // What each waiting photo was picked after, and which ones were removed rather than placed —
@@ -353,11 +358,17 @@ export function PhotosTab({ activity, photos, error, draft, setDraft, active, bu
               </div>
               {isEditing && track && (
                 <>
-                  {slider(fractionAt(track, row.routeAt), (fraction) => {
-                    const routeAt = pointAt(track, fraction).t;
-                    if (row.kind === 'new') updateNew(row.id, { routeAt });
-                    else changeSaved(row.photo, { routeAt });
-                  })}
+                  {slider(
+                    slidTo?.id === row.id && pointAt(track, slidTo.fraction).t === row.routeAt
+                      ? slidTo.fraction
+                      : fractionAt(track, row.routeAt),
+                    (fraction) => {
+                      setSlidTo({ id: row.id, fraction });
+                      const routeAt = pointAt(track, fraction).t;
+                      if (row.kind === 'new') updateNew(row.id, { routeAt });
+                      else changeSaved(row.photo, { routeAt });
+                    },
+                  )}
                   <input
                     className="settings-page__input"
                     type="text"
