@@ -452,3 +452,28 @@ func TestPhotoPlaceCheck(t *testing.T) {
 		t.Errorf("long uploaded caption: %d, want 400", rec.Code)
 	}
 }
+
+// A PATCH refused for its route_at changes nothing, its caption included.
+func TestPhotoUpdateRefusedLeavesCaptionAlone(t *testing.T) {
+	s3 := newMemS3()
+	d := newDBTestWithS3(t, s3)
+	me := d.newAccount(false)
+	start := photoTrackStart
+	act := d.newActivity(me, testActivity{activityType: "walk", startedAt: start, durationSecs: 60, at: &[2]float64{10, 50}})
+	var photo struct {
+		ID string `json:"id"`
+	}
+	d.decode(d.uploadPhoto(me, testJPEG(t, 40, 30), testJPEG(t, 8, 6), map[string]string{"activity_id": act, "taken_at": "2026-05-01T10:00:00Z"}), http.StatusCreated, &photo)
+
+	rec := d.do(me, http.MethodPatch, "/v1/photos/"+photo.ID, map[string]any{"caption": "new", "route_at": "not a time"})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status %d, want 400", rec.Code)
+	}
+	var caption *string
+	if err := d.pool.QueryRow(context.Background(), `SELECT caption FROM activity_photos WHERE id = $1`, photo.ID).Scan(&caption); err != nil {
+		t.Fatal(err)
+	}
+	if caption != nil {
+		t.Fatalf("caption = %q, want unchanged (none)", *caption)
+	}
+}

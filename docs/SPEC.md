@@ -1341,7 +1341,7 @@ Deliberately out of scope, not a "not yet", and not planned: Oura and other reco
 ### FR-16.4 Editing
 
 **Behavior**:
-1. `PATCH /v1/photos/{id}` takes a JSON object; a field present changes, a field absent doesn't. `caption`: trimmed; empty or null clears it; at most 500 characters. `route_at`: RFC 3339, the photo's new moment on the track, clamped to it. A photo can't be taken off the track. It answers `200` with the photo.
+1. `PATCH /v1/photos/{id}` takes a JSON object; a field present changes, a field absent doesn't. `caption`: trimmed; empty or null clears it; at most 500 characters. `route_at`: RFC 3339, the photo's new moment on the track, clamped to it. A photo can't be taken off the track. A request refused for either field changes neither. It answers `200` with the photo.
 2. `GET /v1/activities/track-metrics/{id}` (FR-4.8) carries each display point's moment as `time_s` (epoch seconds), so a client can turn a place on the track into a `route_at`.
 
 **Error cases**:

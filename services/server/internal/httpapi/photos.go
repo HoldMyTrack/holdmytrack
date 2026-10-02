@@ -678,21 +678,22 @@ func (s *Server) handleUpdatePhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Both fields are checked before either is written, and then written together: a request
+	// refused for its route_at must not have changed the caption.
+	setCaption, setRouteAt := false, false
+	var caption *string
+	var routeAt time.Time
 	if raw, ok := req["caption"]; ok {
-		var caption *string
-		if err := json.Unmarshal(raw, &caption); err != nil {
+		var in *string
+		if err := json.Unmarshal(raw, &in); err != nil {
 			http.Error(w, errPhotoInvalidJSON.Error(), http.StatusBadRequest)
 			return
 		}
-		value, ok := photoCaption(w, r, deref(caption))
+		value, ok := photoCaption(w, r, deref(in))
 		if !ok {
 			return
 		}
-		if _, err := s.pool.Exec(ctx, `UPDATE activity_photos SET caption = $2 WHERE id = $1`, photoID, value); err != nil {
-			s.log.Error("photo update: caption failed", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
+		caption, setCaption = value, true
 	}
 
 	if raw, ok := req["route_at"]; ok {
@@ -711,8 +712,17 @@ func (s *Server) handleUpdatePhoto(w http.ResponseWriter, r *http.Request) {
 			httpErrorT(w, r, http.StatusConflict, "error.photo_no_track")
 			return
 		}
-		if _, err := s.pool.Exec(ctx, `UPDATE activity_photos SET route_at = $2 WHERE id = $1`, photoID, clampToSpan(*at, start, end)); err != nil {
-			s.log.Error("photo update: route_at failed", "err", err)
+		routeAt, setRouteAt = clampToSpan(*at, start, end), true
+	}
+
+	if setCaption || setRouteAt {
+		if _, err := s.pool.Exec(ctx, `
+			UPDATE activity_photos SET
+				caption = CASE WHEN $2 THEN $3 ELSE caption END,
+				route_at = CASE WHEN $4 THEN $5::timestamptz ELSE route_at END
+			WHERE id = $1
+		`, photoID, setCaption, caption, setRouteAt, routeAt); err != nil {
+			s.log.Error("photo update failed", "err", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
