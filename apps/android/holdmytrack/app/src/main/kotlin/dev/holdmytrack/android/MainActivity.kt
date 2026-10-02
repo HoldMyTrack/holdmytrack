@@ -1793,13 +1793,14 @@ class MainActivity : AppCompatActivity() {
 
     /** The burger menu: the destinations that don't fit on the map itself — the app's own
      *  screens, then the web header's Donate and Info pages (About, Help, Contacts), opened in
-     *  a browser tab, and last the app's version, a line to read rather than an action. */
+     *  a browser tab, and last the app's version, a line to read rather than an action. Donate
+     *  only where `BuildConfig.DONATE_LINK` allows it, which the Play build doesn't. */
     private fun showMenu(anchor: View) {
         val menu = PopupMenu(this, anchor)
         menu.menu.add(MENU_GROUP_APP, MENU_PROFILE, 0, R.string.menu_profile)
         menu.menu.add(MENU_GROUP_APP, MENU_SYNC, 1, R.string.menu_sync)
         menu.menu.add(MENU_GROUP_APP, MENU_SETTINGS, 2, R.string.menu_settings)
-        menu.menu.add(MENU_GROUP_WEB, MENU_DONATE, 3, R.string.menu_donate)
+        if (BuildConfig.DONATE_LINK) menu.menu.add(MENU_GROUP_WEB, MENU_DONATE, 3, R.string.menu_donate)
         menu.menu.add(MENU_GROUP_WEB, MENU_ABOUT, 4, R.string.menu_about)
         menu.menu.add(MENU_GROUP_WEB, MENU_HELP, 5, R.string.menu_help)
         menu.menu.add(MENU_GROUP_WEB, MENU_CONTACTS, 6, R.string.menu_contacts)
