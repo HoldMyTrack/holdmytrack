@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"sync"
 	"testing"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 // sentMail records what a test's server would have mailed.
@@ -98,5 +100,34 @@ func TestChangeEmailToAnotherAccountsAddressIsRefused(t *testing.T) {
 	rec := d.do(a, http.MethodPatch, "/v1/auth/email", map[string]string{"email": taken})
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status %d, want 409", rec.Code)
+	}
+}
+
+// After 10 wrong passwords for one email in the window, even the right one is refused: the
+// limit is checked before the password is.
+func TestSignInFailuresAreLimitedPerEmail(t *testing.T) {
+	d := newDBTest(t)
+	a := d.newAccount(false)
+	email, _ := d.email(a)
+	hash, err := bcrypt.GenerateFromPassword([]byte("right-password"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.pool.Exec(context.Background(), `UPDATE users SET password_hash = $2 WHERE id = $1`, a.id, hash); err != nil {
+		t.Fatal(err)
+	}
+	login := func(password string) int {
+		return d.do(account{}, http.MethodPost, "/v1/auth/login", map[string]string{"email": email, "password": password}).Code
+	}
+	if code := login("right-password"); code != http.StatusOK {
+		t.Fatalf("first sign-in: %d", code)
+	}
+	for i := 0; i < 10; i++ {
+		if code := login("wrong-password"); code != http.StatusUnauthorized {
+			t.Fatalf("wrong password %d: %d, want 401", i+1, code)
+		}
+	}
+	if code := login("right-password"); code != http.StatusTooManyRequests {
+		t.Fatalf("right password after 10 failures: %d, want 429", code)
 	}
 }

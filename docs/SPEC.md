@@ -103,6 +103,7 @@ The JSON endpoints in this section are refused (`403`) the same way when a brows
 
 **Error cases**:
 - Email not found, account with no password set (never claimed, or Google- or Facebook-only — FR-1.9, FR-1.10), or password mismatch → `401 Unauthorized` with a single generic message ("invalid email or password") in every case — the system does not distinguish these to a caller, so it cannot be used to discover which emails are registered.
+- After 10 failed sign-ins for one email, or 50 from one address, within 15 minutes → `429 Too Many Requests`, checked before the password, so even the right one is refused until the window passes.
 
 ### FR-1.3 Sign out
 

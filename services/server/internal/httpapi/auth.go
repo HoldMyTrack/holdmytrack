@@ -349,7 +349,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	userID, err := s.checkPassword(r.Context(), req.Email, req.Password)
+	userID, err := s.checkPassword(r.Context(), clientIP(r), req.Email, req.Password)
 	if err != nil {
 		s.writeAccountError(w, r, "login", err)
 		return
@@ -361,10 +361,17 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 // for a matching email and password. One generic failure whether the email doesn't exist,
 // belongs to an unclaimed seed row (password_hash still NULL), or the password just doesn't
 // match — distinguishing any of those would tell a caller which emails are registered.
-func (s *Server) checkPassword(ctx context.Context, rawEmail, password string) (string, error) {
+//
+// Failed attempts are limited per email and per caller address (signInFailureLimits), and a
+// limited caller is refused before the password is checked, so guessing a password costs
+// more than bcrypt's own time.
+func (s *Server) checkPassword(ctx context.Context, ip, rawEmail, password string) (string, error) {
 	email, err := validateCredentials(rawEmail, password)
 	if err != nil {
 		return "", err
+	}
+	if signInFailuresByEmail.exceeded(email) || signInFailuresByIP.exceeded(ip) {
+		return "", accountFailure(http.StatusTooManyRequests, "error.rate_limited")
 	}
 	var userID string
 	var hash []byte
@@ -373,10 +380,22 @@ func (s *Server) checkPassword(ctx context.Context, rawEmail, password string) (
 		return "", err
 	}
 	if errors.Is(err, pgx.ErrNoRows) || hash == nil || bcrypt.CompareHashAndPassword(hash, []byte(password)) != nil {
+		signInFailuresByEmail.hit(email)
+		signInFailuresByIP.hit(ip)
 		return "", accountFailure(http.StatusUnauthorized, "error.invalid_credentials")
 	}
 	return userID, nil
 }
+
+// signInFailuresByEmail and signInFailuresByIP count failed sign-ins (checkPassword). Per
+// email, 10 in 15 minutes: guessing one account's password from many addresses stays at
+// about a thousand tries a day, and its owner, locked out of password sign-in at worst for 15
+// minutes, still has Forgot password and Google/Facebook. Per address, 50 in 15 minutes:
+// enough for a household behind one address, not for trying many accounts' passwords.
+var (
+	signInFailuresByEmail = newFixedWindowLimiter(10, 15*time.Minute)
+	signInFailuresByIP    = newFixedWindowLimiter(50, 15*time.Minute)
+)
 
 // handleLogout serves `POST /v1/auth/logout` — deletes the session server-side (not just
 // clearing the cookie), so a captured-but-not-yet-expired token stops working immediately.
@@ -810,30 +829,49 @@ func newFixedWindowLimiter(limit int, window time.Duration) *fixedWindowLimiter 
 	return &fixedWindowLimiter{limit: limit, window: window, counts: make(map[string]*windowCount)}
 }
 
-// allow also sweeps every stale entry on each call, so the map stays bounded by recently
-// active callers rather than growing forever from one-off addresses that never return —
-// the only cleanup this needs, since demo starts are inherently infrequent per caller.
+// allow counts one request against key and reports whether it is within the limit — the
+// limit on every request, for the endpoints that mail or create something.
 func (l *fixedWindowLimiter) allow(key string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	c := l.current(key)
+	if c.count >= l.limit {
+		return false
+	}
+	c.count++
+	return true
+}
 
+// exceeded and hit split allow for a limit on failures only (sign-in): exceeded checks
+// without counting, hit counts one.
+func (l *fixedWindowLimiter) exceeded(key string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.current(key).count >= l.limit
+}
+
+func (l *fixedWindowLimiter) hit(key string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.current(key).count++
+}
+
+// current is key's count in its live window, starting a fresh one if it has none. It also
+// sweeps every stale entry on each call, so the map stays bounded by recently active callers
+// rather than growing forever from one-off addresses that never return. The caller holds mu.
+func (l *fixedWindowLimiter) current(key string) *windowCount {
 	now := time.Now()
 	for k, c := range l.counts {
 		if now.Sub(c.windowFrom) > l.window {
 			delete(l.counts, k)
 		}
 	}
-
 	c, ok := l.counts[key]
 	if !ok {
-		l.counts[key] = &windowCount{count: 1, windowFrom: now}
-		return true
+		c = &windowCount{windowFrom: now}
+		l.counts[key] = c
 	}
-	if c.count >= l.limit {
-		return false
-	}
-	c.count++
-	return true
+	return c
 }
 
 // clientIP is the address a per-caller limit keys on. In production every request arrives
