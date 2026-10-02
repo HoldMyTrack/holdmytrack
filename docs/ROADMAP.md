@@ -127,11 +127,11 @@ Connecting the app to third-party services.
 
 ### Path 1 — cloud connectors (gated on the prerequisites above)
 
-- [ ] Generic OAuth connection scaffolding — `connections` table already exists (`migrations/0002_activities.sql`, §3.2); build the authorize/callback/token-refresh flow once, provider-agnostic, before any specific provider.
+- [ ] Generic OAuth connection scaffolding — `connections` table already exists (`migrations/0002_activities.sql`, `IMPLEMENTATION.md` §3.2); build the authorize/callback/token-refresh flow once, provider-agnostic, before any specific provider.
 - [ ] Garmin connector (after the licence prerequisite is settled).
 - [ ] Wahoo connector (after partner approval).
 - [ ] COROS connector (after partner approval).
-- [ ] Deauthorization deletion for each connector as it ships, not after — Garmin/Wahoo/COROS contractually require it (§7).
+- [ ] Deauthorization deletion for each connector as it ships, not after — Garmin/Wahoo/COROS contractually require it (`VISION.md` §7).
 - [ ] These connectors are the one part of the web's Sync page, `/sync` (`docs/IMPLEMENTATION.md` §4.0.1), that's actually triggerable from the page itself — connect/disconnect, and (once token-refresh runs on a schedule) a last-synced/status summary alongside Health Connect/GPS Logger's own read-only rows there. Sync stayed read-only-only through Phase 2 specifically because neither on-device source can be triggered from the web; a cloud connector can.
 
 ---
@@ -169,4 +169,4 @@ Non-negotiable, GDPR Art. 9 special-category data (`VISION.md` §7).
 
 ## Ongoing, not phase-bound
 
-- [ ] Re-measure the funding-model assumptions (§4.3, §6.3) against real usage once any real users exist, rather than assuming the estimates hold.
+- [ ] Re-measure the funding-model assumptions (`VISION.md` §4.3, §6.3) against real usage once any real users exist, rather than assuming the estimates hold.
