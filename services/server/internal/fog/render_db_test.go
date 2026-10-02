@@ -3,6 +3,7 @@ package fog
 import (
 	"context"
 	"fmt"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -10,6 +11,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/db"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage/storagetest"
 )
 
 // Reads TEST_DATABASE_URL and skips without it, like internal/httpapi's database tests
@@ -95,5 +98,69 @@ func TestUpsertTileRenderedKeepsAMidRenderMark(t *testing.T) {
 	}
 	if tileDirty(t, pool, userID, z, x, y) {
 		t.Error("tile rendered with nothing marking it since stayed dirty")
+	}
+}
+
+func memStore(t *testing.T) *storage.Store {
+	t.Helper()
+	srv := httptest.NewServer(storagetest.New())
+	t.Cleanup(srv.Close)
+	store, err := storage.New(srv.URL, "test", "test", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return store
+}
+
+func tileRendered(t *testing.T, pool *pgxpool.Pool, userID string, zoom, x, y int) bool {
+	t.Helper()
+	var key *string
+	var dirty bool
+	err := pool.QueryRow(context.Background(),
+		`SELECT object_key, dirty FROM fog_tiles WHERE user_id = $1 AND zoom = $2 AND tile_x = $3 AND tile_y = $4`,
+		userID, zoom, x, y).Scan(&key, &dirty)
+	return err == nil && key != nil && !dirty
+}
+
+// A dirty z14 tile is rendered, then every ancestor up to z0.
+func TestRenderUserBuildsThePyramid(t *testing.T) {
+	pool, userID := testAccount(t)
+	const x, y = 8800, 5400
+	if _, err := pool.Exec(context.Background(),
+		`INSERT INTO fog_tiles (user_id, zoom, tile_x, tile_y, dirty) VALUES ($1, $2, $3, $4, true)`,
+		userID, Zoom, x, y); err != nil {
+		t.Fatal(err)
+	}
+	if err := RenderUser(context.Background(), pool, memStore(t), userID); err != nil {
+		t.Fatal(err)
+	}
+	for z := Zoom; z >= 0; z-- {
+		shift := Zoom - z
+		if !tileRendered(t, pool, userID, z, x>>shift, y>>shift) {
+			t.Errorf("z%d ancestor not rendered", z)
+		}
+	}
+}
+
+// A pass cut off after its z14 render, before the levels above, left their tiles stale with
+// nothing marking them; the next pass finishes them now. Here, the state such a pass leaves:
+// z14 rendered and clean, its parent dirty.
+func TestRenderUserFinishesAnInterruptedPyramid(t *testing.T) {
+	pool, userID := testAccount(t)
+	const x, y = 8800, 5400
+	if _, err := pool.Exec(context.Background(), `
+		INSERT INTO fog_tiles (user_id, zoom, tile_x, tile_y, object_key, heatmap_object_key, dirty, rendered_at)
+		VALUES ($1, $2, $3, $4, NULL, NULL, false, NOW()), ($1, $2 - 1, $3 / 2, $4 / 2, NULL, NULL, true, NULL)
+	`, userID, Zoom, x, y); err != nil {
+		t.Fatal(err)
+	}
+	if err := RenderUser(context.Background(), pool, memStore(t), userID); err != nil {
+		t.Fatal(err)
+	}
+	for z := Zoom - 1; z >= 0; z-- {
+		shift := Zoom - z
+		if !tileRendered(t, pool, userID, z, x>>shift, y>>shift) {
+			t.Errorf("z%d not rendered", z)
+		}
 	}
 }
