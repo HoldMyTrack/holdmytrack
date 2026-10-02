@@ -1635,6 +1635,10 @@ button.activities-panel__story-badge:hover {
 
 .photo-popup__image-link {
   display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  cursor: zoom-in;
   border-radius: var(--fm-radius-sm);
   overflow: hidden;
   background: var(--fm-surface-tint-strong);
@@ -1706,6 +1710,122 @@ button.activities-panel__story-badge:hover {
 
 .photo-popup__full:hover {
   text-decoration: underline;
+}
+
+/* PhotoViewer.tsx: a photo over the whole page, to zoom into — a <dialog> filling the viewport,
+   dark whatever the theme, as a picture is best seen; a bar of controls over a stage the picture
+   is fitted into and transformed within. */
+.photo-viewer {
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: #0f1311;
+  color: #ece6d8;
+  overflow: hidden;
+}
+
+.photo-viewer[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.photo-viewer::backdrop {
+  background: transparent;
+}
+
+.photo-viewer__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fm-space-8) var(--fm-space-16);
+  padding: var(--fm-space-8) var(--fm-space-16);
+}
+
+.photo-viewer__nav,
+.photo-viewer__tools {
+  display: flex;
+  align-items: center;
+  gap: var(--fm-space-4);
+}
+
+.photo-viewer__tools {
+  margin-left: auto;
+}
+
+.photo-viewer__position {
+  font-size: var(--fm-text-md);
+  font-weight: var(--fm-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.photo-viewer__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.photo-viewer__caption {
+  font-size: var(--fm-text-lg);
+  font-weight: var(--fm-weight-semibold);
+}
+
+.photo-viewer__taken {
+  font-size: var(--fm-text-sm);
+  color: #a8b2a9;
+}
+
+.photo-viewer__btn {
+  display: flex;
+  padding: var(--fm-space-6);
+  border: 0;
+  border-radius: var(--fm-radius-sm);
+  background: rgb(255 255 255 / 8%);
+  color: inherit;
+  cursor: pointer;
+}
+
+.photo-viewer__btn:hover:not(:disabled) {
+  background: rgb(255 255 255 / 18%);
+}
+
+.photo-viewer__btn:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+/* touch-action: none — a pinch or a drag here is the viewer's, not the browser's. */
+.photo-viewer__stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  touch-action: none;
+  cursor: zoom-in;
+}
+
+.photo-viewer__stage--zoomed {
+  cursor: grab;
+}
+
+.photo-viewer__stage--dragging {
+  cursor: grabbing;
+}
+
+.photo-viewer__image {
+  display: block;
+  max-width: none;
+  user-select: none;
+  will-change: transform;
+}
+
+.photo-viewer__image--smooth {
+  transition: transform 0.15s ease-out;
 }
 
 /* ZoomLevelNotice.tsx — which level Fog/Heatmap is drawing at, fading out after a few seconds.
