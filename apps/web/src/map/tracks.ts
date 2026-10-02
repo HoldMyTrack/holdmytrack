@@ -52,8 +52,12 @@ type TrackDateRange = Pick<ActivityQuery, 'from' | 'to' | 'story'>;
  * Sent alongside the tile version (`cv`, coverageVersion.ts), which is what lets the browser
  * keep a tracks tile: this one only tells refreshes apart within the page, so a refresh after
  * a change the page hasn't read a new tile version for yet (a type edit) still asks again.
+ * Prefixed with when the page loaded: the server marks a tile with the caller's own `cv`
+ * cacheable for good, so a bare counter, which every page starts again from 1, would have one
+ * tab's refresh hit the tile another tab cached under the same `cv` and `v` before the change.
  */
 let tracksVersion = 0;
+const pageLoaded = Date.now().toString(36);
 
 /**
  * `GET /tiles/v1/tracks/{z}/{x}/{y}.mvt?from=&to=` — the backend already applies this
@@ -69,7 +73,7 @@ function trackTileURL(range: TrackDateRange): string {
   if (range.to) params.set('to', range.to);
   if (range.story) params.set('story', range.story);
   if (getTileVersion()) params.set('cv', getTileVersion());
-  if (tracksVersion > 0) params.set('v', String(tracksVersion));
+  if (tracksVersion > 0) params.set('v', `${pageLoaded}.${tracksVersion}`);
   const qs = params.toString();
   return `${API_BASE_URL}${TILES_V1}/tracks/{z}/{x}/{y}.mvt${qs ? `?${qs}` : ''}`;
 }
@@ -273,10 +277,25 @@ function isTouch(event: MouseEvent): boolean {
   return window.matchMedia('(pointer: coarse)').matches;
 }
 
-// The previously-hovered id, so setHoveredTrack can clear exactly that feature's state —
-// same reasoning and the same MapLibre constraint (no id-less removeFeatureState) as
-// selectedIds/setSelectedTracks below, just for a single id instead of a set.
-let hoveredTrackId: string | null = null;
+// The hovered and selected ids the tracks source's feature-state holds, so setHoveredTrack and
+// setSelectedTracks can clear exactly those features' state — MapLibre has no id-less
+// removeFeatureState: tried removeFeatureState({source, sourceLayer}, 'selected') against the
+// installed maplibre-gl 6.9.0, it throws "A feature id is required to remove its specific state
+// property". Kept per source object, not per module: a theme swap's setStyle, or a new map,
+// brings a fresh source with no feature-state at all, and ids remembered from the old one would
+// make a later call skip setting state the new one never had.
+const trackStates = new WeakMap<object, { hovered: string | null; selected: Set<string> }>();
+
+function trackState(map: MapLibreMap) {
+  const source = map.getSource(TRACKS_SOURCE_ID);
+  if (!source) return null;
+  let state = trackStates.get(source);
+  if (!state) {
+    state = { hovered: null, selected: new Set() };
+    trackStates.set(source, state);
+  }
+  return state;
+}
 
 /**
  * Applies the transient "hover" feature-state to at most one track — the single source of
@@ -286,28 +305,19 @@ let hoveredTrackId: string | null = null;
  * share one piece of state without either clobbering state the other one owns.
  */
 export function setHoveredTrack(map: MapLibreMap, activityId: string | null): void {
-  if (!map.getSource(TRACKS_SOURCE_ID)) return; // see setSelectedTracks' identical guard
-  if (activityId === hoveredTrackId) return;
-  if (hoveredTrackId !== null) {
+  const state = trackState(map); // null before the source exists: see setSelectedTracks
+  if (!state || activityId === state.hovered) return;
+  if (state.hovered !== null) {
     map.setFeatureState(
-      { source: TRACKS_SOURCE_ID, sourceLayer: TRACKS_SOURCE_LAYER, id: hoveredTrackId },
+      { source: TRACKS_SOURCE_ID, sourceLayer: TRACKS_SOURCE_LAYER, id: state.hovered },
       { hover: false },
     );
   }
   if (activityId !== null) {
     map.setFeatureState({ source: TRACKS_SOURCE_ID, sourceLayer: TRACKS_SOURCE_LAYER, id: activityId }, { hover: true });
   }
-  hoveredTrackId = activityId;
+  state.hovered = activityId;
 }
-
-// The previously-selected ids, so setSelectedTracks can clear exactly those features' state
-// without touching ones that are still selected. Tried removeFeatureState({source,
-// sourceLayer}, 'selected') — a key with no id — first, on the assumption it clears that key
-// across every feature in one call; actually tested against the installed maplibre-gl 6.9.0,
-// it throws "A feature id is required to remove its specific state property" instead.
-// Tracking ids explicitly, the same way the hover handler above already has to, is the API
-// MapLibre actually has.
-let selectedIds = new Set<string>();
 
 /**
  * Applies the persistent "selected" feature-state to every id in `activityIds`, clearing it
@@ -322,19 +332,20 @@ export function setSelectedTracks(map: MapLibreMap, activityIds: readonly string
   // directly: without this guard, mounting throws "source 'tracks' does not exist" every
   // time, not occasionally. A missing source has nothing selected on it by definition, so a
   // no-op is the correct behavior here, not a workaround.
-  if (!map.getSource(TRACKS_SOURCE_ID)) return;
+  const state = trackState(map);
+  if (!state) return;
   const next = new Set(activityIds);
-  for (const id of selectedIds) {
+  for (const id of state.selected) {
     if (!next.has(id)) {
       map.removeFeatureState({ source: TRACKS_SOURCE_ID, sourceLayer: TRACKS_SOURCE_LAYER, id }, 'selected');
     }
   }
   for (const id of next) {
-    if (!selectedIds.has(id)) {
+    if (!state.selected.has(id)) {
       map.setFeatureState({ source: TRACKS_SOURCE_ID, sourceLayer: TRACKS_SOURCE_LAYER, id }, { selected: true });
     }
   }
-  selectedIds = next;
+  state.selected = next;
 }
 
 /**

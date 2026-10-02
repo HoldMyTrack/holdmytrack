@@ -57,11 +57,13 @@ export function ShowInArea({ map, categories }: ShowInAreaProps) {
     const wanted = [...categories];
     setLoading(true);
     setError(false);
+    // Here, not when the answer lands: a pan while it's in flight leaves the answer for the old
+    // view, and the button has to come back for the new one.
+    setMoved(false);
     getSpotsInArea([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()], wanted, controller.signal)
       .then(({ spots, total }) => {
         setSpotsInArea(map, spots);
         setLoaded({ categories: wanted, shown: spots.length, total });
-        setMoved(false);
       })
       .catch(() => {
         if (!controller.signal.aborted) setError(true);
@@ -71,7 +73,7 @@ export function ShowInArea({ map, categories }: ShowInAreaProps) {
       });
   };
 
-  const current = loaded !== null && !moved && categories.every((c) => loaded.categories.includes(c));
+  const current = loaded !== null && !moved && !loading && categories.every((c) => loaded.categories.includes(c));
   let status: string | null = null;
   if (current && !error) {
     if (loaded.total === 0) status = t('spots.in_area_none');

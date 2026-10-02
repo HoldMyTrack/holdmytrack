@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getStory, StoryNotFoundError, type Story } from '../api';
 
 export interface StoryState {
@@ -9,7 +9,8 @@ export interface StoryState {
   notFound: boolean;
   /** Re-reads it — after anything that changes its activities or their numbers. */
   reload: () => void;
-  /** Replaces it with a copy a write already returned (a rename, a removal). */
+  /** Replaces it with a copy a write already returned (a rename, a removal) — ignored once
+   *  another Story is open, so a write that lands after a switch can't overwrite the new one. */
   set: (story: Story) => void;
 }
 
@@ -20,6 +21,8 @@ export function useStory(id: string | null): StoryState {
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [nonce, setNonce] = useState(0);
+  const openId = useRef(id);
+  openId.current = id;
 
   useEffect(() => {
     setError(null);
@@ -44,5 +47,8 @@ export function useStory(id: string | null): StoryState {
   }, [id, nonce]);
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
-  return { story, error, notFound, reload, set: setStory };
+  const set = useCallback((next: Story) => {
+    if (next.id === openId.current) setStory(next);
+  }, []);
+  return { story, error, notFound, reload, set };
 }

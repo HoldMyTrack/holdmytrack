@@ -20,6 +20,41 @@ const MAX_DESCRIPTION_LEN = 2000;
 
 export type EditTab = 'activity' | 'track' | 'photos';
 
+/** What `updateActivity` writes — the PATCH endpoint is a full replace of all three. */
+interface ActivityFields {
+  activityType: string;
+  name: string;
+  description: string;
+}
+
+/**
+ * The field writes Save has to make: one per activity whose fields, as the form now has them,
+ * differ from what the server holds — what an earlier Save in this window wrote (`written`),
+ * else what the window opened with. One activity takes all three fields from the form. A group
+ * takes only the type, and keeps each activity's own name and description: the endpoint
+ * replaces all three, so a group edit still sends them unchanged. An empty type on a group
+ * ("Mixed types") keeps each activity's own type too.
+ */
+function fieldWrites(
+  activities: readonly Activity[],
+  single: Activity | null,
+  type: string,
+  name: string,
+  description: string,
+  written: ReadonlyMap<string, ActivityFields>,
+): { id: string; fields: ActivityFields }[] {
+  return activities.flatMap((activity) => {
+    const held = written.get(activity.id) ?? {
+      activityType: activity.activityType,
+      name: activity.name ?? '',
+      description: activity.description ?? '',
+    };
+    const fields = single ? { activityType: type, name, description } : { ...held, activityType: type || held.activityType };
+    const same = fields.activityType === held.activityType && fields.name === held.name && fields.description === held.description;
+    return same ? [] : [{ id: activity.id, fields }];
+  });
+}
+
 /**
  * The Edit window (§4.7.4, §4.7.7) — reached from the header toolbar's Edit button
  * (ActivitiesPanel.tsx) over whatever's currently checked, floating over the map. Two tabs
@@ -43,7 +78,8 @@ export type EditTab = 'activity' | 'track' | 'photos';
  * Save writes what changed — the fields first (skipped when they're as they were), then the
  * track edit (skipped when the Track tab did nothing) — and closes. If a later write fails after earlier ones landed, the window stays open with the
  * error, a retry skips what's already written, and `onClose` still reports it so the list picks
- * it up. Cancel (or Escape) discards whatever wasn't written.
+ * it up. Cancel discards whatever wasn't written; Escape does too, after asking, when there is
+ * any. Both wait, with Save, while the Photos tab is still preparing picked photos.
  *
  * Floating, not a modal `<dialog>` as the Activity form alone once was: the Track tab edits on
  * the map, and a modal would make the map inert. MapView makes the Activities panel inert
@@ -130,9 +166,13 @@ export function EditActivityWindow({
   const [trackPending, setTrackPending] = useState<{ edit: TrackEdit | null } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Fields already written by an earlier Save whose track edit then failed — a later Cancel
-  // still has to report them, and a retry needn't write them again.
-  const fieldsSaved = useRef(false);
+  // Photos still being prepared (PhotosTab's Add): Save would leave the rest of the batch
+  // behind, and Cancel would drop it without asking.
+  const [preparing, setPreparing] = useState(false);
+  // Each activity's fields as an earlier Save in this window wrote them — what the server holds
+  // now, where the `activities` prop still has what the window opened with. A retry after a later
+  // failure compares against these, and a Cancel still reports them so the list picks them up.
+  const written = useRef(new Map<string, ActivityFields>());
 
   const onTrackChange = useCallback((pending: { edit: TrackEdit | null } | null) => {
     setTrackPending(pending);
@@ -140,26 +180,34 @@ export function EditActivityWindow({
   }, []);
 
   const cancel = useCallback(() => {
-    onClose({ saved: fieldsSaved.current, trackApplied: false, photosSaved: photosSaved.current });
+    onClose({ saved: written.current.size > 0, trackApplied: false, photosSaved: photosSaved.current });
   }, [onClose]);
 
+  // Anything Cancel would throw away: a field edit, a track edit, a photo change.
+  const unsaved =
+    !draftIsEmpty(photoDraft) ||
+    trackPending !== null ||
+    fieldWrites(activities, single, activityType.trim(), name.trim(), description, written.current).length > 0;
+  const unsavedRef = useRef(unsaved);
+  unsavedRef.current = unsaved;
+
   useEffect(() => {
-    if (saving) return;
+    if (saving || preparing) return;
     const onKeyDown = (event: KeyboardEvent) => {
       // Not an Escape meant for a dialog of its own, such as the discard confirmation below.
       if ((event.target as Element | null)?.closest?.('dialog')) return;
       if (event.key !== 'Escape' || event.defaultPrevented) return;
-      // Escape is a reflex, and photo changes can be a lot of picking and sliding: ask first.
+      // Escape is a reflex, and an edit can be a lot of typing, chopping or sliding: ask first.
       // preventDefault, or the browser's own Escape handling closes the confirmation the moment
       // it opens — it's the topmost dialog by the time this key's default action runs.
-      if (!draftIsEmpty(draftRef.current)) {
+      if (unsavedRef.current) {
         event.preventDefault();
         setConfirmDiscard(true);
       } else cancel();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [saving, cancel]);
+  }, [saving, preparing, cancel]);
 
   // Leaving the page — a reload, a closed tab, a link in the header — would lose unsaved photo
   // changes with no way back, so the browser asks first while there are any, or while they're
@@ -217,31 +265,15 @@ export function EditActivityWindow({
       openTab('photos');
       return;
     }
-    const fieldsChanged = single
-      ? trimmedType !== single.activityType || trimmedName !== (single.name ?? '') || description !== (single.description ?? '')
-      : trimmedType !== '' && activities.some((a) => a.activityType !== trimmedType);
-
     setSaving(true);
     setError(null);
     try {
-      if (fieldsChanged && !fieldsSaved.current) {
-        if (single) {
-          await updateActivity(single.id, { activityType: trimmedType, name: trimmedName, description });
-        } else {
-          // The PATCH endpoint is a full replace (activities.go), not a per-field patch — so
-          // changing only Type across a group still has to resend each activity's own current
-          // name/description unchanged, or the backend would clear them. Sequential, not
-          // Promise.all, matching ActivitiesPanel.tsx's own group delete: a hand-checked group
-          // is a handful of rows, not bulk-import scale.
-          for (const activity of activities) {
-            await updateActivity(activity.id, {
-              activityType: trimmedType,
-              name: activity.name ?? '',
-              description: activity.description ?? '',
-            });
-          }
-        }
-        fieldsSaved.current = true;
+      // Sequential, not Promise.all, matching ActivitiesPanel.tsx's own group delete: a
+      // hand-checked group is a handful of rows, not bulk-import scale. Each write is recorded
+      // as it lands, so a failure partway leaves the rest for a retry.
+      for (const { id, fields } of fieldWrites(activities, single, trimmedType, trimmedName, description, written.current)) {
+        await updateActivity(id, fields);
+        written.current.set(id, fields);
       }
       if (single && !draftIsEmpty(photoDraft)) await savePhotos(single.id, photoDraft);
       if (single && trackPending) {
@@ -249,7 +281,7 @@ export function EditActivityWindow({
         onClose({ saved: true, trackApplied: true, photosSaved: photosSaved.current });
         return;
       }
-      onClose({ saved: fieldsSaved.current, trackApplied: false, photosSaved: photosSaved.current });
+      onClose({ saved: written.current.size > 0, trackApplied: false, photosSaved: photosSaved.current });
     } catch (err) {
       setError(err instanceof Error ? err.message : t('edit.save_failed'));
       setSaving(false);
@@ -412,6 +444,7 @@ export function EditActivityWindow({
             setDraft={setPhotoDraft}
             active={tab === 'photos'}
             busy={saving}
+            onPreparingChange={setPreparing}
             onOverlay={photos.onOverlay}
           />
         </div>
@@ -420,13 +453,13 @@ export function EditActivityWindow({
       {error && <p className="edit-track__error">{error}</p>}
       <div className="edit-track__row edit-track__row--footer">
         <span className="edit-track__spacer" aria-hidden="true" />
-        <button type="button" className="edit-track__btn" disabled={saving} onClick={cancel}>
+        <button type="button" className="edit-track__btn" disabled={saving || preparing} onClick={cancel}>
           {t('common.cancel')}
         </button>
         <button
           type="button"
           className="edit-track__btn edit-track__btn--primary"
-          disabled={saving}
+          disabled={saving || preparing}
           onClick={() => void save()}
           data-testid="edit-save"
         >
@@ -439,10 +472,10 @@ export function EditActivityWindow({
       </div>
       {confirmDiscard && (
         <ConfirmDialog
-          title={t('photos.discard_title')}
-          message={t('photos.discard_message')}
-          confirmLabel={t('photos.discard')}
-          cancelLabel={t('photos.keep_editing')}
+          title={t('edit.discard_title')}
+          message={t('edit.discard_message')}
+          confirmLabel={t('edit.discard')}
+          cancelLabel={t('edit.keep_editing')}
           onConfirm={async () => cancel()}
           onClose={() => setConfirmDiscard(false)}
         />

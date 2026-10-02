@@ -148,9 +148,15 @@ export function attachPrivateLocationsHandlers(map: MapLibreMap, handlers: Priva
   const move = (e: { lngLat: { lng: number; lat: number } }) => {
     if (dragging) handlers.onDrag(e.lngLat);
   };
+  // The map's own mouseup/touchend fire only for a release over the map; a drag can end
+  // anywhere — over the side panel, outside the window — so the document's pointerup ends it
+  // too, as does the window losing focus mid-drag.
   const end = () => {
     if (!dragging) return;
     dragging = false;
+    document.removeEventListener('pointerup', end);
+    document.removeEventListener('pointercancel', end);
+    window.removeEventListener('blur', end);
     map.dragPan.enable();
     map.getCanvas().style.cursor = '';
   };
@@ -158,6 +164,9 @@ export function attachPrivateLocationsHandlers(map: MapLibreMap, handlers: Priva
     if ('points' in e && e.points.length !== 1) return;
     e.preventDefault();
     dragging = true;
+    document.addEventListener('pointerup', end);
+    document.addEventListener('pointercancel', end);
+    window.addEventListener('blur', end);
     map.dragPan.disable();
     map.getCanvas().style.cursor = 'grabbing';
   };

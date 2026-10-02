@@ -740,11 +740,17 @@ export function ActivitiesPanel({
             // fog_tiles rows would race each other's dirty-mark-and-render trigger for no
             // benefit — a checked group is a handful of rows a user selected by hand, not a
             // bulk-import scale operation, so there's no latency reason to parallelize this.
-            const ids = targetActivities.map((a) => a.id);
-            for (const id of ids) {
-              await deleteActivity(id);
+            const deleted: string[] = [];
+            try {
+              for (const activity of targetActivities) {
+                await deleteActivity(activity.id);
+                deleted.push(activity.id);
+              }
+            } finally {
+              // The ones already gone leave the list and the group even when a later one fails,
+              // so the dialog's retry deletes only the rest.
+              if (deleted.length > 0) onActivitiesDeleted(deleted);
             }
-            onActivitiesDeleted(ids);
           }}
           onClose={() => setDeletingGroup(false)}
         />

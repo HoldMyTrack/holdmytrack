@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { t } from './i18n';
 import { getCurrentUser, type SessionUser } from './api';
 import { AuthProvider } from './auth/AuthContext';
 import { MapView } from './map/MapView';
@@ -50,11 +51,15 @@ function takePrivateLocationsParam(): boolean {
  * `'checking'` until `getCurrentUser` answers — the app renders nothing rather than flashing
  * before a session is confirmed. The Go server only serves this app to a signed-in, verified
  * (or demo) account; the redirects below are the fallback for a session that ended since.
+ * `failed` is the answer not arriving at all — a network error, a 5xx — which says nothing
+ * about the session: sending that to /signin would bounce straight back here, since the
+ * server's sign-in page sends a signed-in visitor to `/`.
  */
-type AuthState = 'checking' | SessionUser;
+type AuthState = 'checking' | { failed: string } | SessionUser;
 
 export function App() {
   const [auth, setAuth] = useState<AuthState>('checking');
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     getCurrentUser()
@@ -65,10 +70,30 @@ export function App() {
         else if ('email' in user && !user.emailVerified) window.location.replace('/verify-pending');
         else setAuth(user);
       })
-      .catch(() => window.location.replace('/signin'));
-  }, []);
+      .catch((err: unknown) =>
+        // fetch rejects with a TypeError ("Failed to fetch") when the server can't be reached at all.
+        setAuth({ failed: err instanceof TypeError ? t('common.network_error') : err instanceof Error ? err.message : String(err) }),
+      );
+  }, [attempt]);
 
   if (auth === 'checking') return <VersionBanner />;
+  if ('failed' in auth) {
+    return (
+      <div className="app-load-error" role="alert">
+        <p className="confirm-dialog__message">{t('app.load_failed', { message: auth.failed })}</p>
+        <button
+          type="button"
+          className="settings-page__button"
+          onClick={() => {
+            setAuth('checking');
+            setAttempt((n) => n + 1);
+          }}
+        >
+          {t('app.try_again')}
+        </button>
+      </div>
+    );
+  }
 
   const authValue = { user: auth };
 

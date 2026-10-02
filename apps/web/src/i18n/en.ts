@@ -5,6 +5,8 @@
  * as its raw value, underscores to spaces (format.ts's formatActivityType).
  */
 export const en = {
+  'app.load_failed': "Couldn't load your account: {message}",
+  'app.try_again': 'Try again',
   'common.bad_response': "The server's reply couldn't be read.",
   'common.cancel': 'Cancel',
   'common.confirm': 'Confirm',
@@ -91,6 +93,10 @@ export const en = {
   'edit.description': 'Description',
   'edit.description_placeholder': 'Add a note — e.g. "Roadtrip to California with kids"',
   'edit.description_too_long': 'Description must be {max} characters or fewer.',
+  'edit.discard_title': 'Discard changes?',
+  'edit.discard_message': 'The changes you made in this window haven\'t been saved yet.',
+  'edit.discard': 'Discard',
+  'edit.keep_editing': 'Keep editing',
   'edit.multi_reason': 'Editing multiple activities changes their type and Stories — name and description are per-activity.',
   'edit.multi_subtitle': 'Type and Stories apply to every checked activity; name and description are per-activity.',
   'edit.name': 'Name',
@@ -269,10 +275,6 @@ export const en = {
   'photos.done': 'Done',
   'photos.place_first': 'Place every new photo on the route before saving.',
   'photos.saving_n': 'Saving photos {n} of {total}…',
-  'photos.discard_title': 'Discard photo changes?',
-  'photos.discard_message': 'The photos you added, moved or deleted in this window haven\'t been saved yet.',
-  'photos.discard': 'Discard',
-  'photos.keep_editing': 'Keep editing',
   'photos.previous': 'Previous photo',
   'photos.next': 'Next photo',
   'photos.position': '{n} of {total}',

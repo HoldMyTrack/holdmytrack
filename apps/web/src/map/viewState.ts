@@ -37,14 +37,20 @@ export function parseHash(hash: string): HashState {
 
   const map = params.get('map');
   if (map) {
-    const [zoom, latitude, longitude] = map.split('/').map(Number);
+    // Number('') is 0, so a truncated link's empty part (`#map=5//`) would read as 0°, 0°.
+    const parts = map.split('/');
+    const [zoom, latitude, longitude] = parts.map(Number);
     if (
+      parts.length === 3 &&
+      parts.every((part) => part.trim() !== '') &&
       zoom !== undefined &&
       latitude !== undefined &&
       longitude !== undefined &&
       Number.isFinite(zoom) &&
       Number.isFinite(latitude) &&
       Number.isFinite(longitude) &&
+      zoom >= 0 &&
+      zoom <= 24 &&
       Math.abs(latitude) <= 90 &&
       Math.abs(longitude) <= 180
     ) {

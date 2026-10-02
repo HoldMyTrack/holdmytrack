@@ -24,6 +24,8 @@ export interface PhotosTabProps {
   active: boolean;
   /** The window is saving: nothing here can change meanwhile. */
   busy: boolean;
+  /** Add is preparing picked photos — the window holds its Save and Cancel until it's done. */
+  onPreparingChange: (preparing: boolean) => void;
   /** How the map should show the draft: photos moved, added or deleted, and the one in hand. */
   onOverlay: (overlay: PhotoMarkerOverlay | null) => void;
 }
@@ -45,19 +47,33 @@ function timeOfDay(seconds: number): string {
  * its caption. The slider walks the track as drawn (photoTrack.ts) and the photo moves along the
  * map with it; a place is kept as the moment at that point.
  */
-export function PhotosTab({ activity, photos, error, draft, setDraft, active, busy, onOverlay }: PhotosTabProps) {
+export function PhotosTab({ activity, photos, error, draft, setDraft, active, busy, onPreparingChange, onOverlay }: PhotosTabProps) {
   const input = useRef<HTMLInputElement>(null);
   const [track, setTrack] = useState<PhotoTrack | null>(null);
   const [trackError, setTrackError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [failures, setFailures] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Where the open row's slider was last put. A place is kept as a moment, and fractionAt reads
+  // a moment back as the first point that has it, so on a stretch where points share a second
+  // the slider would jump back under the pointer; it stays where it was put while that's still
+  // the moment it was put at, and the photo shows where the moment really is.
+  const [slidTo, setSlidTo] = useState<{ id: string; fraction: number } | null>(null);
   // The waiting photo's slider: which photo it's for, and where it is.
   const [waitingAt, setWaitingAt] = useState<{ key: string; fraction: number } | null>(null);
   // What each waiting photo was picked after, and which ones were removed rather than placed —
   // what a waiting photo's slider starts from (startFraction).
   const anchors = useRef(new Map<string, PlaceAnchor>());
   const removed = useRef(new Set<string>());
+  // Cleared on unmount, so an Add still running stops instead of preparing photos into a draft
+  // nothing will save or free.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -124,6 +140,7 @@ export function PhotosTab({ activity, photos, error, draft, setDraft, active, bu
     // The photo picked before this one, for where a waiting one's slider starts.
     let previous: PlaceAnchor = null;
     for (let i = 0; i < files.length; i++) {
+      if (!mounted.current) return;
       const file = files[i]!;
       setProgress({ done: i, total: files.length });
       try {
@@ -136,6 +153,7 @@ export function PhotosTab({ activity, photos, error, draft, setDraft, active, bu
           if (!(err instanceof PhotoNeedsPlaceError)) throw err;
           anchors.current.set(key, previous);
         }
+        if (!mounted.current) return;
         const entry: NewPhoto = { key, name: file.name, prepared, thumbSrc: URL.createObjectURL(prepared.thumb), routeAt, caption: '' };
         previous = routeAt !== null ? { t: routeAt } : { waiting: key };
         setDraft((d) => ({ ...d, added: [...d.added, entry] }));
@@ -205,6 +223,10 @@ export function PhotosTab({ activity, photos, error, draft, setDraft, active, bu
   }, [editingId]);
 
   const picking = progress !== null;
+  useEffect(() => {
+    onPreparingChange(picking);
+    return () => onPreparingChange(false);
+  }, [picking, onPreparingChange]);
 
   return (
     <div className="photos-tab" data-testid="photos-tab">
@@ -336,11 +358,17 @@ export function PhotosTab({ activity, photos, error, draft, setDraft, active, bu
               </div>
               {isEditing && track && (
                 <>
-                  {slider(fractionAt(track, row.routeAt), (fraction) => {
-                    const routeAt = pointAt(track, fraction).t;
-                    if (row.kind === 'new') updateNew(row.id, { routeAt });
-                    else changeSaved(row.photo, { routeAt });
-                  })}
+                  {slider(
+                    slidTo?.id === row.id && pointAt(track, slidTo.fraction).t === row.routeAt
+                      ? slidTo.fraction
+                      : fractionAt(track, row.routeAt),
+                    (fraction) => {
+                      setSlidTo({ id: row.id, fraction });
+                      const routeAt = pointAt(track, fraction).t;
+                      if (row.kind === 'new') updateNew(row.id, { routeAt });
+                      else changeSaved(row.photo, { routeAt });
+                    },
+                  )}
                   <input
                     className="settings-page__input"
                     type="text"

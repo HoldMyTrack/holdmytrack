@@ -448,6 +448,13 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   const pendingIds = useMemo(() => activities.filter((a) => a.pending).map((a) => a.id), [activities]);
 
   const activityDistanceBounds = useMemo(() => distanceBounds(activities), [activities]);
+  // The slider, and its Reset, only show while the loaded activities span a range of distances.
+  // A band left set when they stop doing so — deleted down to one, say — would go on filtering
+  // with nothing on screen to clear it.
+  const distanceSliderShown = activityDistanceBounds !== null && activityDistanceBounds.min < activityDistanceBounds.max;
+  useEffect(() => {
+    if (!distanceSliderShown) setDistanceFilter(null);
+  }, [distanceSliderShown]);
   const facets = useMemo(() => typeFacets(activities, distanceFilter), [activities, distanceFilter]);
   const filteredActivities = useMemo(
     () => activities.filter((a) => passesFilters(a, excludedTypes, distanceFilter)),
@@ -842,8 +849,8 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // group — since bands are inherently a "look at this one activity" view, the same territory
   // a row click already owns.
   //
-  // Fetches per-vertex speed for the focused activity — null (not stale data from
-  // whatever was focused before) the instant focus moves to a different row or clears.
+  // Fetches per-vertex speed for the focused activity. What's in hand may still be the previous
+  // activity's until this lands, so everything drawing it checks `activityId` against the focus.
   useEffect(() => {
     if (!focusedActivityId) {
       setTrackMetrics(null);
@@ -876,7 +883,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   );
   useEffect(() => {
     if (!map) return;
-    if (trackMetrics && focusedActivityId !== null && !mapHiddenIds.has(focusedActivityId) && !focusedPending) {
+    if (trackMetrics?.activityId === focusedActivityId && focusedActivityId !== null && !mapHiddenIds.has(focusedActivityId) && !focusedPending) {
       setTrackBands(map, trackMetrics.points);
     } else {
       clearTrackBands(map);
@@ -1070,9 +1077,9 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   const handleStoryEdited = useCallback(
     (story: Story) => {
       storiesList.replace(story);
-      if (story.id === storyId) storyState.set(story);
+      storyState.set(story); // only if it's still the open one (useStory)
     },
-    [storiesList.replace, storyId, storyState.set],
+    [storiesList.replace, storyState.set],
   );
   // A deleted Story's activities stay, but their Story badges change. Deleting the open one
   // opens the next newest, in its place in the history; deleting the last leaves none open.
@@ -1282,6 +1289,9 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
       ensureFogLayer(instance, beforeId, isDarkBase(flavor, satellite));
       ensureHeatmapLayer(instance, beforeId, isDarkBase(flavor, satellite));
       ensureTrackLayer(instance, beforeId, activityQuery);
+      // A style swap brings the tracks source back with no feature-state, the focused track's
+      // `selected` included.
+      setSelectedTracks(instance, focusedActivityId !== null ? [focusedActivityId] : []);
       // After tracks, so it paints on top and fully overlays the one track it applies to —
       // see trackBands.ts's own doc comment for why this is a second layer rather than a
       // change to the shared one.
@@ -1304,7 +1314,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
       // styledata mid-focus would otherwise silently wipe whatever bands were showing until
       // the selection happened to change again. Same mapHiddenIds check as the live effect
       // above: a styledata while the focused activity is hidden must not repaint its band.
-      if (trackMetrics && focusedActivityId !== null && !mapHiddenIds.has(focusedActivityId) && !focusedPending) {
+      if (trackMetrics?.activityId === focusedActivityId && focusedActivityId !== null && !mapHiddenIds.has(focusedActivityId) && !focusedPending) {
         setTrackBands(instance, trackMetrics.points);
       }
     },
