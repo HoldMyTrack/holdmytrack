@@ -160,3 +160,18 @@ func TestOversizedFileUploadIsRefused(t *testing.T) {
 		t.Fatalf("status %d, want 413", rec.Code)
 	}
 }
+
+// A job's status is its owner's to read: another account asking after the same file (the
+// same external_id, its SHA-256) learns nothing.
+func TestActivityStatusIsPerAccount(t *testing.T) {
+	d := newDBTestWithS3(t, newMemS3())
+	me, other := d.newAccount(false), d.newAccount(false)
+	resp := d.uploadFile(me, "ride.gpx", []byte(resumeGPX))
+
+	var mine, theirs statusResponse
+	d.decode(d.do(me, http.MethodGet, "/v1/activities/status/"+resp.ExternalID, nil), http.StatusOK, &mine)
+	d.decode(d.do(other, http.MethodGet, "/v1/activities/status/"+resp.ExternalID, nil), http.StatusOK, &theirs)
+	if mine.Status != "processing" || theirs.Status != "unknown" {
+		t.Fatalf("owner sees %q, another account %q; want processing, unknown", mine.Status, theirs.Status)
+	}
+}

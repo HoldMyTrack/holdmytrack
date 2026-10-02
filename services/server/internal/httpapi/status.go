@@ -20,9 +20,12 @@ type statusResponse struct {
 // points, say) looked identical in the UI to a successful one: the widget just said
 // "enqueued" and the map silently never updated, with no signal that anything went wrong.
 //
-// Looks at the most recent ingest job for this external_id, not the activities table
-// directly, so "failed" is distinguishable from "never existed" — a failed job never
-// persists an activities row, so that table alone can't tell the two apart.
+// Looks at the caller's own most recent ingest job for this external_id, not the activities
+// table directly, so "failed" is distinguishable from "never existed" — a failed job never
+// persists an activities row, so that table alone can't tell the two apart. Only the caller's:
+// a file's external_id is its SHA-256, so across accounts this told anyone holding a file
+// whether someone else had uploaded it, and showed two accounts uploading the same file each
+// other's job.
 func (s *Server) handleActivityStatus(w http.ResponseWriter, r *http.Request) {
 	externalID := r.PathValue("external_id")
 	if externalID == "" {
@@ -34,9 +37,9 @@ func (s *Server) handleActivityStatus(w http.ResponseWriter, r *http.Request) {
 	var lastError, errorCode *string
 	err := s.pool.QueryRow(r.Context(),
 		`SELECT state, last_error, error_code FROM jobs
-		 WHERE kind = 'ingest' AND payload->>'external_id' = $1
+		 WHERE user_id = $2 AND kind = 'ingest' AND payload->>'external_id' = $1
 		 ORDER BY id DESC LIMIT 1`,
-		externalID,
+		externalID, userIDFromContext(r.Context()),
 	).Scan(&state, &lastError, &errorCode)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
