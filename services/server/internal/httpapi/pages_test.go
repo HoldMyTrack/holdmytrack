@@ -273,8 +273,12 @@ func TestLanguageMenu(t *testing.T) {
 	req.AddCookie(cookie[0])
 	rec = httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
-	if !strings.Contains(rec.Body.String(), `<html lang="ru">`) {
-		t.Errorf("an English browser that picked Russian didn't get a Russian page")
+	body := rec.Body.String()
+	if !strings.Contains(body, `<html lang="ru">`) || !strings.Contains(body, `value="ru" lang="ru" aria-checked="true">Русский</button>`) {
+		t.Errorf("an English browser that picked Russian didn't get a Russian page with Русский checked")
+	}
+	if !strings.Contains(body, `value="en" lang="en" aria-checked="false">English</button>`) {
+		t.Errorf("the language menu doesn't offer English by its own name")
 	}
 }
 

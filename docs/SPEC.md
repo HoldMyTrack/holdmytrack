@@ -983,11 +983,11 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 **Description**: Every page shares one header — the map and Profile included — and every page other than those two shares one footer.
 
 **Behavior**:
-1. The header shows the logo, wordmark and tagline (the brand links to `/`), then Donate (FR-11.1), an "Info" menu listing About, Help and Contacts with the current page marked, and the account area.
+1. The header shows the logo, wordmark and tagline (the brand links to `/`), then Donate (FR-11.1), the language menu (FR-13.2), an "Info" menu listing About, Help and Contacts with the current page marked, and the account area.
 2. Signed out, the account area is a "Sign in" link to `/signin`. With a session (real or demo), it is an account menu showing the account's avatar (or a generic icon) that opens to the account's email (a demo session shows its display name instead, followed by "Create your own account", FR-2.3), then "Profile" (`/profile`), "Settings" (`/settings`), "Admin" (`/admin`, an admin only — FR-12.1) and "Sign out".
-3. Both menus open and close without JavaScript.
+3. The menus open and close without JavaScript.
 4. "Sign out" submits `POST /logout`, which ends the session the same way `POST /v1/auth/logout` does and redirects to `/`. The request is refused (`403`) unless its `Origin` header — or, without one, its `Referer` — is the app's own origin.
-5. On a desktop the header's controls are sized to it (about 36px tall, 14px text), and each is an icon with its label — Donate a heart, Upload an arrow, Sync two arrows, Info an "i" in a circle; none has a caret, though Upload, Info and the account menu open menus. It gives way in steps as the window narrows: at 1180px and below the tagline is hidden; at 960px and below Upload, Sync and Info show their icons alone. On a phone-width screen (≤768px) the controls turn compact and Donate shows its heart alone too; every control stays. Narrower than 360px, the wordmark is hidden too, leaving the logo. Nothing in the header runs past the screen's edge at any width, in either language.
+5. On a desktop the header's controls are sized to it (about 36px tall, 14px text), and each is an icon with its label — Donate a heart, Upload an arrow, Sync two arrows, the language menu a globe beside the page's language code ("EN"), Info an "i" in a circle; none has a caret, though Upload, the language menu, Info and the account menu open menus. It gives way in steps as the window narrows: at 1180px and below the tagline is hidden; at 960px and below Upload, Sync and Info show their icons alone. On a phone-width screen (≤768px) the controls turn compact, Donate shows its heart alone too, and the language menu its code alone; every control stays. Narrower than 360px, the wordmark is hidden too, leaving the logo. Nothing in the header runs past the screen's edge at any width, in either language.
 6. The footer links to the map (`/`), About, Help, Contacts and the GitHub repository.
 7. With a session, pages are sent with `Cache-Control: no-store`, since the header names the signed-in account. Without one, the front page, About, Help and Contacts are the same for every visitor and are sent `Cache-Control: public, max-age=300` with `Vary: Cookie`, so a copy cached before signing in is never reused after.
 8. An address no page answers gets a "Page not found" page (`404`) with the same header; under `/v1/` and `/tiles/` it's a plain `404`, not a page.
@@ -1066,7 +1066,7 @@ A read-only view of every account and every account's activities, for the people
 
 **Description**: Anyone can choose the language, signed in or not, from the shared header (ADR-0025).
 
-**Inputs**: `POST /language` with `lang`, `en` or `ru`, from a page of this site.
+**Inputs**: The header's language menu (FR-10.4), on every page, signed in or not: it shows the page's language code and opens to each language named in itself (English, Русский), the current one bold. Choosing one submits `POST /language` with `lang`, `en` or `ru`; it works without JavaScript.
 
 **Behavior**:
 1. The browser remembers the choice for a year (cookie `hmt_lang`), and every later page and request from it is in that language, unless a signed-in account's own Language setting says otherwise (FR-13.1).
