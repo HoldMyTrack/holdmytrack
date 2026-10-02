@@ -46,17 +46,40 @@ One throwaway app, one physical device, both platform questions answered togethe
 
 ## Phase 6: Verification & Compliance (Pre-Launch)
 
-Prepare the app for testing and store publication.
+Everything between a tested app and its Play Store listing, roughly in the order it has to happen. Requirements below were checked against Google's Play Console Help and Android developer documentation on 2026-10-02; Play's rules change, so recheck each against its current page when you reach it.
 
 - [x] **Physical device / Health Connect testing**
   - Done end to end on a physical device, with the Health Connect toolbox on the host.
+- [ ] **A Play Console developer account**
+  - Personal or organization, decided first, since it changes what follows. A personal account created after 13 November 2023 can't publish to production until a closed test has had at least 12 testers opted in continuously for 14 days (Play Console Help, "App testing requirements for new personal developer accounts"); an organization account skips that but needs a D-U-N-S number for the organization. Either way: the one-time registration fee, identity verification, and, to distribute in the EU, a Digital Services Act trader-status declaration.
+- [ ] **A release build**
+  - `holdmytrack.apiBaseUrl` set to `https://holdmytrack.com` for release: `gradle.properties`' default is the emulator's `http://10.0.2.2:8080`, so a release built without `-P` points at nothing.
+  - An upload key kept outside the repository, a `release` `signingConfig` that reads it, and `./gradlew bundleRelease`: Play takes an Android App Bundle, not an APK, and with Play App Signing it re-signs the app with a key Google holds. `release` has `isMinifyEnabled = false` today; R8 is optional, and would need MapLibre's and OkHttp's keep rules checked.
+  - Already met, checked 2026-10-02: `targetSdk = 37` is above Play's requirement (API 36 for new apps and updates from 31 August 2026), and MapLibre's native libraries pass the 16 KB page-size check (`zipalign -c -P 16 -v 4` on the debug APK: every `libmaplibre.so` OK).
+- [ ] **Google sign-in in the Play build**
+  - Credential Manager only answers for an app whose signing certificate is registered on the Android OAuth client, and only this Mac's debug key is today. Add the SHA-1 of Play's app signing key (Play Console → App integrity), and the upload key's for any build installed outside Play. Facebook needs nothing: its sign-in is a browser-tab handoff to the server (ADR-0016), with no app signature involved.
+- [ ] **No donation link in the Play build**
+  - Play's Payments policy lets an app take or point to payment only through Google Play's billing system, with an exception for donations to tax-exempt organizations; Play Billing itself doesn't sell donations. StreetComplete's Play submission was rejected for its Patreon, Liberapay and GitHub Sponsors links, and it took them out of its Play build. The burger menu's Donate opens `/about#funding`, so it has to go from the Play build, unless HoldMyTrack's funding goes through a tax-exempt organization. StreetComplete's link to its project page was flagged as well, because that page carried the donation details, so About and Help, which open the same site, need the same look before submission.
+- [ ] **A privacy policy page**
+  - None exists yet: the server's pages are About, Help, Contacts and the account pages. Play requires one on the store listing, and the Data safety form and Health Connect declaration point to it. Health Connect also requires the policy on the listing to match the one users reach from Health Connect's link to the app, which opens `SyncActivity` (the manifest's `ACTION_SHOW_PERMISSIONS_RATIONALE` and `VIEW_PERMISSION_USAGE` entries), so that screen links to it too.
+- [ ] **Account deletion, in the app and on the web**
+  - Play requires both for any app where an account can be created: a path inside the app, and a web page where deletion can be requested, declared in the Data safety form. Blocked on the server's account deletion, root `ROADMAP.md` Phase 6.
 - [ ] **Play Store Health Connect data-type declarations**
   - The list is settled and is as short as it can be: **one data type, Exercise** (`READ_EXERCISE`), plus `READ_EXERCISE_ROUTES` and `READ_HEALTH_DATA_HISTORY`, neither of which is an additional type — routes are part of an exercise session, and history is a time window over it. Confirmed on the device: Health Connect's own permission dialog for HoldMyTrack offers exactly one toggle. No heart rate, distance, calories, sleep or weight; the product draws outdoor GPS routes, so anything else would be requesting more than it demonstrably uses, which is a known rejection cause (`docs/VISION.md` §7; root `ROADMAP.md` Phase 6). What remains is filling in the Play Console declaration itself.
+  - Filed as the Health apps declaration on Play Console's App content page: Activity and fitness, with a justification for each permission.
 - [ ] **Location-permission Play Console declarations**
   - In-app recording's live location is a distinct Play Console review surface from Health Connect's data-type declarations above — location permissions have their own policy requirements (a prominent in-app disclosure before the first request, a stated retention/use case) that the Health Connect declarations don't cover.
+  - `RecordingService` declares `foregroundServiceType="location"`, so the Foreground service permissions declaration is needed as well: a description of the feature, what the user loses if it's deferred or interrupted, and a video showing how a recording is started.
+- [ ] **The rest of the App content page**
+  - The Data safety form: email address, precise location, exercise sessions and routes, and photos are collected; all of it travels encrypted; none of it is shared or used for ads; accounts can be deleted.
+  - The content rating questionnaire (IARC), the target audience (not aimed at children), and no ads.
+  - App access: reviewers need a way in. The demo account gets them onto the map, but it can't sync Health Connect or edit anything, so supply a review account's credentials and say what's in it.
+- [ ] **The store listing, in English and Russian**
+  - Name, short description (80 characters), full description (4,000), the 512 × 512 icon (`brand/make_icons.py` renders the launcher icon from the same logo), a 1024 × 500 feature graphic, and at least two phone screenshots, plus a category, a contact email, the website and the privacy policy URL.
+- [ ] **Testing tracks, then production**
+  - An internal test first, to install the Play-signed build and check Google sign-in against its key. Then the closed test, with its 12 testers for 14 days on a personal account, and its pre-launch report read. Then apply for production access and release in stages.
 - [ ] **Confirm the wider launch gates are met**
   - A Play Store release is a public launch and is gated by the same items as any other: the DPIA, EU-region hosting for EU users, and working data export and deletion endpoints (root `ROADMAP.md` Phase 6), plus the funding page and concept-render validation in its Phase 1. These are not Android work, but shipping the app without them is not an option.
-
 ---
 
 ## Phase 11: Spots places refresh
