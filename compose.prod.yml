@@ -173,6 +173,37 @@ services:
     depends_on:
       - api
 
+  # Backups (docs/DEPLOY.md §11) — never started by `up` (the `ops` profile keeps it out);
+  # scripts/backup.sh and scripts/restore-drill.sh `run --rm` it for each rclone step. It is
+  # configured from these variables rather than a config file, and the scripts see two remotes,
+  # each already pointing into its bucket: `data:`, the app's own bucket with the app's own
+  # token, and `backup:`, the backup bucket with a token scoped to it alone. NO_CHECK_BUCKET
+  # because a bucket-scoped R2 token can't list or create buckets.
+  rclone:
+    image: rclone/rclone:1.75.1
+    profiles: ["ops"]
+    environment:
+      RCLONE_CONFIG: /dev/null
+      RCLONE_CONFIG_R2DATA_TYPE: s3
+      RCLONE_CONFIG_R2DATA_PROVIDER: Cloudflare
+      RCLONE_CONFIG_R2DATA_ENDPOINT: ${S3_ENDPOINT}
+      RCLONE_CONFIG_R2DATA_ACCESS_KEY_ID: ${S3_ACCESS_KEY}
+      RCLONE_CONFIG_R2DATA_SECRET_ACCESS_KEY: ${S3_SECRET_KEY}
+      RCLONE_CONFIG_R2DATA_NO_CHECK_BUCKET: "true"
+      RCLONE_CONFIG_DATA_TYPE: alias
+      RCLONE_CONFIG_DATA_REMOTE: r2data:${S3_BUCKET}
+      RCLONE_CONFIG_R2BACKUP_TYPE: s3
+      RCLONE_CONFIG_R2BACKUP_PROVIDER: Cloudflare
+      RCLONE_CONFIG_R2BACKUP_ENDPOINT: ${BACKUP_S3_ENDPOINT:-${S3_ENDPOINT}}
+      RCLONE_CONFIG_R2BACKUP_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY:-}
+      RCLONE_CONFIG_R2BACKUP_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_KEY:-}
+      RCLONE_CONFIG_R2BACKUP_NO_CHECK_BUCKET: "true"
+      RCLONE_CONFIG_BACKUP_TYPE: alias
+      RCLONE_CONFIG_BACKUP_REMOTE: r2backup:${BACKUP_S3_BUCKET:-}
+    volumes:
+      # The host directory local dumps are kept in; restore-drill.sh downloads into it too.
+      - ${BACKUP_DIR:-/srv/holdmytrack-backups}:/backups
+
 volumes:
   pgdata:
   caddy_data:
