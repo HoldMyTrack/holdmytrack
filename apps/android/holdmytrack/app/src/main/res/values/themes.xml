@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Material 3 on Views (apps/android/docs/ROADMAP.md Phase 5, "Decide the UI toolkit"): the
+<!-- Material 3 on Views (docs/adr/0026-material-3-on-views.md): the
      web's design tokens mapped onto Material's roles once, so every widget picks them up from
      the theme rather than from literals — colors.xml onto the color roles, dimens.xml's type
      and radius scales onto the type roles and corner sizes, and Inter/Fraunces (res/font) as

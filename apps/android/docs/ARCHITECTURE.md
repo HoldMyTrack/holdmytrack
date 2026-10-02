@@ -18,7 +18,7 @@ The Android app is a **single Gradle module against the platform SDK directly** 
 
 | Decision | Reason |
 | :--- | :--- |
-| Material 3 on Views, not Compose | Compose would rewrite every existing screen before styling could start, and host MapLibre's `MapView` through `AndroidView` interop on the screen that matters most; Material brings the token vocabulary the design freeze will fill in. Reasoning in full: `apps/android/docs/ROADMAP.md` Phase 5, "Decide the UI toolkit" |
+| Material 3 on Views, not Compose | Compose would rewrite every existing screen before styling could start, and host MapLibre's `MapView` through `AndroidView` interop on the screen that matters most; Material brings the token vocabulary the web's design maps onto. Reasoning in full: [ADR-0026](../../../docs/adr/0026-material-3-on-views.md) |
 | Bearer token (`Authorization: Bearer <session-id>`), not a cookie jar | Two separate HTTP stacks need the credential — the app's own client and MapLibre Native's internal tile fetcher, which never sees the app's cookie jar. A per-request interceptor reaches both; a cookie jar reaches only one — [ADR-0001](../../../docs/adr/0001-three-independent-ingest-paths.md) |
 | One shared `OkHttpClient` for the app *and* for MapLibre Native | `HttpRequestUtil.setOkHttpClient` (`HoldMyTrackApplication.onCreate`) replaces the map SDK's own client with the app's, so one interceptor is the only place the token can go missing from |
 | Foreground-only Health Connect sync — no background service, no `WorkManager` job | `ExerciseRouteResult.ConsentRequired` comes back for background reads regardless of grant state (measured, Phase 1) — a background sync would advance the watermark past routes it never actually read, producing a history complete except for the map |
@@ -61,7 +61,7 @@ This app is the "Android app" client root `docs/ARCHITECTURE.md` §1.2 draws. iO
 
 | Component | Add it when |
 | :--- | :--- |
-| Compose | The app outgrows "a handful of screens" — Phase 5 chose Material 3 on Views, and Views/Compose interop means any later move can go one screen at a time |
+| Compose | The app outgrows "a handful of screens" — the app is Material 3 on Views ([ADR-0026](../../../docs/adr/0026-material-3-on-views.md)), and Views/Compose interop means any later move can go one screen at a time |
 | Background sync of any kind | Never, for Health Connect routes specifically — the platform constraint this app is built around, not a sequencing gap |
 | An encrypted token store | A threat model beyond "physical access to the device's own private storage" is identified — not the case today |
 | iOS client | Path 2's contract is proven out and stable against this app first (`apps/android/docs/ROADMAP.md`) |
