@@ -101,7 +101,7 @@ mkdir -p /tmp/demo-export && chmod 777 /tmp/demo-export
 docker compose -f compose.prod.yml --env-file .env.prod run --rm -v /tmp/demo-export:/out api export-demo-activities /out <activity-id> <activity-id> ...
 ```
 
-That writes each activity as a GPX file of exactly what its owner sees on the map — clipped by their Private locations, with their track edits applied, never the original upload — plus `manifest.json` (names, types and descriptions) into `/tmp/demo-export`, reading the database and storage only. Copy the files into `demo_data/`, merging the manifest's `activities` entries into the one already there (its `stories` section lists the demo's Stories, by file), and review every track before committing — they are going into a public repository.
+That writes each activity as a GPX file of exactly what its owner sees on the map — clipped by their Private locations, with their track edits applied, never the original upload — plus each activity's photos into `photos/` (the stored, resized images, never an original) and `manifest.json` (names, types, descriptions and photos) into `/tmp/demo-export`, reading the database and storage only. Copy the files into `demo_data/`, the photos into `demo_data/photos/`, merging the manifest's `activities` entries into the one already there (its `stories` section lists the demo's Stories, by file), and review every track and photo before committing — they are going into a public repository.
 
 To open the admin panel (`/admin`, `SPEC.md` FR-12), make your own account an admin. It has to exist first, so sign up on the site, then:
 

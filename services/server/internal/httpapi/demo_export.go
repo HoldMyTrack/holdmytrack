@@ -23,7 +23,8 @@ import (
 )
 
 // ExportDemoActivities writes the listed activities into outDir as demo_data/-ready GPX files,
-// and outDir/manifest.json with their names, types and descriptions — the
+// their photos' images into outDir/photos/, and outDir/manifest.json with their names, types,
+// descriptions and photos — the
 // `export-demo-activities` CLI subcommand, run against a live deployment to pick real
 // activities for the Demo Customer's history (SeedDemoCustomer). Each file holds the points
 // the owner sees on the map (ingest.DisplayedPoints: clipped by their Private locations, with
@@ -124,7 +125,108 @@ func exportDemoActivity(ctx context.Context, pool *pgxpool.Pool, store *storage.
 	if err := f.Close(); err != nil {
 		return "", demoManifestEntry{}, err
 	}
+	photos, err := exportDemoPhotos(ctx, pool, store, outDir, activityID, strings.TrimSuffix(filename, ".gpx"), points)
+	if err != nil {
+		return "", demoManifestEntry{}, err
+	}
+	entry.Photos = photos
 	return filename, entry, nil
+}
+
+// exportDemoPhotos copies an activity's photos out: each one's stored image and thumbnail —
+// already resized, with no EXIF, as the upload left them (§4.27) — into outDir/photos/ as
+// "<base> <n>.<ext>" and "<base> <n>-thumb.<ext>", base being the GPX file's name, and its
+// fields for the manifest. route_at is clamped to the exported track's span, as every read
+// clamps it to the drawn track (photoSelect), so a moment Private locations or Edit track cut
+// away isn't carried into the file.
+func exportDemoPhotos(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, outDir, activityID, base string, points []parse.Point) ([]demoManifestPhoto, error) {
+	rows, err := pool.Query(ctx, `
+		SELECT id, user_id, taken_at, route_at, COALESCE(caption, ''), content_type, thumb_content_type, width, height
+		FROM activity_photos WHERE activity_id = $1 ORDER BY route_at, created_at`, activityID)
+	if err != nil {
+		return nil, err
+	}
+	type stored struct {
+		id, userID, contentType, thumbContentType string
+		photo                                     demoManifestPhoto
+	}
+	var all []stored
+	for rows.Next() {
+		var s stored
+		if err := rows.Scan(&s.id, &s.userID, &s.photo.TakenAt, &s.photo.RouteAt, &s.photo.Caption, &s.contentType, &s.thumbContentType, &s.photo.Width, &s.photo.Height); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		all = append(all, s)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(all) == 0 {
+		return nil, nil
+	}
+
+	dir := filepath.Join(outDir, demoPhotoDir)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	start, end := points[0].Time, points[len(points)-1].Time
+	photos := make([]demoManifestPhoto, 0, len(all))
+	for n, s := range all {
+		ext, thumbExt := allowedPhotoContentType[s.contentType], allowedPhotoContentType[s.thumbContentType]
+		if ext == "" || thumbExt == "" {
+			return nil, fmt.Errorf("photo %s: unexpected content type %s / %s", s.id, s.contentType, s.thumbContentType)
+		}
+		if ext == "jpeg" {
+			ext = "jpg"
+		}
+		if thumbExt == "jpeg" {
+			thumbExt = "jpg"
+		}
+		p := s.photo
+		p.File = fmt.Sprintf("%s %d.%s", base, n+1, ext)
+		p.Thumb = fmt.Sprintf("%s %d-thumb.%s", base, n+1, thumbExt)
+		for _, img := range []struct{ key, file string }{
+			{photoKey(s.userID, s.id), p.File},
+			{photoThumbKey(s.userID, s.id), p.Thumb},
+		} {
+			if err := copyDemoObject(ctx, store, img.key, filepath.Join(dir, img.file)); err != nil {
+				return nil, fmt.Errorf("photo %s: %w", s.id, err)
+			}
+		}
+		if p.RouteAt.Before(start) {
+			p.RouteAt = start
+		} else if p.RouteAt.After(end) {
+			p.RouteAt = end
+		}
+		p.RouteAt = p.RouteAt.UTC()
+		if p.TakenAt != nil {
+			t := p.TakenAt.UTC()
+			p.TakenAt = &t
+		}
+		photos = append(photos, p)
+	}
+	return photos, nil
+}
+
+// copyDemoObject writes one stored object to a new file, never over an existing one.
+func copyDemoObject(ctx context.Context, store *storage.Store, key, file string) error {
+	r, err := store.Get(ctx, key)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+	f, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(f, r); err != nil {
+		f.Close()
+		os.Remove(file)
+		return err
+	}
+	return f.Close()
 }
 
 // writeDemoGPX writes points as a one-segment GPX 1.1 track with everything parse.ParseGPX

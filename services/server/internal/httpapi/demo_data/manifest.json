@@ -59,6 +59,68 @@
     "2026-09-27 Clague Park.gpx": {
       "name": "Clague Park – outbound drive",
       "type": "driving"
+    },
+    "2026-10-01 Cleveland s West Side.gpx": {
+      "name": "Cleveland's West Side",
+      "type": "Solowheel",
+      "photos": [
+        {
+          "file": "2026-10-01 Cleveland s West Side 1.webp",
+          "thumb": "2026-10-01 Cleveland s West Side 1-thumb.webp",
+          "taken_at": "2026-10-01T20:10:35Z",
+          "route_at": "2026-10-01T20:10:35Z",
+          "width": 2048,
+          "height": 1536
+        },
+        {
+          "file": "2026-10-01 Cleveland s West Side 2.webp",
+          "thumb": "2026-10-01 Cleveland s West Side 2-thumb.webp",
+          "taken_at": "2026-10-01T20:15:01Z",
+          "route_at": "2026-10-01T20:15:01Z",
+          "width": 2048,
+          "height": 1536
+        },
+        {
+          "file": "2026-10-01 Cleveland s West Side 3.webp",
+          "thumb": "2026-10-01 Cleveland s West Side 3-thumb.webp",
+          "taken_at": "2026-10-01T20:34:57Z",
+          "route_at": "2026-10-01T20:34:57Z",
+          "width": 2048,
+          "height": 1536
+        },
+        {
+          "file": "2026-10-01 Cleveland s West Side 4.webp",
+          "thumb": "2026-10-01 Cleveland s West Side 4-thumb.webp",
+          "taken_at": "2026-10-01T20:40:30Z",
+          "route_at": "2026-10-01T20:40:30Z",
+          "width": 2048,
+          "height": 1536
+        },
+        {
+          "file": "2026-10-01 Cleveland s West Side 5.webp",
+          "thumb": "2026-10-01 Cleveland s West Side 5-thumb.webp",
+          "taken_at": "2026-10-01T20:46:25Z",
+          "route_at": "2026-10-01T20:46:25Z",
+          "width": 2048,
+          "height": 1536
+        },
+        {
+          "file": "2026-10-01 Cleveland s West Side 6.webp",
+          "thumb": "2026-10-01 Cleveland s West Side 6-thumb.webp",
+          "taken_at": "2026-10-01T20:49:47Z",
+          "route_at": "2026-10-01T20:49:47Z",
+          "width": 2048,
+          "height": 1536
+        },
+        {
+          "file": "2026-10-01 Cleveland s West Side 7.webp",
+          "thumb": "2026-10-01 Cleveland s West Side 7-thumb.webp",
+          "taken_at": "2026-10-01T21:12:18Z",
+          "route_at": "2026-10-01T21:12:18Z",
+          "width": 2048,
+          "height": 1536
+        }
+      ]
     }
   },
   "stories": [
