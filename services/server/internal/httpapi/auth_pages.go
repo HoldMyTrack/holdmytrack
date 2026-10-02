@@ -260,10 +260,19 @@ func (s *Server) handleResetForm(w http.ResponseWriter, r *http.Request) {
 // GET /verify?token= — the link in the verification email. A GET with an effect, because
 // it's a link someone clicks in their inbox; the effect is idempotent (verifying twice
 // verifies once, and the token is single-use), which is what makes that acceptable.
+//
+// A browser already signed in to a different account stays signed in to it: the link still
+// verifies, but doesn't replace that session. Otherwise anyone could send their own account's
+// link to someone signed in here and switch them silently into the sender's account, where
+// whatever they uploaded next would land.
 func (s *Server) handleVerifyPage(w http.ResponseWriter, r *http.Request) {
 	userID, err := s.verifyEmail(r.Context(), r.URL.Query().Get("token"))
 	if err != nil {
 		s.renderAuthError(w, r, "verify email", "verify", "verify.title", true, authForm{}, err)
+		return
+	}
+	if acct := s.pageAccount(r); acct != nil && acct.info.userID != userID {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 	s.signIn(w, r, userID)

@@ -269,7 +269,33 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	if s.crossSiteAPIWrite(r) {
+		http.Error(w, "cross-origin request refused", http.StatusForbidden)
+		return
+	}
 	s.mux.ServeHTTP(w, r)
+}
+
+// crossSiteAPIWrite reports a state-changing /v1/ request a browser sent from another site.
+// SameSite=Lax keeps the session cookie off such a request, but not off the response: a
+// hostile page's auto-submitted form to /v1/auth/login, with an enctype="text/plain" body
+// shaped into valid JSON, set the attacker's session in the victim's browser, so whatever the
+// victim uploaded next went to the attacker's account. A browser always sends Origin on a
+// POST, PATCH or DELETE, so one naming a different origin than this app's (or the dev
+// allowlist's) is refused. The native apps send no Origin, and pass.
+func (s *Server) crossSiteAPIWrite(r *http.Request) bool {
+	switch r.Method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return false
+	}
+	if !strings.HasPrefix(r.URL.Path, apiPrefix+"/") {
+		return false
+	}
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return false
+	}
+	return !corsAllowedOrigins[origin] && !s.isSameOrigin(r)
 }
 
 type healthzResponse struct {

@@ -212,6 +212,34 @@ func TestAuthFormsRequireSameOrigin(t *testing.T) {
 	}
 }
 
+// A browser's write to the JSON API from another site is refused before any handler runs —
+// a text/plain form shaped into JSON signed a victim into an attacker's account. Same-origin
+// requests and the native apps' (which send no Origin) still reach the handler, here as the
+// 400 a malformed body gets.
+func TestAPIWritesRefuseForeignOrigins(t *testing.T) {
+	s := newPagesTestServer(t)
+	for _, tc := range []struct {
+		origin string
+		want   int
+	}{
+		{"https://evil.example", http.StatusForbidden},
+		{"null", http.StatusForbidden},
+		{"https://app.example", http.StatusBadRequest},
+		{"", http.StatusBadRequest},
+	} {
+		req := httptest.NewRequest(http.MethodPost, "/v1/auth/login", strings.NewReader("not json"))
+		req.Header.Set("Content-Type", "text/plain")
+		if tc.origin != "" {
+			req.Header.Set("Origin", tc.origin)
+		}
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, req)
+		if rec.Code != tc.want {
+			t.Errorf("origin %q: status %d, want %d", tc.origin, rec.Code, tc.want)
+		}
+	}
+}
+
 // A signed-out visitor gets the language their browser asks for — and the next visitor, asking
 // for another, isn't served the first one's cached copy.
 func TestPagesFollowAcceptLanguage(t *testing.T) {
