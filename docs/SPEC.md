@@ -672,15 +672,15 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 
 | Zoom | A 1280 px-wide view spans | Tracks (Normal) | Fog and Heatmap | Paths (ticked) | Points of interest (ticked) |
 | :-- | :-- | :-- | :-- | :-- | :-- |
-| 0–3 | A continent to the world | — | Whole countries | — | — |
-| 4 | Several countries (~6,000 km) | Drawn | Whole countries | — | — |
-| 5–7 | A country to a state (~3,000–800 km) | Drawn | States and regions | — | — |
-| 8–9 | A state to a region (~400–200 km) | Drawn | Street level | — | — |
+| 0–2 | Most of the world or more (~25,000 km and more) | — | Whole countries | — | — |
+| 3 | A continent (~12,000 km) | — | States and regions | — | — |
+| 4–6 | Several countries to a country (~6,000–1,600 km) | Drawn | States and regions | — | — |
+| 7–9 | A state to a region (~800–200 km) | Drawn | Street level | — | — |
 | 10–12 | A metro area to a city (~100–25 km) | Drawn | Street level | — | On request: **Show in this area** |
 | 13 and up | A few neighbourhoods or less (~12 km and less) | Drawn | Street level | Drawn | Drawn, loaded as the map moves |
 
 **Behavior**:
-1. Each band starts at its first zoom and runs up to, not including, the next band's: zoom 7.9 is still States and regions, and zoom 12.9 still offers Show in this area.
+1. Each band starts at its first zoom and runs up to, not including, the next band's: zoom 6.9 is still States and regions, and zoom 12.9 still offers Show in this area.
 2. Zoomed in far enough, the map runs out of stored detail and enlarges the most detailed level it has instead: tracks, Fog, Heatmap and points of interest past zoom 14, the base map past zoom 15, and satellite imagery (FR-4.14) past the deployment's deepest level (zoom 18 on holdmytrack.com). Lines, labels and badges — the base map, tracks, paths and points of interest — stay sharp when enlarged, though a track's shape gets no more detailed; Fog, Heatmap and satellite imagery are pictures and grow softer.
 3. The Android app follows the same bands for tracks, Fog, Heatmap, paths and points of interest.
 
