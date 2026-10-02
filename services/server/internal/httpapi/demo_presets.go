@@ -62,10 +62,42 @@ type demoManifestStory struct {
 // that don't carry their own: a synced activity (Health Connect, in-app recording) reports
 // its type in the sync request, not inside the JSON payload the export copies out.
 // Description is the activity's free-text description, which no file carries either.
+// Photos are the activity's photos (§4.27), their images in demo_data/photos/.
 type demoManifestEntry struct {
-	Name        string `json:"name,omitempty"`
-	Type        string `json:"type,omitempty"`
-	Description string `json:"description,omitempty"`
+	Name        string              `json:"name,omitempty"`
+	Type        string              `json:"type,omitempty"`
+	Description string              `json:"description,omitempty"`
+	Photos      []demoManifestPhoto `json:"photos,omitempty"`
+}
+
+// demoPhotoDir is the demo_data/ subdirectory the photos' images are in — a directory, so
+// demoFiles never mistakes one for an activity file.
+const demoPhotoDir = "photos"
+
+// demoManifestPhoto is one photo on a demo activity: its resized image and thumbnail as stored
+// (files in demoPhotoDir, JPEG or WebP by extension), and the activity_photos fields that
+// aren't the image itself. RouteAt is a moment on the activity's track, which the exported GPX
+// keeps the timestamps of, so it lands on the same spot after a re-ingest.
+type demoManifestPhoto struct {
+	File    string     `json:"file"`
+	Thumb   string     `json:"thumb"`
+	TakenAt *time.Time `json:"taken_at,omitempty"`
+	RouteAt time.Time  `json:"route_at"`
+	Caption string     `json:"caption,omitempty"`
+	Width   int        `json:"width"`
+	Height  int        `json:"height"`
+}
+
+// demoPhotoContentType is a demo photo file's content type, from its extension: the two the
+// photo endpoints store (allowedPhotoContentType), or "" for anything else.
+func demoPhotoContentType(file string) string {
+	switch strings.ToLower(path.Ext(file)) {
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".webp":
+		return "image/webp"
+	}
+	return ""
 }
 
 // loadDemoManifest reads demo_data/manifest.json. A missing manifest is an empty one; a
@@ -92,9 +124,30 @@ func loadDemoManifest(fsys fs.FS, files []string) (demoManifest, error) {
 	for _, f := range files {
 		present[f] = true
 	}
-	for f := range manifest.Activities {
+	photoFiles := map[string]bool{}
+	for f, entry := range manifest.Activities {
 		if !present[f] {
 			return demoManifest{}, fmt.Errorf("%s: entry %q has no matching file", demoManifestFile, f)
+		}
+		for _, p := range entry.Photos {
+			for _, img := range []string{p.File, p.Thumb} {
+				if demoPhotoContentType(img) == "" {
+					return demoManifest{}, fmt.Errorf("%s: %q: photo %q must be .jpg or .webp", demoManifestFile, f, img)
+				}
+				if photoFiles[img] {
+					return demoManifest{}, fmt.Errorf("%s: photo file %q is listed twice", demoManifestFile, img)
+				}
+				photoFiles[img] = true
+				if _, err := fs.Stat(fsys, path.Join(demoPhotoDir, img)); err != nil {
+					return demoManifest{}, fmt.Errorf("%s: %q: photo %q has no matching file", demoManifestFile, f, img)
+				}
+			}
+			if p.RouteAt.IsZero() || p.Width <= 0 || p.Height <= 0 {
+				return demoManifest{}, fmt.Errorf("%s: %q: photo %q needs route_at, width and height", demoManifestFile, f, p.File)
+			}
+			if len([]rune(p.Caption)) > maxPhotoCaptionLen {
+				return demoManifest{}, fmt.Errorf("%s: %q: photo %q: caption over %d characters", demoManifestFile, f, p.File, maxPhotoCaptionLen)
+			}
 		}
 	}
 	names := map[string]bool{}
@@ -229,6 +282,10 @@ func SeedDemoCustomer(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 				failed++
 			}
 		}
+		if err := seedDemoPhotos(ctx, pool, store, fsys, DemoCustomerUserID, result.ActivityID, entry.Photos); err != nil {
+			log.Error("demo customer seed: photos failed", "err", err, "file", filename)
+			failed++
+		}
 	}
 
 	if failed == 0 {
@@ -240,6 +297,47 @@ func SeedDemoCustomer(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 	log.Info("demo customer seed: done", "ingested", ingested, "already_present", skipped, "failed", failed, "total", len(names), "stories", len(manifest.Stories))
 	if failed > 0 {
 		return fmt.Errorf("seed demo customer: %d of %d files failed", failed, len(names))
+	}
+	return nil
+}
+
+// seedDemoPhotos gives a seeded activity of userID's (the Demo Customer, but a parameter so
+// tests can use their own) the manifest's photos: both images into storage where the photo
+// endpoints read them (photoKey, photoThumbKey), and the row. Each photo's id is derived from
+// the account and its file name, so a re-run updates the same row and objects rather than
+// adding a copy, as it does an activity's name.
+func seedDemoPhotos(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, fsys fs.FS, userID, activityID string, photos []demoManifestPhoto) error {
+	for _, p := range photos {
+		var photoID string
+		if err := pool.QueryRow(ctx, `SELECT md5('demo-photo/' || $1 || '/' || $2)::uuid::text`, userID, p.File).Scan(&photoID); err != nil {
+			return err
+		}
+		var size int
+		for _, img := range []struct{ file, key string }{
+			{p.File, photoKey(userID, photoID)},
+			{p.Thumb, photoThumbKey(userID, photoID)},
+		} {
+			b, err := fs.ReadFile(fsys, path.Join(demoPhotoDir, img.file))
+			if err != nil {
+				return err
+			}
+			if err := store.Put(ctx, img.key, bytes.NewReader(b), int64(len(b))); err != nil {
+				return fmt.Errorf("photo %q: %w", img.file, err)
+			}
+			size += len(b)
+		}
+		if _, err := pool.Exec(ctx, `
+			INSERT INTO activity_photos (id, user_id, activity_id, taken_at, route_at, caption, content_type, thumb_content_type, width, height, bytes)
+			VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''), $7, $8, $9, $10, $11)
+			ON CONFLICT (id) DO UPDATE SET activity_id = EXCLUDED.activity_id, taken_at = EXCLUDED.taken_at,
+				route_at = EXCLUDED.route_at, caption = EXCLUDED.caption, content_type = EXCLUDED.content_type,
+				thumb_content_type = EXCLUDED.thumb_content_type, width = EXCLUDED.width, height = EXCLUDED.height,
+				bytes = EXCLUDED.bytes`,
+			photoID, userID, activityID, p.TakenAt, p.RouteAt, p.Caption,
+			demoPhotoContentType(p.File), demoPhotoContentType(p.Thumb), p.Width, p.Height, size,
+		); err != nil {
+			return fmt.Errorf("photo %q: %w", p.File, err)
+		}
 	}
 	return nil
 }
@@ -301,7 +399,7 @@ func seedDemoStories(ctx context.Context, pool *pgxpool.Pool, userID string, sto
 
 // resetDemoCustomer deletes every activity the demo account has, with everything derived from
 // them, so the seed that follows starts from nothing. The DB side cascades from activities
-// (streams, tile masks, country/region matches); fog_tiles is per user, not per activity, so
+// (streams, tile masks, country/region matches, photos); fog_tiles is per user, not per activity, so
 // it's deleted explicitly — ingest recreates each row a new activity touches, and a row left
 // behind would keep a tile only the old history reached. Object storage has no foreign keys,
 // so its prefixes are swept first, in the same log-and-continue style demo_purge.go uses.
@@ -335,7 +433,7 @@ func resetDemoCustomer(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 		return fmt.Errorf("reset: rows: %w", err)
 	}
 
-	prefixes := []string{"raw/" + DemoCustomerUserID + "/", "fog/" + DemoCustomerUserID + "/", "heatmap/" + DemoCustomerUserID + "/"}
+	prefixes := []string{"raw/" + DemoCustomerUserID + "/", "fog/" + DemoCustomerUserID + "/", "heatmap/" + DemoCustomerUserID + "/", "photos/" + DemoCustomerUserID + "/"}
 	for _, id := range activityIDs {
 		prefixes = append(prefixes, "activity-masks/"+id+"/")
 	}
