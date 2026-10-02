@@ -1581,6 +1581,38 @@ button.activities-panel__story-badge:hover {
   outline: none;
 }
 
+/* A group of photos that would overlap: its first photo, with two cards' edges showing behind it
+   and the count on its corner. */
+.photo-marker--group {
+  overflow: visible;
+  box-shadow:
+    3px -3px 0 -1px var(--fm-surface),
+    3px -3px 0 0 rgb(var(--fm-shadow-rgb) / 25%),
+    6px -6px 0 -1px var(--fm-surface),
+    6px -6px 0 0 rgb(var(--fm-shadow-rgb) / 25%),
+    var(--fm-shadow-md);
+}
+
+.photo-marker--group img {
+  border-radius: var(--fm-radius-pill);
+}
+
+.photo-marker__count {
+  position: absolute;
+  top: -8px;
+  right: -10px;
+  min-width: 18px;
+  padding: 0 var(--fm-space-4);
+  border-radius: var(--fm-radius-pill);
+  background: var(--fm-accent);
+  color: var(--fm-on-accent);
+  font-size: var(--fm-text-xs);
+  font-weight: var(--fm-weight-bold);
+  line-height: 18px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
 .photo-marker--active {
   z-index: 1;
   width: 52px;
@@ -1614,6 +1646,38 @@ button.activities-panel__story-badge:hover {
   height: auto;
   max-height: 260px;
   object-fit: contain;
+}
+
+.photo-popup__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.photo-popup__position {
+  font-size: var(--fm-text-sm);
+  font-weight: var(--fm-weight-semibold);
+  color: var(--fm-ink-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.photo-popup__step {
+  display: flex;
+  padding: var(--fm-space-4);
+  border: 0;
+  border-radius: var(--fm-radius-sm);
+  background: var(--fm-surface-tint);
+  color: var(--fm-ink);
+  cursor: pointer;
+}
+
+.photo-popup__step:hover:not(:disabled) {
+  background: var(--fm-surface-tint-strong);
+}
+
+.photo-popup__step:disabled {
+  cursor: default;
+  opacity: 0.35;
 }
 
 .photo-popup__caption {

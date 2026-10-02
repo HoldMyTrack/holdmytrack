@@ -112,6 +112,15 @@ function frameSize(
   return maxW / maxH >= ratio ? { widthPx: maxH * ratio, heightPx: maxH } : { widthPx: maxW, heightPx: maxW / ratio };
 }
 
+/** How far apart, in metres, a group's photos must be for zooming in to separate them (§4.27). */
+const GROUP_SPREAD_M = 15;
+
+function haversineM(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const rad = Math.PI / 180;
+  const h = Math.sin(((lat2 - lat1) * rad) / 2) ** 2 + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(((lon2 - lon1) * rad) / 2) ** 2;
+  return 2 * 6_371_008.8 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
 export function MapView({ initialPrivateLocationsOpen = false, initialActivity = null }: MapViewProps) {
   // docs/SPEC.md FR-2.1–FR-2.3: a demo account is
   // read-only (no upload/sync, no edit/delete) — see ActivitiesPanel's own readOnly prop and
@@ -254,16 +263,20 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // A Story's photos change with its members too.
   const storyMembers = storyState.story?.activityIds.join(',') ?? '';
   const photoState = usePhotos(photoScope, `${trackMetricsVersion}|${storyMembers}`);
-  // The photo whose popup is open (its marker was clicked); closed whenever the photos in view
-  // change hands, or it's gone from them.
-  const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
-  const openPhoto = photoState.photos.find((p) => p.id === openPhotoId) ?? null;
+  // The photos whose popup is open — one, or a group's, stepped through — from a marker's click;
+  // closed whenever the photos in view change hands, and showing only those still there.
+  const [openGroup, setOpenGroup] = useState<{ ids: string[]; index: number } | null>(null);
+  // Only saved photos open; a photo the Photos tab hasn't saved yet has nothing to show.
+  const openPhotos = useMemo(
+    () => (openGroup ? openGroup.ids.flatMap((id) => photoState.photos.filter((p) => p.id === id)) : []),
+    [openGroup, photoState.photos],
+  );
   // The Photos tab's unsaved changes as they alter the markers (PhotosTab.tsx).
   const [photoOverlay, setPhotoOverlay] = useState<PhotoMarkerOverlay | null>(null);
   // Which tab the Edit window shows: its Track tab hides the photos.
   const [editTab, setEditTab] = useState<EditTab>('activity');
   const photoScopeKey = photoScope === null ? null : JSON.stringify(photoScope);
-  useEffect(() => setOpenPhotoId(null), [photoScopeKey]);
+  useEffect(() => setOpenGroup(null), [photoScopeKey]);
   const storiesList = useStories(panelTab === 'stories');
 
   // TYPE/DISTANCE facets — pure client-side filters over
@@ -1377,7 +1390,31 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     const keptIds = new Set(kept.map((item) => item.id));
     return [...kept, ...photoOverlay.upserts.filter((item) => !keptIds.has(item.id))];
   }, [photoScope, editOpen, editTab, mapHiddenIds, photoState.photos, photoOverlay]);
-  usePhotoMarkers(map, photoMarkers, { onOpen: setOpenPhotoId, activeId: photoOverlay?.activeId ?? openPhotoId });
+  // A marker's click (FR-16.7): one photo opens its popup. A group the map can separate — its
+  // photos more than GROUP_SPREAD_M apart — zooms in to fit them, at most to z19, where that
+  // spread is wider than a marker; one it can't (several taken at one spot) opens the popup on
+  // its first photo, to step through the rest.
+  const openPhotoMarker = useCallback(
+    (ids: string[]) => {
+      if (!map) return;
+      const group = photoMarkers.filter((item) => ids.includes(item.id));
+      const spread = Math.max(0, ...group.flatMap((a) => group.map((b) => haversineM(a.lat, a.lon, b.lat, b.lon))));
+      if (group.length > 1 && spread > GROUP_SPREAD_M) {
+        const lons = group.map((p) => p.lon);
+        const lats = group.map((p) => p.lat);
+        map.fitBounds([Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)], { padding: 80, maxZoom: 19 });
+        return;
+      }
+      setOpenGroup({ ids, index: 0 });
+    },
+    [map, photoMarkers],
+  );
+  const openPhotoId = openPhotos.length > 0 && openGroup ? openPhotos[Math.min(openGroup.index, openPhotos.length - 1)]!.id : null;
+  usePhotoMarkers(map, photoMarkers, {
+    onOpen: openPhotoMarker,
+    activeId: photoOverlay?.activeId ?? openPhotoId,
+    loneId: photoOverlay?.activeId ?? null,
+  });
 
   return (
     <div className="app-shell">
@@ -1481,7 +1518,15 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
               onClose={closeEditWindow}
             />
           )}
-          {map && openPhoto && <PhotoPopup map={map} photo={openPhoto} onClose={() => setOpenPhotoId(null)} />}
+          {map && openGroup && openPhotos.length > 0 && (
+            <PhotoPopup
+              map={map}
+              photos={openPhotos}
+              index={Math.min(openGroup.index, openPhotos.length - 1)}
+              onIndex={(index) => setOpenGroup({ ...openGroup, index })}
+              onClose={() => setOpenGroup(null)}
+            />
+          )}
           {!editOpen && (
             <div className="map-toggles">
               <div className="map-mode-toggle" role="group" aria-label={t('map.mode')} data-testid="map-mode-toggle">

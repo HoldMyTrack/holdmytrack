@@ -65,7 +65,3 @@ ADR-0024 keeps a resized copy of each photo on our own storage. If photos ever b
 * Roughly a fifteenth of today's storage per photo, at the cost of an OAuth integration per provider, a photo that only opens once the user shares it "with anyone with the link", and a broken link every time the user tidies their files.
 * Google Photos can't serve as one: its API hands out image URLs that expire within the hour.
 * Decide only once cost-per-user is measured (`ROADMAP.md` Phase 5) and photos show up in it.
-
-### Photo markers when zoomed out
-
-A Story's or a long activity's photos are one marker each at every zoom (`IMPLEMENTATION.md` §4.27), so zoomed out to a whole trip, a day's photos stack on one spot and only the top one can be clicked. Clustering them (a count badge that zooms in on click), or dots below some zoom with thumbnails above it, would keep the trip's overview readable. Not needed while photos per activity are few; worth deciding once real trips with dozens of photos exist.

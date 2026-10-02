@@ -1,30 +1,36 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Popup, type Map as MapLibreMap } from 'maplibre-gl';
-import { ExternalLink } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { API_BASE_URL, type Photo } from '../api';
 import { t } from '../i18n';
 import { formatStartedAt } from './format';
 
 export interface PhotoPopupProps {
   map: MapLibreMap;
-  photo: Photo;
+  /** The photo shown, or a group's photos in route order (a marker standing for several). */
+  photos: readonly Photo[];
+  index: number;
+  onIndex: (index: number) => void;
   onClose: () => void;
 }
 
 /**
  * A photo's popup (FR-16.7), opened from its marker: the picture, its caption and when it was
  * taken, anchored at its place on the route so it moves with the map — no window over the page.
- * Full size opens the stored copy in a browser tab. Changing a photo is the Edit window's Photos
- * tab's job, not this. A MapLibre popup with React rendered into it through a portal, as
- * SpotPopup.tsx does.
+ * Full size opens the stored copy in a browser tab. Opened from a group's marker (photos taken
+ * at one spot, which no zoom separates), it steps through the group with ‹ › and "2 of 5",
+ * staying anchored at the group's first photo so it doesn't jump between them. Changing a photo
+ * is the Edit window's Photos tab's job, not this. A MapLibre popup with React rendered into it
+ * through a portal, as SpotPopup.tsx does.
  */
-export function PhotoPopup({ map, photo, onClose }: PhotoPopupProps) {
+export function PhotoPopup({ map, photos, index, onIndex, onClose }: PhotoPopupProps) {
+  const photo = photos[Math.min(index, photos.length - 1)]!;
   const [container, setContainer] = useState<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const popupRef = useRef<Popup | null>(null);
-  const { lon, lat } = photo;
+  const { lon, lat } = photos[0]!;
 
   useEffect(() => {
     if (lon === null || lat === null) return;
@@ -44,7 +50,7 @@ export function PhotoPopup({ map, photo, onClose }: PhotoPopupProps) {
       popup.remove();
     };
     // A new place is a new popup; the same photo re-read with the same place keeps this one.
-  }, [map, photo.id, lon, lat]);
+  }, [map, photos[0]!.id, lon, lat]);
 
   // MapLibre picks which side of the marker the popup opens on from its size when placed — empty
   // then, before the portal renders. Placing it again once the content is in (and again once the
@@ -69,6 +75,24 @@ export function PhotoPopup({ map, photo, onClose }: PhotoPopupProps) {
           onLoad={reanchor}
         />
       </a>
+      {photos.length > 1 && (
+        <div className="photo-popup__nav">
+          <button type="button" className="photo-popup__step" aria-label={t('photos.previous')} disabled={index === 0} onClick={() => onIndex(index - 1)}>
+            <ChevronLeft size={16} aria-hidden="true" />
+          </button>
+          <span className="photo-popup__position">{t('photos.position', { n: index + 1, total: photos.length })}</span>
+          <button
+            type="button"
+            className="photo-popup__step"
+            aria-label={t('photos.next')}
+            disabled={index === photos.length - 1}
+            onClick={() => onIndex(index + 1)}
+            data-testid="photo-popup-next"
+          >
+            <ChevronRight size={16} aria-hidden="true" />
+          </button>
+        </div>
+      )}
       {photo.caption && <p className="photo-popup__caption">{photo.caption}</p>}
       <div className="photo-popup__meta">
         {photo.takenAt && <span>{t('photos.taken', { when: formatStartedAt(photo.takenAt) })}</span>}
