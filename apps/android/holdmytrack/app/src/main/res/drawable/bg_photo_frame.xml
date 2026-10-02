@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Behind a photo while it loads — the popup's picture, a Photos tab thumbnail — the web's
+     .photo-popup__image-link: the strong surface tint, small radius. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/hmt_surface_tint_strong" />
+    <corners android:radius="@dimen/hmt_radius_sm" />
+</shape>

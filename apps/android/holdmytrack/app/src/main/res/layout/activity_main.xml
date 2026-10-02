@@ -10,8 +10,19 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- A spot's popup (map/SpotPopup): over the map, under all of its chrome. -->
+    <!-- Photo markers (map/PhotoMarkers): views over the map, placed in code. The layer itself
+         takes no touches, so the map pans and taps through it everywhere but on a marker. -->
+    <FrameLayout
+        android:id="@+id/photo_markers"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipChildren="false" />
+
+    <!-- A spot's popup (map/SpotPopup) and a photo's (map/PhotoPopup): over the map, under all
+         of its chrome. -->
     <include layout="@layout/view_spot_popup" />
+
+    <include layout="@layout/view_photo_popup" />
 
     <!-- The top of the map: the chrome row, and under it the one notice the map can show —
          checking the session, the server unreachable, the map failing to load, or nothing on

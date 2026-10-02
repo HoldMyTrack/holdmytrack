@@ -438,6 +438,56 @@
         <item quantity="other">Edit %1$d activities</item>
     </plurals>
 
+    <!-- Photos (photos/, panel/PhotosTab.kt, map/PhotoMarkers.kt, map/PhotoPopup.kt), after the
+         web's photos.* messages. -->
+    <string name="photos_tab">Photos</string>
+    <string name="photos_unsaved">Photos, with unsaved changes</string>
+    <string name="photos_check_one">Photos belong to one activity — check just one to add or change them.</string>
+    <string name="photos_no_track">This activity has no track to put photos on.</string>
+    <string name="photos_add">Add photos</string>
+    <string name="photos_preparing">Preparing %1$d of %2$d…</string>
+    <string name="photos_loading">Loading photos…</string>
+    <string name="photos_empty">No photos yet. Add the ones you took on this activity — each goes on the route where it was taken.</string>
+    <string name="photos_upload_failed">%1$s: %2$s</string>
+    <string name="photos_unreadable">This file can\'t be opened as a photo.</string>
+    <string name="photos_needs_place">Couldn\'t tell where this was taken. Move the slider to its place on the route.</string>
+    <string name="photos_slider">Place on the route</string>
+    <plurals name="photos_more_waiting">
+        <item quantity="one">%1$d more to place</item>
+        <item quantity="other">%1$d more to place</item>
+    </plurals>
+    <string name="photos_remove">Remove</string>
+    <string name="photos_place_here">Place here</string>
+    <string name="photos_photo_n">Photo %1$d</string>
+    <string name="photos_new">New</string>
+    <string name="photos_changed">Changed</string>
+    <string name="photos_deleted">Will be deleted</string>
+    <string name="photos_edit">Edit</string>
+    <string name="photos_edit_one">Edit %1$s</string>
+    <string name="photos_delete_one">Delete %1$s</string>
+    <string name="photos_undo_delete">Keep this photo</string>
+    <string name="photos_caption">Caption</string>
+    <string name="photos_caption_placeholder">Add a caption</string>
+    <string name="photos_caption_too_long">Caption must be %1$d characters or fewer.</string>
+    <string name="photos_done">Done</string>
+    <string name="photos_place_first">Place every new photo on the route before saving.</string>
+    <string name="photos_saving_n">Saving photos %1$d of %2$d…</string>
+    <string name="photos_discard_title">Discard photo changes?</string>
+    <string name="photos_discard_message">The photos you added, moved or deleted in this window haven\'t been saved yet.</string>
+    <string name="photos_discard">Discard</string>
+    <string name="photos_keep_editing">Keep editing</string>
+    <string name="photos_marker">Photo</string>
+    <plurals name="photos_marker_group">
+        <item quantity="one">%1$d photo</item>
+        <item quantity="other">%1$d photos</item>
+    </plurals>
+    <string name="photos_taken">Taken %1$s</string>
+    <string name="photos_full_size">Full size</string>
+    <string name="photos_previous">Previous photo</string>
+    <string name="photos_next">Next photo</string>
+    <string name="photos_position">%1$d of %2$d</string>
+    <string name="photos_close">Close</string>
+
     <!-- The panel's Privacy tab (panel/PrivacyTab.kt), after the web's private.* messages. -->
     <string name="panel_tab_privacy">Privacy</string>
     <string name="private_subtitle">Tracks never start or end inside these circles.</string>

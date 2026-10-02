@@ -192,12 +192,14 @@ data class Story(
 
 /**
  * One vertex of an activity's display track, as `GET /v1/activities/track-metrics/{id}`
- * measures it: its speed from the vertex before.
+ * measures it: its speed from the vertex before, and its moment ([timeS], epoch seconds) —
+ * what the Photos tab's slider turns a place on the track into (`docs/SPEC.md` FR-16.4).
  */
 data class TrackMetricPoint(
     val lon: Double,
     val lat: Double,
     val speedMps: Double,
+    val timeS: Long = 0,
 )
 
 /** What the selected activity's pace bands are drawn from. */
@@ -226,6 +228,45 @@ data class TrackEdit(
 
 /** An activity's recorded points and the edit already applied to them, if any. */
 data class TrackPoints(val points: List<TrackPoint>, val edit: TrackEdit?)
+
+/**
+ * One photo on an activity (`docs/SPEC.md` FR-16.3), always with a place on its track:
+ * [routeAt], a moment on it. [lon]/[lat] are that moment's point on the track as drawn, null
+ * only for an activity with no track left at all. [url] and [thumbUrl] are API paths
+ * (`/v1/photos/…`); [width]/[height] are the stored copy's.
+ */
+data class Photo(
+    val id: String,
+    val activityId: String,
+    val takenAt: Instant?,
+    val routeAt: Instant,
+    val lon: Double?,
+    val lat: Double?,
+    val caption: String?,
+    val width: Int,
+    val height: Int,
+    val url: String,
+    val thumbUrl: String,
+)
+
+/**
+ * What a photo's EXIF said about when and where it was taken, as `POST /v1/photos` and its
+ * placement check take it (FR-16.1): [takenAt] an instant, or [takenLocal] a camera clock with
+ * no zone (`YYYY-MM-DDTHH:MM:SS`) — at most one is set — and a position.
+ */
+data class PhotoExif(
+    val takenAt: Instant? = null,
+    val takenLocal: String? = null,
+    val lat: Double? = null,
+    val lon: Double? = null,
+)
+
+/** A photo's image, resized for upload: its bytes and their type (`image/webp`, `image/jpeg`). */
+class PhotoImage(val bytes: ByteArray, val contentType: String)
+
+/** The server couldn't tell where on the track a photo was taken (`photo_needs_place`,
+ *  FR-16.1): nothing was stored, and it goes again with the user's `route_at`. */
+class PhotoNeedsPlaceException(message: String) : IOException(message)
 
 /**
  * One of the account's Private locations (`docs/SPEC.md` FR-8.1): a circle whose contents are
@@ -301,8 +342,27 @@ data class TrendPeriod(
  * rather than replaced with something vaguer — "invalid email or password" and "an account
  * with this email already exists" are exactly what someone needs to read.
  */
-class ApiException(val code: Int, message: String) :
-    IOException(message.ifBlank { "request failed ($code)" })
+class ApiException(val code: Int, message: String, val errorCode: String? = null) :
+    IOException(message.ifBlank { "request failed ($code)" }) {
+    companion object {
+        /**
+         * The refusal in a non-2xx [body]: plain text as it is, or — for the refusals a client
+         * branches on (`demo_read_only`, `photo_needs_place`) — `{error, message}`, its message
+         * shown and its code kept.
+         */
+        fun from(code: Int, body: String): ApiException {
+            val text = body.trim()
+            if (text.startsWith("{")) {
+                val json = runCatching { JSONObject(text) }.getOrNull()
+                val message = json?.optString("message").orEmpty()
+                if (json != null && message.isNotEmpty()) {
+                    return ApiException(code, message, json.optString("error").takeIf { it.isNotEmpty() })
+                }
+            }
+            return ApiException(code, text)
+        }
+    }
+}
 
 /**
  * The app's whole HTTP surface: the auth endpoints, sync and its history, and the activity
@@ -338,7 +398,7 @@ object HoldMyTrackApi {
      * inheriting OkHttp's default here would throttle the map relative to the SDK's own
      * behaviour for no reason.
      */
-    /** This build: the release number and the commit, "0.3 (62da50b)" — what the menu shows
+    /** This build: the release number and the commit, "0.4 (62da50b)" — what the menu shows
      *  and the User-Agent carries. */
     val appVersion: String = "${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_SHA})"
 
@@ -375,7 +435,7 @@ object HoldMyTrackApi {
     }
 
     /**
-     * Names the app and its build — `HoldMyTrack-Android/0.3 (62da50b)` — on HoldMyTrack's own
+     * Names the app and its build — `HoldMyTrack-Android/0.4 (62da50b)` — on HoldMyTrack's own
      * requests, so the server's logs say which build made a call. Other origins keep what the
      * request already had: MapLibre's own agent on the basemap's assets.
      */
@@ -451,7 +511,7 @@ object HoldMyTrackApi {
                 .build()
             val response = client.newCall(request).execute()
             val text = response.use { it.body?.string().orEmpty() }
-            if (!response.isSuccessful) throw ApiException(response.code, text.trim())
+            if (!response.isSuccessful) throw ApiException.from(response.code, text)
             val results = JSONObject(text).getJSONArray("results")
             List(results.length()) { i ->
                 val result = results.getJSONObject(i)
@@ -683,9 +743,17 @@ object HoldMyTrackApi {
         call(request, { text -> Profile.parse(JSONObject(text)) }, onResult)
     }
 
-    /** The avatar at [path] (a [Profile.avatarUrl], relative to the API), fetched with the
-     *  session's bearer token like any other API request, and decoded. */
-    fun avatar(path: String, onResult: (Result<Bitmap>) -> Unit) {
+    /** The avatar at [path] (a [Profile.avatarUrl], relative to the API) — see [image]. */
+    fun avatar(path: String, onResult: (Result<Bitmap>) -> Unit) = image(path, maxSide = null, onResult)
+
+    /**
+     * The image at [path] (relative to the API: an avatar, a [Photo.url] or [Photo.thumbUrl]),
+     * fetched with the session's bearer token like any other API request — a browser tab or an
+     * image library would have no token to send — and decoded, off the main thread. With
+     * [maxSide], decoded at the largest power-of-two reduction still at least that many pixels on
+     * its long side, so a 2048 px photo shown at a popup's width isn't held at full size.
+     */
+    fun image(path: String, maxSide: Int?, onResult: (Result<Bitmap>) -> Unit) {
         val request = Request.Builder().url(BuildConfig.API_BASE_URL + path).build()
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
@@ -696,7 +764,17 @@ object HoldMyTrackApi {
                 val result = response.use {
                     if (!it.isSuccessful) return@use Result.failure(ApiException(it.code, ""))
                     val bytes = it.body?.bytes() ?: ByteArray(0)
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let { bitmap -> Result.success(bitmap) }
+                    val options = BitmapFactory.Options()
+                    if (maxSide != null) {
+                        options.inJustDecodeBounds = true
+                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+                        val longSide = maxOf(options.outWidth, options.outHeight)
+                        var sample = 1
+                        while (longSide / (sample * 2) >= maxSide) sample *= 2
+                        options.inJustDecodeBounds = false
+                        options.inSampleSize = sample
+                    }
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.let { bitmap -> Result.success(bitmap) }
                         ?: Result.failure(IOException("not an image"))
                 }
                 main.post { onResult(result) }
@@ -903,6 +981,7 @@ object HoldMyTrackApi {
                         lon = p.getDouble("lon"),
                         lat = p.getDouble("lat"),
                         speedMps = p.optDouble("speed_mps", 0.0),
+                        timeS = p.optLong("time_s"),
                     )
                 },
             )
@@ -957,6 +1036,117 @@ object HoldMyTrackApi {
         if (edit.remove.isNotEmpty()) put("remove", JSONArray(edit.remove.map { JSONArray().put(it.first).put(it.second) }))
         if (edit.drop.isNotEmpty()) put("drop", JSONArray(edit.drop))
     }
+
+    /**
+     * `GET /v1/photos?activity=` or `?story=` (`docs/SPEC.md` FR-16.3) — one activity's photos,
+     * or every photo of a Story's activities, in route order. Exactly one of the two is given.
+     */
+    fun photos(activity: String?, story: String?, onResult: (Result<List<Photo>>) -> Unit) {
+        val url = (BuildConfig.API_BASE_URL + API_V1 + "/photos").toHttpUrl().newBuilder()
+            .apply { if (activity != null) addQueryParameter("activity", activity) }
+            .apply { if (story != null) addQueryParameter("story", story) }
+            .build()
+        call(Request.Builder().url(url).build(), { text ->
+            val rows = JSONObject(text).optJSONArray("photos") ?: JSONArray()
+            List(rows.length()) { parsePhoto(rows.getJSONObject(it)) }
+        }, onResult)
+    }
+
+    /**
+     * `POST /v1/photos/place` (FR-16.1) — where an upload of a photo with this EXIF would be
+     * placed on [activityId]'s track, storing nothing: its `route_at`. A
+     * [PhotoNeedsPlaceException] when the server can't tell, for the user to choose.
+     */
+    fun checkPhotoPlace(activityId: String, exif: PhotoExif, onResult: (Result<Instant>) -> Unit) {
+        val body = JSONObject().put("activity_id", activityId)
+        exif.takenAt?.let { body.put("taken_at", it.toString()) }
+        if (exif.takenAt == null) exif.takenLocal?.let { body.put("taken_local", it) }
+        if (exif.lat != null && exif.lon != null) body.put("lat", exif.lat).put("lon", exif.lon)
+        val request = Request.Builder()
+            .url(BuildConfig.API_BASE_URL + API_V1 + "/photos/place")
+            .post(body.toString().toRequestBody(JSON))
+            .build()
+        call(request, { text -> parseInstant(JSONObject(text).getString("route_at")) }) { result ->
+            onResult(result.recoverCatching { throw needsPlace(it) })
+        }
+    }
+
+    /**
+     * `POST /v1/photos` (FR-16.1) — a photo already resized ([file] and its [thumb]), what its
+     * EXIF said, where on the track it goes ([routeAt]: the placement check's answer or the
+     * user's, which wins at upload) and its [caption]. Answers with the photo as stored.
+     */
+    fun uploadPhoto(
+        activityId: String,
+        file: PhotoImage,
+        thumb: PhotoImage,
+        exif: PhotoExif,
+        routeAt: Instant,
+        caption: String,
+        onResult: (Result<Photo>) -> Unit,
+    ) {
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("activity_id", activityId)
+            .addFormDataPart("file", "photo", file.bytes.toRequestBody(file.contentType.toMediaType()))
+            .addFormDataPart("thumb", "thumb", thumb.bytes.toRequestBody(thumb.contentType.toMediaType()))
+            .apply {
+                if (exif.takenAt != null) addFormDataPart("taken_at", exif.takenAt.toString())
+                else exif.takenLocal?.let { addFormDataPart("taken_local", it) }
+                if (exif.lat != null && exif.lon != null) {
+                    addFormDataPart("lat", exif.lat.toString())
+                    addFormDataPart("lon", exif.lon.toString())
+                }
+                addFormDataPart("route_at", routeAt.toString())
+                if (caption.isNotEmpty()) addFormDataPart("caption", caption)
+            }
+            .build()
+        val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/photos").post(body).build()
+        call(request, { text -> parsePhoto(JSONObject(text)) }) { result ->
+            onResult(result.recoverCatching { throw needsPlace(it) })
+        }
+    }
+
+    /** `PATCH /v1/photos/{id}` (FR-16.4) — a field given changes: [caption] (empty clears it),
+     *  [routeAt] the photo's new moment on its track, which the server clamps to the track. */
+    fun updatePhoto(id: String, caption: String?, routeAt: Instant?, onResult: (Result<Photo>) -> Unit) {
+        val body = JSONObject()
+        caption?.let { body.put("caption", it) }
+        routeAt?.let { body.put("route_at", it.toString()) }
+        val request = Request.Builder()
+            .url(BuildConfig.API_BASE_URL + API_V1 + "/photos/" + id)
+            .patch(body.toString().toRequestBody(JSON))
+            .build()
+        call(request, { text -> parsePhoto(JSONObject(text)) }, onResult)
+    }
+
+    /** `DELETE /v1/photos/{id}` (FR-16.5) — the photo and both its images. */
+    fun deletePhoto(id: String, onResult: (Result<Unit>) -> Unit) {
+        val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/photos/" + id).delete().build()
+        call(request, { }, onResult)
+    }
+
+    /** `photo_needs_place` as its own exception, so the Photos tab can tell it from a failure. */
+    private fun needsPlace(failure: Throwable): Throwable =
+        if (failure is ApiException && failure.code == 422 && failure.errorCode == "photo_needs_place") {
+            PhotoNeedsPlaceException(failure.message.orEmpty())
+        } else {
+            failure
+        }
+
+    private fun parsePhoto(json: JSONObject) = Photo(
+        id = json.getString("id"),
+        activityId = json.optString("activity_id"),
+        takenAt = json.optNullableString("taken_at")?.let(::parseInstant),
+        routeAt = parseInstant(json.getString("route_at")),
+        lon = json.optNullableDouble("lon"),
+        lat = json.optNullableDouble("lat"),
+        caption = json.optNullableString("caption")?.takeIf { it.isNotEmpty() },
+        width = json.optInt("width"),
+        height = json.optInt("height"),
+        url = json.optString("url"),
+        thumbUrl = json.optString("thumb_url"),
+    )
 
     /** `GET /v1/private-locations` — every one, oldest first. */
     fun privateLocations(onResult: (Result<List<PrivateLocation>>) -> Unit) {
@@ -1227,7 +1417,7 @@ object HoldMyTrackApi {
                 val body = response.use { it.body?.string().orEmpty() }
                 deliver(
                     if (response.isSuccessful) runCatching { parse(body) }
-                    else Result.failure(ApiException(response.code, body.trim())),
+                    else Result.failure(ApiException.from(response.code, body)),
                 )
             }
 

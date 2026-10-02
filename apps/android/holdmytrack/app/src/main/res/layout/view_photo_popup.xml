@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A photo's popup (map/PhotoPopup, docs/SPEC.md FR-16.7), the web's .photo-popup in the spot
+     popup's frame: the picture at the popup's width with its close button over it, ‹ "n of m" ›
+     for a group taken at one spot, the caption, when it was taken, and Full size. Placed over
+     the photo's marker by PhotoPopup. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/photo_popup"
+    android:layout_width="276dp"
+    android:layout_height="wrap_content"
+    android:layout_gravity="top|start"
+    android:background="@drawable/bg_spot_popup"
+    android:clickable="true"
+    android:elevation="6dp"
+    android:focusable="false"
+    android:orientation="vertical"
+    android:padding="@dimen/hmt_space_8"
+    android:visibility="gone">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_photo_frame"
+        android:minHeight="120dp">
+
+        <ImageView
+            android:id="@+id/photo_popup_image"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:adjustViewBounds="true"
+            android:maxHeight="260dp"
+            android:scaleType="fitCenter"
+            tools:ignore="ContentDescription" />
+
+        <Button
+            android:id="@+id/photo_popup_close"
+            style="@style/Widget.HoldMyTrack.Button.RowIcon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:contentDescription="@string/photos_close"
+            app:backgroundTint="#8C000000"
+            app:icon="@drawable/ic_x"
+            app:iconSize="18dp"
+            app:iconTint="@android:color/white" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:id="@+id/photo_popup_nav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/photo_popup_previous"
+            style="@style/Widget.HoldMyTrack.Button.RowIcon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/photos_previous"
+            app:icon="@drawable/ic_chevron_left"
+            app:iconSize="18dp" />
+
+        <TextView
+            android:id="@+id/photo_popup_position"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:accessibilityLiveRegion="polite"
+            android:fontFeatureSettings="tnum"
+            android:gravity="center"
+            android:textColor="@color/hmt_ink_secondary"
+            android:textFontWeight="600"
+            android:textSize="@dimen/hmt_text_sm"
+            tools:text="2 of 5" />
+
+        <Button
+            android:id="@+id/photo_popup_next"
+            style="@style/Widget.HoldMyTrack.Button.RowIcon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/photos_next"
+            app:icon="@drawable/ic_chevron_right"
+            app:iconSize="18dp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/photo_popup_caption"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/hmt_space_6"
+        android:textColor="@color/hmt_ink"
+        android:textFontWeight="600"
+        android:textSize="@dimen/hmt_text_md"
+        tools:text="The view from the ridge" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/photo_popup_taken"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="@color/hmt_ink_secondary"
+            android:textSize="@dimen/hmt_text_sm"
+            tools:text="Taken Sep 24, 2026, 4:10 PM" />
+
+        <Button
+            android:id="@+id/photo_popup_full"
+            style="@style/Widget.HoldMyTrack.Button.Text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/photos_full_size"
+            android:textSize="@dimen/hmt_text_sm"
+            app:icon="@drawable/ic_maximize_2"
+            app:iconSize="14dp" />
+    </LinearLayout>
+</LinearLayout>
