@@ -14,10 +14,12 @@ import (
 // syncSources is the `source` allowlist this endpoint accepts — IMPLEMENTATION.md §4.0 names
 // the two on-device platforms for Path 2 (iOS/HealthKit, Android/Health Connect), and §4.0.4
 // adds "recorded" for in-app GPS recording (ADR-0007) — authored by HoldMyTrack itself rather than
-// read from a platform health store, but the same batched wire shape either way. Path 1
-// (webhooks) and Path 3 (upload) have their own endpoints and their own `source` values, so
-// this list doesn't need to anticipate those.
-var syncSources = map[string]bool{"healthconnect": true, "healthkit": true, "recorded": true}
+// read from a platform health store, but the same batched wire shape either way. §4.0.5 adds
+// "timeline": a Google Maps Timeline export, read in the browser, whose movement segments
+// arrive here already split into activities. Path 1 (webhooks) and Path 3's file upload have
+// their own endpoints and their own `source` values, so this list doesn't need to anticipate
+// those.
+var syncSources = map[string]bool{"healthconnect": true, "healthkit": true, "recorded": true, "timeline": true}
 
 // syncExternalIDPattern is what a synced activity's external_id may be: a Health Connect or
 // HealthKit record UUID, or the UUID GPS-Logger mints, fits easily. The id goes into the raw
@@ -96,7 +98,7 @@ func (s *Server) handleSyncActivities(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !syncSources[req.Source] {
-		http.Error(w, `invalid "source", want "healthconnect", "healthkit" or "recorded"`, http.StatusBadRequest)
+		http.Error(w, `invalid "source", want "healthconnect", "healthkit", "recorded" or "timeline"`, http.StatusBadRequest)
 		return
 	}
 	if len(req.Activities) == 0 {

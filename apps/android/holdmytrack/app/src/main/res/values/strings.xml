@@ -334,9 +334,11 @@
     <string name="source_upload">an uploaded file</string>
     <string name="source_takeout">a Google Takeout import</string>
     <string name="source_recorded">a GPS recording</string>
+    <string name="source_timeline">a Google Maps Timeline import</string>
     <string name="source_title_upload">Uploaded file</string>
     <string name="source_title_takeout" translatable="false">Google Takeout</string>
     <string name="source_title_recorded">GPS Logger</string>
+    <string name="source_title_timeline">Google Maps Timeline</string>
 
     <!-- The map's Activities panel (panel/ActivitiesPanel.kt), after the web's activities.* and filters.* messages. -->
     <string name="panel_label">Activities panel</string>

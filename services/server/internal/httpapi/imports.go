@@ -69,7 +69,7 @@ func importTitle(l *i18n.Localizer, source, batchTitle, filename string) string 
 // sourceLabel names an import source: "Health Connect", "GPS Logger", "Google Takeout"…
 func sourceLabel(l *i18n.Localizer, source string) string {
 	switch source {
-	case "upload", "takeout", "healthconnect", "healthkit", "recorded":
+	case "upload", "takeout", "healthconnect", "healthkit", "recorded", "timeline":
 		return l.T("imports.source." + source)
 	default:
 		return source

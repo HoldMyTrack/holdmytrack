@@ -346,8 +346,10 @@
     <string name="source_upload">загруженного файла</string>
     <string name="source_takeout">импорта Google Takeout</string>
     <string name="source_recorded">GPS-записи</string>
+    <string name="source_timeline">Хронологии Google Карт</string>
     <string name="source_title_upload">Загруженный файл</string>
     <string name="source_title_recorded">GPS-запись</string>
+    <string name="source_title_timeline">Хронология Google Карт</string>
 
     <!-- The map's Activities panel (panel/ActivitiesPanel.kt), after the web's activities.* and filters.* messages. -->
     <string name="panel_label">Панель занятий</string>

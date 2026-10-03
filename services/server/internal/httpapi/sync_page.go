@@ -181,7 +181,7 @@ func (s *Server) buildSync(ctx context.Context, l *i18n.Localizer, acct *pageAcc
 // app's formatIngestSource and the Android app's sourceName().
 func sourcePhrase(l *i18n.Localizer, source string) string {
 	switch source {
-	case "upload", "takeout", "healthconnect", "healthkit", "recorded":
+	case "upload", "takeout", "healthconnect", "healthkit", "recorded", "timeline":
 		return l.T("imports.source_phrase." + source)
 	default:
 		return source

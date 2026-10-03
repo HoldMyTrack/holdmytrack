@@ -220,6 +220,7 @@ class ImportHistory(
         "upload" -> res.getString(R.string.source_title_upload)
         "takeout" -> res.getString(R.string.source_title_takeout)
         "recorded" -> res.getString(R.string.source_title_recorded)
+        "timeline" -> res.getString(R.string.source_title_timeline)
         else -> source
     }
 
@@ -230,6 +231,7 @@ class ImportHistory(
         "upload" -> res.getString(R.string.source_upload)
         "takeout" -> res.getString(R.string.source_takeout)
         "recorded" -> res.getString(R.string.source_recorded)
+        "timeline" -> res.getString(R.string.source_timeline)
         else -> source
     }
 
