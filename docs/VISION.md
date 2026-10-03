@@ -12,14 +12,14 @@ HoldMyTrack's wedge is:
 
 1. **Visual quality as the product.** Competitors are functional and largely ugly. HoldMyTrack treats the render — smooth fog edges, considered typography, print-grade output — as the thing worth building.
 2. **Source independence.** Three independent ingest paths (§4.1) mean the product survives any single provider revoking access, changing terms, or pricing itself out of reach. This is a deliberate structural choice, not a convenience.
-3. **Free, and funded in the open.** No subscription, no paywalled features, no ads, no selling data. Running costs are covered by recurring community funding with public accounting (§6).
+3. **Free, and funded in the open.** No subscription and no paywalled features today, and user data is never sold. Running costs are covered by recurring community funding with public accounting (§6). How it's funded past the community milestone is decided from that milestone's numbers, not promised now (§5, ADR-0031).
 
 ### 1.1 What HoldMyTrack is not
 
 Worth stating early, because the shorthand for this product is "a free Strava" and that overstates it in three specific ways:
 
 * **HoldMyTrack is not a fitness tracker.** The mobile app can record a plain GPS track as a convenience — a road trip, a dog walk, a forest walk, anything you'd otherwise need a separate tool running for (§4.1) — but it captures GPS only: no heart rate, cadence, power or other sensor data, no training metrics, no ambition to match a dedicated watch's battery life or accuracy. If you already track workouts on a watch, that stays the better tool for the job; HoldMyTrack keeps ingesting its output exactly as it always has.
-* **HoldMyTrack has no social network yet.** No feed, no follows, no kudos, no segments, no leaderboards. Athlete social networking is a stated direction (§5.7) and is deliberately out of scope until the core works — see §5.8 for why that ordering is not just caution.
+* **HoldMyTrack has no social network yet.** No feed, no follows, no kudos, no segments, no leaderboards. A social graph is the third milestone (§5), built only if the second milestone's numbers say it can be paid for — and not building it is an acceptable outcome. See §5.8 for why that ordering is not just caution.
 * **HoldMyTrack is not a health or fitness advisor, and keeps no health data.** We don't keep your health profile — only the geographical data you trust us with, and the photos you choose to add to it. No HR zones, no training load, no recovery or readiness scores, no sleep tracking — and no heart rate at all: it is never read from a file or from Health Connect, never stored and never shown. An activity is where you went, when, and at what elevation; pace is derived from that and shown only as the color of a selected route. An outdoor GPS tracker is what this is, not a health platform wearing a map as a skin (ADR-0017).
 
 What is left is an aggregator and a map for exploring where you've been — not an analytics platform and not a coach. That is a smaller product than Strava and a more defensible one: it competes on the axis Strava is weakest on rather than the axis where Strava has a decade of network effects.
@@ -213,12 +213,18 @@ That is a genuinely small number, and it is the whole argument for this model wo
 
 ## 5. Product Roadmap
 
-Sequenced so the unconditional ingest path ships first and the ones that depend on other companies' permission come later. The phase numbers are the ones `docs/ROADMAP.md` uses, which carries each phase's step-by-step detail.
+The product moves through three milestones (ADR-0031):
+
+1. **MVP** — where HoldMyTrack is now. Activities, the map modes, Spots, Stories and photos, on the web and Android (Phases 0–3 below). Free for everyone, community-funded.
+2. **Release and community.** A public launch, then settling: polish, bug fixes, and adjusting features to what the people using it ask for (Phases 4–6). It starts with what a public launch needs anyway — the funding page (§6.1), a privacy policy and a DPIA (§7) — and ends with a measured answer to what community funding can carry: monthly donations against the monthly bill, and the share of active users who give, over several months (§8.3).
+3. **Social graph** (Phase 7). Public pages, followers and the rest — if at all. Whether to build it, and whether to pay for it with paid features, community funding or sponsors, is decided from Milestone 2's numbers. Staying a single-player product and never starting this milestone is one of the options.
+
+Within the milestones, phases are sequenced so the unconditional ingest path ships first and the ones that depend on other companies' permission come later. The phase numbers are the ones `docs/ROADMAP.md` uses, which carries each phase's step-by-step detail.
 
 ### 5.1 Phase 0: Validation (Weeks 1–2) — *no application code*
 * Start the §4.1 gate: Garmin licence position in writing; Wahoo and COROS applications filed (lead time starts now); HealthKit and Samsung route checks.
 * Stand up the funding page (§6) before launch, not after — the ask is much weaker retrofitted.
-* Post concept renders to r/running, r/cycling, r/Garmin and r/Strava; specifically test whether "free forever, funded by users" reads as credible or as doomed.
+* Post concept renders to r/running, r/cycling, r/Garmin and r/Strava; specifically test whether "free, funded by its users" reads as credible or as doomed.
 
 ### 5.2 Phase 1: Upload + Map (Months 1–3)
 * **Path 3 first**: `.GPX`/`.FIT`/`.TCX` parsing and bulk-archive import.
@@ -247,14 +253,14 @@ Sequenced so the unconditional ingest path ships first and the ones that depend 
 ### 5.6 Phases 5–6: Cost control and compliance
 Gates rather than features. Cost control — retention, per-user quotas, rate limits, and measuring cost per active user — can land alongside any phase, and is what keeps §6's funding model honest (§4.3). Compliance (§7) — a DPIA, EU-region hosting, working data export and account deletion — gates any public launch, however small.
 
-### 5.7 Phase 7: Social (not committed)
-Athlete social networking is the stated long-term direction and is deliberately unscheduled. It should not start until §6 shows the funding base can absorb it, because social features add moderation, abuse handling and safety obligations that are **staff costs, not server costs** — the one category donations scale to worst. See §5.8.
+### 5.7 Phase 7: Social graph (Milestone 3, not committed)
+Public pages, followers and the rest of a social graph make up Milestone 3, and it is deliberately unscheduled. It doesn't start until Milestone 2 has shown what community funding can carry, because social features add moderation, abuse handling and safety obligations that are **staff costs, not server costs** — the one category donations scale to worst. The decision at that point is which way to pay for them — paid features, community funding or sponsors — or not to build them at all. See §5.8.
 
 ### 5.8 Why social is last, not just later
 
 Deferred for a reason worth writing down. A fog map is a precise record of where someone lives and when they are away from home. Adding a social graph to that is not an incremental feature; it is a change in threat model. Strava's own 2018 heatmap incident and its subsequent stalking-related redesigns are the reference case, and Strava had a large trust-and-safety team when they hit it.
 
-A free product with no headcount should not ship a location-sharing social network. Either the funding supports moderation or the feature does not ship.
+A product with no headcount should not ship a location-sharing social network. Either the funding supports moderation or the feature does not ship. Whatever pays for it, public pages need their privacy defaults decided first: private unless the user chooses otherwise, Private locations applied, and nothing live or recent on show.
 
 ---
 
@@ -262,7 +268,7 @@ A free product with no headcount should not ship a location-sharing social netwo
 
 ### 6.1 The model
 
-**HoldMyTrack is free. All features, all sources, all exports, no ads, no data sales, no tiers.**
+**HoldMyTrack is free today: all features, all sources, all exports, for everyone, and user data is never sold.** Nothing is promised past Milestone 2 (§5) — not "free forever", not "no ads". The one standing commitment is that data is never sold (ADR-0031).
 
 Running costs are covered by **ongoing community funding** — recurring monthly support through a platform such as Open Collective, GitHub Sponsors or Patreon.
 
@@ -270,15 +276,15 @@ Open Collective is the strongest fit specifically because it makes spending publ
 
 ### 6.2 What supporters get
 
-Deliberately, **nothing that non-supporters do not get.** The moment a feature is supporter-only the product has a paid tier and §1 is untrue.
+Deliberately, **nothing that non-supporters do not get.** A supporter-only feature would be a paid tier, and whether HoldMyTrack ever has one is the Milestone 3 decision (§5), made from Milestone 2's numbers rather than slipped in as a perk.
 
 What is available instead is recognition, not capability: a supporter badge, a credits page, a say in roadmap prioritisation. Anything touching the maps, the analysis or the exports stays free for everyone.
 
 ### 6.3 Honest risks of this model
 
 * **Donation revenue is not correlated with cost.** Costs scale with users; donations scale with goodwill. A growth spike is a cost spike, and the funding page does not spike with it.
-* **It depends on one person's continued interest.** Donation-funded projects are typically one maintainer, and the failure mode is burnout, not bankruptcy. The mitigation is keeping scope small — which is the real reason §1.1 says no recording and no social.
-* **It caps ambition, and that is a choice being made.** This model will not fund a team, an office, or a print supply chain. It will fund a good product used by a lot of people. If the goal is a business, this plan is the wrong plan and should be rejected now rather than discovered later.
+* **It depends on one person's continued interest.** Donation-funded projects are typically one maintainer, and the failure mode is burnout, not bankruptcy. The mitigation is keeping scope small — which is the real reason §1.1 says no fitness tracking, and why social waits for Milestone 3.
+* **It caps ambition, and that is a choice being made.** This model will not fund a team, an office, or a print supply chain. It will fund a good product used by a lot of people. Whether to go past that — a social graph, and a way of paying for one — is the Milestone 3 decision (§5), made once there are numbers to make it from.
 * **Break-even is genuinely low** (§4.3) — under 1% of users at 10,000. That is the strongest argument that this works. It is also the number to actually measure in Phase 1 rather than assume.
 
 ---
@@ -318,4 +324,4 @@ Everything else follows from it — the screenshot people post is the marketing,
 ### 8.3 The key validation questions
 
 1. **Does Garmin's licence apply to a free service?** (§4.1.) The one item that can impose a fixed cost this model cannot absorb. Settle it in Phase 0 (§5.1).
-2. **Will people fund a free tool they like?** (§6.) Under 1% of users at $5/month covers the bill. This is a low bar and a real one — measure it in Phase 1 rather than assuming it, and treat a persistent shortfall as a signal to reduce scope, not to add a paid tier.
+2. **Will people fund a free tool they like?** (§6.) Under 1% of users at $5/month covers the bill. This is a low bar and a real one — measure it through Milestone 2 rather than assuming it. Its answer is what the Milestone 3 decision (§5) is made from.
