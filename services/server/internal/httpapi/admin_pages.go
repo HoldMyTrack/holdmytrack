@@ -148,7 +148,7 @@ func (s *Server) adminUsers(ctx context.Context, l *i18n.Localizer, userID strin
 		       COALESCE(sum(a.distance_meters), 0)::float8
 		FROM users u
 		LEFT JOIN activities a ON a.user_id = u.id AND a.superseded_by IS NULL
-		WHERE $1 = '' OR u.id::text = $1
+		WHERE u.deleted_at IS NULL AND ($1 = '' OR u.id::text = $1)
 		GROUP BY u.id
 		ORDER BY u.created_at DESC
 	`, userID)

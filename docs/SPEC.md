@@ -287,6 +287,24 @@ The JSON endpoints in this section are refused (`403`) the same way when a brows
 
 A new account made this way is unverified, like one made on the web; the Android app shows its own "check your email" screen until it is (`apps/android/docs/SPEC.md` FR-1.4).
 
+### FR-1.11 Delete account
+
+**Description**: A signed-in user deletes their account and everything in it.
+
+**Preconditions**: An active session of a real account, verified or not. A demo session can't (`403`, `demo_read_only`).
+
+**Inputs**: The account's email address, typed as confirmation.
+
+**Behavior**:
+1. `DELETE /v1/account` with `{"email": "<the account's email>"}`. The email is compared ignoring case and surrounding spaces.
+2. On a match the account is closed at once: every session of it ends, on every device, its Google and Facebook links and any unused reset, verification or app sign-in link stop working, and it can no longer be signed in to by any means. The email address is free: a new account can be made with it straight away. The response is `204 No Content` and clears the session cookie.
+3. Within a few minutes, everything the account held is deleted: its activities and their uploaded files, tiles, photos, Stories, Private locations, captures, import history, avatar and settings. A file still being processed for it finishes first.
+4. Backups keep it for up to 8 weeks (FR-10.6).
+
+**Error cases**:
+- The email doesn't match → `400`: "That isn't this account's email address. Type it exactly as you sign in with it." Nothing changes.
+- No session → `401`.
+
 ## 4. FR-2 — No-Signup Demo
 
 ### FR-2.1 Start a demo

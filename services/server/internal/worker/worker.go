@@ -41,6 +41,10 @@ const maxAttempts = 3
 // needs sub-second responsiveness the way the job queue does.
 const demoPurgeInterval = 5 * time.Minute
 
+// accountPurgeInterval is how long a deleted account's data can outlast the request that
+// deleted it (account_purge.go), plus however long a job of its takes to finish.
+const accountPurgeInterval = time.Minute
+
 // heatmapAgingInterval is daily, not weekly — heatmap_aging.go's sweep is cheap (one indexed
 // query plus whatever small number of activities actually crossed the window boundary since
 // the last run), so there's no reason to let staleness accumulate to a week when a day is just
@@ -68,6 +72,8 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 	defer ticker.Stop()
 	demoTicker := time.NewTicker(demoPurgeInterval)
 	defer demoTicker.Stop()
+	accountTicker := time.NewTicker(accountPurgeInterval)
+	defer accountTicker.Stop()
 	heatmapTicker := time.NewTicker(heatmapAgingInterval)
 	defer heatmapTicker.Stop()
 	heatmapCapTicker := time.NewTicker(heatmapCapInterval)
@@ -101,6 +107,10 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 		case <-demoTicker.C:
 			if err := purgeExpiredDemoUsers(ctx, pool, store, log); err != nil {
 				log.Error("demo purge error", "err", err)
+			}
+		case <-accountTicker.C:
+			if err := purgeDeletedAccounts(ctx, pool, store, log); err != nil {
+				log.Error("account purge error", "err", err)
 			}
 		case <-heatmapTicker.C:
 			if err := ageOutHeatmapWindow(ctx, pool, log); err != nil {

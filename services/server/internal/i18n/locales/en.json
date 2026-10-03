@@ -251,6 +251,7 @@
   "email.verify.body": "Welcome to HoldMyTrack! Confirm this email address to unlock your account:\n\n{link}\n\nThis link works once and expires in 24 hours. If you didn't create a HoldMyTrack account, you can safely ignore this email.",
   "email.reset.subject": "Reset your HoldMyTrack password",
   "email.reset.body": "Someone requested a password reset for this HoldMyTrack account.\n\nReset it here (expires in 1 hour, and only works once):\n{link}\n\nIf you didn't request this, you can safely ignore this email.",
+  "error.delete_confirm_mismatch": "That isn't this account's email address. Type it exactly as you sign in with it.",
   "error.demo_read_only": "Demo accounts can't add, edit, or delete activities — create an account to save your own data.",
   "error.upload_too_large": "File too large or malformed multipart body.",
   "error.upload_empty": "Empty file.",
