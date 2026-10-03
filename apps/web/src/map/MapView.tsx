@@ -38,6 +38,8 @@ import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
 import { OverlaysMenu } from '../ui/OverlaysMenu';
 import { PhotoPopup } from '../ui/PhotoPopup';
 import { ShowInArea } from '../ui/ShowInArea';
+import { TimelineImportWindow } from '../ui/TimelineImportWindow';
+import { takeHandedOffFile } from '../timeline/handoff';
 import { ZoomLevelNotice } from '../ui/ZoomLevelNotice';
 import { SpotPopup } from '../ui/SpotPopup';
 import { todayLocal, type DateRange } from '../ui/dateMath';
@@ -85,6 +87,9 @@ export interface MapViewProps {
   /** Mount on one activity: its day selected, it focused — `/?activity=&day=` (App.tsx), the
    *  /sync page's "View on map". */
   initialActivity?: { id: string; day: string } | null;
+  /** Mount with the Google Maps Timeline import open — `/?import=timeline` (App.tsx), the
+   *  Upload menu's link from any other page. */
+  initialTimelineImport?: boolean;
 }
 
 /** The frame-and-capture export flow's own state — lives here, not inside `ExportFrame.tsx`,
@@ -121,7 +126,7 @@ function haversineM(lat1: number, lon1: number, lat2: number, lon2: number): num
   return 2 * 6_371_008.8 * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
-export function MapView({ initialPrivateLocationsOpen = false, initialActivity = null }: MapViewProps) {
+export function MapView({ initialPrivateLocationsOpen = false, initialActivity = null, initialTimelineImport = false }: MapViewProps) {
   // docs/SPEC.md FR-2.1–FR-2.3: a demo account is
   // read-only (no upload/sync, no edit/delete) — see ActivitiesPanel's own readOnly prop and
   // the importControl below. `'email' in user` is the same narrowing api.ts's SessionUser
@@ -221,6 +226,26 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // it's open the panel is inert and the map's own controls step aside.
   const [editWindowIds, setEditWindowIds] = useState<string[] | null>(null);
   const editOpen = editWindowIds !== null;
+  // The Google Maps Timeline import (TimelineImportWindow.tsx) takes the same corner, and the
+  // panel is inert under it too: what it sends lands in the list as it's processed.
+  const [timelineOpen, setTimelineOpen] = useState(initialTimelineImport && !isDemo);
+  // The file it reads: chosen in the Upload menu or dropped on the map (upload.js sends any
+  // .json here), or handed over by another page through IndexedDB (timeline/handoff.ts).
+  const [timelineFile, setTimelineFile] = useState<File | null>(null);
+  useEffect(() => {
+    if (isDemo) return;
+    if (initialTimelineImport) void takeHandedOffFile().then((file) => file && setTimelineFile(file));
+    // Cancelled to tell upload.js the map has the file, so it doesn't go to /?import=timeline.
+    const open = (event: Event) => {
+      event.preventDefault();
+      const file = (event as CustomEvent<{ file?: File }>).detail?.file;
+      if (file) setTimelineFile(file);
+      setTimelineOpen(true);
+    };
+    window.addEventListener('hmt:open-timeline-import', open);
+    return () => window.removeEventListener('hmt:open-timeline-import', open);
+  }, [isDemo, initialTimelineImport]);
+  const windowOpen = editOpen || timelineOpen;
   // Its Track tab's session (§4.7.7) — one activity, from the first time that tab opens until
   // the window closes. While it's set, every other track is hidden and TrackEditor owns the map.
   const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
@@ -1433,7 +1458,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
           // Inert while the Edit window is open: changing the range, the selection or a filter
           // underneath it would pull its activities out from under it.
           // display: contents keeps the wrapper out of the flex layout.
-          <div className="edit-track-lock" inert={editOpen}>
+          <div className="edit-track-lock" inert={windowOpen}>
             <ActivitiesPanel
               readOnly={isDemo}
               activities={filteredActivities}
@@ -1528,6 +1553,16 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
               onClose={closeEditWindow}
             />
           )}
+          {map && timelineOpen && !editOpen && (
+            <TimelineImportWindow
+              map={map}
+              file={timelineFile}
+              onClose={() => {
+                setTimelineOpen(false);
+                setTimelineFile(null);
+              }}
+            />
+          )}
           {map && openGroup && openPhotos.length > 0 && (
             <PhotoPopup
               map={map}
@@ -1537,7 +1572,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
               onClose={() => setOpenGroup(null)}
             />
           )}
-          {!editOpen && (
+          {!windowOpen && (
             <div className="map-toggles">
               <div className="map-mode-toggle" role="group" aria-label={t('map.mode')} data-testid="map-mode-toggle">
                 <button

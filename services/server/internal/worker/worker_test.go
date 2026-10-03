@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/db"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 )
 
@@ -163,5 +164,38 @@ func TestShutdownReleasesTheRunningJob(t *testing.T) {
 	}
 	if r.state != "pending" || r.attempts != 0 || lockedAt != nil {
 		t.Fatalf("job = %+v locked_at %v, want pending, unlocked, no attempt counted", r, lockedAt)
+	}
+}
+
+func TestRenderFogCoalescesWhileUnclaimed(t *testing.T) {
+	pool, userID := testPool(t)
+	ctx := context.Background()
+	count := func() int {
+		var n int
+		if err := pool.QueryRow(ctx,
+			`SELECT count(*) FROM jobs WHERE kind = 'render_fog' AND user_id = $1 AND state = 'pending'`, userID).Scan(&n); err != nil {
+			t.Fatalf("count: %v", err)
+		}
+		return n
+	}
+
+	for range 3 {
+		if err := ingest.EnqueueRenderFog(ctx, pool, userID); err != nil {
+			t.Fatalf("enqueue: %v", err)
+		}
+	}
+	if n := count(); n != 1 {
+		t.Fatalf("three enqueues with none claimed left %d jobs, want 1", n)
+	}
+
+	// Claimed, it may already have read the dirty flags: the next change needs a job of its own.
+	if _, err := pool.Exec(ctx, `UPDATE jobs SET locked_at = NOW() WHERE kind = 'render_fog' AND user_id = $1`, userID); err != nil {
+		t.Fatalf("claim: %v", err)
+	}
+	if err := ingest.EnqueueRenderFog(ctx, pool, userID); err != nil {
+		t.Fatalf("enqueue: %v", err)
+	}
+	if n := count(); n != 2 {
+		t.Fatalf("an enqueue behind a claimed job left %d jobs, want 2", n)
 	}
 }

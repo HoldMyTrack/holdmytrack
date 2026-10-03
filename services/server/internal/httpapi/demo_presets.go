@@ -406,10 +406,10 @@ func seedDemoStories(ctx context.Context, pool *pgxpool.Pool, userID string, sto
 // heatmap_cap goes back to its column default: the old history's value would scale the new
 // one's heatmap until the worker's daily cap sweep caught up.
 //
-// The worker is quiesced for this account first: every ingest enqueues a render_fog job, so a
-// previous seed can leave hundreds queued, and one already running would rewrite fog_tiles
-// rows (and their objects) right after they were deleted. The queued ones are dropped — the
-// seed that follows enqueues its own — and a running one is waited out.
+// The worker is quiesced for this account first: a previous seed can leave a render_fog job
+// queued behind its ingests, and one already running would rewrite fog_tiles rows (and their
+// objects) right after they were deleted. The queued ones are dropped — the seed that follows
+// enqueues its own — and a running one is waited out.
 func resetDemoCustomer(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger) error {
 	if err := quiesceDemoJobs(ctx, pool, log); err != nil {
 		return fmt.Errorf("reset: %w", err)

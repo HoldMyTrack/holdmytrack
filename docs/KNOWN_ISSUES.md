@@ -6,6 +6,14 @@ This file stays lean and current-only. Once an entry is fixed, its root-cause/fi
 
 ---
 
+### A Google Health Takeout export over 512 MB, or split into several files, can't be imported
+
+`handleUpload` refuses a `.zip` over `maxZipUploadBytes` (512 MiB, `services/server/internal/httpapi/server.go`), but Takeout's smallest part size is 1 GB and its default is 2 GB. The real sample the Takeout reader was built against (`IMPLEMENTATION.md` §4.0.2) was 1.9 GB, so it would be refused through the upload. Takeout also splits an export bigger than the chosen part size into several `.zip` files. `handleTakeoutUpload` reads one archive at a time, and the join needs an activity's exercise log (`exercise-N.json`) and its day's GPS file (`gps_location_*.csv`) in the same archive. Split across parts, an activity whose two halves land apart comes out with no route, or is skipped. The export guide (`SPEC.md` FR-10.5) states both limits rather than promising otherwise.
+
+- [ ] Accept a Takeout archive above 512 MB. It's already read from a temp file rather than memory (`multipartMemoryBytes`), so the cap is about request size, not RAM. A separate, larger cap for an archive `isTakeoutArchive` recognizes would do, or a resumable upload.
+- [ ] Join across the parts of one split export: hold the parts of one Takeout export (they share a name stem, `takeout-<timestamp>-NNN.zip`) until all have arrived, or index each part's exercise logs and GPS files and join across them.
+- [ ] Check both against a real multi-part export, then drop the limit from the guide.
+
 ### Trends leaves out empty weeks and months, so its bars don't show the 12 months `SPEC.md` FR-9 describes
 
 FR-9 behavior 3 says the Profile page renders the trailing 12 months as one bar per bucket. `activityTrendsQuery` (`services/server/internal/httpapi/activities.go`) groups only the account's activities, so a week or month with none never comes back, and both clients draw one bar per period returned (`buildTrendBars`, `profile/TrendsChartView`). A history with two active weeks draws two bars filling the whole chart, each half its width, with nothing to show the other 50 weeks were empty; the axis's two dates are the first and last active period, not the window's ends. Found on the Android emulator against a local stack while porting the page; the web's `/profile` draws the same two bars.

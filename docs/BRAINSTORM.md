@@ -66,6 +66,15 @@ ADR-0024 keeps a resized copy of each photo on our own storage. If photos ever b
 * Google Photos can't serve as one: its API hands out image URLs that expire within the hour.
 * Decide only once cost-per-user is measured (`ROADMAP.md` Phase 5) and photos show up in it.
 
+### Preview and select before importing an archive
+
+A Google Maps Timeline export is narrowed to a date range and a set of modes, and drawn on the map, before anything is sent (`SPEC.md` FR-3.10). A `.zip` or a Google Takeout export goes straight in, every activity in it, so a 5,000-file Strava archive or a multi-year Takeout can't be cut down to the trip someone actually wanted. The same window could serve both. Timeline can be previewed in the browser because it's plain JSON. Archives are parsed on the server: FIT is binary, and the Takeout join (`IMPLEMENTATION.md` §4.0.2) is Go. Reading them in the browser as well would mean two parsers that drift apart. So this would be a two-step import on the server.
+
+* Upload, then the server parses the archive and returns a preview: each activity's day, type, distance and a simplified route, without ingesting anything. The person picks a range and types and confirms, and only that is ingested.
+* The upload has to be held between the two steps, in object storage with an expiry, and abandoned previews cleaned up. A Takeout export can be close to 2 GB.
+* The preview of a large archive is itself big: thousands of simplified routes may need a coarser simplification, or a tile layer rather than GeoJSON.
+* The need is weaker than for Timeline. An archive's activities are ones the person already chose to record, while Timeline is the one source they didn't.
+
 ### Deploy on merge
 
 Deploys to `holdmytrack.com` are run by hand over SSH (`docs/DEPLOY.md` §6). What held back deploying every merge to `main` was that the server held the only copy of real synced history; nightly backups and a monthly restore drill now exist (ADR-0029), so a bad deploy can be undone.

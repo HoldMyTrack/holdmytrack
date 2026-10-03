@@ -56,7 +56,7 @@ To let athletes, runners, cyclists, travellers and explorers see and keep the sh
 * **Urban explorers** — people who gamify coverage of their city.
 * **Casual smartwatch owners** — want a nice seasonal or annual summary, not analytics.
 * **The multi-device athlete** — a Garmin for rides, an Apple Watch for runs, and no single place that shows all of it. This segment is served specifically by §4.1's three ingest paths and is underserved by every single-source competitor.
-* **Travellers** — people who want a holiday, a road trip or a multi-day trek kept as one journey on a map, with its photos. Served by Stories, photos and in-app recording (§4.2, §4.1); held back by having no route history to bring unless they recorded one, since most travellers' trace sits in Google Maps Timeline, which HoldMyTrack doesn't import yet (§5.5).
+* **Travellers** — people who want a holiday, a road trip or a multi-day trek kept as one journey on a map, with its photos. Served by Stories, photos and in-app recording (§4.2, §4.1); held back by having no route history to bring unless they recorded one, since most travellers' trace sits in Google Maps Timeline, which HoldMyTrack imports from an Android phone's export but not yet from an iPhone's (§5.5).
 
 ### 3.2 Market Opportunity
 Digital fitness tracking continues to grow, and the major platforms remain focused on real-time logging, social feeds and health metrics rather than spatial artifacts and cross-source aggregation. The opportunity is a **quality and openness** opportunity, not a whitespace opportunity.

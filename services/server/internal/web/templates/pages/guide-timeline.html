@@ -1,0 +1,77 @@
+{{define "content"}}
+<main class="page-main guide">
+  <section class="page-hero">
+    <p class="guide__back"><a href="/help#sync">← Help</a></p>
+    <h1>Export your Google Maps Timeline</h1>
+    <p class="page-lede">Google Maps keeps your Timeline on your phone, not in your Google account. Exporting it gives you one file, <strong>Timeline.json</strong>, with every trip and visit the phone has saved. HoldMyTrack turns the trips in it into activities.</p>
+  </section>
+
+  <section class="page-section">
+    <h2>Before you start</h2>
+    <ul class="page-list">
+      <li>You need the Android phone your Timeline is on, with Timeline turned on. An iPhone's Timeline export can't be imported yet.</li>
+      <li>The screens below are from a Pixel. On other phones the menus can be worded a little differently, or sit somewhere else in Settings. If you can't find it, type <strong>Timeline</strong> into the search box at the top of Settings.</li>
+      <li>Have your screen lock ready: the phone asks for it before exporting.</li>
+    </ul>
+  </section>
+
+  <section class="page-section">
+    <h2>On your phone</h2>
+    <ol class="guide__steps">
+      <li class="guide__step">
+        <div class="guide__text">
+          <h3>1. Open Location settings</h3>
+          <p>Open the <strong>Settings</strong> app and tap <strong>Location</strong>.</p>
+        </div>
+        <figure class="guide__shot"><img src="{{asset "guides/tl-1-settings.webp"}}" width="540" height="1115" alt="The Settings app with Location highlighted" loading="lazy" /></figure>
+      </li>
+      <li class="guide__step">
+        <div class="guide__text">
+          <h3>2. Open Location services</h3>
+          <p>Scroll down and tap <strong>Location services</strong>.</p>
+        </div>
+        <figure class="guide__shot"><img src="{{asset "guides/tl-2-location.webp"}}" width="540" height="1115" alt="The Location screen with Location services highlighted" loading="lazy" /></figure>
+      </li>
+      <li class="guide__step">
+        <div class="guide__text">
+          <h3>3. Open Timeline</h3>
+          <p>Tap <strong>Timeline</strong>.</p>
+        </div>
+        <figure class="guide__shot"><img src="{{asset "guides/tl-3-services.webp"}}" width="540" height="1115" alt="Location services with Timeline highlighted" loading="lazy" /></figure>
+      </li>
+      <li class="guide__step">
+        <div class="guide__text">
+          <h3>4. Export</h3>
+          <p>Tap <strong>Export Timeline data</strong>. <strong>View your Timeline</strong> above it says how many visits and routes the phone holds, and since when.</p>
+        </div>
+        <figure class="guide__shot"><img src="{{asset "guides/tl-4-timeline.webp"}}" width="540" height="1115" alt="The Timeline screen with Export Timeline data highlighted" loading="lazy" /></figure>
+      </li>
+      <li class="guide__step">
+        <div class="guide__text">
+          <h3>5. Confirm it's you</h3>
+          <p>Tap <strong>Continue</strong>, then unlock with your fingerprint, PIN or pattern. Android hides that screen from screenshots, so it isn't shown here. Your Timeline stays on the phone: exporting only makes a copy.</p>
+        </div>
+        <figure class="guide__shot"><img src="{{asset "guides/tl-5-confirm.webp"}}" width="540" height="1115" alt="The Export a copy of your Timeline data dialog with Continue highlighted" loading="lazy" /></figure>
+      </li>
+      <li class="guide__step">
+        <div class="guide__text">
+          <h3>6. Save the file</h3>
+          <p>Pick a folder, <strong>Downloads</strong> is easiest to find again, and tap <strong>Save</strong>. The file is called <strong>Timeline.json</strong>. It's large: three months came to about 40 MB, and years of history can be hundreds.</p>
+        </div>
+        <figure class="guide__shot"><img src="{{asset "guides/tl-6-save.webp"}}" width="540" height="1115" alt="The save screen with Timeline.json as the file name and Save highlighted" loading="lazy" /></figure>
+      </li>
+    </ol>
+  </section>
+
+  <section class="page-section">
+    <h2>Bring it to HoldMyTrack</h2>
+    <p>You can import straight from the phone: open HoldMyTrack in the phone's browser, sign in, and choose the file in the <strong>Upload</strong> menu. A computer's bigger screen makes the map easier to check, though. To move the file there, connect the phone with a USB cable and copy it from its <strong>Download</strong> folder, send it with Quick Share, or put it in Google Drive and download it on the computer.</p>
+    <ol class="page-list">
+      <li>Open <strong>Upload</strong> at the top of any page and choose <strong>Timeline.json</strong>, or drop it on the map. It isn't uploaded as it is: a window opens on the map and reads it in your browser.</li>
+      <li>Pick the days to import with <strong>From</strong> and <strong>To</strong>, and tick the kinds of trip you want. Flights start unticked, because a flight is drawn as a straight line across everything under it.</li>
+      <li>Check the dashed lines on the map, then press <strong>Import</strong>. The trips appear on the map as they're processed.</li>
+    </ol>
+    <p>Only the trips are sent. The places you stopped at, your home and work labels and the rest of the file never leave your device. Timeline keeps a point every few minutes, so a drive may cut a corner where the road curved. Importing a newer export later adds only the trips that are new, and a trip you also recorded with a watch or the app is kept once, as the recording.</p>
+  </section>
+</main>
+{{end}}
