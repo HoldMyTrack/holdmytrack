@@ -113,18 +113,13 @@ docker compose -f compose.prod.yml --env-file .env.prod run --rm api set-admin y
 
 `false` in place of `true` revokes it. This is the only way to grant or revoke admin; nothing on the web can.
 
-Spots (`SPEC.md` FR-15) needs its places loaded, and then refreshed about once a quarter, the same way each time; until the first load the Layers menu's points of interest show none. The extract is made **off the server**: filtering the planet file takes more memory and disk than this box has. On any machine with [osmium-tool](https://osmcode.org/osmium-tool/), about 100 GB of free disk and the current [planet file](https://planet.openstreetmap.org/pbf/):
+Spots (`SPEC.md` FR-15) needs its places loaded, and then refreshed about once a quarter, the same way each time; until the first load the Layers menu's points of interest show none. The extract is made **off the server**: filtering the planet file takes more memory and disk than this box has. `scripts/spots-extract.sh` does it on any machine with [osmium-tool](https://osmcode.org/osmium-tool/) (`brew install osmium-tool`, `apt install osmium-tool`) and about 100 GB free. It downloads the current [planet file](https://planet.openstreetmap.org/pbf/) (95 GB in 2026-09, about 1.5 hours at 18 MB/s), checks its md5, filters it, and prints the place count by tag:
 
 ```
-osmium tags-filter planet-latest.osm.pbf \
-  nwr/leisure=playground,dog_park \
-  nwr/historic=monument,memorial,castle,ruins,fort,archaeological_site \
-  nwr/tourism=viewpoint \
-  -o spots.osm.pbf
-osmium export spots.osm.pbf -f geojsonseq -u type_id --geometry-types=point,polygon -o spots.geojsonseq
+scripts/spots-extract.sh ~/spots-work    # result: ~/spots-work/spots.geojsonseq
 ```
 
-`-u type_id` gives each feature the OSM id the import upserts by, and `--geometry-types=point,polygon` keeps nodes and areas. The same two commands over a [Geofabrik](https://download.geofabrik.de/) region extract make a small file for a dev database. Copy the result to the server and import it:
+It keeps every node, way and relation in the five categories, as points and areas, with the OSM id the import upserts by (`osmium export -u type_id`). Run it again after an interruption: it resumes the download, and skips it once a checked copy is there. Given a [Geofabrik](https://download.geofabrik.de/) extract's URL as a second argument, it makes a small regional file instead, for a dev database or a regional load, imported without `--planet`. Before importing a planet file, compare its total with the last run's. Then, on the server, take a backup (`./scripts/backup.sh`, §11), copy the file over and import it inside `tmux`, since a planet import outlasts a dropped SSH connection:
 
 ```
 mkdir -p /tmp/spots && chmod 755 /tmp/spots   # put spots.geojsonseq here, world-readable
