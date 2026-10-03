@@ -32,6 +32,36 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
+ * The account's latest copy of its data (root `docs/SPEC.md` FR-1.12), as
+ * `GET /v1/account/export` describes it: [state] is "none", "preparing", "ready" or "failed";
+ * [expiresAt] and [parts] only when ready.
+ */
+data class ExportStatus(
+    val state: String,
+    val expiresAt: java.time.Instant?,
+    val totalSize: Long,
+    val parts: List<ExportPart>,
+) {
+    companion object {
+        fun parse(json: JSONObject): ExportStatus {
+            val parts = json.optJSONArray("parts")
+            return ExportStatus(
+                state = json.optString("state", "none"),
+                expiresAt = json.optString("expires_at").takeIf { it.isNotEmpty() }?.let(java.time.Instant::parse),
+                totalSize = json.optLong("total_size"),
+                parts = List(parts?.length() ?: 0) { i ->
+                    val p = parts!!.getJSONObject(i)
+                    ExportPart(p.optInt("n"), p.optLong("size"), p.optString("name"), p.optString("url"))
+                },
+            )
+        }
+    }
+}
+
+/** One zip archive of an export: [url] is relative to the site, [name] what it saves as. */
+data class ExportPart(val n: Int, val size: Long, val name: String, val url: String)
+
+/**
  * The account as the server describes it — `GET /v1/auth/me`, and the same shape every
  * sign-in answers with and `PATCH /v1/account/settings` returns (`authResponse`,
  * `services/server/internal/httpapi/auth.go`). [email] is empty for a demo account, which the
@@ -756,6 +786,25 @@ object HoldMyTrackApi {
             .build()
         call(request, { }, onResult)
     }
+
+    /** `GET /v1/account/export` — where the account's latest copy of its data stands. */
+    fun exportStatus(onResult: (Result<ExportStatus>) -> Unit) {
+        val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/account/export").build()
+        call(request, { body -> ExportStatus.parse(JSONObject(body)) }, onResult)
+    }
+
+    /** `POST /v1/account/export` — asks for a copy; one already being prepared is returned
+     *  instead. The server emails the account when it's ready, in the app's language. */
+    fun requestExport(onResult: (Result<ExportStatus>) -> Unit) {
+        val request = Request.Builder()
+            .url(BuildConfig.API_BASE_URL + API_V1 + "/account/export")
+            .post(EMPTY_BODY)
+            .build()
+        call(request, { body -> ExportStatus.parse(JSONObject(body)) }, onResult)
+    }
+
+    /** An export part's download URL, absolute — for Android's DownloadManager. */
+    fun exportPartUri(part: ExportPart): Uri = Uri.parse(BuildConfig.API_BASE_URL + part.url)
 
     /** The avatar at [path] (a [Profile.avatarUrl], relative to the API) — see [image]. */
     fun avatar(path: String, onResult: (Result<Bitmap>) -> Unit) = image(path, maxSide = null, onResult)

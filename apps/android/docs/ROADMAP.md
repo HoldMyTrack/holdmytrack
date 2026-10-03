@@ -76,4 +76,4 @@ Everything between a tested app and its Play Store listing, roughly in the order
 - [ ] **Testing tracks, then production**
   - An internal test first, to install the Play-signed build and check Google sign-in against its key. Then the closed test, with its 12 testers for 14 days on a personal account, and its pre-launch report read. Then apply for production access and release in stages.
 - [ ] **Confirm the wider launch gates are met**
-  - A Play Store release is a public launch and is gated by the same items as any other: the DPIA, EU-region hosting for EU users, and a working data export endpoint (root `ROADMAP.md` Phase 6), plus the rest of Milestone 2's entry gate (root `ROADMAP.md`, Milestones). These are not Android work, but shipping the app without them is not an option.
+  - A Play Store release is a public launch and is gated by the same items as any other: the DPIA, EU-region hosting for EU users (root `ROADMAP.md` Phase 6), plus the rest of Milestone 2's entry gate (root `ROADMAP.md`, Milestones). These are not Android work, but shipping the app without them is not an option.
