@@ -9,6 +9,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.appcompat.app.AppCompatActivity
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -110,12 +111,17 @@ class SyncActivity : AppCompatActivity() {
         if (savedInstanceState == null && intent?.action in RATIONALE_ACTIONS) showRationale()
     }
 
-    /** What is read from Health Connect and what it is for — the permission rationale. */
+    /** What is read from Health Connect and what it is for — the permission rationale — with
+     *  the privacy policy a button away: Health Connect requires the policy this screen leads to
+     *  to be the one on the Play listing, and both are the web's /privacy. */
     private fun showRationale() {
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.sync_health_connect_info)
             .setMessage(R.string.sync_rationale)
             .setPositiveButton(android.R.string.ok, null)
+            .setNeutralButton(R.string.privacy_policy) { _, _ ->
+                CustomTabsIntent.Builder().build().launchUrl(this, HoldMyTrackApi.webPageUri("/privacy"))
+            }
             .show()
     }
 

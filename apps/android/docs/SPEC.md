@@ -4,7 +4,7 @@
 | :-- | :-- |
 | **Version** | 1.0 |
 | **Status** | Current — describes the app as built: sign-in, map, Health Connect sync and sync status (FR-1–FR-4), plus in-app GPS recording (FR-5, built ahead of the design and compliance phases — §1.2, §7 below) |
-| **Last updated** | 2026-10-02 (FR-2.10: photos on an activity, and the full-screen photo viewer) |
+| **Last updated** | 2026-10-03 (the privacy policy, from the burger menu and the Health Connect rationale) |
 | **Related documents** | `apps/android/docs/ROADMAP.md` (remaining work and the platform-constraint findings; completed phases, with the verification record this document's behavior claims are drawn from, are removed from it once done and survive in its git history); `apps/android/docs/ARCHITECTURE.md` (this app's shape, stack, and key decisions); `apps/android/docs/IMPLEMENTATION.md` (file-by-file "how it's built" detail); `docs/SPEC.md`/`docs/IMPLEMENTATION.md` (the server behavior and schema this app is a client of); `docs/VISION.md` (why Path 2 exists at all, §4.1 and §5.4) |
 
 ## 1. Introduction
@@ -241,7 +241,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 **Behavior**:
 1. **Profile** (FR-1.6), **Sync** (FR-3.5) and **Settings** (FR-1.5) open those screens.
-2. Under a divider, **Donate**, **About**, **Help** and **Contacts** open the web's own pages (`docs/SPEC.md` FR-10, FR-11) — Donate the About page's funding section, as the web header's Donate does — in a browser tab, which shows them in the browser's language (`docs/SPEC.md` FR-13.1). Donate is in the APK the website offers, not in the Play Store build: Play doesn't allow an app to point to payment outside its own billing.
+2. Under a divider, **Donate**, **About**, **Help**, **Contacts** and **Privacy** open the web's own pages (`docs/SPEC.md` FR-10, FR-11) — Donate the About page's funding section, as the web header's Donate does — in a browser tab, which shows them in the browser's language (`docs/SPEC.md` FR-13.1). Donate is in the APK the website offers, not in the Play Store build: Play doesn't allow an app to point to payment outside its own billing.
 3. Last, under another divider, the app's version, greyed and not tappable: "Version 0.4 (62da50b)" — the release number and the commit it was built from.
 
 ### FR-2.10 Photos
@@ -275,7 +275,7 @@ All of FR-3 requires an active session (demo or registered); Health Connect sync
 5. **Needs history permission** — sessions and routes are both readable, but Health Connect will only serve the last 30 days without `READ_HEALTH_DATA_HISTORY`. Unlike the routes permission, this one *is* requestable, so the primary action opens the ordinary system dialog for it. This state is not blocking: Sync now (FR-3.5) syncs the last 30 days, since declining history access is a legitimate answer and syncing a shallower window is still useful.
 6. **Ready** — every permission granted; there is no setup action left, and Sync now (FR-3.5) starts a sync run (FR-3.2).
 
-**Notes**: This same screen is registered for Health Connect's `ACTION_SHOW_PERMISSIONS_RATIONALE` intent, so when Health Connect itself asks the user why HoldMyTrack wants their data, it opens this screen with the rationale already showing, in a dialog — meaning the rationale a user sees inside Health Connect and the explanation they see inside HoldMyTrack are the same text, by construction rather than by two authors staying in sync. Opened from HoldMyTrack's own menu, the same dialog is behind the info button beside the Health Connect heading (FR-3.5), rather than filling the top of the screen; Health Connect's "see how this app used your data" link opens it the same way the rationale request does. Readiness is re-read on every resume rather than cached, since the routes permission specifically can only change in another app's settings screen, and returning from it is the only moment this screen can observe that.
+**Notes**: This same screen is registered for Health Connect's `ACTION_SHOW_PERMISSIONS_RATIONALE` intent, so when Health Connect itself asks the user why HoldMyTrack wants their data, it opens this screen with the rationale already showing, in a dialog — meaning the rationale a user sees inside Health Connect and the explanation they see inside HoldMyTrack are the same text, by construction rather than by two authors staying in sync. The dialog's **Privacy policy** button opens the web's privacy policy (`docs/SPEC.md` FR-10.6) in a browser tab, the same page the Play listing names, as Health Connect requires. Opened from HoldMyTrack's own menu, the same dialog is behind the info button beside the Health Connect heading (FR-3.5), rather than filling the top of the screen; Health Connect's "see how this app used your data" link opens it the same way the rationale request does. Readiness is re-read on every resume rather than cached, since the routes permission specifically can only change in another app's settings screen, and returning from it is the only moment this screen can observe that.
 
 ### FR-3.2 Foreground sync run
 
