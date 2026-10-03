@@ -218,7 +218,7 @@ That is a genuinely small number, and it is the whole argument for this model wo
 The product moves through three milestones (ADR-0031):
 
 1. **MVP** — where HoldMyTrack is now. Activities, the map modes, Spots, Stories and photos, on the web and Android (Phases 0–3 below). Free for everyone, community-funded.
-2. **Release and community.** A public launch, then settling: polish, bug fixes, and adjusting features to what the people using it ask for (Phases 4–6). It starts with what a public launch needs anyway — the funding page (§6.1), a privacy policy and a DPIA (§7) — and ends with a measured answer to what community funding can carry: monthly donations against the monthly bill, and the share of active users who give, over several months (§8.3).
+2. **Release and community** (Phases 4–6). Open HoldMyTrack to the public and build a community around it: polish, fix, and shape the features around what the people using it ask for. Its other job is to find out what community funding can actually carry, and that answer is what Milestone 3 is decided from.
 3. **Social graph** (Phase 7). Public pages, followers and the rest — if at all. Whether to build it, and whether to pay for it with paid features, community funding or sponsors, is decided from Milestone 2's numbers. Staying a single-player product and never starting this milestone is one of the options.
 
 Within the milestones, phases are sequenced so the unconditional ingest path ships first and the ones that depend on other companies' permission come later. The phase numbers are the ones `docs/ROADMAP.md` uses, which carries each phase's step-by-step detail.
