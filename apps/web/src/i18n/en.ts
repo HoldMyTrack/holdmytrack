@@ -285,6 +285,7 @@ export const en = {
   'photos.close_viewer': 'Close',
   'timeline.title': 'Import Google Maps Timeline',
   'timeline.how': 'On your Android phone, open Settings → Location → Location services → Timeline → Export Timeline data, then bring the Timeline.json it saves to this computer.',
+  'timeline.guide': 'Step by step, with screenshots',
   'timeline.private': 'Only the routes you travelled are sent. The places you stopped at, and everything else in the file, stay on this device.',
   'timeline.choose': 'Choose Timeline.json',
   'timeline.choose_other': 'Choose another file',

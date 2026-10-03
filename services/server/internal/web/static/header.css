@@ -304,6 +304,11 @@
   background: var(--fm-accent-hover);
 }
 
+/* The hint's export guides open in a new tab, so the menu and what's uploading stay put. */
+.upload-menu__hint a {
+  color: var(--fm-accent-strong);
+}
+
 .upload-menu__hint,
 .upload-menu__idle {
   margin: 4px 2px 6px;

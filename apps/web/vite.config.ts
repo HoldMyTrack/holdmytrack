@@ -29,6 +29,7 @@ const pageRoutes = [
   '^/admin(/|\\?|$)',
   '^/settings(/|\\?|$)',
   '^/(about|help|contacts|logout|language|signin|signup|demo|forgot|reset|verify)(\\?|$)',
+  '^/help/',
   '^/verify-pending(/|\\?|$)',
   '^/static/',
   '^/v1/',

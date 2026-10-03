@@ -306,6 +306,7 @@ export const ru: Record<MessageKey, string> & Record<string, string> = {
   'photos.close_viewer': 'Закрыть',
   'timeline.title': 'Импорт Хронологии Google Карт',
   'timeline.how': 'На телефоне Android откройте Настройки → Местоположение → Службы геолокации → Хронология → Экспортировать данные Хронологии, затем перенесите сохранённый Timeline.json на этот компьютер.',
+  'timeline.guide': 'Пошагово, со снимками экрана',
   'timeline.private': 'Отправляются только маршруты, по которым вы перемещались. Места, где вы были, и всё остальное в файле остаются на этом устройстве.',
   'timeline.choose': 'Выбрать Timeline.json',
   'timeline.choose_other': 'Выбрать другой файл',

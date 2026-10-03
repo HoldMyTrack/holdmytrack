@@ -150,7 +150,12 @@ export function TimelineImportWindow({ map, file, onClose }: { map: MapLibreMap;
 
       {!loaded && (
         <>
-          <p className="edit-track__note">{t('timeline.how')}</p>
+          <p className="edit-track__note">
+            {t('timeline.how')}{' '}
+            <a href="/help/timeline-export" target="_blank" rel="noopener">
+              {t('timeline.guide')}
+            </a>
+          </p>
           <p className="edit-track__note">{t('timeline.private')}</p>
         </>
       )}
