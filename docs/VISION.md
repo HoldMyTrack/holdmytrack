@@ -16,9 +16,10 @@ HoldMyTrack's wedge is:
 
 ### 1.1 What HoldMyTrack is not
 
-Worth stating early, because the shorthand for this product is "a free Strava" and that overstates it in three specific ways:
+Worth stating early, because the shorthand for this product is "a free Strava" and that overstates it in four specific ways:
 
 * **HoldMyTrack is not a fitness tracker.** The mobile app can record a plain GPS track as a convenience — a road trip, a dog walk, a forest walk, anything you'd otherwise need a separate tool running for (§4.1) — but it captures GPS only: no heart rate, cadence, power or other sensor data, no training metrics, no ambition to match a dedicated watch's battery life or accuracy. If you already track workouts on a watch, that stays the better tool for the job; HoldMyTrack keeps ingesting its output exactly as it always has.
+* **HoldMyTrack is not a location logger.** It imports a Google Maps Timeline export (§5.5), but it doesn't log where someone is all day in the background the way Timeline does. A central store of everyone's round-the-clock location is what draws requests for everyone who was near a place at a given time — the reason Google moved Timeline onto the phone — and it would be a storage line growing without bound (§4.3) and a background-location permission the Play Store reviews strictly. If continuous logging is ever wanted, it stays on the device, like Google's own.
 * **HoldMyTrack has no social network yet.** No feed, no follows, no kudos, no segments, no leaderboards. A social graph is the third milestone (§5), built only if the second milestone's numbers say it can be paid for — and not building it is an acceptable outcome. See §5.8 for why that ordering is not just caution.
 * **HoldMyTrack is not a health or fitness advisor, and keeps no health data.** We don't keep your health profile — only the geographical data you trust us with, and the photos you choose to add to it. No HR zones, no training load, no recovery or readiness scores, no sleep tracking — and no heart rate at all: it is never read from a file or from Health Connect, never stored and never shown. An activity is where you went, when, and at what elevation; pace is derived from that and shown only as the color of a selected route. An outdoor GPS tracker is what this is, not a health platform wearing a map as a skin (ADR-0017).
 
@@ -249,7 +250,8 @@ Within the milestones, phases are sequenced so the unconditional ingest path shi
 * The first shipped UI was functional scaffolding. This pass finished it — one icon set, deliberate typography, design tokens — across desktop and phone browsers, and ended in a design freeze, declared 2026-10-02: the `--fm-*` tokens, Inter and Fraunces (Source Serif 4 for Russian headings), and Lucide icons.
 * The mobile apps inherit that freeze rather than inventing a second visual language: two clients that each chose their own would not read as one product.
 
-### 5.5 Phase 4: Cloud Sources
+### 5.5 Phase 4: More sources
+* Google Maps Timeline import — a one-time upload of the JSON file the phone's Google Maps exports, for the travellers (§3.1) whose only route history is Timeline. Google moved Timeline onto the phone and closed its web version, so years of history have no map of their own any more; "see it all on one map again, with Fog of War" is a strong reason to arrive. Import only — see §1.1 on why HoldMyTrack doesn't pick up continuous location tracking.
 * Path 1 connectors, in whatever order §4.1's approvals actually land.
 
 ### 5.6 Phases 5–6: Cost control and compliance

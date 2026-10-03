@@ -62,9 +62,18 @@ Native apps whose core job is exporting device-recorded health data to HoldMyTra
 
 ---
 
-## Phase 4 — Cloud sources
+## Phase 4 — More sources
 
-Connecting the app to third-party services.
+Connecting the app to third-party services, and reading the exports of ones it can't connect to.
+
+### Path 3 — Google Maps Timeline import
+
+For travellers whose only route history is Timeline (`VISION.md` §3.1, §5.5). Import only: no continuous location logging (`VISION.md` §1.1).
+
+- [ ] Try the render on two or three real Timeline exports before building anything: Timeline is visits plus sparse, mode-guessed movement between them, not a recorded track, so drawn as-is the fog clears in straight lines through buildings and across lakes. Decide from what it looks like how Timeline-sourced data is drawn — for example, clearing fog only around visits, or keeping inferred movement out of the fog — and how flights and guessed modes show.
+- [ ] Settle which formats to read: the phone's on-device export, and the older account-side `Semantic Location History` from past Takeouts, which differ; neither is documented, so the reader is built against real files.
+- [ ] Upload with a date range and a preview of what will be imported, not a whole-history dump — it's the first import of data the user never chose to record as an activity. Private locations apply as for every other source (`VISION.md` §7).
+- [ ] Measure the storage a multi-year Timeline adds per account against `VISION.md` §4.3's assumptions.
 
 ### Prerequisites — gate the specific connectors below, not this phase's other work
 

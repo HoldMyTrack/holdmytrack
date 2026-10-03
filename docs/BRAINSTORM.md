@@ -66,15 +66,6 @@ ADR-0024 keeps a resized copy of each photo on our own storage. If photos ever b
 * Google Photos can't serve as one: its API hands out image URLs that expire within the hour.
 * Decide only once cost-per-user is measured (`ROADMAP.md` Phase 5) and photos show up in it.
 
-### Google Maps Timeline import
-
-Most travellers (`VISION.md` §3.1) have no GPX or FIT files: their trace of a trip is Google Maps Timeline, which none of the three ingest paths reads, so today they can only start with their next trip, recorded in the app. Since 2024 Google keeps Timeline on the phone rather than in the account, and Takeout no longer carries it; the phone's Maps settings can still export it as a JSON file.
-
-* Timeline is sparse, mode-guessed movement between visits, not a recorded track: whether a road trip drawn from it looks right on the map, and how a flight or a guessed mode is shown, needs trying on real exports.
-* The export has no stable, documented format, and older account-side exports (`Semantic Location History`) differ from the on-device one.
-* It would be the first ingest of data the user never chose to record as an activity, so the import needs a date range and a preview, not a whole-history dump.
-* Fits Milestone 2's "adjust features to what users ask for" (`VISION.md` §5): worth deciding once travellers actually show up asking.
-
 ### Deploy on merge
 
 Deploys to `holdmytrack.com` are run by hand over SSH (`docs/DEPLOY.md` §6). What held back deploying every merge to `main` was that the server held the only copy of real synced history; nightly backups and a monthly restore drill now exist (ADR-0029), so a bad deploy can be undone.
