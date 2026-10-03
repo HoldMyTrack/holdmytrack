@@ -17,6 +17,7 @@ import (
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/metrics"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 )
 
@@ -150,6 +151,7 @@ func claimAndRunOne(ctx context.Context, pool *pgxpool.Pool, store *storage.Stor
 		if err := tx.Commit(ctx); err != nil {
 			return false, fmt.Errorf("worker: commit abandoned: %w", err)
 		}
+		finished(j.kind, "failed", failureCode(j.kind, nil))
 		return true, nil
 	}
 
@@ -160,7 +162,9 @@ func claimAndRunOne(ctx context.Context, pool *pgxpool.Pool, store *storage.Stor
 		return false, fmt.Errorf("worker: commit claim: %w", err)
 	}
 
+	start := time.Now()
 	runErr := runJobSafely(ctx, pool, store, log, j)
+	metrics.JobDuration.WithLabelValues(j.kind).Observe(time.Since(start).Seconds())
 
 	// The rest records the outcome on a context that outlives a shutdown: a job that finished
 	// as SIGTERM arrived is still done, and one cut off by it is still owed a release.
@@ -181,13 +185,15 @@ func claimAndRunOne(ctx context.Context, pool *pgxpool.Pool, store *storage.Stor
 
 	if runErr != nil {
 		log.Error("job failed", "job_id", j.id, "kind", j.kind, "err", runErr)
+		code := failureCode(j.kind, runErr)
 		_, uerr := pool.Exec(wctx, `
 			UPDATE jobs SET state = 'failed', last_error = $2, error_code = $3, finished_at = NOW()
 			WHERE id = $1
-		`, j.id, runErr.Error(), failureCode(j.kind, runErr))
+		`, j.id, runErr.Error(), code)
 		if uerr != nil {
 			return true, fmt.Errorf("worker: mark failed: %w", uerr)
 		}
+		finished(j.kind, "failed", code)
 		return true, nil // the queue made progress even though this job failed
 	}
 
@@ -195,7 +201,21 @@ func claimAndRunOne(ctx context.Context, pool *pgxpool.Pool, store *storage.Stor
 		return true, fmt.Errorf("worker: mark done: %w", err)
 	}
 	log.Info("job done", "job_id", j.id, "kind", j.kind)
+	finished(j.kind, "done", nil)
 	return true, nil
+}
+
+// finished counts a job in metrics.JobsFinished. A failure with no jobs.error_code (any kind
+// but ingest) counts as "internal": only an ingest's codes can name the user's file.
+func finished(kind, outcome string, code *string) {
+	c := ""
+	if outcome == "failed" {
+		c = ingest.FailInternal
+		if code != nil {
+			c = *code
+		}
+	}
+	metrics.JobsFinished.WithLabelValues(kind, outcome, c).Inc()
 }
 
 // failureCode is the error_code a failed job is stored with. Only an ingest job's failure

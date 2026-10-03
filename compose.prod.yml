@@ -106,6 +106,9 @@ services:
       FACEBOOK_APP_ID: ${FACEBOOK_APP_ID:-}
       FACEBOOK_APP_SECRET: ${FACEBOOK_APP_SECRET:-}
       FACEBOOK_REDIRECT_URL: ${FACEBOOK_REDIRECT_URL:-}
+      # GET /metrics for the `alloy` service (internal/metrics), on the Docker network only:
+      # nothing publishes 9100, and Caddy only ever proxies to 8080.
+      METRICS_ADDR: ":9100"
     depends_on:
       db: { condition: service_healthy }
 
@@ -188,6 +191,47 @@ services:
     depends_on:
       - api
 
+  # Monitoring (docs/DEPLOY.md §13) — ships the containers' logs and the host's, Postgres's
+  # and the app's metrics to Grafana Cloud, as ops/alloy/config.alloy says. Off unless
+  # .env.prod has COMPOSE_PROFILES=monitoring and the GRAFANA_CLOUD_* values. It reads the
+  # Docker socket to find and tail the containers, which makes it as trusted as root here.
+  alloy:
+    image: grafana/alloy:v1.20.1
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    logging: *logging
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy/data
+      # Its own UI and debug endpoints, on this container's loopback only.
+      - --server.http.listen-addr=127.0.0.1:12345
+    environment:
+      COMPOSE_PROJECT: ${COMPOSE_PROJECT_NAME}
+      DOMAIN: ${DOMAIN}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      GRAFANA_CLOUD_PROMETHEUS_URL: ${GRAFANA_CLOUD_PROMETHEUS_URL:-}
+      GRAFANA_CLOUD_PROMETHEUS_USER: ${GRAFANA_CLOUD_PROMETHEUS_USER:-}
+      GRAFANA_CLOUD_LOKI_URL: ${GRAFANA_CLOUD_LOKI_URL:-}
+      GRAFANA_CLOUD_LOKI_USER: ${GRAFANA_CLOUD_LOKI_USER:-}
+      GRAFANA_CLOUD_TOKEN: ${GRAFANA_CLOUD_TOKEN:-}
+    volumes:
+      - ./ops/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro,rslave
+      # backup.sh and restore-drill.sh write their last run's time here (textfile collector).
+      - ${BACKUP_DIR:-/srv/holdmytrack-backups}/metrics:/textfile:ro
+      # Where it keeps its place in each log and its queue of samples not yet sent, so a
+      # restart neither resends nor loses them.
+      - alloy_data:/var/lib/alloy/data
+    # A cap well above what it uses (docs/DEPLOY.md §13), so a fault in the collector can't
+    # take memory the database needs.
+    mem_limit: 400m
+
   # Backups (docs/DEPLOY.md §11) — never started by `up` (the `ops` profile keeps it out);
   # scripts/backup.sh and scripts/restore-drill.sh `run --rm` it for each rclone step. It is
   # configured from these variables rather than a config file, and the scripts see two remotes,
@@ -223,3 +267,4 @@ volumes:
   pgdata:
   caddy_data:
   caddy_config:
+  alloy_data:

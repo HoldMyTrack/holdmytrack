@@ -38,6 +38,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0027](0027-spots-retired-not-deleted.md) | A place gone from OpenStreetMap is retired, never deleted, and still shown to the accounts that captured it |
 | [0028](0028-spots-capture-only-no-visits.md) | Spots have one mark, the capture; visits worked out from tracks are dropped |
 | [0029](0029-backups-to-a-second-r2-bucket.md) | Nightly backups go to a second R2 bucket, and only what can't be rebuilt is copied |
+| [0030](0030-monitoring-on-grafana-cloud.md) | Monitoring runs on Grafana Cloud's free tier, fed by one Alloy collector, with personal data scrubbed before anything leaves |
 
 ## Writing a new one
 

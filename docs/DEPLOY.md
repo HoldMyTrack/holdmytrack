@@ -289,13 +289,35 @@ apt-config dump | grep Automatic-Reboot
 
 ## 13. Monitoring
 
-Three things watch the deployment, all on free plans, and all alert by email:
+Grafana Cloud's free tier holds the deployment's logs and metrics, with dashboards and alerts on them (ADR-0030). One collector on the server, the `alloy` service (`ops/alloy/config.alloy`), feeds it:
 
-- **An uptime check from outside**, on `https://<your-domain>/healthz`. It answers `200` with `"status":"ok"` while `api` can reach the database, and `503` when it can't. Being outside, it also catches what nothing on the server can report: the droplet, Caddy or the certificate being down.
-- **`scripts/monitor.sh`**, every five minutes from cron, checks from the inside: that `db`, `api`, `worker` and `web` are running; that no runnable job has waited more than 30 minutes (the worker is stuck or gone); errors on our side in the last five minutes, meaning any `ERROR` line or Go panic in `api`'s log (every `500` logs one) and any job that failed for a reason other than the user's file (`jobs.error_code` `internal`, or a non-ingest job); the disk under 85% full; and nothing killed by the kernel's OOM killer, which is how Postgres dies when memory runs out. It sends its report to a heartbeat check, as the body of a ping to the URL when all is well and to the URL's `/fail` when something isn't. The limits are constants at the top of the script.
-- **Heartbeat checks** for `monitor.sh`, `backup.sh` and `restore-drill.sh` (§11). A check alerts when its script pings `/fail`, and when no ping arrives within its period plus grace time, so a script that stops running is noticed too, as is the whole box going quiet.
+- **Logs** from every container in the stack, labeled `service` (`api`, `worker`, `db`, `web`, …), plus `level` for `api`'s and `worker`'s JSON lines. Before anything leaves the server, `internal/mail`'s lines (which name the recipient) and Postgres's `DETAIL` lines (which can quote an email address) are dropped, and every IP address in Caddy's logs is replaced with `redacted`.
+- **The app's metrics** from `api` and `worker` (`GET /metrics` on port 9100, on the Docker network only): requests by route and status class with their timings, recovered panics, finished jobs by kind, outcome and failure code, and the queue's runnable jobs and the oldest one's age, by kind.
+- **The host's metrics**: CPU, memory, swap, disk, network and OOM kills (`node_vmstat_oom_kill`).
+- **Postgres's metrics**, database-wide: connections, size, locks, transactions.
+- **Backup freshness**: `backup.sh` and `restore-drill.sh` write the time of their last successful run to `BACKUP_DIR/metrics/` (`holdmytrack_backup_last_success_timestamp_seconds`, `holdmytrack_restore_drill_last_success_timestamp_seconds`).
 
-**Set up the uptime check** with any service that requests a URL from outside on a schedule and alerts when it fails. Grafana Cloud's Synthetic Monitoring is the plan for `holdmytrack.com` (`docs/ROADMAP.md`, the monitoring item). Point it at `https://<your-domain>/healthz` every few minutes, from more than one location, and have it alert when the response isn't `200` or the body doesn't contain `"status":"ok"`. `/healthz` is exempt from maintenance mode (§7), so the check stays green through a deploy unless `api` itself is down.
+Every series and stream carries `deployment="<your-domain>"`. The stack sends about 1,400 metric series, against the free tier's 10,000. Alloy itself uses about 70 MB of memory and is capped at 400 MB.
+
+**Set it up.**
+
+1. At grafana.com, create a free account and a stack, in the region closest to the server; it can't be moved later. In the stack, under **Alerting → Contact points**, test the default email contact point, or add one that reaches you (Telegram works well), before relying on any alert.
+2. At grafana.com, under your organisation's **Security → Access Policies**, create a policy for the stack with only the `metrics:write` and `logs:write` scopes, and add a token to it. It's shown once; it goes into `.env.prod` and nowhere else.
+3. From the stack's details page, note the **Prometheus** remote-write URL (ending in `/api/prom/push`) and its username (a number), and the **Loki** URL (ending in `/loki/api/v1/push`) and its username (a different number).
+4. Fill in `.env.prod`'s monitoring values (`.env.prod.example` lists them), including `COMPOSE_PROFILES=monitoring`, which is what makes Compose start `alloy`.
+5. Bring it up: `GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod up -d`. That starts `alloy`, and recreates `api` and `worker` if they were built before `METRICS_ADDR` existed.
+6. Check: `docker compose -f compose.prod.yml --env-file .env.prod logs alloy | grep -E 'level=(error|warn)'` should show nothing after its first minute, apart from a `diskstats` note about `/run/udev/data`. In the stack's **Explore**, Loki's `{deployment="<your-domain>"}` should show recent lines, and Prometheus's `holdmytrack_jobs_runnable` four series at 0.
+
+**An uptime check from outside**, on `https://<your-domain>/healthz`, covers what nothing on the server can report: the droplet, Caddy or the certificate being down. `/healthz` answers `200` with `"status":"ok"` while `api` can reach the database, and `503` when it can't. Set it up with any service that requests a URL on a schedule and alerts when it fails. Grafana Cloud's Synthetic Monitoring is the plan for `holdmytrack.com` (`docs/ROADMAP.md`, the monitoring item). Point it at `/healthz` every few minutes, from more than one location, and have it alert when the response isn't `200` or the body doesn't contain `"status":"ok"`. `/healthz` is exempt from maintenance mode (§7), so the check stays green through a deploy unless `api` itself is down.
+
+**Without Grafana Cloud**, `scripts/monitor.sh` and heartbeat checks give a smaller version of the same alerts. `monitor.sh`, run every five minutes from cron, checks from the inside:
+- that `db`, `api`, `worker` and `web` are running;
+- that no runnable job has waited more than 30 minutes;
+- errors on our side in the last five minutes: any `ERROR` line or Go panic in `api`'s log, and any job that failed for a reason other than the user's file;
+- that the disk is under 85% full;
+- that the kernel's OOM killer killed nothing.
+
+It reports to a heartbeat check: a ping to the URL when all is well, and to the URL's `/fail` when something isn't. Each backup script pings a check of its own the same way (§11). A check alerts on a `/fail` ping, and when no ping arrives within its period plus grace time.
 
 **Set up the heartbeat checks** on [healthchecks.io](https://healthchecks.io), one per script, each with the server's time zone (UTC):
 

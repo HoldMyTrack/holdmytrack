@@ -50,6 +50,15 @@ log() { echo "$(date -u +%FT%TZ) $*"; }
 heartbeat=$(env_value BACKUP_HEARTBEAT_URL)
 ping() { [[ -z "$heartbeat" ]] || curl -fsS -m 10 --retry 3 -o /dev/null "$heartbeat${1:-}" || log "heartbeat ping failed"; }
 
+# When this last succeeded, for the alerts (docs/DEPLOY.md §13): a file in Prometheus's text
+# format that the alloy service's textfile collector reads. Written beside its final name and
+# renamed, so a scrape never reads half of it.
+record_success() {
+  mkdir -p "$BACKUP_DIR/metrics"
+  printf '# HELP %s Unix time of the last successful run.\n# TYPE %s gauge\n%s %s\n' "$1" "$1" "$1" "$(date +%s)" > "$BACKUP_DIR/metrics/$2.prom.tmp"
+  mv "$BACKUP_DIR/metrics/$2.prom.tmp" "$BACKUP_DIR/metrics/$2.prom"
+}
+
 rclone() { "${COMPOSE[@]}" run --rm -T rclone "$@"; }
 
 stamp=$(date -u +%Y%m%d-%H%M)
@@ -89,5 +98,6 @@ for dir in $(rclone lsf --dirs-only backup:objects-deleted); do
   if [[ "${dir%/}" < "$cutoff" ]]; then rclone purge "backup:objects-deleted/${dir%/}"; fi
 done
 
+record_success holdmytrack_backup_last_success_timestamp_seconds backup
 ping
 log "backup done"

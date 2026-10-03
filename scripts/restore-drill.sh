@@ -37,6 +37,15 @@ log() { echo "$(date -u +%FT%TZ) $*"; }
 heartbeat=$(env_value RESTORE_DRILL_HEARTBEAT_URL)
 ping() { [[ -z "$heartbeat" ]] || curl -fsS -m 10 --retry 3 -o /dev/null "$heartbeat${1:-}" || log "heartbeat ping failed"; }
 
+# When this last succeeded, for the alerts (docs/DEPLOY.md §13): a file in Prometheus's text
+# format that the alloy service's textfile collector reads. Written beside its final name and
+# renamed, so a scrape never reads half of it.
+record_success() {
+  mkdir -p "$BACKUP_DIR/metrics"
+  printf '# HELP %s Unix time of the last successful run.\n# TYPE %s gauge\n%s %s\n' "$1" "$1" "$1" "$(date +%s)" > "$BACKUP_DIR/metrics/$2.prom.tmp"
+  mv "$BACKUP_DIR/metrics/$2.prom.tmp" "$BACKUP_DIR/metrics/$2.prom"
+}
+
 fail() { log "DRILL FAILED: $*"; exit 1; }
 rclone() { "${COMPOSE[@]}" run --rm -T rclone "$@"; }
 drill_psql() { docker exec "$CONTAINER" psql -U postgres -d restored -v ON_ERROR_STOP=1 -At -c "$1"; }
@@ -108,5 +117,6 @@ if [[ -s "$work/lost" ]]; then
   fail "$(wc -l < "$work/lost" | tr -d ' ') objects the restored database refers to aren't in the backup"
 fi
 
+record_success holdmytrack_restore_drill_last_success_timestamp_seconds restore_drill
 ping
 log "drill passed: $latest restores, and every object it refers to is backed up"
