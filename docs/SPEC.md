@@ -58,6 +58,7 @@ There is no multi-tenancy beyond per-account data isolation. The admin panel is 
 | `GET`/`POST /forgot` | Request a reset link (FR-1.5); answers "Check your email" whatever the address |
 | `GET`/`POST /reset?token=` | Set a new password from the emailed link (FR-1.6) |
 | `GET /verify?token=` | The emailed verification link itself (FR-1.8) |
+| `POST /settings/delete` | Delete the account (FR-1.11) |
 | `GET /verify-pending` | A signed-in, unverified account's holding page: resend (`POST /verify-pending/resend`), change the address (`POST /verify-pending/email`), or sign out (FR-1.8) |
 
 A failed form comes back as the same page, at the failure's status (`400`, `401`, `409`, `429`), with the server's message and the typed email kept. A successful one redirects: to `/verify-pending` for a real account that hasn't verified its email, otherwise to the map (`/`). A visit to `/signin` or `/signup` with a real account already signed in redirects the same way; a demo session can still sign in, or sign up (FR-2.3). The JSON endpoints named below are what the Android app calls and what these pages share their behavior with. Links in emails sent before the pages existed pointed at `/?reset_token=` and `/?verify_token=`, and a failed Google sign-in at `/?auth_error=google`; `/` forwards those to `/reset`, `/verify` and `/signin?error=google`, before any session check.
@@ -188,6 +189,7 @@ The JSON endpoints in this section are refused (`403`) the same way when a brows
 6. **A demo account** sees the page with every field and button disabled and a note that the shared demo account can't be changed, linking to "Create your own account" (FR-2.3); a save or avatar change submitted anyway is refused (`403`).
 7. **A native client** reads the lists this page offers from `GET /v1/account/settings/options` — every Country (code and name in the request's language), every Timezone grouped by region (with the region's name in that language, and the account's own zone always included), and every Language — and saves through the API endpoints above. The Android app's Settings screen is built on it (`apps/android/docs/SPEC.md` FR-1.5).
 8. **Theme** (FR-4.12): below Save, a System / Light / Dark toggle. It belongs to the browser, not the account — not part of Save, not disabled for a demo — and a click applies it at once.
+9. **Delete account** (FR-1.11): last on the page, a real account only.
 
 **Outputs**: The account's current Avatar, Name, Country, Timezone, and Language (`locale` in `GET /v1/auth/me`, `""` for automatic), always reflecting the last successful save (or the account's defaults, if never changed) — reloading the app never reverts to something stale.
 
@@ -286,6 +288,26 @@ The JSON endpoints in this section are refused (`403`) the same way when a brows
 6. The three error cases above redirect to `holdmytrack://oauth?error=<code>` instead, and the app shows the same messages. Closing the tab returns to the sign-in screen with no message.
 
 A new account made this way is unverified, like one made on the web; the Android app shows its own "check your email" screen until it is (`apps/android/docs/SPEC.md` FR-1.4).
+
+### FR-1.11 Delete account
+
+**Description**: A signed-in user deletes their account and everything in it.
+
+**Preconditions**: An active session of a real account, verified or not. A demo session can't (`403`, `demo_read_only`).
+
+**Inputs**: The account's email address, typed as confirmation.
+
+**Behavior**:
+1. `DELETE /v1/account` with `{"email": "<the account's email>"}`. The email is compared ignoring case and surrounding spaces.
+2. On a match the account is closed at once: every session of it ends, on every device, its Google and Facebook links and any unused reset, verification or app sign-in link stop working, and it can no longer be signed in to by any means. The email address is free: a new account can be made with it straight away. The response is `204 No Content` and clears the session cookie.
+3. Within a few minutes, everything the account held is deleted: its activities and their uploaded files, tiles, photos, Stories, Private locations, captures, import history, avatar and settings. A file still being processed for it finishes first.
+4. Backups keep it for up to 8 weeks (FR-10.6).
+5. **In the Android app**, Settings ends with the same section and a dialog (`apps/android/docs/SPEC.md` FR-1.5), which also clears the account's unsynced recordings on that phone.
+6. **On the web**, the Settings page (FR-1.7) ends with a **Delete account** section (`#delete-account`) saying what is deleted, that it can't be undone, and the backups, linking to the privacy policy. **Delete account…** opens a field asking for the account's email, shown beside it, and **Delete my account and data**, which posts `POST /settings/delete` (refused from another origin, like every form). It works without JavaScript. On success it signs out and lands on `/signin?deleted`, which says "Your account was deleted. Everything in it will be gone within a few minutes." A demo session doesn't see the section. An unverified account can't reach Settings (FR-1.8), so on the web it deletes by verifying first, or through Help's email route (FR-10.2).
+
+**Error cases**:
+- The email doesn't match → `400`: "That isn't this account's email address. Type it exactly as you sign in with it." Nothing changes.
+- No session → `401`.
 
 ## 4. FR-2 — No-Signup Demo
 
@@ -981,7 +1003,7 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 
 ### FR-10.2 Help page
 
-**Description**: A public page at `/help` that explains how HoldMyTrack works, in ten sections reachable from jump links under its title: the map (the opening view, the Normal / Fog of War / Heatmap modes, how Fog and Heatmap switch to whole states or regions, then whole countries, as the map zooms out, and the Layers menu's base map and paths — FR-4, FR-4.13, FR-4.14), the date slider (what its slots are, moving a knob, and paging back through history with a knob pulled along — FR-6), editing and deleting activities (anchor `#edit`: the Edit window's Activity and Track tabs, Hide, and Delete — FR-5.10–FR-5.14), Stories (making one, adding and removing activities, the Stories tab, renaming and deleting, the badge — FR-14, FR-5.16), photos (anchor `#photos`: adding them in the Edit window, how each is placed on the route, moving and captioning one, looking at them, and the resized copy kept and the 2,000-photo limit — FR-16), points of interest (anchor `#places`: turning categories on in Layers, where badges and areas show and Show in this area, the popup, capturing a place in the Android app, and that the places come from OpenStreetMap — FR-15), getting activities in (files, `.zip` archives, Google Takeout with a link to Google's own download guide and to the Google Health export guide (FR-10.5), Google Maps Timeline — how to export it from the phone, that it's chosen like any file, and what's sent, FR-3.10, with a link to its export guide — the Android app with a link to download it, and what happens on a repeated or cross-source import — FR-3), exporting a map image (FR-4.10), the Profile page (anchor `#profile`: the activity grid, its totals, and Trends — FR-7, FR-9), and settings and privacy (Country, Timezone, Language, Theme, Private locations — FR-1.7, FR-4.12, FR-13, FR-8.1 — what HoldMyTrack stores and doesn't: no health data, only the route, and the original upload kept only to rebuild it (`VISION.md` §1.1; anchor `#what-we-store`), with a link to the privacy policy (FR-10.6) — and how to ask for an account to be deleted, which is by email to the Contacts address since there is no self-service deletion yet, and how to revoke Google's or Facebook's access on their side; its `#delete-account` anchor is the deployment's data-deletion instructions URL for Facebook, FR-1.10).
+**Description**: A public page at `/help` that explains how HoldMyTrack works, in ten sections reachable from jump links under its title: the map (the opening view, the Normal / Fog of War / Heatmap modes, how Fog and Heatmap switch to whole states or regions, then whole countries, as the map zooms out, and the Layers menu's base map and paths — FR-4, FR-4.13, FR-4.14), the date slider (what its slots are, moving a knob, and paging back through history with a knob pulled along — FR-6), editing and deleting activities (anchor `#edit`: the Edit window's Activity and Track tabs, Hide, and Delete — FR-5.10–FR-5.14), Stories (making one, adding and removing activities, the Stories tab, renaming and deleting, the badge — FR-14, FR-5.16), photos (anchor `#photos`: adding them in the Edit window, how each is placed on the route, moving and captioning one, looking at them, and the resized copy kept and the 2,000-photo limit — FR-16), points of interest (anchor `#places`: turning categories on in Layers, where badges and areas show and Show in this area, the popup, capturing a place in the Android app, and that the places come from OpenStreetMap — FR-15), getting activities in (files, `.zip` archives, Google Takeout with a link to Google's own download guide and to the Google Health export guide (FR-10.5), Google Maps Timeline — how to export it from the phone, that it's chosen like any file, and what's sent, FR-3.10, with a link to its export guide — the Android app with a link to download it, and what happens on a repeated or cross-source import — FR-3), exporting a map image (FR-4.10), the Profile page (anchor `#profile`: the activity grid, its totals, and Trends — FR-7, FR-9), and settings and privacy (Country, Timezone, Language, Theme, Private locations — FR-1.7, FR-4.12, FR-13, FR-8.1 — what HoldMyTrack stores and doesn't: no health data, only the route, and the original upload kept only to rebuild it (`VISION.md` §1.1; anchor `#what-we-store`), with a link to the privacy policy (FR-10.6) — and how to delete an account — in Settings on the web or in the Android app (FR-1.11), or by email to the Contacts address for someone who can no longer sign in — and how to revoke Google's or Facebook's access on their side; its `#delete-account` anchor is the deployment's data-deletion instructions URL for Facebook, FR-1.10).
 
 **Preconditions**: None.
 
@@ -1040,7 +1062,7 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 6. It names the processors — DigitalOcean (the server, US), Cloudflare R2 (files, photos, tiles and backups), Grafana Labs (logs and metrics, US, 14 days, with no tracks, names, email or IP addresses — ADR-0030) and an unnamed email delivery provider — and what the browser or phone loads from others: Google Fonts, MapTiler's satellite imagery when chosen, and Google or Facebook sign-in. It says the data is stored in the US.
 7. It lists the cookies (`holdmytrack_session`, 30 days or 24 hours for the demo, and `hmt_lang`) and the `hmt_theme` local-storage key, and why there is no cookie banner.
 8. Retention: an account until it's deleted; deleting an activity deletes its route, file and photos; sign-ins last 30 days; logs are rotated on the server and kept 14 days with Grafana Labs; deleted data stays in backups for up to 8 weeks (ADR-0029).
-9. Rights: a copy of the data (the original files included), correction, deletion — by email, pointing to Help's `#delete-account` (FR-10.2) — and objection, answered within a month, and a complaint to a data protection authority. The service isn't meant for children under 16.
+9. Rights: a copy of the data (the original files included), correction, deletion — in Settings (FR-1.11, pointing to Help's `#delete-account`, FR-10.2), or by email for someone who can't sign in — and objection, answered within a month, and a complaint to a data protection authority. The service isn't meant for children under 16.
 
 ## 13. FR-11 — Donations
 

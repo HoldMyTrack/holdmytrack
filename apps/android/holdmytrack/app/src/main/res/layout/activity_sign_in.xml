@@ -39,6 +39,14 @@
                     android:text="@string/sign_in_title"
                     android:textAppearance="?attr/textAppearanceTitleLarge" />
 
+                <!-- What brought the user here, when something did: an account just deleted. -->
+                <TextView
+                    android:id="@+id/notice"
+                    style="@style/Widget.HoldMyTrack.Notice"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone" />
+
                 <TextView
                     android:id="@+id/intro"
                     style="@style/Widget.HoldMyTrack.Hint"

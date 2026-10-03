@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Settings' Delete account dialog (SettingsActivity.confirmDelete): what goes, then the email
+     to type, the web's #delete-account form. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="24dp"
+    android:paddingTop="@dimen/hmt_space_8">
+
+    <TextView
+        android:id="@+id/delete_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:lineHeight="20sp"
+        android:textAppearance="@style/TextAppearance.HoldMyTrack.BodyMedium"
+        android:textColor="@color/hmt_ink_message" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/delete_email_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/hmt_space_16"
+        android:hint="@string/settings_delete_email">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/delete_email"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:importantForAutofill="no"
+            android:inputType="textEmailAddress" />
+    </com.google.android.material.textfield.TextInputLayout>
+</LinearLayout>

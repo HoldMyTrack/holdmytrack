@@ -743,6 +743,20 @@ object HoldMyTrackApi {
         call(request, { text -> Profile.parse(JSONObject(text)) }, onResult)
     }
 
+    /**
+     * `DELETE /v1/account` (root `docs/SPEC.md` FR-1.11) — [email] typed as confirmation. The
+     * server closes the account and ends every session of it; a mismatch is its own wording.
+     * The caller clears what this device holds for the account ([Session.clear] and the rest).
+     */
+    fun deleteAccount(email: String, onResult: (Result<Unit>) -> Unit) {
+        val body = JSONObject().put("email", email)
+        val request = Request.Builder()
+            .url(BuildConfig.API_BASE_URL + API_V1 + "/account")
+            .delete(body.toString().toRequestBody(JSON))
+            .build()
+        call(request, { }, onResult)
+    }
+
     /** The avatar at [path] (a [Profile.avatarUrl], relative to the API) — see [image]. */
     fun avatar(path: String, onResult: (Result<Bitmap>) -> Unit) = image(path, maxSide = null, onResult)
 

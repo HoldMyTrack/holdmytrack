@@ -150,6 +150,14 @@ class RecordedActivityStore(context: Context) {
         ).use { cursor -> buildList { while (cursor.moveToNext()) add(cursor.toRecord()) } }
     }
 
+    /** Removes every recording of the signed-in account — its account was just deleted
+     *  (`SettingsActivity`), so nothing of it should wait here to be synced into a new one
+     *  made with the same email. */
+    suspend fun deleteAll() = withContext(Dispatchers.IO) {
+        helper.writableDatabase.delete(RecordingDbHelper.TABLE, "account = ?", arrayOf(account()))
+        Unit
+    }
+
     /** Removes a row — the user's Delete in `RecordedActivityRows` (the only copy,
      *  since nothing here has synced), or `SyncActivity.flushRecordedQueue` once the server
      *  has accepted it and the activity lives there instead. */

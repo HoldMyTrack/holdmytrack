@@ -242,5 +242,38 @@
             android:text="@string/settings_theme_hint"
             android:textAppearance="@style/TextAppearance.HoldMyTrack.BodySmall"
             android:textColor="@color/hmt_ink_secondary" />
+
+        <!-- Delete account (root docs/SPEC.md FR-1.11), last, as on the web's page. Gone for
+             the demo account. -->
+        <LinearLayout
+            android:id="@+id/settings_delete_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_24"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:accessibilityHeading="true"
+                android:text="@string/settings_delete_title"
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.Overline" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_4"
+                android:text="@string/settings_delete_hint"
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.BodySmall"
+                android:textColor="@color/hmt_ink_secondary" />
+
+            <Button
+                android:id="@+id/settings_delete"
+                style="@style/Widget.HoldMyTrack.Button.Danger"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_8"
+                android:text="@string/settings_delete_open" />
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>

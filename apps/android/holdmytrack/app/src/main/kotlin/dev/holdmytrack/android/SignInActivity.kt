@@ -89,6 +89,12 @@ class SignInActivity : AppCompatActivity() {
         email = findViewById(R.id.email)
         password = findViewById(R.id.password)
         error = findViewById(R.id.error)
+        intent.getIntExtra(EXTRA_NOTICE, 0).takeIf { it != 0 }?.let { res ->
+            findViewById<TextView>(R.id.notice).apply {
+                setText(res)
+                visibility = View.VISIBLE
+            }
+        }
         title = findViewById(R.id.title)
         intro = findViewById(R.id.intro)
         submit = findViewById(R.id.submit)
@@ -323,11 +329,15 @@ class SignInActivity : AppCompatActivity() {
          *  session, when a stored token turns out to be revoked, and on sign-out (from Profile
          *  or from `VerifyEmailActivity`), so no screen
          *  that needs a session is ever left underneath it. */
-        fun open(context: Context) {
+        fun open(context: Context, notice: Int = 0) {
             context.startActivity(
                 Intent(context, SignInActivity::class.java)
+                    .putExtra(EXTRA_NOTICE, notice)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
             )
         }
+
+        /** A string shown in a notice above the form — "Your account was deleted." */
+        private const val EXTRA_NOTICE = "notice"
     }
 }

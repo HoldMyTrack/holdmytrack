@@ -169,6 +169,10 @@ func (s *Server) handleSignInPage(w http.ResponseWriter, r *http.Request) {
 	case "facebook_email_in_use":
 		form.ErrorKey = "signin.facebook_email_in_use"
 	}
+	// handleSettingsDeleteForm's landing, once the account is gone (FR-1.11).
+	if r.URL.Query().Has("deleted") {
+		form.NoticeKey = "signin.account_deleted"
+	}
 	s.renderAuth(w, r, http.StatusOK, "signin", "signin.title", false, form)
 }
 
