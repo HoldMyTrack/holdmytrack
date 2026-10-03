@@ -226,14 +226,13 @@ It's served with `Cache-Control: no-cache`, so a replaced file is never masked b
 
 1. Create a second private R2 bucket (e.g. `holdmytrack-backups`), and an R2 API token with **Object Read & Write** on that bucket only. Don't use the app's token, and don't give this one access to the app bucket. Then a leaked app token can't delete the backups, and a mistaken command with this token can't touch the live data.
 2. Fill in `.env.prod`'s `BACKUP_*` values (`.env.prod.example` explains each). Leave `BACKUP_S3_ENDPOINT` empty when both buckets are in the same Cloudflare account.
-3. Optionally, give each script a heartbeat check (§13): put the checks' ping URLs in `BACKUP_HEARTBEAT_URL` and `RESTORE_DRILL_HEARTBEAT_URL`. Each script pings its URL after a successful run, and the URL's `/fail` when it fails, so the check alerts at once on a failure and, past its grace time, on a run that never happened.
-4. Run both scripts once by hand: `./scripts/backup.sh`, then `./scripts/restore-drill.sh`. The first backup copies every object, so it takes longest.
-5. Schedule them in `/etc/cron.d/holdmytrack-backup`:
+3. Run both scripts once by hand: `./scripts/backup.sh`, then `./scripts/restore-drill.sh`. The first backup copies every object, so it takes longest.
+4. Schedule them in `/etc/cron.d/holdmytrack-backup`:
    ```
    17 3 * * * root /srv/holdmytrack/scripts/backup.sh >> /var/log/holdmytrack-backup.log 2>&1
    47 4 1 * * root /srv/holdmytrack/scripts/restore-drill.sh >> /var/log/holdmytrack-backup.log 2>&1
    ```
-6. Rotate that log, which otherwise grows a little every night (more on the first run, which lists every object it copies), in `/etc/logrotate.d/holdmytrack-backup`:
+5. Rotate that log, which otherwise grows a little every night (more on the first run, which lists every object it copies), in `/etc/logrotate.d/holdmytrack-backup`:
    ```
    /var/log/holdmytrack-backup.log {
        su root root
@@ -248,7 +247,7 @@ It's served with `Cache-Control: no-cache`, so a replaced file is never masked b
 
 **What's in the backup bucket.** `postgres/daily/` holds each night's dump for 14 days, and `postgres/weekly/` holds Sunday's for 8 weeks. `objects/` mirrors the app bucket's keys. When the sync would delete or overwrite an object there, it moves the old copy into `objects-deleted/<UTC stamp of that run>/` instead, where it stays for 30 days. An account deleted on request therefore stays in the backups for up to 8 weeks.
 
-**The drill** takes the newest dump from the bucket and restores it into a throwaway container of the live `db` image, which has no network and is removed afterwards. It prints row counts next to the live database's. It then checks every object key the restored database refers to: each activity's raw payload, each photo and its thumbnail, each avatar. Every one must be in `objects/`, or in `objects-deleted/` if the app removed it after the dump. It fails, and skips the heartbeat ping, if the newest dump is more than 36 hours old, if `pg_restore` fails, if the restored database has no users, or if any object is missing. When an object is missing, it also says whether the object is gone from the app bucket too. That would mean the database already pointed at nothing before the backup ran. Run the drill by hand after changing `backup.sh`, or after adding anything that stores objects under a new key.
+**The drill** takes the newest dump from the bucket and restores it into a throwaway container of the live `db` image, which has no network and is removed afterwards. It prints row counts next to the live database's. It then checks every object key the restored database refers to: each activity's raw payload, each photo and its thumbnail, each avatar. Every one must be in `objects/`, or in `objects-deleted/` if the app removed it after the dump. It fails, and records no success for the "Restore drill overdue" alert (§13), if the newest dump is more than 36 hours old, if `pg_restore` fails, if the restored database has no users, or if any object is missing. When an object is missing, it also says whether the object is gone from the app bucket too. That would mean the database already pointed at nothing before the backup ran. Run the drill by hand after changing `backup.sh`, or after adding anything that stores objects under a new key.
 
 **Restoring for real.** Take a manual `./scripts/backup.sh` first if the live database still runs, so the current state is kept too. Then:
 
@@ -342,31 +341,6 @@ The two backup alerts read the files the scripts write after a successful run (�
 5. Leave the check's own alerting off; the rule above is what alerts. **Save**, and its results show on the check's dashboard within a few minutes.
 
 `/healthz` is exempt from maintenance mode (§7), so the check stays green through a deploy unless `api` itself is down.
-
-**Without Grafana Cloud**, `scripts/monitor.sh` and heartbeat checks give a smaller version of the same alerts. `monitor.sh`, run every five minutes from cron, checks from the inside:
-- that `db`, `api`, `worker` and `web` are running;
-- that no runnable job has waited more than 30 minutes;
-- errors on our side in the last five minutes: any `ERROR` line or Go panic in `api`'s log, and any job that failed for a reason other than the user's file;
-- that the disk is under 85% full;
-- that the kernel's OOM killer killed nothing.
-
-It reports to a heartbeat check: a ping to the URL when all is well, and to the URL's `/fail` when something isn't. Each backup script pings a check of its own the same way (§11). A check alerts on a `/fail` ping, and when no ping arrives within its period plus grace time.
-
-**Set up the heartbeat checks** on [healthchecks.io](https://healthchecks.io), one per script, each with the server's time zone (UTC):
-
-| Check | Schedule | Grace | `.env.prod` |
-| :-- | :-- | :-- | :-- |
-| monitor | Simple, every 5 minutes | 10 minutes | `MONITOR_HEARTBEAT_URL` |
-| backup | Cron `17 3 * * *` | 2 hours | `BACKUP_HEARTBEAT_URL` |
-| restore drill | Cron `47 4 1 * *` | 2 hours | `RESTORE_DRILL_HEARTBEAT_URL` |
-
-Copy each check's ping URL (`https://hc-ping.com/<uuid>`) into `.env.prod`, then run `./scripts/monitor.sh` by hand: it prints its report and exits non-zero on a problem, and the check should turn green. Then schedule it, adding a line to `/etc/cron.d/holdmytrack-backup` (§11):
-
-```
-*/5 * * * * root /srv/holdmytrack/scripts/monitor.sh > /dev/null 2>&1
-```
-
-The report a failing run sends shows under the check's last ping on healthchecks.io, with the last few error lines when errors were what failed it. Expect an alert during a deploy that recreates containers if a run lands mid-restart (§7); the next run, five minutes later, clears it.
 
 ## What this doesn't cover
 

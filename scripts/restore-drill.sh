@@ -9,7 +9,8 @@
 #
 #   47 4 1 * * root /srv/holdmytrack/scripts/restore-drill.sh >> /var/log/holdmytrack-backup.log 2>&1
 #
-# Exits non-zero, and doesn't ping RESTORE_DRILL_HEARTBEAT_URL, when anything fails.
+# Exits non-zero, and records no success for the "Restore drill overdue" alert, when
+# anything fails.
 #
 set -euo pipefail
 umask 077  # the downloaded dump is the whole database (backup.sh)
@@ -31,12 +32,6 @@ BACKUP_DIR=${BACKUP_DIR:-/srv/holdmytrack-backups}
 
 log() { echo "$(date -u +%FT%TZ) $*"; }
 
-# The heartbeat monitor (docs/DEPLOY.md §13): its URL after a run that finished, its /fail
-# from the exit trap after one that didn't, so a failure alerts at once rather than when the
-# missing ping is noticed.
-heartbeat=$(env_value RESTORE_DRILL_HEARTBEAT_URL)
-ping() { [[ -z "$heartbeat" ]] || curl -fsS -m 10 --retry 3 -o /dev/null "$heartbeat${1:-}" || log "heartbeat ping failed"; }
-
 # When this last succeeded, for the alerts (docs/DEPLOY.md §13): a file in Prometheus's text
 # format that the alloy service's textfile collector reads. Written beside its final name and
 # renamed, so a scrape never reads half of it.
@@ -53,7 +48,7 @@ live_psql() { "${COMPOSE[@]}" exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$PO
 
 mkdir -p "$BACKUP_DIR"
 work=$(mktemp -d "$BACKUP_DIR/drill.XXXXXX")
-trap 'status=$?; docker rm -fv "$CONTAINER" > /dev/null 2>&1 || true; rm -rf "$work"; (( status == 0 )) || ping /fail' EXIT
+trap 'docker rm -fv "$CONTAINER" > /dev/null 2>&1 || true; rm -rf "$work"' EXIT
 docker rm -fv "$CONTAINER" > /dev/null 2>&1 || true
 
 latest=$(rclone lsf --files-only backup:postgres/daily | sort | tail -n 1)
@@ -118,5 +113,4 @@ if [[ -s "$work/lost" ]]; then
 fi
 
 record_success holdmytrack_restore_drill_last_success_timestamp_seconds restore_drill
-ping
 log "drill passed: $latest restores, and every object it refers to is backed up"

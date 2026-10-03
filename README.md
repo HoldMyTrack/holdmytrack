@@ -33,7 +33,6 @@ holdmytrack/
 ├── ops/grafana/                 # alert rules (apply.py) and dashboard pushed to the Grafana stack (docs/DEPLOY.md §13)
 ├── scripts/backup.sh            # nightly Postgres dump and object sync to the backup bucket (docs/DEPLOY.md §11)
 ├── scripts/maintenance.sh       # flips the deployment's maintenance page (docs/DEPLOY.md §7)
-├── scripts/monitor.sh           # five-minute health check reporting to a heartbeat monitor (docs/DEPLOY.md §13)
 ├── scripts/restore-drill.sh     # restores the newest backup into a throwaway container and checks it (docs/DEPLOY.md §11)
 ├── .env.example                 # Compose interpolation only — never VITE_*
 ├── .env.prod.example            # compose.prod.yml's own env template
