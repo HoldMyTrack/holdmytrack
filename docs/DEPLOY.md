@@ -327,12 +327,21 @@ It creates the `holdmytrack` contact point, a **HoldMyTrack** folder holding the
 | Disk over 85% full | for 15 minutes |
 | Memory nearly exhausted | under 10% available for 10 minutes |
 | Process killed for lack of memory | any OOM kill in the last 10 minutes |
+| Site down from outside | under half the uptime checks of `/healthz` succeeded over 5 minutes, or the check reports nothing |
 | Backup overdue | `backup.sh` last succeeded over 26 hours ago, or never |
 | Restore drill overdue | `restore-drill.sh` last succeeded over 33 days ago, or never |
 
 The two backup alerts read the files the scripts write after a successful run (§11), so on a server whose scripts haven't run since that was added, they fire until each script has run once. Run `./scripts/backup.sh` and `./scripts/restore-drill.sh` by hand to start them off.
 
-**An uptime check from outside**, on `https://<your-domain>/healthz`, covers what nothing on the server can report: the droplet, Caddy or the certificate being down. `/healthz` answers `200` with `"status":"ok"` while `api` can reach the database, and `503` when it can't. Set it up with any service that requests a URL on a schedule and alerts when it fails. Grafana Cloud's Synthetic Monitoring is the plan for `holdmytrack.com` (`docs/ROADMAP.md`, the monitoring item). Point it at `/healthz` every few minutes, from more than one location, and have it alert when the response isn't `200` or the body doesn't contain `"status":"ok"`. `/healthz` is exempt from maintenance mode (§7), so the check stays green through a deploy unless `api` itself is down.
+**An uptime check from outside**, on `https://<your-domain>/healthz`, covers what nothing on the server can report: the droplet, Caddy or the certificate being down. `/healthz` answers `200` with `"status":"ok"` while `api` can reach the database, and `503` when it can't. It's a Synthetic Monitoring check in the same stack, and the "Site down from outside" rule above reads its results, so its alerts go to the same contact point. Create it before running `apply.py`, because that rule also fires when the check reports nothing:
+
+1. In the stack, go to **Testing & synthetics → Synthetics → Checks → Add new check**, type **HTTP**.
+2. **Job name** `healthz` (the rule matches on it), **Target** `https://<your-domain>/healthz`.
+3. Under the request and response options: valid status code `200`, and a body regex match on `"status":"ok"`.
+4. **Probe locations**: two or three, near the server and elsewhere. **Frequency**: every 2 minutes. That's about 22,000 runs a month per location, so check the free tier's monthly limit before adding more.
+5. Leave the check's own alerting off; the rule above is what alerts. **Save**, and its results show on the check's dashboard within a few minutes.
+
+`/healthz` is exempt from maintenance mode (§7), so the check stays green through a deploy unless `api` itself is down.
 
 **Without Grafana Cloud**, `scripts/monitor.sh` and heartbeat checks give a smaller version of the same alerts. `monitor.sh`, run every five minutes from cron, checks from the inside:
 - that `db`, `api`, `worker` and `web` are running;

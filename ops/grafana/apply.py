@@ -78,6 +78,14 @@ RULES = [
          expr=f'sum(increase(node_vmstat_oom_kill{{{D}}}[10m]))',
          op=">", threshold=0, for_="0m", nodata="OK",
          summary="The kernel's OOM killer killed {{ $values.A.Value }} processes in the last 10 minutes. Check that db, api and worker are running."),
+    # Synthetic Monitoring's HTTP check on /healthz (docs/DEPLOY.md §13), job name "healthz":
+    # probe_success is 1 or 0 for each probe from each location. Under half succeeding over
+    # 5 minutes is down; one location's hiccup isn't. No data alerts too, since the check
+    # reports every couple of minutes while it exists: create it before running this.
+    dict(uid="hmt-uptime", title="Site down from outside",
+         expr='avg(avg_over_time(probe_success{job="healthz"}[5m]))',
+         op="<", threshold=0.5, for_="2m", nodata="Alerting",
+         summary="Fewer than half the external checks of /healthz succeeded over the last 5 minutes: the droplet, Caddy, the certificate or the API is down, or the database is unreachable."),
     dict(uid="hmt-backup-stale", title="Backup overdue",
          expr=f'(time() - max(holdmytrack_backup_last_success_timestamp_seconds{{{D}}})) or vector({NEVER})',
          op=">", threshold=26 * 3600, for_="10m", nodata="Alerting",
