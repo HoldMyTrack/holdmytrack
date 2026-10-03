@@ -39,6 +39,7 @@ import { OverlaysMenu } from '../ui/OverlaysMenu';
 import { PhotoPopup } from '../ui/PhotoPopup';
 import { ShowInArea } from '../ui/ShowInArea';
 import { TimelineImportWindow } from '../ui/TimelineImportWindow';
+import { takeHandedOffFile } from '../timeline/handoff';
 import { ZoomLevelNotice } from '../ui/ZoomLevelNotice';
 import { SpotPopup } from '../ui/SpotPopup';
 import { todayLocal, type DateRange } from '../ui/dateMath';
@@ -228,16 +229,22 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // The Google Maps Timeline import (TimelineImportWindow.tsx) takes the same corner, and the
   // panel is inert under it too: what it sends lands in the list as it's processed.
   const [timelineOpen, setTimelineOpen] = useState(initialTimelineImport && !isDemo);
+  // The file it reads: chosen in the Upload menu or dropped on the map (upload.js sends any
+  // .json here), or handed over by another page through IndexedDB (timeline/handoff.ts).
+  const [timelineFile, setTimelineFile] = useState<File | null>(null);
   useEffect(() => {
     if (isDemo) return;
-    // The Upload menu's link, clicked on this page, opens it here instead of reloading.
+    if (initialTimelineImport) void takeHandedOffFile().then((file) => file && setTimelineFile(file));
+    // Cancelled to tell upload.js the map has the file, so it doesn't go to /?import=timeline.
     const open = (event: Event) => {
       event.preventDefault();
+      const file = (event as CustomEvent<{ file?: File }>).detail?.file;
+      if (file) setTimelineFile(file);
       setTimelineOpen(true);
     };
     window.addEventListener('hmt:open-timeline-import', open);
     return () => window.removeEventListener('hmt:open-timeline-import', open);
-  }, [isDemo]);
+  }, [isDemo, initialTimelineImport]);
   const windowOpen = editOpen || timelineOpen;
   // Its Track tab's session (§4.7.7) — one activity, from the first time that tab opens until
   // the window closes. While it's set, every other track is hidden and TrackEditor owns the map.
@@ -1546,7 +1553,16 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
               onClose={closeEditWindow}
             />
           )}
-          {map && timelineOpen && !editOpen && <TimelineImportWindow map={map} onClose={() => setTimelineOpen(false)} />}
+          {map && timelineOpen && !editOpen && (
+            <TimelineImportWindow
+              map={map}
+              file={timelineFile}
+              onClose={() => {
+                setTimelineOpen(false);
+                setTimelineFile(null);
+              }}
+            />
+          )}
           {map && openGroup && openPhotos.length > 0 && (
             <PhotoPopup
               map={map}

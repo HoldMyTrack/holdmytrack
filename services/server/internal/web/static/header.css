@@ -304,19 +304,6 @@
   background: var(--fm-accent-hover);
 }
 
-.upload-menu__timeline {
-  display: block;
-  margin: 0 2px 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--fm-accent-strong);
-  text-decoration: none;
-}
-
-.upload-menu__timeline:hover {
-  text-decoration: underline;
-}
-
 .upload-menu__hint,
 .upload-menu__idle {
   margin: 4px 2px 6px;

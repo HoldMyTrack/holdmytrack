@@ -19,7 +19,14 @@
   var IDLE_MS = 20000;
   // An individually chosen batch's cap; a .zip bypasses it (IMPLEMENTATION.md §4.0.1).
   var MAX_PLAIN_FILES = 20;
-  var ACCEPT = /\.(gpx|fit|tcx|zip)$/i;
+  var ACCEPT = /\.(gpx|fit|tcx|zip|json)$/i;
+  // A .json is a Google Maps Timeline export: never uploaded as it is, but read on the map
+  // (TimelineImportWindow.tsx), which also says so when it's some other .json.
+  var TIMELINE = /\.json$/i;
+  // apps/web/src/timeline/handoff.ts's names: how a file chosen off the map reaches it.
+  var HANDOFF_DB = 'hmt-handoff';
+  var HANDOFF_STORE = 'files';
+  var HANDOFF_KEY = 'timeline';
 
   var menu = document.querySelector('[data-upload-menu]');
   if (!menu) return;
@@ -218,8 +225,44 @@
     });
   }
 
+  // On the map, the map takes the file (it cancels the event to say so). Anywhere else the file
+  // is left in IndexedDB for the map to pick up at /?import=timeline; without IndexedDB the
+  // map's window just asks for it again.
+  function openTimeline(file) {
+    var taken = !window.dispatchEvent(new CustomEvent('hmt:open-timeline-import', { cancelable: true, detail: { file: file } }));
+    if (taken) {
+      menu.open = false;
+      return;
+    }
+    var go = function () { window.location.href = '/?import=timeline'; };
+    try {
+      var req = indexedDB.open(HANDOFF_DB, 1);
+      req.onupgradeneeded = function () { req.result.createObjectStore(HANDOFF_STORE); };
+      req.onerror = go;
+      req.onsuccess = function () {
+        var db = req.result;
+        var tx = db.transaction(HANDOFF_STORE, 'readwrite');
+        tx.objectStore(HANDOFF_STORE).put(file, HANDOFF_KEY);
+        tx.oncomplete = function () { db.close(); go(); };
+        tx.onerror = function () { db.close(); go(); };
+      };
+    } catch (e) {
+      go();
+    }
+  }
+
   function enqueue(fileList) {
     var files = Array.prototype.filter.call(fileList, function (f) { return ACCEPT.test(f.name); });
+    var timeline = files.filter(function (f) { return TIMELINE.test(f.name); });
+    files = files.filter(function (f) { return !TIMELINE.test(f.name); });
+    if (timeline.length > 1) note(strings.timeline_one, true);
+    if (timeline.length > 0) {
+      // The Timeline window replaces this page's view of things, so nothing else is queued
+      // alongside it.
+      if (files.length > 0) note(strings.timeline_alone, true);
+      openTimeline(timeline[0]);
+      return;
+    }
     var plain = files.filter(function (f) { return !/\.zip$/i.test(f.name); });
     if (plain.length > MAX_PLAIN_FILES) {
       note(fill(strings.too_many, { n: plain.length }), true);
@@ -257,20 +300,8 @@
     enqueue(event.detail);
   });
 
-  // The Google Maps Timeline import is a window on the map (TimelineImportWindow.tsx): on the
-  // map, the link opens it there — the map cancels this event to say it has — and from any
-  // other page it goes to /?import=timeline. The window sends its activities itself, and says
-  // when a batch has gone so the list shows it now rather than at the next idle tick.
-  var timelineLink = menu.querySelector('[data-timeline-import]');
-  if (timelineLink) {
-    timelineLink.addEventListener('click', function (event) {
-      var opened = !window.dispatchEvent(new CustomEvent('hmt:open-timeline-import', { cancelable: true }));
-      if (opened) {
-        event.preventDefault();
-        menu.open = false;
-      }
-    });
-  }
+  // The Timeline window sends its activities itself, and says when a batch has gone so the list
+  // shows it now rather than at the next idle tick.
   window.addEventListener('hmt:imports-sent', function () {
     refresh().then(schedule);
   });

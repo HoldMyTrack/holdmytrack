@@ -17,15 +17,16 @@ import { useUnitSystem } from './units';
 
 /**
  * The Google Maps Timeline import (`SPEC.md` FR-3.10, `IMPLEMENTATION.md` §4.0.5): a window over
- * the map's top-left, like the Edit window, opened from the header's Upload menu. The file is
- * read here, in the browser; the person narrows it to a range of days and a set of modes,
- * sees the selection drawn dashed on the map, and only that is sent, a hundred activities to a
- * request, all under one batch so the Upload menu shows the import as one row.
+ * the map's top-left, like the Edit window, opened by a .json chosen in the header's Upload menu
+ * or dropped on the map. The file is read here, in the browser; the person narrows it to a range
+ * of days and a set of modes, sees the selection drawn dashed on the map, and only that is sent,
+ * a hundred activities to a request, all under one batch so the Upload menu shows the import as
+ * one row.
  */
 type Loaded = { file: string; read: TimelineRead; first: string; last: string };
 type Sent = { done: number; total: number; enqueued: number; already: number; rejected: number };
 
-export function TimelineImportWindow({ map, onClose }: { map: MapLibreMap; onClose: () => void }) {
+export function TimelineImportWindow({ map, file, onClose }: { map: MapLibreMap; file: File | null; onClose: () => void }) {
   const units = useUnitSystem();
   const [reading, setReading] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -92,6 +93,12 @@ export function TimelineImportWindow({ map, onClose }: { map: MapLibreMap; onClo
       setReading(null);
     }
   }
+
+  // A file from the Upload menu or a drop on the map, read as soon as it arrives; the window's own
+  // button picks one too. Not while sending: a new file would replace what's being sent.
+  useEffect(() => {
+    if (file && !sending) void choose(file);
+  }, [file]);
 
   function toggleMode(mode: string) {
     setModes((prev) => {
