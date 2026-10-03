@@ -44,12 +44,6 @@ BACKUP_DIR=${BACKUP_DIR:-/srv/holdmytrack-backups}
 
 log() { echo "$(date -u +%FT%TZ) $*"; }
 
-# The heartbeat monitor (docs/DEPLOY.md §13): its URL after a run that finished, its /fail
-# from the exit trap after one that didn't, so a failure alerts at once rather than when the
-# missing ping is noticed.
-heartbeat=$(env_value BACKUP_HEARTBEAT_URL)
-ping() { [[ -z "$heartbeat" ]] || curl -fsS -m 10 --retry 3 -o /dev/null "$heartbeat${1:-}" || log "heartbeat ping failed"; }
-
 # When this last succeeded, for the alerts (docs/DEPLOY.md §13): a file in Prometheus's text
 # format that the alloy service's textfile collector reads. Written beside its final name and
 # renamed, so a scrape never reads half of it.
@@ -66,7 +60,7 @@ name="holdmytrack-$stamp.dump"
 mkdir -p "$BACKUP_DIR/postgres"
 chmod 700 "$BACKUP_DIR"
 partial="$BACKUP_DIR/postgres/$name.partial"
-trap 'status=$?; rm -f "$partial"; (( status == 0 )) || ping /fail' EXIT
+trap 'rm -f "$partial"' EXIT
 
 log "dumping Postgres to $BACKUP_DIR/postgres/$name"
 "${COMPOSE[@]}" exec -T db sh -c 'pg_dump -Fc -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > "$partial"
@@ -99,5 +93,4 @@ for dir in $(rclone lsf --dirs-only backup:objects-deleted); do
 done
 
 record_success holdmytrack_backup_last_success_timestamp_seconds backup
-ping
 log "backup done"
