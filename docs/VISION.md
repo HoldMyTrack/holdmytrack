@@ -32,7 +32,7 @@ What is left is an aggregator and a map for exploring where you've been — not 
 ## 2. Company Description & Vision
 
 ### 2.1 Mission Statement
-To let athletes, runners, cyclists and explorers see and keep the shape of where they have been — without a subscription, and without surrendering their data.
+To let athletes, runners, cyclists, travellers and explorers see and keep the shape of where they have been — without surrendering their data.
 
 **Tagline**: "HoldMyTrack — Every journey, mapped." Not a fitness-tracker claim (§1.1 is explicit that HoldMyTrack isn't one) — HoldMyTrack still motivates and supports people doing fitness activities and syncing them in to see the result, it just isn't the tool doing the tracking itself.
 
