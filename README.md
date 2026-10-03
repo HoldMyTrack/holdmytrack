@@ -30,6 +30,7 @@ holdmytrack/
 ├── codecov.yml                  # Go, TypeScript and Kotlin coverage reporting; informational, never a merge gate
 ├── .github/workflows/ci.yml     # every test suite on push and PR (docs/DEVELOPMENT.md, "CI")
 ├── ops/alloy/config.alloy       # the alloy service's log and metrics shipping to Grafana Cloud (docs/DEPLOY.md §13)
+├── ops/grafana/                 # alert rules (apply.py) and dashboard pushed to the Grafana stack (docs/DEPLOY.md §13)
 ├── scripts/backup.sh            # nightly Postgres dump and object sync to the backup bucket (docs/DEPLOY.md §11)
 ├── scripts/maintenance.sh       # flips the deployment's maintenance page (docs/DEPLOY.md §7)
 ├── scripts/monitor.sh           # five-minute health check reporting to a heartbeat monitor (docs/DEPLOY.md §13)

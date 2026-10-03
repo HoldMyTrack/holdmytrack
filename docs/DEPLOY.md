@@ -308,6 +308,30 @@ Every series and stream carries `deployment="<your-domain>"`. The stack sends ab
 5. Bring it up: `GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod up -d`. That starts `alloy`, and recreates `api` and `worker` if they were built before `METRICS_ADDR` existed.
 6. Check: `docker compose -f compose.prod.yml --env-file .env.prod logs alloy | grep -E 'level=(error|warn)'` should show nothing after its first minute, apart from a `diskstats` note about `/run/udev/data`. In the stack's **Explore**, Loki's `{deployment="<your-domain>"}` should show recent lines, and Prometheus's `holdmytrack_jobs_runnable` four series at 0.
 
+**Alerts and the dashboard** are defined in the repository, not in Grafana's UI: `ops/grafana/apply.py` holds the alert rules, `ops/grafana/dashboard.json` the dashboard, and the script pushes both to the stack. Alerts go through the stack's default notification policy, to whichever contact point it uses (step 1's). Run it from any machine with Python 3, after creating a service account in the stack (**Administration → Users and access → Service accounts**, role **Admin**, which the alerting API needs) and adding a token to it:
+
+```
+GRAFANA_URL=https://<stack>.grafana.net GRAFANA_TOKEN=<service account token> ops/grafana/apply.py
+```
+
+It creates a **HoldMyTrack** folder holding the alert group `holdmytrack` and the **HoldMyTrack** dashboard, and prints the dashboard's link. It replaces the whole group on every run, so a rule deleted from the script is deleted in Grafana too. The rules stay editable in the UI, for trying a change out, but the next run overwrites them. They are:
+
+| Alert | Fires when |
+| :-- | :-- |
+| API answered with 5xx | any `5xx` response in the last 10 minutes |
+| Jobs failed on our side | any job of a kind failed with `error_code` `internal` in the last 10 minutes |
+| Job queue stuck | a kind's oldest runnable job has waited over 30 minutes, for 5 minutes |
+| api or worker not answering | its metrics scrape failed for 5 minutes |
+| Postgres down | the exporter can't reach it for 2 minutes, or reports nothing |
+| No metrics arriving | nothing from the server for 10 minutes: the droplet, Docker or `alloy` is down |
+| Disk over 85% full | for 15 minutes |
+| Memory nearly exhausted | under 10% available for 10 minutes |
+| Process killed for lack of memory | any OOM kill in the last 10 minutes |
+| Backup overdue | `backup.sh` last succeeded over 26 hours ago, or never |
+| Restore drill overdue | `restore-drill.sh` last succeeded over 33 days ago, or never |
+
+The two backup alerts read the files the scripts write after a successful run (§11), so on a server whose scripts haven't run since that was added, they fire until each script has run once. Run `./scripts/backup.sh` and `./scripts/restore-drill.sh` by hand to start them off.
+
 **An uptime check from outside**, on `https://<your-domain>/healthz`, covers what nothing on the server can report: the droplet, Caddy or the certificate being down. `/healthz` answers `200` with `"status":"ok"` while `api` can reach the database, and `503` when it can't. Set it up with any service that requests a URL on a schedule and alerts when it fails. Grafana Cloud's Synthetic Monitoring is the plan for `holdmytrack.com` (`docs/ROADMAP.md`, the monitoring item). Point it at `/healthz` every few minutes, from more than one location, and have it alert when the response isn't `200` or the body doesn't contain `"status":"ok"`. `/healthz` is exempt from maintenance mode (§7), so the check stays green through a deploy unless `api` itself is down.
 
 **Without Grafana Cloud**, `scripts/monitor.sh` and heartbeat checks give a smaller version of the same alerts. `monitor.sh`, run every five minutes from cron, checks from the inside:
