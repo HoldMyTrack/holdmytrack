@@ -309,6 +309,20 @@ A new account made this way is unverified, like one made on the web; the Android
 - The email doesn't match → `400`: "That isn't this account's email address. Type it exactly as you sign in with it." Nothing changes.
 - No session → `401`.
 
+### FR-1.12 Download your data
+
+**Description**: A signed-in user gets a copy of everything their account holds, as zip archives to download.
+
+**Preconditions**: An active session of a real, verified account. A demo session can't ask (`403`, `demo_read_only`).
+
+**Behavior**:
+1. `POST /v1/account/export` asks for a copy and answers `202` with the request's status. While one is being prepared, asking again returns that one rather than starting another. A new request ends the downloads of any earlier one.
+2. `GET /v1/account/export` answers the latest: `{"state": "none"}`; `"preparing"`; `"failed"`; or `"ready"` with `expires_at`, `total_size` and `parts` — each with its number, size, file name and download URL.
+3. When it's ready, usually within minutes, an email goes to the account's address, in the language the request was made in, saying how many archives and how big, until when, and linking to the Settings page's **Download your data** section (`/settings#download-data`), which needs signing in.
+4. `GET /v1/account/exports/{id}/parts/{n}` downloads one archive (`application/zip`, named `holdmytrack-<date>-<n>-of-<total>.zip`), only for the account that asked, and supports resuming (Range requests). Anything else → `404`.
+5. The copy is split into archives of about 2 GB. Extracted into one folder they make: `README.txt`; `originals/`, every file uploaded or synced exactly as it arrived, before Private locations; `tracks/`, every activity as GPX as the map shows it (Private locations cut away, track edits applied); `photos/`, the stored copy of each photo; and `account.json`, the account and settings, every activity's details and files, Stories, Private locations and captured places.
+6. It can be downloaded for 7 days, then is deleted. Deleting the account deletes it too.
+
 ## 4. FR-2 — No-Signup Demo
 
 ### FR-2.1 Start a demo

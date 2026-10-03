@@ -88,6 +88,17 @@ func (s *Store) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 	return obj, nil
 }
 
+// Open is Get for a caller that needs to seek — http.ServeContent, serving a download with
+// Range support (a resumed download of a data export). Seeking to the end asks the store
+// for the object's size.
+func (s *Store) Open(ctx context.Context, key string) (io.ReadSeekCloser, error) {
+	obj, err := s.client.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("storage: open %s: %w", key, err)
+	}
+	return obj, nil
+}
+
 // RemoveByPrefix deletes every object under prefix — internal/worker's demo-account purge
 // sweep is the only caller today, cleaning up a demo user's raw uploads and fog/heatmap tile
 // pyramids (all namespaced raw/{userID}/, fog/{userID}/, heatmap/{userID}/ — see server.go

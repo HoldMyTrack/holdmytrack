@@ -92,17 +92,7 @@ func main() {
 		// SMTP_FROM falls back to SMTP_USERNAME (the common case: the account you're
 		// authenticating as is also the one you're sending as) rather than requiring both to
 		// be set for the same address.
-		smtpFrom := cfg.SMTPFrom
-		if smtpFrom == "" {
-			smtpFrom = cfg.SMTPUsername
-		}
-		// Bodies go to the log only off a real deployment; on one, an unset SMTP_HOST is a
-		// misconfiguration worth a warning at start, not a reason to log live account links.
-		realDeployment := strings.HasPrefix(cfg.AppBaseURL, "https://")
-		if realDeployment && cfg.SMTPHost == "" {
-			log.Warn("serve: SMTP_HOST not set; reset and verification emails will not be sent")
-		}
-		mailer := mail.New(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUsername, cfg.SMTPPassword, smtpFrom, !realDeployment, log)
+		mailer := newMailer(cfg, log, "serve")
 		webFS, webReload := web.Embedded(), false
 		if cfg.WebDevDir != "" {
 			webFS, webReload = os.DirFS(cfg.WebDevDir), true
@@ -149,7 +139,8 @@ func main() {
 		}
 		metrics.Serve(ctx, cfg.MetricsAddr, log)
 		log.Info("work: polling")
-		if err := worker.Run(ctx, pool, store, log); err != nil {
+		notifier := &worker.Notifier{Mailer: newMailer(cfg, log, "work"), BaseURL: cfg.AppBaseURL}
+		if err := worker.Run(ctx, pool, store, log, notifier); err != nil {
 			log.Error("work", "err", err)
 			os.Exit(1)
 		}
@@ -334,4 +325,20 @@ func serveUntilDone(ctx context.Context, srv *http.Server, ln net.Listener, drai
 	}
 	<-drained
 	return nil
+}
+
+// newMailer is the account emails' sender, for `serve` (verification, reset) and `work` (a
+// finished data export). Bodies go to the log only off a real deployment; on one, an unset
+// SMTP_HOST is a misconfiguration worth a warning at start, not a reason to log live account
+// links.
+func newMailer(cfg config.Config, log *slog.Logger, mode string) mail.Sender {
+	smtpFrom := cfg.SMTPFrom
+	if smtpFrom == "" {
+		smtpFrom = cfg.SMTPUsername
+	}
+	realDeployment := strings.HasPrefix(cfg.AppBaseURL, "https://")
+	if realDeployment && cfg.SMTPHost == "" {
+		log.Warn(mode + ": SMTP_HOST not set; account emails will not be sent")
+	}
+	return mail.New(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUsername, cfg.SMTPPassword, smtpFrom, !realDeployment, log)
 }
