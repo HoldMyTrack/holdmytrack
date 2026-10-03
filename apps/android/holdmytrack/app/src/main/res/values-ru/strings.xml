@@ -219,6 +219,13 @@
     <string name="settings_save">Сохранить</string>
     <string name="settings_theme">Тема</string>
     <string name="settings_theme_hint">Только на этом телефоне. Применяется сразу.</string>
+    <string name="settings_delete_title">Удаление аккаунта</string>
+    <string name="settings_delete_hint">Удаляет аккаунт и всё, что в нём, насовсем: все занятия и загруженные файлы, фотографии, истории, приватные и отмеченные места, а также записи на этом телефоне, которые ещё не синхронизированы. Это нельзя отменить, а в резервных копиях данные хранятся ещё до 8 недель.</string>
+    <string name="settings_delete_open">Удалить аккаунт…</string>
+    <string name="settings_delete_confirm">Вы выйдете из аккаунта на всех устройствах, а всё, что в нём, исчезнет в течение нескольких минут. Для подтверждения введите адрес своей почты — %1$s.</string>
+    <string name="settings_delete_email">Адрес почты</string>
+    <string name="settings_delete_submit">Удалить</string>
+    <string name="account_deleted">Ваш аккаунт удалён. Всё, что в нём было, исчезнет в течение нескольких минут.</string>
     <string name="settings_theme_system">Системная</string>
     <string name="settings_theme_light">Светлая</string>
     <string name="settings_theme_dark">Тёмная</string>

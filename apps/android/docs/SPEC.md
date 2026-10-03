@@ -4,7 +4,7 @@
 | :-- | :-- |
 | **Version** | 1.0 |
 | **Status** | Current — describes the app as built: sign-in, map, Health Connect sync and sync status (FR-1–FR-4), plus in-app GPS recording (FR-5, built ahead of the design and compliance phases — §1.2, §7 below) |
-| **Last updated** | 2026-10-03 (the privacy policy, from the burger menu and the Health Connect rationale) |
+| **Last updated** | 2026-10-03 (Delete account in Settings, FR-1.5) |
 | **Related documents** | `apps/android/docs/ROADMAP.md` (remaining work and the platform-constraint findings; completed phases, with the verification record this document's behavior claims are drawn from, are removed from it once done and survive in its git history); `apps/android/docs/ARCHITECTURE.md` (this app's shape, stack, and key decisions); `apps/android/docs/IMPLEMENTATION.md` (file-by-file "how it's built" detail); `docs/SPEC.md`/`docs/IMPLEMENTATION.md` (the server behavior and schema this app is a client of); `docs/VISION.md` (why Path 2 exists at all, §4.1 and §5.4) |
 
 ## 1. Introduction
@@ -116,6 +116,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 6. **First run**: a real, confirmed account with no Country — every new account — opens on Settings instead of the map, titled "Welcome — set up your account", with the web's short explanation, and "Save and continue" takes it on to the map. There is no way past it but saving. A new email-and-password account starts on the phone's timezone.
 7. A demo account sees every field and button disabled, with a note that the shared demo account can't be changed.
 8. **Theme** (`docs/SPEC.md` FR-4.12): below Save, a System / Light / Dark toggle. It belongs to the phone, not the account — not part of Save, not disabled for a demo — and a tap applies it at once: every screen and the map switch between the light and dark palettes. System, the default, follows the phone's own dark setting.
+9. **Delete account** (`docs/SPEC.md` FR-1.11), last, for a real account only: what it deletes — including this phone's recordings that haven't synced — that it can't be undone and that backups keep it for up to 8 weeks, then **Delete account…**. It opens a dialog naming the account's email with a field to type it; **Delete** sends `DELETE /v1/account`. A mismatch shows the server's message under the field and keeps the dialog open. On success the app deletes the account's unsynced recordings and its Health Connect sync position (both kept by email on the phone, which a new account could take again), signs out, and opens the sign-in screen with "Your account was deleted. Everything in it will be gone within a few minutes."
 
 **Error cases**: The server's own wording, in the error box — a missing Country, an image it won't take.
 

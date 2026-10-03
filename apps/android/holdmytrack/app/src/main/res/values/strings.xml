@@ -206,6 +206,13 @@
     <string name="settings_save">Save</string>
     <string name="settings_theme">Theme</string>
     <string name="settings_theme_hint">On this phone only. Applies at once.</string>
+    <string name="settings_delete_title">Delete account</string>
+    <string name="settings_delete_hint">Deletes your account and everything in it, for good: every activity and the files you uploaded, your photos, Stories, Private locations and captured places, and the recordings on this phone that haven\'t synced. It can\'t be undone, and backups keep it for up to 8 weeks.</string>
+    <string name="settings_delete_open">Delete account…</string>
+    <string name="settings_delete_confirm">You\'ll be signed out everywhere, and everything in the account will be gone within a few minutes. To confirm, type your email address, %1$s.</string>
+    <string name="settings_delete_email">Email address</string>
+    <string name="settings_delete_submit">Delete</string>
+    <string name="account_deleted">Your account was deleted. Everything in it will be gone within a few minutes.</string>
     <string name="settings_theme_system">System</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
