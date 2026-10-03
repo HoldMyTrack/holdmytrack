@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-09-30.
+Last updated: 2026-10-03.
 
 ## How to read this document
 
@@ -19,31 +19,6 @@ Checkboxes are the source of truth for progress; re-check them against the three
 ## Phase 1 — MVP
 
 **Shipped and deployable.** Every feature in `SPEC.md`'s FR-1 through FR-15 — auth and account management, the no-signup demo, activity upload/ingestion (file, `.zip`, Google Takeout), Normal/Fog of War/Heatmap map modes with pace-colored segments and high-res export, the Activities panel and its filters, track editing, Private locations, the date-range picker, the per-account activity graph, per-activity pace, distance trends, the public About and Help pages, the Donate link, the admin panel, English and Russian, and Stories on the web and in the Android app, and Spots on the web and in the Android app — is built and documented there; not re-enumerated here.
-
-### Production deployment — a sandbox is live at `holdmytrack.com`, not yet Production
-
-**`https://holdmytrack.com` is up and serving the real stack** — but deliberately not called "Production" yet. It's a 2 vCPU / 4 GB RAM / 80 GB disk VPS (DigitalOcean Basic, shared CPU) with zero traffic that has never been announced anywhere. Right now it's a sandbox for the operator's own personal use (their own account, their own synced history) — real dogfooding, not a public launch, so Phase 6's compliance gates don't bind yet since no other person's data is on it. It becomes "Production" once the remaining items below are actually true of it.
-
-- [x] `compose.prod.yml` + `apps/web/Dockerfile`'s `build`/`serve` stages + `apps/web/docker/Caddyfile` — a minimal single-VPS topology (Postgres+PostGIS, `api`, `worker`, Caddy), verified to build and validate.
-- [x] TLS/HTTPS readiness — the session cookie's `Secure` flag is derived from `APP_BASE_URL`; exercised live at `https://holdmytrack.com`.
-- [x] A VPS and domain are provisioned and reachable (`holdmytrack.com`, DNS on Cloudflare) — the box itself is real, even though it's sandbox-sized, not production-sized.
-- [x] Move the sandbox to `holdmytrack.com` — domain on Cloudflare DNS, `APP_BASE_URL`/`DOMAIN` switched, redeployed from an empty database into a new `holdmytrack-data` bucket (the old sandbox data did not carry over); `www.holdmytrack.com`, `freefitmap.com` and `www.freefitmap.com` redirect via `REDIRECT_DOMAINS` (`apps/web/docker/Caddyfile`).
-- [x] Resolve the on-box build constraint — its disk (80 GB since 2026-10-02), together with `58e2e60`'s single shared server-image build is enough for `docs/DEPLOY.md`'s in-place `up -d --build` to actually run; no need for the off-box-build-and-ship alternative.
-- [x] `docs/DEPLOY.md` §8's verification holds on this box — `/healthz` answers `ok` with the deployed build's SHA, and real Health Connect history synced since the move shows on the map, which goes through the whole path: `api` saves each raw payload to the `holdmytrack-data` R2 bucket, then `worker` processes it and writes fog/heatmap tiles back to R2.
-- [x] CDN in front of the basemap `.pmtiles` archive (`VISION.md` §4.3) — the planet archive, fonts and sprites are served through Cloudflare from the public R2 bucket's custom domain `tiles.holdmytrack.com` (`IMPLEMENTATION.md` §5.4 covers what the free plan does and doesn't edge-cache).
-- [x] Seed the planet's Spots places on `holdmytrack.com` — 2,358,668 places from the 2026-09-28 planet file, made off-box with `scripts/spots-extract.sh` (78 minutes to download, 8 to filter) and loaded with `import-spots --planet` in 12 minutes 42 seconds on the 2 vCPU / 4 GB box; it retired 63 places gone from OSM since the earlier US load (ADR-0027). The same two steps are the quarterly refresh (`docs/DEPLOY.md` §6).
-- [x] Backups (Postgres, object storage) and a restore drill — `scripts/backup.sh` nightly and `scripts/restore-drill.sh` monthly, from cron, into the private `holdmytrack-backups` R2 bucket (ADR-0029, `docs/DEPLOY.md` §11); the first drill on 2026-10-02 restored 192 activities and found all 220 referenced objects in the backup.
-- [x] Host hardening — a DigitalOcean Cloud Firewall allowing only 22/80/443, root SSH by key only, unattended security updates with reboots at 05:30 UTC, and `.env.prod` and the backup dumps readable by root only (`docs/DEPLOY.md` §12).
-- [x] Bound Docker's container logs — `compose.prod.yml`'s `x-logging` puts every service on Docker's rotating, compressed `local` driver, at most 5 × 10 MB per container (`docs/DEPLOY.md` §6); the backup scripts' own log is rotated by logrotate (§11).
-- [x] Monitoring: logs, metrics and alerts on Grafana Cloud's free tier, in a US region beside the server (an EU deployment, Phase 6, would get its own in an EU region), collected by a single Grafana Alloy service (ADR-0030, `docs/DEPLOY.md` §13). Hosted rather than self-hosted, because Grafana, Loki and Prometheus would take about 1 GB of this 4 GB box's RAM from the app, and because monitoring that dies with the box can't report it. Cost-per-user is Phase 5's own measurement item, not an ops alert. The steps:
-- [x] Audit every log call in `api` and `worker` for personal data before any log leaves the box: ids, job kinds and errors may go, but emails, names, tracks and places may not. Three sources could carry more, and the collector handles them (ADR-0030): `internal/mail`'s lines are dropped, Postgres's `DETAIL` lines are dropped, and IP addresses in Caddy's logs are replaced with `redacted`. Naming Grafana Labs as a processor waits on the privacy policy itself (Phase 6).
-- [x] A `/metrics` endpoint (Prometheus format) on `api` and `worker`, reachable only on the Docker network and never through Caddy: runnable jobs and the oldest one's age, jobs finished and failed by kind and `error_code`, and HTTP requests by route and status class, with timings and recovered panics (`internal/metrics`, `IMPLEMENTATION.md` §5.8).
-- [x] An `alloy` service in `compose.prod.yml` that ships the containers' logs, host metrics, Postgres metrics and the `/metrics` endpoints to Grafana Cloud (`ops/alloy/config.alloy`, `docs/DEPLOY.md` §13) — live at `holdmytrack.com` since 2026-10-02, using 53 MB of memory.
-- [x] Backup freshness as a metric: `backup.sh` and `restore-drill.sh` record when they last succeeded, for the alerts to read (`docs/DEPLOY.md` §13).
-- [x] Dashboards and alert rules: 5xx responses, jobs failed on our side, queue age, `api`/`worker`/Postgres down, no metrics arriving, disk, memory and OOM kills, and overdue backups and drills, mailed to a contact point of their own that's proven to arrive (`ops/grafana/apply.py`, `docs/DEPLOY.md` §13).
-- [x] An external uptime check on `/healthz` with Grafana Cloud's Synthetic Monitoring, probing from several locations, and a "Site down from outside" alert on its results (`docs/DEPLOY.md` §13). It's the one signal nothing on the box can give: the box, Caddy or the certificate being down.
-- [x] Retire `scripts/monitor.sh` and the backup scripts' healthchecks.io pings, now that the alerts above cover them.
-- [x] Size up from sandbox hardware — 2 vCPU / 4 GB RAM / 80 GB disk since 2026-10-02 (DigitalOcean Basic, Regular SSD, $24/month), `docs/DEPLOY.md`'s recommended size, with 1.5 GB of swap kept as headroom. The resize grew the disk, so the droplet can't move back to a plan with a smaller one.
 
 ### Pre-launch validation — gates any public launch, regardless of which paths are live
 
