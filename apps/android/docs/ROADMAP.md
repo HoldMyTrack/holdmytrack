@@ -46,8 +46,8 @@ Everything between a tested app and its Play Store listing, roughly in the order
 
 - [x] **Physical device / Health Connect testing**
   - Done end to end on a physical device, with the Health Connect toolbox on the host.
-- [ ] **A Play Console developer account**
-  - Personal or organization, decided first, since it changes what follows. A personal account created after 13 November 2023 can't publish to production until a closed test has had at least 12 testers opted in continuously for 14 days (Play Console Help, "App testing requirements for new personal developer accounts"); an organization account skips that but needs a D-U-N-S number for the organization. Either way: the one-time registration fee, identity verification, and, to distribute in the EU, a Digital Services Act trader-status declaration.
+- [x] **A Play Console developer account**
+  - A personal account, owned by `admin@holdmytrack.com`, registered and verified 2026-10-03, including the Android device check. Being personal, it can't publish to production until a closed test has had at least 12 testers opted in continuously for 14 days (Play Console Help, "App testing requirements for new personal developer accounts"). To distribute in the EU, it also needs the Digital Services Act trader-status declaration.
 - [ ] **A release build**
   - `holdmytrack.apiBaseUrl` set to `https://holdmytrack.com` for release: `gradle.properties`' default is the emulator's `http://10.0.2.2:8080`, so a release built without `-P` points at nothing.
   - An upload key kept outside the repository, a `release` `signingConfig` that reads it, and `./gradlew bundleRelease`: Play takes an Android App Bundle, not an APK, and with Play App Signing it re-signs the app with a key Google holds. `release` has `isMinifyEnabled = false` today; R8 is optional, and would need MapLibre's and OkHttp's keep rules checked.
