@@ -25,7 +25,7 @@ Worth stating early, because a map of your activities is easy to mistake for a b
 
 What is left is an aggregator and a map for exploring where you've been — not an analytics platform and not a coach. That is a deliberately small product, and a more defensible one for it: it is built around seeing where you've been, not around recording, analysis or a network.
 
-**One forward-looking exception: Spots.** Everything above looks back at where someone has been. Spots (§4.2) also suggests where to go next — a playground, a dog park, a viewpoint — and that is deliberately as far as discovery goes: outdoor places from OpenStreetMap only, not a "things to do" app, with no venues, reviews or ratings. The one live step is capture: standing in a place for half a minute with the Android app open marks it captured, a private mark of having gone out to find it, not a check-in anyone else sees (ADR-0023). It is the only mark a place carries (ADR-0028).
+**One place it suggests where to go: Spots.** The fog shows what's left and leaves the choice to the user; Spots (§4.2) goes one step further and names places — a playground, a dog park, a viewpoint — and that is deliberately as far as discovery goes: outdoor places from OpenStreetMap only, not a "things to do" app, with no venues, reviews or ratings. The one live step is capture: standing in a place for half a minute with the Android app open marks it captured, a private mark of having gone out to find it, not a check-in anyone else sees (ADR-0023). It is the only mark a place carries (ADR-0028).
 
 ---
 
