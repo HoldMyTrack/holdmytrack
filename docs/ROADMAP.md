@@ -6,7 +6,7 @@ Last updated: 2026-10-03.
 
 This is the master checklist from "what exists today" to "the full product `VISION.md` describes" — every remaining piece of work, broken into steps small enough to pick up and finish independently. It does not restate design detail already written down elsewhere:
 
-- **`VISION.md`** is the authority on *why* and *in what order* (§5's phases, the funding model, the ingest-path strategy); its phase numbers match this file's.
+- **`VISION.md`** is the authority on *why* and *in what order* (§5's milestones and phases, the funding model, the ingest-path strategy); its phase numbers match this file's.
 - **`SPEC.md`** is the authority on *what's actually shipped*, feature by feature, with preconditions/inputs/outputs/error cases (§1.2 states scope precisely).
 - **`IMPLEMENTATION.md`** is the authority on *how* each shipped piece works, and carries most of the unbuilt pieces' own design already worked out (schema, API shape, algorithm) — this document points at that design rather than re-deriving it.
 - **`AGENTS.md`** is repository orientation — which document to read for what, not a status narrative of its own; `SPEC.md`/`IMPLEMENTATION.md` are where "what's built, mapped to actual files" actually lives.
@@ -14,16 +14,24 @@ This is the master checklist from "what exists today" to "the full product `VISI
 
 Checkboxes are the source of truth for progress; re-check them against the three docs above rather than trusting this file's memory of itself if it's been a while. A step that names a file or table already assumes the reader will open the referenced §/FR for the real detail. Once every checkbox in a subsection is checked, delete the subsection rather than leave it as a completed record — its design and rationale belong in `SPEC.md`/`IMPLEMENTATION.md` by the time it ships, not here. A partially-done section stays as-is until its own last checkbox is checked.
 
+## Milestones
+
+The phases below sit inside three milestones (`VISION.md` §5, ADR-0031):
+
+1. **MVP** — Phases 1–3. Where HoldMyTrack is now; what's left of it is below.
+2. **Release and community** — Phases 4–6. Its entry gate is Phase 1's pre-launch validation and Phase 6's DPIA and privacy policy, which any public launch needs. Its exit gate is a measured answer to what community funding can carry: Phase 5's cost per active user, set against monthly donations and the share of active users who give, over several months.
+3. **Social graph** — Phase 7. Decided from Milestone 2's numbers, including whether to start it at all.
+
 ---
 
-## Phase 1 — MVP
+## Phase 1 — Upload + Map
 
 **Shipped and deployable.** Every feature in `SPEC.md`'s FR-1 through FR-15 — auth and account management, the no-signup demo, activity upload/ingestion (file, `.zip`, Google Takeout), Normal/Fog of War/Heatmap map modes with pace-colored segments and high-res export, the Activities panel and its filters, track editing, Private locations, the date-range picker, the per-account activity graph, per-activity pace, distance trends, the public About and Help pages, the Donate link, the admin panel, English and Russian, and Stories on the web and in the Android app, and Spots on the web and in the Android app — is built and documented there; not re-enumerated here.
 
-### Pre-launch validation — gates any public launch, regardless of which paths are live
+### Pre-launch validation — gates any public launch (Milestone 2), regardless of which paths are live
 
 - [ ] Stand up the funding page (Open Collective, public ledger — `VISION.md` §6.1) before any public launch, not retrofitted after. The app side is built (`IMPLEMENTATION.md` §4.16), and the `holdmytrack` collective applied to Open Source Collective as fiscal host on 2026-09-24; what's left: once approved, set the slug — `services/server/internal/web/web.go`'s `OpenCollectiveSlug` — and replace the About page template's "donations are not open yet" line with a link to it.
-- [ ] Post concept renders to r/running, r/cycling, r/Garmin, r/Strava, r/FogOfWorld (`VISION.md` §5.1, §8.1) — validate "free forever, funded by users" as credible before building further.
+- [ ] Post concept renders to r/running, r/cycling, r/Garmin, r/Strava, r/FogOfWorld (`VISION.md` §5.1, §8.1) — validate "free, funded by its users" as credible before building further.
 
 ### Sign in with Facebook — built, not live
 
@@ -84,7 +92,7 @@ An engineering requirement, can land alongside any of the above (`IMPLEMENTATION
 - [ ] Per-user quotas (activity count, total points) — bounds one pathological account's cost, not a monetization lever.
 - [ ] Rate limits on upload, export, and tile requests (the auth endpoints already have `fixedWindowLimiter` — reuse it), plus a CDN/object-store spend cap.
 - [ ] Conditional reads for `GET /v1/spots/captures` — the web map reads the whole list again on every window focus and tab return (`SPEC.md` FR-15.2), so an `ETag` built from the account's capture count and latest `captured_at`, answered with `304 Not Modified` when it matches `If-None-Match`, keeps the repeat reads bodyless; the Android app's reads get the same for free. Preferred over a `?since=` cursor, which only sees new rows and misses a capture that cascades away with its spot.
-- [ ] Cost-per-active-user measurement from day one — the number that decides whether `VISION.md` §6's funding model actually works.
+- [ ] Cost-per-active-user measurement from day one — with monthly donations and the share of active users who give, the numbers Milestone 2's exit gate and the Milestone 3 decision are made from (`VISION.md` §5, §6).
 
 ---
 
@@ -101,13 +109,13 @@ Non-negotiable, GDPR Art. 9 special-category data (`VISION.md` §7).
 
 ---
 
-## Phase 7 — Social (deliberately not committed)
+## Phase 7 — Social graph (Milestone 3, deliberately not committed)
 
-`VISION.md` §5.7/§5.8 is explicit that this should not be scheduled, let alone built, until the funding base can absorb the moderation and trust-and-safety staffing it requires — a fog map is a precise record of where someone lives, and a social graph on top of that is a threat-model change, not a feature. No steps are listed here on purpose; the first real step is revisiting §6's funding numbers, not writing code.
+Public pages, followers and the rest. `VISION.md` §5.7/§5.8 is explicit that this isn't scheduled, let alone built, until Milestone 2 has shown what community funding can carry — a fog map is a precise record of where someone lives, and a social graph on top of that brings moderation and trust-and-safety work that is staff cost, not server cost. No steps are listed here on purpose; the first real step is the Milestone 3 decision — paid features, community funding, sponsors, or not building it at all — made from Milestone 2's numbers, not writing code.
 
 ---
 
 ## Ongoing, not phase-bound
 
 - [ ] Check the Russian translation — run the Android app in Russian on a real device, and have a native speaker review the Russian across the web, the server's pages and emails, and the app (`IMPLEMENTATION.md` §4.21, ADR-0014).
-- [ ] Re-measure the funding-model assumptions (`VISION.md` §4.3, §6.3) against real usage once any real users exist, rather than assuming the estimates hold.
+- [ ] Re-measure the funding-model assumptions (`VISION.md` §4.3, §6.3) against real usage once any real users exist, rather than assuming the estimates hold — they feed Milestone 2's exit gate.
