@@ -56,7 +56,7 @@ To let athletes, runners, cyclists, travellers and explorers see and keep the sh
 * **Urban explorers** — people who gamify coverage of their city.
 * **Casual smartwatch owners** — want a nice seasonal or annual summary, not analytics.
 * **The multi-device athlete** — a Garmin for rides, an Apple Watch for runs, and no single place that shows all of it. This segment is served specifically by §4.1's three ingest paths and is underserved by every single-source competitor.
-* **Travellers** — people who want a holiday, a road trip or a multi-day trek kept as one journey on a map, with its photos. Served by Stories, photos and in-app recording (§4.2, §4.1); held back by having no route history to bring unless they recorded one, since most travellers' trace sits in Google Maps Timeline, which HoldMyTrack doesn't import.
+* **Travellers** — people who want a holiday, a road trip or a multi-day trek kept as one journey on a map, with its photos. Served by Stories, photos and in-app recording (§4.2, §4.1); held back by having no route history to bring unless they recorded one, since most travellers' trace sits in Google Maps Timeline, which HoldMyTrack doesn't import yet (§5.5).
 
 ### 3.2 Market Opportunity
 Digital fitness tracking continues to grow, and the major platforms remain focused on real-time logging, social feeds and health metrics rather than spatial artifacts and cross-source aggregation. The opportunity is a **quality and openness** opportunity, not a whitespace opportunity.
@@ -129,22 +129,15 @@ So Android on-device sync is foreground-only, and Samsung Galaxy Watch is unsupp
 
 **It is also what the no-signup demo is built from** — the demo account's history went in through this same pipeline. See §8.2.
 
-#### The validation gate
+#### Path 3 needs no one's permission
 
-Before engineering begins:
-
-1. **Get Garmin's licence position in writing** for a free, donation-funded service. This is the one line item that could carry a fixed annual cost with no revenue behind it (§4.3).
-2. **Apply to Wahoo and COROS partner programmes.** Lead time, not cost, is the risk.
-3. **Confirm HealthKit route access** with a throwaway iOS app reading `HKWorkoutRoute`.
-4. **Confirm the Samsung limitation empirically** rather than trusting documentation — if routes turn out to be reachable, Android's product improves materially.
-
-**Path 3 is unconditional.** If every item above fails, file upload still delivers the entire product to every user willing to export once. That is what source independence buys, and it is why Phase 1 builds Path 3 first (§5).
+Paths 1 and 2 depend on things HoldMyTrack doesn't control: Garmin's licence terms, Wahoo's and COROS's partner approvals, and what HealthKit and Health Connect actually expose. **Path 3 is unconditional.** If every one of those fails, file upload still delivers the entire product to every user willing to export once. That is what source independence buys, and it is why Path 3 comes first (§5.2).
 
 #### Casual in-app GPS recording — mobile-only, and not a fourth path
 
 Distinct from the three paths above, which each bring in a user's *existing* history from somewhere else: the mobile app can also originate an activity itself, for someone who has no watch running and does not want to install a separate tracker for a one-off walk or drive. Start, optionally pause, and stop a GPS-only recording directly in HoldMyTrack; on stop, the recorded track submits through the same ingest pipeline every other source already uses (`ARCHITECTURE.md` §1.1, `IMPLEMENTATION.md` §4.1) — no new server-side path, no separate privacy story, no dedupe case beyond what already exists for two overlapping recordings of the same activity.
 
-This isn't a resilience decision the way Paths 1–3 are — §4.1's provider-independence argument doesn't apply, since it depends on no external provider at all. It's a convenience feature: one fewer tool to install for someone who just wants a casual walk or drive on the map, with no export and no import in the way. **Scope stays deliberately narrow — GPS only.** No heart rate, cadence, power, or any other sensor; no training-load or coaching output; not a replacement for a dedicated fitness tracker (§1.1). Phased in on Android first, then iOS (§5.3); see `apps/android/docs/ROADMAP.md` for the plan.
+This isn't a resilience decision the way Paths 1–3 are — §4.1's provider-independence argument doesn't apply, since it depends on no external provider at all. It's a convenience feature: one fewer tool to install for someone who just wants a casual walk or drive on the map, with no export and no import in the way. **Scope stays deliberately narrow — GPS only.** No heart rate, cadence, power, or any other sensor; no training-load or coaching output; not a replacement for a dedicated fitness tracker (§1.1).
 
 ### 4.2 Core Features
 
@@ -163,7 +156,7 @@ This isn't a resilience decision the way Paths 1–3 are — §4.1's provider-in
 | **Export** | Free, unrestricted | Print-grade raster/vector export, animated reveals — no watermark, no tier |
 | **Privacy Controls** | Table stakes, see §7 | Private locations (user-defined privacy zones), per-map share scoping |
 
-**We don't keep your health profile — only the geographical data you trust us with, and the photos you choose to add to it.** An activity is a route: positions, times and elevation. Pace is derived from those and shown as the color of a selected track — a supporting detail on the route, not a pillar and not a training product; the pillars are the map and the exploration stats. Heart rate, cadence, power, calories and every other body signal are never read, stored or shown, whichever source an activity came from. The one place such data can still sit is inside an original upload, which is kept as-is so a track edit or a Private location change can rebuild the activity, is only ever read for its route, and is deleted with the activity. The schema carries per-point streams (`IMPLEMENTATION.md` §3.3) for the route, and no more. A pace/heart-rate/elevation profile card was built and then removed for this reason — see ADR-0017.
+**We don't keep your health profile — only the geographical data you trust us with, and the photos you choose to add to it.** An activity is a route: positions, times and elevation. Pace is derived from those and shown as the color of a selected track — a supporting detail on the route, not a pillar and not a training product; the pillars are the map and the exploration stats. Heart rate, cadence, power, calories and every other body signal are never read, stored or shown, whichever source an activity came from. The one place such data can still sit is inside an original upload, which is kept as-is so a track edit or a Private location change can rebuild the activity, is only ever read for its route, and is deleted with the activity. The schema carries per-point streams (`IMPLEMENTATION.md` §3.3) for the route, and no more. See ADR-0017.
 
 **Photos are the one thing kept that isn't geography, and only because the user adds them.** A trip is remembered by what was seen on it as much as by where it went, so an activity can carry the user's own photos, each pinned to the point of the route where it was taken — worked out from the photo's capture time, or its position when the time is unusable, or chosen by the user when neither says, and movable along the route by hand. Every photo has a place on its route; there are no loose ones. They're kept as a resized copy with every EXIF field stripped, never as the original: HoldMyTrack is a map of trips, not a photo backup, and the original stays wherever the user keeps it. They're private like everything else, and always sit on the route as it's drawn, so a Private location that hides a track's end hides the place a photo there was taken too. See ADR-0024.
 
@@ -223,38 +216,24 @@ The product moves through three milestones (ADR-0031):
 
 Within the milestones, phases are sequenced so the unconditional ingest path ships first and the ones that depend on other companies' permission come later. The phase numbers are the ones `docs/ROADMAP.md` uses, which carries each phase's step-by-step detail.
 
-### 5.1 Phase 0: Validation (Weeks 1–2) — *no application code*
-* Start the §4.1 gate: Garmin licence position in writing; Wahoo and COROS applications filed (lead time starts now); HealthKit and Samsung route checks.
-* Stand up the funding page (§6) before launch, not after — the ask is much weaker retrofitted.
-* Post concept renders to r/running, r/cycling, r/Garmin and r/Strava; specifically test whether "free, funded by its users" reads as credible or as doomed.
+### 5.1 Phase 0: Validation — *no application code*
+Settle what the plan rests on before building on it: whether Garmin's licence applies to a free service, whether the partner APIs and the HealthKit and Samsung route access are what they appear to be (§4.1), and whether "free, funded by its users" reads as credible (§8.3). The funding page stands before launch, not after — the ask is much weaker retrofitted (§6.1).
 
-### 5.2 Phase 1: Upload + Map (Months 1–3)
-* **Path 3 first**: `.GPX`/`.FIT`/`.TCX` parsing and bulk-archive import.
-* Backend: ingest, storage, fog raster pipeline, tile serving.
-* Web app: Fog of War and track modes on the self-hosted planet basemap.
-* **The no-signup demo** — a fully populated example account anyone can open and explore before signing up (§8.2).
-* Accounts and persistence for anyone who wants to keep it.
-* A private activity graph once an account exists — a GitHub-style daily contribution grid shadeable by count or distance, plus active-days and longest-streak stat cards (`IMPLEMENTATION.md` §4.8). The grid itself reuses `IMPLEMENTATION.md` §4.7's histogram query; the streak and active-day stats are small new aggregate queries of their own.
-* Free high-resolution export — a framed image of the current map, unwatermarked, rendered in the browser.
-* Stories — hand-picked, private sets of activities with their own totals and map view, for keeping a trip or an event as one thing (§4.2). A web feature first; Android follows on the same API.
-* Spots — outdoor places from OpenStreetMap in the map's Layers menu, captured by standing in one for 30 seconds with the Android app open (§4.2). A web feature first; Android follows on the same tiles.
+### 5.2 Phase 1: Upload + Map
+The product on the web, on the one ingest path that needs nobody's permission: file upload (Path 3, §4.1), the map in all its modes, the no-signup demo (§8.2), accounts, the activity graph, export, Stories and Spots (§4.2). Path 3 comes first so that the first usable version waits on no one's approval.
 
 ### 5.3 Phase 2: Mobile
-* Android app — Health Connect. Samsung Galaxy Watch sync is unsupported (Samsung never exposes route geometry, and HoldMyTrack only ingests activities that have one). Built first of the pair regardless, so the Path 2 sync contract is designed against the more constrained platform.
-* iOS app — HealthKit and Apple Watch, the stronger of the two on-device paths.
-* In-app GPS recording (Android, then iOS) — a plain start/pause/stop track capture for casual, watch-free activities, submitted through the existing ingest pipeline; no new server-side work beyond the mobile clients themselves (§4.1).
-* Cross-source deduplication — unavoidable the moment a second source exists, so it arrived with Health Connect sync rather than waiting for Phase 4's connectors.
+Native apps for the on-device path (Path 2, §4.1) and for in-app GPS recording. Android goes first although it is the more constrained platform — foreground-only route reads, and no Samsung routes at all, which the app states plainly rather than quietly degrading — so the sync contract is designed against the harder case; iOS, on HealthKit and Apple Watch, the stronger of the two routes, inherits it. Cross-source deduplication belongs here too: it is needed the moment a second source exists.
 
 ### 5.4 Phase 3: Finalized design + mobile browser support
-* The first shipped UI was functional scaffolding. This pass finished it — one icon set, deliberate typography, design tokens — across desktop and phone browsers, and ended in a design freeze, declared 2026-10-02: the `--fm-*` tokens, Inter and Fraunces (Source Serif 4 for Russian headings), and Lucide icons.
-* The mobile apps inherit that freeze rather than inventing a second visual language: two clients that each chose their own would not read as one product.
+One visual language across desktop and phone browsers, then frozen: the `--fm-*` tokens, Inter and Fraunces (Source Serif 4 for Russian headings), and Lucide icons. The mobile apps inherit the freeze rather than inventing a second visual language: two clients that each chose their own would not read as one product.
 
 ### 5.5 Phase 4: More sources
 * Google Maps Timeline import — a one-time upload of the JSON file the phone's Google Maps exports, for the travellers (§3.1) whose only route history is Timeline. Google moved Timeline onto the phone and closed its web version, so years of history have no map of their own any more; "see it all on one map again, with Fog of War" is a strong reason to arrive. Import only — see §1.1 on why HoldMyTrack doesn't pick up continuous location tracking.
-* Path 1 connectors, in whatever order §4.1's approvals actually land.
+* Path 1 connectors (§4.1), in whatever order their approvals land — last among the sources because they are the ones that depend on other companies' permission.
 
 ### 5.6 Phases 5–6: Cost control and compliance
-Gates rather than features. Cost control — retention, per-user quotas, rate limits, and measuring cost per active user — can land alongside any phase, and is what keeps §6's funding model honest (§4.3). Compliance (§7) — a DPIA, EU-region hosting, working data export and account deletion — gates any public launch, however small.
+Gates rather than features. Cost control keeps the cost per user bounded and measured (§4.3), can land alongside any phase, and is what keeps §6's funding model honest. Compliance (§7) gates any public launch, however small.
 
 ### 5.7 Phase 7: Social graph (Milestone 3, not committed)
 Public pages, followers and the rest of a social graph make up Milestone 3, and it is deliberately unscheduled. It doesn't start until Milestone 2 has shown what community funding can carry, because social features add moderation, abuse handling and safety obligations that are **staff costs, not server costs** — the one category donations scale to worst. The decision at that point is which way to pay for them — paid features, community funding or sponsors — or not to build them at all. See §5.8.
@@ -288,7 +267,7 @@ What is available instead is recognition, not capability: a supporter badge, a c
 * **Donation revenue is not correlated with cost.** Costs scale with users; donations scale with goodwill. A growth spike is a cost spike, and the funding page does not spike with it.
 * **It depends on one person's continued interest.** Donation-funded projects are typically one maintainer, and the failure mode is burnout, not bankruptcy. The mitigation is keeping scope small — which is the real reason §1.1 says no fitness tracking, and why social waits for Milestone 3.
 * **It caps ambition, and that is a choice being made.** This model will not fund a team, an office, or a print supply chain. It will fund a good product used by a lot of people. Whether to go past that — a social graph, and a way of paying for one — is the Milestone 3 decision (§5), made once there are numbers to make it from.
-* **Break-even is genuinely low** (§4.3) — under 1% of users at 10,000. That is the strongest argument that this works. It is also the number to actually measure in Phase 1 rather than assume.
+* **Break-even is genuinely low** (§4.3) — under 1% of users at 10,000. That is the strongest argument that this works. It is also the number to actually measure through Milestone 2 rather than assume.
 
 ---
 
@@ -297,11 +276,11 @@ What is available instead is recognition, not capability: a supporter badge, a c
 Non-negotiable. A Fog of War map is a precise map of where a person lives — the 2018 Strava heatmap incident is the canonical warning, and an individual fog map is far more revealing than an aggregate one.
 
 * **Private locations** — user-defined circles (home, work) excluded from every render and export. The leading and trailing parts of a track inside one are hidden; a track that merely passes through one is shown whole, since passing by reveals nothing about where someone starts or ends.
-* **No blanket endpoint trimming** — an earlier default trimmed the first and last N metres of every track. It was dropped: on a multi-day trail every day's start and end is a campsite or trailhead, so it cut a gap into the trail at each day boundary while protecting nothing there. The places worth hiding are the ones the user names — see ADR-0010.
+* **No blanket endpoint trimming** — the first and last metres of every track aren't trimmed: on a multi-day trail every day's start and end is a campsite or trailhead, so trimming would cut a gap into the trail at each day boundary while protecting nothing there. The places worth hiding are the ones the user names — see ADR-0010.
 * **Applied at ingest, server-side** — before anything is persisted or indexed, per `IMPLEMENTATION.md` §4.1. Privacy applied at render time leaks through any bug in the render path.
 * **Share scoping** — shared maps and exports must respect zones; an exported file is permanent and cannot be recalled.
 * **Legal basis** — HoldMyTrack processes no health data (§1.1): heart rate or other body data that happens to sit inside an original upload stays in that file and is never read out of it. A precise location history is sensitive personal data regardless: explicit consent, a DPIA before launch, a documented retention policy, working export and deletion, EU-region hosting for EU users. **Being free changes none of this.** There is no small-project exemption, and the compliance burden is one of the few fixed costs a donation model has to carry regardless of scale.
-* **Deauthorization deletion** — Garmin, Wahoo and COROS require deletion of synced data when a user disconnects. Build it with the first connector, not after.
+* **Deauthorization deletion** — Garmin, Wahoo and COROS require deletion of synced data when a user disconnects, so every connector deletes on disconnect.
 * **Health Connect declarations** — Android health data types must be declared in the Play Console with justified use. Requesting more types than the product demonstrably uses is a known rejection cause. HoldMyTrack requests exercise sessions and their routes (plus the history window over them) and no health measurement at all.
 * **Photos are stored stripped and placed after clipping** — the browser re-encodes a photo before upload, so no EXIF field (the position included) reaches the server inside the file; its place on the map is worked out from the clipped track on every read, so a photo taken inside a Private location — even one added afterwards — shows at the visible end of the track, never inside it (ADR-0024).
 * **Spot captures are private** — visible only to the account itself.
@@ -320,11 +299,11 @@ Non-negotiable. A Fog of War map is a precise map of where a person lives — th
 
 ### 8.2 The demo is the ad
 
-The single best asset in this plan: **a no-signup demo** — one click opens a fully populated example account, months of real walks, rides and road trips, in every map mode and the activity graph. Shareability at zero friction is worth more than a signup funnel. It was first pitched as a drag-your-own-file page; what shipped is read-only (`SPEC.md` FR-2.1), so seeing your *own* fog still takes a free account.
+The single best asset in this plan: **a no-signup demo** — one click opens a fully populated example account, months of real walks, rides and road trips, in every map mode and the activity graph. Shareability at zero friction is worth more than a signup funnel. It is read-only (`SPEC.md` FR-2.1), so seeing your *own* fog still takes a free account.
 
 Everything else follows from it — the screenshot people post is the marketing, and the fog reveal is inherently screenshot-friendly.
 
 ### 8.3 The key validation questions
 
-1. **Does Garmin's licence apply to a free service?** (§4.1.) The one item that can impose a fixed cost this model cannot absorb. Settle it in Phase 0 (§5.1).
+1. **Does Garmin's licence apply to a free service?** (§4.1.) The one item that can impose a fixed cost this model cannot absorb.
 2. **Will people fund a free tool they like?** (§6.) Under 1% of users at $5/month covers the bill. This is a low bar and a real one — measure it through Milestone 2 rather than assuming it. Its answer is what the Milestone 3 decision (§5) is made from.
