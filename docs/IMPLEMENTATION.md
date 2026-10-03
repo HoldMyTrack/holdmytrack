@@ -37,7 +37,7 @@ CREATE TABLE users (
 );
 ```
 
-**No `tier` column.** There are no tiers; every account has every feature (`VISION.md` §6.2). `last_seen_at` exists because storage is the cost that grows forever and dormant accounts are the largest recoverable share of it. `demo_expires_at` (§4.10's no-signup demo) means a demo account is a real row in this same table, not a separate mechanism. `display_name`/`country`/`avatar_key`/`avatar_content_type`/`avatar_updated_at` back §4.12's account settings page. External sign-in identities — Google (§4.15) and Facebook (§4.22) — live in §3.17's `user_identities`, not here; a `users.google_sub` column held Google's before Facebook made it two providers (ADR-0015). `locale` is the Language setting (§4.21); NULL is "automatic".
+**No `tier` column.** There are no tiers; every account has every feature (`VISION.md` §6.2, ADR-0031). `last_seen_at` exists because storage is the cost that grows forever and dormant accounts are the largest recoverable share of it. `demo_expires_at` (§4.10's no-signup demo) means a demo account is a real row in this same table, not a separate mechanism. `display_name`/`country`/`avatar_key`/`avatar_content_type`/`avatar_updated_at` back §4.12's account settings page. External sign-in identities — Google (§4.15) and Facebook (§4.22) — live in §3.17's `user_identities`, not here; a `users.google_sub` column held Google's before Facebook made it two providers (ADR-0015). `locale` is the Language setting (§4.21); NULL is "automatic".
 
 ### 3.2 `connections` — Path 1 OAuth state
 

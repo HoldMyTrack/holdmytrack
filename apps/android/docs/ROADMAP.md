@@ -36,7 +36,7 @@ Before implementing any UI or sync routines, we must design around two hard plat
 Framed as due diligence rather than an open blocker: root `ROADMAP.md` notes that Samsung's own developer docs already state `EXERCISE_ROUTE` is unreachable, and this is "double-checking in case reality is better than documented".
 
 - [ ] **Empirical Samsung Health check** — needs a Galaxy Watch paired to Samsung Health, which the Pixel the app was verified on can't stand in for.
-  - On a real Galaxy Watch paired to Samsung Health, confirm whether route geometry is genuinely unreachable via Health Connect, or whether there is any supported route we have missed (`docs/VISION.md` §4.1's validation gate). If routes turn out to be readable, Android's product improves materially and Samsung Galaxy Watch stops being unsupported.
+  - On a real Galaxy Watch paired to Samsung Health, confirm whether route geometry is genuinely unreachable via Health Connect, or whether there is any supported route we have missed (`docs/VISION.md` §4.1, Path 2). If routes turn out to be readable, Android's product improves materially and Samsung Galaxy Watch stops being unsupported.
 
 ---
 
