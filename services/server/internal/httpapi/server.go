@@ -251,6 +251,7 @@ func (s *Server) registerPages() {
 	s.mux.HandleFunc("POST /settings", s.sameOrigin(s.handleSettingsForm))
 	s.mux.HandleFunc("POST /settings/avatar", s.sameOrigin(s.handleSettingsAvatarForm))
 	s.mux.HandleFunc("POST /settings/avatar/remove", s.sameOrigin(s.handleSettingsAvatarRemoveForm))
+	s.mux.HandleFunc("POST /settings/export", s.sameOrigin(s.handleSettingsExportForm))
 	s.mux.HandleFunc("POST /settings/delete", s.sameOrigin(s.handleSettingsDeleteForm))
 	s.mux.HandleFunc("GET /profile", s.handleProfilePage) // profile_page.go
 	s.mux.HandleFunc("GET /sync", s.handleSyncPage)       // sync_page.go

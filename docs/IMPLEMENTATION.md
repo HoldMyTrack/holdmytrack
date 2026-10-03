@@ -1511,9 +1511,11 @@ The app then posts `{code, verifier}` to `POST /v1/auth/handoff` (`handleAuthHan
 
 **Downloads** — `GET /v1/account/exports/{id}/parts/{n}` (`requireVerified`, the caller's own, ready and unexpired) serves the part with `http.ServeContent` over `storage.Open` (a seekable object), so a dropped download resumes with a Range request; `Content-Disposition` names it `holdmytrack-<date>-<n>-of-<total>.zip`.
 
+**On the web**, Settings' `#download-data` section (`settings.html`, `settings_page.go`'s `settingsExport`, filled from `latestExport` with sizes from `web.FormatBytes` and the expiry day in the account's timezone) posts to `POST /settings/export` (`handleSettingsExportForm`, the same `requestExport`) and redirects back to the section. The parts link straight to the download endpoint, which the session cookie authorizes. Help's `#download-data` explains the contents, and the privacy policy's rights point there.
+
 **The sweep** — `sweepExports`, hourly and at start: removes every export past `expires_at`, parts then row, and any request whose job failed or vanished more than 7 days ago. Deleting the account (§4.28) removes `exports/{id}/` with the rest.
 
-**Tested**: `internal/export`'s `Build` over a real database and `storagetest.MemS3` (a small `PartLimit` forcing a split; every folder's files, the original byte for byte, `account.json`'s contents, a rebuild leaving no stale part); `exports_test.go` (one export per request while preparing, a demo refused, a download whole and resumed by Range, someone else's and a missing part refused — MemS3 now answers ranged reads); `export_job_test.go` (the export lane takes the job and the main lane doesn't, ready with its email and link, and the sweep removing it once expired).
+**Tested**: `internal/export`'s `Build` over a real database and `storagetest.MemS3` (a small `PartLimit` forcing a split; every folder's files, the original byte for byte, `account.json`'s contents, a rebuild leaving no stale part); `exports_test.go` (one export per request while preparing, a demo refused, a download whole and resumed by Range, someone else's and a missing part refused — MemS3 now answers ranged reads); `TestSettingsExportForm` (the section, a request, and the preparing state); `export_job_test.go` (the export lane takes the job and the main lane doesn't, ready with its email and link, and the sweep removing it once expired).
 
 ## 5. Engineering Risks & Mitigations
 

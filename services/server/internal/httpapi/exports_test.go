@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/export"
@@ -87,5 +88,27 @@ func TestDownloadExportPart(t *testing.T) {
 	}
 	if rec := d.do(a, "GET", exportPartURL(st.ID, 2), nil); rec.Code != http.StatusNotFound {
 		t.Errorf("a part past the last: status %d", rec.Code)
+	}
+}
+
+func TestSettingsExportForm(t *testing.T) {
+	d := newDBTest(t)
+	a := d.newAccount(false)
+	page := func(method, path string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, path, nil)
+		req.Header.Set("Origin", "https://app.example")
+		req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: a.session})
+		rec := httptest.NewRecorder()
+		d.srv.ServeHTTP(rec, req)
+		return rec
+	}
+	if body := page("GET", "/settings").Body.String(); !strings.Contains(body, `id="download-data"`) || !strings.Contains(body, "Request a download") {
+		t.Fatal("Settings has no Download your data section")
+	}
+	if rec := page("POST", "/settings/export"); rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/settings#download-data" {
+		t.Fatalf("request: status %d, location %q", rec.Code, rec.Header().Get("Location"))
+	}
+	if body := page("GET", "/settings").Body.String(); !strings.Contains(body, "Preparing your archive") {
+		t.Error("Settings doesn't say the archive is being prepared")
 	}
 }

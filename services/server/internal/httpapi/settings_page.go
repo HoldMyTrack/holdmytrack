@@ -41,6 +41,21 @@ type settingsForm struct {
 	// form's, and keeps its section open.
 	Email       string
 	DeleteError string
+	// Export is Download your data's state (FR-1.12), with its sizes and date already worded.
+	Export settingsExport
+}
+
+// settingsExport is the account's latest export as the page shows it.
+type settingsExport struct {
+	State   string // none, preparing, ready, failed
+	Expires string // the last day to download, in the account's timezone
+	Total   string
+	Parts   []settingsExportPart
+	Error   string
+}
+
+type settingsExportPart struct {
+	URL, Name, Size string
 }
 
 // settingsAccount is the check every Settings request starts with: a live, verified (or demo)
@@ -73,6 +88,25 @@ func (s *Server) renderSettings(w http.ResponseWriter, r *http.Request, status i
 	form.LocalTime = web.LocalTime(l, now, web.CurrentTimezoneName(form.Timezone))
 	if form.NoticeKey != "" {
 		form.Notice = l.T(form.NoticeKey)
+	}
+	if !acct.info.isDemo {
+		form.Export.State = "none"
+		if st, err := s.latestExport(r.Context(), acct.info.userID); err != nil {
+			s.log.Error("settings: export status failed", "err", err)
+		} else {
+			form.Export.State = st.State
+			if st.ExpiresAt != nil {
+				loc, err := time.LoadLocation(acct.info.timezone)
+				if err != nil {
+					loc = time.UTC
+				}
+				form.Export.Expires = web.ShortDate(l, st.ExpiresAt.In(loc).Format("2006-01-02"))
+			}
+			form.Export.Total = web.FormatBytes(l, st.TotalSize)
+			for _, p := range st.Parts {
+				form.Export.Parts = append(form.Export.Parts, settingsExportPart{URL: p.URL, Name: p.Name, Size: web.FormatBytes(l, p.Size)})
+			}
+		}
 	}
 	title := l.T("meta.settings_title")
 	if form.Onboarding {
@@ -163,6 +197,23 @@ func (s *Server) avatarForm(w http.ResponseWriter, r *http.Request, notice strin
 		return
 	}
 	http.Redirect(w, r, "/settings"+notice, http.StatusSeeOther)
+}
+
+// POST /settings/export — Download your data's request (FR-1.12); back to the section, now
+// preparing.
+func (s *Server) handleSettingsExportForm(w http.ResponseWriter, r *http.Request) {
+	acct := s.settingsAccount(w, r)
+	if acct == nil {
+		return
+	}
+	if _, err := s.requestExport(r.Context(), acct.info.userID, acct.info.isDemo, pageLang(acct, r)); err != nil {
+		status, msg := s.settingsError("request export", err, pageLang(acct, r))
+		form := formWithSaved(acct)
+		form.Export.Error = msg
+		s.renderSettings(w, r, status, acct, form)
+		return
+	}
+	http.Redirect(w, r, "/settings#download-data", http.StatusSeeOther)
 }
 
 // POST /settings/delete — the account's email in field "email" as confirmation (FR-1.11). On
