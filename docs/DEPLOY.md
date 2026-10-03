@@ -334,7 +334,7 @@ The two backup alerts read the files the scripts write after a successful run (�
 
 **An uptime check from outside**, on `https://<your-domain>/healthz`, covers what nothing on the server can report: the droplet, Caddy or the certificate being down. `/healthz` answers `200` with `"status":"ok"` while `api` can reach the database, and `503` when it can't. It's a Synthetic Monitoring check in the same stack, and the "Site down from outside" rule above reads its results, so its alerts go to the same contact point. Create it before running `apply.py`, because that rule also fires when the check reports nothing:
 
-1. In the stack, go to **Testing & synthetics → Synthetics → Checks → Add new check**, type **HTTP**.
+1. In the stack, go to **Testing & synthetics → Synthetics → Checks**. The first visit offers **Get started**, which sets Synthetic Monitoring up. If that fails with "data source with the same name already exists", an earlier attempt left a broken `Synthetic Monitoring` data source behind, one the UI can't open or delete. Find its uid in `GET /api/datasources` and delete it with `DELETE /api/datasources/uid/<uid>`, using a service account token as for `apply.py`, then click **Get started** again. Then **Add new check**, type **HTTP**.
 2. **Job name** `healthz` (the rule matches on it), **Target** `https://<your-domain>/healthz`.
 3. Under the request and response options: valid status code `200`, and a body regex match on `"status":"ok"`.
 4. **Probe locations**: two or three, near the server and elsewhere. **Frequency**: every 2 minutes. That's about 22,000 runs a month per location, so check the free tier's monthly limit before adding more.
