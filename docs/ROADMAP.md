@@ -26,12 +26,12 @@ The phases below sit inside three milestones (`VISION.md` §5, ADR-0031):
 
 ## Phase 1 — Upload + Map
 
-**Shipped and deployable.** Every feature in `SPEC.md`'s FR-1 through FR-15 — auth and account management, the no-signup demo, activity upload/ingestion (file, `.zip`, Google Takeout), Normal/Fog of War/Heatmap map modes with pace-colored segments and high-res export, the Activities panel and its filters, track editing, Private locations, the date-range picker, the per-account activity graph, per-activity pace, distance trends, the public About and Help pages, the Donate link, the admin panel, English and Russian, and Stories on the web and in the Android app, and Spots on the web and in the Android app — is built and documented there; not re-enumerated here.
+**Shipped and deployable** — `SPEC.md` FR-1 through FR-16 describe it. What's left before the public launch:
 
 ### Pre-launch validation — gates any public launch (Milestone 2), regardless of which paths are live
 
 - [ ] Stand up the funding page (Open Collective, public ledger — `VISION.md` §6.1) before any public launch, not retrofitted after. The app side is built (`IMPLEMENTATION.md` §4.16), and the `holdmytrack` collective applied to Open Source Collective as fiscal host on 2026-09-24; what's left: once approved, set the slug — `services/server/internal/web/web.go`'s `OpenCollectiveSlug` — and replace the About page template's "donations are not open yet" line with a link to it.
-- [ ] Post concept renders to r/running, r/cycling, r/Garmin, r/Strava, r/FogOfWorld (`VISION.md` §5.1, §8.1) — validate "free, funded by its users" as credible before building further.
+- [ ] Post concept renders to r/running, r/cycling, r/Garmin, r/Strava, r/FogOfWorld (`VISION.md` §5.1, §8.1) — validate "free, funded by its users" as credible before the public launch.
 
 ### Sign in with Facebook — built, not live
 
@@ -44,20 +44,20 @@ Sign in with Facebook is built (`SPEC.md` FR-1.10) and the Meta app exists, but 
 
 ## Phase 2 — Mobile
 
-Native apps whose core job is exporting device-recorded health data to HoldMyTrack (Path 2 on-device sync, `docs/adr/0001-three-independent-ingest-paths.md`) — reading the platform's own health store rather than a cloud API. Needed no licensing gate the way Phase 4's cloud connectors do: HealthKit/Health Connect access itself isn't in question, only how much of it. Android and iOS are separate builds against separate platform constraints (Health Connect vs. HealthKit, Play Store vs. App Store), tracked as two independent subsections below rather than one interleaved list — though iOS's own Path 2 sync contract (payload shape, sync-cursor semantics) inherits directly from whatever Android already settled.
+Path 2 on-device sync and in-app GPS recording (`VISION.md` §5.3). Android and iOS are tracked separately below; iOS reuses the sync contract (payload shape, sync-cursor semantics) Android settled.
 
 ### Android
 
 - [ ] Confirm the Samsung Health Connect route-geometry limitation empirically, not just from documentation (`VISION.md` §4.1) — Samsung's own developer docs already state `EXERCISE_ROUTE` cannot be read via Health Connect; this is double-checking in case reality is better than documented, not an open question blocking the build.
-- [x] Android app: Health Connect sync, foreground-only (`READ_EXERCISE_ROUTES` can't be requested programmatically, and background route reads return `ConsentRequired` even with "Always allow" granted — a platform constraint, not an implementation shortcut). Samsung Galaxy Watch is unsupported — it never exposes route geometry, and HoldMyTrack only ingests activities that have one (the confirmation item above is about verifying that limitation firsthand, not about whether sync itself works). Built first as planned, so the Path 2 sync contract (payload shape, sync-cursor semantics) was designed against the harder platform's constraints, ready for iOS to inherit. `apps/android/docs/ROADMAP.md` carries this app's remaining work (UI design freeze, Play Store compliance) — this root item tracks only "does Path 2 sync itself work end to end," which it now does (`docs/SPEC.md` FR-3.6).
-- [x] In-app GPS recording, Android half — a convenience capture for casual, watch-free activities (a road trip, a dog walk), not a fitness-tracker replacement: GPS only, no sensor data, no training metrics (`VISION.md` §4.1, §1.1). Submits directly through the existing ingest pipeline once a recording stops, reusing the sync endpoint's payload shape rather than opening a new one ([ADR-0007](adr/0007-in-app-gps-recording-submits-directly.md)) — no new server-side path, just a new `source` value. `apps/android/docs/IMPLEMENTATION.md` §7 carries the detail; `docs/SPEC.md` FR-3.8 is the behavior spec.
-- [x] Photos on Android — an activity's and an open Story's photos as markers on the route with a popup, and a Photos tab in the Edit window — added from the photo picker with the web's EXIF rules and resizing, a slider for a photo the server can't place and for moving one (`SPEC.md` FR-16, ADR-0024; `apps/android/docs/SPEC.md` FR-2.10).
-- [x] The map's Activities panel on Android — the phone web's sheet ported with the same layout and rules: the list with its Type and Distance filters, selection on the list and the map, Show/Hide, Edit (fields and track) and Delete, the selected activity's pace bands, and the Sync and Privacy tabs; the separate sync screens folded into one Sync Source window (`apps/android/docs/SPEC.md` FR-2.7, FR-3.5, FR-4.1).
+- [x] Android app: Health Connect sync, foreground-only, end to end (`SPEC.md` FR-3.6). The app's own remaining work is in `apps/android/docs/ROADMAP.md`.
+- [x] In-app GPS recording, Android half (`SPEC.md` FR-3.8, ADR-0007).
+- [x] Photos on Android (`SPEC.md` FR-16, ADR-0024; `apps/android/docs/SPEC.md` FR-2.10).
+- [x] The map's Activities panel on Android (`apps/android/docs/SPEC.md` FR-2.7, FR-3.5, FR-4.1).
 
 ### iOS
 
 - [ ] Confirm `HKWorkoutRoute` access with a throwaway iOS app (`VISION.md` §4.1) — due diligence before committing engineering effort to the full iOS build, not resolving a real unknown: Apple's docs already say this works.
-- [ ] iOS app: HealthKit sync, `HKWorkoutRoute` for full GPS geometry — the stronger of the two on-device paths, and the one that inherits the payload and sync-cursor design Android settles.
+- [ ] iOS app: HealthKit sync, `HKWorkoutRoute` for full GPS geometry, on the payload and sync-cursor design Android settled.
 - [ ] In-app GPS recording, iOS half — inherits the Android build's wire shape and `source` convention once the iOS app itself exists (see the iOS Path 2 item above, which this depends on).
 
 ---
@@ -77,7 +77,7 @@ For travellers whose only route history is Timeline (`VISION.md` §3.1, §5.5). 
 
 ### Prerequisites — gate the specific connectors below, not this phase's other work
 
-- [ ] Get Garmin's Connect Developer Program licence position in writing for a free, donation-funded service (`VISION.md` §4.1, §8.3) — the one item that can impose a fixed cost this funding model cannot absorb.
+- [ ] Get Garmin's Connect Developer Program licence position in writing for a free, donation-funded service (`VISION.md` §4.1, §4.3, §8.3).
 - [ ] File the Wahoo partner-API application (lead time, not cost, is the risk).
 - [ ] File the COROS partner-API application.
 
@@ -88,7 +88,7 @@ For travellers whose only route history is Timeline (`VISION.md` §3.1, §5.5). 
 - [ ] Wahoo connector (after partner approval).
 - [ ] COROS connector (after partner approval).
 - [ ] Deauthorization deletion for each connector as it ships, not after — Garmin/Wahoo/COROS contractually require it (`VISION.md` §7).
-- [ ] These connectors are the one part of the web's Sync page, `/sync` (`docs/IMPLEMENTATION.md` §4.0.1), that's actually triggerable from the page itself — connect/disconnect, and (once token-refresh runs on a schedule) a last-synced/status summary alongside Health Connect/GPS Logger's own read-only rows there. Sync stayed read-only-only through Phase 2 specifically because neither on-device source can be triggered from the web; a cloud connector can.
+- [ ] Connect/disconnect for each connector on the web's Sync page, `/sync` (`docs/IMPLEMENTATION.md` §4.0.1), and (once token-refresh runs on a schedule) a last-synced/status summary beside Health Connect/GPS Logger's read-only rows.
 
 ---
 
@@ -98,7 +98,7 @@ An engineering requirement, can land alongside any of the above (`IMPLEMENTATION
 
 - [ ] Retention/dormancy policy: tier `activity_streams` to cold storage or drop it after N months of inactivity (`users.last_seen_at`), keeping summaries and fog rasters so the map still renders; warn by email first; recoverable by re-upload. Activity photos (`photos/{userID}/`, ADR-0024) are the other per-user line that only grows; decide whether a dormant account keeps them, keeps the thumbnails only, or loses them after the warning.
 - [ ] Raw payload expiry schedule (object storage) — note this caps how far back a `reprivacy` job (a Private location change) can reach; document the tradeoff wherever it's implemented.
-- [ ] Per-user quotas (activity count, total points) — bounds one pathological account's cost, not a monetization lever.
+- [ ] Per-user quotas (activity count, total points) — bounds one pathological account's cost.
 - [ ] Rate limits on upload, export, and tile requests (the auth endpoints already have `fixedWindowLimiter` — reuse it), plus a CDN/object-store spend cap.
 - [ ] Conditional reads for `GET /v1/spots/captures` — the web map reads the whole list again on every window focus and tab return (`SPEC.md` FR-15.2), so an `ETag` built from the account's capture count and latest `captured_at`, answered with `304 Not Modified` when it matches `If-None-Match`, keeps the repeat reads bodyless; the Android app's reads get the same for free. Preferred over a `?since=` cursor, which only sees new rows and misses a capture that cascades away with its spot.
 - [ ] Cost-per-active-user measurement from day one — with monthly donations and the share of active users who give, the numbers Milestone 2's exit gate and the Milestone 3 decision are made from (`VISION.md` §5, §6).
@@ -107,7 +107,7 @@ An engineering requirement, can land alongside any of the above (`IMPLEMENTATION
 
 ## Phase 6 — Compliance
 
-Non-negotiable, GDPR Art. 9 special-category data (`VISION.md` §7).
+Gates any public launch: a precise location history is sensitive personal data under GDPR (`VISION.md` §7).
 
 - [ ] DPIA before any public launch.
 - [ ] EU-region hosting for EU users.
@@ -120,7 +120,7 @@ Non-negotiable, GDPR Art. 9 special-category data (`VISION.md` §7).
 
 ## Phase 7 — Social graph (Milestone 3, deliberately not committed)
 
-Public pages, followers and the rest. `VISION.md` §5.7/§5.8 is explicit that this isn't scheduled, let alone built, until Milestone 2 has shown what community funding can carry — a fog map is a precise record of where someone lives, and a social graph on top of that brings moderation and trust-and-safety work that is staff cost, not server cost. No steps are listed here on purpose; the first real step is the Milestone 3 decision — paid features, community funding, sponsors, or not building it at all — made from Milestone 2's numbers, not writing code.
+Public pages, followers and the rest (`VISION.md` §5.7, §5.8). No steps are listed on purpose: the first step is the Milestone 3 decision, made from Milestone 2's numbers, and not building it is one of its outcomes.
 
 ---
 
