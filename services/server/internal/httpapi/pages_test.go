@@ -34,6 +34,7 @@ func TestPagesRenderSignedOut(t *testing.T) {
 		{"/about", "About HoldMyTrack", false},
 		{"/help", "Help — HoldMyTrack", false},
 		{"/contacts", "Contacts — HoldMyTrack", false},
+		{"/privacy", "Privacy policy — HoldMyTrack", false},
 	} {
 		rec := httptest.NewRecorder()
 		s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tc.path, nil))

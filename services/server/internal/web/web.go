@@ -51,12 +51,12 @@ type Language struct {
 	Name string
 }
 
-// InfoLinks is the header's Info menu. apps/web/src/ui/InfoMenu.tsx repeats it for the map
-// page's React header until that header is this one (ADR-0012); keep the two in step.
+// InfoLinks is the header's Info menu, and the footer's links after "Open the map".
 var InfoLinks = []Link{
 	{Href: "/about", LabelKey: "nav.about"},
 	{Href: "/help", LabelKey: "nav.help"},
 	{Href: "/contacts", LabelKey: "nav.contacts"},
+	{Href: "/privacy", LabelKey: "nav.privacy"},
 }
 
 // User is the signed-in account as the header shows it; nil when nobody is signed in.

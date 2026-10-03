@@ -108,7 +108,7 @@ func TestPagesRenderInEveryLanguage(t *testing.T) {
 	}
 	leftover := regexp.MustCompile(`>\s*[a-z_]+\.[a-z_.]+\s*<|"[a-z_]+\.[a-z_]+\.?[a-z_]*"`)
 	pages := map[string]any{
-		"about": nil, "help": nil, "contacts": nil, "notfound": nil, "guide-timeline": nil, "guide-google-health": nil,
+		"about": nil, "help": nil, "contacts": nil, "privacy": nil, "notfound": nil, "guide-timeline": nil, "guide-google-health": nil,
 		"signin": struct {
 			Email, Error     string
 			Google, Facebook bool

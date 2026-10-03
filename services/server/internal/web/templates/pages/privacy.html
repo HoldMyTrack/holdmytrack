@@ -1,0 +1,117 @@
+{{define "content"}}
+<main class="page-main help">
+  <section class="page-hero">
+    <h1>Privacy policy</h1>
+    <p class="page-lede">HoldMyTrack turns the activities you already have into a map of everywhere you have been. That map is a precise record of where you go, so this page says plainly what we keep, why, who else touches it, and how to get it back or deleted.</p>
+    <p>Last updated: 3 October 2026.</p>
+    <nav class="help__toc" aria-label="On this page">
+      <a href="#who">Who we are</a>
+      <a href="#what">What we keep</a>
+      <a href="#not">What we don't</a>
+      <a href="#android">The Android app</a>
+      <a href="#why">Why we use it</a>
+      <a href="#processors">Who else handles it</a>
+      <a href="#cookies">Cookies</a>
+      <a href="#retention">How long we keep it</a>
+      <a href="#rights">Your rights</a>
+    </nav>
+  </section>
+
+  <section class="page-section" id="who">
+    <h2>Who we are</h2>
+    <p>HoldMyTrack is a free, open-source project funded by its users, run at holdmytrack.com. The HoldMyTrack project decides how your data is used. For anything on this page, write to <a href="mailto:hello@holdmytrack.com">hello@holdmytrack.com</a>.</p>
+  </section>
+
+  <section class="page-section" id="what">
+    <h2>What we keep</h2>
+    <ul class="page-list">
+      <li><strong>Your account:</strong> your email address, your password (only as a one-way hash, never the password itself), and, if you sign in with Google or Facebook, that account's id, email address and name. Your display name, avatar, country, timezone and language, if you set them.</li>
+      <li><strong>Your activities:</strong> where each one went, when, and the elevation along the way, with the distance, time and pace worked out from them; the type, name and description; and the files you uploaded, kept as they are so an activity can be rebuilt when you edit it (<a href="/help#what-we-store">more about this</a>).</li>
+      <li><strong>What you add to the map:</strong> your Private locations, your Stories, the photos you add to activities (a resized copy with none of the photo's hidden details, its location included), and the places you capture in the Android app.</li>
+      <li><strong>Imports:</strong> a record of each file, archive or sync you sent and what came of it, shown on your Sync page.</li>
+    </ul>
+    <p>Your map, activities, photos and captures are visible only to you. HoldMyTrack has no public profiles, no feed and no followers.</p>
+  </section>
+
+  <section class="page-section" id="not">
+    <h2>What we don't keep</h2>
+    <ul class="page-list">
+      <li><strong>No health data.</strong> Heart rate, cadence, calories, weight, sleep and any other body data are never read, stored or shown. If a file you upload contains them, they stay inside that file, which we only ever read the route out of.</li>
+      <li><strong>No live location.</strong> The map's location button, on the website and in the app, only moves the map to where you are; that position isn't sent to us.</li>
+      <li><strong>No tracking.</strong> No analytics, no advertising, no tracking pixels, in the website or the app.</li>
+      <li><strong>No selling.</strong> We never sell your data, and never share it with anyone for advertising. This is a commitment, not a current practice that might change.</li>
+    </ul>
+  </section>
+
+  <section class="page-section" id="android">
+    <h2>The Android app</h2>
+    <ul class="page-list">
+      <li><strong>Health Connect:</strong> with your permission, the app reads your exercise sessions and their GPS routes, and nothing else. It reads them only while its Sync screen is open, sends the ones with a route to your account, and never writes anything to Health Connect. Sessions without a route, such as indoor workouts, aren't sent.</li>
+      <li><strong>Location:</strong> the app uses your phone's location only while you record an activity, show yourself on the map, or capture a place. A recording stays on your phone until you sync it. For a capture, only which place you captured and when is sent, not your position.</li>
+      <li>You can take any of these permissions back at any time in Android's settings or in Health Connect. What was already sent stays in your account until you delete it.</li>
+    </ul>
+  </section>
+
+  <section class="page-section" id="why">
+    <h2>Why we use it</h2>
+    <ul class="page-list">
+      <li><strong>To run the service you signed up for</strong> (GDPR Article 6(1)(b)): your account, your activities and everything you add to them exist to draw your maps, stats and Stories, and are used for nothing else.</li>
+      <li><strong>With your permission</strong> (Article 6(1)(a)): reading Health Connect and your phone's location. You can withdraw it at any time, as above.</li>
+      <li><strong>To keep the service working and safe</strong> (Article 6(1)(f)): short-lived server logs, backups, and limits on how often one address can try to sign in.</li>
+    </ul>
+    <p>We email you only about your account: confirming your address and resetting your password. No newsletters or marketing.</p>
+  </section>
+
+  <section class="page-section" id="processors">
+    <h2>Who else handles it</h2>
+    <p>A few companies run parts of HoldMyTrack for us. They handle your data only on our behalf, and none of them may use it for their own purposes.</p>
+    <ul class="page-list">
+      <li><strong>DigitalOcean</strong> (servers, United States): the server and database that hold your account and activities.</li>
+      <li><strong>Cloudflare</strong> (storage, R2): your uploaded files, photos, the map tiles drawn from your activities, and the backups.</li>
+      <li><strong>Grafana Labs</strong> (monitoring, United States): the server's logs and performance metrics, so we know when something breaks. These carry account ids but no tracks, places, names, email addresses or IP addresses, which are removed before the logs leave our server. They're kept for 14 days.</li>
+      <li><strong>An email delivery provider</strong>, which receives your email address and the message whenever we send you one.</li>
+    </ul>
+    <p>Some things your browser or phone loads straight from another company, which sees your IP address as it would for any website:</p>
+    <ul class="page-list">
+      <li><strong>Google Fonts</strong>, for the website's fonts.</li>
+      <li><strong>MapTiler</strong>, for satellite imagery, only when you choose the Satellite map.</li>
+      <li><strong>Google</strong> or <strong>Facebook</strong>, only if you sign in with them. They learn that you signed in to HoldMyTrack; we receive your email address and name from them. You can remove HoldMyTrack's access on their side at any time (<a href="/help#delete-account">how</a>).</li>
+    </ul>
+    <p>Your data is stored in the United States. Where it is transferred from the European Union, the transfer relies on these companies' Standard Contractual Clauses or their certification under the EU–US Data Privacy Framework.</p>
+  </section>
+
+  <section class="page-section" id="cookies">
+    <h2>Cookies</h2>
+    <p>HoldMyTrack sets only what it needs to work, so there is no cookie banner:</p>
+    <ul class="page-list">
+      <li><strong>holdmytrack_session</strong> keeps you signed in, for up to 30 days (24 hours for the demo).</li>
+      <li><strong>hmt_lang</strong> remembers the language you picked in the menu, if you picked one.</li>
+      <li><strong>hmt_theme</strong>, kept in your browser's local storage rather than a cookie, remembers the light or dark theme you chose.</li>
+    </ul>
+  </section>
+
+  <section class="page-section" id="retention">
+    <h2>How long we keep it</h2>
+    <ul class="page-list">
+      <li>Your account and everything in it, until you delete it or ask us to. Deleting an activity deletes its route, its uploaded file and its photos.</li>
+      <li>A sign-in lasts 30 days; links to confirm an email address or reset a password stop working soon after they're sent.</li>
+      <li>Server logs are kept on our server for a short time and rotated out as new ones come in; the copy with Grafana Labs, for 14 days.</li>
+      <li>Backups are taken every night. Something deleted from your account, or a whole deleted account, can remain in them for up to 8 weeks before the backups holding it expire.</li>
+    </ul>
+  </section>
+
+  <section class="page-section" id="rights">
+    <h2>Your rights</h2>
+    <p>You can see and correct most of your data yourself, in Settings and on the map. You can also ask us, at <a href="mailto:hello@holdmytrack.com">hello@holdmytrack.com</a> from the address you sign in with, to:</p>
+    <ul class="page-list">
+      <li>send you a copy of your data, including your original files;</li>
+      <li>correct anything you can't change yourself;</li>
+      <li>delete your account and everything in it (<a href="/help#delete-account">how</a>) — there's no delete button yet;</li>
+      <li>stop or limit a use of your data you object to.</li>
+    </ul>
+    <p>We answer within a month. If you think we've handled your data wrongly, you can also complain to the data protection authority where you live.</p>
+    <p>HoldMyTrack is not meant for children under 16, and we don't knowingly keep their data.</p>
+    <p>If this policy changes, the date at the top changes with it, and we'll tell you by email before a change that affects what we do with data you've already given us.</p>
+  </section>
+</main>
+{{end}}
