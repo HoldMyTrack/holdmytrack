@@ -6,7 +6,7 @@ HoldMyTrack is a **free, community-funded platform for tracking outdoor activiti
 
 **What it is for.** A watch or tracking app shows one activity at a time, and years of history end up split across whichever devices and apps someone has used. HoldMyTrack puts all of it on one map, so "where have I been?" is answered by a picture rather than a list — and the same picture shows, just as clearly, the streets, parks and trails nearby that are still unexplored. A trip that spans several activities — a multi-day hike, a holiday — can be kept as one Story with its own map and totals (§4.2), instead of dissolving into the rest of the history. It doesn't tell anyone where to go (Spots, §1.1, is the one place it suggests somewhere); it shows what's left and leaves the choice to them.
 
-It targets people who already track workouts and want a better way to *see* the result, without adopting another real-time GPS tracker and without paying for the privilege.
+It targets people who already track workouts or travel and want a better way to *see* the result: all their history on one map, and each trip kept as a Story with its photos, without adopting another real-time GPS tracker.
 
 HoldMyTrack's wedge is:
 
@@ -55,6 +55,7 @@ To let athletes, runners, cyclists and explorers see and keep the shape of where
 * **Urban explorers** — people who gamify coverage of their city.
 * **Casual smartwatch owners** — want a nice seasonal or annual summary, not analytics.
 * **The multi-device athlete** — a Garmin for rides, an Apple Watch for runs, and no single place that shows all of it. This segment is served specifically by §4.1's three ingest paths and is underserved by every single-source competitor.
+* **Travellers** — people who want a holiday, a road trip or a multi-day trek kept as one journey on a map, with its photos. Served by Stories, photos and in-app recording (§4.2, §4.1); held back by having no route history to bring unless they recorded one, since most travellers' trace sits in Google Maps Timeline, which HoldMyTrack doesn't import.
 * **The subscription-fatigued** — people who already pay for Strava and resent it. Being free is not a discount here; it is the pitch.
 
 ### 3.2 Market Opportunity
@@ -71,6 +72,7 @@ Digital fitness tracking continues to grow, and the major platforms remain focus
 | **Squadrats** | z14/z17 tile gamification | Free / cheap | Game only, no artifact |
 | **CityStrides** | Street completion for runners | Free tier + sub | Running-only; sparse visuals |
 | **Fog of World** | The fog mechanic itself | One-time | Requires its own tracking; fog over *satellite* imagery, which we offer only as an optional base map with a capped cost |
+| **Polarsteps** | Trips drawn on a map with their photos, tracked automatically | Free; printed travel books paid | Travel-only: a trip is its own journal, apart from everyday walks and rides; no fog or coverage mechanic |
 | **Runalyze / Intervals.icu** | Free, deep performance analysis | Free / donation | Analysis-first, visually plain; the closest model for our funding approach |
 
 **Three honest observations about this table.**

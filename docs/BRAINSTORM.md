@@ -1,6 +1,6 @@
 # Brainstorm
 
-Ideas that have been raised but not decided — not yet reviewed for whether HoldMyTrack should build them, and not sequenced against anything in `docs/ROADMAP.md`. This is the opposite direction from that file: `ROADMAP.md` is committed, sequenced work; this file is a holding area for things that need a decision before they could become a `ROADMAP.md` item at all. `docs/VISION.md`'s own "not committed" phases (§5.7 Social, §5.8) stay in `VISION.md` itself rather than here, since they already have a stated position (deliberately unscheduled, pending §6's funding numbers) — an idea moves here when it has no such position yet, just a description and open questions.
+Ideas that have been raised but not decided — not yet reviewed for whether HoldMyTrack should build them, and not sequenced against anything in `docs/ROADMAP.md`. This is the opposite direction from that file: `ROADMAP.md` is committed, sequenced work; this file is a holding area for things that need a decision before they could become a `ROADMAP.md` item at all. `docs/VISION.md`'s own "not committed" phases (§5.7 Social, §5.8) stay in `VISION.md` itself rather than here, since they already have a stated position (Milestone 3, decided from Milestone 2's funding numbers) — an idea moves here when it has no such position yet, just a description and open questions.
 
 Once an idea here is decided, it moves out: accepted work goes to `docs/ROADMAP.md` (or straight into `SPEC.md`/`IMPLEMENTATION.md` if small enough to just build), and rejected ideas are deleted rather than kept as a record — this file has no obligation to remember what was said no to.
 
@@ -65,6 +65,15 @@ ADR-0024 keeps a resized copy of each photo on our own storage. If photos ever b
 * Roughly a fifteenth of today's storage per photo, at the cost of an OAuth integration per provider, a photo that only opens once the user shares it "with anyone with the link", and a broken link every time the user tidies their files.
 * Google Photos can't serve as one: its API hands out image URLs that expire within the hour.
 * Decide only once cost-per-user is measured (`ROADMAP.md` Phase 5) and photos show up in it.
+
+### Google Maps Timeline import
+
+Most travellers (`VISION.md` §3.1) have no GPX or FIT files: their trace of a trip is Google Maps Timeline, which none of the three ingest paths reads, so today they can only start with their next trip, recorded in the app. Since 2024 Google keeps Timeline on the phone rather than in the account, and Takeout no longer carries it; the phone's Maps settings can still export it as a JSON file.
+
+* Timeline is sparse, mode-guessed movement between visits, not a recorded track: whether a road trip drawn from it looks right on the map, and how a flight or a guessed mode is shown, needs trying on real exports.
+* The export has no stable, documented format, and older account-side exports (`Semantic Location History`) differ from the on-device one.
+* It would be the first ingest of data the user never chose to record as an activity, so the import needs a date range and a preview, not a whole-history dump.
+* Fits Milestone 2's "adjust features to what users ask for" (`VISION.md` §5): worth deciding once travellers actually show up asking.
 
 ### Deploy on merge
 
