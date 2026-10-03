@@ -37,6 +37,10 @@ type settingsForm struct {
 	AvatarError string
 	Notice      string
 	NoticeKey   string
+	// Email is the address to type to delete the account (FR-1.11); DeleteError is that
+	// form's, and keeps its section open.
+	Email       string
+	DeleteError string
 }
 
 // settingsAccount is the check every Settings request starts with: a live, verified (or demo)
@@ -58,6 +62,9 @@ func (s *Server) renderSettings(w http.ResponseWriter, r *http.Request, status i
 	form.Onboarding = !acct.info.isDemo && acct.profile.Country == ""
 	form.IsDemo = acct.info.isDemo
 	form.AvatarURL = acct.profile.AvatarURL
+	if acct.user != nil {
+		form.Email = acct.user.Email
+	}
 	lang := pageLang(acct, r)
 	l := i18n.Get(lang)
 	form.Countries = web.CountriesIn(lang)
@@ -156,6 +163,24 @@ func (s *Server) avatarForm(w http.ResponseWriter, r *http.Request, notice strin
 		return
 	}
 	http.Redirect(w, r, "/settings"+notice, http.StatusSeeOther)
+}
+
+// POST /settings/delete — the account's email in field "email" as confirmation (FR-1.11). On
+// success the session is gone with the account, so it lands on the sign-in page, which says so.
+func (s *Server) handleSettingsDeleteForm(w http.ResponseWriter, r *http.Request) {
+	acct := s.settingsAccount(w, r)
+	if acct == nil {
+		return
+	}
+	if err := s.closeAccount(r.Context(), acct.info.userID, acct.info.isDemo, r.PostFormValue("email")); err != nil {
+		status, msg := s.settingsError("delete account", err, pageLang(acct, r))
+		form := formWithSaved(acct)
+		form.DeleteError = msg
+		s.renderSettings(w, r, status, acct, form)
+		return
+	}
+	s.endSession(w, r)
+	http.Redirect(w, r, "/signin?deleted", http.StatusSeeOther)
 }
 
 // settingsError is renderAuthError's counterpart for Settings: an accountError's own status

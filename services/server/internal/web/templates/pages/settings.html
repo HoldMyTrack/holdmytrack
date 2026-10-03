@@ -97,6 +97,25 @@
     </span>
     <p class="settings__hint">{{t "settings.theme_hint"}}</p>
   </section>
+  {{/* FR-1.11. A disclosure rather than a second page, so it works without script; open
+       again after a mistyped email. Not for the demo account, which is shared. */}}
+  {{if not .IsDemo}}
+  <section class="settings__section settings__delete" id="delete-account" aria-labelledby="settings-delete">
+    <h2 class="settings__label" id="settings-delete">{{t "settings.delete_title"}}</h2>
+    <p class="settings__hint">{{th "settings.delete_hint"}}</p>
+    <details {{if .DeleteError}}open{{end}}>
+      <summary class="settings__button settings__button--danger">{{t "settings.delete_open"}}</summary>
+      <form method="post" action="/settings/delete" class="settings__delete-form">
+        <label class="settings__section">
+          <span class="settings__confirm">{{th "settings.delete_confirm" "email" .Email}}</span>
+          <input class="settings__input" type="email" name="email" required autocomplete="off" spellcheck="false" />
+        </label>
+        {{with .DeleteError}}<p class="settings__error" role="alert">{{.}}</p>{{end}}
+        <button type="submit" class="settings__submit settings__submit--danger">{{t "settings.delete_submit"}}</button>
+      </form>
+    </details>
+  </section>
+  {{end}}
   <script src="{{asset "search-picker.js"}}" defer></script>
   <script src="{{asset "theme.js"}}" defer></script>
 </main>

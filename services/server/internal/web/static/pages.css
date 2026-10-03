@@ -557,6 +557,50 @@ code {
   cursor: not-allowed;
 }
 
+/* Delete account (FR-1.11), last on the page. */
+.settings__delete {
+  margin-top: 16px;
+  padding-top: 24px;
+  border-top: 1px solid rgb(var(--fm-ink-rgb) / 12%);
+}
+
+.settings__delete summary {
+  list-style: none;
+  width: fit-content;
+  cursor: pointer;
+}
+
+.settings__delete summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings__button--danger {
+  color: var(--fm-danger);
+  border-color: rgb(var(--fm-danger-rgb) / 40%);
+}
+
+.settings__button--danger:hover {
+  color: var(--fm-danger-hover);
+  background: rgb(var(--fm-danger-rgb) / 6%);
+}
+
+.settings__delete-form {
+  margin-top: 16px;
+}
+
+.settings__confirm {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.settings__submit--danger {
+  background: var(--fm-danger);
+}
+
+.settings__submit--danger:hover {
+  background: var(--fm-danger-hover);
+}
+
 /* The Theme control (static/theme.js), below the form. */
 .settings__theme[hidden] {
   display: none;
