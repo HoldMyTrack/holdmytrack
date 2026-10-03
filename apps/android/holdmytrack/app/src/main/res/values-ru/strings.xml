@@ -192,6 +192,7 @@
     <string name="menu_about">О проекте</string>
     <string name="menu_help">Справка</string>
     <string name="menu_contacts">Контакты</string>
+    <string name="menu_privacy">Конфиденциальность</string>
     <string name="menu_version">Версия %1$s</string>
 
     <string name="settings_title">Настройки</string>
@@ -291,6 +292,7 @@
     <string name="sync_section_recorded">Записанные занятия</string>
     <string name="sync_source_health_connect">Health Connect</string>
     <string name="sync_health_connect_info">О синхронизации с Health Connect</string>
+    <string name="privacy_policy">Политика конфиденциальности</string>
     <string name="sync_running_recorded">Синхронизируем записанные занятия…</string>
     <string name="sync_needs_account">Сначала войдите в HoldMyTrack — до этого синхронизировать некуда.</string>
     <string name="sync_needs_verified_email">Сначала подтвердите адрес почты — если нужна новая ссылка, откройте HoldMyTrack.</string>

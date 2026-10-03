@@ -219,6 +219,7 @@ func (s *Server) registerPages() {
 	s.mux.HandleFunc("GET /about", s.staticPage("about", "meta.about_title", "meta.home_description", "/"))
 	s.mux.HandleFunc("GET /help", s.staticPage("help", "meta.help_title", "meta.help_description", ""))
 	s.mux.HandleFunc("GET /contacts", s.staticPage("contacts", "meta.contacts_title", "meta.contacts_description", ""))
+	s.mux.HandleFunc("GET /privacy", s.staticPage("privacy", "meta.privacy_title", "meta.privacy_description", ""))
 	// Step-by-step export guides, linked from the Upload menu and from Help.
 	s.mux.HandleFunc("GET /help/timeline-export", s.staticPage("guide-timeline", "meta.guide_timeline_title", "meta.guide_timeline_description", ""))
 	s.mux.HandleFunc("GET /help/google-health-export", s.staticPage("guide-google-health", "meta.guide_google_health_title", "meta.guide_google_health_description", ""))

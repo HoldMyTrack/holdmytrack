@@ -1792,7 +1792,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** The burger menu: the destinations that don't fit on the map itself — the app's own
-     *  screens, then the web header's Donate and Info pages (About, Help, Contacts), opened in
+     *  screens, then the web header's Donate and Info pages (About, Help, Contacts, Privacy), opened in
      *  a browser tab, and last the app's version, a line to read rather than an action. Donate
      *  only where `BuildConfig.DONATE_LINK` allows it, which the Play build doesn't. */
     private fun showMenu(anchor: View) {
@@ -1804,7 +1804,8 @@ class MainActivity : AppCompatActivity() {
         menu.menu.add(MENU_GROUP_WEB, MENU_ABOUT, 4, R.string.menu_about)
         menu.menu.add(MENU_GROUP_WEB, MENU_HELP, 5, R.string.menu_help)
         menu.menu.add(MENU_GROUP_WEB, MENU_CONTACTS, 6, R.string.menu_contacts)
-        menu.menu.add(MENU_GROUP_VERSION, MENU_VERSION, 7, getString(R.string.menu_version, HoldMyTrackApi.appVersion)).isEnabled = false
+        menu.menu.add(MENU_GROUP_WEB, MENU_PRIVACY, 7, R.string.menu_privacy)
+        menu.menu.add(MENU_GROUP_VERSION, MENU_VERSION, 8, getString(R.string.menu_version, HoldMyTrackApi.appVersion)).isEnabled = false
         menu.menu.setGroupDividerEnabled(true)
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
@@ -1815,6 +1816,7 @@ class MainActivity : AppCompatActivity() {
                 MENU_ABOUT -> openWebPage("/about")
                 MENU_HELP -> openWebPage("/help")
                 MENU_CONTACTS -> openWebPage("/contacts")
+                MENU_PRIVACY -> openWebPage("/privacy")
             }
             true
         }
@@ -2079,6 +2081,7 @@ class MainActivity : AppCompatActivity() {
         private const val MENU_HELP = 7
         private const val MENU_CONTACTS = 8
         private const val MENU_VERSION = 9
+        private const val MENU_PRIVACY = 10
         private const val EXTRA_VIEW_ACTIVITY = "dev.holdmytrack.android.VIEW_ACTIVITY"
         private const val EXTRA_VIEW_STARTED_AT = "dev.holdmytrack.android.VIEW_STARTED_AT"
 
