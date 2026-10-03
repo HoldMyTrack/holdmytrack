@@ -57,7 +57,6 @@ To let athletes, runners, cyclists, travellers and explorers see and keep the sh
 * **Casual smartwatch owners** — want a nice seasonal or annual summary, not analytics.
 * **The multi-device athlete** — a Garmin for rides, an Apple Watch for runs, and no single place that shows all of it. This segment is served specifically by §4.1's three ingest paths and is underserved by every single-source competitor.
 * **Travellers** — people who want a holiday, a road trip or a multi-day trek kept as one journey on a map, with its photos. Served by Stories, photos and in-app recording (§4.2, §4.1); held back by having no route history to bring unless they recorded one, since most travellers' trace sits in Google Maps Timeline, which HoldMyTrack doesn't import.
-* **The subscription-fatigued** — people who already pay for Strava and resent it. Being free is not a discount here; it is the pitch.
 
 ### 3.2 Market Opportunity
 Digital fitness tracking continues to grow, and the major platforms remain focused on real-time logging, social feeds and health metrics rather than spatial artifacts and cross-source aggregation. The opportunity is a **quality and openness** opportunity, not a whitespace opportunity.
@@ -84,7 +83,7 @@ Second, **Intervals.icu and Runalyze already prove the model we are choosing** �
 
 Third, **the tile games (Statshunters, VeloViewer, Squadrats) are a mechanic HoldMyTrack deliberately does not copy.** Counting visited map squares measures the same thing the fog already shows, only coarser and less pleasant to look at; Fog of War is HoldMyTrack's exploration mechanic, and there is no tile score (ADR-0018).
 
-**Implication for strategy:** feature parity is achievable in weeks and is not defensible. The defensible assets are render quality, breadth of ingest, and being genuinely free.
+**Implication for strategy:** feature parity is achievable in weeks and is not defensible. The defensible assets are render quality and breadth of ingest.
 
 **A deliberate visual trade-off.** Fog of World and similar apps draw fog over satellite imagery, and much of their appeal is the texture the reveal exposes — rooftops, tree canopy, water. HoldMyTrack renders over a self-hosted *vector* basemap by default. Imagery means a metered tile provider billed per request, on pan/zoom traffic that earns nothing, so it is never the default and never an open-ended bill: it is an optional Satellite base map, switched on per deployment, on a plan whose quota pauses the imagery rather than billing past it (ADR-0022). The consequence should be owned rather than discovered late: the default reveal looks different, and differentiation has to be carried by render quality and typography. Measured reference numbers are in `IMPLEMENTATION.md` §4.2.1.
 
