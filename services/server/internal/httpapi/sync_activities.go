@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"unicode/utf8"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
@@ -62,7 +63,23 @@ type syncActivityRequest struct {
 type syncActivitiesRequest struct {
 	Source     string                `json:"source"`
 	Activities []syncActivityRequest `json:"activities"`
+	// Batch and BatchTitle are optional: an import the client splits over several requests (a
+	// Timeline export of thousands of activities, §4.0.5) names one batch for all of them, so
+	// the Upload menu shows it as one row, "Timeline.json · 120 of 584", as it does a .zip.
+	// Without one, each request is its own batch.
+	Batch      string `json:"batch"`
+	BatchTitle string `json:"batch_title"`
 }
+
+// syncBatchPattern is what a client-chosen batch id may be. It's stored with clientBatchPrefix,
+// whose ":" neither newBatchID's tokens nor a lone upload's job id (activeImportsQuery groups
+// those by id::text) can contain, so a client can't fold its activities into another row.
+var syncBatchPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{8,64}$`)
+
+const clientBatchPrefix = "client:"
+
+// maxSyncBatchTitleRunes bounds a batch's title, a file name in practice.
+const maxSyncBatchTitleRunes = 200
 
 // syncActivityResult reports what happened to one activity in the batch — a batch is never
 // all-or-nothing, the same "one bad entry doesn't abort the rest" treatment handleZipUpload
@@ -110,13 +127,25 @@ func (s *Server) handleSyncActivities(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	batch := newBatchID()
+	if req.Batch != "" {
+		if !syncBatchPattern.MatchString(req.Batch) {
+			http.Error(w, `invalid "batch", want 8 to 64 letters, digits, "-" or "_"`, http.StatusBadRequest)
+			return
+		}
+		batch = clientBatchPrefix + req.Batch
+	}
+	if utf8.RuneCountInString(req.BatchTitle) > maxSyncBatchTitleRunes {
+		http.Error(w, fmt.Sprintf(`"batch_title" too long, want %d characters or fewer`, maxSyncBatchTitleRunes), http.StatusBadRequest)
+		return
+	}
+
 	ctx := r.Context()
 	userID := userIDFromContext(ctx)
 	l := i18n.Get(requestLang(r))
 	results := make([]syncActivityResult, len(req.Activities))
-	batch := newBatchID()
 	for i, act := range req.Activities {
-		results[i] = s.syncOneActivity(ctx, l, userID, req.Source, batch, act)
+		results[i] = s.syncOneActivity(ctx, l, userID, req.Source, batch, req.BatchTitle, act)
 	}
 
 	w.Header().Set("Cache-Control", "no-store")
@@ -126,7 +155,7 @@ func (s *Server) handleSyncActivities(w http.ResponseWriter, r *http.Request) {
 // syncOneActivity validates and persists+enqueues a single batch entry, isolated into its own
 // function so a marshal or persistAndEnqueue failure on one activity can't unwind the loop
 // handling the rest of the batch.
-func (s *Server) syncOneActivity(ctx context.Context, l *i18n.Localizer, userID, source, batch string, act syncActivityRequest) syncActivityResult {
+func (s *Server) syncOneActivity(ctx context.Context, l *i18n.Localizer, userID, source, batch, batchTitle string, act syncActivityRequest) syncActivityResult {
 	result := syncActivityResult{ExternalID: act.ExternalID}
 
 	if act.ExternalID == "" {
@@ -187,6 +216,7 @@ func (s *Server) syncOneActivity(ctx context.Context, l *i18n.Localizer, userID,
 		Data:       data,
 		ExternalID: act.ExternalID,
 		Batch:      batch,
+		BatchTitle: batchTitle,
 	})
 	if err != nil {
 		s.log.Error("sync activity persist/enqueue failed", "external_id", act.ExternalID, "err", err)

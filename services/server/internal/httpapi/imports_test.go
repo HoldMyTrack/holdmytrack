@@ -88,3 +88,34 @@ func TestUnseenImportFailures(t *testing.T) {
 		t.Errorf("unseen failures after opening /sync %d, want 0", resp.UnseenFailures)
 	}
 }
+
+// An import sent over several sync requests under one client batch is one row, titled with the
+// batch's title; a malformed batch id is refused.
+func TestSyncRequestsShareAClientBatch(t *testing.T) {
+	d := newDBTestWithS3(t, newMemS3())
+	me := d.newAccount(false)
+	send := func(id, batch string) int {
+		body := map[string]any{"source": "timeline", "batch": batch, "batch_title": "Timeline.json", "activities": []map[string]any{{
+			"external_id": id, "activity_type": "walking",
+			"points": []map[string]any{
+				{"lat": 50.0, "lon": 10.0, "time": "2026-05-01T10:00:00Z"},
+				{"lat": 50.001, "lon": 10.001, "time": "2026-05-01T10:01:00Z"},
+			},
+		}}}
+		return d.do(me, http.MethodPost, "/v1/sync/activities", body).Code
+	}
+	for _, id := range []string{"seg-1", "seg-2", "seg-3"} {
+		if code := send(id, "k3Jd9xQa2LmP"); code != http.StatusOK {
+			t.Fatalf("send %s: status %d", id, code)
+		}
+	}
+	if code := send("seg-4", "../x"); code != http.StatusBadRequest {
+		t.Errorf("malformed batch: status %d, want 400", code)
+	}
+
+	var resp activeImportsResponse
+	d.decode(d.do(me, "GET", "/v1/uploads/active", nil), http.StatusOK, &resp)
+	if len(resp.Imports) != 1 || resp.Imports[0].Title != "Timeline.json" || resp.Imports[0].Total != 3 {
+		t.Errorf("imports: %+v, want one Timeline.json row of 3", resp.Imports)
+	}
+}
