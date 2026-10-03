@@ -2,7 +2,7 @@
 
 [![Go coverage](https://img.shields.io/codecov/c/github/HoldMyTrack/holdmytrack?flag=go&logo=go&logoColor=white&label=Go%20coverage)](https://app.codecov.io/gh/HoldMyTrack/holdmytrack?flags%5B0%5D=go) [![TypeScript coverage](https://img.shields.io/codecov/c/github/HoldMyTrack/holdmytrack?flag=typescript&logo=typescript&logoColor=white&label=TypeScript%20coverage)](https://app.codecov.io/gh/HoldMyTrack/holdmytrack?flags%5B0%5D=typescript) [![Kotlin coverage](https://img.shields.io/codecov/c/github/HoldMyTrack/holdmytrack?flag=kotlin&logo=kotlin&logoColor=white&label=Kotlin%20coverage)](https://app.codecov.io/gh/HoldMyTrack/holdmytrack?flags%5B0%5D=kotlin)
 
-A free, community-funded platform for tracking outdoor activities and seeing the accumulated shape of where you have been. It aggregates the activity history you already have — from watches, from cloud services, from files — and turns it into maps and exploration stats worth looking at. The point is to see, on one map, every place you have already been — and, just as clearly, the streets, parks and trails nearby that you haven't, so the next walk, run or ride can go somewhere new. It is not a fitness tracker (the Android app can record a plain GPS track for a casual walk or drive, nothing more), it is not a health or fitness advisor, and it has no social graph. See [`docs/VISION.md` §1](docs/VISION.md#1-executive-summary).
+A free, community-funded platform for tracking outdoor activities and seeing the accumulated shape of where you have been. It aggregates the activity history you already have — from watches, from cloud services, from files — and turns it into maps and exploration stats worth looking at. The point is to see, on one map, every place you have already been — and, just as clearly, the streets, parks and trails nearby that you haven't, so the next walk, run or ride can go somewhere new, and every trip can be kept as a Story with its photos. What it is, and what it deliberately isn't: [`docs/VISION.md` §1](docs/VISION.md#1-executive-summary).
 
 Live at [holdmytrack.com](https://holdmytrack.com), with a no-signup demo account to explore.
 
@@ -39,7 +39,7 @@ holdmytrack/
 ├── .env.prod.example            # compose.prod.yml's own env template
 ├── .editorconfig
 ├── docs/
-│   ├── VISION.md                # product, market, funding, roadmap
+│   ├── VISION.md                # product, market, funding, milestones and phases
 │   ├── ARCHITECTURE.md          # system architecture, key decisions, stack
 │   ├── IMPLEMENTATION.md        # schema, workflows, each feature's own detail
 │   ├── SPEC.md                  # observable behavior, FR-N.M, independent of the above
@@ -52,9 +52,9 @@ holdmytrack/
 ├── AGENTS.md                    # orientation for coding agents
 ├── brand/                       # logo.svg, the mark's master; make_icons.py renders every logo and icon from it, the README's included
 ├── apps/
-│   ├── android/                 # Kotlin — Phase 2. Health Connect sync + in-app GPS recording; own docs/
-│   ├── ios/                     # Swift — Phase 2, HealthKit ingest. Placeholder
-│   └── web/                     # the Phase 1 product
+│   ├── android/                 # Kotlin. Health Connect sync + in-app GPS recording; own docs/
+│   ├── ios/                     # Swift, HealthKit ingest. Placeholder
+│   └── web/                     # the React map app (pages are server-rendered by services/server)
 │       ├── Dockerfile  .dockerignore  docker/entrypoint.sh
 │       ├── package.json  tsconfig.json  vite.config.ts
 │       ├── scripts/build-basemap.sh
@@ -77,7 +77,7 @@ This tree is the canonical one; do not let a second tree exist anywhere else to 
 
 | Document | Read it when |
 | :-- | :-- |
-| [`docs/VISION.md`](docs/VISION.md) | Product scope, market rationale, funding model, phase roadmap. |
+| [`docs/VISION.md`](docs/VISION.md) | Product scope, market rationale, funding model, milestones and phases. |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System-level shape: the key decisions, the target architecture, the stack, and what's deliberately deferred. |
 | [`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md) | Database schema, and each feature's own implementation detail — ingest, tile/fog workflows, accounts, deployment, engineering risks. |
 | [`docs/SPEC.md`](docs/SPEC.md) | A precise, testable statement of what the system currently does, independent of both the business rationale and the implementation. |
@@ -87,7 +87,7 @@ This tree is the canonical one; do not let a second tree exist anywhere else to 
 | [`docs/adr/`](docs/adr/) | Architecture Decision Records — why each consequential, hard-to-reverse decision was made, and what was rejected. |
 | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Running it locally, the verification checklist, gotchas worth not rediscovering, and the command reference. |
 | [`docs/DEPLOY.md`](docs/DEPLOY.md) | You're standing up an actual deployment. |
-| [`AGENTS.md`](AGENTS.md) | You are a coding agent opening the repo cold — this same routing table, self-contained, plus the Markdown formatting convention these docs follow. |
+| [`AGENTS.md`](AGENTS.md) | You are a coding agent opening the repo cold — this same routing table, self-contained, plus the documentation and Markdown conventions these docs follow. |
 
 ## License
 

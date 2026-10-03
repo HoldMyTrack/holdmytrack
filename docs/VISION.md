@@ -153,7 +153,7 @@ This isn't a resilience decision the way Paths 1–3 are — §4.1's provider-in
 | **Activity graph** | Private, single-player motivation | A GitHub-style daily contribution grid, year by year, shadeable by count or distance (`IMPLEMENTATION.md` §4.8) |
 | **Distance & coverage trends** | See how much ground you've covered this period vs last | Weekly/monthly distance, moving-time and elevation trends |
 | **Filtering** | Slice the history | Activity type, date range, geographic bounding box, source |
-| **Export** | Free, unrestricted | Print-grade raster/vector export, animated reveals — no watermark, no tier |
+| **Export** | Free, unrestricted | Print-grade raster/vector export, animated reveals — no tier; a small HoldMyTrack signature in the corner, nothing else |
 | **Privacy Controls** | Table stakes, see §7 | Private locations (user-defined privacy zones), per-map share scoping |
 
 **We don't keep your health profile — only the geographical data you trust us with, and the photos you choose to add to it.** An activity is a route: positions, times and elevation. Pace is derived from those and shown as the color of a selected track — a supporting detail on the route, not a pillar and not a training product; the pillars are the map and the exploration stats. Heart rate, cadence, power, calories and every other body signal are never read, stored or shown, whichever source an activity came from. The one place such data can still sit is inside an original upload, which is kept as-is so a track edit or a Private location change can rebuild the activity, is only ever read for its route, and is deleted with the activity. The schema carries per-point streams (`IMPLEMENTATION.md` §3.3) for the route, and no more. See ADR-0017.

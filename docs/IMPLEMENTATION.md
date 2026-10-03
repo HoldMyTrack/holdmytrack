@@ -1,6 +1,6 @@
 # HoldMyTrack: Implementation
 
-> **Scope note.** HoldMyTrack mainly ingests activities it didn't record. The one exception is the Android app's casual, GPS-only recording (FR-3.8), which submits through the same ingest pipeline as everything else — it is not a fitness tracker. There is no social graph — see `VISION.md` §1.1 and §5.8 for why. This document covers the database schema and each feature's own implementation detail (ingest, storage, analysis, fog rendering, tile serving) — see `docs/ARCHITECTURE.md` first for the system-level shape and the stack this all runs on.
+> **Scope note.** Besides ingesting activities it didn't record, HoldMyTrack records casual GPS-only tracks in the Android app (FR-3.8), which submit through the same ingest pipeline as everything else. This document covers the database schema and each feature's own implementation detail (ingest, storage, analysis, fog rendering, tile serving) — see `docs/ARCHITECTURE.md` first for the system-level shape and the stack this all runs on.
 
 ---
 
@@ -847,13 +847,11 @@ Attribution/logo bake-in belongs on the *final* canvas in step 3, not the offscr
 
 ### 4.5 Per-activity pace, and distance trends
 
-Not a performance-analysis pillar — `VISION.md` §1.1 draws a hard line against HoldMyTrack being a health or fitness advisor, and keeps no health data at all. What's here is deliberately narrow: pace shown as route context on a single activity (§4.3.1's bands, derived from the display trajectory), and a plain distance/time rollup over a period. No heart rate, no HR zones, no power, no training load, no all-time performance records.
+Deliberately narrow: pace shown as route context on a single activity (§4.3.1's bands, derived from the display trajectory), and a plain distance/time rollup over a period. Anything further is the health or fitness advisor territory `VISION.md` §1.1 rules out.
 
 **Moving time and cumulative distance come from ingest.** `internal/ingest`'s `computeMetrics` computes `movingS` for §3.3's `moving_seconds` (a point-to-point speed threshold, ~1.8 km/h, excludes a segment below it from moving time) and a per-point cumulative-distance array (`dist_m`, §3.4) in the same pass that walks every point for `distanceM` — no second scan. Trends reads the first; neither is user-visible on its own.
 
 **Trends** — count/distance/moving-time/elevation-gain per week or month, `GET /v1/activities/trends?bucket=week|month` — is shown on the Profile page below the activity grid (§4.8; `activityTrends`, the same query the endpoint runs): it needed no schema change and reuses §4.8's stat-query shape. One bar per period, a log scale against the window's busiest (so one huge week doesn't flatten every other bar), the Week/Month switch a pair of links (`?bucket=`). A bar's breakdown is its native tooltip on hover; since a touch screen never shows those, a few lines of script show the tapped (or clicked) bar's breakdown in a line under the chart, and a second tap hides it — the tap fallback the React chart had (§5.9).
-
-**Out of scope.** Best-effort curves, personal bests, grade-adjusted pace, HR zones, time-in-zone, power curves, training load and recovery data (sleep/HRV/readiness) are all squarely in the "health or fitness advisor" territory `VISION.md` §1.1 rules out, and none of them is planned.
 
 ### 4.6 Cross-source deduplication
 
@@ -1080,7 +1078,7 @@ Each row (`apps/web/src/ui/ActivitiesPanel.tsx`) has three independent interacti
 
 ### 4.10 The no-signup demo
 
-**Built.** `VISION.md` §8.2's no-signup demo, "the single best asset in this plan" — first pitched as a drag-your-own-file page, shipped as a read-only, fully populated example account (FR-2.1). Reuses §4.9's entire auth/session/upload/ingest/fog pipeline unchanged, behind a real account, rather than a second, from-scratch client-side parse-and-render path that would mean reimplementing GPX/FIT/TCX parsing and fog rasterization a second time, in a different language, with two implementations to keep in sync forever after.
+**Built.** `VISION.md` §8.2's no-signup demo: a read-only, fully populated example account (FR-2.1). Reuses §4.9's entire auth/session/upload/ingest/fog pipeline unchanged, behind a real account, rather than a second, from-scratch client-side parse-and-render path that would mean reimplementing GPX/FIT/TCX parsing and fog rasterization a second time, in a different language, with two implementations to keep in sync forever after.
 
 **`POST /v1/auth/demo` (`handleDemoStart`, auth.go) opens a session against one persistent, shared account** — a fixed `DemoCustomerUserID` constant (`demo_presets.go`), not a fresh row per visitor. Its `demo_expires_at` (`migrations/0006_demo_customer.sql`) is a fixed far-future timestamp rather than `NULL`: `isDemo := demoExpiresAt != nil` (auth.go) needs it non-`NULL` to keep the account read-only (`requireNotDemo`) and exempt from email verification (`requireVerified`), while a value that far out never matches the purge sweep's `< NOW()` condition below, so the account is never deleted. `demoSessionTTL` (24h) bounds each visitor's own session cookie — a fresh `POST /v1/auth/demo` call opens another session against the same account, and any number of visitors hold one at once, all seeing identical data. Its `email` (`demo-customer@holdmytrack.invalid`) is a synthetic, `.invalid`-TLD placeholder; `handleMe` strips it to `""` before it ever reaches the frontend.
 
@@ -1496,7 +1494,7 @@ Protomaps publishes daily planet builds at `https://build.protomaps.com/{YYYYMMD
 
 This client-side path has a real ceiling worth naming honestly: it can only export what the browser itself can already render at whatever resolution its own canvas will allocate, which is generously larger than a screenshot but not a calibrated print DPI against a known physical output size, and it can't outrun what a single browser tab's GPU/memory can hold for one temporary map instance. If that ceiling turns out to matter — a specific print product, or output large enough that a client-side canvas becomes unreliable — the original plan below is still the right design for that case, not a discarded idea:
 
-Exports are free and unwatermarked, so they will be used more than a paid version would be — budget for that rather than treating them as rare. Render in the worker pool, not the API process, and deliver asynchronously. Print-grade output needs a genuinely higher-resolution path than the screen renderer: a headless MapLibre render at print DPI, driven by the shared style document from `ARCHITECTURE.md` §2.1, not an upscaled screenshot.
+Exports are free, so they will be used more than a paid version would be — budget for that rather than treating them as rare. Render in the worker pool, not the API process, and deliver asynchronously. Print-grade output needs a genuinely higher-resolution path than the screen renderer: a headless MapLibre render at print DPI, driven by the shared style document from `ARCHITECTURE.md` §2.1, not an upscaled screenshot.
 
 Rate-limit export generation per user. It is the most expensive thing an individual can trigger on demand, and there is no payment step in front of it.
 
@@ -1520,9 +1518,9 @@ New, and specific to being free (`VISION.md` §4.3, §6.3). Costs scale with use
 
 * **Retention and dormancy.** `activity_streams` is the largest storage line and the least frequently read. Tier it: after N months of account inactivity (`users.last_seen_at`), move streams to cold storage or drop them, keeping `activities` summaries and fog rasters so the map still renders. Warn by email first, and make it recoverable by re-upload. This is the single most effective lever on the cost curve.
 * **Raw payload retention.** Raw ingest payloads (Path 3 originals, Path 1 provider pushes, Path 2 synced point batches) in object storage are not pure insurance — they are what a `reprivacy` job re-parses from (§7), since `activity_streams` never carries position. Expire them on a schedule anyway; they are also the most sensitive artifact we hold (§7). An activity whose payload has already expired simply cannot be retroactively re-clipped from source — that is an accepted limit of the retention window, not a bug.
-* **Per-user quotas.** A generous but finite cap on activities and total points. Not to monetise — to prevent one pathological account from becoming a material share of the bill.
+* **Per-user quotas.** A generous but finite cap on activities and total points, to prevent one pathological account from becoming a material share of the bill.
 * **Rate limits everywhere, with a spend cap.** Uploads, exports, tile requests and provider backfills. A CDN and object-store spend cap is load-bearing infrastructure: a free product has no natural throttle and a front-page day is a cost event with no matching revenue event.
-* **Measure cost per active user from day one.** It is the number that decides whether `VISION.md` §6's funding model works, and it cannot be reconstructed retroactively.
+* **Measure cost per active user from day one.** With monthly donations, it is what Milestone 2's exit gate is measured by (`VISION.md` §5, `docs/ROADMAP.md`), and it cannot be reconstructed retroactively.
 
 ### 5.8 Minimal deployment topology
 
@@ -1590,7 +1588,7 @@ Privacy is enforced at **ingest**, not at render. Once a point is excluded at st
 * **Raw payload handling** — payloads from all three paths retain unclipped data, including points inside privacy zones, and are what retroactive re-clipping re-parses from (above). They must be private, server-side-encrypted, never publicly addressable, and aggressively expired (§5.7). This is the most sensitive artifact in the system.
 * **Provider tokens** — encrypted at rest with a key outside the database, never logged, never returned by an API.
 * **Deauthorization deletion** — disconnecting a provider must delete the data synced from it, not merely the `connections` row. Required by Garmin, Wahoo and COROS.
-* **Special-category data** — location plus health data is GDPR Art. 9 data. DPIA before launch, working export and deletion endpoints, documented retention, EU-region storage for EU users. **Being free changes none of this.**
+* **Sensitive personal data** — a precise location history is sensitive under GDPR even with no health data in it (`VISION.md` §7). DPIA before launch, working export and deletion endpoints, documented retention, EU-region storage for EU users. **Being free changes none of this.**
 * **Tile authorization** — `/tiles/…?user_id=` is an IDOR. Derive the user from the session; never accept a user ID as a tile parameter. Signed, expiring URLs for any shared map.
 * **Operator access** — the admin panel (§4.20) is the one place an account sees another's data: every account and each one's activity list (ids, dates, names, countries/regions — not tracks). It takes the account id in the path by design, so it is gated on `users.is_admin`, which only the server's own CLI can set, and answers 404 to everyone else. Anything that later lets an admin see a track, or act on one, should come with an audit log of who looked at or changed what.
 * **The no-signup demo does hold data, deliberately — bounded by a TTL, not by refusing to persist.** See `docs/adr/0004-demo-account-reuses-real-pipeline.md` for why, the alternatives considered, and the tradeoff. The privacy properties that actually matter still hold — ingest-time Private location clipping (above) applies identically to a demo account, and `internal/worker/demo_purge.go`'s sweep is what keeps it from becoming a permanent, anonymous storage tier: `demo_expires_at` bounds the row's life to 24h, and the purge deletes both the DB rows (cascaded) and the object-storage keys (`raw/{userID}/`, `fog/{userID}/`, `heatmap/{userID}/`). "Must not become an anonymous upload endpoint" is enforced by that TTL and by `demoLimiter`'s per-IP rate limit (§4.10), not by refusing to accept uploads at all.
