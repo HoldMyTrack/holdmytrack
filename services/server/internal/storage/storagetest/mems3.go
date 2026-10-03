@@ -58,7 +58,14 @@ func (m *MemS3) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("ETag", `"0"`)
 		w.Header().Set("Last-Modified", time.Now().UTC().Format(http.TimeFormat))
+		// A ranged read ("bytes=N-" or "bytes=N-M"), as minio-go sends one after a Seek.
+		status := http.StatusOK
+		if from, to, ok := parseRange(r.Header.Get("Range"), len(body)); ok {
+			w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", from, to, len(body)))
+			body, status = body[from:to+1], http.StatusPartialContent
+		}
 		w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+		w.WriteHeader(status)
 		if r.Method == http.MethodGet {
 			w.Write(body)
 		}
@@ -86,6 +93,27 @@ func decodeAWSChunked(body []byte) []byte {
 		body = bytes.TrimPrefix(rest[size:], []byte("\r\n"))
 	}
 	return out
+}
+
+// parseRange reads a single "bytes=N-" or "bytes=N-M" range within size.
+func parseRange(h string, size int) (from, to int, ok bool) {
+	spec, found := strings.CutPrefix(h, "bytes=")
+	if !found {
+		return 0, 0, false
+	}
+	a, b, _ := strings.Cut(spec, "-")
+	from, err := strconv.Atoi(a)
+	if err != nil || from >= size {
+		return 0, 0, false
+	}
+	to = size - 1
+	if b != "" {
+		if to, err = strconv.Atoi(b); err != nil || to < from {
+			return 0, 0, false
+		}
+		to = min(to, size-1)
+	}
+	return from, to, true
 }
 
 // serveBucket answers the bucket-level calls: a listing (ListObjectsV2, by prefix, never
@@ -130,6 +158,14 @@ func (m *MemS3) Put(key string, body []byte) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.objects[key] = body
+}
+
+// Object is key's stored bytes.
+func (m *MemS3) Object(key string) ([]byte, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	b, ok := m.objects[key]
+	return b, ok
 }
 
 // Has reports whether key is stored.

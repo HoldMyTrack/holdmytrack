@@ -243,6 +243,56 @@
             android:textAppearance="@style/TextAppearance.HoldMyTrack.BodySmall"
             android:textColor="@color/hmt_ink_secondary" />
 
+        <!-- Download your data (root docs/SPEC.md FR-1.12), above Delete account as on the
+             web's page: where the latest copy stands, its archives when ready, and the request.
+             Gone for the demo account. -->
+        <LinearLayout
+            android:id="@+id/settings_export_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_24"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:accessibilityHeading="true"
+                android:text="@string/settings_export_title"
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.Overline" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_4"
+                android:text="@string/settings_export_hint"
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.BodySmall"
+                android:textColor="@color/hmt_ink_secondary" />
+
+            <TextView
+                android:id="@+id/settings_export_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_8"
+                android:accessibilityLiveRegion="polite"
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.BodyMedium"
+                android:visibility="gone" />
+
+            <!-- One Download button per archive, filled by SettingsActivity.showExport. -->
+            <LinearLayout
+                android:id="@+id/settings_export_parts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <Button
+                android:id="@+id/settings_export_request"
+                style="@style/Widget.HoldMyTrack.Button.Outlined"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_8"
+                android:text="@string/settings_export_request" />
+        </LinearLayout>
+
         <!-- Delete account (root docs/SPEC.md FR-1.11), last, as on the web's page. Gone for
              the demo account. -->
         <LinearLayout

@@ -557,6 +557,30 @@ code {
   cursor: not-allowed;
 }
 
+/* Download your data (FR-1.12), above Delete account. */
+.settings__export {
+  margin-top: 16px;
+  padding-top: 24px;
+  border-top: 1px solid rgb(var(--fm-ink-rgb) / 12%);
+}
+
+.settings__export-ready {
+  margin: 0;
+  font-size: 14px;
+}
+
+.settings__export-parts {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.settings__export-parts li + li {
+  margin-top: 4px;
+}
+
 /* Delete account (FR-1.11), last on the page. */
 .settings__delete {
   margin-top: 16px;

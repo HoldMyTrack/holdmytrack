@@ -77,6 +77,19 @@ func LocalTime(l *i18n.Localizer, at time.Time, zone string) string {
 	return ShortDate(l, t.Format("2006-01-02")) + ", " + t.Format("15:04")
 }
 
+// FormatBytes is a download's size: "840 KB", "12 MB", "1.4 GB" — decimal units, as browsers
+// and file managers show them.
+func FormatBytes(l *i18n.Localizer, n int64) string {
+	switch {
+	case n >= 1e9:
+		return l.T("unit.size.gb", "v", l.Float(float64(n)/1e9, 1))
+	case n >= 1e6:
+		return l.T("unit.size.mb", "v", l.Int((n+5e5)/1e6))
+	default:
+		return l.T("unit.size.kb", "v", l.Int((n+999)/1000))
+	}
+}
+
 // ShortDate is "Sep 8" / "8 сент." for a YYYY-MM-DD day.
 func ShortDate(l *i18n.Localizer, day string) string {
 	t, err := time.Parse("2006-01-02", day)

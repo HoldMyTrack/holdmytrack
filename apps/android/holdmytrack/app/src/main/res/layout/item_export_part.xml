@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One archive of a ready export in Settings (SettingsActivity.showExport): "Download 1 of 2
+     (1.9 GB)". -->
+<Button xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/Widget.HoldMyTrack.Button.Link"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content" />

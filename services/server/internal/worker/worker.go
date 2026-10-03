@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"runtime/debug"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -63,11 +64,38 @@ type job struct {
 	payload []byte
 }
 
+// exportSweepInterval is how often expired exports are removed (export_job.go).
+const exportSweepInterval = time.Hour
+
 // Run polls until ctx is cancelled. Each job is claimed in its own short transaction (FOR
 // UPDATE SKIP LOCKED, then locked_at stamped), run outside it, and marked done/failed after.
 // The fresh locked_at, not the row lock, is what keeps a second worker process off a job
 // that is still running (claimLease).
-func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger) error {
+//
+// Export jobs have a lane of their own, a second loop beside this one: building an archive
+// takes minutes, and nobody's upload should wait behind it. n tells the owner when one is
+// ready (export_job.go).
+func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, n *Notifier) error {
+	notifier = n
+	var lanes sync.WaitGroup
+	defer lanes.Wait() // an export cut off by shutdown is released before Run returns
+	lanes.Add(1)
+	go func() {
+		defer lanes.Done()
+		t := time.NewTicker(exportPollInterval)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				if _, err := claimAndRun(ctx, pool, store, log, laneExport); err != nil {
+					log.Error("export job processing error", "err", err)
+				}
+			}
+		}
+	}()
+
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 	demoTicker := time.NewTicker(demoPurgeInterval)
@@ -78,6 +106,8 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 	defer heatmapTicker.Stop()
 	heatmapCapTicker := time.NewTicker(heatmapCapInterval)
 	defer heatmapCapTicker.Stop()
+	exportSweepTicker := time.NewTicker(exportSweepInterval)
+	defer exportSweepTicker.Stop()
 
 	// A ticker's first tick is a whole interval away, so the daily sweeps also run once at
 	// start: a worker restarted more often than daily (every deploy) would otherwise never
@@ -87,6 +117,9 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 	}
 	if err := recomputeHeatmapCaps(ctx, pool, log); err != nil {
 		log.Error("heatmap cap error", "err", err)
+	}
+	if err := sweepExports(ctx, pool, store, log); err != nil {
+		log.Error("export sweep error", "err", err)
 	}
 
 	for {
@@ -116,6 +149,10 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 			if err := ageOutHeatmapWindow(ctx, pool, log); err != nil {
 				log.Error("heatmap aging error", "err", err)
 			}
+		case <-exportSweepTicker.C:
+			if err := sweepExports(ctx, pool, store, log); err != nil {
+				log.Error("export sweep error", "err", err)
+			}
 		case <-heatmapCapTicker.C:
 			if err := recomputeHeatmapCaps(ctx, pool, log); err != nil {
 				log.Error("heatmap cap error", "err", err)
@@ -124,7 +161,18 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 	}
 }
 
+// The two lanes Run claims from: every kind but export, and export alone.
+const (
+	laneMain   = false
+	laneExport = true
+)
+
+// claimAndRunOne is claimAndRun on the main lane.
 func claimAndRunOne(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger) (bool, error) {
+	return claimAndRun(ctx, pool, store, log, laneMain)
+}
+
+func claimAndRun(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, exports bool) (bool, error) {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return false, fmt.Errorf("worker: begin: %w", err)
@@ -137,10 +185,11 @@ func claimAndRunOne(ctx context.Context, pool *pgxpool.Pool, store *storage.Stor
 		SELECT id, kind, payload, attempts FROM jobs
 		WHERE state = 'pending' AND run_after <= NOW()
 		  AND (locked_at IS NULL OR locked_at < NOW() - make_interval(secs => $1))
+		  AND (kind = 'export') = $2
 		ORDER BY run_after, id
 		FOR UPDATE SKIP LOCKED
 		LIMIT 1
-	`, claimLease.Seconds()).Scan(&j.id, &j.kind, &j.payload, &attempts)
+	`, claimLease.Seconds(), exports).Scan(&j.id, &j.kind, &j.payload, &attempts)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
@@ -253,13 +302,13 @@ func runJobSafely(ctx context.Context, pool *pgxpool.Pool, store *storage.Store,
 			err = fmt.Errorf("panic: %v", r)
 		}
 	}()
-	return jobRunner(ctx, pool, store, j)
+	return jobRunner(ctx, pool, store, log, j)
 }
 
 // jobRunner is runJob; a test swaps in a job that blocks until shutdown.
 var jobRunner = runJob
 
-func runJob(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, j job) error {
+func runJob(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, j job) error {
 	switch j.kind {
 	case "ingest":
 		var ij ingest.Job
@@ -292,6 +341,8 @@ func runJob(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, j job
 			return fmt.Errorf("unmarshal reprivacy job: %w", err)
 		}
 		return ingest.ProcessReprivacy(ctx, pool, store, j.id, rj)
+	case "export":
+		return runExport(ctx, pool, store, log, j.id, j.payload)
 	default:
 		return fmt.Errorf("unhandled job kind %q (export / provider_sync / retention are out of scope for this task)", j.kind)
 	}

@@ -206,6 +206,15 @@
     <string name="settings_save">Save</string>
     <string name="settings_theme">Theme</string>
     <string name="settings_theme_hint">On this phone only. Applies at once.</string>
+    <string name="settings_export_title">Download your data</string>
+    <string name="settings_export_hint">A copy of everything in your account, as zip archives: the files you uploaded or synced, every activity as GPX, your photos, and your settings, Stories, Private locations and captured places.</string>
+    <string name="settings_export_request">Request a download</string>
+    <string name="settings_export_again">Request a new one</string>
+    <string name="settings_export_preparing">Preparing your archive. It usually takes a few minutes; we\'ll email %1$s when it\'s ready, and it will be here too.</string>
+    <string name="settings_export_ready">Ready, %1$s in all. Download until %2$s:</string>
+    <string name="settings_export_download">Download %1$d of %2$d (%3$s)</string>
+    <string name="settings_export_failed">Your last download couldn\'t be prepared. Please try again, and if it fails again, let us know.</string>
+    <string name="settings_export_downloading">Downloading to the Downloads folder.</string>
     <string name="settings_delete_title">Delete account</string>
     <string name="settings_delete_hint">Deletes your account and everything in it, for good: every activity and the files you uploaded, your photos, Stories, Private locations and captured places, and the recordings on this phone that haven\'t synced. It can\'t be undone, and backups keep it for up to 8 weeks.</string>
     <string name="settings_delete_open">Delete account…</string>

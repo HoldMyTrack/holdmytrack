@@ -97,6 +97,30 @@
     </span>
     <p class="settings__hint">{{t "settings.theme_hint"}}</p>
   </section>
+  {{/* FR-1.12. Where the latest export stands; the email links here (#download-data). */}}
+  {{if not .IsDemo}}{{with .Export}}
+  <section class="settings__section settings__export" id="download-data" aria-labelledby="settings-export">
+    <h2 class="settings__label" id="settings-export">{{t "settings.export_title"}}</h2>
+    <p class="settings__hint">{{th "settings.export_hint"}}</p>
+    {{if eq .State "preparing"}}
+    <p class="settings__notice" role="status">{{th "settings.export_preparing" "email" $.Page.Email}}</p>
+    {{else}}
+    {{if eq .State "ready"}}
+    <p class="settings__export-ready">{{t "settings.export_ready" "date" .Expires "size" .Total}}</p>
+    <ul class="settings__export-parts">
+      {{range .Parts}}<li><a href="{{.URL}}" download="{{.Name}}">{{.Name}}</a> <span class="settings__hint">{{.Size}}</span></li>{{end}}
+    </ul>
+    {{else if eq .State "failed"}}
+    <p class="settings__error" role="alert">{{t "settings.export_failed"}}</p>
+    {{end}}
+    {{with .Error}}<p class="settings__error" role="alert">{{.}}</p>{{end}}
+    <form method="post" action="/settings/export" class="settings__inline-form">
+      <button type="submit" class="settings__button">{{if eq .State "ready"}}{{t "settings.export_again"}}{{else}}{{t "settings.export_request"}}{{end}}</button>
+    </form>
+    {{end}}
+  </section>
+  {{end}}{{end}}
+
   {{/* FR-1.11. A disclosure rather than a second page, so it works without script; open
        again after a mistyped email. Not for the demo account, which is shared. */}}
   {{if not .IsDemo}}

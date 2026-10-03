@@ -3,20 +3,17 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/export"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
@@ -108,7 +105,7 @@ func exportDemoActivity(ctx context.Context, pool *pgxpool.Pool, store *storage.
 	if description != nil {
 		entry.Description = *description
 	}
-	filename, err := freeDemoFilename(outDir, points[0].Time.UTC().Format("2006-01-02")+" "+demoSlug(label), ".gpx")
+	filename, err := freeDemoFilename(outDir, points[0].Time.UTC().Format("2006-01-02")+" "+export.Slug(label), ".gpx")
 	if err != nil {
 		return "", demoManifestEntry{}, err
 	}
@@ -117,7 +114,7 @@ func exportDemoActivity(ctx context.Context, pool *pgxpool.Pool, store *storage.
 	if err != nil {
 		return "", demoManifestEntry{}, err
 	}
-	if err := writeDemoGPX(f, activityType, points); err != nil {
+	if err := export.WriteGPX(f, activityType, points); err != nil {
 		f.Close()
 		os.Remove(f.Name())
 		return "", demoManifestEntry{}, err
@@ -227,46 +224,6 @@ func copyDemoObject(ctx context.Context, store *storage.Store, key, file string)
 		return err
 	}
 	return f.Close()
-}
-
-// writeDemoGPX writes points as a one-segment GPX 1.1 track with everything parse.ParseGPX
-// reads back — position, elevation and time — and nothing else: no creator
-// device, no author metadata. Coordinates and elevation keep their full precision, so a
-// re-ingest derives the same metrics and trajectory; the name lives in the manifest.
-func writeDemoGPX(w io.Writer, activityType string, points []parse.Point) error {
-	var b strings.Builder
-	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n")
-	b.WriteString(`<gpx version="1.1" creator="HoldMyTrack" xmlns="http://www.topografix.com/GPX/1/1">` + "\n")
-	b.WriteString("  <trk>\n    <type>")
-	xml.EscapeText(&b, []byte(activityType))
-	b.WriteString("</type>\n    <trkseg>\n")
-	for _, p := range points {
-		fmt.Fprintf(&b, `      <trkpt lat="%s" lon="%s">`,
-			strconv.FormatFloat(p.Lat, 'f', -1, 64), strconv.FormatFloat(p.Lon, 'f', -1, 64))
-		if p.Elevation != nil {
-			fmt.Fprintf(&b, "<ele>%s</ele>", strconv.FormatFloat(float64(*p.Elevation), 'f', -1, 32))
-		}
-		fmt.Fprintf(&b, "<time>%s</time>", p.Time.UTC().Format(time.RFC3339Nano))
-		b.WriteString("</trkpt>\n")
-	}
-	b.WriteString("    </trkseg>\n  </trk>\n</gpx>\n")
-	_, err := io.WriteString(w, b.String())
-	return err
-}
-
-var demoSlugUnsafe = regexp.MustCompile(`[^\p{L}\p{N}]+`)
-
-// demoSlug keeps a name readable as a filename: letters and digits, everything else collapsed
-// to single spaces, bounded in length.
-func demoSlug(s string) string {
-	s = strings.TrimSpace(demoSlugUnsafe.ReplaceAllString(s, " "))
-	if r := []rune(s); len(r) > 60 {
-		s = strings.TrimSpace(string(r[:60]))
-	}
-	if s == "" {
-		return "Activity"
-	}
-	return s
 }
 
 // freeDemoFilename returns base+ext, or base-2+ext, base-3+ext, ... — the first not already in

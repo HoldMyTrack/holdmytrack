@@ -88,7 +88,7 @@ func purgeAccount(ctx context.Context, pool *pgxpool.Pool, store *storage.Store,
 		return fmt.Errorf("activities: rows: %w", err)
 	}
 	prefixes = append(prefixes,
-		"raw/"+userID+"/", "fog/"+userID+"/", "heatmap/"+userID+"/", "photos/"+userID+"/")
+		"raw/"+userID+"/", "fog/"+userID+"/", "heatmap/"+userID+"/", "photos/"+userID+"/", "exports/"+userID+"/")
 	for _, prefix := range prefixes {
 		if err := store.RemoveByPrefix(ctx, prefix); err != nil {
 			log.Error("account purge: storage cleanup failed, deleting the account anyway", "user_id", userID, "prefix", prefix, "err", err)

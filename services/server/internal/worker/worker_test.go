@@ -142,7 +142,7 @@ func TestShutdownReleasesTheRunningJob(t *testing.T) {
 	pool, userID := testPool(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	running := make(chan struct{})
-	jobRunner = func(ctx context.Context, _ *pgxpool.Pool, _ *storage.Store, _ job) error {
+	jobRunner = func(ctx context.Context, _ *pgxpool.Pool, _ *storage.Store, _ *slog.Logger, _ job) error {
 		close(running)
 		<-ctx.Done()
 		return ctx.Err()

@@ -464,6 +464,28 @@ CREATE INDEX idx_activity_photos_user ON activity_photos (user_id);
 
 **No position column.** `route_at` is a moment on the activity's `trajectory`, whose M dimension is epoch seconds (§3.3); the position is that moment's point on the track, worked out on every read. A stored point would go stale when Edit track (§4.7.7) or a Private location change (§7) rebuilds the track, and would keep a position a Private location added later should hide. `taken_at` is kept apart from `route_at` because moving a photo by hand changes only where it sits, not when it was taken.
 
+### 3.23 `exports`
+
+Downloading your data (§4.29, FR-1.12) — `migrations/0019_exports.sql`. One row per request; the archive's zip parts are in object storage at `exports/{user_id}/{id}/{n}.zip`. A row goes with its account, or with the hourly sweep once it expires.
+
+```sql
+CREATE TABLE exports (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    job_id        BIGINT REFERENCES jobs(id) ON DELETE SET NULL,
+    lang          VARCHAR(8) NOT NULL,   -- the request's language, for the email and README
+    requested_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ready_at      TIMESTAMPTZ,
+    expires_at    TIMESTAMPTZ,
+    part_sizes    BIGINT[]               -- bytes of each part, in order
+);
+
+CREATE INDEX idx_exports_user ON exports (user_id, requested_at DESC);
+CREATE INDEX idx_exports_expiry ON exports (expires_at) WHERE expires_at IS NOT NULL;
+```
+
+**No state column.** Until `ready_at` is set, where a request stands is its job's: pending is "preparing", failed (or gone) is "failed". Ready lasts until `expires_at`.
+
 ---
 
 ## 4. Core Technical Workflows
@@ -1469,13 +1491,31 @@ The app then posts `{code, verifier}` to `POST /v1/auth/handoff` (`handleAuthHan
 
 **Two steps: close at once, purge in the worker.** `DELETE /v1/account` (`internal/httpapi/account_delete.go`, `closeAccount`) checks the typed email against the account's own, then in one transaction deletes every way back in — `sessions`, `user_identities`, `password_resets`, `email_verifications`, `auth_handoffs` — clears `password_hash`, renames the email to `deleted-{id}@holdmytrack.invalid` and stamps `users.deleted_at` (migration `0018_account_deletion.sql`). From then on no sign-in path can reach the row, without each of them having to check `deleted_at`, and the address can sign up again straight away. The admin panel's list leaves such rows out. Behind `requireAuth` alone, so an unverified account can be deleted; a demo session is refused with `demo_read_only`.
 
-**The data goes in the worker**, `internal/worker/account_purge.go`, on a one-minute ticker of its own in `worker.Run`. For each account with `deleted_at` set, oldest first, 20 a tick: drop its pending jobs that nobody has claimed (or whose claim is older than `claimLease`); if one is still running, wait for the next tick — a running ingest or render could write a raw file, tile or mask after the sweep had listed them. Then remove its objects: `raw/`, `fog/`, `heatmap/` and `photos/` under its id, its `avatars/{id}`, and `activity-masks/{activityID}/` for each of its activities, read before the row goes since those are keyed by activity. Last, `DELETE FROM users`, whose cascade takes every other row. A failed removal is logged and the row deleted anyway, as the demo purge (§4.10) and an activity delete do. It is separate from the demo purge, which sweeps `demo_expires_at`.
+**The data goes in the worker**, `internal/worker/account_purge.go`, on a one-minute ticker of its own in `worker.Run`. For each account with `deleted_at` set, oldest first, 20 a tick: drop its pending jobs that nobody has claimed (or whose claim is older than `claimLease`); if one is still running, wait for the next tick — a running ingest or render could write a raw file, tile or mask after the sweep had listed them. Then remove its objects: `raw/`, `fog/`, `heatmap/`, `photos/` and `exports/` under its id, its `avatars/{id}`, and `activity-masks/{activityID}/` for each of its activities, read before the row goes since those are keyed by activity. Last, `DELETE FROM users`, whose cascade takes every other row. A failed removal is logged and the row deleted anyway, as the demo purge (§4.10) and an activity delete do. It is separate from the demo purge, which sweeps `demo_expires_at`.
 
 **On the web**, Settings' last section (`settings.html`, `#delete-account`) is a `<details>` holding a form that posts the typed email to `POST /settings/delete` (`settings_page.go`, `handleSettingsDeleteForm`), which calls the same `closeAccount`. A mismatch re-renders the page with the `<details>` open and its error; success ends the session and redirects to `/signin?deleted`, whose notice says so. Help's `#delete-account` and the privacy policy point here; Help keeps the email route for someone who can't sign in.
 
 **Backups** still hold the account for up to 8 weeks (ADR-0029), which the privacy policy says.
 
 **Tested** against a real database: the endpoint (`account_delete_test.go`: a wrong email changes nothing, the right one in any case closes the account, ends its sessions and frees the address; an unverified account can, a demo can't; the Settings form re-opens on a mismatch and lands on the sign-in notice) and the sweep (`account_purge_test.go`, over `storagetest.MemS3`, which lists and bulk-deletes for it: a running job holds it off, then every object of the account goes and nobody else's).
+
+### 4.29 Downloading your data (FR-1.12)
+
+**A request is a row and a job.** `POST /v1/account/export` (`internal/httpapi/exports.go`, `requestExport`) locks the account's `users` row, and unless an export is already being prepared, sets `expires_at = NOW()` on any earlier ready one (the sweep below removes it), inserts an `exports` row with the request's language, and an `export` job pointing at it. A request while one is preparing returns that one, so repeated taps make one archive. `GET /v1/account/export` (`latestExport`) reports the newest: none, preparing, failed, or ready with its parts.
+
+**The job runs in a lane of its own.** The worker's main loop claims every kind but `export` (`claimAndRun`'s `laneMain`); a second goroutine in `worker.Run` polls every 5 seconds for `export` alone, so building an archive, which takes minutes for a big account, never holds up anyone's upload. A running export refreshes its claim's `locked_at` every 5 minutes, so a build longer than `claimLease` isn't taken for abandoned. `Run` waits for the lane on shutdown, so a cut-off export is released like any other job.
+
+**The archive** (`internal/export`, `Build`) waits up to 2 minutes for the account's pending track edits (`edit_pending`), since a track can't be rebuilt mid-edit, then writes, in order: `README.txt` in the request's language, and per activity, oldest first, named `<YYYY-MM-DD HHMM> <name or type>` in the account's timezone (a repeat gets ` 2`): `originals/` — its raw payload as stored, once per key (duplicates share one); `tracks/` — a GPX of `ingest.DisplayedPoints`, the track as its map shows it; and `photos/` — each stored copy. Last, `account.json`: the account and settings, every activity's fields with the paths of its files (`duplicate_of` for a superseded copy, `track_unavailable` where the raw payload no longer parses), Stories, Private locations and captures. GPX and JSON are deflated; originals and photos are stored as they are. A part is closed once its compressed size passes `PartLimit` (2 GB, Takeout's default) and the next file starts another. Each part is written to a temporary file and uploaded with its size known: minio-go buffers about 537 MB per part for an upload of unknown length. A retried build first removes what an earlier attempt left. `WriteGPX` and `Slug` are shared with the demo export (§4.10).
+
+**Done, then told.** The job sets `ready_at`, `expires_at` (7 days, `export.Lifetime`) and `part_sizes`, then emails the account (`worker.Notifier`, the same `internal/mail` sender as `serve`, built by `cmd/holdmytrack`'s `newMailer`) in the request's language: how many parts and how big, the expiry date in the account's timezone, and a link to `/settings#download-data`. The link needs a session; the archive is never reachable by the link alone. A failed email is logged, not retried: the archive is on the Settings page either way. A failed build fails the job, which Settings reports.
+
+**Downloads** — `GET /v1/account/exports/{id}/parts/{n}` (`requireVerified`, the caller's own, ready and unexpired) serves the part with `http.ServeContent` over `storage.Open` (a seekable object), so a dropped download resumes with a Range request; `Content-Disposition` names it `holdmytrack-<date>-<n>-of-<total>.zip`.
+
+**On the web**, Settings' `#download-data` section (`settings.html`, `settings_page.go`'s `settingsExport`, filled from `latestExport` with sizes from `web.FormatBytes` and the expiry day in the account's timezone) posts to `POST /settings/export` (`handleSettingsExportForm`, the same `requestExport`) and redirects back to the section. The parts link straight to the download endpoint, which the session cookie authorizes. Help's `#download-data` explains the contents, and the privacy policy's rights point there.
+
+**The sweep** — `sweepExports`, hourly and at start: removes every export past `expires_at`, parts then row, and any request whose job failed or vanished more than 7 days ago. Deleting the account (§4.28) removes `exports/{id}/` with the rest.
+
+**Tested**: `internal/export`'s `Build` over a real database and `storagetest.MemS3` (a small `PartLimit` forcing a split; every folder's files, the original byte for byte, `account.json`'s contents, a rebuild leaving no stale part); `exports_test.go` (one export per request while preparing, a demo refused, a download whole and resumed by Range, someone else's and a missing part refused — MemS3 now answers ranged reads); `TestSettingsExportForm` (the section, a request, and the preparing state); `export_job_test.go` (the export lane takes the job and the main lane doesn't, ready with its email and link, and the sweep removing it once expired).
 
 ## 5. Engineering Risks & Mitigations
 

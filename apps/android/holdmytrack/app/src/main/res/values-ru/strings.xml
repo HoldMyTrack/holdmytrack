@@ -219,6 +219,15 @@
     <string name="settings_save">Сохранить</string>
     <string name="settings_theme">Тема</string>
     <string name="settings_theme_hint">Только на этом телефоне. Применяется сразу.</string>
+    <string name="settings_export_title">Скачать свои данные</string>
+    <string name="settings_export_hint">Копия всего, что есть в вашем аккаунте, в zip-архивах: загруженные и синхронизированные файлы, все занятия в виде GPX, фотографии, а также настройки, истории, приватные и отмеченные места.</string>
+    <string name="settings_export_request">Запросить архив</string>
+    <string name="settings_export_again">Запросить новый</string>
+    <string name="settings_export_preparing">Готовим архив. Обычно это занимает несколько минут; когда он будет готов, мы напишем на %1$s, и он появится здесь.</string>
+    <string name="settings_export_ready">Готово, всего %1$s. Скачать можно до %2$s:</string>
+    <string name="settings_export_download">Скачать %1$d из %2$d (%3$s)</string>
+    <string name="settings_export_failed">Не удалось подготовить архив. Попробуйте ещё раз, а если снова не получится — напишите нам.</string>
+    <string name="settings_export_downloading">Скачивается в папку «Загрузки».</string>
     <string name="settings_delete_title">Удаление аккаунта</string>
     <string name="settings_delete_hint">Удаляет аккаунт и всё, что в нём, насовсем: все занятия и загруженные файлы, фотографии, истории, приватные и отмеченные места, а также записи на этом телефоне, которые ещё не синхронизированы. Это нельзя отменить, а в резервных копиях данные хранятся ещё до 8 недель.</string>
     <string name="settings_delete_open">Удалить аккаунт…</string>

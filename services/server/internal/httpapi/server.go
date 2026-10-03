@@ -149,6 +149,10 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(route("DELETE", "/account/avatar"), s.requireNotDemo(s.handleDeleteAvatar))
 	// requireAuth alone: an unverified account can be deleted too. closeAccount refuses a demo.
 	s.mux.HandleFunc(route("DELETE", "/account"), s.requireAuth(s.handleDeleteAccount))
+	// exports.go — downloading your data. A demo session sees "none" and is refused a request.
+	s.mux.HandleFunc(route("POST", "/account/export"), s.requireNotDemo(s.handleRequestExport))
+	s.mux.HandleFunc(route("GET", "/account/export"), s.requireVerified(s.handleGetExport))
+	s.mux.HandleFunc(route("GET", "/account/exports/{id}/parts/{n}"), s.requireVerified(s.handleDownloadExportPart))
 	s.mux.HandleFunc(route("POST", "/activities/upload"), s.requireNotDemo(s.handleUpload))
 	s.mux.HandleFunc(route("GET", "/activities"), s.requireVerified(s.handleListActivities))
 	s.mux.HandleFunc(route("PATCH", "/activities/{id}"), s.requireNotDemo(s.handleUpdateActivity))
@@ -247,6 +251,7 @@ func (s *Server) registerPages() {
 	s.mux.HandleFunc("POST /settings", s.sameOrigin(s.handleSettingsForm))
 	s.mux.HandleFunc("POST /settings/avatar", s.sameOrigin(s.handleSettingsAvatarForm))
 	s.mux.HandleFunc("POST /settings/avatar/remove", s.sameOrigin(s.handleSettingsAvatarRemoveForm))
+	s.mux.HandleFunc("POST /settings/export", s.sameOrigin(s.handleSettingsExportForm))
 	s.mux.HandleFunc("POST /settings/delete", s.sameOrigin(s.handleSettingsDeleteForm))
 	s.mux.HandleFunc("GET /profile", s.handleProfilePage) // profile_page.go
 	s.mux.HandleFunc("GET /sync", s.handleSyncPage)       // sync_page.go
