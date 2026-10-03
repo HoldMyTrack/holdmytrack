@@ -310,7 +310,7 @@ Non-negotiable. A Fog of War map is a precise map of where a person lives — th
 ## 8. Go-To-Market
 
 ### 8.1 Launch
-* **Community-first** — r/running, r/cycling, r/Garmin, r/Strava, r/FogOfWorld. These communities respond to a working demo, not a landing page. "Free, no subscription" is a strong post title in every one of them.
+* **Community-first** — r/running, r/cycling, r/Garmin, r/Strava, r/FogOfWorld. These communities respond to a working demo, not a landing page. "Free, funded by its users" is a strong post title in every one of them.
 * **Lead with the demo, not the pitch** (§8.2).
 * **Influencer partnerships** — endurance creators and bikepackers, compensated in nothing, because there is no money. What can be offered is a genuinely good free tool and a credit.
 * **Be explicit about funding from day one.** Users of free products are rightly suspicious about what is being monetised instead. Answering that question before it is asked — with a public ledger — converts suspicion into support.
