@@ -257,6 +257,24 @@
     enqueue(event.detail);
   });
 
+  // The Google Maps Timeline import is a window on the map (TimelineImportWindow.tsx): on the
+  // map, the link opens it there — the map cancels this event to say it has — and from any
+  // other page it goes to /?import=timeline. The window sends its activities itself, and says
+  // when a batch has gone so the list shows it now rather than at the next idle tick.
+  var timelineLink = menu.querySelector('[data-timeline-import]');
+  if (timelineLink) {
+    timelineLink.addEventListener('click', function (event) {
+      var opened = !window.dispatchEvent(new CustomEvent('hmt:open-timeline-import', { cancelable: true }));
+      if (opened) {
+        event.preventDefault();
+        menu.open = false;
+      }
+    });
+  }
+  window.addEventListener('hmt:imports-sent', function () {
+    refresh().then(schedule);
+  });
+
   // Opening the menu reads the latest at once rather than waiting for the next tick.
   menu.addEventListener('toggle', function () {
     if (menu.open) refresh();

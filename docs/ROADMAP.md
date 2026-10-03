@@ -70,10 +70,11 @@ Connecting the app to third-party services, and reading the exports of ones it c
 
 For travellers whose only route history is Timeline (`VISION.md` §3.1, §5.5). Import only: no continuous location logging (`VISION.md` §1.1).
 
-- [ ] Try the render on two or three real Timeline exports before building anything: Timeline is visits plus sparse, mode-guessed movement between them, not a recorded track, so drawn as-is the fog clears in straight lines through buildings and across lakes. Decide from what it looks like how Timeline-sourced data is drawn — for example, clearing fog only around visits, or keeping inferred movement out of the fog — and how flights and guessed modes show.
-- [ ] Settle which formats to read: the phone's on-device export, and the older account-side `Semantic Location History` from past Takeouts, which differ; neither is documented, so the reader is built against real files.
-- [ ] Upload with a date range and a preview of what will be imported, not a whole-history dump — it's the first import of data the user never chose to record as an activity. Private locations apply as for every other source (`VISION.md` §7).
-- [ ] Measure the storage a multi-year Timeline adds per account against `VISION.md` §4.3's assumptions.
+- [x] Try the render on a real Timeline export before building anything, and decide how Timeline data is drawn: as given, every trip an activity and visits left out, flights unticked until chosen (`IMPLEMENTATION.md` §4.0.5).
+- [x] Read the Android phone's on-device export, in the browser, sending only the trips (`IMPLEMENTATION.md` §4.0.5).
+- [ ] Read the iPhone's Timeline export and the older account-side `Semantic Location History` from past Takeouts. Both differ from the Android export and neither is documented, so each waits for a real file to build against. Until then the import recognizes and refuses them by name.
+- [x] Import with a date range, a choice of modes and a preview on the map, not a whole-history dump (`SPEC.md` FR-3.10). Private locations apply as for every other source.
+- [ ] Bound the storage a Timeline adds per account. Three months of daily driving measured about 60 MB, most of it per-activity masks (`IMPLEMENTATION.md` §4.0.5), against `VISION.md` §4.3's assumption of about 27 MB per user in all. A multi-year export, which no one has measured yet, would be several times that.
 
 ### Prerequisites — gate the specific connectors below, not this phase's other work
 

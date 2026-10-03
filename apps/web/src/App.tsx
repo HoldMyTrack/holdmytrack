@@ -12,7 +12,9 @@ import { VersionBanner } from './ui/VersionBanner';
  * than re-checking one.
  */
 function AuthenticatedApp() {
-  return <MapView initialPrivateLocationsOpen={openPrivateLocations} initialActivity={openActivity} />;
+  return (
+    <MapView initialPrivateLocationsOpen={openPrivateLocations} initialActivity={openActivity} initialTimelineImport={openTimelineImport} />
+  );
 }
 
 /** `?private-locations` is the map arriving with the Activities panel on its Privacy tab. Read once per page load, here at module load rather than
@@ -25,6 +27,19 @@ const openPrivateLocations = takePrivateLocationsParam();
  *  "View on map" (`SPEC.md` FR-3.9), which works out the activity's day on the server. Taken
  *  once and stripped, like `?private-locations`, so a refresh doesn't narrow the range again. */
 const openActivity = takeActivityParam();
+
+/** `?import=timeline` is the map arriving with the Google Maps Timeline import open — the
+ *  header's Upload menu, from a page other than this one. Taken once and stripped, likewise. */
+const openTimelineImport = takeImportParam();
+
+function takeImportParam(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('import') !== 'timeline') return false;
+  params.delete('import');
+  const rest = params.toString();
+  window.history.replaceState(null, '', window.location.pathname + (rest ? `?${rest}` : '') + window.location.hash);
+  return true;
+}
 
 function takeActivityParam(): { id: string; day: string } | null {
   const params = new URLSearchParams(window.location.search);

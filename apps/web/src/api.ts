@@ -891,3 +891,37 @@ export async function deletePhoto(id: string): Promise<void> {
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
 }
+
+export type SyncActivityStatus = 'enqueued' | 'already_processed' | 'rejected';
+
+/** One activity of a `syncActivities` request, as the server's `parse.JSONActivity` reads it. */
+export type SyncActivityInput = {
+  external_id: string;
+  activity_type: string;
+  points: { lat: number; lon: number; time: string }[];
+};
+
+/**
+ * `POST /v1/sync/activities` (IMPLEMENTATION.md §4.0.3) — the phone's sync endpoint, which the
+ * Google Maps Timeline import (§4.0.5) sends its activities to. At most 100 a request; `batch`
+ * and `batchTitle` make several requests one row in the Upload menu.
+ */
+export async function syncActivities(input: {
+  source: string;
+  batch: string;
+  batchTitle: string;
+  activities: SyncActivityInput[];
+}): Promise<{ external_id: string; status: SyncActivityStatus; error?: string }[]> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/sync/activities`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ source: input.source, batch: input.batch, batch_title: input.batchTitle, activities: input.activities }),
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
+  }
+  const body = (await res.json()) as { results?: { external_id: string; status: SyncActivityStatus; error?: string }[] };
+  if (!Array.isArray(body.results)) throw new Error(t('common.bad_response'));
+  return body.results;
+}

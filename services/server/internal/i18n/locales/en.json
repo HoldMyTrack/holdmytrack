@@ -312,6 +312,7 @@
   "upload.demo": "Not available for demo accounts — create an account to upload your own activities",
   "upload.choose": "Choose files…",
   "upload.hint": ".gpx, .fit, .tcx or a .zip of them — or drop them on the map",
+  "upload.timeline": "Import Google Maps Timeline…",
   "upload.idle": "Nothing is being imported right now.",
   "upload.queued": "Queued",
   "upload.uploading": "Uploading {percent}%",
