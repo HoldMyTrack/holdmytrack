@@ -308,13 +308,13 @@ Every series and stream carries `deployment="<your-domain>"`. The stack sends ab
 5. Bring it up: `GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod up -d`. That starts `alloy`, and recreates `api` and `worker` if they were built before `METRICS_ADDR` existed.
 6. Check: `docker compose -f compose.prod.yml --env-file .env.prod logs alloy | grep -E 'level=(error|warn)'` should show nothing after its first minute, apart from a `diskstats` note about `/run/udev/data`. In the stack's **Explore**, Loki's `{deployment="<your-domain>"}` should show recent lines, and Prometheus's `holdmytrack_jobs_runnable` four series at 0.
 
-**Alerts and the dashboard** are defined in the repository, not in Grafana's UI: `ops/grafana/apply.py` holds the alert rules, `ops/grafana/dashboard.json` the dashboard, and the script pushes both to the stack. Alerts go through the stack's default notification policy, to whichever contact point it uses (step 1's). Run it from any machine with Python 3, after creating a service account in the stack (**Administration → Users and access → Service accounts**, role **Admin**, which the alerting API needs) and adding a token to it:
+**Alerts and the dashboard** are defined in the repository, not in Grafana's UI: `ops/grafana/apply.py` holds the alert rules, `ops/grafana/dashboard.json` the dashboard, and the script pushes both to the stack. Alerts go to the addresses in `ALERT_EMAIL` (several separated by `;`), through a contact point the script keeps for them, named `holdmytrack`. Every rule names that contact point directly, so a later change to the stack's default notification policy can't redirect them. Run it from any machine with Python 3, after creating a service account in the stack (**Administration → Users and access → Service accounts**, role **Admin**, which the alerting API needs) and adding a token to it:
 
 ```
-GRAFANA_URL=https://<stack>.grafana.net GRAFANA_TOKEN=<service account token> ops/grafana/apply.py
+GRAFANA_URL=https://<stack>.grafana.net GRAFANA_TOKEN=<service account token> ALERT_EMAIL=<address> ops/grafana/apply.py
 ```
 
-It creates a **HoldMyTrack** folder holding the alert group `holdmytrack` and the **HoldMyTrack** dashboard, and prints the dashboard's link. It replaces the whole group on every run, so a rule deleted from the script is deleted in Grafana too. The rules stay editable in the UI, for trying a change out, but the next run overwrites them. They are:
+It creates the `holdmytrack` contact point, a **HoldMyTrack** folder holding the alert group `holdmytrack`, and the **HoldMyTrack** dashboard, and prints the dashboard's link. Running it again updates all three in place. It replaces the whole group on every run, so a rule deleted from the script is deleted in Grafana too. The rules stay editable in the UI, for trying a change out, but the next run overwrites them. They are:
 
 | Alert | Fires when |
 | :-- | :-- |

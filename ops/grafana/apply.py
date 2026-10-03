@@ -6,12 +6,13 @@ here and run this again, rather than editing them in Grafana's UI. Run from anyw
 Python 3 and no other packages:
 
     GRAFANA_URL=https://<stack>.grafana.net GRAFANA_TOKEN=<service account token> \\
-        ops/grafana/apply.py
+        ALERT_EMAIL=<address> ops/grafana/apply.py
 
 GRAFANA_TOKEN is a token for a service account with the Admin role, which the alerting
-provisioning API needs. DEPLOYMENT is the `deployment` label Alloy adds (DOMAIN in .env.prod),
-holdmytrack.com unless set. Rules notify through the stack's default notification policy, so
-whatever contact point that uses is where alerts go.
+provisioning API needs. ALERT_EMAIL is where every alert goes, several separated by ";": the
+script keeps a contact point of its own with those addresses and routes each rule to it, so
+a change to the stack's default notification policy can't redirect them. DEPLOYMENT is the
+`deployment` label Alloy adds (DOMAIN in .env.prod), holdmytrack.com unless set.
 """
 
 import json
@@ -24,6 +25,8 @@ import urllib.request
 FOLDER_UID = "holdmytrack"
 FOLDER_TITLE = "HoldMyTrack"
 GROUP = "holdmytrack"
+CONTACT_POINT = "holdmytrack"
+CONTACT_POINT_UID = "holdmytrack-email"
 DEPLOYMENT = os.environ.get("DEPLOYMENT", "holdmytrack.com")
 D = f'deployment="{DEPLOYMENT}"'
 
@@ -130,6 +133,8 @@ def rule(r, prom):
         "execErrState": "Error",
         "annotations": {"summary": r["summary"]},
         "labels": {"deployment": DEPLOYMENT},
+        # Straight to this script's contact point, past the notification policy tree.
+        "notification_settings": {"receiver": CONTACT_POINT},
         "data": [
             {
                 "refId": "A",
@@ -153,11 +158,26 @@ def rule(r, prom):
 
 
 def main():
-    for var in ("GRAFANA_URL", "GRAFANA_TOKEN"):
+    for var in ("GRAFANA_URL", "GRAFANA_TOKEN", "ALERT_EMAIL"):
         if not os.environ.get(var):
             sys.exit(f"{var} is not set; see this file's docstring")
     prom = datasource("prometheus", "-prom")
     loki = datasource("loki", "-logs")
+
+    # Before the rules, which name it. Created once, then updated in place by its uid.
+    contact = {
+        "uid": CONTACT_POINT_UID,
+        "name": CONTACT_POINT,
+        "type": "email",
+        "settings": {"addresses": os.environ["ALERT_EMAIL"], "singleEmail": False},
+        "disableResolveMessage": False,
+    }
+    existing = api("GET", f"/api/v1/provisioning/contact-points?name={CONTACT_POINT}")
+    if any(c.get("uid") == CONTACT_POINT_UID for c in existing):
+        api("PUT", f"/api/v1/provisioning/contact-points/{CONTACT_POINT_UID}", contact, headers={"X-Disable-Provenance": "true"})
+    else:
+        api("POST", "/api/v1/provisioning/contact-points", contact, headers={"X-Disable-Provenance": "true"})
+    print(f"contact point: {CONTACT_POINT} -> {os.environ['ALERT_EMAIL']}")
 
     if not any(f["uid"] == FOLDER_UID for f in api("GET", "/api/folders")):
         api("POST", "/api/folders", {"uid": FOLDER_UID, "title": FOLDER_TITLE})
