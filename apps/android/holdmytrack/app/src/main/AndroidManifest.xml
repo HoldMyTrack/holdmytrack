@@ -126,6 +126,41 @@
             <intent-filter>
                 <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
             </intent-filter>
+            <!-- An activity file or archive another app opens or shares with HoldMyTrack —
+                 uploaded as if picked in the screen's Files section (imports/FileImports). A .fit
+                 has no type of its own most apps agree on, so it's picked in the screen. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/gpx+xml" />
+                <data android:mimeType="application/vnd.garmin.tcx+xml" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/gpx+xml" />
+                <data android:mimeType="application/vnd.garmin.tcx+xml" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
+            </intent-filter>
+        </activity>
+
+        <!-- Exported for the same reason: a Timeline.json opened or shared from another app (a
+             file manager, Downloads) comes straight here, as one picked on the Sync screen does. -->
+        <activity
+            android:name=".TimelineImportActivity"
+            android:exported="true"
+            android:label="@string/timeline_title"
+            android:theme="@style/Theme.HoldMyTrack">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/json" />
+            </intent-filter>
         </activity>
 
         <!-- Not exported: reached only from a Sync Source recording row's Edit, never by another app. -->

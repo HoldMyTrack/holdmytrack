@@ -1,5 +1,6 @@
 package dev.holdmytrack.android.net
 
+import android.content.ContentResolver
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -13,6 +14,7 @@ import java.io.IOException
 import java.time.ZoneId
 import java.time.Instant
 import java.time.OffsetDateTime
+import java.util.concurrent.TimeUnit
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.Dispatcher
@@ -28,6 +30,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okio.BufferedSink
+import okio.source
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -127,6 +131,15 @@ data class Providers(val google: Boolean, val facebook: Boolean, val googleClien
  * record rather than a transient failure worth retrying.
  */
 data class SyncResult(val externalId: String, val status: String, val error: String)
+
+/**
+ * What `POST /v1/activities/upload` said about one file: "enqueued" or "already_processed" for a
+ * single `.gpx`/`.fit`/`.tcx`, "zip_processed" for a `.zip` or a Google Takeout export, with how
+ * many of the archive's files were already imported before or skipped, and whether it had more
+ * files than one upload reads ([truncated]). Neither already-imported nor skipped files become
+ * jobs, so the sync history never shows them: this is the only place they're counted.
+ */
+data class UploadOutcome(val status: String, val alreadyInArchive: Int, val skippedInArchive: Int, val truncated: Boolean)
 
 /**
  * One row of the sync history — an `ingest` job and, once it has produced one, the activity it
@@ -408,12 +421,15 @@ object HoldMyTrackApi {
 
     private const val API_V1 = "/v1"
 
-    /** The two `source` values this app posts to `POST /v1/sync/activities` — Health Connect
-     *  sync (`sync/SyncRunner.kt`) and in-app GPS recording (`recording/RecordingActivity.kt`,
-     *  `docs/adr/0007-in-app-gps-recording-submits-directly.md`). iOS's own is `"healthkit"`;
-     *  Paths 1 and 3 have their own endpoints and their own values. */
+    /** The `source` values this app posts to `POST /v1/sync/activities` — Health Connect
+     *  sync (`sync/SyncRunner.kt`), in-app GPS recording (`recording/RecordingActivity.kt`,
+     *  `docs/adr/0007-in-app-gps-recording-submits-directly.md`) and a Google Maps Timeline
+     *  export read on the phone (`timeline/TimelineImport.kt`, root `docs/IMPLEMENTATION.md`
+     *  §4.0.5). iOS's own is `"healthkit"`; an uploaded file has its own endpoint
+     *  ([uploadActivityFile]). */
     const val SOURCE_HEALTH_CONNECT = "healthconnect"
     const val SOURCE_RECORDED = "recorded"
+    const val SOURCE_TIMELINE = "timeline"
     private val JSON = "application/json; charset=utf-8".toMediaType()
     private val main = Handler(Looper.getMainLooper())
 
@@ -529,12 +545,22 @@ object HoldMyTrackApi {
      * not all-or-nothing there, and the caller needs to know which ones landed before it can
      * decide how far the watermark may move. A non-2xx status is the whole request failing and
      * throws instead; nothing in the batch was decided.
+     *
+     * [batch] and [batchTitle] name one import the caller splits over several requests (a
+     * Timeline export, a hundred activities to a request), so the history counts it as one.
      */
-    suspend fun syncActivities(activities: List<JSONObject>, source: String): List<SyncResult> =
+    suspend fun syncActivities(
+        activities: List<JSONObject>,
+        source: String,
+        batch: String? = null,
+        batchTitle: String? = null,
+    ): List<SyncResult> =
         withContext(Dispatchers.IO) {
             val body = JSONObject()
                 .put("source", source)
                 .put("activities", JSONArray(activities))
+            if (batch != null) body.put("batch", batch)
+            if (batchTitle != null) body.put("batch_title", batchTitle)
             val request = Request.Builder()
                 .url(BuildConfig.API_BASE_URL + API_V1 + "/sync/activities")
                 .post(body.toString().toRequestBody(JSON))
@@ -552,6 +578,82 @@ object HoldMyTrackApi {
                 )
             }
         }
+
+    /**
+     * Uploads wait as long as the server takes to answer: a `.zip` or a Google Takeout export is
+     * read through, one job per file, before the response is written, and a large one takes
+     * longer than the default ten seconds. The same client otherwise, so the same interceptors.
+     */
+    private val uploadClient: OkHttpClient by lazy {
+        client.newBuilder()
+            .writeTimeout(2, TimeUnit.MINUTES)
+            .readTimeout(10, TimeUnit.MINUTES)
+            .build()
+    }
+
+    /**
+     * `POST /v1/activities/upload` — the web's Upload menu's request (root `docs/SPEC.md`
+     * FR-3.1–FR-3.3): one `.gpx`, `.fit`, `.tcx` or `.zip`, which the server tells apart from a
+     * Google Takeout export itself. The file is streamed from [uri] rather than read into memory
+     * first, since a `.zip` can be 512 MiB; [onProgress] gets the bytes sent so far, on the
+     * I/O thread sending them. Suspending, like [syncActivities]: its caller (`imports/FileImports.kt`)
+     * sends one file after another and waits for each.
+     */
+    suspend fun uploadActivityFile(
+        resolver: ContentResolver,
+        uri: Uri,
+        name: String,
+        size: Long,
+        onProgress: (Long) -> Unit,
+    ): UploadOutcome = withContext(Dispatchers.IO) {
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("file", name, UriRequestBody(resolver, uri, size, onProgress))
+            .build()
+        val request = Request.Builder()
+            .url(BuildConfig.API_BASE_URL + API_V1 + "/activities/upload")
+            .post(body)
+            .build()
+        val response = uploadClient.newCall(request).execute()
+        val text = response.use { it.body?.string().orEmpty() }
+        if (!response.isSuccessful) throw ApiException.from(response.code, text)
+        val json = runCatching { JSONObject(text) }.getOrDefault(JSONObject())
+        val files = json.optJSONArray("files")
+        fun count(status: String) = (0 until (files?.length() ?: 0)).count { files!!.getJSONObject(it).optString("status") == status }
+        UploadOutcome(
+            status = json.optString("status"),
+            alreadyInArchive = count("already_processed"),
+            skippedInArchive = count("skipped"),
+            truncated = json.optBoolean("truncated"),
+        )
+    }
+
+    /** A picked file as a request body, read as it's sent. Opened afresh on every [writeTo], so
+     *  OkHttp's retry of a dropped connection sends the whole file again. */
+    private class UriRequestBody(
+        private val resolver: ContentResolver,
+        private val uri: Uri,
+        private val size: Long,
+        private val onProgress: (Long) -> Unit,
+    ) : RequestBody() {
+        override fun contentType() = "application/octet-stream".toMediaType()
+
+        override fun contentLength() = size
+
+        override fun writeTo(sink: BufferedSink) {
+            val input = resolver.openInputStream(uri) ?: throw IOException("could not open the file")
+            input.source().use { source ->
+                var sent = 0L
+                while (true) {
+                    val read = source.read(sink.buffer, 64 * 1024L)
+                    if (read == -1L) break
+                    sink.emitCompleteSegments()
+                    sent += read
+                    onProgress(sent)
+                }
+            }
+        }
+    }
 
     /**
      * `GET /v1/uploads` — every ingest job this account has, newest first, whatever path it

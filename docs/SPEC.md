@@ -382,7 +382,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Inputs**: One or more files, each a `.gpx`, `.fit`, or `.tcx` file no larger than 64 MiB. Up to 20 individually-selected files per batch (a larger selection is rejected client-side in full, before any upload begins, with a message directing the user to a `.zip` archive instead — FR-3.2).
 
 **Behavior**:
-1. User chooses files from the header's **Upload** menu (FR-3.4), on any page, or drops them on the map.
+1. User chooses files from the header's **Upload** menu (FR-3.4), on any page, or drops them on the map. The Android app sends them from its Sync screen (`apps/android/docs/SPEC.md` FR-3.6).
 2. Each file uploads independently, as its own `POST /v1/activities/upload` request (multipart), and is tracked independently — one file failing does not affect the others.
 3. For each file: server validates its extension and size, computes a content hash to check for a duplicate (FR-3.5), persists the raw file, and enqueues a background parsing job.
 4. The Upload menu shows each file's live status (uploading, with a progress percentage; then "Processing…") until the background job finishes; then it leaves the menu for the Sync page (FR-3.9).
@@ -537,7 +537,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 ### FR-3.10 Google Maps Timeline import
 
-**Description**: A user imports the movement in the Timeline export Google Maps writes on an Android phone: each trip it recorded between two places becomes an activity. The places stopped at aren't imported. The file is read in the browser, and only the selected trips leave it.
+**Description**: A user imports the movement in the Timeline export Google Maps writes on an Android phone: each trip it recorded between two places becomes an activity. The places stopped at aren't imported. The file is read in the browser, and only the selected trips leave it. The Android app reads it on the phone in the same way, on a screen of its own without the map preview (`apps/android/docs/SPEC.md` FR-3.7); what follows is the web's.
 
 **Preconditions**: Active session, not a demo one.
 

@@ -15,7 +15,7 @@ This document specifies the Android app's functional behavior as currently imple
 
 ### 1.2 Scope
 
-**In scope**: everything currently built and verified on a physical device — sign in, sign up, and starting a demo account (FR-1); an unconfirmed email held at a "check your email" screen (FR-1.4, verified on an emulator); session persistence and server-side re-verification on cold start (FR-1); a full-screen map with Normal, Fog of War, and Heatmap modes, Normal's tracks narrowed by a date-range slider (FR-2), and the web's phone Activities panel over it — the range's activities listed, filtered by type and distance, selected — with its pace bands — hidden, edited (its track too) and deleted, gathered into Stories, with the account's Stories and Private locations as its other two tabs (FR-2.7, verified on an emulator); photos on their routes, and added, moved, captioned and deleted in the Edit window's Photos tab (FR-2.10, verified on an emulator); a Profile screen with the web's activity graph and Trends (FR-1.6, verified on an emulator); Health Connect onboarding and permission acquisition (FR-3); a foreground sync run with resumable watermark tracking (FR-3); per-activity sync rejection feedback (FR-3); and, on the same Sync screen, the history of every import and the cross-source duplicates (FR-4). Also in scope, verified on an emulator rather than a physical device (noted where it matters — §7): casual in-app GPS recording started from a button on the map, with a live track on the map and notification controls, its recordings listed for review and sync on the Sync screen, with a route preview per row, a searchable activity-type picker in Edit and GPX download (FR-5).
+**In scope**: everything currently built and verified on a physical device — sign in, sign up, and starting a demo account (FR-1); an unconfirmed email held at a "check your email" screen (FR-1.4, verified on an emulator); session persistence and server-side re-verification on cold start (FR-1); a full-screen map with Normal, Fog of War, and Heatmap modes, Normal's tracks narrowed by a date-range slider (FR-2), and the web's phone Activities panel over it — the range's activities listed, filtered by type and distance, selected — with its pace bands — hidden, edited (its track too) and deleted, gathered into Stories, with the account's Stories and Private locations as its other two tabs (FR-2.7, verified on an emulator); photos on their routes, and added, moved, captioned and deleted in the Edit window's Photos tab (FR-2.10, verified on an emulator); a Profile screen with the web's activity graph and Trends (FR-1.6, verified on an emulator); Health Connect onboarding and permission acquisition (FR-3); a foreground sync run with resumable watermark tracking (FR-3); per-activity sync rejection feedback (FR-3); and, on the same Sync screen, the history of every import and the cross-source duplicates (FR-4). Also in scope, verified on an emulator rather than a physical device (noted where it matters — §7): casual in-app GPS recording started from a button on the map, with a live track on the map and notification controls, its recordings listed for review and sync on the Sync screen, with a route preview per row, a searchable activity-type picker in Edit and GPX download (FR-5); and, from the same screen, uploading activity files and archives (FR-3.6) and importing a Google Maps Timeline export (FR-3.7).
 
 **Out of scope** as a platform limitation rather than a "not yet": background Health Connect sync (will not be built — see FR-3.2 behavior 5; this does not apply to in-app recording, which is not subject to the same platform constraint — [ADR-0007](../../../docs/adr/0007-in-app-gps-recording-submits-directly.md)), and Samsung Galaxy Watch sync (Samsung does not expose route geometry to Health Connect at all, so every Samsung-sourced session is rejected for having no route, same as any other route-less activity). iOS does not exist.See §9 for the complete list.
 
@@ -260,7 +260,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 7. **Save** writes the activity's fields, then the photos one at a time — uploads, then changes, then deletes — reading "Saving photos n of m…", then a track edit, and closes, the map reading the photos again. If a write fails the window stays open with the server's reason, and Save again carries on from the first unwritten change. Cancel throws every photo change away at once; Back asks first while there are any ("Discard photo changes?" — Discard or Keep editing).
 8. The Edit window isn't available to a demo account (FR-2.7 item 7), so neither is the tab.
 
-## 5. FR-3 — Health Connect Sync (Path 2)
+## 5. FR-3 — Sync and Imports
 
 All of FR-3 requires an active session (demo or registered); Health Connect sync has no unauthenticated path, and syncing to a demo account works identically to a registered one.
 
@@ -319,10 +319,49 @@ All of FR-3 requires an active session (demo or registered); Health Connect sync
 2. **Health Connect**: its heading with an info button beside it that opens the rationale (FR-3.1 Notes) in a dialog, then its readiness notice and the one setup step that remains, if any (FR-3.1).
 3. **Recorded activities**: the recordings on this device that haven't synced yet, one row each (FR-5.2).
 4. **Sync now** is enabled while no run is in flight and there is something to send — at least one recording, or Health Connect Ready or needing only history access. It runs the Health Connect sync (FR-3.2) when Health Connect can be read, then submits every recording (FR-5.2 step 6), and reports under itself (FR-3.4). While only recordings are going, the progress line reads "Syncing recorded activities…".
-5. Under the run's report, the history and the duplicates (FR-4).
-6. The demo account sees its recordings and its history; the Health Connect section and Sync now are hidden (the server refuses a demo account's sync, `requireNotDemo`).
+5. Under the run's report, **Files**: what can be imported, links to the two step-by-step export guides, and **Choose files…** (FR-3.6).
+6. Then the history and the duplicates (FR-4).
+7. The demo account sees its recordings and its history; the Health Connect section, Sync now and Files are hidden (the server refuses a demo account's sync and uploads, `requireNotDemo`).
 
 **Notes**: Confirmed on an emulator: with Health Connect not yet permitted, the section read "HoldMyTrack can't read your exercise sessions yet." over "Allow Health Connect access", and Sync now was disabled with no recording on the device; after a recording was saved, Sync now sent it (it reached the server as a `recorded` job, left the list, and topped the history as "GPS Logger").
+
+### FR-3.6 Uploading files
+
+**Description**: The Sync screen's **Files** section is the web's Upload menu on the phone (`docs/SPEC.md` FR-3.1–FR-3.4): activity files, a `.zip` of them and a Google Takeout export go to the same `POST /v1/activities/upload`, and a Google Maps Timeline export opens its own screen (FR-3.7).
+
+**Preconditions**: Signed in with a confirmed email, not the demo account.
+
+**Inputs**: Files picked with **Choose files…** (Android's file picker, several at once, any type), or opened or shared with HoldMyTrack from another app: a `.gpx`, `.tcx` or `.zip` (by its MIME type, which is all another app hands over) opens the Sync screen and is uploaded as if picked.
+
+**Behavior**:
+1. Above the button, the section says what can be imported — ".gpx, .fit, .tcx, a .zip of them, a Google Health export, or a Google Maps Timeline export (.json)." — and has two links, "How to export from Google Health" and "How to export Google Maps Timeline", which open the web's guides (`docs/SPEC.md` FR-10.5) in a browser tab.
+2. A picked `.json` is a Timeline export: it opens FR-3.7's screen and nothing else picked with it is sent, with "A Google Maps Timeline export imports on its own: choose the other files again once it's done."; of several `.json` files only the first is opened, and a note says so.
+3. A file that isn't a `.gpx`, `.fit`, `.tcx` or `.zip` is named in the error box and not sent. More than 20 files picked one by one are refused, as on the web ("Too many files selected (n) — zip them and upload the archive instead."), and any `.zip` among them still goes. A file over the server's limit — 64 MB, or 512 MB for a `.zip` — is named in the error box and not sent.
+4. The rest are sent one at a time, in the order picked. Each has a row under the button with its name and "Queued", then "Uploading 45%", until it has gone. Uploads carry on if the screen is rotated or left; coming back shows where they are.
+5. Once a file has gone, the history (FR-4.1) is read again, so its jobs appear there as "Processing…" and then "Ready" or "Failed". What the history can't show goes in a notice under the rows, as the web's Upload menu says it: "{file} was already uploaded before.", and for an archive "Already uploaded before, in {file}: n", "Skipped in {file}: n", or that it had more files than are read at once. A refused upload or a dropped connection is in the error box as "{file}: {the server's reason}". The notes stay until the next files are picked.
+
+**Outputs**: The server's jobs, one per file or per file inside an archive (`docs/SPEC.md` FR-3.1–FR-3.3).
+
+**Notes**: Verified on an emulator against a local stack: a `.gpx`, a `.zip` of two and a `.txt` picked together sent the three activity files (the archive's two listed by name in the history) and named the `.txt` as not sent; the same `.gpx` again gave "was already uploaded before."; the `.zip` shared from the Files app opened the Sync screen and reported "Already uploaded before, in archive.zip: 2".
+
+### FR-3.7 Google Maps Timeline import
+
+**Description**: The web's Timeline import (`docs/SPEC.md` FR-3.10) as a screen of its own: a `Timeline.json` exported on the phone is read on the phone, narrowed to a range of days and a set of modes, and only that is sent. The same file imported on the website and here makes the same activities, so nothing is imported twice.
+
+**Preconditions**: Signed in with a confirmed email, not the demo account; otherwise the screen shows only the Sync screen's notice saying why.
+
+**Inputs**: A `Timeline.json` picked on the Sync screen (FR-3.6), picked on this screen with **Choose Timeline.json**, or opened or shared with HoldMyTrack from another app (any `application/json` file).
+
+**Behavior**:
+1. With no file read, the screen says how to export one ("Settings → Location → Location services → Timeline → Export Timeline data"), links to the step-by-step guide, and says that only the routes travelled are sent.
+2. A file that isn't a Timeline export, an iPhone's Timeline export and an older Takeout location file are refused with the web's messages, as is one that isn't JSON or has no trips. While it's read, the button reads "Reading {file}…".
+3. Once read: the file's name and the days it spans; **From** and **To**, each a date picker limited to the file's days and the other end of the range; one checkbox per mode, most trips first, with its trip count and distance, all ticked except Flying; a note counting the trips that never left one place; and "n activities to import (distance)." or "Nothing selected.". The selection is the web's: trips that started, in local time, on a day from From to To, in a ticked mode.
+4. **Import** sends the selection a hundred at a time under one batch named after the file, reading "Sending 300 of 584…", then "Sent 584: 580 new, 4 imported before, 0 refused. They appear on the map as they are processed." and **Close**. The history shows the trips as "Google Maps Timeline". A send cut short says why in the error box; Import again sends the rest, since what arrived comes back as imported before. Reading and sending carry on through a rotation or a trip to another app.
+5. There is no map preview: the web draws the selection dashed on the map before Import; here the counts and distances are the check.
+
+**Outputs**: One activity per selected trip not imported before (`docs/SPEC.md` FR-3.10 behavior 8).
+
+**Notes**: Verified on an emulator against a local stack with a generated four-day export: drives, walks and a ride ticked and a flight not, From moved a day later narrowed it to three trips, Import sent "3 new", and the history listed three "Google Maps Timeline" rows; a `.json` that isn't an export, opened from the Files app, came straight to this screen and read "This isn't a Google Maps Timeline export."
 
 ## 6. FR-4 — Sync History & Duplicates
 
@@ -402,10 +441,12 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 
 Named here rather than left implicit, the way `docs/SPEC.md` §20 does for the wider system:
 
-- **Imports are the Sync screen's.** The web keeps finished imports on its `/sync` page and what's in progress in its header's Upload menu (`docs/SPEC.md` FR-3.4, FR-3.9); this app has no Upload menu, so its Sync screen's history lists both (FR-4.1), and it imports through that screen (FR-3.5), not file upload. Where the web reads a value on hover — the profile's readout, Cut's preview — a touch and hold stands in.
+- **Imports are the Sync screen's.** The web keeps finished imports on its `/sync` page and what's in progress in its header's Upload menu (`docs/SPEC.md` FR-3.4, FR-3.9); this app has no Upload menu, so its Sync screen's history lists both (FR-4.1), and files are uploaded from that screen too (FR-3.6).
+- **A `.gpx` or `.fit` can't be opened with HoldMyTrack from another app** on most phones: the Files app and others hand them over as a generic binary, which the app doesn't claim, so they're picked on the Sync screen instead. A `.zip`, a `.tcx` and a Timeline `.json` can be opened or shared with it.
+- **The Timeline import has no map preview** (FR-3.7 behavior 5). Where the web reads a value on hover — the profile's readout, Cut's preview — a touch and hold stands in.
 - **A picked photo's position rarely arrives.** Android's photo picker removes location from the copies it hands an app, so a photo is placed on its route by its capture time (FR-2.10 item 4), which the picker keeps, or by the user's slider — the position only counts for a file that still carries one. The web reads it from any JPEG with GPS tags.
 - **Samsung Galaxy Watch is unsupported**, not degraded — Samsung does not expose route geometry to Health Connect at all, so every Samsung-sourced session is rejected for having no route, indistinguishable at sync time from an ordinary indoor workout.
 - **Background sync will never be built for Health Connect routes** — a platform constraint (`ConsentRequired` regardless of grant state when backgrounded), not a sequencing gap.
 - **In-app GPS recording's iOS half is unbuilt** — FR-5 above is Android-only; the iOS half is in `docs/ROADMAP.md` Phase 2.
-- **Few automated tests.** Only the Activities panel's filter and selection rules, the track band rules, the track editor's rules and the Private location circle (FR-2.7), a spot popup's text (FR-2.8), the photo logic — EXIF capture times, the slider's walk along a track, the Photos tab's draft, the markers' grouping (FR-2.10) — and Profile's stats, grid layout, shading and Trends bars (FR-1.6) have unit tests (`app/src/test`). Every behavior in this document has been verified manually against a live server stack — a physical device for FR-1 through FR-4, an emulator for FR-5 (§7, noted inline where it matters); see `apps/android/docs/IMPLEMENTATION.md` §9 for the verification record.
+- **Few automated tests.** Only the Activities panel's filter and selection rules, the track band rules, the track editor's rules and the Private location circle (FR-2.7), a spot popup's text (FR-2.8), the photo logic — EXIF capture times, the slider's walk along a track, the Photos tab's draft, the markers' grouping (FR-2.10) — the Timeline export's reading into trips and its selection (FR-3.7) — and Profile's stats, grid layout, shading and Trends bars (FR-1.6) have unit tests (`app/src/test`). Every behavior in this document has been verified manually against a live server stack — a physical device for FR-1 through FR-4, an emulator for FR-3.6, FR-3.7 and FR-5 (§7, noted inline where it matters); see `apps/android/docs/IMPLEMENTATION.md` §9 for the verification record.
 - **iOS does not exist.** Path 2's HealthKit half is unbuilt; this app defines the sync contract iOS will inherit (`apps/android/docs/ROADMAP.md`).
