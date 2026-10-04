@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-10-03.
+Last updated: 2026-10-04.
 
 ## How to read this document
 
@@ -32,6 +32,15 @@ The phases below sit inside three milestones (`VISION.md` §5, ADR-0031):
 
 - [ ] Stand up the funding page (Open Collective, public ledger — `VISION.md` §6.1) before any public launch, not retrofitted after. The app side is built (`IMPLEMENTATION.md` §4.16), and the `holdmytrack` collective applied to Open Source Collective as fiscal host on 2026-09-24; what's left: once approved, set the slug — `services/server/internal/web/web.go`'s `OpenCollectiveSlug` — and replace the About page template's "donations are not open yet" line with a link to it.
 - [ ] Post concept renders to r/running, r/cycling, r/Garmin, r/Strava, r/FogOfWorld (`VISION.md` §5.1, §8.1) — validate "free, funded by its users" as credible before the public launch.
+
+### Accurate country and region borders — before the public launch
+
+Country/Region matching (`IMPLEMENTATION.md` §4.2.4) uses Natural Earth's 1:50m countries and 1:10m states/provinces, whose borders can be about a kilometre off where they follow a river. A walk in Niagara Falls, NY lands inside Canada and Ontario by up to 843 m, so the demo's Niagara Falls trip shows Canada although it never crossed the border. The same goes for any river or strait border (Detroit–Windsor, the St. Lawrence).
+
+- [ ] Choose more accurate boundary data (geoBoundaries, or OpenStreetMap-based outlines) for countries and regions, and check its licence fits a public repository and a free service.
+- [ ] Load it without bloating the repository and server image: likely fetched at deploy time by `seed-admin-boundaries` rather than embedded (`internal/geo/geo.go`), with its seed time and database size measured.
+- [ ] Keep the Country/Region tiles fast, since they are drawn live from these polygons per request (ADR-0008): likely a simplified copy for low zooms, with the detailed one used for matching at ingest.
+- [ ] Re-match existing activities against the new boundaries, and confirm the Niagara Falls trip shows only the United States and New York.
 
 ### Sign in with Facebook — built, not live
 
