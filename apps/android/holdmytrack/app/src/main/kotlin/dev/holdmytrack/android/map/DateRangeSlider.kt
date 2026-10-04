@@ -13,8 +13,8 @@ import java.time.format.DateTimeFormatter
 
 /**
  * The map's date-range control — the Android counterpart of the web's phone footer,
- * `apps/web/src/ui/DateRangeSlider.tsx`, and the same design: Earlier · a two-knob track ·
- * Later, with the selected dates under it (`docs/SPEC.md` §19 item 2).
+ * `apps/web/src/ui/DateRangeSlider.tsx`, and the same design: one row, « ‹ track › », with the
+ * selected dates under it (`docs/SPEC.md` §19 item 2).
  *
  * **Activity days, not calendar days.** The track is a window of [WINDOW_DAYS] consecutive
  * days that have activity ([ActivityDays]); the days between take no room.
@@ -29,9 +29,9 @@ import java.time.format.DateTimeFormatter
  * the moved window is in (the days before it may still be loading), so a gesture's commit waits
  * for that too.
  *
- * **Range shift.** The buttons either side of the dates move the whole selection by its own
- * length in activity days ([shiftRange]), the window following — Earlier/Later move the scale,
- * these move the range. A tap commits; a hold repeats like Earlier/Later and commits on release.
+ * **Range shift.** The inner pair, ‹ ›, move the whole selection by its own length in activity
+ * days ([shiftRange]), the window following — the outer pair, « » (Earlier/Later), move the
+ * scale. A tap commits; a hold repeats like Earlier/Later and commits on release.
  *
  * Drags and held buttons render from a local draft and commit through [onChange] only on
  * release, so the map's tracks aren't re-requested for every day passed.
@@ -48,7 +48,8 @@ class DateRangeSlider(
     private val track: DateRangeTrackView = root.findViewById(R.id.date_range_track)
     private val shiftEarlier: View = root.findViewById(R.id.date_range_shift_earlier)
     private val shiftLater: View = root.findViewById(R.id.date_range_shift_later)
-    private val datesLabel: TextView = root.findViewById(R.id.date_range_dates)
+    private val fromLabel: TextView = root.findViewById(R.id.date_range_from)
+    private val toLabel: TextView = root.findViewById(R.id.date_range_to)
 
     private var days: List<ActivityDay> = emptyList()
     private var canPanEarlier = false
@@ -286,13 +287,15 @@ class DateRangeSlider(
         val sel = current
         if (sel == null) {
             track.set(0, 0, 0, emptyList())
-            datesLabel.text = null
+            fromLabel.text = null
+            toLabel.text = null
             shiftEarlier.isEnabled = false
             shiftLater.isEnabled = false
             return
         }
         track.set(days.size, startOf(sel.from), endOf(sel.to), ticksOf(days.map { it.date }))
-        datesLabel.text = "${formatDay(sel.from)} – ${formatDay(sel.to)}"
+        fromLabel.text = formatDay(sel.from)
+        toLabel.text = formatDay(sel.to)
         shiftEarlier.isEnabled = canShift(sel, -1)
         shiftLater.isEnabled = canShift(sel, 1)
     }
@@ -310,8 +313,10 @@ class DateRangeSlider(
     }
 
     companion object {
-        /** How many activity days the track shows edge to edge — the web phone slider's. */
-        const val WINDOW_DAYS = 15
+        /** How many activity days the track shows edge to edge — 3 fewer than the web's, as
+         *  the « ‹ › » buttons leave a phone's track narrower: ~18dp a day on a Pixel 10a
+         *  (411dp wide), so the 14dp knobs of a one-day selection still sit apart. */
+        const val WINDOW_DAYS = 12
 
         /** How far one Earlier/Later tap moves the window, in activity days. */
         const val STEP_DAYS = 5
