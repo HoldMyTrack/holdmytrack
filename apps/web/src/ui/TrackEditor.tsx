@@ -263,22 +263,22 @@ export function TrackEditor({ map, activity, active, busy, onChange }: TrackEdit
         <button
           type="button"
           className="edit-track__btn"
-          aria-pressed={pointMode === 'delete'}
-          disabled={busy}
-          onClick={() => setPointMode((mode) => (mode === 'delete' ? null : 'delete'))}
-          title={t('edit_track.delete_point_title')}
-        >
-          {t('edit_track.delete_point')}
-        </button>
-        <button
-          type="button"
-          className="edit-track__btn"
           aria-pressed={pointMode === 'move'}
           disabled={busy}
           onClick={() => setPointMode((mode) => (mode === 'move' ? null : 'move'))}
           title={t('edit_track.move_point_title')}
         >
           {t('edit_track.move_point')}
+        </button>
+        <button
+          type="button"
+          className="edit-track__btn"
+          aria-pressed={pointMode === 'delete'}
+          disabled={busy}
+          onClick={() => setPointMode((mode) => (mode === 'delete' ? null : 'delete'))}
+          title={t('edit_track.delete_point_title')}
+        >
+          {t('edit_track.delete_point')}
         </button>
         <span className="edit-track__spacer" aria-hidden="true" />
         <button type="button" className="edit-track__btn" disabled={ops.length === 0 || busy} onClick={undo} title={t('edit_track.undo_title')}>
