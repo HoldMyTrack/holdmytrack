@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import type { HistogramBucket } from '../api';
 import { formatDayLabel } from './format';
 import type { DateRange } from './dateMath';
@@ -48,7 +48,7 @@ const REPEAT_INTERVAL_MS = 180;
 
 /**
  * The date-range control (`SPEC.md` FR-6), on the Activities tab alone: a plain two-knob slider
- * with Earlier/Later either side and the selected dates under it — the look of the Activities
+ * in one row, « ‹ track › », with the selected dates under it — the look of the Activities
  * panel's DistanceFilter.tsx (its `.activity-filters__track`/`__fill` rules) with finger-height
  * knobs. The same control on a desktop and a phone; only where it sits differs (index.css).
  *
@@ -77,9 +77,9 @@ const REPEAT_INTERVAL_MS = 180;
  * Knob drags and held buttons render from a local draft and commit only on release, so the
  * activity list isn't refetched for every day passed.
  *
- * **Range shift.** The buttons either side of the dates under the track move the whole
- * selection by its own length in activity-days, packed against the old range (rangeShift.ts),
- * and the window follows — Earlier/Later move the scale, these move the range. A tap commits;
+ * **Range shift.** The inner pair, ‹ ›, move the whole selection by its own length in
+ * activity-days, packed against the old range (rangeShift.ts), and the window follows — the
+ * outer pair, « » (Earlier/Later), move the scale. A tap commits;
  * a hold repeats like Earlier/Later and commits on release.
  *
  * **Day marks.** A tick on every slot boundary — where a knob can land — taller where the month
@@ -256,14 +256,14 @@ export function DateRangeSlider({
         finish();
       }}
     >
-      {dir < 0 ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+      {dir < 0 ? <ChevronsLeft size={16} /> : <ChevronsRight size={16} />}
     </button>
   );
 
   const shiftButton = (dir: -1 | 1) => (
     <button
       type="button"
-      className="date-range-slider__shift"
+      className="date-range-slider__page date-range-slider__page--shift"
       data-testid={dir < 0 ? 'date-range-slider-shift-earlier' : 'date-range-slider-shift-later'}
       aria-label={dir < 0 ? t('slider.shift_earlier') : t('slider.shift_later')}
       title={dir < 0 ? t('slider.shift_earlier') : t('slider.shift_later')}
@@ -277,7 +277,7 @@ export function DateRangeSlider({
         finish();
       }}
     >
-      {dir < 0 ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+      {dir < 0 ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
     </button>
   );
 
@@ -350,6 +350,7 @@ export function DateRangeSlider({
     <div className="date-range-slider" data-testid="date-range-slider">
       <div className="date-range-slider__row">
         {pageButton(-1)}
+        {shiftButton(-1)}
         <div
           ref={trackRef}
           className="date-range-slider__track"
@@ -378,14 +379,12 @@ export function DateRangeSlider({
           {knob('start')}
           {knob('end')}
         </div>
+        {shiftButton(1)}
         {pageButton(1)}
       </div>
-      <div className="date-range-slider__labels">
-        {shiftButton(-1)}
-        <span data-testid="date-range-slider-labels">
-          {formatDayLabel(current.from)} – {formatDayLabel(current.to)}
-        </span>
-        {shiftButton(1)}
+      <div className="date-range-slider__labels" data-testid="date-range-slider-labels">
+        <span>{formatDayLabel(current.from)}</span>
+        <span>{formatDayLabel(current.to)}</span>
       </div>
     </div>
   );
