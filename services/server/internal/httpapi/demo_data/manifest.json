@@ -40,6 +40,38 @@
       "name": "Way back",
       "type": "driving"
     },
+    "2026-08-02 Italy.gpx": {
+      "name": "Day #1",
+      "type": "walking"
+    },
+    "2026-08-03 Italy-2.gpx": {
+      "name": "Day #2 – Vatican City",
+      "type": "walking"
+    },
+    "2026-08-03 Italy-3.gpx": {
+      "name": "Day #2 – along the Tiber",
+      "type": "walking"
+    },
+    "2026-08-03 Italy.gpx": {
+      "name": "Day #2 – to St. Peter's Square",
+      "type": "walking"
+    },
+    "2026-08-04 Italy.gpx": {
+      "name": "Day #3",
+      "type": "walking"
+    },
+    "2026-08-05 Italy-2.gpx": {
+      "name": "Day #4 – Ostia seafront",
+      "type": "walking"
+    },
+    "2026-08-05 Italy.gpx": {
+      "name": "Day #4 – drive to Ostia",
+      "type": "driving"
+    },
+    "2026-08-06 Italy.gpx": {
+      "name": "Day #5 – drive to Torrimpietra",
+      "type": "driving"
+    },
     "2026-09-05 Big Creek Reservation.gpx": {
       "name": "Big Creek Reservation",
       "type": "walking"
@@ -214,6 +246,20 @@
         "2026-10-03 driving.gpx",
         "2026-10-03 Preston s H O P E Playground Park.gpx",
         "2026-10-03 driving-2.gpx"
+      ]
+    },
+    {
+      "name": "Italy",
+      "description": "Five days in Rome: the city on foot, Vatican City and the sea at Ostia.",
+      "activities": [
+        "2026-08-02 Italy.gpx",
+        "2026-08-03 Italy.gpx",
+        "2026-08-03 Italy-2.gpx",
+        "2026-08-03 Italy-3.gpx",
+        "2026-08-04 Italy.gpx",
+        "2026-08-05 Italy.gpx",
+        "2026-08-05 Italy-2.gpx",
+        "2026-08-06 Italy.gpx"
       ]
     }
   ],
