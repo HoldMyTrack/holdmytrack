@@ -914,7 +914,7 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 
 ## 8. FR-6 — Date Range Slider
 
-The date range is picked with a two-knob slider at the top of the Activities tab (FR-5), above the Type and Distance filters, with Earlier/Later buttons either side and the selected start and end dates under it. It exists on that tab alone: the Stories and Privacy tabs (FR-14.6, FR-8.1) are not filtered by a date range, and neither are Fog of War and Heatmap (FR-4.2, FR-4.3). Switching to another tab and back keeps the range as it was. On a phone it sits at the bottom of the screen instead (§19 item 2).
+The date range is picked with a two-knob slider at the top of the Activities tab (FR-5), above the Type and Distance filters, with Earlier/Later buttons either side and the selected start and end dates under it, between the two range-shift buttons (FR-6.7). It exists on that tab alone: the Stories and Privacy tabs (FR-14.6, FR-8.1) are not filtered by a date range, and neither are Fog of War and Heatmap (FR-4.2, FR-4.3). Switching to another tab and back keeps the range as it was. On a phone it sits at the bottom of the screen instead (§19 item 2).
 
 The slider counts only days with at least one activity; days without one take no room on the track. The track shows a window of 15 activity days, which on load is the 15 most recent. Every day boundary on the track has a tick: a taller one where the month changes, and a doubled one where the two neighbouring activity days aren't consecutive calendar days. Ticks inside the selection are in the accent colour. A selection is applied when a knob or a held button is released, not while it moves.
 
@@ -932,7 +932,11 @@ The slider counts only days with at least one activity; days without one take no
 
 ### FR-6.6 Changing the selection resets dependent state
 
-**Description**: Committing a new date range (via FR-6.2 or FR-6.4) clears both the row-click focus (FR-5.5) and the checked group (FR-5.6) independently, the hidden-activity set (FR-5.8), and both the TYPE and DISTANCE filters (FR-5.2/FR-5.3) together — all of these could otherwise silently describe activities the new range no longer lists. The camera flies to fit the new range's drawn activities once, when its list arrives. Only a range the user picked moves it: an upload or sync landing never does — not when it refreshes the same range, and not when it shifts the automatic default range (FR-6.1) — and neither does a Pending activity (FR-5.15) finishing or a Private location change.
+**Description**: Committing a new date range (via FR-6.2, FR-6.4 or FR-6.7) clears both the row-click focus (FR-5.5) and the checked group (FR-5.6) independently, the hidden-activity set (FR-5.8), and both the TYPE and DISTANCE filters (FR-5.2/FR-5.3) together — all of these could otherwise silently describe activities the new range no longer lists. The camera flies to fit the new range's drawn activities once, when its list arrives. Only a range the user picked moves it: an upload or sync landing never does — not when it refreshes the same range, and not when it shifts the automatic default range (FR-6.1) — and neither does a Pending activity (FR-5.15) finishing or a Private location change.
+
+### FR-6.7 Shift the range
+
+**Description**: Earlier and Later move the scale. The two buttons either side of the dates under the track move the selection itself, by its own length in activity days. The new range starts right after the old one ends, or ends right before it begins. A 2-day selection of Sep 8–9 moves to the two activity days before Sep 8: Sep 6–7 if both have activities, otherwise the nearest two earlier days that do. Near the account's first or most recent activity day the range stops at that day and keeps its length, overlapping the old range. A button is disabled once the selection already reaches that end; a selection running to today with nothing recorded today counts as reaching the newest end. A selection containing no activity day moves to the nearest activity day on that side. The window moves as little as needed to show the new range; a range longer than the window shows its end on the side it moved toward. A press commits the new range at once; holding the button repeats the shift and commits on release, as Earlier and Later do.
 
 ## 9. FR-7 — Activity Graph (Profile)
 

@@ -2880,13 +2880,44 @@ button.activities-panel__story-badge:hover {
   outline-offset: 2px;
 }
 
+/* ‹ dates › — the range-shift buttons sit around the dates rather than beside Earlier/Later, so
+   the buttons that move the scale and the ones that move the range don't read as one row of
+   four chevrons. Lighter than the page buttons: no border until hovered. */
 .date-range-slider__labels {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fm-space-8);
   font-size: var(--fm-text-sm);
   font-weight: var(--fm-weight-semibold);
   letter-spacing: 0.02em;
   color: rgb(var(--fm-ink-rgb) / 65%);
+}
+
+.date-range-slider__shift {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
+  border: 1px solid transparent;
+  border-radius: var(--fm-radius-md);
+  padding: 0;
+  background: var(--fm-surface-tint);
+  color: var(--fm-ink);
+  cursor: pointer;
+  touch-action: none;
+}
+
+.date-range-slider__shift:hover:not(:disabled) {
+  border-color: var(--fm-border-panel);
+}
+
+.date-range-slider__shift:disabled {
+  background: none;
+  color: var(--fm-ink-faint);
+  cursor: not-allowed;
 }
 
 /* MapLibre's own controls (zoom, locate, the scale bar, attribution) on the palette, so they
