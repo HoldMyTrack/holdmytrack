@@ -124,6 +124,35 @@ func TestTrackEditValidate(t *testing.T) {
 	if err := (TrackEdit{Keep: &[2]int64{1, 1}, Remove: [][2]int64{{2, 2}}}).Validate(); err != nil {
 		t.Errorf("single-instant ranges are valid: %v", err)
 	}
+	if err := (TrackEdit{Move: map[int64][2]float64{1: {181, 0}}}).Validate(); err == nil {
+		t.Error("a point moved off the map must be rejected")
+	}
+	if err := (TrackEdit{Move: map[int64][2]float64{1: {-180, 90}}}).Validate(); err != nil {
+		t.Errorf("a point moved to the map's edge is valid: %v", err)
+	}
+}
+
+// A moved point keeps its time and elevation and takes the new position; a move of a point the
+// rest of the edit removes changes nothing, and a move alone is not an empty edit.
+func TestTrackEditMove(t *testing.T) {
+	points, ms := editFixture()
+	elev := float32(120)
+	points[4].Elevation = &elev
+	edit := TrackEdit{Drop: []int64{ms[2]}, Move: map[int64][2]float64{ms[4]: {13.5, 52.5}, ms[2]: {14, 53}}}
+	got := edit.Apply(points)
+	if !equalInts(survivors(got, ms[0]), []int{0, 1, 3, 4, 5, 6, 7, 8, 9}) {
+		t.Fatalf("move must not change which points survive: %v", survivors(got, ms[0]))
+	}
+	moved := got[3]
+	if moved.Lon != 13.5 || moved.Lat != 52.5 || moved.Elevation == nil || *moved.Elevation != 120 || moved.Time.UnixMilli() != ms[4] {
+		t.Errorf("moved point: %+v", moved)
+	}
+	if points[4].Lon != 13.0 {
+		t.Error("Apply must not move the caller's points")
+	}
+	if (TrackEdit{Move: map[int64][2]float64{ms[1]: {13, 52}}}).IsEmpty() {
+		t.Error("a move alone is an edit")
+	}
 }
 
 // An empty spec round-trips as {} and reads back as empty — the handler stores NULL for it.
@@ -138,6 +167,13 @@ func TestTrackEditJSON(t *testing.T) {
 	}
 	if e.Keep == nil || e.Keep[1] != 2 || len(e.Remove) != 1 || e.Drop[0] != 5 {
 		t.Errorf("unexpected decode: %+v", e)
+	}
+	// Move is keyed by timestamp, which JSON can only carry as an object key string.
+	if err := json.Unmarshal([]byte(`{"move":{"1725177600000":[13.5,52.5]}}`), &e); err != nil {
+		t.Fatal(err)
+	}
+	if c, ok := e.Move[1725177600000]; !ok || c != [2]float64{13.5, 52.5} {
+		t.Errorf("unexpected move decode: %+v", e.Move)
 	}
 }
 

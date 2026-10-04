@@ -877,7 +877,7 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 **Error cases**:
 - The activity doesn't exist, belongs to another account, is a superseded duplicate, or already has an edit Pending → `409 Conflict` on Apply, indistinguishable from each other; opening the editor on an activity that doesn't exist or belongs to another account → `404 Not Found`.
 - The activity has no stored original recording, or its timestamps are missing or run backwards → `409 Conflict` when opening the editor, shown in the editor window.
-- A range whose start is after its end → `400 Bad Request`.
+- A range whose start is after its end, or a point moved off the map → `400 Bad Request`.
 - An edit that would leave fewer than two points (possible only through the API directly) → accepted, then fails during reprocessing; the activity is left as it was.
 
 ### FR-5.15 Activity states
