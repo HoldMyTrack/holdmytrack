@@ -24,17 +24,21 @@ import (
 // A point survives when it lies inside Keep (inclusive; nil keeps everything), outside every
 // Remove range (inclusive), and its timestamp isn't in Drop. Chop narrows Keep, Cut adds a
 // Remove range spanning the points strictly between its two ends (so the ends themselves
-// survive and are joined), and Delete point adds to Drop. Points sharing one timestamp are
-// kept or removed together — see EditableTimestamps for the one ordering the spec relies on.
+// survive and are joined), and Delete point adds to Drop. A surviving point whose timestamp is
+// in Move takes that entry's [lon, lat] in place of its recorded position — a Move point drag,
+// for the outliers a sparse source like Google Maps Timeline is full of; its elevation and time
+// stay as recorded. Points sharing one timestamp are kept, removed or moved together — see
+// EditableTimestamps for the one ordering the spec relies on.
 type TrackEdit struct {
-	Keep   *[2]int64  `json:"keep,omitempty"`
-	Remove [][2]int64 `json:"remove,omitempty"`
-	Drop   []int64    `json:"drop,omitempty"`
+	Keep   *[2]int64            `json:"keep,omitempty"`
+	Remove [][2]int64           `json:"remove,omitempty"`
+	Drop   []int64              `json:"drop,omitempty"`
+	Move   map[int64][2]float64 `json:"move,omitempty"`
 }
 
 // IsEmpty reports whether the edit changes nothing — stored as NULL, not as an empty object.
 func (e TrackEdit) IsEmpty() bool {
-	return e.Keep == nil && len(e.Remove) == 0 && len(e.Drop) == 0
+	return e.Keep == nil && len(e.Remove) == 0 && len(e.Drop) == 0 && len(e.Move) == 0
 }
 
 // Validate rejects a malformed spec — a range whose start is after its end. It says nothing
@@ -46,6 +50,11 @@ func (e TrackEdit) Validate() error {
 	for _, r := range e.Remove {
 		if r[0] > r[1] {
 			return errors.New("remove range starts after it ends")
+		}
+	}
+	for _, c := range e.Move {
+		if !(c[0] >= -180 && c[0] <= 180 && c[1] >= -90 && c[1] <= 90) {
+			return errors.New("moved point is off the map")
 		}
 	}
 	return nil
@@ -76,9 +85,13 @@ func (e TrackEdit) Apply(points []parse.Point) []parse.Point {
 				break
 			}
 		}
-		if !removed {
-			out = append(out, p)
+		if removed {
+			continue
 		}
+		if c, ok := e.Move[t]; ok {
+			p.Lon, p.Lat = c[0], c[1]
+		}
+		out = append(out, p)
 	}
 	return out
 }

@@ -58,6 +58,35 @@ class EditTrackOpsTest {
     }
 
     @Test
+    fun `a move puts the point elsewhere and keeps its time`() {
+        val edit = EditTrackOps.fold(null, listOf(EditTrackOps.move(30L, 0.5, 0.25)))
+        assertEquals(mapOf(30L to (0.5 to 0.25)), edit.move)
+        val after = EditTrackOps.apply(track, edit)
+        assertEquals(TrackPoint(lon = 0.5, lat = 0.25, t = 30L), after[3])
+        assertEquals(times(track), times(after))
+    }
+
+    @Test
+    fun `a point moved twice ends where it was let go last, and a deleted one stays gone`() {
+        val twice = EditTrackOps.fold(null, listOf(EditOp.Move(30L, 0.5, 0.25), EditOp.Move(30L, 0.6, 0.35)))
+        assertEquals(0.6 to 0.35, twice.move[30L])
+        val dropped = EditTrackOps.fold(null, listOf(EditOp.Move(30L, 0.5, 0.25), EditOp.Drop(30L)))
+        assertEquals(listOf(0L, 10L, 20L, 40L, 50L, 60L, 70L, 80L, 90L), times(EditTrackOps.apply(track, dropped)))
+    }
+
+    @Test
+    fun `a saved move counts as an edit, and reset clears it`() {
+        val base = TrackEdit(move = mapOf(30L to (0.5 to 0.25)))
+        assertTrue(!base.isEmpty)
+        assertTrue(EditTrackOps.fold(base, listOf(EditOp.Reset)).isEmpty)
+    }
+
+    @Test
+    fun `a move is rounded to the points' 1e-6 degrees`() {
+        assertEquals(EditOp.Move(1L, 13.123457, 52.987654), EditTrackOps.move(1L, 13.12345678, 52.98765432))
+    }
+
+    @Test
     fun `distances add up along the track`() {
         val d = EditTrackOps.cumulativeDistances(track)
         assertEquals(0.0, d[0], 0.0)

@@ -2053,7 +2053,7 @@ button.activities-panel__story-badge:hover {
   cursor: not-allowed;
 }
 
-/* Delete point mode's toggle, while it's on. */
+/* Delete point and Move point modes' toggles, while on. */
 .edit-track__btn[aria-pressed='true'] {
   background: rgb(var(--fm-accent-rgb) / 20%);
   color: var(--fm-accent-strong);

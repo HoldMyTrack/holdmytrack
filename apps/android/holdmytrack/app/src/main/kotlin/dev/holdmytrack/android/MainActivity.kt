@@ -577,12 +577,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Dragging a Private location's handle takes the touch before the map can pan with it
-     *  (`PrivacyTab.onMapTouch`). Only a press on the handle is taken; every other touch,
-     *  taps included, still reaches the map, which performs its own clicks. */
+    /** Dragging a Private location's handle (`PrivacyTab.onMapTouch`), or a track point in the
+     *  editor's Move point mode (`TrackEditor.onMapTouch`), takes the touch before the map can
+     *  pan with it. Only a press on the handle or a point is taken; every other touch, taps
+     *  included, still reaches the map, which performs its own clicks. */
     @SuppressLint("ClickableViewAccessibility")
     private fun takeHandleDrags() {
-        mapView.setOnTouchListener { _, event -> privacyShowing && privacyTab.onMapTouch(event) }
+        mapView.setOnTouchListener { _, event ->
+            when {
+                privacyShowing -> privacyTab.onMapTouch(event)
+                editWindow.isOpen -> map?.let { editWindow.trackEditor.onMapTouch(event, it, resources.displayMetrics.density) } ?: false
+                else -> false
+            }
+        }
     }
 
     /** [MIN_TOUCH_TARGET_DP] in pixels, rounded up. */

@@ -94,8 +94,8 @@ type trackEditRequest struct {
 	Edit *ingest.TrackEdit `json:"edit"`
 }
 
-// maxTrackEditEntries bounds the spec's size — Delete point adds one timestamp per click, so
-// this is far past any real editing session while still rejecting an absurd payload.
+// maxTrackEditEntries bounds the spec's size — Delete point adds one timestamp per click and
+// Move point one per point dragged, so this is far past any real editing session while still rejecting an absurd payload.
 const maxTrackEditEntries = 10000
 
 // handleActivityTrackEdit serves `POST /v1/activities/track-edit/{id}`: validate the spec,
@@ -120,7 +120,7 @@ func (s *Server) handleActivityTrackEdit(w http.ResponseWriter, r *http.Request)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if len(req.Edit.Remove)+len(req.Edit.Drop) > maxTrackEditEntries {
+		if len(req.Edit.Remove)+len(req.Edit.Drop)+len(req.Edit.Move) > maxTrackEditEntries {
 			httpErrorT(w, r, http.StatusBadRequest, "error.track_edit_too_large")
 			return
 		}
