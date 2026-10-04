@@ -35,7 +35,7 @@ The phases below sit inside three milestones (`VISION.md` §5, ADR-0031):
 
 ### Accurate country and region borders — before the public launch
 
-Country/Region matching (`IMPLEMENTATION.md` §4.2.4) uses Natural Earth's 1:50m countries and 1:10m states/provinces, whose borders can be about a kilometre off where they follow a river. A walk in Niagara Falls, NY lands inside Canada and Ontario by up to 843 m, so the demo's Niagara Falls trip shows Canada although it never crossed the border. The same goes for any river or strait border (Detroit–Windsor, the St. Lawrence).
+Country/Region matching (`IMPLEMENTATION.md` §4.2.4) uses Natural Earth's 1:50m countries and 1:10m states/provinces, small enough to embed in the server, at the cost of borders that can be about a kilometre off. That cost lands on everyone who lives or travels near a country or region border: a walk in Niagara Falls, NY lands inside Canada and Ontario by up to 843 m, so the demo's Niagara Falls trip shows Canada although it never crossed the border.
 
 - [ ] Choose more accurate boundary data (geoBoundaries, or OpenStreetMap-based outlines) for countries and regions, and check its licence fits a public repository and a free service.
 - [ ] Load it without bloating the repository and server image: likely fetched at deploy time by `seed-admin-boundaries` rather than embedded (`internal/geo/geo.go`), with its seed time and database size measured.
