@@ -8,7 +8,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -21,7 +23,7 @@ import (
 
 // ExportDemoActivities writes the listed activities into outDir as demo_data/-ready GPX files,
 // their photos' images into outDir/photos/, and outDir/manifest.json with their names, types,
-// descriptions and photos — the
+// descriptions and photos, and the owner's Spots captures over the same span — the
 // `export-demo-activities` CLI subcommand, run against a live deployment to pick real
 // activities for the Demo Customer's history (SeedDemoCustomer). Each file holds the points
 // the owner sees on the map (ingest.DisplayedPoints: clipped by their Private locations, with
@@ -33,6 +35,10 @@ import (
 // (or type). A file already in outDir is never overwritten; the name gets a -2, -3, ... suffix
 // instead, so several exports into one directory accumulate. Any failure stops the export,
 // naming the activity id.
+//
+// Captures belong to the account, not to an activity, so they're picked by time: every one the
+// owner made from the first exported point to the last (exportDemoCaptures). That takes in a
+// place captured between two of a trip's activities, so a trip is exported in one run.
 func ExportDemoActivities(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, outDir string, activityIDs []string) ([]string, error) {
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return nil, err
@@ -51,49 +57,113 @@ func ExportDemoActivities(ctx context.Context, pool *pgxpool.Pool, store *storag
 		return nil, err
 	}
 
+	writeManifest := func() error {
+		b, err := json.MarshalIndent(manifest, "", "  ")
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(manifestPath, append(b, '\n'), 0o644)
+	}
 	var written []string
+	spans := map[string]demoSpan{}
 	for _, id := range activityIDs {
-		filename, entry, err := exportDemoActivity(ctx, pool, store, outDir, id)
+		filename, entry, owner, span, err := exportDemoActivity(ctx, pool, store, outDir, id)
 		if err != nil {
 			return written, fmt.Errorf("activity %s: %w", id, err)
 		}
 		manifest.Activities[filename] = entry
 		written = append(written, filename)
+		if s, ok := spans[owner]; ok {
+			span = demoSpan{min(s.start, span.start), max(s.end, span.end)}
+		}
+		spans[owner] = span
 
 		// Rewritten after every file, so a failure part-way leaves a manifest that matches
 		// the files already copied.
-		b, err := json.MarshalIndent(manifest, "", "  ")
-		if err != nil {
-			return written, err
-		}
-		if err := os.WriteFile(manifestPath, append(b, '\n'), 0o644); err != nil {
+		if err := writeManifest(); err != nil {
 			return written, err
 		}
 	}
-	return written, nil
+	for owner, span := range spans {
+		captures, err := exportDemoCaptures(ctx, pool, owner, span)
+		if err != nil {
+			return written, fmt.Errorf("captures: %w", err)
+		}
+		manifest.SpotCaptures = mergeDemoCaptures(manifest.SpotCaptures, captures)
+	}
+	return written, writeManifest()
 }
 
-func exportDemoActivity(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, outDir, activityID string) (string, demoManifestEntry, error) {
+// demoSpan is the time from an export's first point to its last, as Unix milliseconds so the
+// built-in min and max apply.
+type demoSpan struct{ start, end int64 }
+
+// exportDemoCaptures returns the owner's captures within span, oldest first, except a place
+// that reaches into one of the owner's Private locations: a playground by their home would
+// give away where they live, and demo_data/ is public, as the GPX files' clipping is for.
+func exportDemoCaptures(ctx context.Context, pool *pgxpool.Pool, owner string, span demoSpan) ([]demoManifestCapture, error) {
+	rows, err := pool.Query(ctx, `
+		SELECT s.osm_type, s.osm_id, COALESCE(s.name, ''), c.captured_at
+		FROM spot_captures c JOIN spots s ON s.id = c.spot_id
+		WHERE c.user_id = $1 AND c.captured_at BETWEEN $2 AND $3
+		  AND NOT EXISTS (SELECT 1 FROM privacy_zones z
+		                  WHERE z.user_id = $1 AND ST_DWithin(z.center, s.geom::geography, z.radius_m))
+		ORDER BY c.captured_at`,
+		owner, time.UnixMilli(span.start), time.UnixMilli(span.end))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var captures []demoManifestCapture
+	for rows.Next() {
+		var c demoManifestCapture
+		if err := rows.Scan(&c.OSMType, &c.OSMID, &c.Name, &c.CapturedAt); err != nil {
+			return nil, err
+		}
+		c.CapturedAt = c.CapturedAt.UTC()
+		captures = append(captures, c)
+	}
+	return captures, rows.Err()
+}
+
+// mergeDemoCaptures adds captures to the manifest's, one per place: an export of a place
+// already there replaces it.
+func mergeDemoCaptures(existing, captures []demoManifestCapture) []demoManifestCapture {
+	for _, c := range captures {
+		i := slices.IndexFunc(existing, func(e demoManifestCapture) bool { return e.OSMType == c.OSMType && e.OSMID == c.OSMID })
+		if i >= 0 {
+			existing[i] = c
+		} else {
+			existing = append(existing, c)
+		}
+	}
+	return existing
+}
+
+// exportDemoActivity writes one activity's GPX file and photos, and returns its manifest
+// entry, its owner and the span of its exported points.
+func exportDemoActivity(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, outDir, activityID string) (string, demoManifestEntry, string, demoSpan, error) {
 	var (
+		owner        string
 		activityType string
 		name         *string
 		description  *string
 	)
 	err := pool.QueryRow(ctx,
-		`SELECT activity_type, name, description FROM activities WHERE id = $1`, activityID,
-	).Scan(&activityType, &name, &description)
+		`SELECT user_id, activity_type, name, description FROM activities WHERE id = $1`, activityID,
+	).Scan(&owner, &activityType, &name, &description)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", demoManifestEntry{}, errors.New("not found")
+		return "", demoManifestEntry{}, "", demoSpan{}, errors.New("not found")
 	}
 	if err != nil {
-		return "", demoManifestEntry{}, err
+		return "", demoManifestEntry{}, "", demoSpan{}, err
 	}
 	points, err := ingest.DisplayedPoints(ctx, pool, store, activityID)
 	if err != nil {
-		return "", demoManifestEntry{}, err
+		return "", demoManifestEntry{}, "", demoSpan{}, err
 	}
 	if points == nil {
-		return "", demoManifestEntry{}, errors.New("no visible track: hidden entirely by Private locations")
+		return "", demoManifestEntry{}, "", demoSpan{}, errors.New("no visible track: hidden entirely by Private locations")
 	}
 
 	entry := demoManifestEntry{Type: activityType}
@@ -107,27 +177,27 @@ func exportDemoActivity(ctx context.Context, pool *pgxpool.Pool, store *storage.
 	}
 	filename, err := freeDemoFilename(outDir, points[0].Time.UTC().Format("2006-01-02")+" "+export.Slug(label), ".gpx")
 	if err != nil {
-		return "", demoManifestEntry{}, err
+		return "", demoManifestEntry{}, "", demoSpan{}, err
 	}
 
 	f, err := os.OpenFile(filepath.Join(outDir, filename), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if err != nil {
-		return "", demoManifestEntry{}, err
+		return "", demoManifestEntry{}, "", demoSpan{}, err
 	}
 	if err := export.WriteGPX(f, activityType, points); err != nil {
 		f.Close()
 		os.Remove(f.Name())
-		return "", demoManifestEntry{}, err
+		return "", demoManifestEntry{}, "", demoSpan{}, err
 	}
 	if err := f.Close(); err != nil {
-		return "", demoManifestEntry{}, err
+		return "", demoManifestEntry{}, "", demoSpan{}, err
 	}
 	photos, err := exportDemoPhotos(ctx, pool, store, outDir, activityID, strings.TrimSuffix(filename, ".gpx"), points)
 	if err != nil {
-		return "", demoManifestEntry{}, err
+		return "", demoManifestEntry{}, "", demoSpan{}, err
 	}
 	entry.Photos = photos
-	return filename, entry, nil
+	return filename, entry, owner, demoSpan{points[0].Time.UnixMilli(), points[len(points)-1].Time.UnixMilli()}, nil
 }
 
 // exportDemoPhotos copies an activity's photos out: each one's stored image and thumbnail —

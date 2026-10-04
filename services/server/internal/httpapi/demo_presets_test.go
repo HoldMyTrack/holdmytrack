@@ -135,6 +135,36 @@ func TestLoadDemoManifestPhotos(t *testing.T) {
 	}
 }
 
+func TestLoadDemoManifestCaptures(t *testing.T) {
+	fsys := fstest.MapFS{}
+	capture := func(fields ...string) string {
+		return `{"spot_captures": [{` + strings.Join(fields, `}, {`) + `}]}`
+	}
+	ok := `"osm_type": "way", "osm_id": 631388618, "name": "Playground", "captured_at": "2026-10-03T15:13:30.193259Z"`
+
+	fsys["manifest.json"] = &fstest.MapFile{Data: []byte(capture(ok))}
+	got, err := loadDemoManifest(fsys, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []demoManifestCapture{{OSMType: "way", OSMID: 631388618, Name: "Playground", CapturedAt: time.Date(2026, 10, 3, 15, 13, 30, 193259000, time.UTC)}}
+	if !reflect.DeepEqual(got.SpotCaptures, want) {
+		t.Fatalf("captures %+v, want %+v", got.SpotCaptures, want)
+	}
+
+	for name, manifest := range map[string]string{
+		"an unknown osm_type": capture(`"osm_type": "area", "osm_id": 1, "captured_at": "2026-10-03T15:13:30Z"`),
+		"no osm_id":           capture(`"osm_type": "node", "captured_at": "2026-10-03T15:13:30Z"`),
+		"no captured_at":      capture(`"osm_type": "node", "osm_id": 1`),
+		"one place twice":     capture(ok, ok),
+	} {
+		fsys["manifest.json"] = &fstest.MapFile{Data: []byte(manifest)}
+		if _, err := loadDemoManifest(fsys, nil); err == nil {
+			t.Errorf("want an error for %s", name)
+		}
+	}
+}
+
 func TestFreeDemoFilename(t *testing.T) {
 	dir := t.TempDir()
 	for _, want := range []string{"2026-09-01 Walk.gpx", "2026-09-01 Walk-2.gpx", "2026-09-01 Walk-3.gpx"} {
@@ -199,5 +229,72 @@ func TestDemoPhotosRoundTrip(t *testing.T) {
 	}
 	if !s3.Has(photoKey(demo.id, p.ID)) || !s3.Has(photoThumbKey(demo.id, p.ID)) {
 		t.Errorf("seeded images not stored under the new owner")
+	}
+}
+
+// Captures through export-demo-activities and back in through the seed (exportDemoCaptures,
+// seedDemoCaptures): only the owner's within the span, none reaching into their Private
+// locations, and a re-run of the seed keeping one capture per place at the manifest's time.
+func TestDemoCapturesRoundTrip(t *testing.T) {
+	d := newDBTest(t)
+	ctx := context.Background()
+	owner, other, demo := d.newAccount(false), d.newAccount(false), d.newAccount(false)
+	base := time.Now().UnixNano()
+	// Three places mapped as points — 30 m circles — in open ocean no other test uses.
+	spot := func(n int, lon float64) int64 {
+		var id int64
+		if err := d.pool.QueryRow(ctx, `
+			INSERT INTO spots (category, name, geom, osm_type, osm_id)
+			VALUES ('playground', 'Test Playground', ST_Multi(ST_Buffer(ST_SetSRID(ST_MakePoint($1, -41.5), 4326)::geography, 30)::geometry), 'node', $2)
+			RETURNING id`, lon, base+int64(n)).Scan(&id); err != nil {
+			t.Fatalf("create spot: %v", err)
+		}
+		t.Cleanup(func() { d.pool.Exec(context.Background(), `DELETE FROM spots WHERE id = $1`, id) })
+		return id
+	}
+	inside, early, home := spot(1, -41.5), spot(2, -41.6), spot(3, -41.7)
+	if _, err := d.pool.Exec(ctx, `INSERT INTO privacy_zones (user_id, center, radius_m) VALUES ($1, ST_SetSRID(ST_MakePoint(-41.7, -41.5005), 4326)::geography, 200)`, owner.id); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Date(2026, 10, 3, 14, 50, 0, 0, time.UTC)
+	span := demoSpan{start.UnixMilli(), start.Add(2 * time.Hour).UnixMilli()}
+	for _, c := range []struct {
+		user account
+		spot int64
+		at   time.Time
+	}{
+		{owner, inside, start.Add(time.Hour)},
+		{owner, early, start.Add(-time.Minute)},
+		{owner, home, start.Add(time.Hour)},
+		{other, early, start.Add(time.Hour)},
+	} {
+		if _, err := d.pool.Exec(ctx, `INSERT INTO spot_captures (user_id, spot_id, captured_at) VALUES ($1, $2, $3)`, c.user.id, c.spot, c.at); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	captures, err := exportDemoCaptures(ctx, d.pool, owner.id, span)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(captures) != 1 || captures[0].OSMType != "node" || captures[0].OSMID != base+1 || captures[0].Name != "Test Playground" ||
+		!captures[0].CapturedAt.Equal(start.Add(time.Hour)) {
+		t.Fatalf("exported %+v", captures)
+	}
+
+	gone := demoManifestCapture{OSMType: "way", OSMID: base, CapturedAt: start}
+	for run := 1; run <= 2; run++ {
+		missing, err := seedDemoCaptures(ctx, d.pool, demo.id, append(captures, gone))
+		if err != nil {
+			t.Fatalf("seed run %d: %v", run, err)
+		}
+		if len(missing) != 1 || missing[0] != gone {
+			t.Fatalf("seed run %d: missing %+v, want the place not loaded", run, missing)
+		}
+	}
+	var list spotCapturesResponse
+	d.decode(d.do(demo, "GET", "/v1/spots/captures", nil), http.StatusOK, &list)
+	if len(list.Captures) != 1 || list.Captures[0].SpotID != inside || !list.Captures[0].CapturedAt.Equal(start.Add(time.Hour)) {
+		t.Errorf("seeded captures %+v", list.Captures)
 	}
 }
