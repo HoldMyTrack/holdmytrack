@@ -6,9 +6,12 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"io/fs"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -588,5 +591,69 @@ func TestSyncEnqueuesRawPayloadsInline(t *testing.T) {
 		if got[i].Status != want {
 			t.Errorf("repeat result %d: %s, want %s", i, got[i].Status, want)
 		}
+	}
+}
+
+// A Google Takeout export goes the same way as a plain zip: recognised in the request, unpacked
+// by the worker into one ingest job per activity with GPS, each typed and named as
+// internal/takeout writes it.
+func TestTakeoutUploadIsUnpackedByTheWorker(t *testing.T) {
+	d := newDBTestWithS3(t, newMemS3())
+	me := d.newAccount(false)
+	ctx := context.Background()
+
+	var archive bytes.Buffer
+	zw := zip.NewWriter(&archive)
+	root := "../takeout/testdata/sample"
+	err := filepath.WalkDir(root, func(path string, e fs.DirEntry, err error) error {
+		if err != nil || e.IsDir() {
+			return err
+		}
+		rel, _ := filepath.Rel(root, path)
+		w, err := zw.Create(filepath.ToSlash(rel))
+		if err != nil {
+			return err
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		_, err = w.Write(data)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw.Close()
+
+	var resp archiveUploadResponse
+	d.decode(d.uploadRaw(me, "takeout-20260101.zip", archive.Bytes()), http.StatusAccepted, &resp)
+	var format string
+	if err := d.pool.QueryRow(ctx, `SELECT payload->>'format' FROM jobs WHERE user_id = $1 AND kind = 'unpack'`, me.id).Scan(&format); err != nil || format != unpack.FormatTakeout {
+		t.Fatalf("unpack job format = %q, %v", format, err)
+	}
+	d.runUnpack(me)
+
+	rows, err := d.pool.Query(ctx, `
+		SELECT payload->>'source', payload->>'activity_type', payload->>'source_detail', payload->>'batch_title'
+		FROM jobs WHERE user_id = $1 AND kind = 'ingest' ORDER BY id`, me.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	types := map[string]int{}
+	for rows.Next() {
+		var source, typ, name, title string
+		if err := rows.Scan(&source, &typ, &name, &title); err != nil {
+			t.Fatal(err)
+		}
+		if source != "takeout" || !strings.HasSuffix(name, ".gpx") || title != "takeout-20260101.zip" {
+			t.Errorf("job: %s %s %s %s", source, typ, name, title)
+		}
+		types[typ]++
+	}
+	// The sample's two activities with GPS, as testdata/pathify-out has them.
+	if len(types) != 2 || types["Walk"] != 1 || types["Outdoor Bike"] != 1 {
+		t.Fatalf("ingest jobs by type: %v, want one Walk and one Outdoor Bike", types)
 	}
 }
