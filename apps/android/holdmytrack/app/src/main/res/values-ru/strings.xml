@@ -187,6 +187,7 @@
     </plurals>
     <string name="locate_needs_location">HoldMyTrack нужен доступ к местоположению, чтобы показать, где вы.</string>
     <string name="menu_profile">Профиль</string>
+    <string name="menu_upload">Загрузить</string>
     <string name="menu_sync">Синхронизация</string>
     <string name="menu_donate">Поддержать</string>
     <string name="menu_about">О проекте</string>
@@ -344,7 +345,9 @@
     <string name="status_history">История</string>
     <string name="status_loading">Загрузка…</string>
     <string name="status_summary_empty">Пока ничего не импортировано.</string>
-    <string name="sync_section_files">Файлы</string>
+    <string name="upload_title">Загрузить</string>
+    <string name="upload_demo">Недоступно в демо-аккаунте — создайте аккаунт, чтобы загружать свои занятия.</string>
+    <string name="upload_see_sync">Следить в «Синхронизации»</string>
     <string name="upload_hint">.gpx, .fit, .tcx, zip-архив с ними, выгрузка Google Health или выгрузка Хронологии Google Карт (.json).</string>
     <string name="upload_guide_google_health">Как выгрузить данные из Google Health</string>
     <string name="upload_guide_timeline">Как выгрузить Хронологию Google Карт</string>

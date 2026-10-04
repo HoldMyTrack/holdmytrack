@@ -1,23 +1,19 @@
 package dev.holdmytrack.android
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
-import android.text.TextUtils
 import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContract
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.holdmytrack.android.health.HealthConnect
-import dev.holdmytrack.android.imports.FileImports
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.recording.RecordedActivityRows
@@ -37,11 +33,9 @@ import kotlinx.coroutines.launch
 /**
  * Sync: every place activities come from on this device and one "Sync now" that sends all of
  * it — Health Connect, once it can be read, and every GPS recording on the device
- * (`RecordedActivityRows`) — then files to upload, the web's Upload menu ([FileImports]), and
- * everything imported so far, the web's `/sync` page ([ImportHistory]). Health Connect's
- * onboarding lives here too — Path 2's on-device half
- * (`docs/adr/0001-three-independent-ingest-paths.md`). Another app's file handed to this app to
- * open or share lands here too, and is uploaded as if picked.
+ * (`RecordedActivityRows`) — then everything imported so far, the web's `/sync` page
+ * ([ImportHistory]). Health Connect's onboarding lives here too — Path 2's on-device half
+ * (`docs/adr/0001-three-independent-ingest-paths.md`).
  *
  * Also the screen Health Connect opens as this app's permission *rationale*. What is read and
  * what it is for sits behind the info button beside Health Connect's title, and opens by
@@ -66,10 +60,6 @@ class SyncActivity : AppCompatActivity() {
     private lateinit var recordedSection: View
     private lateinit var recordedRows: RecordedActivityRows
     private lateinit var healthConnectSection: View
-    private lateinit var filesSection: View
-    private lateinit var transfers: LinearLayout
-    private lateinit var fileNotes: TextView
-    private lateinit var fileErrors: TextView
     private lateinit var historySection: View
     private lateinit var history: ImportHistory
     private lateinit var status: TextView
@@ -83,23 +73,6 @@ class SyncActivity : AppCompatActivity() {
 
     /** The last readiness `render` saw; null until the first read comes back. */
     private var readiness: HealthConnect.Readiness? = null
-
-    /** [FileImports.sentCount] as of the last history read: when it moves, a file has gone and
-     *  its jobs are worth reading. */
-    private var filesSeen = FileImports.sentCount
-
-    private val filesListener: () -> Unit = {
-        renderFiles()
-        if (FileImports.sentCount != filesSeen && historySection.visibility == View.VISIBLE) {
-            filesSeen = FileImports.sentCount
-            history.start()
-        }
-    }
-
-    // Any type: providers label .gpx and .fit all sorts of ways, and FileImports says which it won't send.
-    private val filePicker = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        if (uris.isNotEmpty()) importFiles(uris)
-    }
 
     private val permissionLauncher = registerForActivityResult(
         @Suppress("UNCHECKED_CAST")
@@ -120,10 +93,6 @@ class SyncActivity : AppCompatActivity() {
             onChanged = ::updateSyncNow,
         )
         healthConnectSection = findViewById(R.id.sync_health_connect_section)
-        filesSection = findViewById(R.id.sync_files_section)
-        transfers = findViewById(R.id.sync_files_transfers)
-        fileNotes = findViewById(R.id.sync_files_notes)
-        fileErrors = findViewById(R.id.sync_files_errors)
         historySection = findViewById(R.id.sync_history_section)
         history = ImportHistory(findViewById(android.R.id.content), onViewOnMap = ::viewOnMap)
         status = findViewById(R.id.sync_status)
@@ -135,80 +104,11 @@ class SyncActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.sync_health_connect_info).setOnClickListener { showRationale() }
         syncNow.setOnClickListener { startSync() }
-        findViewById<Button>(R.id.sync_files_choose).setOnClickListener { filePicker.launch(arrayOf("*/*")) }
-        findViewById<Button>(R.id.sync_files_guide_google_health).setOnClickListener { openPage(GOOGLE_HEALTH_GUIDE_PATH) }
-        findViewById<Button>(R.id.sync_files_guide_timeline).setOnClickListener { openPage(TimelineImportActivity.GUIDE_PATH) }
 
         // Health Connect asked "why does this app want my data" — answer it straight away,
         // rather than making the user find the info button. Only on a fresh start, so a
         // rotation after dismissing it doesn't bring it back.
         if (savedInstanceState == null && intent?.action in RATIONALE_ACTIONS) showRationale()
-        if (savedInstanceState == null) importShared(intent)
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        importShared(intent)
-    }
-
-    /** Files another app handed this one to open or share: uploaded as if picked here, when
-     *  this account can (the notice says why not otherwise). */
-    private fun importShared(intent: Intent?) {
-        val uris = when (intent?.action) {
-            Intent.ACTION_VIEW -> listOfNotNull(intent.data)
-            Intent.ACTION_SEND -> listOfNotNull(intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java))
-            Intent.ACTION_SEND_MULTIPLE -> intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
-            else -> emptyList()
-        }
-        if (uris.isNotEmpty() && canUpload()) importFiles(uris)
-    }
-
-    /** The server refuses a demo account's uploads (`requireNotDemo`) and an unconfirmed one's. */
-    private fun canUpload() = Session.isSignedIn && Session.emailVerified && !Session.isDemo
-
-    /** Picked or shared files to [FileImports]; a Timeline export among them opens its own screen. */
-    private fun importFiles(uris: List<Uri>) {
-        FileImports.enqueue(this, uris)?.let { TimelineImportActivity.open(this, it) }
-    }
-
-    private fun openPage(path: String) {
-        CustomTabsIntent.Builder().build().launchUrl(this, HoldMyTrackApi.webPageUri(path))
-    }
-
-    /** Each file queued or uploading, then the uploads' notes and errors. */
-    private fun renderFiles() {
-        transfers.removeAllViews()
-        for (transfer in FileImports.transfers) {
-            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            val name = TextView(this).apply {
-                text = transfer.name
-                maxLines = 1
-                ellipsize = TextUtils.TruncateAt.MIDDLE
-            }
-            val status = TextView(this).apply {
-                setTextColor(getColor(R.color.hmt_ink_meta))
-                text = when {
-                    transfer.sent < 0 -> getString(R.string.upload_queued)
-                    transfer.size > 0 -> getString(R.string.upload_uploading, (transfer.sent * 100 / transfer.size).toInt())
-                    else -> getString(R.string.upload_uploading_mb, (transfer.sent shr 20).toInt())
-                }
-            }
-            row.addView(name, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-            row.addView(status)
-            transfers.addView(row)
-        }
-        val (errors, notes) = FileImports.notes.partition { it.error }
-        fileNotes.text = notes.joinToString("\n") { it.text }
-        fileNotes.visibility = if (notes.isEmpty()) View.GONE else View.VISIBLE
-        fileErrors.text = errors.joinToString("\n") { it.text }
-        fileErrors.visibility = if (errors.isEmpty()) View.GONE else View.VISIBLE
-    }
-
-    override fun onStart() {
-        super.onStart()
-        FileImports.addListener(filesListener)
-        renderFiles()
     }
 
     /** What is read from Health Connect and what it is for — the permission rationale — with
@@ -238,7 +138,6 @@ class SyncActivity : AppCompatActivity() {
         syncJob?.cancel()
         syncJob = null
         history.stop()
-        FileImports.removeListener(filesListener)
         super.onStop()
     }
 
@@ -281,13 +180,11 @@ class SyncActivity : AppCompatActivity() {
         // hidden rather than left to fail. Recordings stay listed — a demo account can still
         // record, edit and delete them locally — and so does its history, as on the web.
         historySection.visibility = View.VISIBLE
-        filesSeen = FileImports.sentCount
         history.start()
         if (Session.isDemo) {
             showAccountNotice(getString(R.string.sync_demo_read_only))
             recordedSection.visibility = View.VISIBLE
             healthConnectSection.visibility = View.GONE
-            filesSection.visibility = View.GONE
             syncNow.visibility = View.GONE
             return
         }
@@ -295,7 +192,6 @@ class SyncActivity : AppCompatActivity() {
         accountNotice.visibility = View.GONE
         recordedSection.visibility = View.VISIBLE
         healthConnectSection.visibility = View.VISIBLE
-        filesSection.visibility = View.VISIBLE
         syncNow.visibility = View.VISIBLE
         renderHealthConnect(readiness)
         updateSyncNow()
@@ -306,7 +202,6 @@ class SyncActivity : AppCompatActivity() {
         showAccountNotice(text)
         recordedSection.visibility = View.GONE
         healthConnectSection.visibility = View.GONE
-        filesSection.visibility = View.GONE
         syncNow.visibility = View.GONE
         historySection.visibility = View.GONE
     }
@@ -532,9 +427,6 @@ class SyncActivity : AppCompatActivity() {
 
     private companion object {
         const val TAG = "HoldMyTrackSync"
-
-        /** The step-by-step Google Health (Takeout) export guide (root `docs/SPEC.md` FR-10.5). */
-        const val GOOGLE_HEALTH_GUIDE_PATH = "/help/google-health-export"
 
         /** Health Connect's rationale request, and its "see how this app used your data" link
          *  (the manifest's `ViewPermissionUsageActivity` alias). */

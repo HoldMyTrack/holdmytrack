@@ -1798,18 +1798,20 @@ class MainActivity : AppCompatActivity() {
     private fun showMenu(anchor: View) {
         val menu = PopupMenu(this, anchor)
         menu.menu.add(MENU_GROUP_APP, MENU_PROFILE, 0, R.string.menu_profile)
-        menu.menu.add(MENU_GROUP_APP, MENU_SYNC, 1, R.string.menu_sync)
-        menu.menu.add(MENU_GROUP_APP, MENU_SETTINGS, 2, R.string.menu_settings)
-        if (BuildConfig.DONATE_LINK) menu.menu.add(MENU_GROUP_WEB, MENU_DONATE, 3, R.string.menu_donate)
-        menu.menu.add(MENU_GROUP_WEB, MENU_ABOUT, 4, R.string.menu_about)
-        menu.menu.add(MENU_GROUP_WEB, MENU_HELP, 5, R.string.menu_help)
-        menu.menu.add(MENU_GROUP_WEB, MENU_CONTACTS, 6, R.string.menu_contacts)
-        menu.menu.add(MENU_GROUP_WEB, MENU_PRIVACY, 7, R.string.menu_privacy)
-        menu.menu.add(MENU_GROUP_VERSION, MENU_VERSION, 8, getString(R.string.menu_version, HoldMyTrackApi.appVersion)).isEnabled = false
+        menu.menu.add(MENU_GROUP_APP, MENU_UPLOAD, 1, R.string.menu_upload)
+        menu.menu.add(MENU_GROUP_APP, MENU_SYNC, 2, R.string.menu_sync)
+        menu.menu.add(MENU_GROUP_APP, MENU_SETTINGS, 3, R.string.menu_settings)
+        if (BuildConfig.DONATE_LINK) menu.menu.add(MENU_GROUP_WEB, MENU_DONATE, 4, R.string.menu_donate)
+        menu.menu.add(MENU_GROUP_WEB, MENU_ABOUT, 5, R.string.menu_about)
+        menu.menu.add(MENU_GROUP_WEB, MENU_HELP, 6, R.string.menu_help)
+        menu.menu.add(MENU_GROUP_WEB, MENU_CONTACTS, 7, R.string.menu_contacts)
+        menu.menu.add(MENU_GROUP_WEB, MENU_PRIVACY, 8, R.string.menu_privacy)
+        menu.menu.add(MENU_GROUP_VERSION, MENU_VERSION, 9, getString(R.string.menu_version, HoldMyTrackApi.appVersion)).isEnabled = false
         menu.menu.setGroupDividerEnabled(true)
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 MENU_PROFILE -> startActivity(Intent(this, ProfileActivity::class.java))
+                MENU_UPLOAD -> startActivity(Intent(this, UploadActivity::class.java))
                 MENU_SYNC -> startActivity(Intent(this, SyncActivity::class.java))
                 MENU_SETTINGS -> SettingsActivity.open(this)
                 MENU_DONATE -> openWebPage("/about#funding")
@@ -2075,6 +2077,7 @@ class MainActivity : AppCompatActivity() {
         private const val MENU_GROUP_VERSION = 3
         private const val MENU_PROFILE = 1
         private const val MENU_SYNC = 2
+        private const val MENU_UPLOAD = 3
         private const val MENU_SETTINGS = 4
         private const val MENU_DONATE = 5
         private const val MENU_ABOUT = 6

@@ -126,9 +126,19 @@
             <intent-filter>
                 <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
             </intent-filter>
+        </activity>
+
+        <!-- Upload: the web's Upload menu as a screen. Exported because other apps open and share
+             files with it. -->
+        <activity
+            android:name=".UploadActivity"
+            android:exported="true"
+            android:label="@string/upload_title"
+            android:theme="@style/Theme.HoldMyTrack">
             <!-- An activity file or archive another app opens or shares with HoldMyTrack —
-                 uploaded as if picked in the screen's Files section (imports/FileImports). A .fit
-                 has no type of its own most apps agree on, so it's picked in the screen. -->
+                 uploaded as if picked here (imports/FileImports). A .fit has no type of its own
+                 most apps agree on, and most hand a .gpx over as a generic binary, which isn't
+                 claimed, so those are picked in the screen. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -149,7 +159,7 @@
         </activity>
 
         <!-- Exported for the same reason: a Timeline.json opened or shared from another app (a
-             file manager, Downloads) comes straight here, as one picked on the Sync screen does. -->
+             file manager, Downloads) comes straight here, as one picked on Upload does. -->
         <activity
             android:name=".TimelineImportActivity"
             android:exported="true"

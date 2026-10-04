@@ -13,15 +13,15 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
- * The files the Sync screen sends to `POST /v1/activities/upload` — the web's Upload menu
+ * The files the Upload screen sends to `POST /v1/activities/upload` — the web's Upload menu
  * (`services/server/internal/web/static/upload.js`, root `docs/SPEC.md` FR-3.1–FR-3.4) on the
  * phone: `.gpx`, `.fit`, `.tcx` and `.zip`, a Google Takeout export being a `.zip` the server
  * recognizes. One file at a time, in the order picked, each with its progress.
  *
  * Process-wide rather than the screen's, so an upload carries on through a rotation or a trip to
- * another app; the screen only draws [transfers] and [notes] and listens for changes. The server
- * takes it from there: once a file has gone, its jobs are in the sync history, which polls while
- * they process.
+ * another app; `UploadActivity` only draws [transfers] and [notes] and listens for changes. The
+ * server takes it from there: once a file has gone, its jobs are in Sync's history, which polls
+ * while they process.
  */
 object FileImports {
 
@@ -61,7 +61,7 @@ object FileImports {
     private val _notes = mutableListOf<Note>()
     val notes: List<Note> get() = _notes
 
-    /** Bumped each time a file has gone, so the Sync screen knows to read its history again. */
+    /** Bumped each time a file has gone, so the Upload screen knows to point to Sync's history. */
     var sentCount = 0
         private set
 

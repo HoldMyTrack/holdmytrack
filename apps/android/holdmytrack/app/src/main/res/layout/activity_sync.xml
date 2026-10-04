@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Sync: what this phone sends, and everything imported so far. Health Connect and the
-     recordings on the device, one Sync now that sends all of it, files to upload, then the sync history and
+     recordings on the device, one Sync now that sends all of it, then the sync history and
      the duplicates, the web's /sync page (services/server/internal/web/templates/pages/sync.html)
      under it. 16dp padding and gap; where things stand in a notice box, and what a run did in
      notices under the button that started it. -->
@@ -145,78 +145,6 @@
             android:layout_height="wrap_content"
             android:textIsSelectable="true"
             android:visibility="gone" />
-
-        <!-- Files: the web's Upload menu (services/server/internal/web/static/upload.js). What
-             can be imported, the two step-by-step export guides, Choose files…, then each file
-             queued or uploading, and what the uploads had to say. Filled by
-             SyncActivity.renderFiles from imports/FileImports. -->
-        <LinearLayout
-            android:id="@+id/sync_files_section"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:divider="@drawable/gap_8"
-            android:orientation="vertical"
-            android:showDividers="middle"
-            android:visibility="gone">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:accessibilityHeading="true"
-                android:text="@string/sync_section_files"
-                android:textAppearance="@style/TextAppearance.HoldMyTrack.Overline" />
-
-            <TextView
-                style="@style/Widget.HoldMyTrack.Hint"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/upload_hint" />
-
-            <Button
-                android:id="@+id/sync_files_guide_google_health"
-                style="@style/Widget.HoldMyTrack.Button.Link"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/upload_guide_google_health" />
-
-            <Button
-                android:id="@+id/sync_files_guide_timeline"
-                style="@style/Widget.HoldMyTrack.Button.Link"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/upload_guide_timeline" />
-
-            <Button
-                android:id="@+id/sync_files_choose"
-                style="@style/Widget.HoldMyTrack.Button.Outlined"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/upload_choose" />
-
-            <!-- A row per file queued or uploading: its name, then "Queued" or "Uploading 45%". -->
-            <LinearLayout
-                android:id="@+id/sync_files_transfers"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:accessibilityLiveRegion="polite"
-                android:orientation="vertical" />
-
-            <TextView
-                android:id="@+id/sync_files_notes"
-                style="@style/Widget.HoldMyTrack.Notice"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textIsSelectable="true"
-                android:visibility="gone" />
-
-            <TextView
-                android:id="@+id/sync_files_errors"
-                style="@style/Widget.HoldMyTrack.Notice.Error"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textIsSelectable="true"
-                android:visibility="gone" />
-        </LinearLayout>
 
         <!-- The sync history (the web's /sync list): every import from every source, newest
              first, a page at a time. Filled by sync/ImportHistory. -->

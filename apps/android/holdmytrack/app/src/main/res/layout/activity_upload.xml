@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Upload: the web's Upload menu (services/server/internal/web/static/upload.js) as a screen.
+     What can be imported, the two step-by-step export guides, Choose files…, then each file
+     queued or uploading, what the uploads had to say, and the way to the history on Sync.
+     Filled by UploadActivity.render from imports/FileImports. Laid out like the Sync screen:
+     16dp padding and gap, notes in a notice, what went wrong in the error box. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:divider="@drawable/gap_16"
+        android:orientation="vertical"
+        android:padding="@dimen/hmt_space_16"
+        android:showDividers="middle">
+
+        <!-- Why nothing can be uploaded: signed out, email unconfirmed, or the demo. -->
+        <TextView
+            android:id="@+id/upload_account_notice"
+            style="@style/Widget.HoldMyTrack.Notice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/upload_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:divider="@drawable/gap_8"
+            android:orientation="vertical"
+            android:showDividers="middle">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:lineHeight="20sp"
+                android:text="@string/upload_hint" />
+
+            <Button
+                android:id="@+id/upload_guide_google_health"
+                style="@style/Widget.HoldMyTrack.Button.Link"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/upload_guide_google_health" />
+
+            <Button
+                android:id="@+id/upload_guide_timeline"
+                style="@style/Widget.HoldMyTrack.Button.Link"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/upload_guide_timeline" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/upload_choose"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/upload_choose" />
+
+        <!-- A row per file queued or uploading: its name, then "Queued" or "Uploading 45%". -->
+        <LinearLayout
+            android:id="@+id/upload_transfers"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:accessibilityLiveRegion="polite"
+            android:orientation="vertical" />
+
+        <TextView
+            android:id="@+id/upload_notes"
+            style="@style/Widget.HoldMyTrack.Notice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textIsSelectable="true"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/upload_errors"
+            style="@style/Widget.HoldMyTrack.Notice.Error"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textIsSelectable="true"
+            android:visibility="gone" />
+
+        <!-- Once a file has gone: where its activities can be followed as they're processed. -->
+        <Button
+            android:id="@+id/upload_see_sync"
+            style="@style/Widget.HoldMyTrack.Button.Outlined"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/upload_see_sync"
+            android:visibility="gone" />
+    </LinearLayout>
+</ScrollView>

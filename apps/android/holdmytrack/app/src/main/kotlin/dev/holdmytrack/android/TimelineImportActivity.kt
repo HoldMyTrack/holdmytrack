@@ -30,9 +30,9 @@ import java.time.format.FormatStyle
 
 /**
  * The Google Maps Timeline import (`apps/android/docs/SPEC.md` FR-3.6, root `docs/SPEC.md`
- * FR-3.10): the web's import window as a screen, without its map preview. Opened from the Sync
- * screen — its Files section, or a `.json` picked there — or by another app handing it a
- * `Timeline.json` to view or share. The state is [TimelineImport]'s; this only draws it.
+ * FR-3.10): the web's import window as a screen, without its map preview. Opened from Upload — its
+ * guide link, or a `.json` picked there — or by another app handing it a `Timeline.json` to view
+ * or share. The state is [TimelineImport]'s; this only draws it.
  */
 class TimelineImportActivity : AppCompatActivity() {
 
@@ -121,7 +121,7 @@ class TimelineImportActivity : AppCompatActivity() {
                 when {
                     !Session.isSignedIn -> R.string.sync_needs_account
                     !Session.emailVerified -> R.string.sync_needs_verified_email
-                    else -> R.string.sync_demo_read_only
+                    else -> R.string.upload_demo
                 },
             )
             accountNotice.visibility = View.VISIBLE
@@ -248,7 +248,7 @@ class TimelineImportActivity : AppCompatActivity() {
         /** The step-by-step export guide (root `docs/SPEC.md` FR-10.5). */
         const val GUIDE_PATH = "/help/timeline-export"
 
-        /** The file another app handed this screen to view or share, or the Sync screen's. */
+        /** The file another app handed this screen to view or share, or the Upload screen's. */
         fun incomingUri(intent: Intent?): Uri? = when (intent?.action) {
             Intent.ACTION_SEND -> intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
             else -> intent?.data
