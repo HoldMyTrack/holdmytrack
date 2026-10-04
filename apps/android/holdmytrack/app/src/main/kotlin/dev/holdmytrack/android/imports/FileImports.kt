@@ -7,6 +7,7 @@ import android.os.Looper
 import android.provider.OpenableColumns
 import dev.holdmytrack.android.R
 import dev.holdmytrack.android.net.HoldMyTrackApi
+import dev.holdmytrack.android.net.UnpackedArchive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -21,7 +22,9 @@ import kotlinx.coroutines.launch
  * Process-wide rather than the screen's, so an upload carries on through a rotation or a trip to
  * another app; `UploadActivity` only draws [transfers] and [notes] and listens for changes. The
  * server takes it from there: once a file has gone, its jobs are in Sync's history, which polls
- * while they process.
+ * while they process. An archive is unpacked in the background (root `docs/IMPLEMENTATION.md`
+ * §4.0.1), so what its files came to arrives later: this polls `GET /v1/uploads/active` while
+ * one it sent is unpacking, and adds the same notes then.
  */
 object FileImports {
 
@@ -60,6 +63,14 @@ object FileImports {
 
     private val _notes = mutableListOf<Note>()
     val notes: List<Note> get() = _notes
+
+    /** Archives sent and still being unpacked, by batch: their file names, for the notes. */
+    private val unpacking = mutableMapOf<String, String>()
+    private var polling = false
+
+    /** How often [unpacking] is checked on: the web's Upload menu's pace while something is in
+     *  flight. */
+    private const val UNPACK_POLL_MS = 2_000L
 
     /** Bumped each time a file has gone, so the Upload screen knows to point to Sync's history. */
     var sentCount = 0
@@ -149,9 +160,10 @@ object FileImports {
                     }
                 }
                 if (outcome.status == "already_processed") _notes += Note(res.getString(R.string.upload_already, transfer.name), error = false)
-                if (outcome.alreadyInArchive > 0) _notes += Note(res.getString(R.string.upload_already_in, transfer.name, outcome.alreadyInArchive), error = false)
-                if (outcome.skippedInArchive > 0) _notes += Note(res.getString(R.string.upload_skipped, transfer.name, outcome.skippedInArchive), error = false)
-                if (outcome.truncated) _notes += Note(res.getString(R.string.upload_truncated, transfer.name), error = false)
+                if (outcome.status == "zip_accepted" && outcome.batch.isNotEmpty()) {
+                    unpacking[outcome.batch] = transfer.name
+                    pollUnpacking(context)
+                }
             } catch (e: Exception) {
                 val reason = e.message?.takeIf { it.isNotBlank() } ?: res.getString(R.string.upload_network_error)
                 _notes += Note(res.getString(R.string.upload_failed_transfer, transfer.name, reason), error = true)
@@ -162,6 +174,30 @@ object FileImports {
                 sendNext(context)
             }
         }
+    }
+
+    /** Checks every [UNPACK_POLL_MS] for the archives in [unpacking] until none is left, noting
+     *  what each one's files came to. A failed check just tries again. */
+    private fun pollUnpacking(context: Context) {
+        if (polling) return
+        polling = true
+        main.postDelayed({
+            HoldMyTrackApi.unpackedArchives { result ->
+                polling = false
+                result.getOrNull()?.forEach { unpacked(context, it) }
+                if (unpacking.isNotEmpty()) pollUnpacking(context)
+            }
+        }, UNPACK_POLL_MS)
+    }
+
+    private fun unpacked(context: Context, archive: UnpackedArchive) {
+        val name = unpacking.remove(archive.batch) ?: return
+        val res = context.resources
+        if (archive.error.isNotEmpty()) _notes += Note(res.getString(R.string.upload_failed_transfer, name, archive.error), error = true)
+        if (archive.already > 0) _notes += Note(res.getString(R.string.upload_already_in, name, archive.already), error = false)
+        if (archive.skipped > 0) _notes += Note(res.getString(R.string.upload_skipped, name, archive.skipped), error = false)
+        if (archive.truncated) _notes += Note(res.getString(R.string.upload_truncated, name), error = false)
+        changed()
     }
 
     /** The file's own name, as the picker or the app that shared it gives it. */
