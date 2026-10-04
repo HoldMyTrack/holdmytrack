@@ -164,6 +164,8 @@
 
     <string name="menu_button">Menu</string>
     <string name="locate_button">Find my location</string>
+    <string name="date_range_shift_earlier">Move the range earlier</string>
+    <string name="date_range_shift_later">Move the range later</string>
     <plurals name="date_range_earlier">
         <item quantity="one">%d active day earlier</item>
         <item quantity="other">%d active days earlier</item>

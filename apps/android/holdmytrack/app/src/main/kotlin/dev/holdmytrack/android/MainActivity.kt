@@ -512,7 +512,12 @@ class MainActivity : AppCompatActivity() {
         )
         onBackPressedDispatcher.addCallback(this, closeEditOnBack)
         activityDays = ActivityDays(DateRangeSlider.WINDOW_DAYS, ::onActivityDaysChanged)
-        dateSlider = DateRangeSlider(dateFooter, onPan = activityDays::panBy) { range ->
+        dateSlider = DateRangeSlider(
+            dateFooter,
+            onPan = activityDays::panBy,
+            onShift = activityDays::shift,
+            canShift = activityDays::canShift,
+        ) { range ->
             userChangedRange = true
             applyRange(range, fly = true)
         }
