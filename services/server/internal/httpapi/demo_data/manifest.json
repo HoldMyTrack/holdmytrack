@@ -197,6 +197,78 @@
     },
     "2026-10-03 driving.gpx": {
       "type": "driving"
+    },
+    "2026-10-04 Solowheel-2.gpx": {
+      "type": "Solowheel"
+    },
+    "2026-10-04 Solowheel.gpx": {
+      "type": "Solowheel",
+      "photos": [
+        {
+          "file": "2026-10-04 Solowheel 1.webp",
+          "thumb": "2026-10-04 Solowheel 1-thumb.webp",
+          "taken_at": "2026-10-04T19:19:34Z",
+          "route_at": "2026-10-04T19:19:34Z",
+          "width": 2048,
+          "height": 1536
+        },
+        {
+          "file": "2026-10-04 Solowheel 2.webp",
+          "thumb": "2026-10-04 Solowheel 2-thumb.webp",
+          "taken_at": "2026-10-04T19:19:43Z",
+          "route_at": "2026-10-04T19:19:43Z",
+          "width": 2048,
+          "height": 1536
+        },
+        {
+          "file": "2026-10-04 Solowheel 3.webp",
+          "thumb": "2026-10-04 Solowheel 3-thumb.webp",
+          "taken_at": "2026-10-04T19:34:54Z",
+          "route_at": "2026-10-04T19:34:54Z",
+          "width": 2048,
+          "height": 1536
+        },
+        {
+          "file": "2026-10-04 Solowheel 4.webp",
+          "thumb": "2026-10-04 Solowheel 4-thumb.webp",
+          "taken_at": "2026-10-04T19:40:18Z",
+          "route_at": "2026-10-04T19:40:18Z",
+          "width": 2048,
+          "height": 1536
+        },
+        {
+          "file": "2026-10-04 Solowheel 5.webp",
+          "thumb": "2026-10-04 Solowheel 5-thumb.webp",
+          "taken_at": "2026-10-04T19:43:06Z",
+          "route_at": "2026-10-04T19:43:06Z",
+          "width": 2048,
+          "height": 1536
+        },
+        {
+          "file": "2026-10-04 Solowheel 6.webp",
+          "thumb": "2026-10-04 Solowheel 6-thumb.webp",
+          "taken_at": "2026-10-04T19:45:56Z",
+          "route_at": "2026-10-04T19:45:56Z",
+          "width": 2048,
+          "height": 1536
+        },
+        {
+          "file": "2026-10-04 Solowheel 7.webp",
+          "thumb": "2026-10-04 Solowheel 7-thumb.webp",
+          "taken_at": "2026-10-04T19:50:58Z",
+          "route_at": "2026-10-04T19:50:58Z",
+          "width": 2048,
+          "height": 1536
+        },
+        {
+          "file": "2026-10-04 Solowheel 8.webp",
+          "thumb": "2026-10-04 Solowheel 8-thumb.webp",
+          "taken_at": "2026-10-04T19:59:37Z",
+          "route_at": "2026-10-04T19:59:37Z",
+          "width": 2048,
+          "height": 1536
+        }
+      ]
     }
   },
   "stories": [
@@ -225,7 +297,9 @@
         "2026-07-01 Emerald Necklace Trail.gpx",
         "2026-07-03 Day 2.gpx",
         "2026-07-07 Day 3.gpx",
-        "2026-07-11 Bonnie Park Picnic Area.gpx"
+        "2026-07-11 Bonnie Park Picnic Area.gpx",
+        "2026-10-04 Solowheel.gpx",
+        "2026-10-04 Solowheel-2.gpx"
       ]
     },
     {
@@ -275,6 +349,17 @@
       "osm_id": 5177258839,
       "name": "David Berger National Memorial",
       "captured_at": "2026-10-03T16:30:41.202733Z"
+    },
+    {
+      "osm_type": "node",
+      "osm_id": 1710411320,
+      "captured_at": "2026-10-04T19:44:19.16895Z"
+    },
+    {
+      "osm_type": "way",
+      "osm_id": 983648985,
+      "name": "Historical game court",
+      "captured_at": "2026-10-04T19:49:05.152444Z"
     }
   ]
 }
