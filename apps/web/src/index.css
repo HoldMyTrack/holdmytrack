@@ -2826,6 +2826,40 @@ button.activities-panel__story-badge:hover {
   top: 13px;
 }
 
+/* Day marks: one per slot boundary. A month change is taller; a skipped stretch of calendar
+   (the slots are packed activity-days) is a doubled tick, the usual axis break. */
+.date-range-slider__tick {
+  position: absolute;
+  top: 10px;
+  width: 1px;
+  height: 8px;
+  transform: translateX(-50%);
+  background: rgb(var(--fm-ink-rgb) / 28%);
+  pointer-events: none;
+}
+
+.date-range-slider__tick--month {
+  top: 7px;
+  height: 14px;
+  background: rgb(var(--fm-ink-rgb) / 45%);
+}
+
+.date-range-slider__tick--gap {
+  width: 4px;
+  background: none;
+  border-left: 1px solid rgb(var(--fm-ink-rgb) / 28%);
+  border-right: 1px solid rgb(var(--fm-ink-rgb) / 28%);
+  box-sizing: border-box;
+}
+
+.date-range-slider__tick--selected:not(.date-range-slider__tick--gap) {
+  background: var(--fm-accent);
+}
+
+.date-range-slider__tick--gap.date-range-slider__tick--selected {
+  border-color: var(--fm-accent);
+}
+
 /* A tall, narrow pill: finger height, but narrow enough that two knobs one day (~18px)
    apart — the closest they can get — still read as two separate knobs with a gap between. */
 .date-range-slider__knob {

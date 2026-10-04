@@ -20,6 +20,21 @@ export interface DateRangeSliderProps {
 
 type Knob = 'start' | 'end';
 
+type Tick = 'day' | 'gap' | 'month';
+
+const DAY_MS = 86_400_000;
+
+/** The kind of tick on each slot boundary, 0..days.length — the two outer edges are plain. */
+function ticksOf(days: HistogramBucket[]): Tick[] {
+  return Array.from({ length: days.length + 1 }, (_, b) => {
+    const before = days[b - 1]?.date;
+    const after = days[b]?.date;
+    if (!before || !after) return 'day';
+    if (before.slice(0, 7) !== after.slice(0, 7)) return 'month';
+    return Date.parse(after) - Date.parse(before) > DAY_MS ? 'gap' : 'day';
+  });
+}
+
 /** How far one Earlier/Later tap moves the window, in activity-days. */
 const STEP_DAYS = 5;
 
@@ -57,6 +72,11 @@ const REPEAT_INTERVAL_MS = 180;
  *
  * Knob drags and held buttons render from a local draft and commit only on release, so the
  * activity list isn't refetched for every day passed.
+ *
+ * **Day marks.** A tick on every slot boundary — where a knob can land — taller where the month
+ * changes, and doubled (an axis break) where the two neighbouring activity-days aren't
+ * consecutive calendar days, so packed slots don't pass for an unbroken run. Ticks inside the
+ * selection take the accent.
  */
 export function DateRangeSlider({
   days,
@@ -297,6 +317,15 @@ export function DateRangeSlider({
           onPointerCancel={onPointerUp}
         >
           <div className="activity-filters__track" />
+          {ticksOf(days).map((tick, b) => (
+            <span
+              key={b}
+              className={`date-range-slider__tick date-range-slider__tick--${tick}${
+                b >= clamp(start) && b <= clamp(end) ? ' date-range-slider__tick--selected' : ''
+              }`}
+              style={{ left: `${percent(b)}%` }}
+            />
+          ))}
           {n > 0 && clamp(end) > clamp(start) && (
             <div
               className="activity-filters__fill"

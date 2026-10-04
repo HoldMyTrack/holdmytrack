@@ -916,7 +916,7 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 
 The date range is picked with a two-knob slider at the top of the Activities tab (FR-5), above the Type and Distance filters, with Earlier/Later buttons either side and the selected start and end dates under it. It exists on that tab alone: the Stories and Privacy tabs (FR-14.6, FR-8.1) are not filtered by a date range, and neither are Fog of War and Heatmap (FR-4.2, FR-4.3). Switching to another tab and back keeps the range as it was. On a phone it sits at the bottom of the screen instead (§19 item 2).
 
-The slider counts only days with at least one activity; days without one take no room on the track. The track shows a window of 15 activity days, which on load is the 15 most recent. A selection is applied when a knob or a held button is released, not while it moves.
+The slider counts only days with at least one activity; days without one take no room on the track. The track shows a window of 15 activity days, which on load is the 15 most recent. Every day boundary on the track has a tick: a taller one where the month changes, and a doubled one where the two neighbouring activity days aren't consecutive calendar days. Ticks inside the selection are in the accent colour. A selection is applied when a knob or a held button is released, not while it moves.
 
 ### FR-6.1 Default selection
 
