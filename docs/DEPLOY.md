@@ -1,6 +1,6 @@
 # Deploying HoldMyTrack — minimal single-VPS setup
 
-The smallest deployment that's actually production-shaped: one small VPS running `compose.prod.yml` (Postgres+PostGIS, `api`, `worker`, and Caddy in front of the built frontend), plus Cloudflare R2 for object storage. See `docs/VISION.md` §4.3 for the cost model this is built around; spend caps and the compliance work (DPIA, EU-region hosting) are `docs/ROADMAP.md`'s Phases 5 and 6. This document only covers getting a working deployment live, not everything a real public launch needs.
+The smallest deployment that's actually production-shaped: one small VPS running `compose.prod.yml` (Postgres+PostGIS, `api`, `worker`, and Caddy in front of the built frontend), plus Cloudflare R2 for object storage. See `docs/VISION.md` §4.3 for the cost model this is built around; spend caps and the compliance work (DPIA, EU-region hosting) are `docs/ROADMAP.md`'s Phases 5 and 6. This document only covers getting a working deployment live, not everything a real public launch needs. Redeploying holdmytrack.com afterwards is routine: in Claude Code, `/deploy` (`.claude/skills/deploy/SKILL.md`) walks §6–§8 and §10 for the commits since the running version.
 
 ## 1. Provision the VPS
 
