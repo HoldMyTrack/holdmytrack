@@ -13,8 +13,8 @@ import java.time.format.DateTimeFormatter
 
 /**
  * The map's date-range control — the Android counterpart of the web's phone footer,
- * `apps/web/src/ui/DateRangeSlider.tsx`, and the same design: Earlier · a two-knob track ·
- * Later, with the selected dates under it (`docs/SPEC.md` §19 item 2).
+ * `apps/web/src/ui/DateRangeSlider.tsx`, and the same design: one row, « ‹ track › », with the
+ * selected dates under it (`docs/SPEC.md` §19 item 2).
  *
  * **Activity days, not calendar days.** The track is a window of [WINDOW_DAYS] consecutive
  * days that have activity ([ActivityDays]); the days between take no room.
@@ -29,17 +29,25 @@ import java.time.format.DateTimeFormatter
  * the moved window is in (the days before it may still be loading), so a gesture's commit waits
  * for that too.
  *
+ * **Range shift.** The inner pair, ‹ ›, move the whole selection by its own length in activity
+ * days ([shiftRange]), the window following — the outer pair, « » (Earlier/Later), move the
+ * scale. A tap commits; a hold repeats like Earlier/Later and commits on release.
+ *
  * Drags and held buttons render from a local draft and commit through [onChange] only on
  * release, so the map's tracks aren't re-requested for every day passed.
  */
 class DateRangeSlider(
     root: View,
     private val onPan: (delta: Int) -> Unit,
+    private val onShift: (range: DateRange, dir: Int) -> DateRange?,
+    private val canShift: (range: DateRange, dir: Int) -> Boolean,
     private val onChange: (DateRange) -> Unit,
 ) {
     private val earlier: View = root.findViewById(R.id.date_range_earlier)
     private val later: View = root.findViewById(R.id.date_range_later)
     private val track: DateRangeTrackView = root.findViewById(R.id.date_range_track)
+    private val shiftEarlier: View = root.findViewById(R.id.date_range_shift_earlier)
+    private val shiftLater: View = root.findViewById(R.id.date_range_shift_later)
     private val fromLabel: TextView = root.findViewById(R.id.date_range_from)
     private val toLabel: TextView = root.findViewById(R.id.date_range_to)
 
@@ -69,12 +77,14 @@ class DateRangeSlider(
     private var pan: Pan? = null
 
     private val handler = Handler(Looper.getMainLooper())
-    private var repeatDir = 0
+    /** The held button's step, until release. */
+    private var repeatAction: (() -> Boolean)? = null
     private val repeat = object : Runnable {
         override fun run() {
+            val action = repeatAction ?: return
             // Reaching the end disables the button, and a disabled button gets no ACTION_UP —
             // so the hold ends (and commits) here instead.
-            if (!step(repeatDir)) return stopRepeat()
+            if (!action()) return stopRepeat()
             handler.postDelayed(this, REPEAT_INTERVAL_MS)
         }
     }
@@ -89,8 +99,10 @@ class DateRangeSlider(
         monthFormat = DateTimeFormatter.ofPattern("LLL", locale)
         earlier.contentDescription = root.resources.getQuantityString(R.plurals.date_range_earlier, STEP_DAYS, STEP_DAYS)
         later.contentDescription = root.resources.getQuantityString(R.plurals.date_range_later, STEP_DAYS, STEP_DAYS)
-        setUpPageButton(earlier, -1)
-        setUpPageButton(later, 1)
+        setUpRepeatButton(earlier) { step(-1) }
+        setUpRepeatButton(later) { step(1) }
+        setUpRepeatButton(shiftEarlier) { shiftStep(-1) }
+        setUpRepeatButton(shiftLater) { shiftStep(1) }
         track.onPress = ::onTrackPress
         track.onDrag = ::onTrackDrag
         track.onRelease = ::onTrackRelease
@@ -194,6 +206,15 @@ class DateRangeSlider(
         return true
     }
 
+    /** Moves the selection its own length; false when it can't move that way (yet). */
+    private fun shiftStep(dir: Int): Boolean {
+        val sel = current ?: return false
+        val next = onShift(sel, dir) ?: return false
+        draft = next
+        render()
+        return true
+    }
+
     /** Ends a gesture: commits now, or once a pan still in flight has landed. */
     private fun finish() {
         val pending = pan
@@ -201,22 +222,22 @@ class DateRangeSlider(
     }
 
     private fun stopRepeat() {
-        if (repeatDir == 0) return
+        if (repeatAction == null) return
         handler.removeCallbacks(repeat)
-        repeatDir = 0
+        repeatAction = null
         finish()
     }
 
     // Press-and-hold is a touch gesture; a click that didn't come from one (TalkBack, a
     // keyboard) steps once.
     @SuppressLint("ClickableViewAccessibility")
-    private fun setUpPageButton(button: View, dir: Int) {
+    private fun setUpRepeatButton(button: View, action: () -> Boolean) {
         button.setOnTouchListener { view, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     view.isPressed = true
-                    step(dir)
-                    repeatDir = dir
+                    action()
+                    repeatAction = action
                     handler.postDelayed(repeat, REPEAT_DELAY_MS)
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
@@ -227,7 +248,7 @@ class DateRangeSlider(
             true
         }
         button.setOnClickListener {
-            if (step(dir)) finish()
+            if (action()) finish()
         }
     }
 
@@ -265,14 +286,18 @@ class DateRangeSlider(
         later.isEnabled = canPanLater
         val sel = current
         if (sel == null) {
-            track.set(0, 0, 0)
+            track.set(0, 0, 0, emptyList())
             fromLabel.text = null
             toLabel.text = null
+            shiftEarlier.isEnabled = false
+            shiftLater.isEnabled = false
             return
         }
-        track.set(days.size, startOf(sel.from), endOf(sel.to))
+        track.set(days.size, startOf(sel.from), endOf(sel.to), ticksOf(days.map { it.date }))
         fromLabel.text = formatDay(sel.from)
         toLabel.text = formatDay(sel.to)
+        shiftEarlier.isEnabled = canShift(sel, -1)
+        shiftLater.isEnabled = canShift(sel, 1)
     }
 
     /** "12 MAR 2026" — the web's `formatDayLabel`, in the app's language. */
@@ -284,12 +309,14 @@ class DateRangeSlider(
     /** Stops a held button's repeat without committing — the screen is going away. */
     fun release() {
         handler.removeCallbacks(repeat)
-        repeatDir = 0
+        repeatAction = null
     }
 
     companion object {
-        /** How many activity days the track shows edge to edge — the web phone slider's. */
-        const val WINDOW_DAYS = 15
+        /** How many activity days the track shows edge to edge — 3 fewer than the web's, as
+         *  the « ‹ › » buttons leave a phone's track narrower: ~18dp a day on a Pixel 10a
+         *  (411dp wide), so the 14dp knobs of a one-day selection still sit apart. */
+        const val WINDOW_DAYS = 12
 
         /** How far one Earlier/Later tap moves the window, in activity days. */
         const val STEP_DAYS = 5

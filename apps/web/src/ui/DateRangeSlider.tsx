@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import type { HistogramBucket } from '../api';
 import { formatDayLabel } from './format';
 import type { DateRange } from './dateMath';
@@ -14,11 +14,30 @@ export interface DateRangeSliderProps {
   onPan: (deltaDays: number) => void;
   canPanEarlier: boolean;
   canPanLater: boolean;
+  /** The range-shift buttons: `range` moved its own length in activity-days, the window
+   *  following it — or null when it can't move (useActivityDays' `shift`). */
+  onShift: (range: DateRange, dir: -1 | 1) => DateRange | null;
+  canShift: (range: DateRange, dir: -1 | 1) => boolean;
   value: DateRange;
   onChange: (next: DateRange) => void;
 }
 
 type Knob = 'start' | 'end';
+
+type Tick = 'day' | 'gap' | 'month';
+
+const DAY_MS = 86_400_000;
+
+/** The kind of tick on each slot boundary, 0..days.length — the two outer edges are plain. */
+function ticksOf(days: HistogramBucket[]): Tick[] {
+  return Array.from({ length: days.length + 1 }, (_, b) => {
+    const before = days[b - 1]?.date;
+    const after = days[b]?.date;
+    if (!before || !after) return 'day';
+    if (before.slice(0, 7) !== after.slice(0, 7)) return 'month';
+    return Date.parse(after) - Date.parse(before) > DAY_MS ? 'gap' : 'day';
+  });
+}
 
 /** How far one Earlier/Later tap moves the window, in activity-days. */
 const STEP_DAYS = 5;
@@ -29,7 +48,7 @@ const REPEAT_INTERVAL_MS = 180;
 
 /**
  * The date-range control (`SPEC.md` FR-6), on the Activities tab alone: a plain two-knob slider
- * with Earlier/Later either side and the selected dates under it — the look of the Activities
+ * in one row, « ‹ track › », with the selected dates under it — the look of the Activities
  * panel's DistanceFilter.tsx (its `.activity-filters__track`/`__fill` rules) with finger-height
  * knobs. The same control on a desktop and a phone; only where it sits differs (index.css).
  *
@@ -57,12 +76,24 @@ const REPEAT_INTERVAL_MS = 180;
  *
  * Knob drags and held buttons render from a local draft and commit only on release, so the
  * activity list isn't refetched for every day passed.
+ *
+ * **Range shift.** The inner pair, ‹ ›, move the whole selection by its own length in
+ * activity-days, packed against the old range (rangeShift.ts), and the window follows — the
+ * outer pair, « » (Earlier/Later), move the scale. A tap commits;
+ * a hold repeats like Earlier/Later and commits on release.
+ *
+ * **Day marks.** A tick on every slot boundary — where a knob can land — taller where the month
+ * changes, and doubled (an axis break) where the two neighbouring activity-days aren't
+ * consecutive calendar days, so packed slots don't pass for an unbroken run. Ticks inside the
+ * selection take the accent.
  */
 export function DateRangeSlider({
   days,
   onPan,
   canPanEarlier,
   canPanLater,
+  onShift,
+  canShift,
   value,
   onChange,
 }: DateRangeSliderProps) {
@@ -127,8 +158,8 @@ export function DateRangeSlider({
 
   // Latest values for the press-and-hold timer and the pull effect, which outlive the render
   // that started them.
-  const live = useRef({ current, canPanEarlier, canPanLater, onPan, startOf, endOf, n });
-  live.current = { current, canPanEarlier, canPanLater, onPan, startOf, endOf, n };
+  const live = useRef({ current, canPanEarlier, canPanLater, onPan, onShift, startOf, endOf, n });
+  live.current = { current, canPanEarlier, canPanLater, onPan, onShift, startOf, endOf, n };
 
   const commit = (next: DateRange | null) => {
     setDraft(null);
@@ -167,6 +198,16 @@ export function DateRangeSlider({
     return true;
   };
 
+  /** Moves the selection its own length; false when it can't move that way (yet). */
+  const shiftStep = (dir: -1 | 1): boolean => {
+    const now = live.current;
+    const next = now.onShift(now.current, dir);
+    if (!next) return false;
+    now.current = next;
+    setDraft(next);
+    return true;
+  };
+
   /** Ends a gesture: commits now, or once a pan still in flight has landed. */
   const finish = () => {
     if (panRef.current) panRef.current.commit = true;
@@ -181,14 +222,15 @@ export function DateRangeSlider({
     finish();
   };
 
-  const startRepeat = (dir: -1 | 1, event: ReactPointerEvent<HTMLButtonElement>) => {
+  /** Press-and-hold on any of the four buttons: `action` once now, then repeating. */
+  const startRepeat = (action: () => boolean, event: ReactPointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
-    step(dir);
+    action();
     const tick = () => {
       // Reaching the end disables the button, and a disabled button gets no pointerup — so
       // the hold ends (and commits) here instead.
-      if (!step(dir)) return stopRepeat();
+      if (!action()) return stopRepeat();
       if (repeatRef.current) repeatRef.current.timer = window.setTimeout(tick, REPEAT_INTERVAL_MS);
     };
     repeatRef.current = { timer: window.setTimeout(tick, REPEAT_DELAY_MS) };
@@ -204,13 +246,34 @@ export function DateRangeSlider({
       aria-label={dir < 0 ? tn('slider.days_earlier', STEP_DAYS) : tn('slider.days_later', STEP_DAYS)}
       title={dir < 0 ? t('slider.earlier') : t('slider.later')}
       disabled={dir < 0 ? !canPanEarlier : !canPanLater}
-      onPointerDown={(event) => startRepeat(dir, event)}
+      onPointerDown={(event) => startRepeat(() => step(dir), event)}
       onPointerUp={stopRepeat}
       onPointerCancel={stopRepeat}
       // Pointer presses are handled above; this is the keyboard's Enter/Space (detail 0).
       onClick={(event: ReactMouseEvent) => {
         if (event.detail !== 0) return;
         step(dir);
+        finish();
+      }}
+    >
+      {dir < 0 ? <ChevronsLeft size={16} /> : <ChevronsRight size={16} />}
+    </button>
+  );
+
+  const shiftButton = (dir: -1 | 1) => (
+    <button
+      type="button"
+      className="date-range-slider__page date-range-slider__page--shift"
+      data-testid={dir < 0 ? 'date-range-slider-shift-earlier' : 'date-range-slider-shift-later'}
+      aria-label={dir < 0 ? t('slider.shift_earlier') : t('slider.shift_later')}
+      title={dir < 0 ? t('slider.shift_earlier') : t('slider.shift_later')}
+      disabled={!canShift(current, dir)}
+      onPointerDown={(event) => startRepeat(() => shiftStep(dir), event)}
+      onPointerUp={stopRepeat}
+      onPointerCancel={stopRepeat}
+      onClick={(event: ReactMouseEvent) => {
+        if (event.detail !== 0) return;
+        shiftStep(dir);
         finish();
       }}
     >
@@ -287,6 +350,7 @@ export function DateRangeSlider({
     <div className="date-range-slider" data-testid="date-range-slider">
       <div className="date-range-slider__row">
         {pageButton(-1)}
+        {shiftButton(-1)}
         <div
           ref={trackRef}
           className="date-range-slider__track"
@@ -297,6 +361,15 @@ export function DateRangeSlider({
           onPointerCancel={onPointerUp}
         >
           <div className="activity-filters__track" />
+          {ticksOf(days).map((tick, b) => (
+            <span
+              key={b}
+              className={`date-range-slider__tick date-range-slider__tick--${tick}${
+                b >= clamp(start) && b <= clamp(end) ? ' date-range-slider__tick--selected' : ''
+              }`}
+              style={{ left: `${percent(b)}%` }}
+            />
+          ))}
           {n > 0 && clamp(end) > clamp(start) && (
             <div
               className="activity-filters__fill"
@@ -306,6 +379,7 @@ export function DateRangeSlider({
           {knob('start')}
           {knob('end')}
         </div>
+        {shiftButton(1)}
         {pageButton(1)}
       </div>
       <div className="date-range-slider__labels" data-testid="date-range-slider-labels">

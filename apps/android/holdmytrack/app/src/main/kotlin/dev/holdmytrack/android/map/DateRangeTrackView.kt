@@ -10,7 +10,24 @@ import android.view.MotionEvent
 import android.view.View
 import androidx.core.graphics.ColorUtils
 import dev.holdmytrack.android.R
+import java.time.LocalDate
 import kotlin.math.roundToInt
+
+/** A day mark's kind: plain, a month change (taller), or skipped calendar days (doubled). */
+enum class Tick { DAY, GAP, MONTH }
+
+/** The tick on each slot boundary of [days] (YYYY-MM-DD, ascending), 0..days.size — the two
+ *  outer edges are plain. The web's `ticksOf` in `DateRangeSlider.tsx`. */
+fun ticksOf(days: List<String>): List<Tick> = List(days.size + 1) { b ->
+    val before = days.getOrNull(b - 1)
+    val after = days.getOrNull(b)
+    when {
+        before == null || after == null -> Tick.DAY
+        before.take(7) != after.take(7) -> Tick.MONTH
+        LocalDate.parse(before).plusDays(1) != LocalDate.parse(after) -> Tick.GAP
+        else -> Tick.DAY
+    }
+}
 
 /**
  * The date-range slider's track: a thin line, the selected stretch in the accent colour, and two
@@ -20,7 +37,8 @@ import kotlin.math.roundToInt
  * for a knob off either side of the window, which isn't drawn), and nothing about dates;
  * `DateRangeSlider` turns those into a selection. The whole view is the touch target: a press
  * goes to [onPress] with the nearest boundary, a drag to [onDrag], a release to [onRelease].
- * The line is inset by half a knob, so a knob on either end stays whole.
+ * The line is inset by half a knob, so a knob on either end stays whole. A day mark sits on
+ * every boundary ([ticks]), in the accent between the knobs.
  */
 class DateRangeTrackView @JvmOverloads constructor(
     context: Context,
@@ -33,6 +51,7 @@ class DateRangeTrackView @JvmOverloads constructor(
         private set
     var end = 0
         private set
+    private var ticks: List<Tick> = emptyList()
 
     var onPress: ((boundary: Int) -> Unit)? = null
     var onDrag: ((boundary: Int) -> Unit)? = null
@@ -51,6 +70,16 @@ class DateRangeTrackView @JvmOverloads constructor(
         color = ColorUtils.setAlphaComponent(context.getColor(R.color.hmt_ink), (0.12f * 255).roundToInt())
     }
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accent }
+    private val tickWidth = density
+    private val tickHeight = 8 * density
+    private val monthTickHeight = 14 * density
+    private val gapTickSpread = 3 * density
+    private val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = ColorUtils.setAlphaComponent(context.getColor(R.color.hmt_ink), (0.28f * 255).roundToInt())
+    }
+    private val monthTickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = ColorUtils.setAlphaComponent(context.getColor(R.color.hmt_ink), (0.45f * 255).roundToInt())
+    }
 
     /** The web's `--fm-shadow-sm`: 0 1px 4px, ink at 25%. */
     private val knobPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -69,11 +98,12 @@ class DateRangeTrackView @JvmOverloads constructor(
     }
     private val rect = RectF()
 
-    fun set(slots: Int, start: Int, end: Int) {
-        if (slots == this.slots && start == this.start && end == this.end) return
+    fun set(slots: Int, start: Int, end: Int, ticks: List<Tick>) {
+        if (slots == this.slots && start == this.start && end == this.end && ticks == this.ticks) return
         this.slots = slots
         this.start = start
         this.end = end
+        this.ticks = ticks
         invalidate()
     }
 
@@ -96,6 +126,14 @@ class DateRangeTrackView @JvmOverloads constructor(
         if (clamp(end) > clamp(start)) {
             rect.set(xOf(start), cy - lineHeight / 2, xOf(end), cy + lineHeight / 2)
             canvas.drawRoundRect(rect, lineRadius, lineRadius, fillPaint)
+        }
+        ticks.forEachIndexed { b, tick ->
+            val selected = b >= clamp(start) && b <= clamp(end)
+            val paint = if (selected) fillPaint else if (tick == Tick.MONTH) monthTickPaint else tickPaint
+            val half = (if (tick == Tick.MONTH) monthTickHeight else tickHeight) / 2
+            val x = xOf(b)
+            val xs = if (tick == Tick.GAP) floatArrayOf(x - gapTickSpread / 2, x + gapTickSpread / 2) else floatArrayOf(x)
+            for (at in xs) canvas.drawRect(at - tickWidth / 2, cy - half, at + tickWidth / 2, cy + half, paint)
         }
         for (boundary in intArrayOf(start, end)) {
             if (boundary < 0 || boundary > slots) continue

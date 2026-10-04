@@ -123,6 +123,8 @@ export const en = {
   'slider.earlier': 'Earlier',
   'slider.end': 'End date',
   'slider.later': 'Later',
+  'slider.shift_earlier': 'Move the range earlier',
+  'slider.shift_later': 'Move the range later',
   'slider.start': 'Start date',
   'map.drop_files': 'Drop to upload: .gpx, .fit, .tcx or a .zip',
   'map.level.fog.city': 'City view — cleared exactly where you\'ve been',

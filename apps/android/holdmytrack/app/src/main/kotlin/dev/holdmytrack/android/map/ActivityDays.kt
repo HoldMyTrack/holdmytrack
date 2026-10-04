@@ -70,6 +70,44 @@ class ActivityDays(private val windowDays: Int, private val onChange: (reloaded:
     val canPanEarlier get() = start > 0 || hasEarlier
     val canPanLater get() = start < maxStart
 
+    /**
+     * The range-shift buttons ([shiftRange]): [range] moved its own length in activity days,
+     * with the window moved just enough to show it — or null when there's nothing further that
+     * way, or the days it needs are still loading (the next page is asked for; ask again).
+     */
+    fun shift(range: DateRange, dir: Int): DateRange? {
+        val dates = days.map { it.date }
+        val next = when (val result = shiftRange(dates, hasEarlier, range, dir)) {
+            is RangeShift.Shifted -> result.range
+            RangeShift.Load -> {
+                extendEarlier()
+                return null
+            }
+            RangeShift.None -> return null
+        }
+        // Move the window only as far as it takes to show the new range; one longer than the
+        // window shows its leading edge, the end it moved toward.
+        val first = dates.indexOf(next.from)
+        val last = dates.indexOf(next.to)
+        val start = start
+        var left = when {
+            last - first + 1 > windowDays -> if (dir < 0) first else last - windowDays + 1
+            first < start -> first
+            last >= start + windowDays -> last - windowDays + 1
+            else -> start
+        }
+        left = left.coerceIn(0, maxStart)
+        if (left != start) {
+            anchor = if (left >= maxStart) null else dates[left]
+            changed(reloaded = false)
+        }
+        return next
+    }
+
+    /** Whether [shift] has anywhere to go — true while the days it needs are only unloaded. */
+    fun canShift(range: DateRange, dir: Int) =
+        shiftRange(days.map { it.date }, hasEarlier, range, dir) != RangeShift.None
+
     /** Re-reads from the newest end, back to the window's opening position. */
     fun reload() {
         val gen = ++generation

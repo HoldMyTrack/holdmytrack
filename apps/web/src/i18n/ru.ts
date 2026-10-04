@@ -140,6 +140,8 @@ export const ru: Record<MessageKey, string> & Record<string, string> = {
   'slider.earlier': 'Раньше',
   'slider.end': 'Дата конца',
   'slider.later': 'Позже',
+  'slider.shift_earlier': 'Сдвинуть диапазон раньше',
+  'slider.shift_later': 'Сдвинуть диапазон позже',
   'slider.start': 'Дата начала',
   'map.drop_files': 'Отпустите, чтобы загрузить: .gpx, .fit, .tcx или zip-архив',
   'map.level.fog.city': 'Город — открыто ровно там, где вы были',

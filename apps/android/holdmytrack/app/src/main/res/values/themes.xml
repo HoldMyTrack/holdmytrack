@@ -308,6 +308,13 @@
 
     <!-- A date under the date-range slider (.date-range-slider__labels): 12sp semibold, lightly
          tracked, at 65% ink. -->
+    <!-- The inner pair, ‹ ›, that shift the range (the web's page buttons, shift variant):
+         Earlier/Later's look, 4dp narrower to leave the track more width. -->
+    <style name="Widget.HoldMyTrack.Button.MapShift" parent="Widget.HoldMyTrack.Button.MapPage">
+        <item name="android:minWidth">28dp</item>
+        <item name="android:padding">@dimen/hmt_space_6</item>
+    </style>
+
     <style name="Widget.HoldMyTrack.DateRangeLabel" parent="">
         <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.LabelMedium</item>
         <item name="android:textColor">@color/hmt_ink_hint</item>

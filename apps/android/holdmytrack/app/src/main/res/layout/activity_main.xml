@@ -435,6 +435,15 @@
                     style="@style/Widget.HoldMyTrack.Button.MapPage"
                     android:layout_width="32dp"
                     android:layout_height="wrap_content"
+                    app:icon="@drawable/ic_chevrons_left" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/date_range_shift_earlier"
+                    style="@style/Widget.HoldMyTrack.Button.MapShift"
+                    android:layout_width="28dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/hmt_space_6"
+                    android:contentDescription="@string/date_range_shift_earlier"
                     app:icon="@drawable/ic_chevron_left" />
 
                 <dev.holdmytrack.android.map.DateRangeTrackView
@@ -446,11 +455,20 @@
                     android:layout_weight="1" />
 
                 <com.google.android.material.button.MaterialButton
+                    android:id="@+id/date_range_shift_later"
+                    style="@style/Widget.HoldMyTrack.Button.MapShift"
+                    android:layout_width="28dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="@dimen/hmt_space_6"
+                    android:contentDescription="@string/date_range_shift_later"
+                    app:icon="@drawable/ic_chevron_right" />
+
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/date_range_later"
                     style="@style/Widget.HoldMyTrack.Button.MapPage"
                     android:layout_width="32dp"
                     android:layout_height="wrap_content"
-                    app:icon="@drawable/ic_chevron_right" />
+                    app:icon="@drawable/ic_chevrons_right" />
             </LinearLayout>
 
             <!-- The selected dates, under the track's ends: the web's .date-range-slider__labels,

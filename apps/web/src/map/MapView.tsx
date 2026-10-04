@@ -430,6 +430,8 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     canPanLater,
     panBy,
     reveal: revealDay,
+    shift: shiftDays,
+    canShift,
     reload: reloadDays,
     generation: historyGeneration,
   } = useActivityDays();
@@ -1499,6 +1501,8 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
                 onPan: panBy,
                 canPanEarlier,
                 canPanLater,
+                onShift: shiftDays,
+                canShift,
                 value: selectedRange ?? { from: today, to: today },
                 onChange: changeSelectedRange,
               }}
