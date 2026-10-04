@@ -12,9 +12,9 @@ coverage:
       default:
         informational: true
 
-comment:
-  layout: "condensed_header, diff, flags"
-  require_changes: true
+# No PR comment: the badges, the status checks and codecov.io carry the numbers, and a comment
+# on every PR only added a notification email each time.
+comment: false
 
 # Paths are reported relative to the repo root; the Go module lives in services/server,
 # JaCoCo reports the Android sources by package path alone, and c8 reports the web app's
