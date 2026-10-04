@@ -407,6 +407,10 @@ func seedDemoCaptures(ctx context.Context, pool *pgxpool.Pool, userID string, ca
 // manifest doesn't name is left alone; --reset is what removes those. One transaction, and one
 // tile-version bump if any Story's activities changed (§4.2.6): the tracks tiles take a
 // `story` filter.
+//
+// Each Story is dated the day after its last activity ended, as someone would make one after a
+// trip, rather than the moment of the seed: the Stories are listed newest first, so they then
+// read in the order they were visited, not the manifest's.
 func seedDemoStories(ctx context.Context, pool *pgxpool.Pool, userID string, stories []demoManifestStory, activityIDs map[string]string) error {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
@@ -445,6 +449,14 @@ func seedDemoStories(ctx context.Context, pool *pgxpool.Pool, userID string, sto
 		}
 		if removed.RowsAffected() > 0 || added.RowsAffected() > 0 {
 			changed = true
+		}
+		if _, err := tx.Exec(ctx, `
+			UPDATE stories s SET created_at = d.at, updated_at = d.at
+			FROM (SELECT MAX(started_at + make_interval(secs => COALESCE(duration_seconds, 0))) + INTERVAL '1 day' AS at
+			      FROM activities WHERE id = ANY($2::uuid[])) d
+			WHERE s.id = $1 AND (s.created_at IS DISTINCT FROM d.at OR s.updated_at IS DISTINCT FROM d.at)`,
+			storyID, ids); err != nil {
+			return fmt.Errorf("story %q: %w", st.Name, err)
 		}
 	}
 	if changed {

@@ -35,12 +35,12 @@ The phases below sit inside three milestones (`VISION.md` §5, ADR-0031):
 
 ### Accurate country and region borders — before the public launch
 
-Country/Region matching (`IMPLEMENTATION.md` §4.2.4) uses Natural Earth's 1:50m countries and 1:10m states/provinces, small enough to embed in the server, at the cost of borders that can be about a kilometre off. That cost lands on everyone who lives or travels near a country or region border: a walk in Niagara Falls, NY lands inside Canada and Ontario by up to 843 m, so the demo's Niagara Falls trip shows Canada although it never crossed the border.
+Country/Region matching (`IMPLEMENTATION.md` §4.2.4) uses Natural Earth's 1:50m countries and 1:10m states/provinces, small enough to embed in the server, at the cost of borders that can be about a kilometre off. That cost lands on everyone who lives or travels near a country or region border: a walk in Niagara Falls, NY lands inside Canada and Ontario by up to 843 m, so the demo's Niagara Falls trip shows Canada although it never crossed the border. Coastlines and small countries are off too: the demo's Italy Story has a walk along the seafront at Ostia that matches no country at all, its whole track out at sea, and its Vatican City walk shows only Italy, while a drive past it shows Vatican City, whose outline sits about 1.6 km west of the real one.
 
 - [ ] Choose more accurate boundary data (geoBoundaries, or OpenStreetMap-based outlines) for countries and regions, and check its licence fits a public repository and a free service.
 - [ ] Load it without bloating the repository and server image: likely fetched at deploy time by `seed-admin-boundaries` rather than embedded (`internal/geo/geo.go`), with its seed time and database size measured.
 - [ ] Keep the Country/Region tiles fast, since they are drawn live from these polygons per request (ADR-0008): likely a simplified copy for low zooms, with the detailed one used for matching at ingest.
-- [ ] Re-match existing activities against the new boundaries, and confirm the Niagara Falls trip shows only the United States and New York.
+- [ ] Re-match existing activities against the new boundaries, and confirm the Niagara Falls trip shows only the United States and New York, and the Italy Story's Vatican City walk and Ostia seafront walk show Vatican City and Italy.
 
 ### Sign in with Facebook — built, not live
 
