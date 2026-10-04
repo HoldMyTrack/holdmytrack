@@ -29,3 +29,24 @@ func TestSetTileCacheControl(t *testing.T) {
 		})
 	}
 }
+
+func TestClientGone(t *testing.T) {
+	r := httptest.NewRequest("GET", "/tiles/v1/heatmap/12/1114/1529.png", nil)
+	w := httptest.NewRecorder()
+	if clientGone(w, r) {
+		t.Fatal("clientGone = true for a live request")
+	}
+	if w.Code != 200 || w.Body.Len() != 0 {
+		t.Errorf("a live request was answered: %d %q", w.Code, w.Body.String())
+	}
+
+	ctx, cancel := context.WithCancel(r.Context())
+	cancel()
+	w = httptest.NewRecorder()
+	if !clientGone(w, r.WithContext(ctx)) {
+		t.Fatal("clientGone = false for a cancelled request")
+	}
+	if w.Code != statusClientClosedRequest {
+		t.Errorf("status %d, want %d", w.Code, statusClientClosedRequest)
+	}
+}

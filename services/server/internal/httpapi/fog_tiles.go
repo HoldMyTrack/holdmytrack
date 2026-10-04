@@ -36,12 +36,18 @@ func (s *Server) handleFogTile(w http.ResponseWriter, r *http.Request) {
 		userID, z, x, y,
 	).Scan(&objectKey)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		if clientGone(w, r) {
+			return
+		}
 		s.log.Error("fog tile query failed", "err", err, "z", z, "x", x, "y", y)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	mask, err := loadMaskOrBlank(ctx, s.store, objectKey)
 	if err != nil {
+		if clientGone(w, r) {
+			return
+		}
 		s.log.Error("fog tile fetch failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -50,7 +56,6 @@ func (s *Server) handleFogTile(w http.ResponseWriter, r *http.Request) {
 	rgba := fog.RenderFogPNG(mask, fog.VeilForTheme(r.URL.Query().Get("theme")))
 	w.Header().Set("Content-Type", "image/png")
 	setTileCacheControl(w, r)
-	if err := png.Encode(w, rgba); err != nil {
-		s.log.Error("fog tile encode failed", "err", err)
-	}
+	// Encoding an in-memory image fails only on the write, which is the client having gone.
+	_ = png.Encode(w, rgba)
 }
