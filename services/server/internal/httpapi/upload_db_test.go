@@ -5,15 +5,18 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/unpack"
 )
 
 const resumeGPX = `<?xml version="1.0"?>
@@ -23,7 +26,8 @@ const resumeGPX = `<?xml version="1.0"?>
 <trkpt lat="50.0020" lon="10.0020"><time>2026-05-01T10:02:00Z</time></trkpt>
 </trkseg></trk></gpx>`
 
-func (d *dbTest) uploadFile(as account, name string, data []byte) uploadResponse {
+// uploadRaw posts one file to the upload endpoint as the given account.
+func (d *dbTest) uploadRaw(as account, name string, data []byte) *httptest.ResponseRecorder {
 	d.t.Helper()
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
@@ -35,6 +39,12 @@ func (d *dbTest) uploadFile(as account, name string, data []byte) uploadResponse
 	req.Header.Set("Authorization", bearerPrefix+as.session)
 	rec := httptest.NewRecorder()
 	d.srv.ServeHTTP(rec, req)
+	return rec
+}
+
+func (d *dbTest) uploadFile(as account, name string, data []byte) uploadResponse {
+	d.t.Helper()
+	rec := d.uploadRaw(as, name, data)
 	var resp uploadResponse
 	if rec.Code != http.StatusOK && rec.Code != http.StatusAccepted {
 		d.t.Fatalf("upload: status %d: %s", rec.Code, rec.Body.String())
@@ -63,6 +73,30 @@ func (d *dbTest) latestIngestJob(as account) ingest.Job {
 		d.t.Fatal(err)
 	}
 	return j
+}
+
+// runUnpack runs the account's newest unpack job as the worker would, and returns the state it
+// finished with.
+func (d *dbTest) runUnpack(as account) unpack.State {
+	d.t.Helper()
+	ctx := context.Background()
+	var id int64
+	var payload []byte
+	if err := d.pool.QueryRow(ctx,
+		`SELECT id, payload FROM jobs WHERE user_id = $1 AND kind = 'unpack' ORDER BY id DESC LIMIT 1`, as.id).Scan(&id, &payload); err != nil {
+		d.t.Fatal(err)
+	}
+	if err := unpack.Run(ctx, d.pool, d.srv.store, id, payload); err != nil {
+		d.t.Fatal(err)
+	}
+	var j unpack.Job
+	if err := d.pool.QueryRow(ctx, `SELECT payload FROM jobs WHERE id = $1`, id).Scan(&payload); err != nil {
+		d.t.Fatal(err)
+	}
+	if err := json.Unmarshal(payload, &j); err != nil {
+		d.t.Fatal(err)
+	}
+	return j.State
 }
 
 // An ingest cut off after its activity row commits isn't "already processed": uploading the
@@ -115,13 +149,15 @@ func TestInterruptedIngestResumes(t *testing.T) {
 	}
 }
 
-// A zip larger than the in-memory multipart threshold is read from the temp file it spilled
-// to, not copied into memory, and still unpacks. Measured as what the request allocates, which
-// stays a fixed multiple of the threshold (the multipart reader's own buffer, grown to it before
-// spilling) however large the archive; keeping the part in memory and copying it whole grew
-// with the archive, here to about 500 MiB.
+// A zip larger than the in-memory multipart threshold is stored from the temp file it spilled
+// to, not copied into memory. Measured as what the request allocates, which stays a fixed
+// multiple of the threshold (the multipart reader's own buffer, grown to it before spilling)
+// however large the archive; keeping the part in memory and copying it whole grew with the
+// archive, here to about 500 MiB. The store discards what it's sent: an in-memory one would
+// count its own copy of the archive against the request.
 func TestLargeZipUploadIsReadInPlace(t *testing.T) {
-	d := newDBTestWithS3(t, newMemS3())
+	s3 := &discardS3{}
+	d := newDBTestWithS3(t, s3)
 	me := d.newAccount(false)
 
 	var archive bytes.Buffer
@@ -147,17 +183,127 @@ func TestLargeZipUploadIsReadInPlace(t *testing.T) {
 	d.srv.ServeHTTP(rec, req)
 	runtime.ReadMemStats(&after)
 
-	var resp zipUploadResponse
+	var resp archiveUploadResponse
 	d.decode(rec, http.StatusAccepted, &resp)
 	if allocated := after.TotalAlloc - before.TotalAlloc; allocated > 6*multipartMemoryBytes {
 		t.Errorf("the request allocated %d MiB for a %d MiB archive", allocated>>20, archive.Len()>>20)
 	}
-	statuses := map[string]string{}
-	for _, f := range resp.Files {
-		statuses[f.Filename] = f.Status
+	if got := s3.received.Load(); got < int64(archive.Len()) {
+		t.Errorf("the store received %d bytes of a %d-byte archive", got, archive.Len())
 	}
-	if statuses["ride.gpx"] != "enqueued" || statuses["padding.bin"] != "skipped" {
-		t.Fatalf("files = %+v", resp.Files)
+}
+
+// An archive upload is answered once the archive is stored, with one `unpack` job; the job
+// enqueues its activity files as ingest jobs under the archive's batch, counts what it
+// skipped or already had, and removes the archive.
+func TestZipUploadIsUnpackedByTheWorker(t *testing.T) {
+	s3 := newMemS3()
+	d := newDBTestWithS3(t, s3)
+	me := d.newAccount(false)
+	ctx := context.Background()
+
+	upload := func(files map[string]string) archiveUploadResponse {
+		var archive bytes.Buffer
+		zw := zip.NewWriter(&archive)
+		for name, content := range files {
+			w, _ := zw.Create(name)
+			w.Write([]byte(content))
+		}
+		zw.Close()
+		var resp archiveUploadResponse
+		d.decode(d.uploadRaw(me, "export.zip", archive.Bytes()), http.StatusAccepted, &resp)
+		if resp.Status != "zip_accepted" || resp.Batch == "" {
+			t.Fatalf("response = %+v", resp)
+		}
+		if !s3.Has(unpack.Key(me.id, resp.Batch)) {
+			t.Fatal("the archive wasn't stored")
+		}
+		var ingests int
+		if err := d.pool.QueryRow(ctx, `SELECT count(*) FROM jobs WHERE user_id = $1 AND kind = 'ingest' AND payload->>'batch' = $2`, me.id, resp.Batch).Scan(&ingests); err != nil || ingests != 0 {
+			t.Fatalf("ingest jobs before unpacking: %d, %v", ingests, err)
+		}
+		return resp
+	}
+
+	resp := upload(map[string]string{"rides/ride.gpx": resumeGPX, "notes.txt": "hello"})
+	if st := d.runUnpack(me); st.Skipped != 1 || st.Already != 0 || st.Truncated {
+		t.Fatalf("state = %+v, want notes.txt skipped", st)
+	}
+	if s3.Has(unpack.Key(me.id, resp.Batch)) {
+		t.Fatal("the archive is still stored after unpacking")
+	}
+	j := d.latestIngestJob(me)
+	if j.SourceDetail != "ride.gpx" || j.Source != "upload" || j.Batch != resp.Batch || j.BatchTitle != "export.zip" {
+		t.Fatalf("ingest job = %+v", j)
+	}
+	if res, err := ingest.Process(ctx, d.pool, d.srv.store, j); err != nil || !res.Persisted {
+		t.Fatalf("ingest: %+v, %v", res, err)
+	}
+
+	upload(map[string]string{"ride.gpx": resumeGPX})
+	if st := d.runUnpack(me); st.Already != 1 || st.Skipped != 0 {
+		t.Fatalf("state = %+v, want ride.gpx already imported", st)
+	}
+}
+
+// An unpack cut off partway — a deploy — resumes from its saved cursor: the files it had
+// already enqueued aren't enqueued a second time.
+func TestUnpackResumesFromItsCursor(t *testing.T) {
+	d := newDBTestWithS3(t, newMemS3())
+	me := d.newAccount(false)
+	ctx := context.Background()
+
+	var archive bytes.Buffer
+	zw := zip.NewWriter(&archive)
+	for _, name := range []string{"a.gpx", "b.txt", "c.gpx"} {
+		w, _ := zw.Create(name)
+		w.Write([]byte(strings.Replace(resumeGPX, "<trk>", "<trk><name>"+name+"</name>", 1)))
+	}
+	zw.Close()
+	var resp archiveUploadResponse
+	d.decode(d.uploadRaw(me, "export.zip", archive.Bytes()), http.StatusAccepted, &resp)
+
+	// The state an earlier run left when it was cut off after its first chunk: a.gpx
+	// enqueued, one unit walked.
+	if _, err := d.pool.Exec(ctx, `UPDATE jobs SET payload = jsonb_set(payload, '{state}', '{"cursor": 1}') WHERE user_id = $1 AND kind = 'unpack'`, me.id); err != nil {
+		t.Fatal(err)
+	}
+	if st := d.runUnpack(me); st.Cursor != 3 || st.Skipped != 1 {
+		t.Fatalf("state = %+v, want cursor 3 and b.txt skipped", st)
+	}
+	var names []string
+	rows, err := d.pool.Query(ctx, `SELECT payload->>'source_detail' FROM jobs WHERE user_id = $1 AND kind = 'ingest' ORDER BY id`, me.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var n string
+		rows.Scan(&n)
+		names = append(names, n)
+	}
+	if strings.Join(names, ",") != "c.gpx" {
+		t.Fatalf("ingest jobs = %v, want only c.gpx", names)
+	}
+}
+
+// discardS3 accepts single and multipart PUTs, reading each body through without keeping it,
+// and counts the bytes it was sent.
+type discardS3 struct{ received atomic.Int64 }
+
+func (s *discardS3) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	w.Header().Set("Content-Type", "application/xml")
+	switch _, starting := q["uploads"]; {
+	case q.Has("location"):
+		io.WriteString(w, `<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`)
+	case r.Method == http.MethodPost && starting:
+		io.WriteString(w, `<InitiateMultipartUploadResult><UploadId>1</UploadId></InitiateMultipartUploadResult>`)
+	case r.Method == http.MethodPost:
+		io.WriteString(w, `<CompleteMultipartUploadResult><Bucket>test</Bucket><Key>k</Key><ETag>"0"</ETag></CompleteMultipartUploadResult>`)
+	case r.Method == http.MethodPut:
+		n, _ := io.Copy(io.Discard, r.Body)
+		s.received.Add(n)
+		w.Header().Set("ETag", `"`+q.Get("partNumber")+`"`)
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
@@ -44,6 +45,12 @@ type Enqueued struct {
 	AlreadyProcessed bool
 }
 
+// Querier is what EnqueueRaw runs on: the pool, or a transaction the caller commits.
+type Querier interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+}
+
 // EnqueueRaw adds an `ingest` job for each item the account doesn't already have, with the
 // item's bytes in the job's own `raw` column rather than in object storage: a request answers
 // after two queries however many items it carries, and the worker moves the bytes to their
@@ -53,7 +60,7 @@ type Enqueued struct {
 // that is Process's ON CONFLICT DO NOTHING, which still holds when two identical uploads race
 // past this check. It's scoped by source, matching activities' (user_id, source, external_id)
 // unique index. The jobs go in with one INSERT, so either every new item is enqueued or none.
-func EnqueueRaw(ctx context.Context, pool *pgxpool.Pool, userID string, items []RawItem) ([]Enqueued, error) {
+func EnqueueRaw(ctx context.Context, db Querier, userID string, items []RawItem) ([]Enqueued, error) {
 	out := make([]Enqueued, len(items))
 	if len(items) == 0 {
 		return out, nil
@@ -78,7 +85,7 @@ func EnqueueRaw(ctx context.Context, pool *pgxpool.Pool, userID string, items []
 		out[i].ExternalID = ids[i]
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := db.Query(ctx, `
 		SELECT a.source, a.external_id FROM activities a
 		JOIN unnest($2::text[], $3::text[]) AS t(source, external_id)
 		  ON a.source = t.source AND a.external_id = t.external_id
@@ -127,7 +134,7 @@ func EnqueueRaw(ctx context.Context, pool *pgxpool.Pool, userID string, items []
 	if len(payloads) == 0 {
 		return out, nil
 	}
-	if _, err := pool.Exec(ctx, `
+	if _, err := db.Exec(ctx, `
 		INSERT INTO jobs (kind, user_id, payload, raw)
 		SELECT 'ingest', $1, p::jsonb, r FROM unnest($2::text[], $3::bytea[]) AS t(p, r)`,
 		userID, payloads, raws); err != nil {
@@ -137,13 +144,17 @@ func EnqueueRaw(ctx context.Context, pool *pgxpool.Pool, userID string, items []
 }
 
 // Enqueuer feeds EnqueueRaw a long run of items — an archive's files — a chunk at a time, so
-// neither the bytes held in memory nor one INSERT grows with the archive.
+// neither the bytes held in memory nor one INSERT grows with the archive. Each chunk is its
+// own transaction.
 type Enqueuer struct {
 	Pool   *pgxpool.Pool
 	UserID string
 	// Done is called once per added item, in the order added, with the item's sequence
-	// number (0 for the first Add) and either its result or the error that failed its chunk.
-	Done func(seq int, res Enqueued, err error)
+	// number (0 for the first Add) and its result, inside its chunk's transaction.
+	Done func(seq int, res Enqueued)
+	// Commit, when set, runs last in each chunk's transaction, so a caller can record how far
+	// it has got in the same commit as the jobs that got it there.
+	Commit func(ctx context.Context, tx pgx.Tx) error
 
 	pending []RawItem
 	bytes   int
@@ -158,29 +169,44 @@ const (
 )
 
 // Add queues an item, enqueuing the chunk once it's full.
-func (e *Enqueuer) Add(ctx context.Context, it RawItem) {
+func (e *Enqueuer) Add(ctx context.Context, it RawItem) error {
 	e.pending = append(e.pending, it)
 	e.bytes += len(it.Data)
 	if len(e.pending) >= enqueueChunkItems || e.bytes >= enqueueChunkBytes {
-		e.Flush(ctx)
+		return e.Flush(ctx)
 	}
+	return nil
 }
 
-// Flush enqueues whatever is queued.
-func (e *Enqueuer) Flush(ctx context.Context) {
+// Flush enqueues whatever is queued. An error leaves the chunk unenqueued, and the Enqueuer
+// isn't to be used further.
+func (e *Enqueuer) Flush(ctx context.Context) error {
 	if len(e.pending) == 0 {
-		return
+		return nil
 	}
-	res, err := EnqueueRaw(ctx, e.Pool, e.UserID, e.pending)
-	for i := range e.pending {
-		var r Enqueued
-		if err == nil {
-			r = res[i]
+	tx, err := e.Pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("ingest: begin enqueue: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
+	res, err := EnqueueRaw(ctx, tx, e.UserID, e.pending)
+	if err != nil {
+		return err
+	}
+	for i := range res {
+		e.Done(e.seq+i, res[i])
+	}
+	if e.Commit != nil {
+		if err := e.Commit(ctx, tx); err != nil {
+			return err
 		}
-		e.Done(e.seq, r, err)
-		e.seq++
 	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("ingest: commit enqueue: %w", err)
+	}
+	e.seq += len(e.pending)
 	e.pending, e.bytes = nil, 0
+	return nil
 }
 
 // PromoteRaw writes a job's inline raw payload (EnqueueRaw) to its raw key and clears it from

@@ -25,6 +25,7 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mapstyle"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/metrics"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/unpack"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 )
 
@@ -45,21 +46,6 @@ const maxZipUploadBytes = 512 << 20 // 512 MiB
 // a whole archive in RAM, and the zip branch then copied it again — about 1 GiB per upload,
 // so two or three large exports at once could get the API killed for out-of-memory.
 const multipartMemoryBytes = 32 << 20
-
-// maxZipEntries bounds how many files inside one archive handleZipUpload will process — not
-// a claim that a real import can't have more, just where this server stops rather than
-// enqueueing an unbounded number of jobs from one request. §5.1's "one bad file in a bulk
-// import cannot abort the batch" still holds beneath this cap; this is a different, coarser
-// limit on the batch's total size.
-const maxZipEntries = 5000
-
-// maxZipEntryBytes bounds any single file *inside* a zip the same way maxUploadBytes bounds
-// a plain upload — checked against the entry's own declared size before it's decompressed at
-// all (§5.1's zip-bomb defense), and again against how much is actually read, since a
-// declared size is something a malformed or hostile archive can simply lie about.
-const maxZipEntryBytes = maxUploadBytes
-
-var allowedExt = map[string]bool{".gpx": true, ".fit": true, ".tcx": true}
 
 // corsAllowedOrigins lists the origins a credentialed cross-origin request may come from —
 // needed now that sessions are cookies (see serve's own doc comment for why "*" no
@@ -431,8 +417,8 @@ type uploadResponse struct {
 //
 // A `.zip` archive takes a different path entirely (handleZipUpload,
 // IMPLEMENTATION.md §4.0.1's bulk-import case) — bypassing §4.0.1's 20-file client-side
-// cap rather than being one more file subject to it, and producing many jobs from one
-// request instead of one. The body-size ceiling below has to accommodate whichever path a
+// cap rather than being one more file subject to it, and turning into many jobs, by way of
+// the worker's `unpack`, instead of one. The body-size ceiling below has to accommodate whichever path a
 // given request turns out to need before the multipart form (and therefore the filename) has
 // even been parsed, which is why it's sized for a zip archive regardless of what's actually
 // uploaded — a single non-zip file is still bounded to maxUploadBytes once read (below), so
@@ -470,14 +456,10 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 			httpErrorT(w, r, http.StatusBadRequest, "error.upload_bad_zip")
 			return
 		}
-		if isTakeoutArchive(zr) {
-			s.handleTakeoutUpload(w, r, zr, header.Filename)
-			return
-		}
-		s.handleZipUpload(w, r, zr, header.Filename)
+		s.handleZipUpload(w, r, zr, ra, header.Size, header.Filename)
 		return
 	}
-	if !allowedExt[ext] {
+	if !unpack.AllowedExt[ext] {
 		httpErrorT(w, r, http.StatusUnsupportedMediaType, "error.upload_type", "type", strconv.Quote(ext))
 		return
 	}

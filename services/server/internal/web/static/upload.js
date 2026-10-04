@@ -1,9 +1,10 @@
 // The header's Upload menu (templates/header.html, docs/SPEC.md FR-3.4), on every page: files
 // chosen here — or dropped on the map, which sends them here as an `hmt:upload-files` event —
 // upload one at a time with their progress, then show as "Processing…" until the server has
-// finished them, a .zip or Takeout export as one row counting its files. A finished import
-// leaves the menu, whatever became of it: what it came to is the header's Sync item's, the
-// /sync page, whose red dot this script also keeps — a failure the account hasn't seen there.
+// finished them, a .zip or Takeout export as one row, "Unpacking…" while the worker finds its
+// files and then counting them. A finished import leaves the menu, whatever became of it: what
+// it came to is the header's Sync item's, the /sync page, whose red dot this script also keeps
+// — a failure the account hasn't seen there.
 //
 // The server's GET /v1/uploads/active is the list of what's still processing — a phone sync's
 // too — and the count of unseen failures, read every POLL_MS while anything is in flight and
@@ -43,11 +44,31 @@
 
   var transfers = []; // { id, name, progress, sending } — files still to send, or being sent
   var active = []; // GET /v1/uploads/active's imports
+  // Archives this tab uploaded, by batch, until the server says what their files came to:
+  // kept for the session, so it survives going to another page while one unpacks.
+  var AWAITING_KEY = 'hmt-unpacking';
+  var awaiting = loadAwaiting(); // { batch: filename }
   var unseenFailures = 0;
   var noteList = []; // { id, text, error } — this page's own messages, dismissed one by one
   var uid = 0;
   var timer = null;
   var polling = false;
+
+  function loadAwaiting() {
+    try {
+      return JSON.parse(sessionStorage.getItem(AWAITING_KEY) || '{}') || {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveAwaiting() {
+    try {
+      sessionStorage.setItem(AWAITING_KEY, JSON.stringify(awaiting));
+    } catch (e) {
+      // Without storage, the notes only reach this page.
+    }
+  }
 
   function fill(template, values) {
     return template.replace(/\{(\w+)\}/g, function (m, key) {
@@ -84,7 +105,9 @@
       list.appendChild(row(t.name, t.sending ? fill(strings.uploading, { percent: Math.round(t.progress * 100) }) : strings.queued));
     });
     active.forEach(function (a) {
-      var status = a.total > 1 ? fill(strings.processing_count, { done: a.done, total: a.total }) : strings.processing;
+      var status = a.unpacking
+        ? strings.unpacking
+        : a.total > 1 ? fill(strings.processing_count, { done: a.done, total: a.total }) : strings.processing;
       list.appendChild(row(a.title, status));
     });
     var busy = transfers.length + active.length;
@@ -141,12 +164,28 @@
         });
         active = body.imports;
         unseenFailures = body.unseen_failures;
+        (body.unpacked || []).forEach(unpacked);
         render();
         if (finishedSome) changed();
       })
       .catch(function () {
         // The next tick tries again.
       });
+  }
+
+  // An archive this tab uploaded has been unpacked: what its files came to beyond the jobs it
+  // made. Neither already-imported nor skipped files become jobs, so neither shows on the Sync
+  // page: these notes are the only place they're told — and for an archive with nothing new,
+  // the only sign it arrived.
+  function unpacked(a) {
+    var filename = awaiting[a.batch];
+    if (filename === undefined) return;
+    delete awaiting[a.batch];
+    saveAwaiting();
+    if (a.error) note(fill(strings.failed_transfer, { filename: filename, error: a.error }), true);
+    if (a.already > 0) note(fill(strings.already_in, { filename: filename, n: a.already }));
+    if (a.skipped > 0) note(fill(strings.skipped, { filename: filename, n: a.skipped }));
+    if (a.truncated) note(fill(strings.truncated, { filename: filename }));
   }
 
   function schedule() {
@@ -200,18 +239,11 @@
           // An upload the server took; nothing more to say about it.
         }
         if (body.status === 'already_processed') note(fill(strings.already, { filename: file.name }));
-        if (body.status === 'zip_processed') {
-          var files = body.files || [];
-          var count = function (status) {
-            return files.filter(function (f) { return f.status === status; }).length;
-          };
-          // Neither kind becomes a job, so neither shows on the Sync page: this note is the only
-          // place they're told — and for an archive with nothing new, the only sign it arrived.
-          var already = count('already_processed');
-          var skipped = count('skipped');
-          if (already > 0) note(fill(strings.already_in, { filename: file.name, n: already }));
-          if (skipped > 0) note(fill(strings.skipped, { filename: file.name, n: skipped }));
-          if (body.truncated) note(fill(strings.truncated, { filename: file.name }));
+        // An archive is unpacked by the worker; its notes come with the import list once
+        // that's done (unpacked).
+        if (body.status === 'zip_accepted' && body.batch) {
+          awaiting[body.batch] = file.name;
+          saveAwaiting();
         }
         resolve();
       };

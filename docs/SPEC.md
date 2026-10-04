@@ -406,15 +406,16 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Inputs**: One `.zip` archive, at most 512 MiB compressed, containing at most 5,000 entries, each contained file at most 64 MiB.
 
 **Behavior**:
-1. User uploads a `.zip` file the same way as FR-3.1 (the Upload menu, or dropped on the map). While its files are processed it is one row in the Upload menu, counting them (FR-3.4).
-2. Server extracts the archive and processes each contained `.gpx`/`.fit`/`.tcx` file exactly as FR-3.1 does — one background parsing job per file.
-3. A file inside the archive with an unsupported extension, or that is oversized or unreadable, is skipped with a reason recorded; the rest of the batch proceeds regardless.
-4. The response reports how many files were accepted and how many were skipped (and why), plus whether the archive was truncated at the entry-count limit.
+1. User uploads a `.zip` file the same way as FR-3.1 (the Upload menu, or dropped on the map). The server answers as soon as the archive has arrived (`202`, `"zip_accepted"`, with the archive's batch id), whatever its size. From then on it is one row in the Upload menu, "Unpacking…" and then counting its files (FR-3.4).
+2. In the background, the server extracts the archive and processes each contained `.gpx`/`.fit`/`.tcx` file exactly as FR-3.1 does — one background parsing job per file.
+3. A file inside the archive with an unsupported extension, or that is oversized, unreadable or empty, is skipped; the rest of the batch proceeds regardless. Files past the 5,000th aren't read, and the archive is reported as truncated.
+4. Once the archive is unpacked, the Upload menu that sent it notes how many of its files were already uploaded before, how many were skipped, and whether it was truncated (FR-3.4).
 
 **Outputs**: One new `Activity` per successfully ingested contained file.
 
 **Error cases**:
-- Archive itself exceeds size/entry-count bounds, or is not a valid `.zip` → `400 Bad Request` / `413 Request Entity Too Large` (rejected before any entries are processed).
+- Archive itself exceeds the size bound, or is not a valid `.zip` → `413 Request Entity Too Large` / `400 Bad Request`, before anything is stored.
+- An archive that can't be unpacked after all (a Takeout export missing its data files) → the Upload menu notes the failure (FR-3.4).
 - An individual bad entry does not fail the request — see step 3.
 
 ### FR-3.3 Google Takeout import
@@ -440,14 +441,14 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Behavior** — an **Upload** button in the header of every page opens a menu of what is being imported right now:
 1. **Choose files…** opens the file picker (`.gpx`, `.fit`, `.tcx`, `.zip` — FR-3.1–FR-3.3); files dropped anywhere on the map, which shows a dashed "Drop to upload" cover while they're dragged over it, go to the same place. Choosing or dropping opens the menu. Under the button, the list of what it takes links "Google Health export" and "Google Maps Timeline .json" to their export guides (FR-10.5), in a new tab. A `.json`, a Google Maps Timeline export, isn't uploaded but opens that import's window on the map with the file in it (FR-3.10), going to the map first from any other page. One goes at a time, and on its own: further `.json` files, or other files chosen with it, are left out with a note saying so.
-2. The menu lists every import in progress: files waiting their turn ("Queued"), a file being sent ("Uploading 45%"), then each one the server is processing ("Processing…"), including activities synced from the phone, named after their source. A `.zip`, a Takeout export or a Google Maps Timeline import is one row counting its files or activities — "Processing 120 of 340". The button shows how many rows there are.
+2. The menu lists every import in progress: files waiting their turn ("Queued"), a file being sent ("Uploading 45%"), then each one the server is processing ("Processing…"), including activities synced from the phone, named after their source. A `.zip`, a Takeout export or a Google Maps Timeline import is one row counting its files or activities — "Processing 120 of 340"; an archive reads "Unpacking…" until the server has found all its files. The button shows how many rows there are.
 3. An import leaves the menu as soon as it has finished, whether it succeeded or failed; what it came to is the Sync page's (FR-3.9). The map refreshes itself as each finishes.
-4. Messages about this page's own uploads — a file already uploaded before, how many of a `.zip`'s or Takeout export's files were already uploaded before ("Already uploaded before, in Trips.zip: 12"), the files an archive skipped, too many files chosen, a file the server refused outright (with the reason) — show in the menu until dismissed, one by one.
+4. Messages about this browser tab's own uploads — a file already uploaded before, how many of a `.zip`'s or Takeout export's files were already uploaded before ("Already uploaded before, in Trips.zip: 12"), the files an archive skipped, an archive that couldn't be unpacked (with the reason), too many files chosen, a file the server refused outright (with the reason) — show in the menu until dismissed, one by one. An archive's come once it has been unpacked, on whichever page the tab is on by then.
 5. The menu closes on a click outside it or Escape. It has nothing about finished imports: those are the header's Sync item's (FR-3.9).
 6. What's in progress is read from the server every 2 seconds while anything is, every 20 otherwise.
 7. A demo session sees the button disabled, its tooltip saying why.
 
-**Outputs**: `GET /v1/uploads/active` returns the imports still in progress — each with a title, its source, how many of its jobs have finished and how many there are, and when it was submitted — and how many failed imports the account hasn't seen yet on the Sync page. `GET /v1/uploads?limit=&offset=&source=` (the Android app's Sync screen) returns one page of every import, the total count (scoped to `source` when given), and how many are still processing; each row carries `source` and, once the job has produced one, the resulting activity's own `id`.
+**Outputs**: `GET /v1/uploads/active` returns the imports still in progress — each with a title, its source, how many of its jobs have finished and how many there are, whether it's an archive still being unpacked, and when it was submitted — the archives unpacked in the last hour with their batch id, how many of their files were already imported or skipped, whether they were truncated, and for one that failed, why — and how many failed imports the account hasn't seen yet on the Sync page. `GET /v1/uploads?limit=&offset=&source=` (the Android app's Sync screen) returns one page of every import, the total count (scoped to `source` when given), and how many are still processing; each row carries `source` and, once the job has produced one, the resulting activity's own `id`.
 
 ### FR-3.5 Duplicate detection
 

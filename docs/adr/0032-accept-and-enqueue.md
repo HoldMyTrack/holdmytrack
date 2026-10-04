@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Built: inline raw payloads (`internal/ingest/enqueue.go`, `IMPLEMENTATION.md` §4.1 step 1). Unpacking `.zip` and Takeout archives in the worker is the next step.
+Accepted. Built: inline raw payloads (`internal/ingest/enqueue.go`, `IMPLEMENTATION.md` §4.1 step 1) and the worker's `unpack` job (`internal/unpack`, §4.0.1), with the web Upload menu showing an archive's notes once it's unpacked. The Android app's side, which still reads the notes from the upload's response, is the next change.
 
 ## Context
 

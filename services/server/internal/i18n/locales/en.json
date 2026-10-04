@@ -348,6 +348,7 @@
   "upload.uploading": "Uploading {percent}%",
   "upload.processing": "Processing…",
   "upload.processing_count": "Processing {done} of {total}",
+  "upload.unpacking": "Unpacking…",
   "upload.dismiss": "Dismiss",
   "upload.too_many": "Too many files selected ({n}) — zip them and upload the archive instead.",
   "upload.already": "{filename} was already uploaded before.",
@@ -363,5 +364,7 @@
   "ingest_error.too_few_points": "The file has fewer than two GPS points, so there's no track to draw.",
   "ingest_error.no_timestamps": "The file has no timestamps. It's a planned route, not a recorded activity.",
   "ingest_error.too_large": "The track covers too much ground to draw: more than 20,000 map squares of about 2.4 km.",
-  "ingest_error.internal": "Something went wrong on our side while processing it."
+  "ingest_error.internal": "Something went wrong on our side while processing it.",
+  "unpack_error.unreadable_archive": "The archive couldn't be read.",
+  "unpack_error.internal": "Something went wrong on our side while unpacking it."
 }

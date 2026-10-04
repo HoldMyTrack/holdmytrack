@@ -353,6 +353,7 @@
   "upload.uploading": "Загрузка {percent}%",
   "upload.processing": "Обработка…",
   "upload.processing_count": "Обработано {done} из {total}",
+  "upload.unpacking": "Распаковка…",
   "upload.dismiss": "Скрыть",
   "upload.too_many": "Выбрано слишком много файлов ({n}) — упакуйте их в zip-архив и загрузите его.",
   "upload.already": "{filename} уже был загружен раньше.",
@@ -368,5 +369,7 @@
   "ingest_error.too_few_points": "В файле меньше двух GPS-точек, поэтому трек не построить.",
   "ingest_error.no_timestamps": "В файле нет отметок времени. Это запланированный маршрут, а не записанное занятие.",
   "ingest_error.too_large": "Трек охватывает слишком большую территорию: больше 20 000 квадратов карты по 2,4 км.",
-  "ingest_error.internal": "При обработке что-то пошло не так на нашей стороне."
+  "ingest_error.internal": "При обработке что-то пошло не так на нашей стороне.",
+  "unpack_error.unreadable_archive": "Не удалось прочитать архив.",
+  "unpack_error.internal": "При распаковке что-то пошло не так на нашей стороне."
 }

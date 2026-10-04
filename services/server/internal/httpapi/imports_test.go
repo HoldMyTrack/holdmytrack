@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// insertImportJob adds an ingest job the way persistAndEnqueue would, in the given state; a
+// insertImportJob adds an ingest job the way ingest.EnqueueRaw would, in the given state; a
 // finished one gets a finished_at, as the worker sets it.
 func (d *dbTest) insertImportJob(acct account, state, source, filename, batch, batchTitle string) {
 	d.t.Helper()
@@ -117,5 +117,45 @@ func TestSyncRequestsShareAClientBatch(t *testing.T) {
 	d.decode(d.do(me, "GET", "/v1/uploads/active", nil), http.StatusOK, &resp)
 	if len(resp.Imports) != 1 || resp.Imports[0].Title != "Timeline.json" || resp.Imports[0].Total != 3 {
 		t.Errorf("imports: %+v, want one Timeline.json row of 3", resp.Imports)
+	}
+}
+
+// An archive is one row from its upload on: "unpacking" while its unpack job is pending, with
+// the ingest jobs it has made so far counted. Once that job has finished, its outcome is in
+// `unpacked`, a failure's in the reader's language.
+func TestActiveImportsUnpacking(t *testing.T) {
+	d := newDBTest(t)
+	me := d.newAccount(false)
+	ctx := context.Background()
+	unpackJob := func(state, batch, title, code string, st map[string]any) {
+		payload, _ := json.Marshal(map[string]any{
+			"user_id": me.id, "source": "upload", "format": "zip", "batch": batch, "batch_title": title, "state": st,
+		})
+		if _, err := d.pool.Exec(ctx, `
+			INSERT INTO jobs (kind, user_id, payload, state, error_code, finished_at)
+			VALUES ('unpack', $1, $2, $3::text, NULLIF($4, ''), CASE WHEN $3::text = 'pending' THEN NULL ELSE NOW() END)`,
+			me.id, payload, state, code); err != nil {
+			t.Fatal(err)
+		}
+	}
+	unpackJob("pending", "b1", "Trips.zip", "", map[string]any{"cursor": 0})
+	d.insertImportJob(me, "pending", "upload", "a.gpx", "b1", "Trips.zip")
+	unpackJob("done", "b2", "Old.zip", "", map[string]any{"cursor": 5, "already": 2, "skipped": 1, "truncated": true})
+	unpackJob("failed", "b3", "Broken.zip", "unreadable_archive", map[string]any{"cursor": 0})
+
+	var resp activeImportsResponse
+	d.decode(d.do(me, "GET", "/v1/uploads/active", nil), http.StatusOK, &resp)
+	if len(resp.Imports) != 1 || resp.Imports[0].Title != "Trips.zip" || !resp.Imports[0].Unpacking || resp.Imports[0].Total != 1 {
+		t.Fatalf("imports = %+v, want Trips.zip unpacking with 1 found", resp.Imports)
+	}
+	byBatch := map[string]unpackedArchive{}
+	for _, a := range resp.Unpacked {
+		byBatch[a.Batch] = a
+	}
+	if a := byBatch["b2"]; len(resp.Unpacked) != 2 || a.Already != 2 || a.Skipped != 1 || !a.Truncated || a.Error != "" {
+		t.Fatalf("unpacked = %+v", resp.Unpacked)
+	}
+	if a := byBatch["b3"]; a.Error != "The archive couldn't be read." {
+		t.Fatalf("failed archive's error = %q", a.Error)
 	}
 }

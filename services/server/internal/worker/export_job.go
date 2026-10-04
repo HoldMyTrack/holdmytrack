@@ -29,13 +29,10 @@ type Notifier struct {
 // notifier is Run's, read by runExport. Nil in tests that don't set it: no email is sent.
 var notifier *Notifier
 
-// exportPollInterval is how often the export lane looks for a request. Coarse: an export
-// takes minutes, and the person is told by email, not by watching.
-const exportPollInterval = 5 * time.Second
-
-// exportHeartbeat refreshes a running export's claim: a big account can take longer than
-// claimLease, and an export that looked abandoned would be claimed and built a second time.
-const exportHeartbeat = 5 * time.Minute
+// longPollInterval is how often the long lane looks for a job. Coarser than the main lane's:
+// an export takes minutes and is announced by email, but someone who has just uploaded an
+// archive is watching the Upload menu for it to start.
+const longPollInterval = time.Second
 
 // ExportJob is an `export` job's payload.
 type ExportJob struct {
@@ -63,22 +60,7 @@ func runExport(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, lo
 		return fmt.Errorf("export lookup: %w", err)
 	}
 
-	hctx, stop := context.WithCancel(ctx)
-	defer stop()
-	go func() {
-		t := time.NewTicker(exportHeartbeat)
-		defer t.Stop()
-		for {
-			select {
-			case <-hctx.Done():
-				return
-			case <-t.C:
-				if _, err := pool.Exec(hctx, `UPDATE jobs SET locked_at = NOW() WHERE id = $1`, jobID); err != nil && hctx.Err() == nil {
-					log.Error("export heartbeat failed", "job_id", jobID, "err", err)
-				}
-			}
-		}
-	}()
+	defer keepClaimed(ctx, pool, log, jobID)()
 
 	sizes, err := export.Build(ctx, pool, store, userID, ej.ExportID, lang)
 	if err != nil {
