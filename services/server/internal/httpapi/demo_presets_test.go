@@ -32,9 +32,10 @@ func TestEmbeddedDemoDataIsSeedable(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The Stories a demo visitor sees (docs/SPEC.md FR-2.2).
-	if len(manifest.Stories) != 3 || manifest.Stories[0].Name != "Brecksville Reservation trip" || len(manifest.Stories[0].Activities) != 3 ||
+	if len(manifest.Stories) != 4 || manifest.Stories[0].Name != "Brecksville Reservation trip" || len(manifest.Stories[0].Activities) != 3 ||
 		manifest.Stories[1].Name != "Emerald Necklace Trail" || len(manifest.Stories[1].Activities) != 3 ||
-		manifest.Stories[2].Name != "Greater Cleveland trails" || len(manifest.Stories[2].Activities) != 4 {
+		manifest.Stories[2].Name != "Greater Cleveland trails" || len(manifest.Stories[2].Activities) != 4 ||
+		manifest.Stories[3].Name != "Niagara Falls trip" || len(manifest.Stories[3].Activities) != 6 {
 		t.Errorf("demo stories %+v", manifest.Stories)
 	}
 }
