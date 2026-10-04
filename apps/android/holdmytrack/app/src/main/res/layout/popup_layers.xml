@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The Layers menu (.overlays-menu__panel), opened by the Layers button under the burger
-     (map/LayersMenu): Base map, Map or Satellite, when the served style carries imagery; then
-     Paths and Points of interest, each switched on and off over any mode. It scrolls when it
+<!-- The Layers menu (.overlays-menu__panel), opened by the Layers pill under the burger
+     (map/LayersMenu): Paths and Points of interest, each picked over any mode. It scrolls when it
      outgrows the screen (landscape). -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -15,46 +14,6 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:padding="@dimen/hmt_space_8">
-
-        <LinearLayout
-            android:id="@+id/layers_basemap_group"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
-
-            <TextView
-                style="@style/Widget.HoldMyTrack.LayersLegend"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/layers_basemap" />
-
-            <RadioGroup
-                android:id="@+id/layers_basemap"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content">
-
-                <com.google.android.material.radiobutton.MaterialRadioButton
-                    android:id="@+id/layers_basemap_map"
-                    style="@style/Widget.HoldMyTrack.LayersOption.Radio"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/layers_basemap_map" />
-
-                <com.google.android.material.radiobutton.MaterialRadioButton
-                    android:id="@+id/layers_basemap_satellite"
-                    style="@style/Widget.HoldMyTrack.LayersOption.Radio"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/layers_basemap_satellite" />
-            </RadioGroup>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginTop="@dimen/hmt_space_8"
-                android:layout_marginBottom="@dimen/hmt_space_8"
-                android:background="@color/hmt_border" />
-        </LinearLayout>
 
         <TextView
             style="@style/Widget.HoldMyTrack.LayersLegend"

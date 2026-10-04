@@ -521,11 +521,6 @@
         <item name="android:textColor">@color/hmt_ink</item>
     </style>
 
-    <style name="Widget.HoldMyTrack.LayersOption.Radio" parent="Widget.Material3.CompoundButton.RadioButton">
-        <item name="android:textSize">@dimen/hmt_text_md</item>
-        <item name="android:textColor">@color/hmt_ink</item>
-    </style>
-
     <!-- The Activities panel's toolbar actions (Show/Hide, Edit, Delete), after the web's
          .activities-panel__edit & co. at phone width: a 34dp tinted square around a 16dp icon,
          drawn inset in a 48dp touch target (bg_panel_chip). -->

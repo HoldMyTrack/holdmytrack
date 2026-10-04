@@ -7,45 +7,44 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.CheckBox
 import android.widget.PopupWindow
-import android.widget.RadioGroup
 import android.widget.TextView
 import androidx.core.view.isVisible
 import com.google.android.material.button.MaterialButton
 import dev.holdmytrack.android.R
 
 /**
- * The Layers button under the burger and the menu it opens — the web's `OverlaysMenu`
- * (`docs/SPEC.md` FR-4.13, FR-4.14): the Base map, Map or Satellite, when the served style
- * carries imagery; then Paths — Trails, Tracks and Bike paths — and Points of interest, one
- * entry per [MapSpots.Category], each switched on and off over any mode.
+ * The Layers pill under the burger and the menu it opens — the web's `OverlaysMenu`
+ * (`docs/SPEC.md` FR-4.13): Paths — Trails, Tracks and Bike paths — and Points of interest, one
+ * entry per [MapSpots.Category], each picked over any mode.
  *
- * The button is an icon, filled like the active map mode while any path or place is on, with a
- * badge on its corner counting them; the Base map is a choice between two, not an overlay, so
- * neither counts it. A tap on the button toggles the
- * menu, and a tap outside it or Back closes it, like the Activities panel's Type dropdown.
+ * The pill is a checkbox, which shows or hides every pick at once and keeps them ([shown]), then
+ * the icon, filled like the active map mode while picks show, with a badge on its corner counting
+ * them, greyed while the checkbox is off. Picking an entry while it's off turns it back on, or the
+ * pick would seem to do nothing; with nothing picked it can't be changed. A tap on the icon
+ * toggles the menu, and a tap outside it or Back closes it, like the Activities panel's Type
+ * dropdown.
  */
 class LayersMenu(
+    private val master: CheckBox,
     private val button: MaterialButton,
     private val count: TextView,
     private val paths: () -> MapPaths.Paths,
-    private val satellite: () -> Boolean,
     private val spots: () -> List<MapSpots.Category>,
+    private val shown: () -> Boolean,
     private val onPaths: (MapPaths.Paths) -> Unit,
-    private val onSatellite: (Boolean) -> Unit,
     private val onSpots: (List<MapSpots.Category>) -> Unit,
+    private val onShown: (Boolean) -> Unit,
 ) {
     private val res = button.resources
     private var popup: PopupWindow? = null
     private var closedAt = 0L
 
-    /** Whether the served style carries imagery; without it the menu has no Base map group. */
-    var satelliteAvailable = false
-        set(value) {
-            field = value
-            dismiss()
-        }
-
     init {
+        // A click, not a checked-change listener: render() sets the box from the saved choice.
+        master.setOnClickListener {
+            onShown(master.isChecked)
+            render()
+        }
         button.setOnClickListener {
             // The button is checkable for the filled look, so a tap just flipped it; that follows
             // the paths, not taps.
@@ -59,14 +58,24 @@ class LayersMenu(
         render()
     }
 
-    /** The filled look and the badge, from the saved choice. */
+    /** The checkbox, the filled look and the badge, from the saved choice. */
     fun render() {
-        val on = paths().count + spots().size
-        button.isChecked = on > 0
-        count.isVisible = on > 0
-        count.text = on.toString()
+        val picked = paths().count + spots().size
+        val on = shown()
+        master.isChecked = on
+        master.isEnabled = picked > 0
+        master.tooltipText = if (picked > 0) null else res.getString(R.string.layers_master_empty)
+        button.isChecked = on && picked > 0
+        count.isVisible = picked > 0
+        count.alpha = if (on) 1f else OFF_ALPHA
+        count.text = picked.toString()
         val label = res.getString(R.string.layers_button)
-        button.contentDescription = if (on > 0) "$label, $on" else label
+        button.contentDescription = if (picked > 0) "$label, $picked" else label
+    }
+
+    /** A pick turns the checkbox back on before it's applied, so it shows. */
+    private fun picked(on: Boolean) {
+        if (on && !shown()) onShown(true)
     }
 
     fun dismiss() {
@@ -78,17 +87,12 @@ class LayersMenu(
         if (popup != null) return
         val content = LayoutInflater.from(button.context).inflate(R.layout.popup_layers, null)
 
-        content.findViewById<View>(R.id.layers_basemap_group).isVisible = satelliteAvailable
-        content.findViewById<RadioGroup>(R.id.layers_basemap).apply {
-            check(if (satellite()) R.id.layers_basemap_satellite else R.id.layers_basemap_map)
-            setOnCheckedChangeListener { _, id -> onSatellite(id == R.id.layers_basemap_satellite) }
-        }
-
         val current = paths()
         fun bind(id: Int, checked: Boolean, next: (MapPaths.Paths, Boolean) -> MapPaths.Paths) {
             content.findViewById<CheckBox>(id).apply {
                 isChecked = checked
                 setOnCheckedChangeListener { _, on ->
+                    picked(on)
                     onPaths(next(paths(), on))
                     render()
                 }
@@ -102,6 +106,7 @@ class LayersMenu(
             content.findViewById<CheckBox>(id).apply {
                 isChecked = category in spots()
                 setOnCheckedChangeListener { _, on ->
+                    picked(on)
                     val before = spots()
                     onSpots(MapSpots.Category.entries.filter { if (it == category) on else it in before })
                     render()
@@ -126,8 +131,8 @@ class LayersMenu(
             closedAt = SystemClock.uptimeMillis()
         }
         popup = window
-        // Under the button's panel, lined up with its edge, the row's own 6dp gap below it.
-        window.showAsDropDown(button.parent as View, 0, res.getDimensionPixelSize(R.dimen.hmt_space_6))
+        // Under the pill, lined up with its edge, the row's own 6dp gap below it.
+        window.showAsDropDown(master.parent as View, 0, res.getDimensionPixelSize(R.dimen.hmt_space_6))
     }
 
     private companion object {
@@ -141,5 +146,8 @@ class LayersMenu(
 
         const val REOPEN_GUARD_MS = 300L
         const val MENU_WIDTH_DP = 224
+
+        /** The badge while the checkbox is off: the web's greyed count. */
+        const val OFF_ALPHA = 0.55f
     }
 }
