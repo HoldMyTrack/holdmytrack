@@ -301,7 +301,8 @@ func TestSeedDemoStories(t *testing.T) {
 	ctx := context.Background()
 	a := d.newActivity(acct, testActivity{activityType: "driving", durationSecs: 60})
 	b := d.newActivity(acct, testActivity{activityType: "walking", durationSecs: 60})
-	c := d.newActivity(acct, testActivity{activityType: "cycling", durationSecs: 60})
+	// c a week later: its Story, second in the manifest, was made later and is listed first.
+	c := d.newActivity(acct, testActivity{activityType: "cycling", durationSecs: 60, startedAt: time.Date(2026, 5, 8, 10, 0, 0, 0, time.UTC)})
 	ids := map[string]string{"a.gpx": a, "b.gpx": b, "c.gpx": c}
 	manifest := []demoManifestStory{
 		{Name: "Trip", Description: "Weekend", Activities: []string{"a.gpx", "b.gpx"}},
@@ -335,6 +336,14 @@ func TestSeedDemoStories(t *testing.T) {
 	}
 	if version() == v0 {
 		t.Errorf("creating Stories with activities didn't bump the tile version")
+	}
+	// Each dated the day after its last activity ended, so listed in the order visited.
+	var list storiesResponse
+	d.decode(d.do(acct, "GET", "/v1/stories", nil), http.StatusOK, &list)
+	if len(list.Stories) != 2 || list.Stories[0].Name != "Trail" ||
+		!list.Stories[0].CreatedAt.Equal(time.Date(2026, 5, 9, 10, 1, 0, 0, time.UTC)) ||
+		!list.Stories[1].CreatedAt.Equal(time.Date(2026, 5, 2, 10, 1, 0, 0, time.UTC)) {
+		t.Errorf("stories not dated by their visits: %+v", list.Stories)
 	}
 
 	// A re-run over an unchanged account changes nothing, and bumps nothing.
