@@ -145,6 +145,26 @@
           "height": 1536
         }
       ]
+    },
+    "2026-10-03 Preston s H O P E Playground Park.gpx": {
+      "name": "Preston's H.O.P.E. Playground Park",
+      "type": "walking",
+      "photos": [
+        {
+          "file": "2026-10-03 Preston s H O P E Playground Park 1.webp",
+          "thumb": "2026-10-03 Preston s H O P E Playground Park 1-thumb.webp",
+          "taken_at": "2026-10-03T15:36:03Z",
+          "route_at": "2026-10-03T15:37:57Z",
+          "width": 2048,
+          "height": 1536
+        }
+      ]
+    },
+    "2026-10-03 driving-2.gpx": {
+      "type": "driving"
+    },
+    "2026-10-03 driving.gpx": {
+      "type": "driving"
     }
   },
   "stories": [
@@ -187,6 +207,28 @@
         "2026-07-16 Niagara Falls trip.gpx",
         "2026-07-17 Niagara Falls trip.gpx"
       ]
+    },
+    {
+      "name": "Preston's H.O.P.E. Playground Park",
+      "activities": [
+        "2026-10-03 driving.gpx",
+        "2026-10-03 Preston s H O P E Playground Park.gpx",
+        "2026-10-03 driving-2.gpx"
+      ]
+    }
+  ],
+  "spot_captures": [
+    {
+      "osm_type": "way",
+      "osm_id": 631388618,
+      "name": "Preston's H.O.P.E. Playground Park",
+      "captured_at": "2026-10-03T15:13:30.193259Z"
+    },
+    {
+      "osm_type": "node",
+      "osm_id": 5177258839,
+      "name": "David Berger National Memorial",
+      "captured_at": "2026-10-03T16:30:41.202733Z"
     }
   ]
 }

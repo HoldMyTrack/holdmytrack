@@ -38,14 +38,27 @@ const DemoCustomerUserID = "22222222-2222-2222-2222-222222222222"
 var demoData embed.FS
 
 // demoManifestFile is demo_data/'s one non-activity file: what the raw files can't carry
-// themselves — per-file overrides (not every file needs one) and the account's Stories.
+// themselves — per-file overrides (not every file needs one), the account's Stories and its
+// Spots captures.
 const demoManifestFile = "manifest.json"
 
-// demoManifest is manifest.json: Activities keyed by filename, and Stories naming their
-// activities by filename too.
+// demoManifest is manifest.json: Activities keyed by filename, Stories naming their
+// activities by filename too, and SpotCaptures.
 type demoManifest struct {
-	Activities map[string]demoManifestEntry `json:"activities"`
-	Stories    []demoManifestStory          `json:"stories,omitempty"`
+	Activities   map[string]demoManifestEntry `json:"activities"`
+	Stories      []demoManifestStory          `json:"stories,omitempty"`
+	SpotCaptures []demoManifestCapture        `json:"spot_captures,omitempty"`
+}
+
+// demoManifestCapture is one place the account has captured (§4.25). A capture belongs to the
+// account, not to an activity. The place is named by its OSM key, which, unlike spots.id, is
+// the same on every deployment that loaded it. Name is only for someone reading the manifest;
+// the seed ignores it.
+type demoManifestCapture struct {
+	OSMType    string    `json:"osm_type"`
+	OSMID      int64     `json:"osm_id"`
+	Name       string    `json:"name,omitempty"`
+	CapturedAt time.Time `json:"captured_at"`
 }
 
 // demoManifestStory is one Story the seed gives the account (§4.23): a name, a description,
@@ -104,7 +117,8 @@ func demoPhotoContentType(file string) string {
 // manifest naming a file that isn't there fails — an activity entry or a Story's activity
 // alike — since that's a typo or a file deleted without its entry, and would otherwise pass
 // silently. So does a Story the API itself would refuse: no name, a name or description over
-// the limit, two Stories with one name (a re-run couldn't tell them apart), or no activities.
+// the limit, two Stories with one name (a re-run couldn't tell them apart), or no activities;
+// and a capture with no place or time, or two of one place (the table keeps one per place).
 func loadDemoManifest(fsys fs.FS, files []string) (demoManifest, error) {
 	manifest := demoManifest{Activities: map[string]demoManifestEntry{}}
 	b, err := fs.ReadFile(fsys, demoManifestFile)
@@ -168,6 +182,19 @@ func loadDemoManifest(fsys fs.FS, files []string) (demoManifest, error) {
 				return demoManifest{}, fmt.Errorf("%s: story %q: activity %q has no matching file", demoManifestFile, st.Name, f)
 			}
 		}
+	}
+	captured := map[demoManifestCapture]bool{}
+	for _, c := range manifest.SpotCaptures {
+		key := demoManifestCapture{OSMType: c.OSMType, OSMID: c.OSMID}
+		switch {
+		case c.OSMType != "node" && c.OSMType != "way" && c.OSMType != "relation":
+			return demoManifest{}, fmt.Errorf("%s: capture of %s %d: osm_type must be node, way or relation", demoManifestFile, c.OSMType, c.OSMID)
+		case c.OSMID <= 0 || c.CapturedAt.IsZero():
+			return demoManifest{}, fmt.Errorf("%s: capture of %s %d needs osm_id and captured_at", demoManifestFile, c.OSMType, c.OSMID)
+		case captured[key]:
+			return demoManifest{}, fmt.Errorf("%s: %s %d is captured twice", demoManifestFile, c.OSMType, c.OSMID)
+		}
+		captured[key] = true
 	}
 	return manifest, nil
 }
@@ -293,8 +320,16 @@ func SeedDemoCustomer(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 			return fmt.Errorf("seed demo customer: %w", err)
 		}
 	}
+	missing, err := seedDemoCaptures(ctx, pool, DemoCustomerUserID, manifest.SpotCaptures)
+	if err != nil {
+		return fmt.Errorf("seed demo customer: %w", err)
+	}
+	for _, c := range missing {
+		log.Warn("demo customer seed: captured place not loaded here, skipped", "osm_type", c.OSMType, "osm_id", c.OSMID, "name", c.Name)
+	}
 
-	log.Info("demo customer seed: done", "ingested", ingested, "already_present", skipped, "failed", failed, "total", len(names), "stories", len(manifest.Stories))
+	log.Info("demo customer seed: done", "ingested", ingested, "already_present", skipped, "failed", failed, "total", len(names), "stories", len(manifest.Stories),
+		"captures", len(manifest.SpotCaptures)-len(missing))
 	if failed > 0 {
 		return fmt.Errorf("seed demo customer: %d of %d files failed", failed, len(names))
 	}
@@ -340,6 +375,29 @@ func seedDemoPhotos(ctx context.Context, pool *pgxpool.Pool, store *storage.Stor
 		}
 	}
 	return nil
+}
+
+// seedDemoCaptures gives the account (the Demo Customer, but a parameter so tests can use their
+// own) the manifest's captures, each at the manifest's time, so a re-run fixes one that
+// drifted. A capture the manifest doesn't name is left alone; --reset is what removes those.
+// A place this deployment hasn't loaded (import-spots, §4.25) can't be captured: it's returned
+// rather than failing the seed, since a development stack often has no places at all.
+func seedDemoCaptures(ctx context.Context, pool *pgxpool.Pool, userID string, captures []demoManifestCapture) ([]demoManifestCapture, error) {
+	var missing []demoManifestCapture
+	for _, c := range captures {
+		tag, err := pool.Exec(ctx, `
+			INSERT INTO spot_captures (user_id, spot_id, captured_at)
+			SELECT $1, id, $4 FROM spots WHERE osm_type = $2 AND osm_id = $3
+			ON CONFLICT (user_id, spot_id) DO UPDATE SET captured_at = EXCLUDED.captured_at`,
+			userID, c.OSMType, c.OSMID, c.CapturedAt)
+		if err != nil {
+			return nil, fmt.Errorf("capture of %s %d: %w", c.OSMType, c.OSMID, err)
+		}
+		if tag.RowsAffected() == 0 {
+			missing = append(missing, c)
+		}
+	}
+	return missing, nil
 }
 
 // seedDemoStories gives the account (the Demo Customer, but a parameter so tests can use their
@@ -453,6 +511,8 @@ func resetDemoCustomer(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 		`DELETE FROM activities WHERE user_id = $1`,
 		// Its Stories too: the seed recreates the manifest's, and nothing else should survive.
 		`DELETE FROM stories WHERE user_id = $1`,
+		// And its captures, which belong to the account rather than to an activity.
+		`DELETE FROM spot_captures WHERE user_id = $1`,
 		`DELETE FROM fog_tiles WHERE user_id = $1`,
 		// Its tiles are about to be rendered from scratch; nothing cached before this is its.
 		`UPDATE users SET heatmap_cap = DEFAULT, map_version = map_version + 1 WHERE id = $1`,
