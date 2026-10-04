@@ -17,6 +17,8 @@ export type EditOp =
   | { kind: 'cut'; remove: [number, number] }
   /** Remove one point — a click in Delete point mode. */
   | { kind: 'drop'; t: number }
+  /** Put one point somewhere else — a drag in Move point mode. */
+  | { kind: 'move'; t: number; to: [number, number] }
   /** Discard every earlier edit, including the one saved before this session. */
   | { kind: 'reset' };
 
@@ -26,12 +28,14 @@ export function foldEdit(base: TrackEdit | null, ops: readonly EditOp[]): TrackE
   let keep = base?.keep ? ([...base.keep] as [number, number]) : undefined;
   let remove = base?.remove ? base.remove.map((r) => [...r] as [number, number]) : [];
   let drop = base?.drop ? [...base.drop] : [];
+  let move: Record<string, [number, number]> = { ...base?.move };
   for (const op of ops) {
     switch (op.kind) {
       case 'reset':
         keep = undefined;
         remove = [];
         drop = [];
+        move = {};
         break;
       case 'chop':
         keep = keep ? [Math.max(keep[0], op.keep[0]), Math.min(keep[1], op.keep[1])] : op.keep;
@@ -42,30 +46,48 @@ export function foldEdit(base: TrackEdit | null, ops: readonly EditOp[]): TrackE
       case 'drop':
         drop.push(op.t);
         break;
+      case 'move':
+        // A point dragged twice ends where it was dropped last.
+        move[String(op.t)] = op.to;
+        break;
     }
   }
   return {
     ...(keep ? { keep } : {}),
     ...(remove.length > 0 ? { remove } : {}),
     ...(drop.length > 0 ? { drop } : {}),
+    ...(Object.keys(move).length > 0 ? { move } : {}),
   };
 }
 
 export function isEmptyEdit(edit: TrackEdit): boolean {
-  return !edit.keep && !edit.remove?.length && !edit.drop?.length;
+  return !edit.keep && !edit.remove?.length && !edit.drop?.length && Object.keys(edit.move ?? {}).length === 0;
 }
 
-/** The points that survive `edit`, in order — the same predicate as the server's
- *  `TrackEdit.Apply`, so what the editor shows is exactly what Apply will produce. */
+/** The points that survive `edit`, in order, moved where it moves them — the same as the
+ *  server's `TrackEdit.Apply`, so what the editor shows is exactly what Apply will produce. */
 export function applyEdit(points: readonly TrackPoint[], edit: TrackEdit): TrackPoint[] {
   if (isEmptyEdit(edit)) return [...points];
   const drop = new Set(edit.drop ?? []);
   const remove = edit.remove ?? [];
-  return points.filter(([, , t]) => {
-    if (edit.keep && (t < edit.keep[0] || t > edit.keep[1])) return false;
-    if (drop.has(t)) return false;
-    return !remove.some(([a, b]) => t >= a && t <= b);
-  });
+  const move = edit.move ?? {};
+  return points
+    .filter(([, , t]) => {
+      if (edit.keep && (t < edit.keep[0] || t > edit.keep[1])) return false;
+      if (drop.has(t)) return false;
+      return !remove.some(([a, b]) => t >= a && t <= b);
+    })
+    .map((p) => {
+      const to = move[String(p[2])];
+      return to ? [to[0], to[1], p[2]] : p;
+    });
+}
+
+/** The op a Move point drag commits: the point at `t` dropped at `lon`/`lat`, rounded to the
+ *  1e-6° (~0.1 m) the server sends points in. */
+export function moveOp(t: number, lon: number, lat: number): EditOp {
+  const round = (v: number) => Math.round(v * 1e6) / 1e6;
+  return { kind: 'move', t, to: [round(lon), round(lat)] };
 }
 
 /** The op a Chop press commits for knobs on `visible[lo]` and `visible[hi]`, or null when the

@@ -407,14 +407,16 @@ export async function getActivityTrackMetrics(
 }
 
 /**
- * A track edit (§4.7.7), as the server stores it: every value is a point timestamp in unix
+ * A track edit (§4.7.7), as the server stores it: every timestamp a point's in unix
  * milliseconds. A point survives when it's inside `keep` (inclusive; absent keeps everything),
- * outside every `remove` range (inclusive), and not in `drop`. Mirrors `ingest.TrackEdit`.
+ * outside every `remove` range (inclusive), and not in `drop`; a survivor whose timestamp is a
+ * key of `move` is drawn at that [lon, lat] instead. Mirrors `ingest.TrackEdit`.
  */
 export interface TrackEdit {
   keep?: [number, number];
   remove?: [number, number][];
   drop?: number[];
+  move?: Record<string, [number, number]>;
 }
 
 /** One recorded point: [lon, lat, unix ms]. */

@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { getActivityTrackPoints, type Activity, type TrackEdit, type TrackPoint } from '../api';
 import { labelInsertionPoint } from '../map/layers';
-import { clearTrackEdit, ensureTrackEditLayer, onTrackEditPointClick, setTrackEditData, type EditPreview } from '../map/trackEdit';
-import { applyEdit, chopOp, cumulativeDistances, cutOp, foldEdit, isEmptyEdit, type EditOp } from './editTrackOps';
+import { clearTrackEdit, ensureTrackEditLayer, onTrackEditPointClick, onTrackEditPointDrag, setTrackEditData, type EditPreview } from '../map/trackEdit';
+import { applyEdit, chopOp, cumulativeDistances, cutOp, foldEdit, isEmptyEdit, moveOp, type EditOp } from './editTrackOps';
 import { distanceValue, unitLabel } from './format';
 import { useUnitSystem } from './units';
 import { lang, t, tn } from '../i18n';
@@ -17,12 +17,13 @@ import { lang, t, tn } from '../i18n';
  * The session is `base` (the edit the track already had) plus a stack of ops (editTrackOps.ts).
  * Everything drawn is a replay of that stack over the original points: Undo pops one op,
  * Cancel throws the stack away, Save folds it into one edit and sends it. The knobs are a live
- * preview only — nothing is committed until Chop, Cut, or a Delete point click pushes an op,
- * and every op resets the knobs to the new track's ends.
+ * preview only — nothing is committed until Chop, Cut, a Delete point click or a Move point
+ * drop pushes an op, and every op resets the knobs to the new track's ends.
  *
  * Stays mounted while the Activity tab is showing, so switching tabs loses nothing; `active`
- * is false then, which turns off Delete point mode (a map click there would otherwise drop a
- * point the user can't see being edited) and Cmd/Ctrl+Z (which belongs to the text fields).
+ * is false then, which turns off Delete point and Move point (a map click or drag there would
+ * otherwise change a point the user can't see being edited) and Cmd/Ctrl+Z (which belongs to
+ * the text fields).
  */
 export interface TrackEditorProps {
   map: MapLibreMap;
@@ -51,13 +52,24 @@ interface Knobs {
 
 const ENDS: Knobs = { lo: null, hi: null };
 
+/** Which map gesture edits points: a click deletes one, or a drag moves one. */
+type PointMode = 'delete' | 'move' | null;
+
+/** A Move point drag in progress: the point at `t` drawn under the pointer. */
+interface Dragging {
+  t: number;
+  lon: number;
+  lat: number;
+}
+
 export function TrackEditor({ map, activity, active, busy, onChange }: TrackEditorProps) {
   const system = useUnitSystem();
   const [session, setSession] = useState<Session | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [ops, setOps] = useState<EditOp[]>([]);
   const [knobs, setKnobs] = useState<Knobs>(ENDS);
-  const [deleteMode, setDeleteMode] = useState(false);
+  const [pointMode, setPointMode] = useState<PointMode>(null);
+  const [dragging, setDragging] = useState<Dragging | null>(null);
   const [preview, setPreview] = useState<EditPreview>('chop');
 
   useEffect(() => {
@@ -80,7 +92,7 @@ export function TrackEditor({ map, activity, active, busy, onChange }: TrackEdit
   }, [ops.length, edit, onChange]);
 
   useEffect(() => {
-    if (!active) setDeleteMode(false);
+    if (!active) setPointMode(null);
   }, [active]);
 
   // Timestamps back to indices into what's visible now: the first point at or after lo, the
@@ -119,27 +131,45 @@ export function TrackEditor({ map, activity, active, busy, onChange }: TrackEdit
 
   // Draw, and redraw after a theme swap discards custom layers (styledata) — this overlay is
   // owned here, not by MapView's reattachOverlays, since it only exists during a session.
+  // A point being dragged is drawn where the pointer is, its line segments following it.
+  const shown = useMemo(
+    () => (dragging ? visible.map((p): TrackPoint => (p[2] === dragging.t ? [dragging.lon, dragging.lat, p[2]] : p)) : visible),
+    [visible, dragging],
+  );
   useEffect(() => {
     const draw = () => {
       ensureTrackEditLayer(map, labelInsertionPoint(map));
-      if (visible.length > 0) setTrackEditData(map, visible, lo, hi, preview);
+      if (shown.length > 0) setTrackEditData(map, shown, lo, hi, preview);
     };
     draw();
     map.on('styledata', draw);
     return () => {
       map.off('styledata', draw);
     };
-  }, [map, visible, lo, hi, preview]);
+  }, [map, shown, lo, hi, preview]);
   useEffect(() => () => clearTrackEdit(map), [map]);
 
   // Delete point mode: a click on a point drops it. Never below two points — a track needs
   // two to stay a track.
   useEffect(() => {
-    if (!deleteMode || busy) return;
+    if (pointMode !== 'delete' || busy) return;
     return onTrackEditPointClick(map, (t) => {
       if (visible.length > 2) push({ kind: 'drop', t });
     });
-  }, [map, deleteMode, busy, visible.length, push]);
+  }, [map, pointMode, busy, visible.length, push]);
+
+  // Move point mode: a point pressed follows the pointer and is committed where it's let go.
+  // Its deps stay fixed through a drag, since re-attaching abandons one in progress.
+  useEffect(() => {
+    if (pointMode !== 'move' || busy) return;
+    return onTrackEditPointDrag(map, {
+      onMove: (t, lon, lat) => setDragging({ t, lon, lat }),
+      onEnd: (t, to) => {
+        setDragging(null);
+        if (to) push(moveOp(t, to[0], to[1]));
+      },
+    });
+  }, [map, pointMode, busy, push]);
 
   const unit = unitLabel(system);
 
@@ -233,12 +263,22 @@ export function TrackEditor({ map, activity, active, busy, onChange }: TrackEdit
         <button
           type="button"
           className="edit-track__btn"
-          aria-pressed={deleteMode}
+          aria-pressed={pointMode === 'delete'}
           disabled={busy}
-          onClick={() => setDeleteMode((on) => !on)}
+          onClick={() => setPointMode((mode) => (mode === 'delete' ? null : 'delete'))}
           title={t('edit_track.delete_point_title')}
         >
           {t('edit_track.delete_point')}
+        </button>
+        <button
+          type="button"
+          className="edit-track__btn"
+          aria-pressed={pointMode === 'move'}
+          disabled={busy}
+          onClick={() => setPointMode((mode) => (mode === 'move' ? null : 'move'))}
+          title={t('edit_track.move_point_title')}
+        >
+          {t('edit_track.move_point')}
         </button>
         <span className="edit-track__spacer" aria-hidden="true" />
         <button type="button" className="edit-track__btn" disabled={ops.length === 0 || busy} onClick={undo} title={t('edit_track.undo_title')}>
@@ -259,7 +299,8 @@ export function TrackEditor({ map, activity, active, busy, onChange }: TrackEdit
           </button>
         )}
       </div>
-      {deleteMode && <p className="edit-track__note">{t('edit_track.delete_point_note')}</p>}
+      {pointMode === 'delete' && <p className="edit-track__note">{t('edit_track.delete_point_note')}</p>}
+      {pointMode === 'move' && <p className="edit-track__note">{t('edit_track.move_point_note')}</p>}
     </>
   );
 }

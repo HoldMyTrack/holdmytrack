@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 // Plain .mjs so tsc (which has no Node types here) leaves it alone; Node strips the types
 // from the imported .ts module itself. Run with `npm run test:unit`.
-import { applyEdit, chopOp, cutOp, foldEdit, isEmptyEdit } from '../src/ui/editTrackOps.ts';
+import { applyEdit, chopOp, cutOp, foldEdit, isEmptyEdit, moveOp } from '../src/ui/editTrackOps.ts';
 
 // Ten points one second apart, walking north; each point's index is recoverable from its time.
 const T0 = Date.UTC(2026, 8, 1, 8);
@@ -70,4 +70,31 @@ test('a second chop narrows the first rather than replacing it', () => {
 test('the fold never carries empty arrays', () => {
   assert.deepEqual(foldEdit(null, []), {});
   assert.deepEqual(foldEdit(null, [{ kind: 'cut', remove: [1, 2] }]), { remove: [[1, 2]] });
+});
+
+test('a move puts the point elsewhere and keeps its time', () => {
+  const edit = foldEdit(null, [moveOp(T0 + 3000, 13.5, 52.5)]);
+  assert.deepEqual(edit, { move: { [String(T0 + 3000)]: [13.5, 52.5] } });
+  const after = applyEdit(points, edit);
+  assert.deepEqual(after[3], [13.5, 52.5, T0 + 3000]);
+  assert.deepEqual(indices(after), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  assert.deepEqual(points[3], [13, 52 + 3 * 0.0001, T0 + 3000], 'the recorded points stay as they were');
+});
+
+test('a point moved twice ends where it was dropped last, and undo takes it back one drop', () => {
+  const ops = [moveOp(T0 + 3000, 13.5, 52.5), moveOp(T0 + 3000, 13.6, 52.6)];
+  assert.deepEqual(applyEdit(points, foldEdit(null, ops))[3], [13.6, 52.6, T0 + 3000]);
+  ops.pop();
+  assert.deepEqual(applyEdit(points, foldEdit(null, ops))[3], [13.5, 52.5, T0 + 3000]);
+});
+
+test('a moved point that is then deleted is gone, and a reset clears the saved moves', () => {
+  const base = { move: { [String(T0 + 3000)]: [13.5, 52.5] } };
+  assert.ok(!isEmptyEdit(base));
+  assert.deepEqual(indices(applyEdit(points, foldEdit(base, [{ kind: 'drop', t: T0 + 3000 }]))), [0, 1, 2, 4, 5, 6, 7, 8, 9]);
+  assert.ok(isEmptyEdit(foldEdit(base, [{ kind: 'reset' }])));
+});
+
+test('a move is rounded to the 1e-6 degrees points come in', () => {
+  assert.deepEqual(moveOp(1, 13.12345678, 52.98765432).to, [13.123457, 52.987654]);
 });

@@ -1,4 +1,4 @@
-import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
+import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, MapTouchEvent } from 'maplibre-gl';
 import type { TrackPoint } from '../api';
 
 /**
@@ -127,6 +127,29 @@ export function clearTrackEdit(map: MapLibreMap): void {
   (map.getSource(TRACK_EDIT_SOURCE_ID) as GeoJSONSource | undefined)?.setData(EMPTY);
 }
 
+/** The recorded point nearest `at`, within a few pixels, by its timestamp — not whichever the
+ *  renderer happened to list first: points at 1 Hz sit a couple of pixels apart once zoomed out. */
+function pointNear(map: MapLibreMap, at: { x: number; y: number }): number | null {
+  if (!map.getLayer(TRACK_EDIT_POINTS_LAYER_ID)) return null;
+  const { x, y } = at;
+  const hits = map.queryRenderedFeatures(
+    [
+      [x - CLICK_TOLERANCE_PX, y - CLICK_TOLERANCE_PX],
+      [x + CLICK_TOLERANCE_PX, y + CLICK_TOLERANCE_PX],
+    ],
+    { layers: [TRACK_EDIT_POINTS_LAYER_ID] },
+  );
+  let best: { t: number; d: number } | null = null;
+  for (const hit of hits) {
+    const t = hit.properties?.t as number | undefined;
+    if (t === undefined || hit.geometry.type !== 'Point') continue;
+    const p = map.project(hit.geometry.coordinates as [number, number]);
+    const d = (p.x - x) ** 2 + (p.y - y) ** 2;
+    if (!best || d < best.d) best = { t, d };
+  }
+  return best?.t ?? null;
+}
+
 /**
  * Delete point mode's click: calls `onPoint` with the clicked point's timestamp. Attached per
  * session and detached by the returned function — unlike the tracks layer's handlers, which
@@ -134,26 +157,8 @@ export function clearTrackEdit(map: MapLibreMap): void {
  */
 export function onTrackEditPointClick(map: MapLibreMap, onPoint: (t: number) => void): () => void {
   const click = (e: { point: { x: number; y: number } }) => {
-    if (!map.getLayer(TRACK_EDIT_POINTS_LAYER_ID)) return;
-    const { x, y } = e.point;
-    const hits = map.queryRenderedFeatures(
-      [
-        [x - CLICK_TOLERANCE_PX, y - CLICK_TOLERANCE_PX],
-        [x + CLICK_TOLERANCE_PX, y + CLICK_TOLERANCE_PX],
-      ],
-      { layers: [TRACK_EDIT_POINTS_LAYER_ID] },
-    );
-    // The hit nearest the click, not whichever the renderer happened to list first — points
-    // at 1 Hz sit a couple of pixels apart once zoomed out.
-    let best: { t: number; d: number } | null = null;
-    for (const hit of hits) {
-      const t = hit.properties?.t as number | undefined;
-      if (t === undefined || hit.geometry.type !== 'Point') continue;
-      const p = map.project(hit.geometry.coordinates as [number, number]);
-      const d = (p.x - x) ** 2 + (p.y - y) ** 2;
-      if (!best || d < best.d) best = { t, d };
-    }
-    if (best) onPoint(best.t);
+    const t = pointNear(map, e.point);
+    if (t !== null) onPoint(t);
   };
   const enter = () => (map.getCanvas().style.cursor = 'crosshair');
   const leave = () => (map.getCanvas().style.cursor = '');
@@ -165,5 +170,84 @@ export function onTrackEditPointClick(map: MapLibreMap, onPoint: (t: number) => 
     map.off('mouseenter', TRACK_EDIT_POINTS_LAYER_ID, enter);
     map.off('mouseleave', TRACK_EDIT_POINTS_LAYER_ID, leave);
     map.getCanvas().style.cursor = '';
+  };
+}
+
+export interface PointDrag {
+  /** The point at `t` is under the pointer at `lon`/`lat` — a preview, nothing committed. */
+  onMove: (t: number, lon: number, lat: number) => void;
+  /** Let go: `to` is where it was dropped, null when it was pressed and let go unmoved. */
+  onEnd: (t: number, to: [number, number] | null) => void;
+}
+
+/**
+ * Move point mode's drag, by mouse or one finger: pressing a point takes the gesture from the
+ * map's own pan (preventDefault, and dragPan off until let go — the Private locations handle's
+ * drag, privateLocations.ts), moving reports each position, and letting go reports where.
+ * Attached while the mode is on and detached by the returned function, which also abandons a
+ * drag in progress — onEnd(t, null).
+ */
+export function onTrackEditPointDrag(map: MapLibreMap, drag: PointDrag): () => void {
+  let dragging: { t: number; to: [number, number] | null } | null = null;
+  const canvas = map.getCanvas();
+
+  // As the Private locations handle's: the map's own mouseup/touchend fire only for a release
+  // over the map, so the document's pointerup ends a drag too, as does the window losing focus.
+  const end = () => {
+    if (!dragging) return;
+    const { t, to } = dragging;
+    dragging = null;
+    document.removeEventListener('pointerup', end);
+    document.removeEventListener('pointercancel', end);
+    window.removeEventListener('blur', end);
+    map.dragPan.enable();
+    canvas.style.cursor = '';
+    drag.onEnd(t, to);
+  };
+  const start = (e: MapMouseEvent | MapTouchEvent) => {
+    if ('points' in e && e.points.length !== 1) return;
+    const t = pointNear(map, e.point);
+    if (t === null) return;
+    e.preventDefault();
+    dragging = { t, to: null };
+    document.addEventListener('pointerup', end);
+    document.addEventListener('pointercancel', end);
+    window.addEventListener('blur', end);
+    map.dragPan.disable();
+    canvas.style.cursor = 'grabbing';
+  };
+  const move = (e: MapMouseEvent | MapTouchEvent) => {
+    if (!dragging || ('points' in e && e.points.length !== 1)) return;
+    const { lng, lat } = e.lngLat.wrap();
+    dragging.to = [lng, lat];
+    drag.onMove(dragging.t, lng, lat);
+  };
+  const hoverOn = () => {
+    if (!dragging) canvas.style.cursor = 'grab';
+  };
+  const hoverOff = () => {
+    if (!dragging) canvas.style.cursor = '';
+  };
+
+  map.on('mousedown', start);
+  map.on('touchstart', start);
+  map.on('mousemove', move);
+  map.on('touchmove', move);
+  map.on('mouseup', end);
+  map.on('touchend', end);
+  map.on('mouseenter', TRACK_EDIT_POINTS_LAYER_ID, hoverOn);
+  map.on('mouseleave', TRACK_EDIT_POINTS_LAYER_ID, hoverOff);
+  return () => {
+    if (dragging) dragging.to = null; // abandoned, not dropped
+    end();
+    map.off('mousedown', start);
+    map.off('touchstart', start);
+    map.off('mousemove', move);
+    map.off('touchmove', move);
+    map.off('mouseup', end);
+    map.off('touchend', end);
+    map.off('mouseenter', TRACK_EDIT_POINTS_LAYER_ID, hoverOn);
+    map.off('mouseleave', TRACK_EDIT_POINTS_LAYER_ID, hoverOff);
+    canvas.style.cursor = '';
   };
 }
