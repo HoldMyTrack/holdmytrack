@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"net/http"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
@@ -34,4 +35,19 @@ func loadMaskOrBlank(ctx context.Context, store *storage.Store, objectKey *strin
 		return nil, fmt.Errorf("tile %q is not grayscale", *objectKey)
 	}
 	return gray, nil
+}
+
+// statusClientClosedRequest is nginx's 499: the client went away before the answer was ready.
+const statusClientClosedRequest = 499
+
+// clientGone reports whether r's client has already disconnected, and if so answers 499. A
+// map drops in-flight tile requests whenever it's zoomed or panned past them, so a cancelled
+// query or object fetch there is routine, not a server fault: it isn't logged, and the 499
+// keeps it out of the request metrics' 5xx count.
+func clientGone(w http.ResponseWriter, r *http.Request) bool {
+	if r.Context().Err() == nil {
+		return false
+	}
+	w.WriteHeader(statusClientClosedRequest)
+	return true
 }
