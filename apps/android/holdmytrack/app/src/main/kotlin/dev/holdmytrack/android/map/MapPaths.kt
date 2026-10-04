@@ -19,6 +19,9 @@ object MapPaths {
         val count: Int get() = listOf(trails, tracks, bikePaths).count { it }
     }
 
+    /** Every kind hidden: what's drawn while the Layers checkbox is off ([MapLayersSwitch]). */
+    val NONE = Paths(trails = false, tracks = false, bikePaths = false)
+
     /** Must match `TRAIL_LAYER_IDS`, `TRACK_LAYER_IDS` and `BIKE_PATH_LAYER_IDS` in
      *  apps/web/src/map/style.ts, which builds the served style. */
     private val TRAIL_LAYER_IDS = listOf("paths_trail", "paths_bridges_trail")

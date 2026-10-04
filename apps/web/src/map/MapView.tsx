@@ -36,6 +36,7 @@ import { EditActivityWindow, type EditTab, type EditWindowResult } from '../ui/E
 import { ExportControl } from '../ui/ExportControl';
 import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
 import { OverlaysMenu } from '../ui/OverlaysMenu';
+import { BasemapToggle } from '../ui/BasemapToggle';
 import { PhotoPopup } from '../ui/PhotoPopup';
 import { ShowInArea } from '../ui/ShowInArea';
 import { TimelineImportWindow } from '../ui/TimelineImportWindow';
@@ -168,16 +169,21 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // Normal is what already rendered before fog existed — it needed no new work to count
   // as a "mode" (IMPLEMENTATION.md §4.2.2).
   const [mapMode, setMapModeState] = useState<MapMode>('normal');
-  // The Layers menu (OverlaysMenu.tsx): the Base map, then Trails, Tracks, Bike paths and each
-  // Spots category, over any mode, remembered per browser (overlays.ts).
+  // The Satellite button (BasemapToggle.tsx) and the Layers menu (OverlaysMenu.tsx): Trails,
+  // Tracks, Bike paths and each Spots category, over any mode, drawn while the Layers checkbox is
+  // on; remembered per browser (overlays.ts).
   const [overlays, setOverlays] = useState<Overlays>(loadOverlays);
   const changeOverlays = useCallback((next: Overlays) => {
     saveOverlays(next);
     setOverlays(next);
   }, []);
   const paths = useMemo(
-    () => ({ trails: overlays.trails, tracks: overlays.tracks, bikePaths: overlays.bikePaths }),
-    [overlays.trails, overlays.tracks, overlays.bikePaths],
+    () => ({
+      trails: overlays.enabled && overlays.trails,
+      tracks: overlays.enabled && overlays.tracks,
+      bikePaths: overlays.enabled && overlays.bikePaths,
+    }),
+    [overlays.enabled, overlays.trails, overlays.tracks, overlays.bikePaths],
   );
   // Satellite imagery (FR-4.14): only when the deployment configures some, whatever was saved.
   const satelliteAvailable = satelliteSource() !== null;
@@ -251,7 +257,10 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
   const editingTrack = editingActivityId !== null;
   // Spots step aside during a track session, like every other track: TrackEditor owns the map.
-  const spotsShown = useMemo<readonly SpotCategory[]>(() => (editingTrack ? [] : overlays.spots), [editingTrack, overlays.spots]);
+  const spotsShown = useMemo<readonly SpotCategory[]>(
+    () => (editingTrack || !overlays.enabled ? [] : overlays.spots),
+    [editingTrack, overlays.enabled, overlays.spots],
+  );
 
   // The Activities panel's tab — here rather than in the panel so `/?private-locations` can open
   // onto Privacy (FR-8.1) and `/?story=` onto Stories (FR-14.6), and so the tab outlives the
@@ -1376,7 +1385,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     map.setStyle(buildStyle({ flavor, origin: basemapOrigin(), satellite: satelliteSource(), satelliteOn: satellite }), {
       diff: false,
     });
-    // Only a flavor change swaps the style; the Base map switch flips layers in place (below).
+    // Only a flavor change swaps the style; the Satellite button flips layers in place (below).
   }, [map, flavor]);
 
   // Mode changes outside of a styledata event (the toggle itself, not a theme swap) still
@@ -1607,7 +1616,10 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
                 </button>
               </div>
               {/* Its own group: layers switched on and off over any mode, not a fourth mode. */}
-              <OverlaysMenu overlays={overlays} satelliteAvailable={satelliteAvailable} onChange={changeOverlays} />
+              <OverlaysMenu overlays={overlays} onChange={changeOverlays} />
+              {satelliteAvailable && (
+                <BasemapToggle satellite={overlays.satellite} onChange={(on) => changeOverlays({ ...overlays, satellite: on })} />
+              )}
               {/* On a line of its own under the toggles, however many rows they wrap to. */}
               {map && <ZoomLevelNotice map={map} mode={mapMode} />}
             </div>

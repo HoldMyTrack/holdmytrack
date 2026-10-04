@@ -223,7 +223,7 @@ describe('basemap foundation', () => {
     assert.ok(true);
   });
 
-  it('8. Layers menu: trails, tracks and bike paths off by default, each shown on its own, remembered across reload', async () => {
+  it('8. Layers menu: trails, tracks and bike paths off by default, each shown on its own, all hidden by the checkbox, remembered across reload', async () => {
     const TRAILS = ['paths_trail', 'paths_bridges_trail'];
     const TRACKS = ['paths_track', 'paths_bridges_track'];
     const BIKES = ['paths_cycleway', 'paths_bridges_cycleway'];
@@ -263,11 +263,35 @@ describe('basemap foundation', () => {
     await page.reload();
     await styleLoaded();
     assert.deepEqual(await visibility(ALL), ALL.map(() => 'visible'), 'remembered across reload');
+
+    // The checkbox on the Layers button hides every pick at once and keeps them.
+    const master = page.locator('#overlay-master');
+    assert.equal(await master.isChecked(), true, 'checkbox on while picks show');
+    await master.uncheck();
+    assert.deepEqual(await visibility(ALL), ALL.map(() => 'none'), 'all hidden by the checkbox');
     await openMenu();
+    assert.equal(await page.locator('#overlay-trails').isChecked(), true, 'picks kept while hidden');
+    assert.equal(await menu.locator('.overlays-menu__count--off').textContent(), '3', 'count greyed, not cleared');
+    await page.reload();
+    await styleLoaded();
+    assert.equal(await master.isChecked(), false, 'checkbox remembered across reload');
+    assert.deepEqual(await visibility(ALL), ALL.map(() => 'none'), 'still hidden after reload');
+    await master.check();
+    assert.deepEqual(await visibility(ALL), ALL.map(() => 'visible'), 'all back with the checkbox');
+    // Picking something while it's off turns it back on, or the pick would seem to do nothing.
+    await master.uncheck();
+    await openMenu();
+    await page.locator('#overlay-trails').uncheck();
+    assert.equal(await master.isChecked(), false, 'unpicking leaves the checkbox off');
+    await page.locator('#overlay-trails').check();
+    assert.equal(await master.isChecked(), true, 'picking turns the checkbox back on');
+    assert.deepEqual(await visibility(ALL), ALL.map(() => 'visible'), 'picks shown again');
+
     await page.locator('#overlay-trails').uncheck();
     await page.locator('#overlay-tracks').uncheck();
     await page.locator('#overlay-bike-paths').uncheck();
     assert.deepEqual(await visibility(ALL), ALL.map(() => 'none'), 'hidden again once unticked');
+    assert.equal(await master.isDisabled(), true, 'nothing picked: nothing for the checkbox to show');
 
     // Tracks explains itself behind an info button, without ticking the box.
     await page.locator('.overlays-menu__info').click();
@@ -278,18 +302,13 @@ describe('basemap foundation', () => {
   });
 
   // Satellite mode (docs/SPEC.md FR-4.14) exists only when the dev server was started with
-  // VITE_SATELLITE_TILES: without it the style has no imagery and the menu no Base map section,
-  // which is what CI checks; with it, the switch itself.
-  it('9. Base map: Satellite shows imagery under roads and labels, remembered across reload, or is absent unconfigured', async () => {
-    const menu = page.getByTestId('map-overlays');
-    const openMenu = async () => {
-      const trigger = menu.getByRole('button').first();
-      if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
-    };
+  // VITE_SATELLITE_TILES: without it the style has no imagery and the map no Satellite button,
+  // which is what CI checks; with it, the button itself.
+  it('9. Satellite button: shows imagery under roads and labels, remembered across reload, or is absent unconfigured', async () => {
+    const button = page.getByTestId('map-basemap').getByRole('button');
     const hasImagery = await page.evaluate(() => Boolean(window.__holdmytrack.getLayer('satellite')));
-    await openMenu();
     if (!hasImagery) {
-      assert.equal(await page.locator('#overlay-basemap-satellite').count(), 0, 'no Base map section without imagery');
+      assert.equal(await page.getByTestId('map-basemap').count(), 0, 'no Satellite button without imagery');
       return;
     }
 
@@ -309,8 +328,10 @@ describe('basemap foundation', () => {
     page.on('response', countImagery);
 
     assert.deepEqual(await visibility(['satellite']), ['none'], 'imagery off until chosen');
-    await page.locator('#overlay-basemap-satellite').check();
+    assert.equal(await button.getAttribute('aria-pressed'), 'false', 'button not pressed');
+    await button.click();
     assert.deepEqual(await visibility(['satellite']), ['visible'], 'imagery on');
+    assert.equal(await button.getAttribute('aria-pressed'), 'true', 'button pressed');
     assert.deepEqual(await visibility(FILLS), FILLS.map(() => 'none'), 'fills hidden over it');
     assert.deepEqual(await visibility(KEPT), KEPT.map(() => 'visible'), 'roads and labels kept');
     const roadOpacity = () =>
@@ -327,8 +348,7 @@ describe('basemap foundation', () => {
     await page.reload();
     await styleLoaded();
     assert.deepEqual(await visibility(['satellite']), ['visible'], 'remembered across reload');
-    await openMenu();
-    await page.locator('#overlay-basemap-map').check();
+    await button.click();
     assert.deepEqual(await visibility(['satellite']), ['none'], 'imagery off again');
     assert.deepEqual(await visibility(FILLS), FILLS.map(() => 'visible'), 'fills back');
     assert.deepEqual(await roadOpacity(), [undefined, undefined, 0.5], 'roads opaque again');

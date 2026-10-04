@@ -1423,6 +1423,36 @@ button.activities-panel__story-badge:hover {
   text-align: center;
 }
 
+/* Greyed while the Layers checkbox is off: the picks are kept, not shown. */
+.overlays-menu__count--off {
+  opacity: 0.55;
+}
+
+/* The checkbox before the Layers button: shows or hides every pick at once. The label pads it to a
+   comfortable hit area of its own, apart from the button that opens the menu. */
+.overlays-menu__master {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--fm-space-4) 0 var(--fm-space-6);
+  cursor: pointer;
+}
+
+.overlays-menu__master input {
+  margin: 0;
+  accent-color: var(--fm-accent);
+  cursor: inherit;
+}
+
+.overlays-menu__master:has(input:disabled) {
+  cursor: default;
+}
+
+.basemap-toggle .map-mode-toggle__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fm-space-6);
+}
+
 .overlays-menu__panel {
   position: absolute;
   top: calc(100% + 8px);

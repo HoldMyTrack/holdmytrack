@@ -108,9 +108,9 @@
     <string name="map_level_heatmap_country">Country view — every country you\'ve been to in the last year is highlighted</string>
     <string name="map_level_heatmap_region">Region view — every state or province you\'ve been to in the last year is highlighted</string>
     <string name="layers_button">Layers</string>
-    <string name="layers_basemap">Base map</string>
-    <string name="layers_basemap_map">Map</string>
-    <string name="layers_basemap_satellite">Satellite</string>
+    <string name="layers_master">Show layers</string>
+    <string name="layers_master_empty">Pick paths or places first</string>
+    <string name="layers_satellite">Satellite</string>
     <string name="layers_paths">Paths</string>
     <string name="layers_trails">Trails</string>
     <string name="layers_tracks">Tracks</string>

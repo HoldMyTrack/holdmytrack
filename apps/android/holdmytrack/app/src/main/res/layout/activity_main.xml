@@ -165,50 +165,97 @@
             android:clipChildren="false"
             android:clipToPadding="false">
 
-            <!-- Layers (map/LayersMenu): the base map and the paths, switched on over any mode. Icon
-                 only, the burger's own panel and size; filled, like the active mode, while any path
-                 is on, with a badge on its corner counting them. -->
-            <FrameLayout
-                android:id="@+id/layers_panel"
-                style="@style/Widget.HoldMyTrack.MapPanel"
+            <!-- Layers and Satellite, at the second row's start. Layers (map/LayersMenu) is a pill:
+                 a checkbox that shows or hides every picked path and place at once, then the icon
+                 that opens the menu, filled like the active mode while picks show, with a badge on
+                 its corner counting them. Satellite (MapSatellite) is an icon toggle of its own
+                 under it, rather than beside it, so the row keeps its width for Show in this area;
+                 gone when the served style has no imagery. -->
+            <LinearLayout
+                android:id="@+id/layers_group"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="start|top"
                 android:clipChildren="false"
                 android:clipToPadding="false"
+                android:orientation="vertical"
                 android:visibility="gone">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/layers_button"
-                    style="@style/Widget.HoldMyTrack.Button.MapIcon.Toggle"
+                <LinearLayout
+                    android:id="@+id/layers_panel"
+                    style="@style/Widget.HoldMyTrack.MapPanel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:contentDescription="@string/layers_button"
-                    app:icon="@drawable/ic_layers" />
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                <TextView
-                    android:id="@+id/layers_count"
+                    <com.google.android.material.checkbox.MaterialCheckBox
+                        android:id="@+id/layers_master"
+                        android:layout_width="wrap_content"
+                        android:layout_height="48dp"
+                        android:contentDescription="@string/layers_master"
+                        android:minWidth="40dp"
+                        android:minHeight="48dp" />
+
+                    <FrameLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:clipChildren="false"
+                        android:clipToPadding="false">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/layers_button"
+                            style="@style/Widget.HoldMyTrack.Button.MapIcon.Toggle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:contentDescription="@string/layers_button"
+                            app:icon="@drawable/ic_layers" />
+
+                        <TextView
+                            android:id="@+id/layers_count"
+                            android:layout_width="wrap_content"
+                            android:layout_height="16dp"
+                            android:layout_gravity="end|top"
+                            android:layout_marginTop="-2dp"
+                            android:layout_marginEnd="-2dp"
+                            android:background="@drawable/bg_layers_count"
+                            android:elevation="2dp"
+                            android:gravity="center"
+                            android:importantForAccessibility="no"
+                            android:minWidth="16dp"
+                            android:paddingStart="@dimen/hmt_space_4"
+                            android:paddingEnd="@dimen/hmt_space_4"
+                            android:textColor="@color/hmt_on_accent"
+                            android:textSize="@dimen/hmt_text_3xs"
+                            android:textStyle="bold"
+                            android:visibility="gone" />
+                    </FrameLayout>
+                </LinearLayout>
+
+                <FrameLayout
+                    android:id="@+id/satellite_panel"
+                    style="@style/Widget.HoldMyTrack.MapPanel"
                     android:layout_width="wrap_content"
-                    android:layout_height="16dp"
-                    android:layout_gravity="end|top"
-                    android:layout_marginTop="-2dp"
-                    android:layout_marginEnd="-2dp"
-                    android:background="@drawable/bg_layers_count"
-                    android:elevation="2dp"
-                    android:gravity="center"
-                    android:importantForAccessibility="no"
-                    android:minWidth="16dp"
-                    android:paddingStart="@dimen/hmt_space_4"
-                    android:paddingEnd="@dimen/hmt_space_4"
-                    android:textColor="@color/hmt_on_accent"
-                    android:textSize="@dimen/hmt_text_3xs"
-                    android:textStyle="bold"
-                    android:visibility="gone" />
-            </FrameLayout>
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/hmt_space_6"
+                    android:visibility="gone">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/satellite_button"
+                        style="@style/Widget.HoldMyTrack.Button.MapIcon.Toggle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:contentDescription="@string/layers_satellite"
+                        app:icon="@drawable/ic_satellite" />
+                </FrameLayout>
+            </LinearLayout>
 
             <!-- "Show in this area" (map/ShowInArea): centred between Layers and Record, wrapping
-                 to a second line rather than running under either. Gone outside zoom 10–13 and
-                 with no place ticked. -->
+                 to a second line rather than running under either: its start margin follows the
+                 Layers pill's width (MainActivity.fitShowInArea), the end one clears Record. Gone
+                 outside zoom 10–13 and with no place shown. -->
             <TextView
                 android:id="@+id/show_in_area"
                 style="@style/Widget.HoldMyTrack.ShowInArea"

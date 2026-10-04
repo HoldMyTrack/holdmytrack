@@ -44,6 +44,7 @@ import dev.holdmytrack.android.map.DateRangeSlider
 import dev.holdmytrack.android.map.MapMode
 import dev.holdmytrack.android.map.MapOverlays
 import dev.holdmytrack.android.map.LayersMenu
+import dev.holdmytrack.android.map.MapLayersSwitch
 import dev.holdmytrack.android.map.MapPaths
 import dev.holdmytrack.android.map.MapSatellite
 import dev.holdmytrack.android.map.MapSpots
@@ -144,7 +145,9 @@ class MainActivity : AppCompatActivity() {
     private var showInArea: ShowInArea? = null
     private lateinit var recordButton: RecordButton
     private lateinit var secondRow: View
-    private lateinit var layersPanel: View
+    private lateinit var layersGroup: View
+    private lateinit var satellitePanel: View
+    private lateinit var satelliteButton: MaterialButton
     private lateinit var recordingStatus: View
     private lateinit var recordingStatusDot: View
     private lateinit var recordingStatusTime: Chronometer
@@ -407,17 +410,23 @@ class MainActivity : AppCompatActivity() {
             button.minWidth = minTouchTargetPx()
             button.minimumWidth = minTouchTargetPx()
         }
-        layersPanel = findViewById(R.id.layers_panel)
+        layersGroup = findViewById(R.id.layers_group)
         layersMenu = LayersMenu(
+            master = findViewById(R.id.layers_master),
             button = findViewById(R.id.layers_button),
             count = findViewById(R.id.layers_count),
             paths = { MapPaths.get(this) },
-            satellite = { MapSatellite.isOn(this) },
             spots = { MapSpots.get(this) },
+            shown = { MapLayersSwitch.isOn(this) },
             onPaths = ::setPaths,
-            onSatellite = ::setSatellite,
             onSpots = ::setSpots,
+            onShown = ::setLayersShown,
         )
+        satellitePanel = findViewById(R.id.satellite_panel)
+        satelliteButton = findViewById(R.id.satellite_button)
+        satelliteButton.setOnClickListener { setSatellite(!MapSatellite.isOn(this)) }
+        renderSatelliteButton()
+        layersGroup.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> fitShowInArea() }
         spotPopup = SpotPopup(findViewById(R.id.spot_popup), { topChrome.bottom }, ::onCaptureTap)
         photoMarkers = PhotoMarkers(findViewById(R.id.photo_markers), ::openPhotoMarker)
         photoPopup = PhotoPopup(findViewById(R.id.photo_popup), { topChrome.bottom }) { renderPhotoMarkers() }
@@ -575,7 +584,7 @@ class MainActivity : AppCompatActivity() {
             instance.addOnCameraIdleListener { photoMarkers.regroup() }
             showInArea = ShowInArea(findViewById(R.id.show_in_area), instance) { spots ->
                 MapSpots.setInArea(style?.takeIf { overlaysAttached }, spots)
-            }.apply { setCategories(MapSpots.get(this@MainActivity)) }
+            }.apply { setCategories(shownSpots(MapSpots.get(this@MainActivity))) }
             instance.addOnCameraIdleListener { showInArea?.onCameraIdle() }
             instance.addOnCameraIdleListener { zoomLevelNotice.onCameraIdle(instance.cameraPosition.zoom) }
             loadStyle()
@@ -641,9 +650,9 @@ class MainActivity : AppCompatActivity() {
             style = loaded
             hideNotice(Notice.MAP_FAILED)
             // The served style ships the path layers hidden; a fresh style needs the saved choice.
-            MapPaths.apply(loaded, MapPaths.get(this))
-            // Only a deployment with imagery serves it; without, the Layers menu has no Base map.
-            layersMenu.satelliteAvailable = MapSatellite.isAvailable(loaded)
+            MapPaths.apply(loaded, shownPaths(MapPaths.get(this)))
+            // Only a deployment with imagery serves it; without, there is no Satellite button.
+            satellitePanel.isVisible = MapSatellite.isAvailable(loaded)
             MapSatellite.apply(loaded, MapSatellite.isOn(this))
             MapOverlays.attachLiveTrack(loaded)
             syncSession()
@@ -868,7 +877,7 @@ class MainActivity : AppCompatActivity() {
             MapOverlays.attach(loaded, mode, selectedRange, darkBase(loaded), storyId)
             MapOverlays.setTrackFilter(loaded, panelState.mapHidden, panelState.focused)
             // Last, so the places are over everything else, labels included.
-            MapSpots.attach(loaded, this, MapSpots.get(this))
+            MapSpots.attach(loaded, this, shownSpots(MapSpots.get(this)))
             overlaysAttached = true
             loadSpotCaptures()
             captureMode.onStyleAttached()
@@ -1207,7 +1216,7 @@ class MainActivity : AppCompatActivity() {
     private fun renderModeBar() {
         if (!modeBarReady) return
         modeBar.visibility = if (isRecording() || editWindow.isOpen) View.GONE else View.VISIBLE
-        layersPanel.visibility = View.VISIBLE
+        layersGroup.visibility = View.VISIBLE
         renderZoomLevelNotice()
     }
 
@@ -1856,19 +1865,55 @@ class MainActivity : AppCompatActivity() {
     /** The Layers menu's Points of interest. Unticking the open popup's category closes it. */
     private fun setSpots(categories: List<MapSpots.Category>) {
         MapSpots.set(this, categories)
-        style?.takeIf { overlaysAttached }?.let { MapSpots.setCategories(it, categories) }
-        spotPopup.spot?.let { open -> if (categories.none { it.wire == open.category }) spotPopup.close() }
+        showSpots(shownSpots(categories))
         captureMode.spot?.let { target -> if (categories.none { it.wire == target.category }) captureMode.stop() }
-        showInArea?.setCategories(categories)
     }
 
     private fun setPaths(paths: MapPaths.Paths) {
         MapPaths.set(this, paths)
-        style?.let { MapPaths.apply(it, paths) }
+        style?.let { MapPaths.apply(it, shownPaths(paths)) }
+    }
+
+    /** The Layers checkbox: shows or hides every pick at once, keeping them. A capture in progress
+     *  carries on, since hiding the places is about the view, not about going to one. */
+    private fun setLayersShown(on: Boolean) {
+        MapLayersSwitch.set(this, on)
+        style?.let { MapPaths.apply(it, shownPaths(MapPaths.get(this))) }
+        showSpots(shownSpots(MapSpots.get(this)))
+    }
+
+    /** What the map draws of the picks: all of them while the Layers checkbox is on, none while off. */
+    private fun shownPaths(paths: MapPaths.Paths) = if (MapLayersSwitch.isOn(this)) paths else MapPaths.NONE
+
+    private fun shownSpots(categories: List<MapSpots.Category>) =
+        if (MapLayersSwitch.isOn(this)) categories else emptyList()
+
+    /** Draws these places, and closes the popup of one that's no longer drawn. */
+    private fun showSpots(shown: List<MapSpots.Category>) {
+        style?.takeIf { overlaysAttached }?.let { MapSpots.setCategories(it, shown) }
+        spotPopup.spot?.let { open -> if (shown.none { it.wire == open.category }) spotPopup.close() }
+        showInArea?.setCategories(shown)
+    }
+
+    /** Keeps Show in this area centred between the Layers pill and Record, clear of both: its
+     *  start margin follows the pill's width, plus the row's gap; the end one, from the layout,
+     *  clears Record. */
+    private fun fitShowInArea() {
+        val view = findViewById<View>(R.id.show_in_area)
+        val params = view.layoutParams as MarginLayoutParams
+        val start = layersGroup.width + resources.getDimensionPixelSize(R.dimen.hmt_space_12)
+        if (params.marginStart == start) return
+        params.marginStart = start
+        view.layoutParams = params
+    }
+
+    private fun renderSatelliteButton() {
+        satelliteButton.isChecked = MapSatellite.isOn(this)
     }
 
     private fun setSatellite(on: Boolean) {
         MapSatellite.set(this, on)
+        renderSatelliteButton()
         val loaded = style ?: return
         MapSatellite.apply(loaded, on)
         if (overlaysAttached) MapOverlays.setDarkVeil(loaded, darkBase(loaded))
