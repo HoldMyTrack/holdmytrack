@@ -1,6 +1,7 @@
 package dev.holdmytrack.android.panel
 
 import android.annotation.SuppressLint
+import android.graphics.PointF
 import android.view.MotionEvent
 import android.view.View
 import android.widget.TextView
@@ -9,6 +10,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.slider.RangeSlider
 import dev.holdmytrack.android.R
 import dev.holdmytrack.android.map.EditPreview
+import dev.holdmytrack.android.map.TrackEditOverlay
 import dev.holdmytrack.android.net.Activity
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.TrackEdit
@@ -18,13 +20,15 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import kotlin.math.roundToInt
+import org.maplibre.android.maps.MapLibreMap
 
 /**
  * The Edit window's Track tab — the web's `apps/web/src/ui/TrackEditor.tsx` (`docs/SPEC.md`
  * FR-5.14): one activity's recorded points and the edit already saved on them, a two-knob range
  * over the points as the edit leaves them, and **Chop** (keep the range), **Cut** (take out
  * what's between the knobs and join them), **Delete point** (a toggle: a tap on the map takes
- * out the point under it), **Undo** and **Reset**. Nothing is sent from here: [pending] is the
+ * out the point under it), **Move point** (a toggle: a point pressed on the map follows the
+ * finger and stays where it's let go), **Undo** and **Reset**. Nothing is sent from here: [pending] is the
  * whole edit for the window's Save to send, and every change is drawn over the map through
  * [onDraw] — the points as they'd end up, the knobs, and the preview of what goes.
  *
@@ -52,9 +56,10 @@ class TrackEditor(
     private val chop: MaterialButton = root.findViewById(R.id.edit_track_chop)
     private val cut: MaterialButton = root.findViewById(R.id.edit_track_cut)
     private val deletePoint: MaterialButton = root.findViewById(R.id.edit_track_delete_point)
+    private val movePoint: MaterialButton = root.findViewById(R.id.edit_track_move_point)
     private val undo: MaterialButton = root.findViewById(R.id.edit_track_undo)
     private val reset: MaterialButton = root.findViewById(R.id.edit_track_reset)
-    private val deleteNote: View = root.findViewById(R.id.edit_track_delete_note)
+    private val modeNote: TextView = root.findViewById(R.id.edit_track_mode_note)
 
     private var activityId: String? = null
     private var points: List<TrackPoint>? = null
@@ -68,6 +73,12 @@ class TrackEditor(
     /** Delete point is on: a map tap on a point goes to [dropPoint]. */
     var deleteMode = false
         private set
+
+    /** Move point is on: a press on a point drags it ([onMapTouch]). Never on with [deleteMode]. */
+    private var moveMode = false
+
+    /** The point a Move point drag holds, drawn at the finger — nothing committed until let go. */
+    private var dragging: EditOp.Move? = null
 
     /** The window is saving: nothing here changes meanwhile. */
     var busy = false
@@ -101,6 +112,12 @@ class TrackEditor(
         holdToPreviewCut()
         deletePoint.addOnCheckedChangeListener { _, checked ->
             deleteMode = checked
+            if (checked) movePoint.isChecked = false
+            render()
+        }
+        movePoint.addOnCheckedChangeListener { _, checked ->
+            moveMode = checked
+            if (checked) deletePoint.isChecked = false else dragging = null
             render()
         }
         undo.setOnClickListener {
@@ -112,6 +129,7 @@ class TrackEditor(
         TooltipCompat.setTooltipText(chop, res.getString(R.string.edit_track_chop_title))
         TooltipCompat.setTooltipText(cut, res.getString(R.string.edit_track_cut_title))
         TooltipCompat.setTooltipText(deletePoint, res.getString(R.string.edit_track_delete_point_title))
+        TooltipCompat.setTooltipText(movePoint, res.getString(R.string.edit_track_move_point_title))
         TooltipCompat.setTooltipText(undo, res.getString(R.string.edit_track_undo_title))
         TooltipCompat.setTooltipText(reset, res.getString(R.string.edit_track_reset_title))
     }
@@ -129,7 +147,7 @@ class TrackEditor(
         ops = emptyList()
         knobLo = null
         knobHi = null
-        deletePoint.isChecked = false
+        pointModesOff()
         val gen = ++generation
         note.setText(R.string.edit_track_loading)
         note.setTextColor(context.getColor(R.color.hmt_ink_meta))
@@ -150,9 +168,15 @@ class TrackEditor(
         }
     }
 
-    /** The tab is out of sight: Delete point goes off, as the web's does when its tab does. */
+    /** The tab is out of sight: Delete point and Move point go off, as the web's do when its
+     *  tab does. */
     fun hide() {
+        pointModesOff()
+    }
+
+    private fun pointModesOff() {
         deletePoint.isChecked = false
+        movePoint.isChecked = false
     }
 
     /** The window closed: the session and the overlay go. */
@@ -161,7 +185,7 @@ class TrackEditor(
         activityId = null
         points = null
         ops = emptyList()
-        deletePoint.isChecked = false
+        pointModesOff()
         onDraw(null, 0, 0, EditPreview.CHOP)
     }
 
@@ -179,6 +203,53 @@ class TrackEditor(
         if (!deleteMode || busy || visible.size <= 2) return
         push(EditOp.Drop(t))
     }
+
+    /**
+     * The map's own touches, before it pans, in Move point mode: a press on a point takes the
+     * gesture — the map stays put, as the Privacy tab's handle drag does — each move draws the
+     * point under the finger, and letting go is one step; let go unmoved, or a second finger
+     * down, and nothing changes. Returns whether the touch was taken.
+     */
+    fun onMapTouch(event: MotionEvent, map: MapLibreMap, density: Float): Boolean {
+        if (!moveMode || busy || points == null) return false
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                val t = TrackEditOverlay.pointAt(map, PointF(event.x, event.y), density) ?: return false
+                val p = visible.firstOrNull { it.t == t } ?: return false
+                dragging = EditOp.Move(t, p.lon, p.lat)
+                pressedUnmoved = true
+                return true
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                val was = dragging != null
+                dragging = null
+                if (was) draw()
+                return false
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val held = dragging ?: return false
+                val at = map.projection.fromScreenLocation(PointF(event.x, event.y))
+                dragging = held.copy(lon = at.longitude, lat = at.latitude)
+                pressedUnmoved = false
+                draw()
+                return true
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                val held = dragging ?: return false
+                dragging = null
+                if (event.actionMasked == MotionEvent.ACTION_UP && !pressedUnmoved) {
+                    push(EditTrackOps.move(held.t, held.lon, held.lat))
+                } else {
+                    draw()
+                }
+                return true
+            }
+        }
+        return dragging != null
+    }
+
+    /** No ACTION_MOVE since the press: a tap on a point, which moves nothing. */
+    private var pressedUnmoved = false
 
     private fun push(op: EditOp?) {
         if (op == null) return
@@ -236,12 +307,27 @@ class TrackEditor(
         chop.isEnabled = !busy && EditTrackOps.chop(visible, lo, hi) != null
         cut.isEnabled = !busy && EditTrackOps.cut(visible, lo, hi) != null
         deletePoint.isEnabled = !busy
+        movePoint.isEnabled = !busy
         undo.isEnabled = !busy && ops.isNotEmpty()
         reset.visibility = if (!EditTrackOps.fold(base, ops).isEmpty) View.VISIBLE else View.GONE
         reset.isEnabled = !busy
-        deleteNote.visibility = if (deleteMode) View.VISIBLE else View.GONE
+        when {
+            deleteMode -> modeNote.setText(R.string.edit_track_delete_point_note)
+            moveMode -> modeNote.setText(R.string.edit_track_move_point_note)
+        }
+        modeNote.visibility = if (deleteMode || moveMode) View.VISIBLE else View.GONE
 
-        onDraw(visible, lo, hi, if (preview == EditPreview.CUT && cut.isEnabled) EditPreview.CUT else EditPreview.CHOP)
+        draw()
+    }
+
+    /** The overlay alone, for each step of a drag: the held point at the finger, so the line
+     *  through it follows, over the points as the edit leaves them. */
+    private fun draw() {
+        if (visible.size < 2) return
+        val (lo, hi) = knobs()
+        val held = dragging
+        val shown = if (held == null) visible else visible.map { if (it.t == held.t) it.copy(lon = held.lon, lat = held.lat) else it }
+        onDraw(shown, lo, hi, if (preview == EditPreview.CUT && cut.isEnabled) EditPreview.CUT else EditPreview.CHOP)
     }
 
     /** The web previews Cut while its button is hovered or focused; on a phone, while it's

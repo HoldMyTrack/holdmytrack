@@ -258,15 +258,17 @@ data class TrackPoint(val lon: Double, val lat: Double, val t: Long)
 /**
  * A track edit, as the server stores and replays it (`docs/IMPLEMENTATION.md` §4.7.7): a point
  * survives when it's inside [keep] (inclusive, null for no limit), outside every [remove]
- * range (inclusive), and not in [drop]. All times are Unix ms.
+ * range (inclusive), and not in [drop]; a survivor whose time is a key of [move] is drawn at
+ * that lon/lat instead. All times are Unix ms.
  */
 data class TrackEdit(
     val keep: Pair<Long, Long>? = null,
     val remove: List<Pair<Long, Long>> = emptyList(),
     val drop: List<Long> = emptyList(),
+    val move: Map<Long, Pair<Double, Double>> = emptyMap(),
 ) {
     val isEmpty: Boolean
-        get() = keep == null && remove.isEmpty() && drop.isEmpty()
+        get() = keep == null && remove.isEmpty() && drop.isEmpty() && move.isEmpty()
 }
 
 /** An activity's recorded points and the edit already applied to them, if any. */
@@ -1189,10 +1191,16 @@ object HoldMyTrackApi {
         fun pair(a: JSONArray) = a.getLong(0) to a.getLong(1)
         val remove = json.optJSONArray("remove")
         val drop = json.optJSONArray("drop")
+        // Keyed by time, which JSON can only carry as an object key.
+        val move = json.optJSONObject("move")
         return TrackEdit(
             keep = json.optJSONArray("keep")?.let(::pair),
             remove = List(remove?.length() ?: 0) { pair(remove!!.getJSONArray(it)) },
             drop = List(drop?.length() ?: 0) { drop!!.getLong(it) },
+            move = move?.keys()?.asSequence()?.associate { t ->
+                val at = move.getJSONArray(t)
+                t.toLong() to (at.getDouble(0) to at.getDouble(1))
+            }.orEmpty(),
         )
     }
 
@@ -1200,6 +1208,9 @@ object HoldMyTrackApi {
         edit.keep?.let { put("keep", JSONArray().put(it.first).put(it.second)) }
         if (edit.remove.isNotEmpty()) put("remove", JSONArray(edit.remove.map { JSONArray().put(it.first).put(it.second) }))
         if (edit.drop.isNotEmpty()) put("drop", JSONArray(edit.drop))
+        if (edit.move.isNotEmpty()) {
+            put("move", JSONObject().apply { edit.move.forEach { (t, at) -> put(t.toString(), JSONArray().put(at.first).put(at.second)) } })
+        }
     }
 
     /**

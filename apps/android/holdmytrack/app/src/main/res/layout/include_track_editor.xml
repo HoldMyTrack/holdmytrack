@@ -131,6 +131,15 @@
                     android:text="@string/edit_track_delete_point" />
 
                 <com.google.android.material.button.MaterialButton
+                    android:id="@+id/edit_track_move_point"
+                    style="@style/Widget.HoldMyTrack.Button.EditTrack"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/hmt_space_6"
+                    android:checkable="true"
+                    android:text="@string/edit_track_move_point" />
+
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/edit_track_undo"
                     style="@style/Widget.HoldMyTrack.Button.EditTrack"
                     android:layout_width="wrap_content"
@@ -150,11 +159,10 @@
         </HorizontalScrollView>
 
         <TextView
-            android:id="@+id/edit_track_delete_note"
+            android:id="@+id/edit_track_mode_note"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/hmt_space_4"
-            android:text="@string/edit_track_delete_point_note"
             android:textColor="@color/hmt_ink_meta"
             android:textSize="@dimen/hmt_text_sm"
             android:visibility="gone" />

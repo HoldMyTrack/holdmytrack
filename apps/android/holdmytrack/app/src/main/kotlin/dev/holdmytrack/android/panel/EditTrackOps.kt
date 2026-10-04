@@ -19,6 +19,9 @@ sealed interface EditOp {
     /** Take the one point at [t] out. */
     data class Drop(val t: Long) : EditOp
 
+    /** Put the one point at [t] at [lon]/[lat] instead. */
+    data class Move(val t: Long, val lon: Double, val lat: Double) : EditOp
+
     /** Back to the track as recorded — itself a step, so Undo brings the edits back. */
     data object Reset : EditOp
 }
@@ -36,20 +39,24 @@ object EditTrackOps {
         var keep = base?.keep
         val remove = base?.remove.orEmpty().toMutableList()
         val drop = base?.drop.orEmpty().toMutableList()
+        val move = base?.move.orEmpty().toMutableMap()
         for (op in ops) {
             when (op) {
                 EditOp.Reset -> {
                     keep = null
                     remove.clear()
                     drop.clear()
+                    move.clear()
                 }
                 // Chop narrows what's already kept, never widens it.
                 is EditOp.Chop -> keep = keep?.let { maxOf(it.first, op.keep.first) to minOf(it.second, op.keep.second) } ?: op.keep
                 is EditOp.Cut -> remove += op.remove
                 is EditOp.Drop -> drop += op.t
+                // A point moved twice ends where it was let go last.
+                is EditOp.Move -> move[op.t] = op.lon to op.lat
             }
         }
-        return TrackEdit(keep, remove, drop)
+        return TrackEdit(keep, remove, drop, move)
     }
 
     fun apply(points: List<TrackPoint>, edit: TrackEdit): List<TrackPoint> {
@@ -60,7 +67,14 @@ object EditTrackOps {
             if (keep != null && (p.t < keep.first || p.t > keep.second)) return@filter false
             if (p.t in drop) return@filter false
             edit.remove.none { (a, b) -> p.t in a..b }
-        }
+        }.map { p -> edit.move[p.t]?.let { (lon, lat) -> p.copy(lon = lon, lat = lat) } ?: p }
+    }
+
+    /** The point at [t] let go at [lon]/[lat], rounded to the 1e-6° (~0.1 m) the server sends
+     *  points in. */
+    fun move(t: Long, lon: Double, lat: Double): EditOp {
+        fun round(v: Double) = Math.round(v * 1e6) / 1e6
+        return EditOp.Move(t, round(lon), round(lat))
     }
 
     /** Keep the knobs' stretch — nothing when the knobs are at both ends already, or would

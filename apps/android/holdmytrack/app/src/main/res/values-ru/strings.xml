@@ -499,6 +499,9 @@
     <string name="edit_track_delete_point">Удалить точку</string>
     <string name="edit_track_delete_point_title">Нажимайте на точки на карте, чтобы удалять их</string>
     <string name="edit_track_delete_point_note">Нажмите на точку на карте, чтобы удалить её.</string>
+    <string name="edit_track_move_point">Переместить точку</string>
+    <string name="edit_track_move_point_title">Перетаскивайте точки на карте, чтобы перемещать их</string>
+    <string name="edit_track_move_point_note">Нажмите на точку на карте и перетащите её, чтобы переместить.</string>
     <string name="edit_track_undo">Отменить</string>
     <string name="edit_track_undo_title">Отменить последнее изменение</string>
     <string name="edit_track_reset">Сбросить</string>

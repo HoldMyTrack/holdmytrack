@@ -144,8 +144,11 @@ object TrackEditOverlay {
 
     /** The time of the point nearest a tap at [point], within a small tolerance — Delete
      *  point's target — or null for a tap on none. */
-    fun pointAt(map: MapLibreMap, point: LatLng, density: Float): Long? {
-        val screen = map.projection.toScreenLocation(point)
+    fun pointAt(map: MapLibreMap, point: LatLng, density: Float): Long? =
+        pointAt(map, map.projection.toScreenLocation(point), density)
+
+    /** The same for a touch at [screen] on the map view — Move point's press. */
+    fun pointAt(map: MapLibreMap, screen: PointF, density: Float): Long? {
         val r = TAP_TOLERANCE_DP * density
         val hits = map.queryRenderedFeatures(RectF(screen.x - r, screen.y - r, screen.x + r, screen.y + r), POINTS_LAYER_ID)
         return hits.mapNotNull { hit ->

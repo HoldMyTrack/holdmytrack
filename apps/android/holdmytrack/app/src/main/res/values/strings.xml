@@ -482,6 +482,9 @@
     <string name="edit_track_delete_point">Delete point</string>
     <string name="edit_track_delete_point_title">Tap points on the map to delete them</string>
     <string name="edit_track_delete_point_note">Tap a point on the map to delete it.</string>
+    <string name="edit_track_move_point">Move point</string>
+    <string name="edit_track_move_point_title">Drag points on the map to move them</string>
+    <string name="edit_track_move_point_note">Press a point on the map and drag it to move it.</string>
     <string name="edit_track_undo">Undo</string>
     <string name="edit_track_undo_title">Undo the last change</string>
     <string name="edit_track_reset">Reset</string>
