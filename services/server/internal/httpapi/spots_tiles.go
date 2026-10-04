@@ -59,6 +59,9 @@ func (s *Server) handleSpotsTile(w http.ResponseWriter, r *http.Request) {
 	var tile []byte
 	if z >= spotsMinZoom {
 		if err := s.pool.QueryRow(r.Context(), spotsQuery, z, x, y).Scan(&tile); err != nil {
+			if clientGone(w, r) {
+				return
+			}
 			s.log.Error("spots tile query failed", "err", err, "z", z, "x", x, "y", y)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return

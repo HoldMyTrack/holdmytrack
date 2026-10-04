@@ -80,6 +80,9 @@ func (s *Server) handleTracksTile(w http.ResponseWriter, r *http.Request) {
 	var tile []byte
 	err = s.pool.QueryRow(r.Context(), tracksQuery, z, x, y, userIDFromContext(r.Context()), filter.From, filter.To, filter.Types, filter.Story).Scan(&tile)
 	if err != nil {
+		if clientGone(w, r) {
+			return
+		}
 		s.log.Error("tracks tile query failed", "err", err, "z", z, "x", x, "y", y)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

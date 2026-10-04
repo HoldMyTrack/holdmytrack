@@ -77,6 +77,9 @@ func (s *Server) serveAdminTile(w http.ResponseWriter, r *http.Request, query st
 	var tile []byte
 	err := s.pool.QueryRow(r.Context(), query, z, x, y, userIDFromContext(r.Context())).Scan(&tile)
 	if err != nil {
+		if clientGone(w, r) {
+			return
+		}
 		s.log.Error("admin tile query failed", "err", err, "z", z, "x", x, "y", y)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
