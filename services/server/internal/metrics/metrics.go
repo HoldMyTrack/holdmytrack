@@ -83,7 +83,7 @@ func StatusClass(status int) string {
 // JobKinds are the jobs.kind values worker.runJob handles. The queue gauges report each one
 // even with nothing waiting, so a series exists at 0 rather than appearing only once a job
 // is stuck.
-var JobKinds = []string{"ingest", "render_fog", "edit_track", "reprivacy"}
+var JobKinds = []string{"ingest", "unpack", "render_fog", "edit_track", "reprivacy"}
 
 // queueCollector reads the queue from the database on every scrape: how many jobs are
 // runnable now, and how long the oldest has waited, by kind. `serve` registers it rather

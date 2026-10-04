@@ -2,129 +2,59 @@ package httpapi
 
 import (
 	"archive/zip"
-	"fmt"
+	"encoding/json"
 	"io"
 	"net/http"
-	"path/filepath"
-	"strings"
+
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/unpack"
 )
 
-// zipEntryResult is one contained file's outcome — the same three states a plain single-file
-// upload can reach (uploadResponse's "enqueued"/"already_processed"), plus "skipped" for a
-// contained file this server declined to process. §5.1's "one bad file in a bulk import
-// cannot abort the batch" is exactly why this is a list of per-entry outcomes rather than one
-// request failing or succeeding as a whole.
-type zipEntryResult struct {
-	Filename   string `json:"filename"`
-	Status     string `json:"status"` // "enqueued" | "already_processed" | "skipped"
-	ExternalID string `json:"external_id,omitempty"`
-	// Only set when Status == "skipped" — why this one entry didn't become a job.
-	Reason string `json:"reason,omitempty"`
+// archiveUploadResponse is what an archive upload is answered with as soon as it has arrived:
+// its files are read by the worker's `unpack` job, and what became of them — already
+// imported, skipped, more than one upload reads — reaches the Upload menu once that's done
+// (GET /v1/uploads/active's `unpacked`, matched by Batch).
+type archiveUploadResponse struct {
+	Status   string `json:"status"` // "zip_accepted"
+	Filename string `json:"filename"`
+	Batch    string `json:"batch"`
 }
 
-type zipUploadResponse struct {
-	Status   string           `json:"status"` // "zip_processed"
-	Filename string           `json:"filename"`
-	Files    []zipEntryResult `json:"files"`
-	// True when the archive had more non-directory entries than maxZipEntries — the ones
-	// past the cap were never looked at, not merely skipped for a per-file reason.
-	Truncated bool `json:"truncated,omitempty"`
-}
-
-// handleZipUpload is handleUpload's branch for a plain `.zip` archive
-// (IMPLEMENTATION.md §4.0.1's bulk-historical-import case) — one job enqueued per
-// contained .gpx/.fit/.tcx file, via the exact same persistAndEnqueue a plain single-file
-// upload uses, so a file that happens to arrive inside a zip is treated no differently once
-// extracted than one dropped on its own. A Google Takeout export is a `.zip` too but takes a
-// different path entirely — see isTakeoutArchive and handleTakeoutUpload in
-// takeout_upload.go — since it has no standalone .gpx/.fit/.tcx entries to walk this way at
-// all.
+// handleZipUpload is handleUpload's branch for a `.zip` (IMPLEMENTATION.md §4.0.1's bulk
+// import case, ADR-0032): a plain archive of .gpx/.fit/.tcx files, or a Google Takeout export.
+// It stores the archive once and enqueues one `unpack` job, which walks it under §5.1's
+// zip-bomb bounds and enqueues an `ingest` job per activity (internal/unpack). The request
+// tells the two kinds apart from the central directory alone, which zr has already read.
 //
-// The caller (handleUpload) has already opened the archive as a *zip.Reader over the uploaded
-// part — zip.NewReader needs an io.ReaderAt, which the multipart part (a temp file for
-// anything large) provides and a bare HTTP body doesn't. This function owns everything from
-// there: walking entries under §5.1's zip-bomb defenses.
-func (s *Server) handleZipUpload(w http.ResponseWriter, r *http.Request, zr *zip.Reader, filename string) {
+// The caller has opened the archive as a *zip.Reader over the uploaded part, which the
+// multipart part (a temp file for anything large) can serve and a bare HTTP body can't; the
+// archive is stored from the same part, without a second copy.
+func (s *Server) handleZipUpload(w http.ResponseWriter, r *http.Request, zr *zip.Reader, ra io.ReaderAt, size int64, filename string) {
 	ctx := r.Context()
 	userID := userIDFromContext(ctx)
-	results := make([]zipEntryResult, 0, len(zr.File))
 	batch := newBatchID()
-	processed := 0
-	truncated := false
-
-	for _, f := range zr.File {
-		if f.FileInfo().IsDir() {
-			continue
-		}
-		if processed >= maxZipEntries {
-			truncated = true
-			break
-		}
-		processed++
-
-		entryName := filepath.Base(f.Name) // strip any directory structure inside the archive
-		ext := strings.ToLower(filepath.Ext(entryName))
-		if !allowedExt[ext] {
-			results = append(results, zipEntryResult{
-				Filename: entryName, Status: "skipped",
-				Reason: fmt.Sprintf("unsupported file type %q", ext),
-			})
-			continue
-		}
-		// Checked against the archive's own declared size before decompressing anything —
-		// the cheap half of the zip-bomb defense. The read below is bounded independently,
-		// since a declared size is exactly the kind of thing a hostile or corrupt archive
-		// can lie about.
-		if f.UncompressedSize64 > maxZipEntryBytes {
-			results = append(results, zipEntryResult{Filename: entryName, Status: "skipped", Reason: "file too large"})
-			continue
-		}
-
-		entryData, err := readZipEntry(f)
-		if err != nil {
-			s.log.Error("zip entry read failed", "err", err, "entry", entryName)
-			results = append(results, zipEntryResult{Filename: entryName, Status: "skipped", Reason: "could not read entry"})
-			continue
-		}
-		if len(entryData) == 0 {
-			results = append(results, zipEntryResult{Filename: entryName, Status: "skipped", Reason: "empty file"})
-			continue
-		}
-		if len(entryData) > maxZipEntryBytes {
-			results = append(results, zipEntryResult{Filename: entryName, Status: "skipped", Reason: "file too large"})
-			continue
-		}
-
-		externalID, alreadyProcessed, err := s.persistAndEnqueue(ctx, uploadFileParams{
-			UserID: userID, Source: "upload", Filename: entryName, Ext: ext, Data: entryData,
-			Batch: batch, BatchTitle: filename,
-		})
-		if err != nil {
-			s.log.Error("zip entry persist/enqueue failed", "err", err, "entry", entryName)
-			results = append(results, zipEntryResult{Filename: entryName, Status: "skipped", Reason: "internal error"})
-			continue
-		}
-		status := "enqueued"
-		if alreadyProcessed {
-			status = "already_processed"
-		}
-		results = append(results, zipEntryResult{Filename: entryName, Status: status, ExternalID: externalID})
+	if batch == "" {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
 	}
-
-	writeJSON(w, http.StatusAccepted, zipUploadResponse{
-		Status: "zip_processed", Filename: filename, Files: results, Truncated: truncated,
-	})
-}
-
-// readZipEntry opens and fully reads one archive entry, bounded to one more byte than
-// maxZipEntryBytes allows — the caller treats a read that actually hits that ceiling as
-// oversized (the declared UncompressedSize64 was already checked before this is even
-// called, but a corrupt or adversarial archive can still decompress to more than it claims).
-func readZipEntry(f *zip.File) ([]byte, error) {
-	rc, err := f.Open()
+	job := unpack.Job{UserID: userID, Source: "upload", Format: unpack.FormatZip, Key: unpack.Key(userID, batch), Batch: batch, BatchTitle: filename}
+	if unpack.IsTakeout(zr) {
+		job.Source, job.Format = "takeout", unpack.FormatTakeout
+	}
+	payload, err := json.Marshal(job)
 	if err != nil {
-		return nil, err
+		s.log.Error("unpack job marshal failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
 	}
-	defer rc.Close()
-	return io.ReadAll(io.LimitReader(rc, maxZipEntryBytes+1))
+	if err := s.store.Put(ctx, job.Key, io.NewSectionReader(ra, 0, size), size); err != nil {
+		s.log.Error("archive store failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if _, err := s.pool.Exec(ctx, `INSERT INTO jobs (kind, user_id, payload) VALUES ('unpack', $1, $2)`, userID, payload); err != nil {
+		s.log.Error("unpack enqueue failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, archiveUploadResponse{Status: "zip_accepted", Filename: filename, Batch: batch})
 }

@@ -40,6 +40,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0029](0029-backups-to-a-second-r2-bucket.md) | Nightly backups go to a second R2 bucket, and only what can't be rebuilt is copied |
 | [0030](0030-monitoring-on-grafana-cloud.md) | Monitoring runs on Grafana Cloud's free tier, fed by one Alloy collector, with personal data scrubbed before anything leaves |
 | [0031](0031-three-milestones-funding-decided-on-evidence.md) | Three milestones (MVP, community, social graph); the funding model is decided on Milestone 2's evidence, and data is never sold |
+| [0032](0032-accept-and-enqueue.md) | A request that brings activities only accepts them; the worker does the storage work, and unpacks archives |
 
 ## Writing a new one
 

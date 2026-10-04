@@ -16,16 +16,19 @@ import (
 	"time"
 )
 
-// MemS3 is an S3 server for tests (an http.Handler, served with httptest) that keeps what's put in it, enough for minio-go's single-part
-// PUT, GET and DELETE of one object, its bucket-location lookup, and the listing and bulk delete
-// storage.RemoveByPrefix makes.
+// MemS3 is an S3 server for tests (an http.Handler, served with httptest) that keeps what's
+// put in it, enough for minio-go's PUT (single-part, and the multipart upload it switches to
+// past 16 MiB), GET and DELETE of one object, its bucket-location lookup, and the listing and
+// bulk delete storage.RemoveByPrefix makes.
 type MemS3 struct {
 	mu      sync.Mutex
 	objects map[string][]byte
+	uploads map[string]map[int][]byte // a multipart upload's parts so far, by upload id
+	nextID  int
 }
 
 // New is an empty store.
-func New() *MemS3 { return &MemS3{objects: map[string][]byte{}} }
+func New() *MemS3 { return &MemS3{objects: map[string][]byte{}, uploads: map[string]map[int][]byte{}} }
 
 func (m *MemS3) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if _, ok := r.URL.Query()["location"]; ok {
@@ -38,6 +41,9 @@ func (m *MemS3) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer m.mu.Unlock()
 	if key == "" {
 		m.serveBucket(w, r)
+		return
+	}
+	if m.serveMultipart(w, r, key) {
 		return
 	}
 	switch r.Method {
@@ -73,6 +79,51 @@ func (m *MemS3) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		delete(m.objects, key)
 		w.WriteHeader(http.StatusNoContent)
 	}
+}
+
+// serveMultipart answers the requests of a multipart upload — start, one per part, complete,
+// abort — and reports whether r was one.
+func (m *MemS3) serveMultipart(w http.ResponseWriter, r *http.Request, key string) bool {
+	q := r.URL.Query()
+	_, starting := q["uploads"]
+	uploadID := q.Get("uploadId")
+	switch {
+	case r.Method == http.MethodPost && starting:
+		m.nextID++
+		id := strconv.Itoa(m.nextID)
+		m.uploads[id] = map[int][]byte{}
+		w.Header().Set("Content-Type", "application/xml")
+		fmt.Fprintf(w, `<InitiateMultipartUploadResult><Bucket>test</Bucket><Key>%s</Key><UploadId>%s</UploadId></InitiateMultipartUploadResult>`, html.EscapeString(key), id)
+	case r.Method == http.MethodPut && uploadID != "":
+		n, _ := strconv.Atoi(q.Get("partNumber"))
+		body, _ := io.ReadAll(r.Body)
+		if strings.HasPrefix(r.Header.Get("X-Amz-Content-Sha256"), "STREAMING-") {
+			body = decodeAWSChunked(body)
+		}
+		m.uploads[uploadID][n] = body
+		w.Header().Set("ETag", fmt.Sprintf(`"%d"`, n))
+	case r.Method == http.MethodPost && uploadID != "":
+		parts := m.uploads[uploadID]
+		numbers := make([]int, 0, len(parts))
+		for n := range parts {
+			numbers = append(numbers, n)
+		}
+		sort.Ints(numbers)
+		var whole []byte
+		for _, n := range numbers {
+			whole = append(whole, parts[n]...)
+		}
+		m.objects[key] = whole
+		delete(m.uploads, uploadID)
+		w.Header().Set("Content-Type", "application/xml")
+		fmt.Fprintf(w, `<CompleteMultipartUploadResult><Bucket>test</Bucket><Key>%s</Key><ETag>"0"</ETag></CompleteMultipartUploadResult>`, html.EscapeString(key))
+	case r.Method == http.MethodDelete && uploadID != "":
+		delete(m.uploads, uploadID)
+		w.WriteHeader(http.StatusNoContent)
+	default:
+		return false
+	}
+	return true
 }
 
 // decodeAWSChunked strips the chunk framing minio-go signs a plain-HTTP upload with:

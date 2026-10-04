@@ -134,12 +134,20 @@ data class SyncResult(val externalId: String, val status: String, val error: Str
 
 /**
  * What `POST /v1/activities/upload` said about one file: "enqueued" or "already_processed" for a
- * single `.gpx`/`.fit`/`.tcx`, "zip_processed" for a `.zip` or a Google Takeout export, with how
- * many of the archive's files were already imported before or skipped, and whether it had more
- * files than one upload reads ([truncated]). Neither already-imported nor skipped files become
- * jobs, so the sync history never shows them: this is the only place they're counted.
+ * single `.gpx`/`.fit`/`.tcx`, "zip_accepted" for a `.zip` or a Google Takeout export, which the
+ * server unpacks in the background; [batch] is the archive's, for finding its [UnpackedArchive]
+ * once it has been.
  */
-data class UploadOutcome(val status: String, val alreadyInArchive: Int, val skippedInArchive: Int, val truncated: Boolean)
+data class UploadOutcome(val status: String, val batch: String)
+
+/**
+ * An archive the server finished unpacking (`GET /v1/uploads/active`'s `unpacked`): how many of
+ * its files were already imported before or skipped, and whether it had more files than one
+ * upload reads ([truncated]); [error], when it couldn't be unpacked, is why, in the app's
+ * language. Neither already-imported nor skipped files become jobs, so the sync history never
+ * shows them: this is the only place they're counted.
+ */
+data class UnpackedArchive(val batch: String, val already: Int, val skipped: Int, val truncated: Boolean, val error: String)
 
 /**
  * One row of the sync history — an `ingest` job and, once it has produced one, the activity it
@@ -582,9 +590,9 @@ object HoldMyTrackApi {
         }
 
     /**
-     * Uploads wait as long as the server takes to answer: a `.zip` or a Google Takeout export is
-     * read through, one job per file, before the response is written, and a large one takes
-     * longer than the default ten seconds. The same client otherwise, so the same interceptors.
+     * Uploads take as long as sending the file does, up to 512 MiB, and the server answers once it
+     * has stored the file, which for a large archive takes longer than the default ten seconds.
+     * The same client otherwise, so the same interceptors.
      */
     private val uploadClient: OkHttpClient by lazy {
         client.newBuilder()
@@ -620,14 +628,7 @@ object HoldMyTrackApi {
         val text = response.use { it.body?.string().orEmpty() }
         if (!response.isSuccessful) throw ApiException.from(response.code, text)
         val json = runCatching { JSONObject(text) }.getOrDefault(JSONObject())
-        val files = json.optJSONArray("files")
-        fun count(status: String) = (0 until (files?.length() ?: 0)).count { files!!.getJSONObject(it).optString("status") == status }
-        UploadOutcome(
-            status = json.optString("status"),
-            alreadyInArchive = count("already_processed"),
-            skippedInArchive = count("skipped"),
-            truncated = json.optBoolean("truncated"),
-        )
+        UploadOutcome(status = json.optString("status"), batch = json.optString("batch"))
     }
 
     /** A picked file as a request body, read as it's sent. Opened afresh on every [writeTo], so
@@ -687,6 +688,26 @@ object HoldMyTrackApi {
                     )
                 },
             )
+        }, onResult)
+    }
+
+    /** `GET /v1/uploads/active`'s archives unpacked in the last hour — see [UnpackedArchive]. */
+    fun unpackedArchives(onResult: (Result<List<UnpackedArchive>>) -> Unit) {
+        val request = Request.Builder()
+            .url(BuildConfig.API_BASE_URL + API_V1 + "/uploads/active")
+            .build()
+        call(request, { body ->
+            val rows = JSONObject(body).optJSONArray("unpacked") ?: JSONArray()
+            List(rows.length()) { i ->
+                val row = rows.getJSONObject(i)
+                UnpackedArchive(
+                    batch = row.optString("batch"),
+                    already = row.optInt("already"),
+                    skipped = row.optInt("skipped"),
+                    truncated = row.optBoolean("truncated"),
+                    error = row.optString("error"),
+                )
+            }
         }, onResult)
     }
 

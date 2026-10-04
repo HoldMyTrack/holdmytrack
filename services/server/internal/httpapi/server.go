@@ -8,12 +8,7 @@ package httpapi
 
 import (
 	"archive/zip"
-	"bytes"
-	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -30,6 +25,7 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mapstyle"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/metrics"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/unpack"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 )
 
@@ -50,21 +46,6 @@ const maxZipUploadBytes = 512 << 20 // 512 MiB
 // a whole archive in RAM, and the zip branch then copied it again — about 1 GiB per upload,
 // so two or three large exports at once could get the API killed for out-of-memory.
 const multipartMemoryBytes = 32 << 20
-
-// maxZipEntries bounds how many files inside one archive handleZipUpload will process — not
-// a claim that a real import can't have more, just where this server stops rather than
-// enqueueing an unbounded number of jobs from one request. §5.1's "one bad file in a bulk
-// import cannot abort the batch" still holds beneath this cap; this is a different, coarser
-// limit on the batch's total size.
-const maxZipEntries = 5000
-
-// maxZipEntryBytes bounds any single file *inside* a zip the same way maxUploadBytes bounds
-// a plain upload — checked against the entry's own declared size before it's decompressed at
-// all (§5.1's zip-bomb defense), and again against how much is actually read, since a
-// declared size is something a malformed or hostile archive can simply lie about.
-const maxZipEntryBytes = maxUploadBytes
-
-var allowedExt = map[string]bool{".gpx": true, ".fit": true, ".tcx": true}
 
 // corsAllowedOrigins lists the origins a credentialed cross-origin request may come from —
 // needed now that sessions are cookies (see serve's own doc comment for why "*" no
@@ -430,14 +411,14 @@ type uploadResponse struct {
 	Filename   string `json:"filename"`
 }
 
-// handleUpload is §4.1 step 1 only: validate, compute the idempotency key, persist the raw
-// payload, enqueue an `ingest` job, return. No parsing happens here — see internal/ingest,
+// handleUpload is §4.1 step 1 only: validate, then enqueue an `ingest` job carrying the raw
+// payload (ingest.EnqueueRaw), return. No parsing happens here — see internal/ingest,
 // run by cmd/holdmytrack work.
 //
 // A `.zip` archive takes a different path entirely (handleZipUpload,
 // IMPLEMENTATION.md §4.0.1's bulk-import case) — bypassing §4.0.1's 20-file client-side
-// cap rather than being one more file subject to it, and producing many jobs from one
-// request instead of one. The body-size ceiling below has to accommodate whichever path a
+// cap rather than being one more file subject to it, and turning into many jobs, by way of
+// the worker's `unpack`, instead of one. The body-size ceiling below has to accommodate whichever path a
 // given request turns out to need before the multipart form (and therefore the filename) has
 // even been parsed, which is why it's sized for a zip archive regardless of what's actually
 // uploaded — a single non-zip file is still bounded to maxUploadBytes once read (below), so
@@ -475,14 +456,10 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 			httpErrorT(w, r, http.StatusBadRequest, "error.upload_bad_zip")
 			return
 		}
-		if isTakeoutArchive(zr) {
-			s.handleTakeoutUpload(w, r, zr, header.Filename)
-			return
-		}
-		s.handleZipUpload(w, r, zr, header.Filename)
+		s.handleZipUpload(w, r, zr, ra, header.Size, header.Filename)
 		return
 	}
-	if !allowedExt[ext] {
+	if !unpack.AllowedExt[ext] {
 		httpErrorT(w, r, http.StatusUnsupportedMediaType, "error.upload_type", "type", strconv.Quote(ext))
 		return
 	}
@@ -506,121 +483,19 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	externalID, alreadyProcessed, err := s.persistAndEnqueue(r.Context(), uploadFileParams{
-		UserID: userIDFromContext(r.Context()), Source: "upload", Filename: header.Filename, Ext: ext, Data: data,
+	res, err := ingest.EnqueueRaw(r.Context(), s.pool, userIDFromContext(r.Context()), []ingest.RawItem{
+		{Source: "upload", Filename: header.Filename, Ext: ext, Data: data},
 	})
 	if err != nil {
-		s.log.Error("upload persist/enqueue failed", "err", err)
+		s.log.Error("upload enqueue failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	if alreadyProcessed {
-		writeJSON(w, http.StatusOK, uploadResponse{Status: "already_processed", ExternalID: externalID, Filename: header.Filename})
+	if res[0].AlreadyProcessed {
+		writeJSON(w, http.StatusOK, uploadResponse{Status: "already_processed", ExternalID: res[0].ExternalID, Filename: header.Filename})
 		return
 	}
-	writeJSON(w, http.StatusAccepted, uploadResponse{Status: "enqueued", ExternalID: externalID, Filename: header.Filename})
-}
-
-// uploadFileParams is persistAndEnqueue's input — a struct rather than a run of positional
-// string parameters (source, filename, ext, activityType all being strings makes positional
-// args easy to transpose silently at a call site).
-type uploadFileParams struct {
-	// The authenticated caller (userIDFromContext) — every call site reads this from the
-	// request it's already handling.
-	UserID string
-	// "upload" (a plain or zip-contained file) or "takeout" (handleTakeoutUpload) — the
-	// `activities.source` column's own provenance value, not just a label.
-	Source   string
-	Filename string
-	Ext      string
-	// Overrides whatever the parser itself detects, when non-empty. Only the Takeout path
-	// sets this today — see ingest.Job.ActivityType's own doc comment for why.
-	ActivityType string
-	Data         []byte
-	// ExternalID, when set, is used verbatim as the idempotency key instead of being derived
-	// from a content hash of Data. Only handleSyncActivities sets this: Path 2 activities
-	// already carry a stable id from the platform health store (a Health Connect record
-	// UUID), which is the record's real identity — hashing the synced JSON bytes instead
-	// would mint a new "activity" on every retry that happened to reserialize a field
-	// differently, defeating the idempotent-retry requirement rather than serving it. Path 3
-	// has no such id of its own, which is why it still hashes.
-	ExternalID string
-	// Batch and BatchTitle are ingest.Job's — set by the handlers that enqueue many jobs from
-	// one request (zip, Takeout, phone sync), empty for a single upload.
-	Batch      string
-	BatchTitle string
-}
-
-// persistAndEnqueue is handleUpload's idempotency-check-then-persist-then-enqueue core,
-// factored out so handleZipUpload's and handleTakeoutUpload's per-file loops can reuse
-// exactly the same logic a plain single-file upload uses — a file arriving inside a zip or
-// pulled out of a Takeout export is not a different kind of upload, just one of many arriving
-// from one request. Returns `alreadyProcessed` rather than a status string so callers can't
-// typo one of two states; the caller decides what to do with either.
-func (s *Server) persistAndEnqueue(ctx context.Context, p uploadFileParams) (externalID string, alreadyProcessed bool, err error) {
-	var rawKey string
-	if p.ExternalID != "" {
-		externalID = p.ExternalID
-		// Scoped by source, unlike the content-addressed key below: a caller-supplied id is
-		// only unique within its own source's namespace (a Health Connect UUID and a
-		// HealthKit UUID could coincide in theory), whereas a hash collision across sources
-		// is intentionally shared storage (see handleDeleteActivity's doc comment).
-		rawKey = fmt.Sprintf("raw/%s/%s/%s%s", p.UserID, p.Source, externalID, p.Ext)
-	} else {
-		sum := sha256.Sum256(p.Data)
-		externalID = hex.EncodeToString(sum[:])
-		rawKey = fmt.Sprintf("raw/%s/%s%s", p.UserID, externalID, p.Ext)
-	}
-
-	// Fast-path idempotency check (IMPLEMENTATION.md §4.0's idempotency
-	// invariant): this is an optimization to skip a wasted job for an obvious repeat, not
-	// the guarantee — that lives in ingest.Process's ON CONFLICT DO NOTHING at persist
-	// time, which still fires correctly even if two identical uploads race each other past
-	// this check. Scoped by the same `source` the job itself will carry, matching the
-	// activities table's own `(user_id, source, external_id)` unique index — a Takeout import
-	// and a plain upload are different provenance even if (implausibly) they hashed the same.
-	// An activity whose ingest never finished isn't a repeat: uploading it again resumes it.
-	var exists bool
-	if err := s.pool.QueryRow(ctx,
-		`SELECT EXISTS (SELECT 1 FROM activities WHERE user_id = $1 AND source = $2 AND external_id = $3 AND ingest_complete)`,
-		p.UserID, p.Source, externalID,
-	).Scan(&exists); err != nil {
-		return "", false, fmt.Errorf("dedupe check: %w", err)
-	}
-	if exists {
-		return externalID, true, nil
-	}
-
-	if err := s.store.Put(ctx, rawKey, bytes.NewReader(p.Data), int64(len(p.Data))); err != nil {
-		return "", false, fmt.Errorf("raw payload upload: %w", err)
-	}
-
-	job := ingest.Job{
-		UserID:        p.UserID,
-		Source:        p.Source,
-		SourceDetail:  p.Filename,
-		ExternalID:    externalID,
-		RawPayloadKey: rawKey,
-		ActivityType:  p.ActivityType,
-		Batch:         p.Batch,
-		BatchTitle:    p.BatchTitle,
-	}
-	payload, err := json.Marshal(job)
-	if err != nil {
-		return "", false, fmt.Errorf("job marshal: %w", err)
-	}
-	if err := enqueue(ctx, s.pool, p.UserID, "ingest", payload); err != nil {
-		return "", false, fmt.Errorf("enqueue: %w", err)
-	}
-	return externalID, false, nil
-}
-
-func enqueue(ctx context.Context, pool *pgxpool.Pool, userID, kind string, payload []byte) error {
-	_, err := pool.Exec(ctx,
-		`INSERT INTO jobs (kind, user_id, payload) VALUES ($1, $2, $3)`,
-		kind, userID, payload,
-	)
-	return err
+	writeJSON(w, http.StatusAccepted, uploadResponse{Status: "enqueued", ExternalID: res[0].ExternalID, Filename: header.Filename})
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

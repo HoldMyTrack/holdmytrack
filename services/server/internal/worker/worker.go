@@ -20,6 +20,7 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/metrics"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/unpack"
 )
 
 const pollInterval = 500 * time.Millisecond
@@ -72,24 +73,24 @@ const exportSweepInterval = time.Hour
 // The fresh locked_at, not the row lock, is what keeps a second worker process off a job
 // that is still running (claimLease).
 //
-// Export jobs have a lane of their own, a second loop beside this one: building an archive
-// takes minutes, and nobody's upload should wait behind it. n tells the owner when one is
-// ready (export_job.go).
+// Long jobs have a lane of their own, a second loop beside this one: building an export or
+// unpacking a large archive takes minutes, and nobody's single upload or phone sync should
+// wait behind it. n tells an export's owner when it's ready (export_job.go).
 func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, n *Notifier) error {
 	notifier = n
 	var lanes sync.WaitGroup
-	defer lanes.Wait() // an export cut off by shutdown is released before Run returns
+	defer lanes.Wait() // a long job cut off by shutdown is released before Run returns
 	lanes.Add(1)
 	go func() {
 		defer lanes.Done()
-		t := time.NewTicker(exportPollInterval)
+		t := time.NewTicker(longPollInterval)
 		defer t.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-t.C:
-				if _, err := claimAndRun(ctx, pool, store, log, laneExport); err != nil {
+				if _, err := claimAndRun(ctx, pool, store, log, laneLong); err != nil {
 					log.Error("export job processing error", "err", err)
 				}
 			}
@@ -161,18 +162,44 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 	}
 }
 
-// The two lanes Run claims from: every kind but export, and export alone.
+// The two lanes Run claims from: the long-running kinds (an export, unpacking an archive) and
+// everything else.
 const (
-	laneMain   = false
-	laneExport = true
+	laneMain = false
+	laneLong = true
 )
+
+// heartbeat refreshes a long job's claim: a big account's export or a big archive can take
+// longer than claimLease, and a job that looked abandoned would be claimed and run a second
+// time.
+const heartbeat = 5 * time.Minute
+
+// keepClaimed refreshes jobID's locked_at every heartbeat until the returned stop is called.
+func keepClaimed(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger, jobID int64) (stop func()) {
+	hctx, cancel := context.WithCancel(ctx)
+	go func() {
+		t := time.NewTicker(heartbeat)
+		defer t.Stop()
+		for {
+			select {
+			case <-hctx.Done():
+				return
+			case <-t.C:
+				if _, err := pool.Exec(hctx, `UPDATE jobs SET locked_at = NOW() WHERE id = $1`, jobID); err != nil && hctx.Err() == nil {
+					log.Error("job heartbeat failed", "job_id", jobID, "err", err)
+				}
+			}
+		}
+	}()
+	return cancel
+}
 
 // claimAndRunOne is claimAndRun on the main lane.
 func claimAndRunOne(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger) (bool, error) {
 	return claimAndRun(ctx, pool, store, log, laneMain)
 }
 
-func claimAndRun(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, exports bool) (bool, error) {
+func claimAndRun(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, long bool) (bool, error) {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return false, fmt.Errorf("worker: begin: %w", err)
@@ -185,11 +212,11 @@ func claimAndRun(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, 
 		SELECT id, kind, payload, attempts FROM jobs
 		WHERE state = 'pending' AND run_after <= NOW()
 		  AND (locked_at IS NULL OR locked_at < NOW() - make_interval(secs => $1))
-		  AND (kind = 'export') = $2
+		  AND (kind IN ('export', 'unpack')) = $2
 		ORDER BY run_after, id
 		FOR UPDATE SKIP LOCKED
 		LIMIT 1
-	`, claimLease.Seconds(), exports).Scan(&j.id, &j.kind, &j.payload, &attempts)
+	`, claimLease.Seconds(), long).Scan(&j.id, &j.kind, &j.payload, &attempts)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
@@ -265,7 +292,7 @@ func claimAndRun(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, 
 }
 
 // finished counts a job in metrics.JobsFinished. A failure with no jobs.error_code (any kind
-// but ingest) counts as "internal": only an ingest's codes can name the user's file.
+// but ingest and unpack) counts as "internal": only their codes can name the user's file.
 func finished(kind, outcome string, code *string) {
 	c := ""
 	if outcome == "failed" {
@@ -277,17 +304,23 @@ func finished(kind, outcome string, code *string) {
 	metrics.JobsFinished.WithLabelValues(kind, outcome, c).Inc()
 }
 
-// failureCode is the error_code a failed job is stored with. Only an ingest job's failure
-// reaches a person (the upload history), so only it gets a code to be translated from; the
-// other kinds' failures are for the logs. A nil err is a failure that isn't the file's own
+// failureCode is the error_code a failed job is stored with. Only an ingest's or an unpack's
+// failure reaches a person (the upload history, the Upload menu), so only they get a code to
+// be translated from; the other kinds' failures are for the logs. A nil err is a failure that isn't the file's own
 // (the abandoned-job path), so FailInternal.
 func failureCode(kind string, err error) *string {
-	if kind != "ingest" {
+	var c string
+	switch {
+	case kind == "unpack" && err != nil:
+		c = unpack.FailureCode(err)
+	case kind == "unpack":
+		c = unpack.FailInternal
+	case kind != "ingest":
 		return nil
-	}
-	c := ingest.FailInternal
-	if err != nil {
+	case err != nil:
 		c = ingest.FailureCode(err)
+	default:
+		c = ingest.FailInternal
 	}
 	return &c
 }
@@ -314,6 +347,9 @@ func runJob(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *
 		var ij ingest.Job
 		if err := json.Unmarshal(j.payload, &ij); err != nil {
 			return fmt.Errorf("unmarshal ingest job: %w", err)
+		}
+		if err := ingest.PromoteRaw(ctx, pool, store, j.id, ij.RawPayloadKey); err != nil {
+			return err
 		}
 		res, err := ingest.Process(ctx, pool, store, ij)
 		if err != nil {
@@ -343,6 +379,9 @@ func runJob(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *
 		return ingest.ProcessReprivacy(ctx, pool, store, j.id, rj)
 	case "export":
 		return runExport(ctx, pool, store, log, j.id, j.payload)
+	case "unpack":
+		defer keepClaimed(ctx, pool, log, j.id)()
+		return unpack.Run(ctx, pool, store, j.id, j.payload)
 	default:
 		return fmt.Errorf("unhandled job kind %q (export / provider_sync / retention are out of scope for this task)", j.kind)
 	}

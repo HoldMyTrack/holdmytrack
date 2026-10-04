@@ -50,7 +50,7 @@ func TestExportJobBuildsMarksReadyAndEmails(t *testing.T) {
 	if processed, err := claimAndRun(ctx, pool, store, log, laneMain); err != nil || readJob(t, pool, job).state != "pending" {
 		t.Fatalf("main lane: processed %v, err %v, state %q", processed, err, readJob(t, pool, job).state)
 	}
-	if processed, err := claimAndRun(ctx, pool, store, log, laneExport); err != nil || !processed {
+	if processed, err := claimAndRun(ctx, pool, store, log, laneLong); err != nil || !processed {
 		t.Fatalf("export lane: processed %v, err %v", processed, err)
 	}
 	if got := readJob(t, pool, job); got.state != "done" {
