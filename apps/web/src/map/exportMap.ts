@@ -62,7 +62,7 @@ export interface ExportViewState {
   /** The Layers menu's Trails and Bike paths (overlays.ts), so the image shows what the
    *  screen does. */
   paths: PathOverlays;
-  /** The Base map switch (FR-4.14): satellite imagery, when the deployment has any. */
+  /** The Satellite button (FR-4.14): satellite imagery, when the deployment has any. */
   satellite: boolean;
 }
 
