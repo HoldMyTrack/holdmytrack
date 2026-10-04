@@ -244,7 +244,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 **Behavior**:
 1. **Profile** (FR-1.6), **Upload** (FR-3.6), **Sync** (FR-3.5) and **Settings** (FR-1.5) open those screens — Upload before Sync, as in the web's header.
 2. Under a divider, **Donate**, **About**, **Help**, **Contacts** and **Privacy** open the web's own pages (`docs/SPEC.md` FR-10, FR-11) — Donate the About page's funding section, as the web header's Donate does — in a browser tab, which shows them in the browser's language (`docs/SPEC.md` FR-13.1). Donate is in the APK the website offers, not in the Play Store build: Play doesn't allow an app to point to payment outside its own billing.
-3. Last, under another divider, the app's version, greyed and not tappable: "Version 0.4 (62da50b)" — the release number and the commit it was built from.
+3. Last, under another divider, the app's version, greyed and not tappable: "Version 0.5 (62da50b)" — the release number and the commit it was built from.
 
 ### FR-2.10 Photos
 
