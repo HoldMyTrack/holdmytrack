@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
 )
 
@@ -95,15 +95,16 @@ type syncActivitiesResponse struct {
 }
 
 // handleSyncActivities serves IMPLEMENTATION.md §4.0's `POST /v1/sync/activities` — Path 2's
-// batched normalized points. Like handleUpload (§4.1 step 1), this only validates, persists
-// the raw payload, and enqueues an `ingest` job per activity; no parsing or privacy clipping
-// happens inline. ingest.Process needs no Path-2-specific branch at all: each activity's raw
-// payload is stored as JSON and read back through parse.ByExtension's ".json" case
+// batched normalized points. Like handleUpload (§4.1 step 1), this only validates and
+// enqueues an `ingest` job per activity with its raw payload inline (ingest.EnqueueRaw), two
+// queries however large the batch; no parsing or privacy clipping happens inline.
+// ingest.Process needs no Path-2-specific branch at all: each activity's raw payload is
+// stored as JSON and read back through parse.ByExtension's ".json" case
 // (parse.ParseJSON), the same "differ only in how bytes arrive, converge on §4.1 step 2"
 // contract §4.0 states for all three paths.
 //
 // Idempotent on (user_id, source, external_id) per §4.0's hard invariant, enforced the same
-// two-layer way as every other path: persistAndEnqueue's existence check here is the fast
+// two-layer way as every other path: EnqueueRaw's existence check here is the fast
 // path, and ingest.Process's `ON CONFLICT DO NOTHING` at persist time is the actual guarantee
 // under concurrent duplicates.
 func (s *Server) handleSyncActivities(w http.ResponseWriter, r *http.Request) {
@@ -144,39 +145,54 @@ func (s *Server) handleSyncActivities(w http.ResponseWriter, r *http.Request) {
 	userID := userIDFromContext(ctx)
 	l := i18n.Get(requestLang(r))
 	results := make([]syncActivityResult, len(req.Activities))
+	var items []ingest.RawItem
+	var slots []int // results index of each item
 	for i, act := range req.Activities {
-		results[i] = s.syncOneActivity(ctx, l, userID, req.Source, batch, req.BatchTitle, act)
+		item, rejection := s.syncItem(l, req.Source, batch, req.BatchTitle, act)
+		if rejection != "" {
+			results[i] = syncActivityResult{ExternalID: act.ExternalID, Status: "rejected", Error: rejection}
+			continue
+		}
+		items = append(items, item)
+		slots = append(slots, i)
+	}
+	enqueued, err := ingest.EnqueueRaw(ctx, s.pool, userID, items)
+	if err != nil {
+		s.log.Error("sync enqueue failed", "err", err, "activities", len(items))
+	}
+	for k, i := range slots {
+		switch {
+		case err != nil:
+			results[i] = syncActivityResult{ExternalID: items[k].ExternalID, Status: "rejected", Error: l.T("error.internal")}
+		case enqueued[k].AlreadyProcessed:
+			results[i] = syncActivityResult{ExternalID: enqueued[k].ExternalID, Status: "already_processed"}
+		default:
+			results[i] = syncActivityResult{ExternalID: enqueued[k].ExternalID, Status: "enqueued"}
+		}
 	}
 
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, syncActivitiesResponse{Results: results})
 }
 
-// syncOneActivity validates and persists+enqueues a single batch entry, isolated into its own
-// function so a marshal or persistAndEnqueue failure on one activity can't unwind the loop
-// handling the rest of the batch.
-func (s *Server) syncOneActivity(ctx context.Context, l *i18n.Localizer, userID, source, batch, batchTitle string, act syncActivityRequest) syncActivityResult {
-	result := syncActivityResult{ExternalID: act.ExternalID}
-
+// syncItem validates one batch entry and turns it into the item EnqueueRaw takes, or returns
+// why it was rejected — one bad entry is that entry's result, never the whole batch's.
+func (s *Server) syncItem(l *i18n.Localizer, source, batch, batchTitle string, act syncActivityRequest) (ingest.RawItem, string) {
 	if act.ExternalID == "" {
-		result.Status, result.Error = "rejected", l.T("error.sync_external_id_required")
-		return result
+		return ingest.RawItem{}, l.T("error.sync_external_id_required")
 	}
 	if !syncExternalIDPattern.MatchString(act.ExternalID) {
-		result.Status, result.Error = "rejected", l.T("error.sync_external_id_invalid")
-		return result
+		return ingest.RawItem{}, l.T("error.sync_external_id_invalid")
 	}
 	// Same >= 2 raw points floor ingest.Process itself enforces on the raw points
 	// (internal/ingest.Process) — a coarse pre-check here, not a claim that every activity
 	// clearing it will also survive the trim; that deeper rejection still happens
 	// asynchronously in the worker, exactly as it already does for Path 3 uploads.
 	if len(act.Points) < 2 {
-		result.Status, result.Error = "rejected", l.T("error.sync_too_few_points")
-		return result
+		return ingest.RawItem{}, l.T("error.sync_too_few_points")
 	}
 	if len(act.Points) > maxSyncPointsPerActivity {
-		result.Status, result.Error = "rejected", l.T("error.sync_too_many_points", "n", len(act.Points), "max", maxSyncPointsPerActivity)
-		return result
+		return ingest.RawItem{}, l.T("error.sync_too_many_points", "n", len(act.Points), "max", maxSyncPointsPerActivity)
 	}
 	// Same bounds handleUpdateActivity enforces for an edit after the fact — these columns
 	// are VARCHAR(50)/VARCHAR(200)/TEXT-but-bounded regardless of which path sets them first.
@@ -185,31 +201,25 @@ func (s *Server) syncOneActivity(ctx context.Context, l *i18n.Localizer, userID,
 	// an over-length value would fail as a raw, unhandled column-width error at insert time
 	// deep in the worker instead of a clean rejection here.
 	if len(act.ActivityType) > maxActivityTypeLen {
-		result.Status, result.Error = "rejected", l.T("error.activity_type_too_long", "max", maxActivityTypeLen)
-		return result
+		return ingest.RawItem{}, l.T("error.activity_type_too_long", "max", maxActivityTypeLen)
 	}
 	if len(act.Name) > maxActivityNameLen {
-		result.Status, result.Error = "rejected", l.T("error.activity_name_too_long", "max", maxActivityNameLen)
-		return result
+		return ingest.RawItem{}, l.T("error.activity_name_too_long", "max", maxActivityNameLen)
 	}
 	if len(act.Description) > maxActivityDescriptionLen {
-		result.Status, result.Error = "rejected", l.T("error.activity_description_too_long", "max", maxActivityDescriptionLen)
-		return result
+		return ingest.RawItem{}, l.T("error.activity_description_too_long", "max", maxActivityDescriptionLen)
 	}
 
 	// Re-marshal the embedded parse.JSONActivity, not the whole syncActivityRequest — the raw
-	// payload persisted to object storage is exactly what parse.ParseJSON expects to decode
+	// payload stored for the job is exactly what parse.ParseJSON expects to decode
 	// back (activity_type + points), with no external_id or other request-envelope fields
 	// mixed in.
 	data, err := json.Marshal(act.JSONActivity)
 	if err != nil {
 		s.log.Error("sync activity marshal failed", "external_id", act.ExternalID, "err", err)
-		result.Status, result.Error = "rejected", l.T("error.internal")
-		return result
+		return ingest.RawItem{}, l.T("error.internal")
 	}
-
-	externalID, alreadyProcessed, err := s.persistAndEnqueue(ctx, uploadFileParams{
-		UserID:     userID,
+	return ingest.RawItem{
 		Source:     source,
 		Filename:   act.ExternalID + ".json",
 		Ext:        ".json",
@@ -217,18 +227,5 @@ func (s *Server) syncOneActivity(ctx context.Context, l *i18n.Localizer, userID,
 		ExternalID: act.ExternalID,
 		Batch:      batch,
 		BatchTitle: batchTitle,
-	})
-	if err != nil {
-		s.log.Error("sync activity persist/enqueue failed", "external_id", act.ExternalID, "err", err)
-		result.Status, result.Error = "rejected", l.T("error.internal")
-		return result
-	}
-
-	result.ExternalID = externalID
-	if alreadyProcessed {
-		result.Status = "already_processed"
-	} else {
-		result.Status = "enqueued"
-	}
-	return result
+	}, ""
 }

@@ -315,6 +315,9 @@ func runJob(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *
 		if err := json.Unmarshal(j.payload, &ij); err != nil {
 			return fmt.Errorf("unmarshal ingest job: %w", err)
 		}
+		if err := ingest.PromoteRaw(ctx, pool, store, j.id, ij.RawPayloadKey); err != nil {
+			return err
+		}
 		res, err := ingest.Process(ctx, pool, store, ij)
 		if err != nil {
 			return err

@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/takeout"
 )
 
@@ -52,6 +53,10 @@ func (s *Server) handleTakeoutUpload(w http.ResponseWriter, r *http.Request, zr 
 
 	results := make([]zipEntryResult, 0)
 	batch := newBatchID()
+	var slots []int // results index of each enqueued activity
+	enq := &ingest.Enqueuer{Pool: s.pool, UserID: userID, Done: func(seq int, res ingest.Enqueued, err error) {
+		setEntryResult(&results[slots[seq]], res, err, s.log)
+	}}
 	for _, t := range archive.Types() {
 		// A swim with no coordinates is not something anyone can hand over as a track. These
 		// logs' own distance and duration are a separate, not-yet-built import path — see
@@ -83,8 +88,9 @@ func (s *Server) handleTakeoutUpload(w http.ResponseWriter, r *http.Request, zr 
 
 		for _, i := range order {
 			name := names[i]
-			externalID, alreadyProcessed, err := s.persistAndEnqueue(ctx, uploadFileParams{
-				UserID:       userID,
+			results = append(results, zipEntryResult{Filename: name})
+			slots = append(slots, len(results)-1)
+			enq.Add(ctx, ingest.RawItem{
 				Source:       "takeout",
 				Filename:     name,
 				Ext:          ".gpx",
@@ -93,18 +99,10 @@ func (s *Server) handleTakeoutUpload(w http.ResponseWriter, r *http.Request, zr 
 				Batch:        batch,
 				BatchTitle:   filename,
 			})
-			if err != nil {
-				s.log.Error("takeout entry persist/enqueue failed", "err", err, "file", name)
-				results = append(results, zipEntryResult{Filename: name, Status: "skipped", Reason: "internal error"})
-				continue
-			}
-			status := "enqueued"
-			if alreadyProcessed {
-				status = "already_processed"
-			}
-			results = append(results, zipEntryResult{Filename: name, Status: status, ExternalID: externalID})
 		}
 	}
+
+	enq.Flush(ctx)
 
 	writeJSON(w, http.StatusAccepted, zipUploadResponse{Status: "zip_processed", Filename: filename, Files: results})
 }

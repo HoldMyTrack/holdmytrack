@@ -4,9 +4,12 @@ import (
 	"archive/zip"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"path/filepath"
 	"strings"
+
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 )
 
 // zipEntryResult is one contained file's outcome — the same three states a plain single-file
@@ -33,8 +36,8 @@ type zipUploadResponse struct {
 
 // handleZipUpload is handleUpload's branch for a plain `.zip` archive
 // (IMPLEMENTATION.md §4.0.1's bulk-historical-import case) — one job enqueued per
-// contained .gpx/.fit/.tcx file, via the exact same persistAndEnqueue a plain single-file
-// upload uses, so a file that happens to arrive inside a zip is treated no differently once
+// contained .gpx/.fit/.tcx file, via the same ingest.EnqueueRaw a plain single-file
+// upload uses (a chunk of entries at a time, ingest.Enqueuer), so a file that happens to arrive inside a zip is treated no differently once
 // extracted than one dropped on its own. A Google Takeout export is a `.zip` too but takes a
 // different path entirely — see isTakeoutArchive and handleTakeoutUpload in
 // takeout_upload.go — since it has no standalone .gpx/.fit/.tcx entries to walk this way at
@@ -51,6 +54,10 @@ func (s *Server) handleZipUpload(w http.ResponseWriter, r *http.Request, zr *zip
 	batch := newBatchID()
 	processed := 0
 	truncated := false
+	var slots []int // results index of each enqueued entry
+	enq := &ingest.Enqueuer{Pool: s.pool, UserID: userID, Done: func(seq int, res ingest.Enqueued, err error) {
+		setEntryResult(&results[slots[seq]], res, err, s.log)
+	}}
 
 	for _, f := range zr.File {
 		if f.FileInfo().IsDir() {
@@ -95,25 +102,32 @@ func (s *Server) handleZipUpload(w http.ResponseWriter, r *http.Request, zr *zip
 			continue
 		}
 
-		externalID, alreadyProcessed, err := s.persistAndEnqueue(ctx, uploadFileParams{
-			UserID: userID, Source: "upload", Filename: entryName, Ext: ext, Data: entryData,
+		results = append(results, zipEntryResult{Filename: entryName})
+		slots = append(slots, len(results)-1)
+		enq.Add(ctx, ingest.RawItem{
+			Source: "upload", Filename: entryName, Ext: ext, Data: entryData,
 			Batch: batch, BatchTitle: filename,
 		})
-		if err != nil {
-			s.log.Error("zip entry persist/enqueue failed", "err", err, "entry", entryName)
-			results = append(results, zipEntryResult{Filename: entryName, Status: "skipped", Reason: "internal error"})
-			continue
-		}
-		status := "enqueued"
-		if alreadyProcessed {
-			status = "already_processed"
-		}
-		results = append(results, zipEntryResult{Filename: entryName, Status: status, ExternalID: externalID})
 	}
+
+	enq.Flush(ctx)
 
 	writeJSON(w, http.StatusAccepted, zipUploadResponse{
 		Status: "zip_processed", Filename: filename, Files: results, Truncated: truncated,
 	})
+}
+
+// setEntryResult fills in an archive entry's result once its chunk has been enqueued.
+func setEntryResult(r *zipEntryResult, res ingest.Enqueued, err error, log *slog.Logger) {
+	switch {
+	case err != nil:
+		log.Error("archive entry enqueue failed", "err", err, "file", r.Filename)
+		r.Status, r.Reason = "skipped", "internal error"
+	case res.AlreadyProcessed:
+		r.Status, r.ExternalID = "already_processed", res.ExternalID
+	default:
+		r.Status, r.ExternalID = "enqueued", res.ExternalID
+	}
 }
 
 // readZipEntry opens and fully reads one archive entry, bounded to one more byte than

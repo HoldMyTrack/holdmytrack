@@ -45,15 +45,21 @@ func (d *dbTest) uploadFile(as account, name string, data []byte) uploadResponse
 	return resp
 }
 
+// latestIngestJob is the account's newest ingest job as the worker takes it: with its inline
+// raw payload moved to storage (ingest.PromoteRaw), ready for ingest.Process.
 func (d *dbTest) latestIngestJob(as account) ingest.Job {
 	d.t.Helper()
+	var id int64
 	var payload []byte
 	if err := d.pool.QueryRow(context.Background(),
-		`SELECT payload FROM jobs WHERE user_id = $1 AND kind = 'ingest' ORDER BY id DESC LIMIT 1`, as.id).Scan(&payload); err != nil {
+		`SELECT id, payload FROM jobs WHERE user_id = $1 AND kind = 'ingest' ORDER BY id DESC LIMIT 1`, as.id).Scan(&id, &payload); err != nil {
 		d.t.Fatal(err)
 	}
 	var j ingest.Job
 	if err := json.Unmarshal(payload, &j); err != nil {
+		d.t.Fatal(err)
+	}
+	if err := ingest.PromoteRaw(context.Background(), d.pool, d.srv.store, id, j.RawPayloadKey); err != nil {
 		d.t.Fatal(err)
 	}
 	return j
@@ -378,5 +384,63 @@ func TestSyncAcceptsTimelineSegments(t *testing.T) {
 	d.decode(d.do(me, http.MethodPost, "/v1/sync/activities", body), http.StatusOK, &resp)
 	if got := resp.Results[0].Status; got != "already_processed" {
 		t.Errorf("second send: %s, want already_processed", got)
+	}
+}
+
+// A sync request answers without touching object storage: each new activity's job carries its
+// raw payload inline, already-ingested ones are found in one query, and the worker's
+// PromoteRaw moves the bytes to the raw key and clears them from the row.
+func TestSyncEnqueuesRawPayloadsInline(t *testing.T) {
+	s3 := newMemS3()
+	d := newDBTestWithS3(t, s3)
+	me := d.newAccount(false)
+	ctx := context.Background()
+	points := []map[string]any{
+		{"lat": 50.0, "lon": 10.0, "time": "2026-05-01T10:00:00Z"},
+		{"lat": 50.001, "lon": 10.001, "time": "2026-05-01T10:01:00Z"},
+		{"lat": 50.002, "lon": 10.002, "time": "2026-05-01T10:02:00Z"},
+	}
+	sync := func(ids ...string) []syncActivityResult {
+		var acts []map[string]any
+		for _, id := range ids {
+			acts = append(acts, map[string]any{"external_id": id, "activity_type": "walk", "points": points})
+		}
+		var resp syncActivitiesResponse
+		d.decode(d.do(me, http.MethodPost, "/v1/sync/activities", map[string]any{"source": "healthconnect", "activities": acts}), http.StatusOK, &resp)
+		return resp.Results
+	}
+
+	got := sync("first-walk", "../bad", "second-walk")
+	for i, want := range []string{"enqueued", "rejected", "enqueued"} {
+		if got[i].Status != want {
+			t.Errorf("result %d: %s, want %s", i, got[i].Status, want)
+		}
+	}
+	key := "raw/" + me.id + "/healthconnect/second-walk.json"
+	if s3.Has(key) {
+		t.Fatal("the request wrote the raw payload to storage")
+	}
+	var inline int
+	if err := d.pool.QueryRow(ctx, `SELECT count(*) FROM jobs WHERE user_id = $1 AND raw IS NOT NULL`, me.id).Scan(&inline); err != nil || inline != 2 {
+		t.Fatalf("jobs with an inline payload: %d, %v", inline, err)
+	}
+
+	res, err := ingest.Process(ctx, d.pool, d.srv.store, d.latestIngestJob(me))
+	if err != nil || !res.Persisted {
+		t.Fatalf("ingest: %+v, %v", res, err)
+	}
+	if !s3.Has(key) {
+		t.Fatal("PromoteRaw didn't write the raw payload")
+	}
+	var cleared bool
+	if err := d.pool.QueryRow(ctx, `SELECT raw IS NULL FROM jobs WHERE user_id = $1 AND payload->>'external_id' = 'second-walk'`, me.id).Scan(&cleared); err != nil || !cleared {
+		t.Fatalf("raw cleared: %v, %v", cleared, err)
+	}
+
+	got = sync("second-walk", "third-walk")
+	for i, want := range []string{"already_processed", "enqueued"} {
+		if got[i].Status != want {
+			t.Errorf("repeat result %d: %s, want %s", i, got[i].Status, want)
+		}
 	}
 }
