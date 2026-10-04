@@ -16,6 +16,30 @@
       "name": "Bonnie Park Picnic Area",
       "type": "cycling"
     },
+    "2026-07-13 Niagara Falls trip.gpx": {
+      "name": "Way there",
+      "type": "driving"
+    },
+    "2026-07-14 Niagara Falls trip-2.gpx": {
+      "name": "Day #1 – walk",
+      "type": "walking"
+    },
+    "2026-07-14 Niagara Falls trip.gpx": {
+      "name": "Day #1 – drive to the Falls",
+      "type": "driving"
+    },
+    "2026-07-15 Niagara Falls trip.gpx": {
+      "name": "Day #2",
+      "type": "walking"
+    },
+    "2026-07-16 Niagara Falls trip.gpx": {
+      "name": "Day #3",
+      "type": "walking"
+    },
+    "2026-07-17 Niagara Falls trip.gpx": {
+      "name": "Way back",
+      "type": "driving"
+    },
     "2026-09-05 Big Creek Reservation.gpx": {
       "name": "Big Creek Reservation",
       "type": "walking"
@@ -150,6 +174,18 @@
         "2026-07-03 Day 2.gpx",
         "2026-07-07 Day 3.gpx",
         "2026-07-11 Bonnie Park Picnic Area.gpx"
+      ]
+    },
+    {
+      "name": "Niagara Falls trip",
+      "description": "Five days of summer at Niagara Falls: a drive there, three days around the Falls, and a drive home.",
+      "activities": [
+        "2026-07-13 Niagara Falls trip.gpx",
+        "2026-07-14 Niagara Falls trip.gpx",
+        "2026-07-14 Niagara Falls trip-2.gpx",
+        "2026-07-15 Niagara Falls trip.gpx",
+        "2026-07-16 Niagara Falls trip.gpx",
+        "2026-07-17 Niagara Falls trip.gpx"
       ]
     }
   ]
