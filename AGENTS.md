@@ -31,7 +31,11 @@ Document what exists, not what used to. When a feature, table, endpoint or secti
 
 One fact, one home. Each kind of content belongs to exactly one document, and every other document points to it by section number rather than restating it: product scope, positioning and the funding stance in `VISION.md`; remaining tasks, gates and checklists in `ROADMAP.md`; observable behavior in `SPEC.md`; how a piece is built in `IMPLEMENTATION.md`; why one decision went the way it did in its ADR. A restated rationale drifts the moment its original changes, so where another document needs it, give a one-line pointer (`VISION.md` §1.1) and keep only what is specific to that document. In practice: `VISION.md` says what a milestone or phase is for and why it comes in that order, not its task list, dates or progress; `ROADMAP.md` lists tasks without arguing the product's scope or funding; a scope note at the top of `ARCHITECTURE.md`, `IMPLEMENTATION.md` or `SPEC.md` says what that document covers, not what the product isn't; and `AGENTS.md` names only the boundaries code must respect. When `VISION.md` or an ADR changes a position, scan the other documents in the same change — the Android ones included — for restatements of the old position and for claims that now contradict it, and replace each with a pointer or fix it.
 
-This file stays limited to orientation — the table above, `What HoldMyTrack is`, and the commit and Markdown conventions below. If you're about to write what a feature does, how it works, or why it was built a particular way, that belongs in `SPEC.md` (what) or `IMPLEMENTATION.md` (how/why), not here.
+This file stays limited to orientation — the table above, `What HoldMyTrack is`, and the working, commit and Markdown conventions below. If you're about to write what a feature does, how it works, or why it was built a particular way, that belongs in `SPEC.md` (what) or `IMPLEMENTATION.md` (how/why), not here.
+
+## Asking Questions
+
+- **Ask, don't assume:** Ask as many questions as you need. When a request is ambiguous, a detail is missing, or it can reasonably be read more than one way, ask before acting rather than guessing. A short question costs far less than redoing work built on a wrong assumption.
 
 ## Commits and Pull Requests
 
