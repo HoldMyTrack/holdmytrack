@@ -176,18 +176,6 @@
     <string name="locate_button">Моё местоположение</string>
     <string name="date_range_shift_earlier">Сдвинуть диапазон раньше</string>
     <string name="date_range_shift_later">Сдвинуть диапазон позже</string>
-    <plurals name="date_range_earlier">
-        <item quantity="one">На %d активный день раньше</item>
-        <item quantity="few">На %d активных дня раньше</item>
-        <item quantity="many">На %d активных дней раньше</item>
-        <item quantity="other">На %d активных дня раньше</item>
-    </plurals>
-    <plurals name="date_range_later">
-        <item quantity="one">На %d активный день позже</item>
-        <item quantity="few">На %d активных дня позже</item>
-        <item quantity="many">На %d активных дней позже</item>
-        <item quantity="other">На %d активных дня позже</item>
-    </plurals>
     <string name="locate_needs_location">HoldMyTrack нужен доступ к местоположению, чтобы показать, где вы.</string>
     <string name="nav_map">Карта</string>
     <string name="nav_stories">Истории</string>
@@ -607,6 +595,8 @@
     <!-- The panel's Privacy tab (panel/PrivacyTab.kt), after the web's private.* messages. -->
     <string name="panel_tab_privacy">Приватность</string>
     <string name="private_subtitle">Треки никогда не начинаются и не заканчиваются внутри этих кругов.</string>
+    <string name="panel_close_private">Назад к занятиям</string>
+    <string name="panel_private_title">Приватные места</string>
     <string name="private_create">Создать</string>
     <string name="private_none">Пока нет.</string>
     <string name="private_unnamed">Без названия</string>

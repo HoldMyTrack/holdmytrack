@@ -49,13 +49,4 @@ class RangeShiftTest {
         assertEquals(shifted("2026-09-03", "2026-09-03"), shiftRange(days, false, DateRange("2026-09-04", "2026-09-05"), -1))
         assertEquals(shifted("2026-09-06", "2026-09-06"), shiftRange(days, false, DateRange("2026-09-04", "2026-09-05"), 1))
     }
-
-    @Test
-    fun ticksMarkMonthChangesAndSkippedDays() {
-        assertEquals(
-            listOf(Tick.DAY, Tick.MONTH, Tick.GAP, Tick.DAY),
-            ticksOf(listOf("2026-08-31", "2026-09-01", "2026-09-04")),
-        )
-        assertEquals(listOf(Tick.DAY), ticksOf(emptyList()))
-    }
 }

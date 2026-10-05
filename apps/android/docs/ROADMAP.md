@@ -90,10 +90,10 @@ The map screen and its menus carry the web's phone layout over, which on a phone
   - Map, Stories, Record (the record button, raised in the middle), Sync and You (`apps/android/docs/SPEC.md` FR-2.9); Sync is a fragment, its run cancelled the moment it leaves the foreground or another tab hides it; the burger menu is gone, and You lists what it held until it gets its own design. Checked on the emulator against a local stack, in English and Russian: each tab, Stories marking the map's Stories tab, Back to Map, a recording started from Sync landing on Map and stopped by a hold, rotation on Sync, and Health Connect's rationale opening the Sync screen on its own.
 - [x] **The map's top chrome**
   - One row: Normal, Fog and Heatmap with icons, and Layers over Find my location on the right; Show layers and Satellite are switches in the Layers menu; the recording's status, with Stop, takes the toggle's place while recording; a chip says what Fog and Heatmap show (`apps/android/docs/SPEC.md` FR-2.2). Checked on the emulator against a local stack, in English and Russian: the row, the Layers menu, Fog's chip, and a recording's card with Stop confirmed.
-- [ ] **The sheet and the date scrubber**
-  - A draggable sheet with collapsed, half and full heights; its peek is the range, its totals and an activity-day scrubber whose bars are each day's distance; the panel's tab row goes.
+- [x] **The sheet and the date scrubber**
+  - A draggable sheet with collapsed, half and expanded heights; its head is the range, its totals and a day scrubber whose bars are each activity day's distance, paged by holding a handle past the edge; the tab row is gone, Stories and Private locations reached from the bottom bar and the You tab (`apps/android/docs/SPEC.md` FR-2.6, FR-2.7 item 1). Checked on the emulator against a local stack: the three heights by drag, handle and Back, a bar picked, ‹ shifting the range, Stories and Private locations, and rotation in both orientations.
 - [ ] **The selected activity and multi-select**
-  - A selected activity's card in the sheet (distance, moving time, pace or speed, the pace bands' legend, its actions), and a contextual bar in the top row while rows are checked.
+  - A selected activity's card in the sheet (distance, moving time, pace or speed, the pace bands' legend, its actions), a contextual bar in the top row while rows are checked, and the list's own redesign: Type and Distance as chips, and rows with a type tile.
 - [ ] **Track editing as a focused mode**
   - A top bar (Cancel, Undo, Save) and an editor sheet with Activity, Track and Photos, the map between them; the Private location editor takes the same frame.
 - [ ] **The Sync, You and Privacy screens**

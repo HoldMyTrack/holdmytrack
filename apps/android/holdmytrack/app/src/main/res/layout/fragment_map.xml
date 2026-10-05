@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- The map tab (MapFragment). A CoordinatorLayout so the Activities sheet at the bottom
+     (include_activities_sheet) can be dragged between its heights; everything else is laid over
+     the map as in a FrameLayout. -->
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/map_root"
     android:layout_width="match_parent"
@@ -355,115 +358,13 @@
         android:layout_marginBottom="@dimen/hmt_space_32"
         android:visibility="gone" />
 
-    <!-- The bottom of the map, Normal mode's alone, the web's phone layout: the Activities panel
-         (include_activities_sheet, panel/ActivitiesPanel) sitting on the date-range footer, one
-         white block the width of the screen with a hairline and a shadow along its top. Gone
-         when neither is up. -->
-    <LinearLayout
-        android:id="@+id/bottom_chrome"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:background="@drawable/bg_panel_sheet"
-        android:elevation="8dp"
-        android:orientation="vertical"
-        android:visibility="gone">
+    <!-- The Activities sheet, Normal mode's alone, at the bottom of the map
+         (include_activities_sheet, panel/ActivitiesPanel). -->
+    <include layout="@layout/include_activities_sheet" />
 
-        <include layout="@layout/include_activities_sheet" />
-
-        <!-- The date range the tracks are drawn for (map/DateRangeSlider): the web's phone
-             footer (apps/web/src/ui/DateRangeSlider.tsx) — Earlier, a two-knob track over 15
-             activity days, Later, and the selected dates under it — under a hairline from the
-             panel above. Normal mode only, as on the web; clickable so a touch in its padding
-             doesn't pan the map underneath. -->
-        <LinearLayout
-            android:id="@+id/date_footer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="@drawable/bg_list_top"
-            android:clickable="true"
-            android:focusable="false"
-            android:orientation="vertical"
-            android:paddingStart="@dimen/hmt_space_12"
-            android:paddingTop="@dimen/hmt_space_4"
-            android:paddingEnd="@dimen/hmt_space_12"
-            android:paddingBottom="@dimen/hmt_space_6"
-            android:visibility="gone">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/date_range_earlier"
-                    style="@style/Widget.HoldMyTrack.Button.MapPage"
-                    android:layout_width="32dp"
-                    android:layout_height="wrap_content"
-                    app:icon="@drawable/ic_chevrons_left" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/date_range_shift_earlier"
-                    style="@style/Widget.HoldMyTrack.Button.MapShift"
-                    android:layout_width="28dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/hmt_space_6"
-                    android:contentDescription="@string/date_range_shift_earlier"
-                    app:icon="@drawable/ic_chevron_left" />
-
-                <dev.holdmytrack.android.map.DateRangeTrackView
-                    android:id="@+id/date_range_track"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_marginStart="@dimen/hmt_space_8"
-                    android:layout_marginEnd="@dimen/hmt_space_8"
-                    android:layout_weight="1" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/date_range_shift_later"
-                    style="@style/Widget.HoldMyTrack.Button.MapShift"
-                    android:layout_width="28dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="@dimen/hmt_space_6"
-                    android:contentDescription="@string/date_range_shift_later"
-                    app:icon="@drawable/ic_chevron_right" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/date_range_later"
-                    style="@style/Widget.HoldMyTrack.Button.MapPage"
-                    android:layout_width="32dp"
-                    android:layout_height="wrap_content"
-                    app:icon="@drawable/ic_chevrons_right" />
-            </LinearLayout>
-
-            <!-- The selected dates, under the track's ends: the web's .date-range-slider__labels,
-                 12sp semibold at 65% ink. -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:id="@+id/date_range_from"
-                    style="@style/Widget.HoldMyTrack.DateRangeLabel"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1" />
-
-                <TextView
-                    android:id="@+id/date_range_to"
-                    style="@style/Widget.HoldMyTrack.DateRangeLabel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:gravity="end" />
-            </LinearLayout>
-        </LinearLayout>
-    </LinearLayout>
-
-    <!-- Laid over the panel and the footer while the Edit window is open, taking every touch:
-         the window edits the toolbar's target, which mustn't change underneath it, as the web
-         makes both inert then. Its height follows bottom_chrome's (MapFragment). -->
+    <!-- Laid over the collapsed sheet while the Edit window is open, taking every touch: the
+         window edits the toolbar's target, which mustn't change underneath it, as the web makes
+         the panel inert then. Its height follows the sheet's peek (MapFragment.placeEditLock). -->
     <View
         android:id="@+id/edit_lock"
         android:layout_width="match_parent"
@@ -474,4 +375,4 @@
         android:focusable="false"
         android:importantForAccessibility="no"
         android:visibility="gone" />
-</FrameLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

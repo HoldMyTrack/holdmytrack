@@ -85,6 +85,9 @@ class MainActivity : AppCompatActivity() {
         } else {
             tab = savedInstanceState.getString(STATE_TAB)?.let(Tab::valueOf) ?: Tab.MAP
             markTab(tab)
+            // The map's panel comes back on its Activities tab; Stories puts it back on its own
+            // once the map's view is up.
+            if (tab == Tab.STORIES) nav.post { map()?.showStories() }
         }
     }
 
@@ -104,7 +107,8 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * Shows [next]'s fragment and hides the others, adding it the first time. Map and Stories are
-     * the same fragment: moving between them moves its panel between Activities and Stories.
+     * the same fragment: moving between them moves its panel between Activities and Stories, and
+     * Map takes it off Private locations too.
      */
     fun showTab(next: Tab) {
         val tag = tagOf(next)
@@ -123,7 +127,7 @@ class MainActivity : AppCompatActivity() {
         tab = next
         when (next) {
             Tab.STORIES -> map()?.showStories()
-            Tab.MAP -> if (map()?.panelTab == PanelTab.STORIES) map()?.showActivities()
+            Tab.MAP -> if (map()?.panelTab.let { it != null && it != PanelTab.ACTIVITIES }) map()?.showActivities()
             else -> Unit
         }
         markTab(next)
@@ -133,6 +137,12 @@ class MainActivity : AppCompatActivity() {
      *  — left on Stories if that's where it is, since that's the map too. */
     fun showMap() {
         if (tab == Tab.SYNC || tab == Tab.YOU) showTab(Tab.MAP)
+    }
+
+    /** The You tab's Private locations: the map, its sheet on them. */
+    fun showPrivacy() {
+        showTab(Tab.MAP)
+        map()?.showPrivacy()
     }
 
     /** The map's panel moved between its tabs: the bar marks Stories while it shows Stories. */

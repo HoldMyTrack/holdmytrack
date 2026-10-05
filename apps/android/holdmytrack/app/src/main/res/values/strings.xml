@@ -167,14 +167,6 @@
     <string name="locate_button">Find my location</string>
     <string name="date_range_shift_earlier">Move the range earlier</string>
     <string name="date_range_shift_later">Move the range later</string>
-    <plurals name="date_range_earlier">
-        <item quantity="one">%d active day earlier</item>
-        <item quantity="other">%d active days earlier</item>
-    </plurals>
-    <plurals name="date_range_later">
-        <item quantity="one">%d active day later</item>
-        <item quantity="other">%d active days later</item>
-    </plurals>
     <string name="locate_needs_location">HoldMyTrack needs location access to show where you are.</string>
     <string name="nav_map">Map</string>
     <string name="nav_stories">Stories</string>
@@ -582,6 +574,8 @@
     <!-- The panel's Privacy tab (panel/PrivacyTab.kt), after the web's private.* messages. -->
     <string name="panel_tab_privacy">Privacy</string>
     <string name="private_subtitle">Tracks never start or end inside these circles.</string>
+    <string name="panel_close_private">Back to activities</string>
+    <string name="panel_private_title">Private locations</string>
     <string name="private_create">Create</string>
     <string name="private_none">None yet.</string>
     <string name="private_unnamed">Unnamed</string>
