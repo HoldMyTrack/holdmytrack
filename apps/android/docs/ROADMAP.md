@@ -88,8 +88,8 @@ The map screen and its menus carry the web's phone layout over, which on a phone
   - `MapFragment` holds everything the map did, hosted by `MainActivity` with no change in behavior (`apps/android/docs/IMPLEMENTATION.md` §1.2). Checked on the emulator against a local stack: sign-in, rotation in Fog, a recording surviving rotation, the notification's Stop, a row selected from the panel, the burger menu, View on map, and a day/night switch.
 - [x] **The bottom navigation bar**
   - Map, Stories, Record (the record button, raised in the middle), Sync and You (`apps/android/docs/SPEC.md` FR-2.9); Sync is a fragment, its run cancelled the moment it leaves the foreground or another tab hides it; the burger menu is gone, and You lists what it held until it gets its own design. Checked on the emulator against a local stack, in English and Russian: each tab, Stories marking the map's Stories tab, Back to Map, a recording started from Sync landing on Map and stopped by a hold, rotation on Sync, and Health Connect's rationale opening the Sync screen on its own.
-- [ ] **The map's top chrome**
-  - One row: Tracks, Fog and Heat with icons, and Layers and Find my location on the right; Satellite moves into the Layers menu; the recording's status replaces the row while recording.
+- [x] **The map's top chrome**
+  - One row: Normal, Fog and Heatmap with icons, and Layers over Find my location on the right; Show layers and Satellite are switches in the Layers menu; the recording's status, with Stop, takes the toggle's place while recording; a chip says what Fog and Heatmap show (`apps/android/docs/SPEC.md` FR-2.2). Checked on the emulator against a local stack, in English and Russian: the row, the Layers menu, Fog's chip, and a recording's card with Stop confirmed.
 - [ ] **The sheet and the date scrubber**
   - A draggable sheet with collapsed, half and full heights; its peek is the range, its totals and an activity-day scrubber whose bars are each day's distance; the panel's tab row goes.
 - [ ] **The selected activity and multi-select**

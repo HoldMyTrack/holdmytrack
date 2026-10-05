@@ -101,6 +101,8 @@
     <string name="mode_normal">Normal</string>
     <string name="mode_fog">Fog</string>
     <string name="mode_heatmap">Heatmap</string>
+    <string name="mode_chip_fog">Every activity, any date</string>
+    <string name="mode_chip_heatmap">The last 365 days</string>
     <string name="map_level_fog_city">City view — cleared exactly where you\'ve been</string>
     <string name="map_level_fog_country">Country view — a whole country clears once you\'ve been anywhere in it</string>
     <string name="map_level_fog_region">Region view — a whole state or province clears once you\'ve been anywhere in it</string>
