@@ -13,7 +13,7 @@ import com.google.android.material.button.MaterialButton
 import dev.holdmytrack.android.R
 
 /**
- * The Layers pill under the burger and the menu it opens — the web's `OverlaysMenu`
+ * The Layers pill under the mode toggle and the menu it opens — the web's `OverlaysMenu`
  * (`docs/SPEC.md` FR-4.13): Paths — Trails, Tracks and Bike paths — and Points of interest, one
  * entry per [MapSpots.Category], each picked over any mode.
  *

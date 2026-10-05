@@ -162,7 +162,6 @@
         <item quantity="other">%s places in this area</item>
     </plurals>
 
-    <string name="menu_button">Menu</string>
     <string name="locate_button">Find my location</string>
     <string name="date_range_shift_earlier">Move the range earlier</string>
     <string name="date_range_shift_later">Move the range later</string>
@@ -175,9 +174,12 @@
         <item quantity="other">%d active days later</item>
     </plurals>
     <string name="locate_needs_location">HoldMyTrack needs location access to show where you are.</string>
+    <string name="nav_map">Map</string>
+    <string name="nav_stories">Stories</string>
+    <string name="nav_sync">Sync</string>
+    <string name="nav_you">You</string>
     <string name="menu_profile">Profile</string>
     <string name="menu_upload">Upload</string>
-    <string name="menu_sync">Sync</string>
     <string name="menu_donate">Donate</string>
     <string name="menu_about">About</string>
     <string name="menu_help">Help</string>

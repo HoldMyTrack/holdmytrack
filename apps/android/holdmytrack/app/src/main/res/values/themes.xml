@@ -68,7 +68,7 @@
              TitleLarge came out in the sans. -->
         <item name="android:textViewStyle">@style/Widget.HoldMyTrack.TextView</item>
         <!-- Text the platform lays out from its own attributes rather than a TextView style:
-             PopupMenu's items (the burger menu) and list and spinner rows. -->
+             PopupMenu's items and list and spinner rows. -->
         <item name="android:textAppearanceLargePopupMenu">@style/TextAppearance.HoldMyTrack.BodyLarge</item>
         <item name="android:textAppearanceSmallPopupMenu">@style/TextAppearance.HoldMyTrack.BodyLarge</item>
         <item name="android:textAppearanceListItem">@style/TextAppearance.HoldMyTrack.BodyLarge</item>
@@ -321,6 +321,34 @@
         <item name="android:letterSpacing">0.02</item>
         <item name="android:paddingStart">@dimen/hmt_space_2</item>
         <item name="android:paddingEnd">@dimen/hmt_space_2</item>
+    </style>
+
+    <!-- The bottom bar (activity_main.xml): every label always shown, the selected tab on an
+         accent-container pill, on the page background with a hairline above it. -->
+    <style name="Widget.HoldMyTrack.BottomNav" parent="Widget.Material3.BottomNavigationView">
+        <item name="android:background">@color/hmt_bg</item>
+        <item name="itemIconTint">@color/nav_item_icon</item>
+        <item name="itemTextColor">@color/nav_item_text</item>
+        <item name="itemActiveIndicatorStyle">@style/Widget.HoldMyTrack.BottomNav.Indicator</item>
+        <item name="labelVisibilityMode">labeled</item>
+        <item name="itemTextAppearanceActive">@style/TextAppearance.HoldMyTrack.LabelMedium</item>
+        <item name="itemTextAppearanceInactive">@style/TextAppearance.HoldMyTrack.LabelMedium</item>
+    </style>
+
+    <style name="Widget.HoldMyTrack.BottomNav.Indicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">@color/hmt_accent_container</item>
+    </style>
+
+    <!-- A row of the You tab (fragment_you.xml): one line, a 56dp target, the platform's press
+         ripple. -->
+    <style name="Widget.HoldMyTrack.ListRow" parent="">
+        <item name="android:minHeight">56dp</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingStart">@dimen/hmt_space_4</item>
+        <item name="android:paddingEnd">@dimen/hmt_space_4</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyLarge</item>
+        <item name="android:textColor">@color/hmt_ink</item>
     </style>
 
     <style name="Widget.HoldMyTrack.MapPanel" parent="">

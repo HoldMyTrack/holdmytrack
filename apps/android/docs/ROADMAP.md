@@ -55,10 +55,10 @@ Everything between a tested app and its Play Store listing, roughly in the order
 - [ ] **Google sign-in in the Play build**
   - Credential Manager only answers for an app whose signing certificate is registered on the Android OAuth client, and only this Mac's debug key is today. Add the SHA-1 of Play's app signing key (Play Console → App integrity), and the upload key's for any build installed outside Play. Facebook needs nothing: its sign-in is a browser-tab handoff to the server (ADR-0016), with no app signature involved.
 - [x] **No donation link in the Play build**
-  - Play's Payments policy lets an app take or point to payment only through Google Play's billing system, with an exception for donations to tax-exempt organizations; Play Billing itself doesn't sell donations. StreetComplete's Play submission was rejected for its Patreon, Liberapay and GitHub Sponsors links, and it took them out of its Play build. So the burger menu's Donate is in debug builds only, which the website's APK is (`BuildConfig.DONATE_LINK`, `apps/android/docs/IMPLEMENTATION.md` §8), and the release build, the Play one, has none.
+  - Play's Payments policy lets an app take or point to payment only through Google Play's billing system, with an exception for donations to tax-exempt organizations; Play Billing itself doesn't sell donations. StreetComplete's Play submission was rejected for its Patreon, Liberapay and GitHub Sponsors links, and it took them out of its Play build. So the You tab's Donate is in debug builds only, which the website's APK is (`BuildConfig.DONATE_LINK`, `apps/android/docs/IMPLEMENTATION.md` §8), and the release build, the Play one, has none.
   - StreetComplete's link to its project page was flagged as well, because that page carried the donation details. About, Help, Contacts and Privacy open the web's pages, whose header has its own Donate: today it goes to `/about#funding`, which has no payment link ("donations are not open yet"), but once `OpenCollectiveSlug` (`services/server/internal/web/web.go`) is set it goes to Open Collective, from every one of those pages. Recheck before each Play submission once donations open.
 - [x] **A privacy policy page**
-  - `/privacy` (root `docs/SPEC.md` FR-10.6), linked from the burger menu and from the Health Connect rationale on `SyncActivity`, which Health Connect's own link to the app opens, so the policy users reach there is the one on the store listing.
+  - `/privacy` (root `docs/SPEC.md` FR-10.6), linked from the You tab and from the Health Connect rationale on the Sync screen, which Health Connect's own link to the app opens, so the policy users reach there is the one on the store listing.
 - [x] **Account deletion, in the app and on the web**
   - In the app, Settings' Delete account (`apps/android/docs/SPEC.md` FR-1.5); on the web, Settings' Delete account section. The Data safety form's deletion URL is Help's `https://holdmytrack.com/help#delete-account`, which explains both and the email route for someone who can't sign in (root `docs/SPEC.md` FR-1.11).
 - [ ] **Play Store Health Connect data-type declarations**
@@ -86,8 +86,8 @@ The map screen and its menus carry the web's phone layout over, which on a phone
 
 - [x] **The map as a Fragment**
   - `MapFragment` holds everything the map did, hosted by `MainActivity` with no change in behavior (`apps/android/docs/IMPLEMENTATION.md` §1.2). Checked on the emulator against a local stack: sign-in, rotation in Fog, a recording surviving rotation, the notification's Stop, a row selected from the panel, the burger menu, View on map, and a day/night switch.
-- [ ] **The bottom navigation bar**
-  - Map, Stories, Record (the record button, raised in the middle), Sync and You; Sync becomes a fragment, its run still cancelled the moment it leaves the foreground; the burger menu goes.
+- [x] **The bottom navigation bar**
+  - Map, Stories, Record (the record button, raised in the middle), Sync and You (`apps/android/docs/SPEC.md` FR-2.9); Sync is a fragment, its run cancelled the moment it leaves the foreground or another tab hides it; the burger menu is gone, and You lists what it held until it gets its own design. Checked on the emulator against a local stack, in English and Russian: each tab, Stories marking the map's Stories tab, Back to Map, a recording started from Sync landing on Map and stopped by a hold, rotation on Sync, and Health Connect's rationale opening the Sync screen on its own.
 - [ ] **The map's top chrome**
   - One row: Tracks, Fog and Heat with icons, and Layers and Find my location on the right; Satellite moves into the Layers menu; the recording's status replaces the row while recording.
 - [ ] **The sheet and the date scrubber**

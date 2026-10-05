@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The bottom bar's middle slot, which the record button covers (activity_main.xml): an empty
+     24dp icon, so the slot is as wide as the others and draws nothing. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <size
+        android:width="24dp"
+        android:height="24dp" />
+    <solid android:color="@android:color/transparent" />
+</shape>

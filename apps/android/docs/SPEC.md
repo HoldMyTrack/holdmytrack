@@ -103,7 +103,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 ### FR-1.5 Settings
 
-**Description**: The account's Settings — Avatar, Name, Country, Timezone and Language, the same five the web's page edits (`docs/SPEC.md` FR-1.7) — on a Settings screen reached from the map's menu, and shown in place of the map on a new account's first run.
+**Description**: The account's Settings — Avatar, Name, Country, Timezone and Language, the same five the web's page edits (`docs/SPEC.md` FR-1.7) — on a Settings screen reached from the You tab (FR-2.9), and shown in place of the map on a new account's first run.
 
 **Preconditions**: A session whose email is confirmed (FR-1.4), or a demo account.
 
@@ -123,9 +123,9 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 ### FR-1.6 Profile
 
-**Description**: The map menu's Profile screen: who is signed in and Sign out (FR-1.3), then the web's `/profile` page — the activity graph (`docs/SPEC.md` FR-7) and Trends (`docs/SPEC.md` FR-9) — for the signed-in account's own activities.
+**Description**: The Profile screen, reached from the You tab (FR-2.9): who is signed in and Sign out (FR-1.3), then the web's `/profile` page — the activity graph (`docs/SPEC.md` FR-7) and Trends (`docs/SPEC.md` FR-9) — for the signed-in account's own activities.
 
-**Preconditions**: A session (the map menu is only reachable with one).
+**Preconditions**: A session (the You tab is only reachable with one).
 
 **Behavior**:
 1. A card with the avatar and Name from Settings (FR-1.5), "Signed in as …" ("Signed in to the demo account" for a demo), and Sign out.
@@ -149,7 +149,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 ### FR-2.2 Three map modes: Normal, Fog of War, Heatmap
 
-**Description**: The same three mutually exclusive views `docs/SPEC.md` FR-4.1–FR-4.4 define, switched by a toggle at the map's top-left, in one row beside the menu button, with a divider between Normal and the two coverage views (Normal | Fog, Heatmap), as on the web. Only visible/available once signed in.
+**Description**: The same three mutually exclusive views `docs/SPEC.md` FR-4.1–FR-4.4 define, switched by a toggle at the start of the map's top row, with a divider between Normal and the two coverage views (Normal | Fog, Heatmap), as on the web. Only visible/available once signed in.
 
 **Behavior**:
 1. **Normal** draws the account's tracks as a single-color vector line layer (`GET /tiles/v1/tracks/{z}/{x}/{y}.mvt`), from zoom 4 inward, the same as the web (`docs/SPEC.md` FR-4.1).
@@ -158,7 +158,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 4. All three layers sit beneath the basemap's first label layer, so place names stay legible; within that, the active raster (fog or heatmap) is drawn beneath the tracks layer so a cleared route reads as visible through the fog rather than obscured by it — the same ordering the web client uses.
 5. Exactly one of the three is active at a time; tapping the active one leaves it active. Its button is filled (dark ink, white text); the other two are plain text on the toggle's light panel. The mode is kept across a theme or language change.
 6. While a GPS recording is in progress (FR-5.1) the toggle is hidden and none of the three modes' layers are drawn — the map shows only that recording. The previously selected mode returns when the recording stops.
-7. Under the menu button, on a second row, is the **Layers** pill (`docs/SPEC.md` FR-4.13): a checkbox, then the Layers icon, which opens the Layers menu under it. The menu has **Paths**: Trails, Tracks (dirt, farm and forest roads, with an info button that shows and hides that explanation under the entry) and Bike paths; then **Points of interest**, one entry per category (FR-2.8). Each is independent of the mode, off by default and kept on the phone only; a phone that had the former Trails & bike paths toggle on starts with all three paths on. The checkbox shows or hides every pick at once and keeps them, as on the web (FR-4.13 item 5): on until turned off, kept on the phone, turned back on by picking an entry, and greyed out with nothing picked. While picks show, the icon is filled like the active map mode, and a badge on its corner shows how many; while the checkbox is off, the badge is greyed and the icon unfilled. A tap on the icon, outside the menu or Back closes it. Hiding the places closes an open place's popup, but a capture in progress (FR-2.8) carries on. Under the pill, only when the server's style carries imagery, is the **Satellite** button (`docs/SPEC.md` FR-4.14), an icon filled while the imagery shows: the imagery under the base map's roads, drawn at 40% opacity, and labels, and over imagery Fog uses the cream veil. Unlike the mode buttons, both stay while recording; they are hidden while the Edit window or the Private location editor is open, and the menu closes with them.
+7. Under the mode toggle, on a second row, is the **Layers** pill (`docs/SPEC.md` FR-4.13): a checkbox, then the Layers icon, which opens the Layers menu under it. The menu has **Paths**: Trails, Tracks (dirt, farm and forest roads, with an info button that shows and hides that explanation under the entry) and Bike paths; then **Points of interest**, one entry per category (FR-2.8). Each is independent of the mode, off by default and kept on the phone only; a phone that had the former Trails & bike paths toggle on starts with all three paths on. The checkbox shows or hides every pick at once and keeps them, as on the web (FR-4.13 item 5): on until turned off, kept on the phone, turned back on by picking an entry, and greyed out with nothing picked. While picks show, the icon is filled like the active map mode, and a badge on its corner shows how many; while the checkbox is off, the badge is greyed and the icon unfilled. A tap on the icon, outside the menu or Back closes it. Hiding the places closes an open place's popup, but a capture in progress (FR-2.8) carries on. Under the pill, only when the server's style carries imagery, is the **Satellite** button (`docs/SPEC.md` FR-4.14), an icon filled while the imagery shows: the imagery under the base map's roads, drawn at 40% opacity, and labels, and over imagery Fog uses the cream veil. Unlike the mode buttons, both stay while recording; they are hidden while the Edit window or the Private location editor is open, and the menu closes with them.
 8. **Which level is in view.** Fog and Heatmap draw at three levels by zoom — whole countries below zoom 3, whole states or provinces below zoom 7, exactly where you've been from there in (`docs/SPEC.md` FR-4.2 behavior 4, FR-4.3 behavior 5). A card under the second row names it, as on the web — "Country view — a whole country clears once you've been anywhere in it", "City view — the more often you go somewhere, the hotter it glows", one per mode and level — on switching to Fog or Heatmap and whenever a zoom comes to rest in another level, fading out after 3 seconds. Never in Normal, which draws tracks at every zoom, nor while recording. It takes no touches, so the map still pans under it.
 
 **Notes — filtering**: Normal's tracks are narrowed to the selected date range (FR-2.6), sent as the tracks tile's `from`/`to`. Fog and Heatmap are never filtered, as on the web (`docs/SPEC.md` FR-4.2, FR-4.3). Within the range, the Activities panel's TYPE and DISTANCE filters, its hidden tracks and Pending rows leave tracks off the map, on the device rather than in the tile request, as on the web (FR-2.7).
@@ -177,7 +177,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 ### FR-2.5 Find my location
 
-**Description**: A button near the right end of the map's top row (the row with the menu button and the mode toggle), with the record button (FR-5.1) on its own row under it, that shows the user's position and moves the camera to it — the Android counterpart of the web map's geolocate control.
+**Description**: A button at the right end of the map's top row (the row with the mode toggle) that shows the user's position and moves the camera to it — the Android counterpart of the web map's geolocate control.
 
 **Behavior**:
 1. The first tap asks for location permission (the system dialog offers Precise or Approximate; either is enough). If it's refused, a message says location access is needed to show where you are, and nothing else happens.
@@ -237,14 +237,16 @@ There is no administrator role and no cross-account visibility, exactly as `docs
    - Once captured it reads "Captured!", the place's badge fills and its popup shows "Captured" with the date, and after 2.5 s capture mode ends by itself. If the server finds the position outside the place, the count starts again ("Not quite inside yet — keep going"); if the capture can't be sent, it's retried every 5 s. If the place was retired since the map loaded it, capture mode says "This place is no longer on the map" and ends by itself 4 s later.
    - It ends with Stop, Back, a track edit starting, unticking the place's category, or leaving the account. The screen stays on while it runs, and location is read only then and only in the foreground; the dot goes when it ends, unless Find my location had it on already.
 
-### FR-2.9 The menu
+### FR-2.9 The bottom bar
 
-**Description**: The burger button at the start of the map's top row opens a menu of what doesn't fit on the map — the app's own screens, then the pages the web's header links to.
+**Description**: A bar along the bottom of the screen, once signed in, moves between the app's main screens: **Map**, **Stories**, the record button (FR-5.1) raised over its middle, **Sync** and **You**. Every label always shows; the tab showing is marked by its icon on an accent pill.
 
 **Behavior**:
-1. **Profile** (FR-1.6), **Upload** (FR-3.6), **Sync** (FR-3.5) and **Settings** (FR-1.5) open those screens — Upload before Sync, as in the web's header.
-2. Under a divider, **Donate**, **About**, **Help**, **Contacts** and **Privacy** open the web's own pages (`docs/SPEC.md` FR-10, FR-11) — Donate the About page's funding section, as the web header's Donate does — in a browser tab, which shows them in the browser's language (`docs/SPEC.md` FR-13.1). Donate is in the APK the website offers, not in the Play Store build: Play doesn't allow an app to point to payment outside its own billing.
-3. Last, under another divider, the app's version, greyed and not tappable: "Version 0.5 (62da50b)" — the release number and the commit it was built from.
+1. **Map** is the map (FR-2.1–FR-2.8) with the Activities panel on its Activities tab. **Stories** is the same map with the panel on its Stories tab (FR-2.7 item 14), and the bar marks Stories whenever the panel shows that tab, however it got there; tapping Map from Stories puts the panel back on Activities, collapsed.
+2. **Sync** is the Sync screen (FR-3.5), and **You** the rest: **Profile** (FR-1.6), **Upload** (FR-3.6) and **Settings** (FR-1.5); then, under a divider, **Donate**, **About**, **Help**, **Contacts** and **Privacy**, which open the web's own pages (`docs/SPEC.md` FR-10, FR-11) — Donate the About page's funding section, as the web header's Donate does — in a browser tab, which shows them in the browser's language (`docs/SPEC.md` FR-13.1). Donate is in the APK the website offers, not in the Play Store build: Play doesn't allow an app to point to payment outside its own billing. Last, under another divider, the app's version, greyed and not tappable: "Version 0.5 (62da50b)" — the release number and the commit it was built from.
+3. Moving between tabs keeps each as it was: the map's camera, mode, range and selection, and a recording on it, are as they were on coming back.
+4. Back from Stories, Sync or You goes to Map; Back on Map leaves the app. A tab survives rotation.
+5. Starting a recording from Sync or You moves to Map, where it's drawn; pausing or stopping one leaves the tab as it is. The notification's Stop (FR-5.1) and a history row's View on map (FR-4.1) come back to Map too.
 
 ### FR-2.10 Photos
 
@@ -312,7 +314,7 @@ All of FR-3 requires an active session (demo or registered); Health Connect sync
 
 ### FR-3.5 The Sync screen — sending what's on the phone
 
-**Description**: The burger menu's **Sync** item opens one screen (`SyncActivity`) that lists every place activities come from on this device, and a single **Sync now** that sends all of it: Health Connect, once it can be read, and every recording on the device. Under it, everything imported so far (FR-4).
+**Description**: The bottom bar's **Sync** (FR-2.9) is one screen that lists every place activities come from on this device, and a single **Sync now** that sends all of it: Health Connect, once it can be read, and every recording on the device. Under it, everything imported so far (FR-4).
 
 **Behavior** (top to bottom):
 1. Signed out, email unconfirmed, or the demo account: a notice saying why nothing below can sync. Signed out or unconfirmed, nothing else is shown; for the demo account, the Health Connect section is hidden too.
@@ -326,7 +328,7 @@ All of FR-3 requires an active session (demo or registered); Health Connect sync
 
 ### FR-3.6 Upload
 
-**Description**: The burger menu's **Upload** opens the web's Upload menu as a screen of its own (`UploadActivity`, `docs/SPEC.md` FR-3.1–FR-3.4): activity files, a `.zip` of them and a Google Takeout export go to the same `POST /v1/activities/upload`, and a Google Maps Timeline export opens its own screen (FR-3.7). It sits apart from Sync as on the web: Sync sends what lives on the phone and keeps coming, Upload brings in a file made somewhere else, usually once.
+**Description**: The You tab's **Upload** (FR-2.9) opens the web's Upload menu as a screen of its own (`UploadActivity`, `docs/SPEC.md` FR-3.1–FR-3.4): activity files, a `.zip` of them and a Google Takeout export go to the same `POST /v1/activities/upload`, and a Google Maps Timeline export opens its own screen (FR-3.7). It sits apart from Sync as on the web: Sync sends what lives on the phone and keeps coming, Upload brings in a file made somewhere else, usually once.
 
 **Preconditions**: Signed in with a confirmed email, not the demo account; otherwise the screen shows only a notice saying why — for the demo account, the web's "Not available for demo accounts — create an account to upload your own activities."
 
@@ -386,7 +388,7 @@ A third way an activity can originate on this app, alongside FR-3's Health Conne
 
 ### FR-5.1 Record — one button on the map
 
-**Description**: A round, translucent record button on its own row under the right end of the map's top row, centred under Find my location (`MapFragment`) — 48dp while idle, 56dp while a recording is in progress — the bottom of the screen is the Activities panel's (FR-2.7) — that records a casual, GPS-only track — a walk, hike, or drive someone would not otherwise bother tracking — in one tap, asking nothing.
+**Description**: A round record button raised over the middle of the bottom bar (FR-2.9) — 56dp while idle, 60dp while a recording is in progress, reachable from every tab — that records a casual, GPS-only track — a walk, hike, or drive someone would not otherwise bother tracking — in one tap, asking nothing.
 
 **Preconditions**: A session (the button is on the map, FR-2.1) and `ACCESS_FINE_LOCATION` granted to record. A demo session can record and manage rows locally; only syncing them is blocked (FR-5.2 step 8).
 
@@ -400,7 +402,7 @@ A third way an activity can originate on this app, alongside FR-3's Health Conne
 7. **Stop** saves the recording on the device, with no name or description and the activity type most recently set in Edit on this account (FR-5.2 step 3) — `"unknown"` for an account's first recording — then opens a **"Save recording"** screen on it: the Edit screen (FR-5.2 step 4) with that type pre-filled, and **Discard** in place of Download GPX. **Save** stores name, type and description (and remembers the type for the next recording), and back on the map a toast says "Recording saved. It will appear on the map after you sync."; **Back** leaves the recording saved as it was; **Discard** asks "Discard this recording?" and deletes it from the device. No network request happens at this step. Confirmed on an emulator: Stop after a minute and a quarter opened Save recording, and Save returned to the map with the toast.
 8. **A recording shorter than one minute is not saved.** Moving time (pauses excluded) under 60 s — or fewer than 2 GPS points — is discarded on Stop with "Too short — not saved." Confirmed on an emulator: a ~20 s recording left no row.
 9. **A recording survives the app being killed mid-recording.** If the process ends while recording or paused — the system reclaiming memory, a crash, Force stop — the recording and its notification stop, but everything recorded up to the last GPS fix is kept on the device. The next time the map opens under the same account, a dialog, "Unfinished recording", gives its moving time and distance and offers **Resume**, **Save** and **Discard**; it can't be dismissed any other way. **Resume** brings the recording back paused, with its track, time and distance, and its notification; the time the app was not running counts as a pause, adding neither time nor distance. If location access has been taken away since, it shows "HoldMyTrack needs location access to record a GPS track." and the prompt comes back next time. **Save** acts like Stop (step 7, including step 8's minimum). **Discard** asks "Discard this recording?" first; Cancel returns to the prompt. Nothing restarts on its own. A leftover recording from another account waits for that account; starting a new recording before choosing saves the leftover as it stands (step 7), under the account it was made on. Confirmed on an emulator (`apps/android/docs/IMPLEMENTATION.md` §7.10).
-10. **A status pill beside the button shows the recording in progress**: a dot (red recording, amber paused), the moving time as h:mm:ss — counting while recording, frozen while paused — and the distance, reading "Waiting for GPS…" instead until the first fix arrives and "Paused · …" while paused. During a hold (step 4) it shows the stop countdown. It is gone while idle. Confirmed on an emulator.
+10. **A status pill at the end of the map's second row, under Find my location's place, shows the recording in progress**: a dot (red recording, amber paused), the moving time as h:mm:ss — counting while recording, frozen while paused — and the distance, reading "Waiting for GPS…" instead until the first fix arrives and "Paused · …" while paused. During a hold (step 4) it shows the stop countdown. It is gone while idle. Confirmed on an emulator.
 
 ### FR-5.2 Recorded activities — review, edit, check, sync
 

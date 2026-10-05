@@ -3,11 +3,25 @@ package dev.holdmytrack.android
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.fragment.app.Fragment
+import com.google.android.material.bottomnavigation.BottomNavigationView
 import dev.holdmytrack.android.net.Session
+import dev.holdmytrack.android.panel.PanelTab
+import dev.holdmytrack.android.recording.RecordingService
 
 /**
- * The app's main window: it hosts the map ([MapFragment]) and hands each new intent to it.
+ * The app's main window: the bottom bar — Map, Stories, Record, Sync, You — and the tab above it
+ * ([ADR-0033](../../../docs/adr/0033-android-bottom-navigation-single-activity.md)). Map and
+ * Stories are both the map ([MapFragment]): Stories is its panel's Stories tab. Sync is
+ * [SyncFragment] and You is [YouFragment]. Tabs are shown and hidden rather than replaced, so the
+ * map — its camera, its layers, a recording on it — is just as it was on coming back to it.
+ * The record button over the bar's middle slot is the map's to drive (`MapFragment.onRecordTap`).
  *
  * Never shows the map without a session: a signed-out visitor is handed straight to
  * `SignInActivity`, mirroring web's `AuthGate` (`docs/IMPLEMENTATION.md` §4.13), before any layout
@@ -16,6 +30,20 @@ import dev.holdmytrack.android.net.Session
  * screen offers one tap away.
  */
 class MainActivity : AppCompatActivity() {
+
+    /** The bottom bar's tabs, Record aside — a button rather than a tab. */
+    enum class Tab { MAP, STORIES, SYNC, YOU }
+
+    private lateinit var nav: BottomNavigationView
+    private var tab = Tab.MAP
+
+    /** Set while the bar's selection is moved in code, so its listener doesn't act on it. */
+    private var selectingInCode = false
+
+    /** Back from any tab but Map goes to Map, and only then leaves the app. */
+    private val backToMap = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() = showTab(Tab.MAP)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,23 +59,146 @@ class MainActivity : AppCompatActivity() {
             return
         }
         setContentView(R.layout.activity_main)
-        // A recreation (rotation, theme, language) restores the fragment with its own state.
+        nav = findViewById(R.id.bottom_nav)
+        // The middle slot is where the record button sits: no tab, and nothing for TalkBack to
+        // stop on under the button.
+        nav.findViewById<View>(R.id.nav_record)?.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        nav.setOnItemSelectedListener { item ->
+            if (!selectingInCode) tabOf(item.itemId)?.let(::showTab)
+            true
+        }
+        // The bar pads itself clear of the gesture bar, so the tabs above it get no bottom inset
+        // — the map's own chrome adds the one it's given (`MapFragment.insetSystemBars`).
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main_content)) { _, insets ->
+            val navigation = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+            WindowInsetsCompat.Builder(insets)
+                .setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(navigation.left, navigation.top, navigation.right, 0))
+                .build()
+        }
+        onBackPressedDispatcher.addCallback(this, backToMap)
+
+        // A recreation (rotation, theme, language) restores the tabs' fragments, which tab was
+        // showing and each one's own state.
         if (savedInstanceState == null) {
-            supportFragmentManager.beginTransaction()
-                .add(R.id.main_content, MapFragment(), TAG_MAP)
-                .commitNow()
+            showTab(Tab.MAP)
+            tabFor(intent)?.let(::showTab)
+        } else {
+            tab = savedInstanceState.getString(STATE_TAB)?.let(Tab::valueOf) ?: Tab.MAP
+            markTab(tab)
         }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        (supportFragmentManager.findFragmentByTag(TAG_MAP) as? MapFragment)?.onNewIntent(intent)
+        // The notification's Stop and a View on map are both about the map.
+        val forMap = intent.action == RecordingService.ACTION_STOP || intent.hasExtra(EXTRA_VIEW_ACTIVITY)
+        if (forMap) showMap()
+        tabFor(intent)?.let(::showTab)
+        map()?.onNewIntent(intent)
     }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(STATE_TAB, tab.name)
+    }
+
+    /**
+     * Shows [next]'s fragment and hides the others, adding it the first time. Map and Stories are
+     * the same fragment: moving between them moves its panel between Activities and Stories.
+     */
+    fun showTab(next: Tab) {
+        val tag = tagOf(next)
+        val fragments = supportFragmentManager
+        val transaction = fragments.beginTransaction().setReorderingAllowed(true)
+        for (other in TAGS) {
+            if (other == tag) continue
+            fragments.findFragmentByTag(other)?.takeIf { !it.isHidden }?.let(transaction::hide)
+        }
+        val target = fragments.findFragmentByTag(tag)
+        when {
+            target == null -> transaction.add(R.id.main_content, newFragment(tag), tag)
+            target.isHidden -> transaction.show(target)
+        }
+        transaction.commitNow()
+        tab = next
+        when (next) {
+            Tab.STORIES -> map()?.showStories()
+            Tab.MAP -> if (map()?.panelTab == PanelTab.STORIES) map()?.showActivities()
+            else -> Unit
+        }
+        markTab(next)
+    }
+
+    /** The map, when a start of a recording, a View on map or the notification's Stop needs it
+     *  — left on Stories if that's where it is, since that's the map too. */
+    fun showMap() {
+        if (tab == Tab.SYNC || tab == Tab.YOU) showTab(Tab.MAP)
+    }
+
+    /** The map's panel moved between its tabs: the bar marks Stories while it shows Stories. */
+    fun onPanelTabChanged(panelTab: PanelTab) {
+        if (tab != Tab.MAP && tab != Tab.STORIES) return
+        markTab(if (panelTab == PanelTab.STORIES) Tab.STORIES else Tab.MAP)
+    }
+
+    private fun markTab(shown: Tab) {
+        tab = shown
+        selectingInCode = true
+        nav.selectedItemId = itemOf(shown)
+        selectingInCode = false
+        backToMap.isEnabled = shown != Tab.MAP
+    }
+
+    private fun map() = supportFragmentManager.findFragmentByTag(TAG_MAP) as? MapFragment
+
+    private fun tagOf(tab: Tab) = when (tab) {
+        Tab.MAP, Tab.STORIES -> TAG_MAP
+        Tab.SYNC -> TAG_SYNC
+        Tab.YOU -> TAG_YOU
+    }
+
+    private fun newFragment(tag: String): Fragment = when (tag) {
+        TAG_SYNC -> SyncFragment()
+        TAG_YOU -> YouFragment()
+        else -> MapFragment()
+    }
+
+    private fun itemOf(tab: Tab) = when (tab) {
+        Tab.MAP -> R.id.nav_map
+        Tab.STORIES -> R.id.nav_stories
+        Tab.SYNC -> R.id.nav_sync
+        Tab.YOU -> R.id.nav_you
+    }
+
+    private fun tabOf(itemId: Int) = when (itemId) {
+        R.id.nav_map -> Tab.MAP
+        R.id.nav_stories -> Tab.STORIES
+        R.id.nav_sync -> Tab.SYNC
+        R.id.nav_you -> Tab.YOU
+        else -> null
+    }
+
+    private fun tabFor(intent: Intent?) = intent?.getStringExtra(EXTRA_TAB)?.let { name -> Tab.entries.firstOrNull { it.name == name } }
 
     companion object {
         private const val TAG_MAP = "map"
+        private const val TAG_SYNC = "sync"
+        private const val TAG_YOU = "you"
+        private val TAGS = listOf(TAG_MAP, TAG_SYNC, TAG_YOU)
+        private const val STATE_TAB = "tab"
+        private const val EXTRA_TAB = "dev.holdmytrack.android.TAB"
         internal const val EXTRA_VIEW_ACTIVITY = "dev.holdmytrack.android.VIEW_ACTIVITY"
         internal const val EXTRA_VIEW_STARTED_AT = "dev.holdmytrack.android.VIEW_STARTED_AT"
+
+        /** Opens the main window on [tab] — Upload's "See Sync". Clears whatever is over an
+         *  existing one. */
+        fun openTab(context: Context, tab: Tab) {
+            context.startActivity(
+                Intent(context, MainActivity::class.java)
+                    .putExtra(EXTRA_TAB, tab.name)
+                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            )
+        }
 
         /** Opens the map on [activityId], started at [startedAt] — the Sync screen's View on
          *  map. Clears whatever is over an existing map, which then selects it. */

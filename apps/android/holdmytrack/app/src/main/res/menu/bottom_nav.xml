@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The bottom bar (activity_main.xml, MainActivity): Map, Stories, an empty middle slot the
+     record button sits over, Sync and You. -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_map"
+        android:icon="@drawable/ic_map"
+        android:title="@string/nav_map" />
+    <item
+        android:id="@+id/nav_stories"
+        android:icon="@drawable/ic_book_open"
+        android:title="@string/nav_stories" />
+    <item
+        android:id="@+id/nav_record"
+        android:enabled="false"
+        android:icon="@drawable/ic_nav_gap"
+        android:title="" />
+    <item
+        android:id="@+id/nav_sync"
+        android:icon="@drawable/ic_refresh_cw"
+        android:title="@string/nav_sync" />
+    <item
+        android:id="@+id/nav_you"
+        android:icon="@drawable/ic_user"
+        android:title="@string/nav_you" />
+</menu>

@@ -20,7 +20,6 @@ import android.view.ViewGroup.MarginLayoutParams
 import android.view.WindowInsets
 import android.widget.Button
 import android.widget.Chronometer
-import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -28,7 +27,6 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -93,9 +91,9 @@ import java.time.ZoneId
 
 /**
  * The map, and everything that hangs off it: the served basemap, the session the user layers
- * need, and the Normal / Fog of War / Heatmap toggle between them. The toggle and the burger
- * menu (Profile, Sync) both float over the map top-start, rather than living in a bar of their
- * own, mirroring the web client's own on-map mode control (`apps/web/src/map/MapView.tsx`).
+ * need, and the Normal / Fog of War / Heatmap toggle between them. The toggle floats over the
+ * map top-start, rather than living in a bar of its own, mirroring the web client's own on-map
+ * mode control (`apps/web/src/map/MapView.tsx`).
  *
  * Along the bottom in Normal mode, the web's phone layout: the Activities panel
  * (`panel/ActivitiesPanel`), a sheet listing the range's activities, on the date range the
@@ -105,8 +103,9 @@ import java.time.ZoneId
  * Story is open, and the tracks, the list and the date range are its activities only
  * ([enterStory]).
  *
- * Also the one place GPS recording is controlled from in the app: a record button in the chrome
- * row (tap to start, tap to pause/resume, hold for two seconds to stop —
+ * Also the one place GPS recording is controlled from in the app: the record button raised in
+ * the middle of `MainActivity`'s bottom bar (tap to start, tap to pause/resume, hold for two
+ * seconds to stop —
  * `RecordingService` does the rest, and its notification offers the same controls, its Stop
  * confirmed here first). While a recording is in
  * progress the map shows only that recording's live track: the mode toggle and every history
@@ -132,7 +131,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private val showChecking = Runnable {
         showNotice(Notice.CHECKING, getString(R.string.checking_session))
     }
-    private lateinit var menuButton: Button
     private lateinit var modeBar: View
     private lateinit var modeButtons: Map<MapMode, MaterialButton>
     private lateinit var layersMenu: LayersMenu
@@ -378,6 +376,23 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     /** The Photos tab's unsaved changes as they alter the markers, while it shows. */
     private var photoOverlay: PhotoMarkerOverlay? = null
 
+    /** The window this map is a tab of — null while the fragment is detached. */
+    private val host get() = activity as? MainActivity
+
+    /** The bottom bar's Stories: the panel's Stories tab. */
+    fun showStories() {
+        if (::panel.isInitialized) panel.showStories()
+    }
+
+    /** The bottom bar's Map: the panel's Activities tab, collapsed. */
+    fun showActivities() {
+        if (::panel.isInitialized) panel.showActivities()
+    }
+
+    /** Which of the panel's tabs shows — the bottom bar marks Stories while it's that one. Null
+     *  before the panel is built. */
+    val panelTab: PanelTab? get() = if (::panel.isInitialized) panel.tab else null
+
     /** The fragment's own views, found the way an Activity finds its own. */
     private fun <T : View> findViewById(id: Int): T = requireView().findViewById(id)
 
@@ -389,7 +404,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         noticeText = findViewById(R.id.map_notice_text)
         noticeDetail = findViewById(R.id.map_notice_detail)
         noticeAction = findViewById(R.id.map_notice_action)
-        menuButton = findViewById(R.id.menu_button)
         modeBar = findViewById(R.id.mode_bar)
         modeButtons = mapOf(
             MapMode.NORMAL to findViewById(R.id.mode_normal),
@@ -426,9 +440,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             frame = ::flyTo,
             onCaptured = spotPopup::renderCaptured,
         )
-        menuButton.setOnClickListener { showMenu(it) }
-
-        recordButton = findViewById(R.id.record_button)
+        // The host's, in the middle of its bottom bar, since the recording is reachable from
+        // every tab; this fragment drives it, since the recording is the map's.
+        recordButton = requireActivity().findViewById(R.id.record_button)
         recordButton.setOnClickListener { onRecordTap() }
         recordButton.onHoldComplete = ::stopRecording
         recordButton.onHoldProgress = ::renderHoldProgress
@@ -464,6 +478,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
                 if (tab != PanelTab.STORIES && storyId != null) exitStory()
                 // The footer is the Activities tab's; renderDateFooter renders Privacy too.
                 renderDateFooter()
+                // The bottom bar's Stories is this tab, so the bar follows it.
+                host?.onPanelTabChanged(tab)
             },
             onOpenStory = ::enterStory,
             onCloseStory = ::exitStory,
@@ -484,9 +500,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             onEditorOpen = {
                 panel.setExpanded(false)
                 placeEditWindow()
-                renderRecordButton()
+                renderSecondRow()
             },
-            onEditorClose = ::renderRecordButton,
+            onEditorClose = ::renderSecondRow,
             onChanged = ::onPrivateLocationsChanged,
             openAreaCenterY = {
                 val editor = findViewById<View>(R.id.private_editor)
@@ -708,10 +724,11 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * Keeps the floating chrome clear of the status bar and the gesture navigation pill.
+     * Keeps the floating chrome clear of the status bar, and of the gesture navigation pill —
+     * which `MainActivity`'s bottom bar takes as its own, so the bottom inset given here is 0.
      *
      * Not optional at this target SDK: from API 35 the system draws every app edge to edge and
-     * ignores the old opt-out. The top row (burger, modes, Find my location) sits in a `layout_margin`ed
+     * ignores the old opt-out. The top row (modes, Find my location) sits in a `layout_margin`ed
      * `LinearLayout`, which has no `fitsSystemWindows` of its own, so without this it renders
      * underneath the status bar's own icons — found exactly that way, the compass included,
      * both behind the clock and battery indicator on a real device. The map itself is left
@@ -756,7 +773,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      * MapLibre's own compass control defaults to top-end with a small fixed margin, unaware of
      * the status bar — found sitting directly behind the clock/battery indicator on a real
      * device — and of the top row, whose Find my location button shares that corner, as does
-     * Record under it. Called from both `insetSystemBars` and `getMapAsync` because whichever of the
+     * the recording's status under it. Called from both `insetSystemBars` and `getMapAsync` because whichever of the
      * inset callback and the map-ready callback fires second is the one that actually has
      * everything it needs.
      */
@@ -767,8 +784,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             compassBaseMarginTop = settings.compassMarginTop
             compassBaseMarginCaptured = true
         }
-        // Below the top row (burger, modes, Find my location), which already sits below the
-        // status bar, Record under it and the notice while either is up; before the row is
+        // Below the top row (modes, Find my location), which already sits below the status
+        // bar, the second row under it and the notice while either is up; before the row is
         // laid out, below the status bar at least.
         val belowTopBar = maxOf(
             findViewById<View>(R.id.top_bar).bottom,
@@ -1091,7 +1108,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         placeEditWindow()
         placeEditLock()
         renderModeBar()
-        renderRecordButton()
+        renderSecondRow()
         renderTrackMetrics()
     }
 
@@ -1132,7 +1149,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         editLock.visibility = View.GONE
         panel.hold(false)
         renderModeBar()
-        renderRecordButton()
+        renderSecondRow()
         renderTrackMetrics()
         if (saved) reloadList()
     }
@@ -1218,9 +1235,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         zoomLevelNotice.render(mode, active = modeBarReady && !isRecording())
     }
 
-    /** Layers and Record, on the second row under the chrome row: away while the Edit window or
-     *  the Private location editor is open, since both open over that row. */
-    private fun renderRecordButton() {
+    /** Layers and the recording's status, on the second row under the chrome row: away while the
+     *  Edit window or the Private location editor is open, since both open over that row. */
+    private fun renderSecondRow() {
         val editing = editWindow.isOpen || (::privacyTab.isInitialized && privacyTab.isEditing)
         secondRow.visibility = if (editing) View.GONE else View.VISIBLE
         if (editing) layersMenu.dismiss()
@@ -1474,6 +1491,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  pause and resume as a toggle's off and on, start as [startRecording]'s confirm — so a
      *  tap that registered is never in doubt. */
     private fun onRecordTap() {
+        // A start from Sync or You goes to the map, where the recording is drawn.
+        if (!isRecording()) host?.showMap()
         if (isRecording()) {
             if (recorder?.state == RecordingState.RECORDING) {
                 recordButton.performHapticFeedback(HapticFeedbackConstants.TOGGLE_OFF)
@@ -1611,6 +1630,13 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             RecordingState.PAUSED -> Triple(R.drawable.ic_play, R.drawable.bg_record_button_paused, R.string.record_button_resume)
         }
         recordButton.setImageResource(icon)
+        // Pause and play are white Lucide strokes, tinted for the button's surface disc; the
+        // idle red dot keeps its own colour.
+        recordButton.imageTintList = when (state) {
+            RecordingState.IDLE -> null
+            RecordingState.RECORDING -> ColorStateList.valueOf(requireContext().getColor(R.color.hmt_record))
+            RecordingState.PAUSED -> ColorStateList.valueOf(requireContext().getColor(R.color.hmt_record_paused))
+        }
         recordButton.setBackgroundResource(background)
         recordButton.contentDescription = getString(description)
         recordButton.holdEnabled = active
@@ -1650,17 +1676,16 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
     }
 
-    /** 48dp idle, 56dp while a recording is in progress — a bigger target for the hold that
-     *  stops it, with less of it under the finger. The end margin keeps it centred under Find
-     *  my location's 56dp panel either way (`activity_main.xml`). */
+    /** 56dp idle, 60dp while a recording is in progress — a bigger target for the hold that
+     *  stops it, with less of it under the finger. Centred over the bottom bar's middle slot
+     *  either way (`activity_main.xml`). */
     private fun sizeRecordButton(active: Boolean) {
         val density = resources.displayMetrics.density
         val size = ((if (active) RECORD_BUTTON_ACTIVE_DP else RECORD_BUTTON_IDLE_DP) * density).toInt()
-        val params = recordButton.layoutParams as MarginLayoutParams
+        val params = recordButton.layoutParams
         if (params.width == size) return
         params.width = size
         params.height = size
-        params.marginEnd = ((RECORD_BUTTON_ACTIVE_DP - (if (active) RECORD_BUTTON_ACTIVE_DP else RECORD_BUTTON_IDLE_DP)) / 2 * density).toInt()
         recordButton.layoutParams = params
     }
 
@@ -1804,44 +1829,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
     }
 
-    /** The burger menu: the destinations that don't fit on the map itself — the app's own
-     *  screens, then the web header's Donate and Info pages (About, Help, Contacts, Privacy), opened in
-     *  a browser tab, and last the app's version, a line to read rather than an action. Donate
-     *  only where `BuildConfig.DONATE_LINK` allows it, which the Play build doesn't. */
-    private fun showMenu(anchor: View) {
-        val menu = PopupMenu(requireContext(), anchor)
-        menu.menu.add(MENU_GROUP_APP, MENU_PROFILE, 0, R.string.menu_profile)
-        menu.menu.add(MENU_GROUP_APP, MENU_UPLOAD, 1, R.string.menu_upload)
-        menu.menu.add(MENU_GROUP_APP, MENU_SYNC, 2, R.string.menu_sync)
-        menu.menu.add(MENU_GROUP_APP, MENU_SETTINGS, 3, R.string.menu_settings)
-        if (BuildConfig.DONATE_LINK) menu.menu.add(MENU_GROUP_WEB, MENU_DONATE, 4, R.string.menu_donate)
-        menu.menu.add(MENU_GROUP_WEB, MENU_ABOUT, 5, R.string.menu_about)
-        menu.menu.add(MENU_GROUP_WEB, MENU_HELP, 6, R.string.menu_help)
-        menu.menu.add(MENU_GROUP_WEB, MENU_CONTACTS, 7, R.string.menu_contacts)
-        menu.menu.add(MENU_GROUP_WEB, MENU_PRIVACY, 8, R.string.menu_privacy)
-        menu.menu.add(MENU_GROUP_VERSION, MENU_VERSION, 9, getString(R.string.menu_version, HoldMyTrackApi.appVersion)).isEnabled = false
-        menu.menu.setGroupDividerEnabled(true)
-        menu.setOnMenuItemClickListener { item ->
-            when (item.itemId) {
-                MENU_PROFILE -> startActivity(Intent(requireContext(), ProfileActivity::class.java))
-                MENU_UPLOAD -> startActivity(Intent(requireContext(), UploadActivity::class.java))
-                MENU_SYNC -> startActivity(Intent(requireContext(), SyncActivity::class.java))
-                MENU_SETTINGS -> SettingsActivity.open(requireContext())
-                MENU_DONATE -> openWebPage("/about#funding")
-                MENU_ABOUT -> openWebPage("/about")
-                MENU_HELP -> openWebPage("/help")
-                MENU_CONTACTS -> openWebPage("/contacts")
-                MENU_PRIVACY -> openWebPage("/privacy")
-            }
-            true
-        }
-        menu.show()
-    }
-
-    private fun openWebPage(path: String) {
-        CustomTabsIntent.Builder().build().launchUrl(requireContext(), HoldMyTrackApi.webPageUri(path))
-    }
-
     private fun setMode(next: MapMode) {
         mode = next
         modeButtons.forEach { (value, button) ->
@@ -1934,8 +1921,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             val box = result.getOrNull()
             if (box == null) {
                 if (!Session.isDemo) {
-                    showNotice(Notice.EMPTY, getString(R.string.map_empty), action = R.string.menu_sync) {
-                        startActivity(Intent(requireContext(), SyncActivity::class.java))
+                    showNotice(Notice.EMPTY, getString(R.string.map_empty), action = R.string.nav_sync) {
+                        host?.showTab(MainActivity.Tab.SYNC)
                     }
                 }
                 return@latestActivityBounds
@@ -2081,8 +2068,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
     companion object {
         private const val TAG = "HoldMyTrack"
-        private const val RECORD_BUTTON_IDLE_DP = 48f
-        private const val RECORD_BUTTON_ACTIVE_DP = 56f
+        private const val RECORD_BUTTON_IDLE_DP = 56f
+        private const val RECORD_BUTTON_ACTIVE_DP = 60f
         private const val POP_SCALE = 1.15f
         private const val POP_HALF_MS = 100L
         private const val FRAME_PADDING_PX = 64
@@ -2119,19 +2106,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
         /** Material's and the platform's minimum touch target. */
         private const val MIN_TOUCH_TARGET_DP = 48
-        private const val MENU_GROUP_APP = 1
-        private const val MENU_GROUP_WEB = 2
-        private const val MENU_GROUP_VERSION = 3
-        private const val MENU_PROFILE = 1
-        private const val MENU_SYNC = 2
-        private const val MENU_UPLOAD = 3
-        private const val MENU_SETTINGS = 4
-        private const val MENU_DONATE = 5
-        private const val MENU_ABOUT = 6
-        private const val MENU_HELP = 7
-        private const val MENU_CONTACTS = 8
-        private const val MENU_VERSION = 9
-        private const val MENU_PRIVACY = 10
 
         /** The default range's length in activity days (`docs/SPEC.md` FR-6.1). */
         private const val DEFAULT_RANGE_DAYS = 5
