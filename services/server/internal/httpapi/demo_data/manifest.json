@@ -1,5 +1,25 @@
 {
   "activities": {
+    "2026-01-20 Vietnam.gpx": {
+      "name": "Day #1 – along the coast to Mui Ne",
+      "type": "walking"
+    },
+    "2026-01-21 Vietnam.gpx": {
+      "name": "Day #2 – a loop around Phu Thuy",
+      "type": "walking"
+    },
+    "2026-01-22 Vietnam.gpx": {
+      "name": "Day #3 – sleeper bus to Hanoi",
+      "type": "bus"
+    },
+    "2026-01-23 Vietnam.gpx": {
+      "name": "Day #4 – along the Red River",
+      "type": "walking"
+    },
+    "2026-01-24 Vietnam.gpx": {
+      "name": "Day #5 – to Hoan Kiem Lake",
+      "type": "walking"
+    },
     "2026-05-07 Estonia.gpx": {
       "name": "Day #1 – Kadriorg to Kalamaja",
       "type": "walking"
@@ -355,6 +375,17 @@
         "2026-05-07 Estonia.gpx",
         "2026-05-08 Estonia.gpx",
         "2026-05-09 Estonia.gpx"
+      ]
+    },
+    {
+      "name": "Vietnam",
+      "description": "Five days in Vietnam: walks by the sea at Mui Ne, a sleeper bus the length of the country to Hanoi, and two days on foot in Hanoi, along the Red River and up to Hoan Kiem Lake.",
+      "activities": [
+        "2026-01-20 Vietnam.gpx",
+        "2026-01-21 Vietnam.gpx",
+        "2026-01-22 Vietnam.gpx",
+        "2026-01-23 Vietnam.gpx",
+        "2026-01-24 Vietnam.gpx"
       ]
     }
   ],
