@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One Activities row, after the web's .activities-panel__row: the checkbox, then the text —
+<!-- One Activities row, after the web's .activities-panel__row: the checkbox while the list is
+     selecting, else a tile of the activity's kind (panel/ActivityKind), then the text —
      the name or start time over "[date ·] distance · duration · type" — which is the row's own
      tap target (select, fly to), and the Pending / Hidden / Story badges at the end, the Story
      badge opening its Story (panel/ActivityRows.kt). An open Story's rows on the Stories tab
@@ -20,6 +21,19 @@
         android:id="@+id/activity_check"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content" />
+
+    <ImageView
+        android:id="@+id/activity_type_icon"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="@dimen/hmt_space_12"
+        android:layout_marginEnd="@dimen/hmt_space_12"
+        android:background="@drawable/bg_type_tile"
+        android:importantForAccessibility="no"
+        android:padding="9dp"
+        android:src="@drawable/ic_route"
+        android:visibility="gone"
+        app:tint="@color/hmt_ink_secondary" />
 
     <LinearLayout
         android:id="@+id/activity_text"

@@ -163,6 +163,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
     /** The Activities sheet, the date range at its head. */
     private lateinit var sheet: View
+
+    /** The toolbar while the sheet's rows are being checked, in the top row's place. */
+    private lateinit var selectionBar: View
     private lateinit var panel: ActivitiesPanel
     private val panelState = PanelState()
     private lateinit var editWindow: EditActivityWindow
@@ -473,8 +476,10 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         dateFooter = findViewById(R.id.date_footer)
         zoomLevelNotice = ZoomLevelNotice(findViewById(R.id.zoom_level_notice))
         sheet = findViewById(R.id.activities_sheet)
+        selectionBar = findViewById(R.id.selection_bar)
         panel = ActivitiesPanel(
             sheet,
+            selectionBar,
             panelState,
             onMapChanged = ::applyTrackFilter,
             onFly = ::flyToActivities,
@@ -1112,6 +1117,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         editLock.visibility = View.VISIBLE
         placeEditWindow()
         placeEditLock()
+        renderSelectionBar()
         renderModeBar()
         renderRail()
         renderTrackMetrics()
@@ -1153,6 +1159,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         closeEditOnBack.isEnabled = false
         editLock.visibility = View.GONE
         panel.hold(false)
+        renderSelectionBar()
         renderModeBar()
         renderRail()
         renderTrackMetrics()
@@ -1229,7 +1236,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  paths are about where the recording is going, not about the modes. */
     private fun renderModeBar() {
         if (!modeBarReady) return
-        modeBar.visibility = if (isRecording() || editWindow.isOpen) View.GONE else View.VISIBLE
+        modeBar.visibility = if (isRecording() || editWindow.isOpen || selectionShown()) View.GONE else View.VISIBLE
         layersPanel.visibility = View.VISIBLE
         renderZoomLevelNotice()
         renderModeChip()
@@ -1257,16 +1264,34 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  or the Private location editor is open, since both open over the top of the map. */
     private fun renderRail() {
         val editing = editWindow.isOpen || (::privacyTab.isInitialized && privacyTab.isEditing)
-        mapRail.visibility = if (editing) View.GONE else View.VISIBLE
+        mapRail.visibility = if (editing || selectionShown()) View.GONE else View.VISIBLE
         if (editing) layersMenu.dismiss()
     }
 
     /** The panel's hidden set, filters, Pending rows and selection, onto the track layers —
-     *  and the selected activity's bands with them. */
+     *  and the selected activity's bands with them; and the sheet's head and the selection bar,
+     *  which follow the selection and the checking. */
     private fun applyTrackFilter() {
         style?.takeIf { overlaysAttached }?.let { MapOverlays.setTrackFilter(it, panelState.mapHidden, panelState.focused) }
         updateTrackMetrics(refetch = false)
         refreshPhotos(force = false)
+        if (::panel.isInitialized) renderDateFooter()
+    }
+
+    /** Whether the sheet's rows are being checked where the selection bar can show: Normal mode,
+     *  the Activities tab, no Edit window over the map. */
+    private fun selectionShown(): Boolean =
+        ::panel.isInitialized && sheet.isVisible && panel.selecting && panel.tab == PanelTab.ACTIVITIES && !editWindow.isOpen
+
+    /** The selection bar in the top row's place while [selectionShown], the mode toggle and the
+     *  rail stepping aside for it. */
+    private fun renderSelectionBar() {
+        val shown = selectionShown()
+        if (selectionBar.isVisible == shown) return
+        selectionBar.visibility = if (shown) View.VISIBLE else View.GONE
+        if (!shown) panel.dismissPopups()
+        renderModeBar()
+        renderRail()
     }
 
     /**
@@ -1309,8 +1334,10 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         val focused = panelState.focused
         if (metrics != null && focused == metrics.activityId && focused !in panelState.mapHidden) {
             MapOverlays.setTrackBands(loaded, metrics.points)
+            panel.setBandsShown(true)
         } else {
             MapOverlays.clearTrackBands(loaded)
+            panel.setBandsShown(false)
         }
     }
 
@@ -1485,11 +1512,13 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  and have their titles at the head instead. */
     private fun renderDateFooter() {
         val normal = modeBarReady && mode == MapMode.NORMAL && !isRecording()
-        val footer = normal && panel.tab == PanelTab.ACTIVITIES && activityDays.ready && activityDays.earliest != null
+        // The selected activity's card takes the range's place at the head.
+        val footer = normal && panel.tab == PanelTab.ACTIVITIES && !panel.showsCard && activityDays.ready && activityDays.earliest != null
         dateFooter.visibility = if (footer) View.VISIBLE else View.GONE
         sheet.visibility = if (normal) View.VISIBLE else View.GONE
         if (!normal) panel.dismissPopups()
         onSheetChanged()
+        renderSelectionBar()
         renderTrackMetrics()
         renderPrivacy()
     }

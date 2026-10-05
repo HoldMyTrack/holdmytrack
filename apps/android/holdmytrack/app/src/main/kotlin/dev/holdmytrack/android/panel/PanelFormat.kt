@@ -67,6 +67,23 @@ object PanelFormat {
         }
     }
 
+    /** The selected activity's third number: pace on foot ("8:47 /mi"), speed otherwise
+     *  ("17.1 km/h") — the account's units either way; a dash with no distance or no time. */
+    fun paceOrSpeed(res: Resources, kind: ActivityKind, meters: Double?, seconds: Long?): String {
+        val imperial = RecordingFormat.imperial()
+        val unitMeters = if (imperial) METERS_PER_MILE else 1000.0
+        if (kind.showsPace) {
+            val perUnit = Pace.secondsPerUnit(meters, seconds, unitMeters) ?: return EM_DASH
+            return res.getString(if (imperial) R.string.card_pace_mi else R.string.card_pace_km, Pace.format(perUnit))
+        }
+        val speed = Pace.speed(meters, seconds, unitMeters) ?: return EM_DASH
+        val number = NumberFormat.getNumberInstance(locale(res)).apply {
+            minimumFractionDigits = 1
+            maximumFractionDigits = 1
+        }.format(speed)
+        return res.getString(if (imperial) R.string.card_speed_mi else R.string.card_speed_km, number)
+    }
+
     /** A row's primary line: its name when it has one, else its start time — also how the
      *  toolbar names one selected activity. */
     fun rowLabel(res: Resources, activity: Activity): String =

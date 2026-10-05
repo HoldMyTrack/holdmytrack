@@ -120,6 +120,9 @@
                 android:layout_marginEnd="@dimen/hmt_space_12" />
         </LinearLayout>
 
+        <!-- The selected activity, in the range's place while one is selected. -->
+        <include layout="@layout/include_activity_card" />
+
         <!-- The Stories and Private locations head: the content's title, and for Private
              locations a close button back to the Activities tab. -->
         <LinearLayout
@@ -186,211 +189,109 @@
             android:layout_height="match_parent"
             android:orientation="vertical">
 
-            <!-- The two filters side by side (.activities-panel__filters): Type's dropdown, then the
-                 DISTANCE slider taking the rest of the row, a hairline under both. -->
+            <!-- The filters as chips (.activities-panel__filters): Type's dropdown, DISTANCE's
+                 slider in a popup under its chip, "Reset" while either is on, and at the end Select,
+                 which shows the rows' checkboxes and the selection bar over the map (Done ends it). -->
             <LinearLayout
                 android:id="@+id/panel_filters"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_row_divider"
-                android:baselineAligned="false"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingStart="@dimen/hmt_space_16"
                 android:paddingTop="@dimen/hmt_space_4"
-                android:paddingEnd="@dimen/hmt_space_16"
-                android:paddingBottom="@dimen/hmt_space_12">
+                android:paddingEnd="@dimen/hmt_space_8"
+                android:paddingBottom="@dimen/hmt_space_8">
 
                 <LinearLayout
                     android:id="@+id/panel_type_trigger"
+                    style="@style/Widget.HoldMyTrack.FilterChip"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/bg_panel_type_trigger"
-                    android:clickable="true"
-                    android:contentDescription="@string/panel_filter_by_type"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="48dp"
-                    android:orientation="horizontal"
-                    android:paddingStart="@dimen/hmt_space_10"
-                    android:paddingEnd="@dimen/hmt_space_6">
+                    android:contentDescription="@string/panel_filter_by_type">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:importantForAccessibility="no"
                         android:text="@string/panel_type"
-                        android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleSmall" />
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.FilterChip" />
 
                     <View
                         android:id="@+id/panel_type_dot"
                         android:layout_width="6dp"
                         android:layout_height="6dp"
-                        android:layout_marginStart="@dimen/hmt_space_8"
+                        android:layout_marginStart="@dimen/hmt_space_6"
                         android:background="@drawable/bg_panel_dot"
                         android:visibility="gone" />
 
                     <ImageView
                         android:layout_width="14dp"
                         android:layout_height="14dp"
-                        android:layout_marginStart="@dimen/hmt_space_8"
+                        android:layout_marginStart="@dimen/hmt_space_6"
                         android:importantForAccessibility="no"
                         android:src="@drawable/ic_chevron_down"
                         app:tint="@color/panel_ink_40" />
                 </LinearLayout>
 
-                <!-- DISTANCE (apps/web/src/ui/DistanceFilter.tsx): the label and its readout, the
-                     two-knob slider, the list's shortest and longest under its ends, and "Reset
-                     filters" while either filter is on. Gone when no two activities differ in
-                     distance, as on the web. -->
+                <!-- DISTANCE (apps/web/src/ui/DistanceFilter.tsx): the chip reads the band, "any
+                     distance" until a knob moves; gone when no two activities differ in distance,
+                     as on the web. -->
                 <LinearLayout
                     android:id="@+id/panel_distance"
-                    android:layout_width="0dp"
+                    style="@style/Widget.HoldMyTrack.FilterChip"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/hmt_space_16"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
+                    android:layout_marginStart="@dimen/hmt_space_8"
+                    android:contentDescription="@string/panel_distance">
 
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/panel_distance"
-                            android:textAppearance="@style/TextAppearance.HoldMyTrack.PanelFilterLabel" />
-
-                        <TextView
-                            android:id="@+id/panel_distance_readout"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:textColor="@color/hmt_ink_meta"
-                            android:textSize="@dimen/hmt_text_xs"
-                            tools:text="any distance" />
-                    </LinearLayout>
-
-                    <com.google.android.material.slider.RangeSlider
-                        android:id="@+id/panel_distance_slider"
-                        style="@style/Widget.HoldMyTrack.PanelSlider"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="-8dp"
-                        android:layout_marginEnd="-8dp"
-                        android:contentDescription="@string/panel_distance" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="-8dp"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:id="@+id/panel_distance_min"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:textColor="@color/panel_ink_40"
-                            android:textSize="@dimen/hmt_text_2xs"
-                            tools:text="1.2 km" />
-
-                        <TextView
-                            android:id="@+id/panel_distance_max"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:textColor="@color/panel_ink_40"
-                            android:textSize="@dimen/hmt_text_2xs"
-                            tools:text="10.4 km" />
-                    </LinearLayout>
-
-                    <Button
-                        android:id="@+id/panel_reset_filters"
-                        style="@style/Widget.HoldMyTrack.Button.Link"
+                    <TextView
+                        android:id="@+id/panel_distance_readout"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:minHeight="0dp"
-                        android:paddingStart="0dp"
-                        android:paddingEnd="0dp"
-                        android:text="@string/panel_reset_filters"
-                        android:textFontWeight="600"
-                        android:textSize="@dimen/hmt_text_sm"
-                        android:visibility="gone" />
+                        android:importantForAccessibility="no"
+                        android:maxLines="1"
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.FilterChip"
+                        tools:text="any distance" />
+
+                    <ImageView
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:layout_marginStart="@dimen/hmt_space_6"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_chevron_down"
+                        app:tint="@color/panel_ink_40" />
                 </LinearLayout>
-            </LinearLayout>
 
-            <!-- The toolbar (.activities-panel__toolbar): the master checkbox and the ▾ of its All /
-                 None / Invert menu, then the actions over the toolbar's target, a divider, and the
-                 accent Focus on map. -->
-            <LinearLayout
-                android:id="@+id/panel_toolbar"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_row_divider"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingStart="@dimen/hmt_space_4"
-                android:paddingEnd="@dimen/hmt_space_8">
-
-                <com.google.android.material.checkbox.MaterialCheckBox
-                    android:id="@+id/panel_check_all"
+                <Button
+                    android:id="@+id/panel_reset_filters"
+                    style="@style/Widget.HoldMyTrack.Button.Link"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-
-                <ImageButton
-                    android:id="@+id/panel_select_menu"
-                    android:layout_width="32dp"
-                    android:layout_height="48dp"
-                    android:layout_marginStart="-8dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/panel_select_menu"
-                    android:padding="9dp"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/ic_chevron_down"
-                    app:tint="@color/panel_select_icon" />
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/hmt_space_4"
+                    android:paddingStart="@dimen/hmt_space_8"
+                    android:paddingEnd="@dimen/hmt_space_8"
+                    android:text="@string/panel_reset"
+                    android:textFontWeight="600"
+                    android:textSize="@dimen/hmt_text_sm"
+                    android:visibility="gone" />
 
                 <Space
                     android:layout_width="0dp"
                     android:layout_height="0dp"
                     android:layout_weight="1" />
 
-                <ImageButton
-                    android:id="@+id/panel_visibility"
-                    style="@style/Widget.HoldMyTrack.PanelChip"
-                    android:contentDescription="@string/panel_no_target"
-                    android:src="@drawable/ic_eye" />
-
-                <ImageButton
-                    android:id="@+id/panel_edit"
-                    style="@style/Widget.HoldMyTrack.PanelChip"
-                    android:contentDescription="@string/panel_no_target"
-                    android:src="@drawable/ic_pencil" />
-
-                <ImageButton
-                    android:id="@+id/panel_add_to_story"
-                    style="@style/Widget.HoldMyTrack.PanelChip"
-                    android:contentDescription="@string/panel_no_target"
-                    android:src="@drawable/ic_book_plus" />
-
-                <ImageButton
-                    android:id="@+id/panel_delete"
-                    style="@style/Widget.HoldMyTrack.PanelChip"
-                    android:contentDescription="@string/panel_no_target"
-                    android:src="@drawable/ic_trash_2" />
-
-                <View
-                    android:layout_width="1dp"
-                    android:layout_height="20dp"
-                    android:layout_marginStart="@dimen/hmt_space_4"
-                    android:layout_marginEnd="@dimen/hmt_space_4"
-                    android:background="@color/hmt_border" />
-
-                <ImageButton
-                    android:id="@+id/panel_focus"
-                    style="@style/Widget.HoldMyTrack.PanelChip.Accent"
-                    android:contentDescription="@string/panel_no_target"
-                    android:src="@drawable/ic_focus" />
+                <Button
+                    android:id="@+id/panel_select"
+                    style="@style/Widget.HoldMyTrack.Button.Link"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="@dimen/hmt_space_8"
+                    android:paddingEnd="@dimen/hmt_space_8"
+                    android:text="@string/panel_select"
+                    android:textFontWeight="600"
+                    android:textSize="@dimen/hmt_text_sm" />
             </LinearLayout>
 
             <!-- The rows, then a note while loading, when nothing matches, or when the read failed

@@ -141,4 +141,26 @@ class PanelStateTest {
         assertEquals(setOf("a"), s.checked)
         assertNull(s.focused)
     }
+
+    @Test
+    fun `selecting gives the selection way to the group, and ending it drops the group`() {
+        val s = state(walk, run)
+        s.focus("a")
+        s.startSelecting()
+        assertTrue(s.selecting)
+        assertNull(s.focused)
+        s.toggleChecked("b")
+        assertEquals(listOf(run), s.targets)
+        s.endSelecting()
+        assertFalse(s.selecting)
+        assertEquals(emptySet<String>(), s.checked)
+    }
+
+    @Test
+    fun `a new range ends selecting`() {
+        val s = state(walk)
+        s.startSelecting()
+        s.resetForNewRange()
+        assertFalse(s.selecting)
+    }
 }

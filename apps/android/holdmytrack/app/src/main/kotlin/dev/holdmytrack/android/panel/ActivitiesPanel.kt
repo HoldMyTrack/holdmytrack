@@ -6,6 +6,9 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.PopupMenu
@@ -20,6 +23,7 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.slider.RangeSlider
@@ -28,6 +32,7 @@ import dev.holdmytrack.android.net.Activity
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.net.Story
+import dev.holdmytrack.android.map.TrackBands
 import dev.holdmytrack.android.recording.RecordingTypes
 import kotlin.math.abs
 
@@ -55,6 +60,8 @@ enum class PanelTab { ACTIVITIES, STORIES, PRIVACY }
  */
 class ActivitiesPanel(
     private val sheet: View,
+    /** The selection bar over the map — the toolbar while the rows are being checked. */
+    selectionBar: View,
     private val state: PanelState,
     private val onMapChanged: () -> Unit,
     private val onFly: (List<Activity>) -> Unit,
@@ -96,19 +103,54 @@ class ActivitiesPanel(
     private val typeDot: View = sheet.findViewById(R.id.panel_type_dot)
     private val distance: View = sheet.findViewById(R.id.panel_distance)
     private val distanceReadout: TextView = sheet.findViewById(R.id.panel_distance_readout)
-    private val distanceSlider: RangeSlider = sheet.findViewById(R.id.panel_distance_slider)
-    private val distanceMin: TextView = sheet.findViewById(R.id.panel_distance_min)
-    private val distanceMax: TextView = sheet.findViewById(R.id.panel_distance_max)
+
+    /** DISTANCE's popup, inflated once so its slider keeps its listener and its values. */
+    @SuppressLint("InflateParams") // A popup's content has no parent to inflate against.
+    private val distanceContent: View = LayoutInflater.from(sheet.context).inflate(R.layout.popup_distance, null)
+    private val distanceSlider: RangeSlider = distanceContent.findViewById(R.id.panel_distance_slider)
+    private val distanceMin: TextView = distanceContent.findViewById(R.id.panel_distance_min)
+    private val distanceMax: TextView = distanceContent.findViewById(R.id.panel_distance_max)
+    private var distancePopup: PopupWindow? = null
+    private val selectButton: TextView = sheet.findViewById(R.id.panel_select)
+    private val selectionClose: View = selectionBar.findViewById(R.id.selection_close)
+
+    private val card: View = sheet.findViewById(R.id.activity_card)
+    private val cardIcon: ImageView = sheet.findViewById(R.id.card_type_icon)
+    private val cardTitle: TextView = sheet.findViewById(R.id.card_title)
+    private val cardMeta: TextView = sheet.findViewById(R.id.card_meta)
+    private val cardDistance: TextView = sheet.findViewById(R.id.card_distance)
+    private val cardMoving: TextView = sheet.findViewById(R.id.card_moving)
+    private val cardPaceLabel: TextView = sheet.findViewById(R.id.card_pace_label)
+    private val cardPace: TextView = sheet.findViewById(R.id.card_pace)
+    private val cardBands: View = sheet.findViewById(R.id.card_bands)
+    private val cardVisibility: MaterialButton = sheet.findViewById(R.id.card_visibility)
+
+    /** The actions over the toolbar's target, twice: the selection bar's icons, and the selected
+     *  activity's card's — the same rules and the same enabled states, whichever shows. */
+    private class Actions(val visibility: View, val edit: View, val addToStory: View, val delete: View, val focus: View)
     private val resetFilters: View = sheet.findViewById(R.id.panel_reset_filters)
-    private val checkAll: MaterialCheckBox = sheet.findViewById(R.id.panel_check_all)
-    private val selectMenu: ImageButton = sheet.findViewById(R.id.panel_select_menu)
-    private val visibility: ImageButton = sheet.findViewById(R.id.panel_visibility)
-    private val edit: ImageButton = sheet.findViewById(R.id.panel_edit)
-    private val addToStory: ImageButton = sheet.findViewById(R.id.panel_add_to_story)
-    private val delete: ImageButton = sheet.findViewById(R.id.panel_delete)
-    private val focus: ImageButton = sheet.findViewById(R.id.panel_focus)
+    private val checkAll: MaterialCheckBox = selectionBar.findViewById(R.id.panel_check_all)
+    private val selectMenu: ImageButton = selectionBar.findViewById(R.id.panel_select_menu)
+    private val visibility: ImageButton = selectionBar.findViewById(R.id.panel_visibility)
+    private val edit: ImageButton = selectionBar.findViewById(R.id.panel_edit)
+    private val addToStory: ImageButton = selectionBar.findViewById(R.id.panel_add_to_story)
+    private val delete: ImageButton = selectionBar.findViewById(R.id.panel_delete)
+    private val focus: ImageButton = selectionBar.findViewById(R.id.panel_focus)
     private val list: RecyclerView = sheet.findViewById(R.id.panel_list)
     private val footer: TextView = sheet.findViewById(R.id.panel_footer)
+
+    private val toolbarActions = Actions(visibility, edit, addToStory, delete, focus)
+    private val cardActions = Actions(
+        cardVisibility,
+        sheet.findViewById(R.id.card_edit),
+        sheet.findViewById(R.id.card_add_to_story),
+        sheet.findViewById(R.id.card_delete),
+        sheet.findViewById(R.id.card_focus),
+    )
+
+    /** Whether the map draws the selected activity's pace bands — its card shows their legend
+     *  only then. */
+    private var bandsShown = false
 
     private val adapter = RowAdapter()
     var tab = PanelTab.ACTIVITIES
@@ -215,17 +257,41 @@ class ActivitiesPanel(
         }
         selectMenu.setOnClickListener { showSelectMenu() }
         TooltipCompat.setTooltipText(selectMenu, res.getString(R.string.panel_select_menu))
-        visibility.setOnClickListener {
-            state.toggleTargetVisibility()
+        for (actions in listOf(toolbarActions, cardActions)) {
+            actions.visibility.setOnClickListener {
+                state.toggleTargetVisibility()
+                changed()
+            }
+            actions.focus.setOnClickListener {
+                val hidden = state.mapHidden
+                onFly(state.targets.filter { it.id !in hidden })
+            }
+            actions.edit.setOnClickListener { state.targets.takeIf { it.isNotEmpty() }?.let(onEdit) }
+            actions.addToStory.setOnClickListener { anchor -> if (storyPopup == null) showAddToStory(anchor) else storyPopup?.dismiss() }
+            actions.delete.setOnClickListener { confirmDelete() }
+        }
+        distance.setOnClickListener { showDistanceFilter() }
+        selectButton.setOnClickListener {
+            if (state.selecting) state.endSelecting() else state.startSelecting()
             changed()
         }
-        focus.setOnClickListener {
-            val hidden = state.mapHidden
-            onFly(state.targets.filter { it.id !in hidden })
+        selectionClose.setOnClickListener {
+            state.endSelecting()
+            changed()
         }
-        edit.setOnClickListener { state.targets.takeIf { it.isNotEmpty() }?.let(onEdit) }
-        addToStory.setOnClickListener { if (storyPopup == null) showAddToStory() else storyPopup?.dismiss() }
-        delete.setOnClickListener { confirmDelete() }
+        sheet.findViewById<View>(R.id.card_close).setOnClickListener { clearFocus() }
+        // The legend's five steps, slowest to fastest, in the map's own band colours.
+        sheet.findViewById<LinearLayout>(R.id.card_band_steps).apply {
+            val gap = res.getDimensionPixelSize(R.dimen.hmt_space_2)
+            TrackBands.COLORS.forEachIndexed { i, color ->
+                addView(View(context).apply {
+                    setBackgroundResource(R.drawable.bg_pace_band)
+                    backgroundTintList = ColorStateList.valueOf(Color.parseColor(color))
+                }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f).apply {
+                    if (i > 0) marginStart = gap
+                })
+            }
+        }
         render()
     }
 
@@ -343,6 +409,20 @@ class ActivitiesPanel(
     fun dismissPopups() {
         typePopup?.dismiss()
         storyPopup?.dismiss()
+        distancePopup?.dismiss()
+    }
+
+    /** Whether the rows are being checked — the selection bar over the map then. */
+    val selecting: Boolean get() = state.selecting
+
+    /** Whether the selected activity's card is at the sheet's head, in the range's place. */
+    val showsCard: Boolean get() = tab == PanelTab.ACTIVITIES && state.focused != null && !state.selecting
+
+    /** The map draws the selected activity's pace bands, or stopped: the card's legend follows. */
+    fun setBandsShown(shown: Boolean) {
+        if (bandsShown == shown) return
+        bandsShown = shown
+        renderCard()
     }
 
     /** The collapsed sheet's height: its head. */
@@ -373,12 +453,14 @@ class ActivitiesPanel(
         val open = expanded && !held
         handle.contentDescription = res.getString(if (open) R.string.panel_collapse else R.string.panel_expand)
 
+        selectButton.setText(if (state.selecting) R.string.panel_select_done else R.string.panel_select)
+        renderCard()
         typeDot.visibility = if (state.excludedTypes.isNotEmpty()) View.VISIBLE else View.GONE
         renderDistance()
         resetFilters.visibility = if (state.hasActiveFilters) View.VISIBLE else View.GONE
         renderToolbar(listed)
 
-        val rows = listed.map { ActivityRowItem(it, checked = it.id in state.checked, focused = it.id == state.focused, hidden = it.id in state.hidden) }
+        val rows = listed.map { ActivityRowItem(it, checked = it.id in state.checked, focused = it.id == state.focused, hidden = it.id in state.hidden, selecting = state.selecting) }
         adapter.submitList(rows)
         if (tab == PanelTab.STORIES) storiesTab.setRows(rows, loading, error)
         noteAdapter.note = when {
@@ -431,7 +513,7 @@ class ActivitiesPanel(
         distanceSlider.valueTo = bounds.max.toFloat()
         if (distanceSlider.values != listOf(lo, hi)) distanceSlider.setValues(lo, hi)
         distanceReadout.text = if (state.distanceFilter == null) {
-            res.getString(R.string.panel_any_distance)
+            res.getString(R.string.panel_any_distance_chip)
         } else {
             res.getString(
                 R.string.panel_distance_range,
@@ -440,6 +522,7 @@ class ActivitiesPanel(
                 PanelFormat.unit(res),
             )
         }
+        distance.contentDescription = "${res.getString(R.string.panel_distance)}, ${distanceReadout.text}"
         distanceMin.text = PanelFormat.distance(res, bounds.min)
         distanceMax.text = PanelFormat.distance(res, bounds.max)
     }
@@ -467,8 +550,14 @@ class ActivitiesPanel(
         val noTarget = res.getString(R.string.panel_no_target)
         val anyHidden = targets.any { it.id in state.hidden }
         visibility.setImageResource(if (anyHidden) R.drawable.ic_eye_off else R.drawable.ic_eye)
+        cardVisibility.setIconResource(if (anyHidden) R.drawable.ic_eye_off else R.drawable.ic_eye)
+        cardVisibility.setText(if (anyHidden) R.string.card_show else R.string.card_hide)
+        for (actions in listOf(toolbarActions, cardActions)) describeActions(actions, targets, targetName, noTarget, anyHidden)
+    }
+
+    private fun describeActions(actions: Actions, targets: List<Activity>, targetName: String?, noTarget: String, anyHidden: Boolean) {
         describe(
-            visibility,
+            actions.visibility,
             targetName?.let { res.getString(if (anyHidden) R.string.panel_show_target else R.string.panel_hide_target, it) } ?: noTarget,
             enabled = targetName != null,
         )
@@ -476,7 +565,7 @@ class ActivitiesPanel(
         // visible, disabled, saying why — as the web's do.
         val demo = Session.isDemo
         describe(
-            edit,
+            actions.edit,
             when {
                 demo -> res.getString(R.string.panel_demo_edit)
                 targetName == null -> noTarget
@@ -486,7 +575,7 @@ class ActivitiesPanel(
             enabled = !demo && targetName != null,
         )
         describe(
-            addToStory,
+            actions.addToStory,
             when {
                 demo -> res.getString(R.string.story_demo_add)
                 targetName == null -> noTarget
@@ -496,7 +585,7 @@ class ActivitiesPanel(
         )
         // A Pending row can't be deleted until its reprocess lands: the job would race it.
         describe(
-            delete,
+            actions.delete,
             when {
                 demo -> res.getString(R.string.panel_demo_delete)
                 targetName == null -> noTarget
@@ -504,7 +593,7 @@ class ActivitiesPanel(
             },
             enabled = !demo && targetName != null && targets.none { it.pending },
         )
-        describe(focus, targetName?.let { res.getString(R.string.panel_focus_target, it) } ?: noTarget, enabled = targetName != null)
+        describe(actions.focus, targetName?.let { res.getString(R.string.panel_focus_target, it) } ?: noTarget, enabled = targetName != null)
     }
 
     /** The master checkbox's ▾ (the web's `.select-menu`): All, None and Invert over the listed
@@ -546,7 +635,7 @@ class ActivitiesPanel(
      * adds the target to it in one request and closes the menu; a failure stays in the menu.
      */
     @SuppressLint("InflateParams") // A popup's content has no parent to inflate against.
-    private fun showAddToStory() {
+    private fun showAddToStory(anchor: View) {
         val targets = state.targets
         if (targets.isEmpty() || Session.isDemo) return
         val ids = targets.map { it.id }
@@ -612,7 +701,7 @@ class ActivitiesPanel(
         }
         storyPopup = popup
         storyPopupTarget = ids
-        popup.showAsDropDown(addToStory, 0, res.getDimensionPixelSize(R.dimen.hmt_space_8))
+        popup.showAsDropDown(anchor, 0, res.getDimensionPixelSize(R.dimen.hmt_space_8))
     }
 
     /**
@@ -663,6 +752,41 @@ class ActivitiesPanel(
                     confirm.setOnClickListener { deleteNext(dialog, ids, index) }
                 }
         }
+    }
+
+    /** The selected activity's card (`include_activity_card`), at the head while [showsCard]. */
+    private fun renderCard() {
+        val activity = state.focused?.let { id -> state.activities.firstOrNull { it.id == id } }
+        val shown = showsCard && activity != null
+        card.visibility = if (shown) View.VISIBLE else View.GONE
+        if (!shown || activity == null) return
+        val kind = ActivityKind.of(activity.activityType)
+        cardIcon.setImageResource(kindIcon(kind))
+        cardTitle.text = PanelFormat.rowLabel(res, activity)
+        // The start moves under the title once a name has taken it, as on a row.
+        val named = activity.name?.trim()?.isNotEmpty() == true
+        cardMeta.text = listOfNotNull(
+            PanelFormat.startedAt(res, activity.startedAt).takeIf { named },
+            RecordingTypes.format(res, activity.activityType),
+        ).joinToString(" · ")
+        cardDistance.text = PanelFormat.distance(res, activity.distanceMeters)
+        cardMoving.text = PanelFormat.duration(res, activity.durationSeconds)
+        cardPaceLabel.setText(if (kind.showsPace) R.string.card_pace else R.string.card_speed)
+        cardPace.text = PanelFormat.paceOrSpeed(res, kind, activity.distanceMeters, activity.durationSeconds)
+        cardBands.visibility = if (bandsShown) View.VISIBLE else View.GONE
+    }
+
+    /** DISTANCE's slider, under its chip, closed by a tap outside it. */
+    private fun showDistanceFilter() {
+        if (distancePopup != null) return
+        (distanceContent.parent as? ViewGroup)?.removeView(distanceContent)
+        // A fixed width, as a popup's content has no parent to take one from.
+        val width = (DISTANCE_POPUP_DP * res.displayMetrics.density).toInt()
+        val popup = PopupWindow(distanceContent, width, ViewGroup.LayoutParams.WRAP_CONTENT, true)
+        popup.elevation = res.getDimension(R.dimen.hmt_space_8)
+        popup.setOnDismissListener { distancePopup = null }
+        distancePopup = popup
+        popup.showAsDropDown(distance, 0, res.getDimensionPixelSize(R.dimen.hmt_space_8))
     }
 
     private fun describe(button: View, text: String, enabled: Boolean) {
@@ -803,13 +927,22 @@ class ActivitiesPanel(
         override fun onBindViewHolder(holder: ActivityRowHolder, position: Int) = holder.bind(
             getItem(position),
             openStoryId = null,
-            onCheck = { id ->
-                state.toggleChecked(id)
-                changed()
-            },
-            onSelect = ::select,
+            // Checkboxes only while selecting; a row's tap then checks it, as its box does.
+            onCheck = if (getItem(position).selecting) ::toggleChecked else null,
+            onSelect = if (getItem(position).selecting) ::toggleChecked else ::selectRow,
             onOpenStory = ::openStory,
         )
+    }
+
+    private fun toggleChecked(id: String) {
+        state.toggleChecked(id)
+        changed()
+    }
+
+    /** A row's tap: selected, and the sheet down to its card, so the track shows. */
+    private fun selectRow(id: String) {
+        select(id)
+        setExpanded(false)
     }
 
     /** A row's Story badge: that Story, on the Stories tab, the sheet down so its tracks show. */
@@ -820,6 +953,7 @@ class ActivitiesPanel(
 
     private companion object {
         const val TYPE_LIST_MAX_DP = 192
+        const val DISTANCE_POPUP_DP = 288
         const val SNAP_METERS = 1.0
         val RESTING_STATES = setOf(
             BottomSheetBehavior.STATE_COLLAPSED,

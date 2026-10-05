@@ -186,6 +186,85 @@
                         android:text="@string/recording_stop" />
                 </LinearLayout>
 
+                <!-- While the Activities sheet's rows are being checked (its Select), the selection
+                     bar in the mode toggle's place, the rail stepping aside for it: × ends selecting,
+                     then the master checkbox and its All / None / Invert, and the actions over the
+                     checked group — Show/Hide, Edit, Add to story, Delete, then Focus on map in the
+                     accent (panel/ActivitiesPanel; MapFragment.renderSelectionBar). -->
+                <LinearLayout
+                    android:id="@+id/selection_bar"
+                    style="@style/Widget.HoldMyTrack.MapPanel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <ImageButton
+                        android:id="@+id/selection_close"
+                        android:layout_width="44dp"
+                        android:layout_height="48dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/selection_close"
+                        android:padding="12dp"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_x"
+                        app:tint="@color/hmt_ink" />
+
+                    <com.google.android.material.checkbox.MaterialCheckBox
+                        android:id="@+id/panel_check_all"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+
+                    <ImageButton
+                        android:id="@+id/panel_select_menu"
+                        android:layout_width="28dp"
+                        android:layout_height="48dp"
+                        android:layout_marginStart="-10dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/panel_select_menu"
+                        android:padding="7dp"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_chevron_down"
+                        app:tint="@color/panel_select_icon" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1" />
+
+                    <ImageButton
+                        android:id="@+id/panel_visibility"
+                        style="@style/Widget.HoldMyTrack.PanelChip"
+                        android:contentDescription="@string/panel_no_target"
+                        android:src="@drawable/ic_eye" />
+
+                    <ImageButton
+                        android:id="@+id/panel_edit"
+                        style="@style/Widget.HoldMyTrack.PanelChip"
+                        android:contentDescription="@string/panel_no_target"
+                        android:src="@drawable/ic_pencil" />
+
+                    <ImageButton
+                        android:id="@+id/panel_add_to_story"
+                        style="@style/Widget.HoldMyTrack.PanelChip"
+                        android:contentDescription="@string/panel_no_target"
+                        android:src="@drawable/ic_book_plus" />
+
+                    <ImageButton
+                        android:id="@+id/panel_delete"
+                        style="@style/Widget.HoldMyTrack.PanelChip"
+                        android:contentDescription="@string/panel_no_target"
+                        android:src="@drawable/ic_trash_2" />
+
+                    <ImageButton
+                        android:id="@+id/panel_focus"
+                        style="@style/Widget.HoldMyTrack.PanelChip.Accent"
+                        android:layout_marginStart="@dimen/hmt_space_4"
+                        android:contentDescription="@string/panel_no_target"
+                        android:src="@drawable/ic_focus" />
+                </LinearLayout>
+
                 <!-- "Show in this area" (map/ShowInArea): centred under the toggle, wrapping to a
                      second line rather than running under the rail. Gone outside zoom 10–13 and
                      with no place shown. -->
