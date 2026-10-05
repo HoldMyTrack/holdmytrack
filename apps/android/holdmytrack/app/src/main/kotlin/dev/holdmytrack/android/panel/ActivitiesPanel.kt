@@ -42,13 +42,13 @@ enum class PanelTab { ACTIVITIES, STORIES, PRIVACY }
  * holds the Type dropdown and the DISTANCE slider, a toolbar over the toolbar's target, the
  * rows and the target's summary; the Stories tab, the account's Stories with one open on the
  * map ([StoriesTab]); the Privacy tab, the Private locations ([PrivacyTab], which
- * `MainActivity` owns, since it works on the map).
+ * `MapFragment` owns, since it works on the map).
  *
  * The rules live in [PanelState]; this draws it and turns taps into state changes.
- * `MainActivity` owns the map and the fetch: it hands over each list ([setActivities]) and
+ * `MapFragment` owns the map and the fetch: it hands over each list ([setActivities]) and
  * hears about every change that touches the map through [onMapChanged] (what to hide, what's
  * selected) and [onFly] (the activities to frame); Edit is [onEdit]'s to open, and a finished
- * Delete is reported through [onDeleted]. Which Story is open is `MainActivity`'s too
+ * Delete is reported through [onDeleted]. Which Story is open is `MapFragment`'s too
  * ([onOpenStory], [onCloseStory]): it narrows the map and the list, which this then draws.
  */
 class ActivitiesPanel(
@@ -228,7 +228,7 @@ class ActivitiesPanel(
     }
 
     /** Onto the Stories tab from outside — a Story Create story just made, which
-     *  `MainActivity` opens straight away. */
+     *  `MapFragment` opens straight away. */
     fun showStories() = showTab(PanelTab.STORIES)
 
     /** The Activities tab, collapsed — the Sync screen's View on map, which is about the map. */

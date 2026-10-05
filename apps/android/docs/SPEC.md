@@ -386,7 +386,7 @@ A third way an activity can originate on this app, alongside FR-3's Health Conne
 
 ### FR-5.1 Record — one button on the map
 
-**Description**: A round, translucent record button on its own row under the right end of the map's top row, centred under Find my location (`MainActivity`) — 48dp while idle, 56dp while a recording is in progress — the bottom of the screen is the Activities panel's (FR-2.7) — that records a casual, GPS-only track — a walk, hike, or drive someone would not otherwise bother tracking — in one tap, asking nothing.
+**Description**: A round, translucent record button on its own row under the right end of the map's top row, centred under Find my location (`MapFragment`) — 48dp while idle, 56dp while a recording is in progress — the bottom of the screen is the Activities panel's (FR-2.7) — that records a casual, GPS-only track — a walk, hike, or drive someone would not otherwise bother tracking — in one tap, asking nothing.
 
 **Preconditions**: A session (the button is on the map, FR-2.1) and `ACCESS_FINE_LOCATION` granted to record. A demo session can record and manage rows locally; only syncing them is blocked (FR-5.2 step 8).
 

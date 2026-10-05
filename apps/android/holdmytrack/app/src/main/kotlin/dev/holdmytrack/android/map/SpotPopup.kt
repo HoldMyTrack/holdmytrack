@@ -25,7 +25,7 @@ import java.util.Locale
  * over the map, above the spot's badge — or under it when there's no room above, below [top] —
  * and following it as the camera moves ([place]). One at a time; [show] replaces it.
  *
- * MainActivity closes it on a tap elsewhere on the map, when its category is unticked and when a
+ * MapFragment closes it on a tap elsewhere on the map, when its category is unticked and when a
  * track edit takes the map. Capture ([onCapture]) starts capture mode on the place
  * ([CaptureMode]) — offered for a place not yet captured, and not to a demo account, which
  * can't capture.

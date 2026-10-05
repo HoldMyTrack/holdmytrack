@@ -18,7 +18,7 @@ import java.text.NumberFormat
  * ([MapSpots.setInArea]).
  *
  * [view] is the button, and, once a load is current — the map not moved and no category ticked
- * since — the line saying what it found, in the same pill. MainActivity tells it the camera
+ * since — the line saying what it found, in the same pill. MapFragment tells it the camera
  * settled ([onCameraIdle]) and the categories changed ([setCategories]).
  */
 class ShowInArea(private val view: TextView, private val map: MapLibreMap, private val onLoaded: (List<Spot>) -> Unit) {

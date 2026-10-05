@@ -97,5 +97,6 @@ dependencies {
     implementation(libs.google.id)
     implementation(libs.browser)
     implementation(libs.recyclerview)
+    implementation(libs.fragment)
     testImplementation(libs.junit)
 }

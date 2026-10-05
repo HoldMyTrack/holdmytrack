@@ -40,7 +40,7 @@ import kotlin.math.roundToInt
  * — then counts 30 s inside it ([SpotCapture]) and captures it on the server.
  *
  * Location is read only while the app is in the foreground ([resume]/[pause], from
- * MainActivity's own), the same platform GPS provider the recording uses: the app asks for no
+ * MapFragment's own), the same platform GPS provider the recording uses: the app asks for no
  * background location, and a hold pauses while the app is away. The screen stays on while it
  * runs. Stop, Back, a track edit, unticking the spot's category, or the capture itself ends it.
  */
@@ -156,13 +156,13 @@ class CaptureMode(
         }
     }
 
-    /** MainActivity's onResume: location again, if capture mode is on. */
+    /** MapFragment's onResume: location again, if capture mode is on. */
     fun resume() {
         resumed = true
         if (capture != null) startListening()
     }
 
-    /** MainActivity's onPause: no location while the app is away. */
+    /** MapFragment's onPause: no location while the app is away. */
     fun pause() {
         resumed = false
         stopListening()

@@ -10,7 +10,7 @@ import androidx.appcompat.app.AppCompatDelegate
  *
  * Applied through AppCompat's night mode, which recreates the open screens: their colors come
  * from `res/values-night/colors.xml` in night mode, and the map picks the matching basemap
- * flavor and fog veil from the same configuration (`MainActivity.styleUrl`, `MapOverlays`).
+ * flavor and fog veil from the same configuration (`MapFragment.styleUrl`, `MapOverlays`).
  */
 object AppTheme {
 

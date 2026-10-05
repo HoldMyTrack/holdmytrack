@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The status pill's dot (activity_main.xml's recording_status): the record button's red,
-     tinted amber in code while paused (MainActivity.renderRecordingStatus). -->
+     tinted amber in code while paused (MapFragment.renderRecordingStatus). -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="oval">
     <solid android:color="@color/hmt_record" />

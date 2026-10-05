@@ -83,10 +83,10 @@ class EditActivityWindow(
     private val trackPanel: View = card.findViewById(R.id.edit_track_panel)
     private val photosPanel: View = card.findViewById(R.id.edit_photos_panel)
 
-    /** The Track tab's editor — `MainActivity` hands it Delete point's map taps. */
+    /** The Track tab's editor — `MapFragment` hands it Delete point's map taps. */
     val trackEditor = TrackEditor(trackPanel, onDrawTrack) { renderTabs() }
 
-    /** The Photos tab — `MainActivity` hands it the saved photos and what the picker returns. */
+    /** The Photos tab — `MapFragment` hands it the saved photos and what the picker returns. */
     val photosTab = PhotosTab(photosPanel, onPickPhotos, onPhotoOverlay) {
         renderTabs()
         // A change to the photos answers whatever Save last refused about them.
@@ -256,7 +256,7 @@ class EditActivityWindow(
     }
 
     /** The saved photos of the one activity the window is open on, or why they couldn't be read
-     *  — `MainActivity` owns them, since they're also the map's markers. */
+     *  — `MapFragment` owns them, since they're also the map's markers. */
     fun setPhotos(photos: List<Photo>, failure: String?) = photosTab.setPhotos(photos, failure)
 
     /** Cancel: nothing more is written. */

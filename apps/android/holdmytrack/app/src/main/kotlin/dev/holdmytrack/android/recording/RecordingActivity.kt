@@ -25,7 +25,7 @@ import kotlinx.coroutines.withContext
 /**
  * Edit for one saved GPS recording — a Sync Source row's Edit button (`RecordedActivityRows`), launched with
  * [EXTRA_RECORDING_ID]. Recording itself has no screen: it's the map's record button and the
- * notification (`MainActivity`, `RecordingService`), which ask nothing, so this is where a
+ * notification (`MapFragment`, `RecordingService`), which ask nothing, so this is where a
  * recording's name, type and description get set, and where its GPX can be downloaded.
  *
  * Also the Save screen `RecordingService` opens the moment a recording stops ([saveIntent]):

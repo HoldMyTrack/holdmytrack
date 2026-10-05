@@ -58,10 +58,10 @@ data class RecordingStats(
  * long as a recording is in progress, tied to start/pause/resume/stop rather than to any
  * Activity's own lifecycle — the whole point is that it outlives the screen turning off.
  *
- * **Driven by intents, not by a bound caller.** The map's record button (`MainActivity`) and
+ * **Driven by intents, not by a bound caller.** The map's record button (`MapFragment`) and
  * the notification's own Pause/Resume and Stop actions both send [ACTION_START] /
  * [ACTION_TOGGLE] / [ACTION_STOP], so a recording can be controlled from the notification
- * shade with no HoldMyTrack screen open at all. Binding is only how `MainActivity` watches it
+ * shade with no HoldMyTrack screen open at all. Binding is only how `MapFragment` watches it
  * ([onChange], [points]) to draw the live track.
  *
  * **Stop saves here, not in a screen**, for the same reason: Stop can come from the
@@ -109,7 +109,7 @@ class RecordingService : Service() {
         private set
 
     /** Set by whoever is bound and wants live redraws (state changes and new fixes); cleared
-     *  on unbind. Nothing here fans out to more than one listener — only `MainActivity` binds. */
+     *  on unbind. Nothing here fans out to more than one listener — only `MapFragment` binds. */
     var onChange: (() -> Unit)? = null
 
     /** The journal's key for the recording in progress, and the `external_id` it syncs under
@@ -156,7 +156,7 @@ class RecordingService : Service() {
      *  draws it. */
     fun points(): List<RecordedPoint> = recorded.toList()
 
-    /** `MainActivity` has already confirmed `ACCESS_FINE_LOCATION` before sending
+    /** `MapFragment` has already confirmed `ACCESS_FINE_LOCATION` before sending
      *  [ACTION_START] — a foreground service with a location type throws at `startForeground`
      *  without it. Re-checked here only so a stray start can't crash the process. */
     private fun start() {
