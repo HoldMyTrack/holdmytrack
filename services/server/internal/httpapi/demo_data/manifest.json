@@ -1,5 +1,17 @@
 {
   "activities": {
+    "2026-05-07 Estonia.gpx": {
+      "name": "Day #1 – Kadriorg to Kalamaja",
+      "type": "walking"
+    },
+    "2026-05-08 Estonia.gpx": {
+      "name": "Day #2 – Old Town and Toompea",
+      "type": "walking"
+    },
+    "2026-05-09 Estonia.gpx": {
+      "name": "Day #3 – along the sea to Pirita",
+      "type": "walking"
+    },
     "2026-07-01 Emerald Necklace Trail.gpx": {
       "name": "Day #1",
       "type": "Solowheel"
@@ -334,6 +346,15 @@
         "2026-08-05 Italy.gpx",
         "2026-08-05 Italy-2.gpx",
         "2026-08-06 Italy.gpx"
+      ]
+    },
+    {
+      "name": "Estonia",
+      "description": "Three days in Tallinn on foot: Kadriorg Park and the seafront to Kalamaja, the Old Town and Toompea, and the coast out to Pirita.",
+      "activities": [
+        "2026-05-07 Estonia.gpx",
+        "2026-05-08 Estonia.gpx",
+        "2026-05-09 Estonia.gpx"
       ]
     }
   ],
