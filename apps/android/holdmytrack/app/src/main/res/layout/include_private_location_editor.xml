@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The Private location editor, after the web's .private-locations__window: a card over the
-     top of the map, as the Edit window is (MapFragment sets its top margin), so the circle it
-     edits stays in view. The title, Name, RADIUS with its readout and slider, a note, an error
+<!-- The Private location editor, after the web's .private-locations__window: a card along the
+     bottom of the map, as the Edit window is (MapFragment sets its bottom margin), so the circle
+     it edits stays in view above it. The title, Name, RADIUS with its readout and slider, a note, an error
      line, and Cancel and Save. Moving the circle is dragging its handle on the map. Filled by
      panel/PrivacyTab. -->
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
@@ -10,9 +10,10 @@
     style="@style/Widget.HoldMyTrack.Card"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_gravity="top"
+    android:layout_gravity="bottom"
     android:layout_marginStart="@dimen/hmt_space_10"
     android:layout_marginEnd="@dimen/hmt_space_10"
+    android:layout_marginBottom="@dimen/hmt_space_10"
     android:clickable="true"
     android:elevation="10dp"
     android:focusable="false"

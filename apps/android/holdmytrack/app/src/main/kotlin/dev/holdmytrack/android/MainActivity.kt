@@ -139,6 +139,12 @@ class MainActivity : AppCompatActivity() {
         if (tab == Tab.SYNC || tab == Tab.YOU) showTab(Tab.MAP)
     }
 
+    /** The bottom bar, and the record button over it — gone while the map's Edit window or
+     *  Private location editor has the screen. */
+    fun setBottomBarShown(shown: Boolean) {
+        findViewById<View>(R.id.bottom_bar).visibility = if (shown) View.VISIBLE else View.GONE
+    }
+
     /** The You tab's Private locations: the map, its sheet on them. */
     fun showPrivacy() {
         showTab(Tab.MAP)
