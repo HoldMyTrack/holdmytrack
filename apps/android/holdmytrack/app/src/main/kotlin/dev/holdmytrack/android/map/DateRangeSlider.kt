@@ -22,6 +22,10 @@ import java.time.LocalDate
  * and the end handle where the last one ends, so a one-day selection has its handles one slot
  * apart and they can never be dragged closer than that.
  *
+ * **Swiping.** A swipe across the scrubber, away from the handles, scrolls the window a day per
+ * slot the finger moves, the selection left as it is ([onSwipe]): handles scroll out of view and
+ * back like any day, their dates staying in the heading.
+ *
  * **Paging.** A handle held past the scrubber's edge moves the window [STEP_DAYS] that way,
  * repeating while it's held there, and pulls the handle along with it — how a selection grows
  * past the window. The far handle may scroll out of view; its date stays in the heading. The pull
@@ -101,6 +105,7 @@ class DateRangeSlider(
         track.onPress = ::onTrackPress
         track.onDrag = ::onTrackDrag
         track.onRelease = ::onTrackRelease
+        track.onSwipe = ::onSwipe
     }
 
     /** The window has changed — paged, loaded further back, or reloaded. */
@@ -279,6 +284,14 @@ class DateRangeSlider(
             draft = moveKnob(knob, b, sel)
             render()
         }
+    }
+
+    /** The finger moved [moved] slots toward the right: the window moves that many days into the
+     *  past, the days following the finger. Clamped at both ends of the history by [onPan]. */
+    private fun onSwipe(moved: Int) {
+        if (moved > 0 && !canPanEarlier) return
+        if (moved < 0 && !canPanLater) return
+        onPan(-moved)
     }
 
     private fun onTrackRelease() {
