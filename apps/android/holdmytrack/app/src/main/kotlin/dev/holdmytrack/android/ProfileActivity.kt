@@ -28,7 +28,7 @@ import java.time.format.FormatStyle
 import kotlin.math.roundToLong
 
 /**
- * The account half of the burger menu: who is signed in — with the avatar and name Settings
+ * Profile, from the You tab: who is signed in — with the avatar and name Settings
  * holds, read fresh from `GET /v1/auth/me` — and the one action available from here, sign
  * out. Only reachable with a session (the map itself is gated behind one), so
  * signing out replaces the whole back stack with `SignInActivity` rather than returning to a

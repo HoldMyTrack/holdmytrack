@@ -37,12 +37,11 @@
         android:clipToPadding="false"
         android:orientation="vertical">
 
-        <!-- Floating chrome over the map, one row along the top: the burger menu and the map-mode
-             toggle at the start, mirroring the web client's own top-left mode control
+        <!-- Floating chrome over the map, one row along the top: the map-mode toggle at the
+             start, mirroring the web client's own top-left mode control
              (apps/web/src/index.css's .map-mode-toggle), and Find my location at the end, where
-             the web has its geolocate control. Record sits on a row of its own under Find my
-             location. MapLibre's compass, also top-end, is pushed below both
-             (MapFragment.applyCompassMargin). The row itself takes no touches, so the
+             the web has its geolocate control. MapLibre's compass, also top-end, is pushed below
+             both (MapFragment.applyCompassMargin). The row itself takes no touches, so the
              map still pans through the gap. Styled from the theme (res/values/themes.xml). -->
         <LinearLayout
             android:id="@+id/top_bar"
@@ -52,20 +51,6 @@
             android:baselineAligned="false"
             android:orientation="horizontal">
 
-            <FrameLayout
-                style="@style/Widget.HoldMyTrack.MapPanel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/menu_button"
-                    style="@style/Widget.HoldMyTrack.Button.MapIcon"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:contentDescription="@string/menu_button"
-                    app:icon="@drawable/ic_menu" />
-            </FrameLayout>
-
             <!-- Only shown to a signed-in account: all three layers the toggle switches between
                  are behind requireAuth, so there is nothing for it to do without a session.
                  A divider sets Normal apart from the two coverage views (Fog, Heatmap), as the
@@ -74,14 +59,13 @@
                  MapFragment.setMode checks exactly one of the three.
 
                  It sits in a weighted scroll container rather than taking its own width first:
-                 LinearLayout sizes weighted children last, so the burger and Find my location
-                 always get theirs, and at a large font size, where the three labels outgrow the
+                 LinearLayout sizes weighted children last, so Find my location always gets its
+                 own, and at a large font size, where the three labels outgrow the
                  row, the toggle scrolls sideways instead of pushing Find my location off the
                  screen. -->
             <HorizontalScrollView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/hmt_space_6"
                 android:layout_marginEnd="@dimen/hmt_space_6"
                 android:layout_weight="1"
                 android:clipToPadding="false"
@@ -149,11 +133,11 @@
             </FrameLayout>
         </LinearLayout>
 
-        <!-- The second row, under the chrome row: Layers under the burger at the start, Record
-             under Find my location at the end, 6dp below the row above — its own gap between
-             panels. Hidden while an editor covers it (MapFragment.renderRecordButton). It takes
-             no touches itself, so the map still pans through the gap, and doesn't clip its
-             children, so the hold's ring and the recording's pulse can draw past the button. -->
+        <!-- The second row, under the chrome row: Layers at the start, under the mode toggle, and
+             the recording's status at the end, under Find my location, 6dp below the row above —
+             its own gap between panels. Hidden while an editor covers it
+             (MapFragment.renderSecondRow). It takes no touches itself, so the map still pans
+             through the gap. -->
         <FrameLayout
             android:id="@+id/second_row"
             android:layout_width="match_parent"
@@ -252,10 +236,10 @@
                 </FrameLayout>
             </LinearLayout>
 
-            <!-- "Show in this area" (map/ShowInArea): centred between Layers and Record, wrapping
-                 to a second line rather than running under either: its start margin follows the
-                 Layers pill's width (MapFragment.fitShowInArea), the end one clears Record. Gone
-                 outside zoom 10–13 and with no place shown. -->
+            <!-- "Show in this area" (map/ShowInArea): centred in the row, wrapping to a second line
+                 rather than running under Layers: its start margin follows the Layers pill's width
+                 (MapFragment.fitShowInArea), and the end one matches it. Gone outside zoom 10–13
+                 and with no place shown. -->
             <TextView
                 android:id="@+id/show_in_area"
                 style="@style/Widget.HoldMyTrack.ShowInArea"
@@ -268,19 +252,10 @@
                 android:accessibilityLiveRegion="polite"
                 android:visibility="gone" />
 
-            <!-- One-tap GPS recording (MapFragment.onRecordTap): tap to start, tap again to pause or
-                 resume, hold for two seconds to stop (RecordButton draws the countdown ring). Up here
-                 under the chrome row since the bottom of the screen is the Activities panel's;
-                 translucent, so the map still reads through it. At the second row's end, the button
-                 centred under Find my location's 56dp panel (the row's 12dp margin plus half the
-                 difference in width, which MapFragment.renderRecording sets as the button grows
-                 from 48dp idle to 56dp while recording). It stays put while recording, when the
-                 row above steps aside. Neither this row nor top_chrome clips its children.
-
-                 The status pill before it (MapFragment.renderRecordingStatus) shows only while a
-                 recording is in progress: a dot, the moving time, and the distance or "Waiting for
-                 GPS…" before the first fix — and, during a hold on the button, the stop countdown,
-                 where a finger on the button can't hide it. -->
+            <!-- While a recording is in progress (MapFragment.renderRecordingStatus), a status pill
+                 at the second row's end: a dot, the moving time, and the distance or "Waiting for
+                 GPS…" before the first fix — and, during a hold on the record button in the bottom
+                 bar, the stop countdown, where a finger on the button can't hide it. -->
             <LinearLayout
                 android:id="@+id/record_row"
                 android:layout_width="wrap_content"
@@ -296,7 +271,6 @@
                     style="@style/Widget.HoldMyTrack.MapPanel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="@dimen/hmt_space_16"
                     android:orientation="vertical"
                     android:paddingStart="@dimen/hmt_space_12"
                     android:paddingEnd="@dimen/hmt_space_12"
@@ -346,17 +320,6 @@
                         app:trackStopIndicatorSize="0dp"
                         app:trackThickness="4dp" />
                 </LinearLayout>
-
-                <dev.holdmytrack.android.recording.RecordButton
-                    android:id="@+id/record_button"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:layout_marginEnd="@dimen/hmt_space_4"
-                    android:background="@drawable/bg_record_button"
-                    android:contentDescription="@string/record_button_start"
-                    android:padding="@dimen/hmt_space_12"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/ic_record_start" />
             </LinearLayout>
         </FrameLayout>
 

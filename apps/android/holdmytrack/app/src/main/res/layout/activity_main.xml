@@ -1,6 +1,53 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The main window (MainActivity): the map fragment (fragment_map.xml) fills it. -->
-<androidx.fragment.app.FragmentContainerView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/main_content"
+<!-- The main window (MainActivity): the tab showing — the map (fragment_map.xml), Sync or You —
+     above the bottom bar, which takes the gesture bar's inset as its own padding.
+
+     The record button sits over the bar's empty middle slot, raised half out of it, so neither
+     the bar nor the root clips it — nor the ring and pulse RecordButton draws around itself.
+     MapFragment drives it (onRecordTap, renderRecording), since the recording is the map's. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/main_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent" />
+    android:layout_height="match_parent"
+    android:clipChildren="false"
+    android:orientation="vertical">
+
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/main_content"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:clipChildren="false"
+        android:clipToPadding="false">
+
+        <com.google.android.material.bottomnavigation.BottomNavigationView
+            android:id="@+id/bottom_nav"
+            style="@style/Widget.HoldMyTrack.BottomNav"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:menu="@menu/bottom_nav" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/hmt_border" />
+
+        <dev.holdmytrack.android.recording.RecordButton
+            android:id="@+id/record_button"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_gravity="center_horizontal|top"
+            android:background="@drawable/bg_record_button"
+            android:contentDescription="@string/record_button_start"
+            android:elevation="6dp"
+            android:padding="@dimen/hmt_space_12"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_record_start"
+            android:translationY="-14dp" />
+    </FrameLayout>
+</LinearLayout>

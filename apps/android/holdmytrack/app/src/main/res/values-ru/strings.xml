@@ -171,7 +171,6 @@
         <item quantity="other">%s места в этой области</item>
     </plurals>
 
-    <string name="menu_button">Меню</string>
     <string name="locate_button">Моё местоположение</string>
     <string name="date_range_shift_earlier">Сдвинуть диапазон раньше</string>
     <string name="date_range_shift_later">Сдвинуть диапазон позже</string>
@@ -188,9 +187,12 @@
         <item quantity="other">На %d активных дня позже</item>
     </plurals>
     <string name="locate_needs_location">HoldMyTrack нужен доступ к местоположению, чтобы показать, где вы.</string>
+    <string name="nav_map">Карта</string>
+    <string name="nav_stories">Истории</string>
+    <string name="nav_sync">Синхр.</string>
+    <string name="nav_you">Вы</string>
     <string name="menu_profile">Профиль</string>
     <string name="menu_upload">Загрузить</string>
-    <string name="menu_sync">Синхронизация</string>
     <string name="menu_donate">Поддержать</string>
     <string name="menu_about">О проекте</string>
     <string name="menu_help">Справка</string>

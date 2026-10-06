@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- You (YouFragment), the bottom bar's last tab: the app's own screens — Profile, Upload,
+     Settings — then the web's pages, opened in a browser tab, and last the app's version. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="@dimen/hmt_space_16">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_8"
+            android:layout_marginBottom="@dimen/hmt_space_8"
+            android:text="@string/nav_you"
+            android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleLarge" />
+
+        <TextView
+            android:id="@+id/you_profile"
+            style="@style/Widget.HoldMyTrack.ListRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/menu_profile" />
+
+        <TextView
+            android:id="@+id/you_upload"
+            style="@style/Widget.HoldMyTrack.ListRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/menu_upload" />
+
+        <TextView
+            android:id="@+id/you_settings"
+            style="@style/Widget.HoldMyTrack.ListRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/menu_settings" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="@dimen/hmt_space_8"
+            android:layout_marginBottom="@dimen/hmt_space_8"
+            android:background="@color/hmt_border" />
+
+        <!-- Only where BuildConfig.DONATE_LINK allows it, which the Play build doesn't
+             (YouFragment). -->
+        <TextView
+            android:id="@+id/you_donate"
+            style="@style/Widget.HoldMyTrack.ListRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/menu_donate"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/you_about"
+            style="@style/Widget.HoldMyTrack.ListRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/menu_about" />
+
+        <TextView
+            android:id="@+id/you_help"
+            style="@style/Widget.HoldMyTrack.ListRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/menu_help" />
+
+        <TextView
+            android:id="@+id/you_contacts"
+            style="@style/Widget.HoldMyTrack.ListRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/menu_contacts" />
+
+        <TextView
+            android:id="@+id/you_privacy"
+            style="@style/Widget.HoldMyTrack.ListRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/menu_privacy" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="@dimen/hmt_space_8"
+            android:layout_marginBottom="@dimen/hmt_space_8"
+            android:background="@color/hmt_border" />
+
+        <TextView
+            android:id="@+id/you_version"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="@dimen/hmt_space_4"
+            android:paddingTop="@dimen/hmt_space_8"
+            android:paddingEnd="@dimen/hmt_space_4"
+            android:textAppearance="@style/TextAppearance.HoldMyTrack.BodyMedium"
+            android:textColor="@color/hmt_ink_muted" />
+    </LinearLayout>
+</ScrollView>

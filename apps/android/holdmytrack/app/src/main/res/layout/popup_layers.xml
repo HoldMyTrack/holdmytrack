@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The Layers menu (.overlays-menu__panel), opened by the Layers pill under the burger
-     (map/LayersMenu): Paths and Points of interest, each picked over any mode. It scrolls when it
+<!-- The Layers menu (.overlays-menu__panel), opened by the Layers pill under the mode
+     toggle (map/LayersMenu): Paths and Points of interest, each picked over any mode. It scrolls when it
      outgrows the screen (landscape). -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
