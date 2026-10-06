@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The Private location editor, after the web's .private-locations__window: a card over the
-     top of the map, as the Edit window is (MainActivity sets its top margin), so the circle it
+     top of the map, as the Edit window is (MapFragment sets its top margin), so the circle it
      edits stays in view. The title, Name, RADIUS with its readout and slider, a note, an error
      line, and Cancel and Save. Moving the circle is dragging its handle on the map. Filled by
      panel/PrivacyTab. -->

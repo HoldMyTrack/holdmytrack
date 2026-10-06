@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The Edit window (panel/EditActivityWindow.kt), after the web's EditActivityWindow.tsx at phone
      width: a card floating over the top of the map, under the chrome row (its top margin is set
-     in MainActivity), rather than a modal dialog, so its Track and Photos tabs can edit on the
+     in MapFragment), rather than a modal dialog, so its Track and Photos tabs can edit on the
      map. The title and whose it is, the Activity, Track and Photos tabs — Type, Name and
      Description on the first, the track editor (panel/TrackEditor) on the second, the photos
      (panel/PhotosTab) on the third — then an error line, and Cancel and Save. Clickable, so a

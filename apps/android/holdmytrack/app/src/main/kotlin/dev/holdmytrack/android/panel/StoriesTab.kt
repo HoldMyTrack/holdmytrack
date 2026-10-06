@@ -31,7 +31,7 @@ import dev.holdmytrack.android.recording.RecordingTypes
  * The Activities panel's Stories tab, the web's `apps/web/src/ui/StoriesTab.tsx` and the Story
  * half of `MapView.tsx` (`docs/SPEC.md` FR-14.6): every Story as a folder, newest first,
  * exactly one of them open while the tab shows — the newest, until another is tapped. Opening
- * one is viewing it: `MainActivity` shows the tracks and the list of all its activities,
+ * one is viewing it: `MapFragment` shows the tracks and the list of all its activities,
  * whatever the date range ([onOpen]), and this tab lists those rows inside the folder — tap to
  * select, × to take one out of the Story — with the whole Story's statistics in the footer. A
  * folder's pencil and bin rename and delete it.
@@ -108,7 +108,7 @@ class StoriesTab(
         }
     }
 
-    /** The tab closed — `MainActivity` has closed its Story. */
+    /** The tab closed — `MapFragment` has closed its Story. */
     fun stop() {
         showing = false
     }

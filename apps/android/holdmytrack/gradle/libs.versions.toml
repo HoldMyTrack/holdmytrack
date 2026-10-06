@@ -34,6 +34,10 @@ browser = "1.10.0"
 # from Material's own dependency on it, at the version Material 1.13.0 already resolves to,
 # so this pins rather than upgrades.
 recyclerview = "1.2.1"
+# The map is a Fragment in MainActivity (docs/adr/0033-android-bottom-navigation-single-activity.md)
+# — declared rather than borrowed from AppCompat and Material, at the version they already
+# resolve to, so this pins rather than upgrades.
+fragment = "1.8.9"
 # Unit tests for the panel's pure logic (src/test).
 junit = "4.13.2"
 
@@ -50,6 +54,7 @@ credentials-play-services = { module = "androidx.credentials:credentials-play-se
 google-id = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleId" }
 browser = { module = "androidx.browser:browser", version.ref = "browser" }
 recyclerview = { module = "androidx.recyclerview:recyclerview", version.ref = "recyclerview" }
+fragment = { module = "androidx.fragment:fragment", version.ref = "fragment" }
 junit = { module = "junit:junit", version.ref = "junit" }
 
 [plugins]

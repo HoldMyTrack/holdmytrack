@@ -11,7 +11,7 @@ import dev.holdmytrack.android.R
  * lifted from a whole country reads as a bug when you don't know that's the level you're at.
  *
  * Shown on entering either mode and whenever a zoom lands in another level, faded out after
- * [SHOW_MS]. MainActivity passes the zoom when the camera comes to rest ([onCameraIdle]), not
+ * [SHOW_MS]. MapFragment passes the zoom when the camera comes to rest ([onCameraIdle]), not
  * mid-gesture, so a pinch through two levels names only where it lands. Never in Normal, which
  * draws tracks at every zoom, nor while the modes are away ([render]'s `active`).
  */

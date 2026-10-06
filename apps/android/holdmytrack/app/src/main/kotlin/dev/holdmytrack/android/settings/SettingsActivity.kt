@@ -52,7 +52,7 @@ import kotlinx.coroutines.launch
  * its units (`RecordingFormat`, from [Session.country]).
  *
  * Also the first run, as on the web: a real account that has never saved Settings (no Country)
- * is sent here from the map (`MainActivity.syncSession`) with [EXTRA_ONBOARDING] — the welcome
+ * is sent here from the map (`MapFragment.syncSession`) with [EXTRA_ONBOARDING] — the welcome
  * title and intro, "Save and continue", and the root of its own task, with no map behind it to
  * go back to. A demo account sees every field disabled, with the web's note.
  *

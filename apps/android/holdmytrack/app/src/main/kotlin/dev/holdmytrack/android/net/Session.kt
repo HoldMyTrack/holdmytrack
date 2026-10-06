@@ -82,7 +82,7 @@ object Session {
 
     /**
      * The account's Country (ISO code), empty until Settings is first saved — which is what the
-     * first-run gate keys on (`MainActivity`), and what decides the app's units
+     * first-run gate keys on (`MapFragment`), and what decides the app's units
      * (`recording/Units`). Kept on disk, like [emailVerified], so a cold start routes and
      * formats correctly before the first `GET /v1/auth/me` answers; that answer refreshes it.
      */

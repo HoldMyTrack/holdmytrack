@@ -77,3 +77,26 @@ Everything between a tested app and its Play Store listing, roughly in the order
   - An internal test first, to install the Play-signed build and check Google sign-in against its key. Then the closed test, with its 12 testers for 14 days on a personal account, and its pre-launch report read. Then apply for production access and release in stages.
 - [ ] **Confirm the wider launch gates are met**
   - A Play Store release is a public launch and is gated by the same items as any other: the DPIA, EU-region hosting for EU users (root `ROADMAP.md` Phase 6), plus the rest of Milestone 2's entry gate (root `ROADMAP.md`, Milestones). These are not Android work, but shipping the app without them is not an option.
+
+---
+
+## Phase 7: Phone-first redesign
+
+The map screen and its menus carry the web's phone layout over, which on a phone stacks the chrome in bands and hides the most-used screens behind a burger. This phase gives the app a layout of its own, on the same tokens, fonts and icons: a bottom navigation bar (Map, Stories, Record, Sync, You), one floating row at the map's top, a draggable sheet whose peek holds the date range, and track editing as a focused mode. The decision to make the tabs Fragments of one Activity is [ADR-0033](../../../docs/adr/0033-android-bottom-navigation-single-activity.md). Each item below is one pull request, each working on its own.
+
+- [x] **The map as a Fragment**
+  - `MapFragment` holds everything the map did, hosted by `MainActivity` with no change in behavior (`apps/android/docs/IMPLEMENTATION.md` §1.2). Checked on the emulator against a local stack: sign-in, rotation in Fog, a recording surviving rotation, the notification's Stop, a row selected from the panel, the burger menu, View on map, and a day/night switch.
+- [ ] **The bottom navigation bar**
+  - Map, Stories, Record (the record button, raised in the middle), Sync and You; Sync becomes a fragment, its run still cancelled the moment it leaves the foreground; the burger menu goes.
+- [ ] **The map's top chrome**
+  - One row: Tracks, Fog and Heat with icons, and Layers and Find my location on the right; Satellite moves into the Layers menu; the recording's status replaces the row while recording.
+- [ ] **The sheet and the date scrubber**
+  - A draggable sheet with collapsed, half and full heights; its peek is the range, its totals and an activity-day scrubber whose bars are each day's distance; the panel's tab row goes.
+- [ ] **The selected activity and multi-select**
+  - A selected activity's card in the sheet (distance, moving time, pace or speed, the pace bands' legend, its actions), and a contextual bar in the top row while rows are checked.
+- [ ] **Track editing as a focused mode**
+  - A top bar (Cancel, Undo, Save) and an editor sheet with Activity, Track and Photos, the map between them; the Private location editor takes the same frame.
+- [ ] **The Sync, You and Privacy screens**
+  - Sync: Sync now, Health Connect, what's on the phone, Upload and Timeline, and the latest imports. You: the account, all-time totals leading to the activity graph and trends, Privacy, Theme and Language, the web's pages, Sign out and Delete account. Privacy: Private locations, what HoldMyTrack keeps, and Download your data. Donate stays out of the Play build.
+- [ ] **Polish and accessibility**
+  - Dark theme on every new surface, TalkBack labels and states, 48dp targets, font scale 2.0, Russian, and the map's side insets.
