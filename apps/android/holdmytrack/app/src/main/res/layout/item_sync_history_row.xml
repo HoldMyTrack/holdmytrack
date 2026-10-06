@@ -57,14 +57,14 @@
             android:textColor="@color/hmt_ink_meta"
             android:textFontWeight="400" />
 
-        <!-- The web's underlined accent text rather than a button, padded out to a usable
+        <!-- The web's underlined accent text rather than a button, padded out to a 48dp
              touch target without changing how it reads. -->
         <TextView
             android:id="@+id/row_action"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="?attr/selectableItemBackground"
-            android:minHeight="32dp"
+            android:minHeight="48dp"
             android:gravity="end|center_vertical"
             android:text="@string/status_view_on_map"
             android:textColor="@color/hmt_accent_strong"

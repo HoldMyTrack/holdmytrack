@@ -72,11 +72,18 @@ class MainActivity : AppCompatActivity() {
             true
         }
         // The bar pads itself clear of the gesture bar, so the tabs above it get no bottom inset
-        // — the map's own chrome adds the one it's given (`MapFragment.insetSystemBars`).
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main_content)) { _, insets ->
+        // — the map's own chrome adds the one it's given (`MapFragment.insetSystemBars`). At the
+        // sides — a landscape phone's navigation bar or its camera cutout — the tabs are padded
+        // in here, once for all of them, and see no side inset of their own.
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main_content)) { content, insets ->
+            val sideTypes = WindowInsetsCompat.Type.navigationBars() or WindowInsetsCompat.Type.displayCutout()
+            val sides = insets.getInsets(sideTypes)
+            content.setPadding(sides.left, 0, sides.right, 0)
             val navigation = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+            val cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
             WindowInsetsCompat.Builder(insets)
-                .setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(navigation.left, navigation.top, navigation.right, 0))
+                .setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, navigation.top, 0, 0))
+                .setInsets(WindowInsetsCompat.Type.displayCutout(), Insets.of(0, cutout.top, 0, cutout.bottom))
                 .build()
         }
         onBackPressedDispatcher.addCallback(this, backToMap)

@@ -4,7 +4,7 @@
 | :-- | :-- |
 | **Version** | 1.0 |
 | **Status** | Current — describes the app as built: sign-in, map, Health Connect sync and sync status (FR-1–FR-4), plus in-app GPS recording (FR-5, built ahead of the design and compliance phases — §1.2, §7 below) |
-| **Last updated** | 2026-10-06 (the Sync and You screens redrawn, FR-2.9, FR-3.5) |
+| **Last updated** | 2026-10-06 (touch targets, large text and landscape, §8) |
 | **Related documents** | `apps/android/docs/ROADMAP.md` (remaining work and the platform-constraint findings; completed phases, with the verification record this document's behavior claims are drawn from, are removed from it once done and survive in its git history); `apps/android/docs/ARCHITECTURE.md` (this app's shape, stack, and key decisions); `apps/android/docs/IMPLEMENTATION.md` (file-by-file "how it's built" detail); `docs/SPEC.md`/`docs/IMPLEMENTATION.md` (the server behavior and schema this app is a client of); `docs/VISION.md` (why Path 2 exists at all, §4.1 and §5.4) |
 
 ## 1. Introduction
@@ -178,7 +178,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 **Description**: On first attaching the user layers each app session, the camera flies to fit the account's most recent activity, once — the web's opening view (`docs/SPEC.md` FR-4.5), not the whole history, which for an account with scattered recent history is a near-world view that reads as broken.
 
-**Behavior**: `GET /v1/activities` is read once per session start, and the most recently started row's `bbox` is taken (rows with no `bbox` — no recorded trajectory — and Pending rows are skipped). The camera animates to fit that box, capped at zoom 15 so a single very short activity, or one heavily clipped by a Private location, doesn't zoom in on an empty rectangle past the basemap's own z14 data. An account with no geometry at all stays at the whole-world view, with a notice — "Nothing on your map yet…" and a Sync action — that is asked again on every return to the map and goes, and the camera frames the new history, once something has arrived. A demo account never gets it. Re-attaching the session (e.g., returning from the sign-in screen without actually changing account) does not re-fly the camera a second time in the same app session.
+**Behavior**: `GET /v1/activities` is read once per session start — a rotation, theme or language change keeps the camera where it was instead — and the most recently started row's `bbox` is taken (rows with no `bbox` — no recorded trajectory — and Pending rows are skipped). The camera animates to fit that box, capped at zoom 15 so a single very short activity, or one heavily clipped by a Private location, doesn't zoom in on an empty rectangle past the basemap's own z14 data. An account with no geometry at all stays at the whole-world view, with a notice — "Nothing on your map yet…" and a Sync action — that is asked again on every return to the map and goes, and the camera frames the new history, once something has arrived. A demo account never gets it. Re-attaching the session (e.g., returning from the sign-in screen without actually changing account) does not re-fly the camera a second time in the same app session.
 
 ### FR-2.4 Attribution
 
@@ -455,6 +455,8 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 | **No reload required** | The Sync screen's history updates itself by polling while work is outstanding, and stops polling once settled (FR-4.1). |
 | **Idempotency** | Re-syncing the same Health Connect record never creates a duplicate activity — the server keys on the platform's own record id (FR-3.2, `docs/IMPLEMENTATION.md` §4.0.3). |
 | **Language** | English or Russian, following the phone's language or the app's own per-app language setting; any other language gets English. The app sends its language as `Accept-Language`, so the server's messages match it (`docs/SPEC.md` FR-13.1). |
+| **Accessibility** | Every control is labelled for TalkBack and is a touch target of at least 48dp; Normal, Fog and Heatmap read as a choice of three ("radio button, 1 of 3"), and the bottom bar says which tab is selected. At a font size of 1.3× or more, rows that no longer fit side by side stack — the You tab's numbers, Theme, Language and web pages, the selected activity's figures — and the map's mode toggle shows only the active mode's label, the other two their icons (FR-2.2). |
+| **Orientation and screen edges** | The map works in landscape, the sheet's head whole however short the screen. A landscape phone's navigation bar and camera cutout never cover a control on any tab: the content is inset from them. The map's camera survives a rotation, theme or language change as it was (FR-2.3). |
 
 ## 9. Known Limitations & Out-of-Scope Items
 

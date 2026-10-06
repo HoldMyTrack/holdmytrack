@@ -38,14 +38,18 @@
         <FrameLayout
             android:id="@+id/panel_handle"
             android:layout_width="match_parent"
-            android:layout_height="24dp"
+            android:layout_height="48dp"
+            android:layout_marginBottom="-24dp"
             android:background="?attr/selectableItemBackground"
             android:contentDescription="@string/panel_expand">
 
+            <!-- The bar is drawn in the top 24dp; the 48dp target reaches under the head's
+                 first row, which takes no taps of its own. -->
             <View
                 android:layout_width="36dp"
                 android:layout_height="4dp"
-                android:layout_gravity="center"
+                android:layout_gravity="top|center_horizontal"
+                android:layout_marginTop="10dp"
                 android:background="@drawable/bg_sheet_handle" />
         </FrameLayout>
 

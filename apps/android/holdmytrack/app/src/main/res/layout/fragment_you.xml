@@ -115,27 +115,47 @@
                 android:paddingEnd="@dimen/hmt_space_12"
                 android:paddingBottom="@dimen/hmt_space_16">
 
+                <!-- Four across, or two rows of two at a large font size (YouFragment.stackWhenLarge). -->
                 <LinearLayout
+                    android:id="@+id/you_stats_row"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:baselineAligned="false"
-                    android:orientation="horizontal">
+                    android:divider="@drawable/gap_8_both"
+                    android:orientation="horizontal"
+                    android:showDividers="middle">
 
-                    <include
-                        android:id="@+id/you_stat_activities"
-                        layout="@layout/item_you_stat" />
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:baselineAligned="false"
+                        android:orientation="horizontal">
 
-                    <include
-                        android:id="@+id/you_stat_distance"
-                        layout="@layout/item_you_stat" />
+                        <include
+                            android:id="@+id/you_stat_activities"
+                            layout="@layout/item_you_stat" />
 
-                    <include
-                        android:id="@+id/you_stat_active_days"
-                        layout="@layout/item_you_stat" />
+                        <include
+                            android:id="@+id/you_stat_distance"
+                            layout="@layout/item_you_stat" />
+                    </LinearLayout>
 
-                    <include
-                        android:id="@+id/you_stat_streak"
-                        layout="@layout/item_you_stat" />
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:baselineAligned="false"
+                        android:orientation="horizontal">
+
+                        <include
+                            android:id="@+id/you_stat_active_days"
+                            layout="@layout/item_you_stat" />
+
+                        <include
+                            android:id="@+id/you_stat_streak"
+                            layout="@layout/item_you_stat" />
+                    </LinearLayout>
                 </LinearLayout>
 
                 <LinearLayout
@@ -241,43 +261,52 @@
                         android:contentDescription="@null"
                         android:src="@drawable/ic_contrast" />
 
-                    <TextView
-                        android:id="@+id/you_theme_label"
+                    <LinearLayout
+                        android:id="@+id/you_theme_inner"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="@string/settings_theme"
-                        android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowTitle" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
-                    <com.google.android.material.button.MaterialButtonToggleGroup
-                        android:id="@+id/you_theme"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:contentDescription="@string/settings_theme"
-                        app:selectionRequired="true"
-                        app:singleSelection="true">
+                        <TextView
+                            android:id="@+id/you_theme_label"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/settings_theme"
+                            android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowTitle" />
 
-                        <Button
-                            android:id="@+id/you_theme_system"
-                            style="@style/Widget.HoldMyTrack.Button.ProfileToggle"
+                        <com.google.android.material.button.MaterialButtonToggleGroup
+                            android:id="@+id/you_theme"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/settings_theme_system" />
+                            android:contentDescription="@string/settings_theme"
+                            app:selectionRequired="true"
+                            app:singleSelection="true">
 
-                        <Button
-                            android:id="@+id/you_theme_light"
-                            style="@style/Widget.HoldMyTrack.Button.ProfileToggle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_theme_light" />
+                            <Button
+                                android:id="@+id/you_theme_system"
+                                style="@style/Widget.HoldMyTrack.Button.ProfileToggle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/settings_theme_system" />
 
-                        <Button
-                            android:id="@+id/you_theme_dark"
-                            style="@style/Widget.HoldMyTrack.Button.ProfileToggle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_theme_dark" />
-                    </com.google.android.material.button.MaterialButtonToggleGroup>
+                            <Button
+                                android:id="@+id/you_theme_light"
+                                style="@style/Widget.HoldMyTrack.Button.ProfileToggle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/settings_theme_light" />
+
+                            <Button
+                                android:id="@+id/you_theme_dark"
+                                style="@style/Widget.HoldMyTrack.Button.ProfileToggle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/settings_theme_dark" />
+                        </com.google.android.material.button.MaterialButtonToggleGroup>
+                    </LinearLayout>
                 </LinearLayout>
 
                 <LinearLayout
@@ -291,19 +320,28 @@
                         android:contentDescription="@null"
                         android:src="@drawable/ic_globe" />
 
-                    <TextView
+                    <LinearLayout
+                        android:id="@+id/you_language_inner"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="@string/settings_language"
-                        android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowTitle" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
-                    <TextView
-                        android:id="@+id/you_language_value"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/hmt_space_8"
-                        android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowSub" />
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/settings_language"
+                            android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowTitle" />
+
+                        <TextView
+                            android:id="@+id/you_language_value"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/hmt_space_8"
+                            android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowSub" />
+                    </LinearLayout>
 
                     <ImageView
                     style="@style/Widget.HoldMyTrack.RowChevron"
@@ -326,51 +364,71 @@
                 android:layout_marginBottom="@dimen/hmt_space_8"
                 android:text="@string/app_name" />
 
+            <!-- Two pairs side by side, or one above the other at a large font size
+                 (YouFragment.stackWhenLarge). -->
             <LinearLayout
+                android:id="@+id/you_web_row"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:baselineAligned="false"
-                android:orientation="horizontal">
+                android:divider="@drawable/gap_8_both"
+                android:orientation="horizontal"
+                android:showDividers="middle">
 
-                <TextView
-                    android:id="@+id/you_about"
-                    style="@style/Widget.HoldMyTrack.WebTile"
+                <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    app:drawableTopCompat="@drawable/ic_info"
-                    android:text="@string/menu_about" />
+                    android:baselineAligned="false"
+                    android:orientation="horizontal">
 
-                <TextView
-                    android:id="@+id/you_help"
-                    style="@style/Widget.HoldMyTrack.WebTile"
+                    <TextView
+                        android:id="@+id/you_about"
+                        style="@style/Widget.HoldMyTrack.WebTile"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        app:drawableTopCompat="@drawable/ic_info"
+                        android:text="@string/menu_about" />
+
+                    <TextView
+                        android:id="@+id/you_help"
+                        style="@style/Widget.HoldMyTrack.WebTile"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/hmt_space_8"
+                        android:layout_weight="1"
+                        app:drawableTopCompat="@drawable/ic_circle_help"
+                        android:text="@string/menu_help" />
+                </LinearLayout>
+
+                <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/hmt_space_8"
                     android:layout_weight="1"
-                    app:drawableTopCompat="@drawable/ic_circle_help"
-                    android:text="@string/menu_help" />
+                    android:baselineAligned="false"
+                    android:orientation="horizontal">
 
-                <TextView
-                    android:id="@+id/you_contacts"
-                    style="@style/Widget.HoldMyTrack.WebTile"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/hmt_space_8"
-                    android:layout_weight="1"
-                    app:drawableTopCompat="@drawable/ic_mail"
-                    android:text="@string/menu_contacts" />
+                    <TextView
+                        android:id="@+id/you_contacts"
+                        style="@style/Widget.HoldMyTrack.WebTile"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        app:drawableTopCompat="@drawable/ic_mail"
+                        android:text="@string/menu_contacts" />
 
-                <TextView
-                    android:id="@+id/you_donate"
-                    style="@style/Widget.HoldMyTrack.WebTile"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/hmt_space_8"
-                    android:layout_weight="1"
-                    app:drawableTopCompat="@drawable/ic_heart"
-                    android:text="@string/menu_donate"
-                    android:visibility="gone" />
+                    <TextView
+                        android:id="@+id/you_donate"
+                        style="@style/Widget.HoldMyTrack.WebTile"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/hmt_space_8"
+                        android:layout_weight="1"
+                        app:drawableTopCompat="@drawable/ic_heart"
+                        android:text="@string/menu_donate"
+                        android:visibility="gone" />
+                </LinearLayout>
             </LinearLayout>
         </LinearLayout>
 
