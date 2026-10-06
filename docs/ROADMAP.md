@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-10-04.
+Last updated: 2026-10-06.
 
 ## How to read this document
 
@@ -126,12 +126,11 @@ An engineering requirement, can land alongside any of the above (`IMPLEMENTATION
 
 Gates any public launch: a precise location history is sensitive personal data under GDPR (`VISION.md` §7).
 
-- [ ] DPIA before any public launch.
+- [ ] DPIA before any public launch. As part of it, re-check that the cookies and browser storage `apps/web` and the server's pages set still match `/privacy`'s Cookies list (`SPEC.md` FR-10.6), all strictly necessary or a preference set at the user's request, so the site still needs no cookie banner; anything non-essential (analytics, an ad pixel, marketing tracking) would flip that.
 - [ ] EU-region hosting for EU users.
 - [x] A privacy policy page — `/privacy` (`SPEC.md` FR-10.6). It names the email delivery provider only generically; name it there once settled, and update the policy when EU-region hosting moves the data.
 - [x] Account deletion and data export — Settings' Delete account and Download your data, on the web and in the Android app (`SPEC.md` FR-1.11, FR-1.12). Named "Download your data" so it doesn't collide with the map's Export control (FR-4.10).
 - [ ] Health Connect data-type declarations in the Play Console, scoped to only what's actually used (Phase 2 builds the app; the declaration work belongs here).
-- [ ] Confirm we don't need a cookie consent banner — as of this writing the web client sets two cookies (`holdmytrack_session`, and `hmt_lang` once someone picks a language in the header's menu, ADR-0025; both `HttpOnly`, `SameSite=Lax`, `Secure` under HTTPS) and one `localStorage` key (`hmt_theme`, the chosen theme), with no analytics or tracking anywhere in `apps/web`. The session cookie is strictly necessary and the other two are user-interface preferences set at the user's request, which should all fall under the ePrivacy Directive Art. 5(3) "strictly necessary" exemption — no consent required, only a plain-language disclosure in the privacy policy. Re-check this conclusion at launch time (cookie/analytics usage can drift) and again the day anything non-essential (analytics, an ad pixel, marketing tracking) is added, since that would flip the answer.
 
 ---
 
