@@ -78,6 +78,25 @@ class TimelineReaderTest {
     }
 
     @Test
+    fun aStartOrEndThePathBesideItCouldNotHaveBeenReachedFromIsLeftOut() {
+        // 150 km in the 10 minutes before the first path point, 44 km in the 5 after the last: 900 and 530 km/h.
+        val far = drive.copy(from = "11.0000000°, 21.0000000°", to = "9.8000000°, 19.8000000°")
+        val segment = TimelineReader.read(path, listOf(far)).segments[0]
+        assertEquals(
+            listOf("2026-07-07T09:10:00.000-04:00", "2026-07-07T09:15:00.000-04:00"),
+            segment.points.map { it.time },
+        )
+        assertTrue("distance ${segment.distanceM}", segment.distanceM < 7000)
+        // With no path inside, there's nothing to measure them against.
+        assertEquals(2, TimelineReader.read(path, listOf(walk)).segments[0].points.size)
+        // 5 s before the first path point: 550 m away is kept, 2.2 km away isn't.
+        val fast = drive.copy(startTime = "2026-07-07T09:09:55.000-04:00", from = "10.0550000°, 20.0400000°")
+        assertEquals("2026-07-07T09:09:55.000-04:00", TimelineReader.read(path, listOf(fast)).segments[0].points[0].time)
+        val farFast = fast.copy(from = "10.0700000°, 20.0400000°")
+        assertEquals("2026-07-07T09:10:00.000-04:00", TimelineReader.read(path, listOf(farFast)).segments[0].points[0].time)
+    }
+
+    @Test
     fun selectionIsByLocalStartDayAndMode() {
         val segments = TimelineReader.read(path, listOf(drive, walk)).segments
         val all = setOf("IN_PASSENGER_VEHICLE", "WALKING")

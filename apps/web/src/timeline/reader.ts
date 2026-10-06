@@ -8,7 +8,8 @@
 // entry: a visit (a place, skipped), an activity (start, end, a guessed mode and a distance,
 // but no route), and a `timelinePath` (the points the phone kept, in two-hour buckets that
 // don't line up with activities). An activity's route is the path points inside its time span,
-// between its own start and end.
+// between its own start and end, unless one of those is too far and too fast from the path
+// beside it.
 
 export type TimelinePoint = { lat: number; lon: number; time: string };
 
@@ -97,6 +98,12 @@ function upperBound(arr: Timed[], t: number): number {
   return lo;
 }
 
+/** An activity's own start or end is left out when it's more than ANCHOR_MAX_M from the path
+ *  point beside it and reaching it would take more than ANCHOR_MAX_MPS: Timeline sometimes puts
+ *  that start or end kilometres from the route, seconds from its first or last point. */
+const ANCHOR_MAX_M = 1500;
+const ANCHOR_MAX_MPS = 200 / 3.6;
+
 const EARTH_M = 6371008.8;
 function metersBetween(a: TimelinePoint, b: TimelinePoint): number {
   const rad = Math.PI / 180;
@@ -140,7 +147,19 @@ export function readTimeline(data: unknown): TimelineRead {
       continue;
     }
     const inside = path.slice(upperBound(path, startMs), upperBound(path, endMs - 1));
-    const timed: Timed[] = [{ ms: startMs, time: start, ...from }, ...inside, { ms: endMs, time: end, ...to }];
+    // The start and end are kept unless they're too far and too fast from the path beside them;
+    // with no path inside, there's nothing to tell which of the two is wrong.
+    const plausible = (a: Timed, b: Timed) => {
+      const m = metersBetween(a, b);
+      return m <= ANCHOR_MAX_M || m <= (ANCHOR_MAX_MPS * Math.abs(b.ms - a.ms)) / 1000;
+    };
+    const startAt: Timed = { ms: startMs, time: start, ...from };
+    const endAt: Timed = { ms: endMs, time: end, ...to };
+    const timed: Timed[] = [
+      ...(inside.length === 0 || plausible(startAt, inside[0]!) ? [startAt] : []),
+      ...inside,
+      ...(inside.length === 0 || plausible(inside[inside.length - 1]!, endAt) ? [endAt] : []),
+    ];
     // Strictly increasing times: the parser keeps one point per instant anyway.
     const points: TimelinePoint[] = [];
     let last = -Infinity;

@@ -16,8 +16,9 @@ import kotlin.math.sqrt
  * The export is undocumented. `semanticSegments` holds visits (skipped), activities (a start, an
  * end, a guessed mode and a distance, but no route) and `timelinePath` buckets (the points the
  * phone kept, which don't line up with activities). An activity's route is the path points
- * inside its time span, between its own start and end. [TimelineFile] streams the JSON into the
- * raw entries this takes, so this part runs on the JVM's own tests.
+ * inside its time span, between its own start and end, unless one of those is too far and too
+ * fast from the path beside it. [TimelineFile] streams the JSON into the raw entries this takes,
+ * so this part runs on the JVM's own tests.
  */
 data class TimelinePoint(val lat: Double, val lon: Double, val time: String)
 
@@ -103,7 +104,17 @@ object TimelineReader {
         return lo
     }
 
+    /** An activity's own start or end is left out when it's more than [ANCHOR_MAX_M] from the
+     *  path point beside it and reaching it would take more than [ANCHOR_MAX_MPS]: Timeline
+     *  sometimes puts that start or end kilometres from the route, seconds from its first or last
+     *  point. */
+    private const val ANCHOR_MAX_M = 1500.0
+    private const val ANCHOR_MAX_MPS = 200 / 3.6
+
     private const val EARTH_M = 6371008.8
+
+    private fun metersBetween(a: Timed, b: Timed): Double =
+        metersBetween(TimelinePoint(a.lat, a.lon, a.time), TimelinePoint(b.lat, b.lon, b.time))
 
     private fun metersBetween(a: TimelinePoint, b: TimelinePoint): Double {
         val rad = Math.PI / 180
@@ -133,8 +144,19 @@ object TimelineReader {
             }
             val lo = upperBound(path, startMs)
             val inside = path.subList(lo, maxOf(lo, upperBound(path, endMs - 1)))
-            val timed = listOf(Timed(startMs, act.startTime!!, from.first, from.second)) + inside +
-                Timed(endMs, act.endTime!!, to.first, to.second)
+            // The start and end are kept unless they're too far and too fast from the path beside
+            // them; with no path inside, there's nothing to tell which of the two is wrong.
+            fun plausible(a: Timed, b: Timed): Boolean {
+                val m = metersBetween(a, b)
+                return m <= ANCHOR_MAX_M || m <= ANCHOR_MAX_MPS * kotlin.math.abs(b.ms - a.ms) / 1000.0
+            }
+            val startAt = Timed(startMs, act.startTime!!, from.first, from.second)
+            val endAt = Timed(endMs, act.endTime!!, to.first, to.second)
+            val timed = buildList {
+                if (inside.isEmpty() || plausible(startAt, inside.first())) add(startAt)
+                addAll(inside)
+                if (inside.isEmpty() || plausible(inside.last(), endAt)) add(endAt)
+            }
             // Strictly increasing times: the parser keeps one point per instant anyway.
             val points = mutableListOf<TimelinePoint>()
             var last = Long.MIN_VALUE
