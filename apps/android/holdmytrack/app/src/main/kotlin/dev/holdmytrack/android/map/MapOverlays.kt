@@ -147,10 +147,11 @@ object MapOverlays {
     /** The track layers' ids, in paint order — what mode and recording show and hide together. */
     private val TRACK_LAYER_IDS = listOf(TRACKS_CASING_LAYER_ID, TRACKS_LAYER_ID, TRACKS_SELECTED_LAYER_ID)
 
-    /** Which tracks aren't painted, and which one is selected — kept here rather than only on
-     *  the layers, because [setTrackRange] replaces the layers and has to put both back. */
+    /** Which tracks aren't painted, and which are drawn bold — the selected one, or the checked
+     *  group — kept here rather than only on the layers, because [setTrackRange] replaces the
+     *  layers and has to put both back. */
     private var hiddenTracks: Set<String> = emptySet()
-    private var selectedTrack: String? = null
+    private var selectedTracks: Set<String> = emptySet()
 
     /** The open Story the tracks are narrowed to, or null — kept here for the same reason, so
      *  every replacement of the tracks source carries it ([setTrackStory]). */
@@ -389,9 +390,9 @@ object MapOverlays {
      * Pending — and draws [selected] bold over its halo, unless it's one of those. The web's
      * `setHiddenTracks` and `setSelectedTracks`, as layer filters on the tile's `id` property.
      */
-    fun setTrackFilter(style: Style, hidden: Set<String>, selected: String?) {
+    fun setTrackFilter(style: Style, hidden: Set<String>, selected: Set<String>) {
         hiddenTracks = hidden
-        selectedTrack = selected
+        selectedTracks = selected
         applyTrackFilter(style)
     }
 
@@ -401,8 +402,12 @@ object MapOverlays {
         } else {
             Expression.not(Expression.`in`(Expression.get("id"), Expression.literal(hiddenTracks.toTypedArray<Any>())))
         }
-        val selected = selectedTrack?.takeIf { it !in hiddenTracks }
-        val only = if (selected == null) Expression.literal(false) else Expression.eq(Expression.get("id"), selected)
+        val selected = selectedTracks - hiddenTracks
+        val only = if (selected.isEmpty()) {
+            Expression.literal(false)
+        } else {
+            Expression.`in`(Expression.get("id"), Expression.literal(selected.toTypedArray<Any>()))
+        }
         (style.getLayer(TRACKS_LAYER_ID) as? LineLayer)?.setFilter(visible)
         (style.getLayer(TRACKS_CASING_LAYER_ID) as? LineLayer)?.setFilter(only)
         (style.getLayer(TRACKS_SELECTED_LAYER_ID) as? LineLayer)?.setFilter(only)

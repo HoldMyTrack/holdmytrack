@@ -182,8 +182,7 @@
             android:orientation="vertical">
 
             <!-- The filters as chips (.activities-panel__filters): Type's dropdown, DISTANCE's
-                 slider in a popup under its chip, "Reset" while either is on, and at the end Select,
-                 which shows the rows' checkboxes and the selection bar over the map (Done ends it). -->
+                 slider in a popup under its chip, and "Reset" while either is on. -->
             <LinearLayout
                 android:id="@+id/panel_filters"
                 android:layout_width="match_parent"
@@ -268,22 +267,6 @@
                     android:textFontWeight="600"
                     android:textSize="@dimen/hmt_text_sm"
                     android:visibility="gone" />
-
-                <Space
-                    android:layout_width="0dp"
-                    android:layout_height="0dp"
-                    android:layout_weight="1" />
-
-                <Button
-                    android:id="@+id/panel_select"
-                    style="@style/Widget.HoldMyTrack.Button.Link"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:paddingStart="@dimen/hmt_space_8"
-                    android:paddingEnd="@dimen/hmt_space_8"
-                    android:text="@string/panel_select"
-                    android:textFontWeight="600"
-                    android:textSize="@dimen/hmt_text_sm" />
             </LinearLayout>
 
             <!-- The rows, then a note while loading, when nothing matches, or when the read failed

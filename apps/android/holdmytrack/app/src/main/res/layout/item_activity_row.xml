@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One Activities row, after the web's .activities-panel__row: the checkbox while the list is
-     selecting, else a tile of the activity's kind (panel/ActivityKind), then the text —
-     the name or start time over "[date ·] distance · duration · type" — which is the row's own
-     tap target (select, fly to), and the Pending / Hidden / Story badges at the end, the Story
-     badge opening its Story (panel/ActivityRows.kt). An open Story's rows on the Stories tab
-     leave the checkbox out and end in an × instead. A hairline under it; selected, the accent
+<!-- One Activities row, after the web's .activities-panel__row: a tile of the activity's kind
+     (panel/ActivityKind), which is also its checkbox — a tap checks it, and a checked one is a ✓
+     on the accent — then the text — the name or start time over "[date ·] distance · duration ·
+     type" — which is the row's own tap target (select and fly to, or check while selecting; a
+     long press checks), and the Pending / Hidden / Story badges at the end, the Story badge
+     opening its Story (panel/ActivityRows.kt). An open Story's rows on the Stories tab keep the
+     tile plain and end in an × instead. A hairline under it; selected, the accent
      tint and a bar down its left edge (bg_panel_row). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -17,23 +18,27 @@
     android:paddingStart="@dimen/hmt_space_4"
     android:paddingEnd="@dimen/hmt_space_16">
 
-    <com.google.android.material.checkbox.MaterialCheckBox
-        android:id="@+id/activity_check"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
+    <!-- The tile's 48dp target around its 40dp tile. -->
+    <FrameLayout
+        android:id="@+id/activity_tile_target"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="@dimen/hmt_space_8"
+        android:layout_marginEnd="@dimen/hmt_space_8"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:focusable="true">
 
-    <ImageView
-        android:id="@+id/activity_type_icon"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_marginStart="@dimen/hmt_space_12"
-        android:layout_marginEnd="@dimen/hmt_space_12"
-        android:background="@drawable/bg_type_tile"
-        android:importantForAccessibility="no"
-        android:padding="9dp"
-        android:src="@drawable/ic_route"
-        android:visibility="gone"
-        app:tint="@color/hmt_ink_secondary" />
+        <ImageView
+            android:id="@+id/activity_type_icon"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_type_tile"
+            android:importantForAccessibility="no"
+            android:padding="9dp"
+            android:src="@drawable/ic_route"
+            app:tint="@color/hmt_ink_secondary" />
+    </FrameLayout>
 
     <LinearLayout
         android:id="@+id/activity_text"

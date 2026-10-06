@@ -187,8 +187,8 @@
                         android:text="@string/recording_stop" />
                 </LinearLayout>
 
-                <!-- While the Activities sheet's rows are being checked (its Select), the selection
-                     bar in the mode toggle's place, the rail stepping aside for it: × ends selecting,
+                <!-- While any of the Activities sheet's rows is checked, the selection bar in the mode
+                     toggle's place, the rail stepping aside for it: × unchecks all, ending selecting,
                      then the master checkbox and its All / None / Invert, and the actions over the
                      checked group — Show/Hide, Edit, Add to story, Delete, then Focus on map in the
                      accent (panel/ActivitiesPanel; MapFragment.renderSelectionBar). -->

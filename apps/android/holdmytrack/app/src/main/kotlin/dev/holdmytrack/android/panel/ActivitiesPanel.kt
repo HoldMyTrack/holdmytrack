@@ -107,7 +107,6 @@ class ActivitiesPanel(
     private val distanceMin: TextView = distanceContent.findViewById(R.id.panel_distance_min)
     private val distanceMax: TextView = distanceContent.findViewById(R.id.panel_distance_max)
     private var distancePopup: PopupWindow? = null
-    private val selectButton: TextView = sheet.findViewById(R.id.panel_select)
     private val selectionClose: View = selectionBar.findViewById(R.id.selection_close)
 
     private val card: View = sheet.findViewById(R.id.activity_card)
@@ -245,10 +244,11 @@ class ActivitiesPanel(
             changed()
         }
 
+        // Only ever shown while something is checked: partly checked, it checks every listed
+        // row; all checked, it unchecks them all, which ends selecting.
         checkAll.setOnClickListener {
             val listed = state.listed
-            val checked = listed.count { it.id in state.checked }
-            if (checked > 0) state.clearChecked() else state.checkAll()
+            if (listed.isNotEmpty() && listed.all { it.id in state.checked }) state.clearChecked() else state.checkAll()
             changed()
         }
         selectMenu.setOnClickListener { showSelectMenu() }
@@ -267,14 +267,7 @@ class ActivitiesPanel(
             actions.delete.setOnClickListener { confirmDelete() }
         }
         distance.setOnClickListener { showDistanceFilter() }
-        selectButton.setOnClickListener {
-            if (state.selecting) state.endSelecting() else state.startSelecting()
-            changed()
-        }
-        selectionClose.setOnClickListener {
-            state.endSelecting()
-            changed()
-        }
+        selectionClose.setOnClickListener { endSelecting() }
         sheet.findViewById<View>(R.id.card_close).setOnClickListener { clearFocus() }
         // The legend's five steps, slowest to fastest, in the map's own band colours.
         sheet.findViewById<LinearLayout>(R.id.card_band_steps).apply {
@@ -333,11 +326,26 @@ class ActivitiesPanel(
         render()
     }
 
-    /** A track tapped on the map: selects it, as a row tap does, and scrolls its row to the
-     *  middle of the list — without expanding a collapsed sheet (`docs/SPEC.md` §19). */
+    /** Selects [id] and scrolls its row to the middle of the list — without expanding a
+     *  collapsed sheet (`docs/SPEC.md` §19). */
     fun focusFromMap(id: String) {
         select(id)
-        if (tab == PanelTab.STORIES) storiesTab.scrollToRow(id) else scrollToFocused()
+        if (tab == PanelTab.STORIES) storiesTab.scrollToRow(id) else scrollToRow(id)
+    }
+
+    /** A track tapped on the map: checked or unchecked while selecting, as its row's tap is,
+     *  else selected ([focusFromMap]). */
+    fun trackTapped(id: String) {
+        if (!state.selecting || tab != PanelTab.ACTIVITIES) return focusFromMap(id)
+        checkRow(id)
+        scrollToRow(id)
+    }
+
+    /** The selection bar's ×, or Back: everything unchecked, which ends selecting. */
+    fun endSelecting() {
+        if (!state.selecting) return
+        state.clearChecked()
+        changed()
     }
 
     /** A tap on empty map, or on the list's empty space: the selection goes, the group stays. */
@@ -455,7 +463,6 @@ class ActivitiesPanel(
         val open = expanded && !held
         handle.contentDescription = res.getString(if (open) R.string.panel_collapse else R.string.panel_expand)
 
-        selectButton.setText(if (state.selecting) R.string.panel_select_done else R.string.panel_select)
         renderCard()
         typeDot.visibility = if (state.excludedTypes.isNotEmpty()) View.VISIBLE else View.GONE
         renderDistance()
@@ -852,10 +859,10 @@ class ActivitiesPanel(
         }
     }
 
-    /** Centres the selected row in the list — the list alone, never the sheet around it, so a
+    /** Centres [id]'s row in the list — the list alone, never the sheet around it, so a
      *  collapsed sheet stays exactly as it was. */
-    private fun scrollToFocused() {
-        val position = adapter.currentList.indexOfFirst { it.activity.id == state.focused }
+    private fun scrollToRow(id: String) {
+        val position = adapter.currentList.indexOfFirst { it.activity.id == id }
         if (position < 0) return
         list.post {
             val manager = list.layoutManager as LinearLayoutManager
@@ -927,15 +934,20 @@ class ActivitiesPanel(
         override fun onBindViewHolder(holder: ActivityRowHolder, position: Int) = holder.bind(
             getItem(position),
             openStoryId = null,
-            // Checkboxes only while selecting; a row's tap then checks it, as its box does.
-            onCheck = if (getItem(position).selecting) ::toggleChecked else null,
-            onSelect = if (getItem(position).selecting) ::toggleChecked else ::selectRow,
+            // The tile, or a long press, checks; while selecting, so does the row's tap.
+            onCheck = ::checkRow,
+            onSelect = if (getItem(position).selecting) ::checkRow else ::selectRow,
             onOpenStory = ::openStory,
         )
     }
 
-    private fun toggleChecked(id: String) {
-        state.toggleChecked(id)
+    /** Checks [id] — starting selecting if nothing was — and flies to it, or unchecks it and
+     *  leaves the camera be. The sheet stays where it is, so the next row is a tap away. */
+    private fun checkRow(id: String) {
+        if (state.toggleChecked(id)) {
+            val hidden = state.mapHidden
+            onFly(state.activities.filter { it.id == id && it.id !in hidden })
+        }
         changed()
     }
 
