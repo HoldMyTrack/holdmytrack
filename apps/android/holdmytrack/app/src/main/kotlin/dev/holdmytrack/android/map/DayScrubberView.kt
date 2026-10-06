@@ -9,6 +9,7 @@ import android.graphics.Typeface
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import dev.holdmytrack.android.R
 import java.time.Month
 import java.time.format.TextStyle
@@ -22,8 +23,16 @@ import kotlin.math.roundToInt
  * Like the track it replaced, it knows [slots] and two slot *boundaries*, [start] and [end]
  * (0..slots, or -1 / slots + 1 for a handle off either side of the window, which isn't drawn), and
  * nothing about dates; `DateRangeSlider` turns those into a selection. The whole view is the touch
- * target: a press goes to [onPress] with the nearest boundary, a drag to [onDrag] — unclamped, so
- * a finger held past an edge can pull the window along — and a release to [onRelease].
+ * target, and a touch is one of three gestures:
+ *
+ * - **A handle dragged.** A press within [HANDLE_GRAB_DP] of a drawn handle goes to [onPress] with
+ *   its boundary, the drag to [onDrag] — unclamped, so a finger held past an edge can pull the
+ *   window along — and the release to [onRelease].
+ * - **A swipe.** A press anywhere else that moves sideways past the touch slop scrolls the window
+ *   instead: [onSwipe] gets each whole slot the finger has moved, positive toward the past (the
+ *   days follow the finger, as a list does), and the selection stays as it was.
+ * - **A tap.** A press elsewhere let go without moving is [onPress] at the nearest boundary, then
+ *   [onRelease] — the nearer handle moves there.
  */
 class DayScrubberView @JvmOverloads constructor(
     context: Context,
@@ -42,6 +51,14 @@ class DayScrubberView @JvmOverloads constructor(
     var onPress: ((boundary: Int) -> Unit)? = null
     var onDrag: ((boundary: Int) -> Unit)? = null
     var onRelease: (() -> Unit)? = null
+    var onSwipe: ((days: Int) -> Unit)? = null
+
+    private enum class Gesture { HANDLE, UNDECIDED, SWIPE }
+    private var gesture: Gesture? = null
+    private var downX = 0f
+    /** Where the swipe's last whole slot was counted from. */
+    private var swipeAnchorX = 0f
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
     private val density = resources.displayMetrics.density
     private val barAreaHeight = 38 * density
@@ -53,6 +70,7 @@ class DayScrubberView @JvmOverloads constructor(
     private val windowRadius = resources.getDimension(R.dimen.hmt_radius_lg)
     private val handleWidth = 5 * density
     private val handleHeight = 28 * density
+    private val handleGrab = HANDLE_GRAB_DP * density
     private val labelSize = 10 * resources.displayMetrics.scaledDensity
 
     private val accent = context.getColor(R.color.hmt_accent)
@@ -125,6 +143,12 @@ class DayScrubberView @JvmOverloads constructor(
         }
     }
 
+    /** The drawn handle within reach of [x], if any — the nearer of the two. */
+    private fun handleNear(x: Float): Int? =
+        intArrayOf(start, end)
+            .filter { it in 0..slots && Math.abs(xOf(it) - x) <= handleGrab }
+            .minByOrNull { Math.abs(xOf(it) - x) }
+
     // A drag is a gesture over the whole scrubber, not a click; the ‹ › buttons beside the range
     // and the range written above it are what TalkBack reads.
     @SuppressLint("ClickableViewAccessibility")
@@ -134,16 +158,61 @@ class DayScrubberView @JvmOverloads constructor(
             MotionEvent.ACTION_DOWN -> {
                 // The sheet under it drags; a press here is the scrubber's.
                 parent?.requestDisallowInterceptTouchEvent(true)
-                onPress?.invoke(boundaryAt(event.x).coerceIn(0, slots))
+                downX = event.x
+                val handle = handleNear(event.x)
+                if (handle != null) {
+                    gesture = Gesture.HANDLE
+                    onPress?.invoke(handle)
+                } else {
+                    gesture = Gesture.UNDECIDED
+                }
             }
-            MotionEvent.ACTION_MOVE -> onDrag?.invoke(boundaryAt(event.x))
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> onRelease?.invoke()
+            MotionEvent.ACTION_MOVE -> when (gesture) {
+                Gesture.HANDLE -> onDrag?.invoke(boundaryAt(event.x))
+                Gesture.UNDECIDED -> if (Math.abs(event.x - downX) > touchSlop) {
+                    gesture = Gesture.SWIPE
+                    swipeAnchorX = downX
+                    swipe(event.x)
+                }
+                Gesture.SWIPE -> swipe(event.x)
+                null -> Unit
+            }
+            MotionEvent.ACTION_UP -> {
+                when (gesture) {
+                    Gesture.HANDLE -> onRelease?.invoke()
+                    Gesture.UNDECIDED -> {
+                        onPress?.invoke(boundaryAt(event.x).coerceIn(0, slots))
+                        onRelease?.invoke()
+                    }
+                    Gesture.SWIPE, null -> Unit
+                }
+                gesture = null
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                if (gesture == Gesture.HANDLE) onRelease?.invoke()
+                gesture = null
+            }
         }
         return true
+    }
+
+    /** Hands on each whole slot the finger has moved since the last one counted. */
+    private fun swipe(x: Float) {
+        if (slotWidth == 0f) return
+        val moved = ((x - swipeAnchorX) / slotWidth).toInt()
+        if (moved == 0) return
+        swipeAnchorX += moved * slotWidth
+        onSwipe?.invoke(moved)
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val wanted = (paddingTop + barAreaHeight + labelSize + 6 * density + paddingBottom).toInt()
         setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), resolveSize(wanted, heightMeasureSpec))
+    }
+
+    private companion object {
+        /** How near a handle a press grabs it rather than starting a swipe or a tap — 24dp, half
+         *  a 48dp target either side of a 5dp handle. */
+        const val HANDLE_GRAB_DP = 24f
     }
 }
