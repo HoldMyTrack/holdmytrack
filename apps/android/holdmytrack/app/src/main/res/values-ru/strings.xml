@@ -31,8 +31,6 @@
     <string name="facebook_no_email">Ваш аккаунт Facebook не передал адрес электронной почты, а он нужен HoldMyTrack. Попробуйте ещё раз и разрешите доступ к почте или зарегистрируйтесь по почте и паролю.</string>
     <string name="facebook_email_in_use">Аккаунт с этой почтой уже существует. Войдите так, как обычно, или задайте пароль через «Забыли пароль?».</string>
 
-    <string name="signed_in_as">Вы вошли как %1$s</string>
-    <string name="signed_in_demo">Вы вошли в демо-аккаунт</string>
     <string name="checking_session">Проверяем вход…</string>
 
     <string name="profile_card_activities">Занятия</string>
@@ -181,13 +179,21 @@
     <string name="nav_stories">Истории</string>
     <string name="nav_sync">Синхр.</string>
     <string name="nav_you">Вы</string>
-    <string name="menu_profile">Профиль</string>
     <string name="menu_donate">Поддержать</string>
     <string name="menu_about">О проекте</string>
     <string name="menu_help">Справка</string>
     <string name="menu_contacts">Контакты</string>
     <string name="menu_privacy">Конфиденциальность</string>
     <string name="menu_version">Версия %1$s</string>
+    <string name="you_section_app">Приложение</string>
+    <string name="you_graph_link">График и тренды</string>
+    <string name="you_privacy_sub">Приватные места и ваши данные</string>
+    <plurals name="you_privacy_count">
+        <item quantity="one">%1$d приватное место · ваши данные</item>
+        <item quantity="few">%1$d приватных места · ваши данные</item>
+        <item quantity="many">%1$d приватных мест · ваши данные</item>
+        <item quantity="other">%1$d приватного места · ваши данные</item>
+    </plurals>
 
     <string name="settings_title">Настройки</string>
     <string name="settings_onboarding_title">Добро пожаловать! Настройте аккаунт</string>
@@ -212,7 +218,6 @@
     <string name="settings_language_hint">Язык приложения, сайта и писем, которые мы вам отправляем. «Автоматически» — язык вашего телефона.</string>
     <string name="settings_save">Сохранить</string>
     <string name="settings_theme">Тема</string>
-    <string name="settings_theme_hint">Только на этом телефоне. Применяется сразу.</string>
     <string name="settings_export_title">Скачать свои данные</string>
     <string name="settings_export_hint">Копия всего, что есть в вашем аккаунте, в zip-архивах: загруженные и синхронизированные файлы, все занятия в виде GPX, фотографии, а также настройки, истории, приватные и отмеченные места.</string>
     <string name="settings_export_request">Запросить архив</string>
@@ -238,7 +243,6 @@
     <string name="settings_avatar_removed">Аватар удалён.</string>
     <string name="settings_search_hint">Поиск</string>
     <string name="settings_no_match">Ничего не найдено.</string>
-    <string name="menu_settings">Настройки</string>
 
     <string name="recording_name_hint">Название</string>
     <string name="recording_type_hint">Тип занятия</string>

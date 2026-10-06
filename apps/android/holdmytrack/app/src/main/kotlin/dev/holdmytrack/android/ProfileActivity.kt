@@ -3,13 +3,11 @@ package dev.holdmytrack.android
 import android.os.Bundle
 import android.text.format.DateFormat
 import android.view.View
-import android.widget.Button
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButtonToggleGroup
-import com.google.android.material.imageview.ShapeableImageView
 import dev.holdmytrack.android.net.ActivityDay
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
@@ -28,13 +26,7 @@ import java.time.format.FormatStyle
 import kotlin.math.roundToLong
 
 /**
- * Profile, from the You tab: who is signed in — with the avatar and name Settings
- * holds, read fresh from `GET /v1/auth/me` — and the one action available from here, sign
- * out. Only reachable with a session (the map itself is gated behind one), so
- * signing out replaces the whole back stack with `SignInActivity` rather than returning to a
- * map that would have nothing left to show.
- *
- * Under the account card, the web's `/profile` page (`services/server/internal/httpapi/profile_page.go`):
+ * Activity graph & trends, from the You tab's numbers: the web's `/profile` page (`services/server/internal/httpapi/profile_page.go`):
  * the four all-time stat cards, one activity grid per year back to the first activity, most
  * recent first, and Trends. Two reads cover it, as the web page's queries do — every day with
  * activity up to the end of this year (`HoldMyTrackApi.activityDays`), from which
@@ -44,10 +36,6 @@ import kotlin.math.roundToLong
  */
 class ProfileActivity : AppCompatActivity() {
 
-    private lateinit var status: TextView
-    private lateinit var name: TextView
-    private lateinit var avatar: ShapeableImageView
-    private lateinit var action: Button
 
     private lateinit var graphStatus: TextView
     private lateinit var graph: View
@@ -87,11 +75,6 @@ class ProfileActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_profile)
 
-        status = findViewById(R.id.profile_status)
-        name = findViewById(R.id.profile_name)
-        avatar = findViewById(R.id.profile_avatar)
-        action = findViewById(R.id.profile_action)
-        action.setOnClickListener { onAction() }
 
         graphStatus = findViewById(R.id.graph_status)
         graph = findViewById(R.id.graph)
@@ -137,40 +120,8 @@ class ProfileActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        render()
-        // Returning from Settings is a resume: the name and avatar may have just changed.
-        HoldMyTrackApi.verifySession { result ->
-            result.onSuccess { profile ->
-                name.text = profile.displayName
-                name.visibility = if (profile.displayName.isEmpty()) View.GONE else View.VISIBLE
-                if (profile.avatarUrl.isNotEmpty()) {
-                    HoldMyTrackApi.avatar(profile.avatarUrl) { image ->
-                        image.onSuccess { bitmap ->
-                            avatar.setPadding(0, 0, 0, 0)
-                            avatar.imageTintList = null
-                            avatar.setImageBitmap(bitmap)
-                        }
-                    }
-                }
-            }
-        }
         loadGraph()
         loadTrends()
-    }
-
-    private fun render() {
-        action.isEnabled = true
-        action.setText(R.string.sign_out)
-        status.text = if (Session.isDemo) {
-            getString(R.string.signed_in_demo)
-        } else {
-            getString(R.string.signed_in_as, Session.email)
-        }
-    }
-
-    private fun onAction() {
-        action.isEnabled = false
-        HoldMyTrackApi.signOut { SignInActivity.open(this) }
     }
 
     // The activity graph.

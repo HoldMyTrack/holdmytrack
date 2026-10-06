@@ -928,4 +928,24 @@
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
     </style>
+
+    <!-- A link to one of the web's pages (the You tab's About, Help, Contacts): a short card,
+         its icon over its label. -->
+    <style name="Widget.HoldMyTrack.WebTile" parent="">
+        <item name="android:background">@drawable/bg_section_card</item>
+        <item name="android:foreground">?attr/selectableItemBackground</item>
+        <item name="android:clipToOutline">true</item>
+        <item name="android:gravity">center</item>
+        <item name="android:minHeight">72dp</item>
+        <item name="android:paddingTop">@dimen/hmt_space_12</item>
+        <item name="android:paddingBottom">@dimen/hmt_space_12</item>
+        <item name="android:drawablePadding">@dimen/hmt_space_6</item>
+        <item name="drawableTint">@color/hmt_ink_secondary</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
+        <item name="android:textColor">@color/hmt_ink</item>
+    </style>
 </resources>

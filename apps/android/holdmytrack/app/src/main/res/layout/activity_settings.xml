@@ -194,58 +194,8 @@
             android:layout_height="wrap_content"
             android:text="@string/settings_save" />
 
-        <!-- The device's own theme (AppTheme.kt): not part of the account, so not part of Save —
-             a tap applies it at once. -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/hmt_space_24"
-            android:accessibilityHeading="true"
-            android:text="@string/settings_theme"
-            android:textAppearance="@style/TextAppearance.HoldMyTrack.Overline" />
-
-        <com.google.android.material.button.MaterialButtonToggleGroup
-            android:id="@+id/settings_theme"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/hmt_space_8"
-            android:contentDescription="@string/settings_theme"
-            app:selectionRequired="true"
-            app:singleSelection="true">
-
-            <Button
-                android:id="@+id/settings_theme_system"
-                style="@style/Widget.HoldMyTrack.Button.ProfileToggle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/settings_theme_system" />
-
-            <Button
-                android:id="@+id/settings_theme_light"
-                style="@style/Widget.HoldMyTrack.Button.ProfileToggle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/settings_theme_light" />
-
-            <Button
-                android:id="@+id/settings_theme_dark"
-                style="@style/Widget.HoldMyTrack.Button.ProfileToggle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/settings_theme_dark" />
-        </com.google.android.material.button.MaterialButtonToggleGroup>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/hmt_space_4"
-            android:text="@string/settings_theme_hint"
-            android:textAppearance="@style/TextAppearance.HoldMyTrack.BodySmall"
-            android:textColor="@color/hmt_ink_secondary" />
-
-        <!-- Download your data (root docs/SPEC.md FR-1.12), above Delete account as on the
-             web's page: where the latest copy stands, its archives when ready, and the request.
-             Gone for the demo account. -->
+        <!-- Download your data (root docs/SPEC.md FR-1.12): where the latest copy stands, its
+             archives when ready, and the request. Gone for the demo account. -->
         <LinearLayout
             android:id="@+id/settings_export_section"
             android:layout_width="match_parent"
@@ -291,39 +241,6 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/hmt_space_8"
                 android:text="@string/settings_export_request" />
-        </LinearLayout>
-
-        <!-- Delete account (root docs/SPEC.md FR-1.11), last, as on the web's page. Gone for
-             the demo account. -->
-        <LinearLayout
-            android:id="@+id/settings_delete_section"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/hmt_space_24"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:accessibilityHeading="true"
-                android:text="@string/settings_delete_title"
-                android:textAppearance="@style/TextAppearance.HoldMyTrack.Overline" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/hmt_space_4"
-                android:text="@string/settings_delete_hint"
-                android:textAppearance="@style/TextAppearance.HoldMyTrack.BodySmall"
-                android:textColor="@color/hmt_ink_secondary" />
-
-            <Button
-                android:id="@+id/settings_delete"
-                style="@style/Widget.HoldMyTrack.Button.Danger"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/hmt_space_8"
-                android:text="@string/settings_delete_open" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

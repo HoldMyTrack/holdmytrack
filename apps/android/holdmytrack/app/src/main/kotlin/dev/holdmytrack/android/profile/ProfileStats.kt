@@ -111,6 +111,20 @@ object ProfileStats {
         return YearLayout(year, gridStart, weeks, levels, months)
     }
 
+    /**
+     * The You tab's preview of the graph: the last [weeks] weeks through [today], Sunday to
+     * Saturday column by column as a year's grid is, the last column this week. Each cell is
+     * shaded by count (0–3); the days after [today] are -1, left blank.
+     */
+    fun recentWeeks(days: List<ActivityDay>, today: LocalDate, weeks: Int): IntArray {
+        val byDate = days.associateBy { it.date }
+        val start = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY)).minusWeeks(weeks - 1L)
+        return IntArray(weeks * 7) { i ->
+            val day = start.plusDays(i.toLong())
+            if (day.isAfter(today)) -1 else shadeLevel(byDate[day.toString()], Shade.COUNT, 0.0, 0.0)
+        }
+    }
+
     /** `buildTrendBars`' heights, 0–1: a log curve against the busiest period, so one huge week
      *  doesn't flatten every other bar to nothing. */
     fun trendHeights(periods: List<TrendPeriod>): List<Double> {

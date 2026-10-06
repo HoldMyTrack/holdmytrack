@@ -86,7 +86,7 @@
         <activity
             android:name=".ProfileActivity"
             android:exported="false"
-            android:label="@string/menu_profile"
+            android:label="@string/you_graph_link"
             android:theme="@style/Theme.HoldMyTrack" />
 
         <!-- Not exported: reached only from MainActivity, never by another app. No action bar:

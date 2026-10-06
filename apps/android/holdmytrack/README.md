@@ -53,8 +53,8 @@ Everything is under `app/src/main/kotlin/dev/holdmytrack/android/`:
 - `HoldMyTrackApplication.kt` — process-level setup. The load-bearing line is `HttpRequestUtil.setOkHttpClient`, which replaces MapLibre Native's own HTTP client with the app's. The map SDK fetches the style, the archive and every tile through a stack the app's API client never sees, so without this the session would reach none of the user layers.
 - `MainActivity.kt` — the main window: the session gate, and the bottom bar (Map, Stories, Record, Sync, You) over the tabs' fragments.
 - `MapFragment.kt` — the map, the on-map mode toggle, the record button's behaviour, and MapLibre's lifecycle forwarding.
-- `YouFragment.kt` — the You tab: Profile, Settings, the web's pages and the version.
-- `ProfileActivity.kt` — Profile, from the You tab: who is signed in, and sign in/out.
+- `YouFragment.kt` — the You tab: the account and its numbers, Privacy, Theme and Language, the web's pages, Sign out and Delete account, and the version.
+- `ProfileActivity.kt` — Activity graph & trends, from the You tab: the web's `/profile` page.
 - `SignInActivity.kt` — sign in, create an account, or start a demo account.
 - `net/Session.kt` — the session token, held process-wide and mirrored to private `SharedPreferences`.
 - `net/HoldMyTrackApi.kt` — the whole HTTP surface: the shared `OkHttpClient`, the interceptor that attaches the token to HoldMyTrack's own origin and nowhere else, and the five calls the app makes.

@@ -17,30 +17,23 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.graphics.scale
 import androidx.core.view.isVisible
-import androidx.lifecycle.lifecycleScope
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.imageview.ShapeableImageView
 import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import dev.holdmytrack.android.MainActivity
 import dev.holdmytrack.android.R
-import dev.holdmytrack.android.SignInActivity
 import dev.holdmytrack.android.net.ExportPart
 import dev.holdmytrack.android.net.ExportStatus
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Profile
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.net.SettingsOptions
-import dev.holdmytrack.android.recording.db.RecordedActivityStore
-import dev.holdmytrack.android.sync.SyncCursor
 import java.io.ByteArrayOutputStream
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.concurrent.Executors
-import kotlinx.coroutines.launch
 
 /**
  * The account's Settings (`docs/SPEC.md` FR-1.7), after the web's page: the avatar, which takes
@@ -57,9 +50,7 @@ import kotlinx.coroutines.launch
  * go back to. A demo account sees every field disabled, with the web's note.
  *
  * Then Download your data (root `docs/SPEC.md` FR-1.12): the request, where it stands, and
- * each finished archive saved to Downloads by Android's DownloadManager. Last, Delete account
- * (root `docs/SPEC.md` FR-1.11), as on the web: a dialog asks for the account's email, the
- * server closes the account, and this device forgets it.
+ * each finished archive saved to Downloads by Android's DownloadManager.
  */
 class SettingsActivity : AppCompatActivity() {
 
@@ -77,7 +68,6 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var timezoneField: TextInputEditText
     private lateinit var languageField: MaterialAutoCompleteTextView
     private lateinit var save: Button
-    private lateinit var delete: Button
     private lateinit var exportStatusView: TextView
     private lateinit var exportParts: android.widget.LinearLayout
     private lateinit var exportRequest: Button
@@ -123,7 +113,6 @@ class SettingsActivity : AppCompatActivity() {
         timezoneField = findViewById(R.id.settings_timezone)
         languageField = findViewById(R.id.settings_language)
         save = findViewById(R.id.settings_save)
-        delete = findViewById(R.id.settings_delete)
         exportStatusView = findViewById(R.id.settings_export_status)
         exportParts = findViewById(R.id.settings_export_parts)
         exportRequest = findViewById(R.id.settings_export_request)
@@ -142,11 +131,8 @@ class SettingsActivity : AppCompatActivity() {
         }
         avatarRemove.setOnClickListener { removeAvatar() }
         save.setOnClickListener { onSave() }
-        findViewById<View>(R.id.settings_delete_section).visibility = if (Session.isDemo) View.GONE else View.VISIBLE
-        delete.setOnClickListener { confirmDelete() }
         findViewById<View>(R.id.settings_export_section).visibility = if (Session.isDemo) View.GONE else View.VISIBLE
         exportRequest.setOnClickListener { requestExport() }
-        bindTheme()
 
         // A save that changed the language recreates the screen; its "Saved." survives that —
         // kept as the string's id, so it comes back in the language just chosen.
@@ -185,23 +171,6 @@ class SettingsActivity : AppCompatActivity() {
                 options = loaded
                 bind()
             }.onFailure { show(getString(R.string.settings_load_failed, it.message.orEmpty()), failed = true) }
-        }
-    }
-
-    /** The Theme toggle: shows this device's choice and applies a new one at once — AppTheme
-     *  recreates the screen, which comes back with the toggle already on the new choice. Not
-     *  part of [onSave]: the theme belongs to the phone, not the account. */
-    private fun bindTheme() {
-        val buttons = mapOf(
-            AppTheme.Choice.SYSTEM to R.id.settings_theme_system,
-            AppTheme.Choice.LIGHT to R.id.settings_theme_light,
-            AppTheme.Choice.DARK to R.id.settings_theme_dark,
-        )
-        val group = findViewById<MaterialButtonToggleGroup>(R.id.settings_theme)
-        group.check(buttons.getValue(AppTheme.current(this)))
-        group.addOnButtonCheckedListener { _, id, checked ->
-            if (!checked) return@addOnButtonCheckedListener
-            buttons.entries.firstOrNull { it.value == id }?.let { AppTheme.set(applicationContext, it.key) }
         }
     }
 
@@ -343,52 +312,6 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     /**
-     * Delete account: the email typed into a dialog, as the web's form asks for it. The server
-     * says whether it matched; the dialog stays up with its error until it does or is cancelled.
-     */
-    private fun confirmDelete() {
-        val view = layoutInflater.inflate(R.layout.dialog_delete_account, null)
-        val layout = view.findViewById<TextInputLayout>(R.id.delete_email_layout)
-        val field = view.findViewById<TextInputEditText>(R.id.delete_email)
-        view.findViewById<TextView>(R.id.delete_message).text = getString(R.string.settings_delete_confirm, Session.email)
-        val dialog = MaterialAlertDialogBuilder(this, R.style.ThemeOverlay_HoldMyTrack_Dialog_Destructive)
-            .setTitle(R.string.settings_delete_title)
-            .setView(view)
-            .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton(R.string.settings_delete_submit, null)
-            .show()
-        val confirm = dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE)
-        confirm.setOnClickListener {
-            layout.error = null
-            confirm.isEnabled = false
-            HoldMyTrackApi.deleteAccount(field.text.toString()) { result ->
-                result.onSuccess {
-                    dialog.dismiss()
-                    forgetAccount()
-                }.onFailure {
-                    confirm.isEnabled = true
-                    layout.error = it.message.orEmpty()
-                }
-            }
-        }
-    }
-
-    /**
-     * What this device keeps for the deleted account goes too: its unsynced recordings and its
-     * Health Connect watermark — both keyed by the email, which a new account can take again —
-     * then the session, and on to the sign-in screen, which says the account was deleted.
-     */
-    private fun forgetAccount() {
-        val email = Session.email
-        lifecycleScope.launch {
-            RecordedActivityStore(applicationContext).deleteAll()
-            SyncCursor(applicationContext, email).reset()
-            Session.clear()
-            SignInActivity.open(this@SettingsActivity, R.string.account_deleted)
-        }
-    }
-
-    /**
      * The picked image, made small before it goes: a phone photo is often past the server's 5 MB
      * limit, and an avatar is never shown larger than a few hundred pixels — so it's decoded at
      * a reduced size, scaled to at most [AVATAR_MAX_PX] on its long side and sent as JPEG, off
@@ -478,7 +401,7 @@ class SettingsActivity : AppCompatActivity() {
      *  demo account, whose settings the server won't change. */
     private fun setEnabled(enabled: Boolean, clearMessages: Boolean = !enabled) {
         val editable = enabled && !Session.isDemo
-        listOf(avatarChoose, avatarRemove, nameField, countryField, timezoneField, languageField, save, delete)
+        listOf(avatarChoose, avatarRemove, nameField, countryField, timezoneField, languageField, save)
             .forEach { it.isEnabled = editable }
         listOf(countryLayout, timezoneLayout, findViewById<View>(R.id.settings_name_layout), findViewById<View>(R.id.settings_language_layout))
             .forEach { it.isEnabled = editable }

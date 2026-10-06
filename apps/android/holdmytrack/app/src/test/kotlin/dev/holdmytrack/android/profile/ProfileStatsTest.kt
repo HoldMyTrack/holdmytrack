@@ -82,4 +82,16 @@ class ProfileStatsTest {
         assertEquals(1.0, heights[2], 1e-9)
         assertEquals(listOf(0.0), ProfileStats.trendHeights(listOf(period(0.0))))
     }
+
+    @Test
+    fun `recent weeks end with this week and leave the days after today blank`() {
+        // Tuesday, October 6 2026: two weeks start on Sunday, September 27.
+        val days = listOf(day("2026-09-26", 2), day("2026-09-27", 1), day("2026-10-06", 4))
+        val levels = ProfileStats.recentWeeks(days, LocalDate.of(2026, 10, 6), 2)
+        assertEquals(14, levels.size)
+        assertEquals(1, levels[0])
+        assertEquals(0, levels[1])
+        assertEquals(3, levels[9])
+        assertEquals(listOf(-1, -1, -1, -1), levels.drop(10))
+    }
 }
