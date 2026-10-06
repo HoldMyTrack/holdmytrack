@@ -14,6 +14,13 @@ This file stays lean and current-only. Once an entry is fixed, its root-cause/fi
 - [ ] Join across the parts of one split export: hold the parts of one Takeout export (they share a name stem, `takeout-<timestamp>-NNN.zip`) until all have arrived, or index each part's exercise logs and GPS files and join across them.
 - [ ] Check both against a real multi-part export, then drop the limit from the guide.
 
+### A split activity's ride arriving again from another source shows up beside its parts
+
+Cross-source duplicate detection (`SPEC.md` FR-3.7, `IMPLEMENTATION.md` §4.6) calls two activities the same one when their time ranges overlap by at least 80% of the longer one. After a split (FR-5.17, §4.7.8), a whole-activity copy of the same recording from a second source, say a Garmin export after a Health Connect sync, overlaps each part by far less than that, so it goes live next to them: the time is counted twice in totals, and the route is drawn twice into the Heatmap. A later copy of just one part is caught, since that part and the copy overlap almost entirely.
+
+- [ ] In `ResolveDuplicates`, compare a new activity against a split group as one span (the group's earliest start to its latest end) as well as against each part. When it matches, mark it superseded by the group's first part.
+- [ ] Decide which copy wins when the new one is richer: keep the parts, since they hold the user's own split, and say so in FR-3.7.
+
 ### Trends leaves out empty weeks and months, so its bars don't show the 12 months `SPEC.md` FR-9 describes
 
 FR-9 behavior 3 says the Profile page renders the trailing 12 months as one bar per bucket. `activityTrendsQuery` (`services/server/internal/httpapi/activities.go`) groups only the account's activities, so a week or month with none never comes back, and both clients draw one bar per period returned (`buildTrendBars`, `profile/TrendsChartView`). A history with two active weeks draws two bars filling the whole chart, each half its width, with nothing to show the other 50 weeks were empty; the axis's two dates are the first and last active period, not the window's ends. Found on the Android emulator against a local stack while porting the page; the web's `/profile` draws the same two bars.

@@ -18,12 +18,13 @@ export interface TypeFacet {
 }
 
 /** The real min/max distance across the range's rows, or null when none have a distance at
- *  all — the slider has nothing to bound itself by in that case. */
+ *  all — the slider has nothing to bound itself by in that case. A private activity (FR-8.1)
+ *  counts as having none: its stored 0 is no track, not a zero-length one. */
 export function distanceBounds(activities: Activity[]): DistanceRange | null {
   let min = Infinity;
   let max = -Infinity;
   for (const a of activities) {
-    if (a.distanceMeters === null) continue;
+    if (a.distanceMeters === null || a.private) continue;
     if (a.distanceMeters < min) min = a.distanceMeters;
     if (a.distanceMeters > max) max = a.distanceMeters;
   }
@@ -47,10 +48,11 @@ export function nextDistanceFilter(
 }
 
 /** A row with no recorded distance can't be said to lie inside a distance band — same
- *  nullability stance format.ts and the backend already take on this field. */
+ *  nullability stance format.ts and the backend already take on this field — nor can a
+ *  private one, whose distance is no track at all. */
 export function passesDistance(activity: Activity, filter: DistanceRange | null): boolean {
   if (!filter) return true;
-  return activity.distanceMeters !== null && activity.distanceMeters >= filter.min && activity.distanceMeters <= filter.max;
+  return activity.distanceMeters !== null && !activity.private && activity.distanceMeters >= filter.min && activity.distanceMeters <= filter.max;
 }
 
 /**

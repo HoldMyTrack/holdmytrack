@@ -100,3 +100,12 @@ The map screen and its menus carry the web's phone layout over, which on a phone
   - Sync: Sync now, Health Connect, what's on the phone, Upload and Timeline, and the latest imports with the whole history a tap away; the bottom bar's Sync badged with the recordings waiting. You: the account, all-time totals leading to Activity graph & trends, Privacy, Theme and Language, the web's pages, Sign out and Delete account. Privacy: Private locations, edited on the map, what HoldMyTrack keeps, and Download your data (`apps/android/docs/SPEC.md` FR-1.7, FR-2.9, FR-3.5). Donate stays out of the Play build. Checked on the emulator against a local stack, in dark mode: Sync signed in and as the demo account, See all, You's card and Language set to Русский and back, the Delete account dialog, and a private location added, reopened and deleted.
 - [x] **Polish and accessibility**
   - Every target 48dp, the record button's raised part included; Normal, Fog and Heatmap read as radio buttons; rows that don't fit a large font size stack, and the mode toggle keeps only the active label; the sheet's head whole in landscape, the camera kept across a rotation, theme or language change, and the content inset from a side navigation bar and the camera cutout (`apps/android/docs/SPEC.md` §8). Checked on the emulator against a local stack: a `uiautomator` audit of every screen at font scales 1.0 and 2.0, light and dark, Russian, and landscape with three-button navigation. TalkBack's spoken pass on a physical device is still to do.
+
+## Phase 8: Web features to carry over
+
+Features the web has that the app doesn't yet. The server side of each is built; only the app's own part is listed.
+
+- [x] **Split an activity** (`docs/SPEC.md` FR-5.17, `docs/IMPLEMENTATION.md` §4.7.8)
+  - A Split tool in the Track tab, its two-color preview, and the confirm for a part left inside a Private location (`apps/android/docs/SPEC.md` FR-2.7 item 12). Merge waits for the web's (`docs/ROADMAP.md`). Checked on the emulator against a local stack, in English and Russian: a walk ending inside a Private location split at a point inside it, the confirm, Split anyway, and two rows, one of them Private.
+- [x] **The Private badge** (`docs/SPEC.md` FR-5.1)
+  - A lock-and-"Private" badge in place of distance and duration, and its explanation on the selected activity's card in place of its stats (`apps/android/docs/SPEC.md` FR-2.7 item 2). Checked in the same run.

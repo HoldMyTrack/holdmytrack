@@ -494,6 +494,8 @@
     <string name="panel_none_match">Нет занятий, подходящих под фильтры.</string>
     <string name="panel_pending">Ожидает</string>
     <string name="panel_hidden">Скрыто</string>
+    <string name="activity_private_badge">Приватное</string>
+    <string name="activity_private_note">Целиком внутри одного из ваших приватных мест, поэтому его нет на карте и у него нет расстояния. Если сдвинуть или удалить это место, оно вернётся.</string>
     <string name="panel_row_check">Отметить «%1$s»</string>
     <string name="panel_row_uncheck">Снять отметку с «%1$s»</string>
     <string name="panel_fly_to">Перейти к «%1$s»</string>
@@ -531,6 +533,11 @@
     <string name="edit_track_chop">Обрезать</string>
     <string name="edit_track_chop_title">Оставить только часть между ручками</string>
     <string name="edit_track_cut">Вырезать</string>
+    <string name="edit_track_split">Разделить</string>
+    <string name="edit_track_split_title">Разделить занятие на два у сдвинутой ручки</string>
+    <string name="edit_track_split_note">При сохранении занятие разделится на два в %1$s. Новая часть получит тот же тип, название и описание.</string>
+    <string name="edit_track_split_hidden_title">Разделить внутри приватного места?</string>
+    <string name="edit_track_split_hidden_confirm">Всё равно разделить</string>
     <string name="edit_track_cut_title">Убрать часть между ручками и соединить концы. Удерживайте для предпросмотра.</string>
     <string name="edit_track_delete_point">Удалить точку</string>
     <string name="edit_track_delete_point_title">Нажимайте на точки на карте, чтобы удалять их</string>

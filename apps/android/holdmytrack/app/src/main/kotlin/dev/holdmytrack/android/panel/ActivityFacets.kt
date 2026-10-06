@@ -17,16 +17,18 @@ data class TypeFacet(val type: String, val count: Int)
 object ActivityFacets {
 
     /** The DISTANCE slider's ends: the shortest and longest activity with a distance, or null
-     *  when none has one. */
+     *  when none has one. A private activity has none: its stored 0 is no track, not a short one. */
     fun distanceBounds(activities: List<Activity>): DistanceRange? {
-        val distances = activities.mapNotNull { it.distanceMeters }
+        val distances = activities.filterNot { it.isPrivate }.mapNotNull { it.distanceMeters }
         if (distances.isEmpty()) return null
         return DistanceRange(distances.min(), distances.max())
     }
 
-    /** An activity with no distance never passes an active band — it can't be placed on it. */
+    /** An activity with no distance never passes an active band — it can't be placed on it —
+     *  and nor does a private one. */
     fun passesDistance(activity: Activity, filter: DistanceRange?): Boolean {
         if (filter == null) return true
+        if (activity.isPrivate) return false
         val meters = activity.distanceMeters ?: return false
         return meters >= filter.min && meters <= filter.max
     }

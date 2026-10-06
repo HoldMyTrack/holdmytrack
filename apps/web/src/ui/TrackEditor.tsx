@@ -3,7 +3,7 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { getActivityTrackPoints, type Activity, type TrackEdit, type TrackPoint } from '../api';
 import { labelInsertionPoint } from '../map/layers';
 import { clearTrackEdit, ensureTrackEditLayer, onTrackEditPointClick, onTrackEditPointDrag, setTrackEditData, type EditPreview } from '../map/trackEdit';
-import { applyEdit, chopOp, cumulativeDistances, cutOp, foldEdit, isEmptyEdit, moveOp, type EditOp } from './editTrackOps';
+import { applyEdit, chopOp, cumulativeDistances, cutOp, foldEdit, isEmptyEdit, moveOp, splitIndex, splitPoint, type EditOp } from './editTrackOps';
 import { distanceValue, unitLabel } from './format';
 import { useUnitSystem } from './units';
 import { lang, t, tn } from '../i18n';
@@ -20,6 +20,11 @@ import { lang, t, tn } from '../i18n';
  * preview only — nothing is committed until Chop, Cut, a Delete point click or a Move point
  * drop pushes an op, and every op resets the knobs to the new track's ends.
  *
+ * Split (§4.7.8) is an op like the others, so Undo takes it back, but it isn't part of the
+ * edit: it's reported beside it and Save sends both in one request. Once the session holds a
+ * split, the other edits wait — Undo the split to make them — since the server would apply
+ * them to both pieces alike.
+ *
  * Stays mounted while the Activity tab is showing, so switching tabs loses nothing; `active`
  * is false then, which turns off Delete point and Move point (a map click or drag there would
  * otherwise change a point the user can't see being edited) and Cmd/Ctrl+Z (which belongs to
@@ -34,8 +39,8 @@ export interface TrackEditorProps {
   busy: boolean;
   /** Reports the session on every change: null while nothing has been done (Save leaves the
    *  track alone), otherwise the edit Save sends — itself null when the ops undo every edit
-   *  the track had, which clears it. */
-  onChange: (pending: { edit: TrackEdit | null } | null) => void;
+   *  the track had, which clears it — and the point to split at, if Split was pressed. */
+  onChange: (pending: { edit: TrackEdit | null; splitAt: number | null } | null) => void;
 }
 
 interface Session {
@@ -87,9 +92,10 @@ export function TrackEditor({ map, activity, active, busy, onChange }: TrackEdit
   const distances = useMemo(() => cumulativeDistances(visible), [visible]);
   const last = visible.length - 1;
 
+  const splitAt = useMemo(() => splitPoint(ops), [ops]);
   useEffect(() => {
-    onChange(ops.length === 0 ? null : { edit: isEmptyEdit(edit) ? null : edit });
-  }, [ops.length, edit, onChange]);
+    onChange(ops.length === 0 ? null : { edit: isEmptyEdit(edit) ? null : edit, splitAt });
+  }, [ops.length, edit, splitAt, onChange]);
 
   useEffect(() => {
     if (!active) setPointMode(null);
@@ -106,9 +112,19 @@ export function TrackEditor({ map, activity, active, busy, onChange }: TrackEdit
     setOps((prev) => [...prev, op]);
   }, []);
 
-  const chop = chopOp(visible, lo, hi);
-  const cut = cutOp(visible, lo, hi);
-  const canReset = session !== null && !isEmptyEdit(edit);
+  const splitting = splitAt !== null;
+  const chop = splitting ? null : chopOp(visible, lo, hi);
+  const cut = splitting ? null : cutOp(visible, lo, hi);
+  const splitCandidate = splitting ? null : splitIndex(visible, lo, hi);
+  const canReset = session !== null && !isEmptyEdit(edit) && !splitting;
+  // What's drawn split: the split made, else the one Split would make while it's previewed.
+  const splitShown = splitting
+    ? visible.findIndex(([, , t]) => t === splitAt)
+    : preview === 'split' ? splitCandidate : null;
+
+  useEffect(() => {
+    if (splitting) setPointMode(null);
+  }, [splitting]);
 
   const undo = useCallback(() => {
     setOps((prev) => prev.slice(0, -1));
@@ -139,14 +155,14 @@ export function TrackEditor({ map, activity, active, busy, onChange }: TrackEdit
   useEffect(() => {
     const draw = () => {
       ensureTrackEditLayer(map, labelInsertionPoint(map));
-      if (shown.length > 0) setTrackEditData(map, shown, lo, hi, preview);
+      if (shown.length > 0) setTrackEditData(map, shown, lo, hi, preview, splitShown !== null && splitShown >= 0 ? splitShown : null);
     };
     draw();
     map.on('styledata', draw);
     return () => {
       map.off('styledata', draw);
     };
-  }, [map, shown, lo, hi, preview]);
+  }, [map, shown, lo, hi, preview, splitShown]);
   useEffect(() => () => clearTrackEdit(map), [map]);
 
   // Delete point mode: a click on a point drops it. Never below two points — a track needs
@@ -263,8 +279,25 @@ export function TrackEditor({ map, activity, active, busy, onChange }: TrackEdit
         <button
           type="button"
           className="edit-track__btn"
+          disabled={splitCandidate === null || busy}
+          onClick={() => {
+            push({ kind: 'split', t: visible[splitCandidate!]![2] });
+            setKnobs(ENDS);
+            setPreview('chop');
+          }}
+          onMouseEnter={() => setPreview('split')}
+          onMouseLeave={() => setPreview('chop')}
+          onFocus={() => setPreview('split')}
+          onBlur={() => setPreview('chop')}
+          title={t('edit_track.split_title')}
+        >
+          {t('edit_track.split')}
+        </button>
+        <button
+          type="button"
+          className="edit-track__btn"
           aria-pressed={pointMode === 'move'}
-          disabled={busy}
+          disabled={busy || splitting}
           onClick={() => setPointMode((mode) => (mode === 'move' ? null : 'move'))}
           title={t('edit_track.move_point_title')}
         >
@@ -274,7 +307,7 @@ export function TrackEditor({ map, activity, active, busy, onChange }: TrackEdit
           type="button"
           className="edit-track__btn"
           aria-pressed={pointMode === 'delete'}
-          disabled={busy}
+          disabled={busy || splitting}
           onClick={() => setPointMode((mode) => (mode === 'delete' ? null : 'delete'))}
           title={t('edit_track.delete_point_title')}
         >
@@ -299,6 +332,11 @@ export function TrackEditor({ map, activity, active, busy, onChange }: TrackEdit
           </button>
         )}
       </div>
+      {splitting && (
+        <p className="edit-track__note" data-testid="edit-track-split-note">
+          {t('edit_track.split_note', { time: clockTime(splitAt) })}
+        </p>
+      )}
       {pointMode === 'delete' && <p className="edit-track__note">{t('edit_track.delete_point_note')}</p>}
       {pointMode === 'move' && <p className="edit-track__note">{t('edit_track.move_point_note')}</p>}
     </>

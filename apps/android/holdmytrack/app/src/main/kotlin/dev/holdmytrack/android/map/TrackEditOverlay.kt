@@ -18,9 +18,9 @@ import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 
-/** What the editor previews: everything outside the knobs going (Chop, the default), or
- *  what's between them (Cut, while its button is held). */
-enum class EditPreview { CHOP, CUT }
+/** What the editor previews: everything outside the knobs going (Chop, the default), what's
+ *  between them (Cut, while its button is held), or the track in two at a knob (Split, held). */
+enum class EditPreview { CHOP, CUT, SPLIT }
 
 /**
  * The track being edited, drawn over the map — the web's `apps/web/src/map/trackEdit.ts`: what
@@ -34,11 +34,13 @@ object TrackEditOverlay {
     private const val SOURCE_ID = "track-edit"
     private const val PREVIEW_LAYER_ID = "track-edit-preview"
     private const val LINE_LAYER_ID = "track-edit-line"
+    private const val SECOND_LAYER_ID = "track-edit-second"
     private const val POINTS_LAYER_ID = "track-edit-points"
     private const val KNOBS_LAYER_ID = "track-edit-knobs"
 
     private const val ACCENT = "#b07e2e"
     private const val REMOVED = "#c53030"
+    private const val SECOND = "#2b6cb0"
 
     /** How far from a tap a point still counts as tapped — the web's click tolerance, in dp. */
     private const val TAP_TOLERANCE_DP = 12f
@@ -72,6 +74,15 @@ object TrackEditOverlay {
             ),
         )
         add(
+            LineLayer(SECOND_LAYER_ID, SOURCE_ID).withFilter(role("second")).withProperties(
+                PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+                PropertyFactory.lineColor(SECOND),
+                PropertyFactory.lineWidth(4f),
+                PropertyFactory.lineOpacity(0.95f),
+            ),
+        )
+        add(
             CircleLayer(POINTS_LAYER_ID, SOURCE_ID).withFilter(role("point")).withProperties(
                 PropertyFactory.circleRadius(
                     Expression.interpolate(
@@ -100,9 +111,11 @@ object TrackEditOverlay {
      * Draws [visible] — the recorded points as the session's edit leaves them — with the knobs
      * at [lo] and [hi]: with [EditPreview.CHOP] the stretch between them kept and both sides
      * dashed; with [EditPreview.CUT] the stretch between them dashed and a straight kept line
-     * joining the knobs, which is what Cut would do.
+     * joining the knobs, which is what Cut would do. With [split] — a split made, or the one
+     * Split would make — the track is its two parts instead, the second in blue, with the one
+     * knob between them (`docs/SPEC.md` FR-5.17).
      */
-    fun set(style: Style, visible: List<TrackPoint>, lo: Int, hi: Int, preview: EditPreview) {
+    fun set(style: Style, visible: List<TrackPoint>, lo: Int, hi: Int, preview: EditPreview, split: Int?) {
         ensure(style)
         val source = style.getSourceAs<GeoJsonSource>(SOURCE_ID) ?: return
         val features = mutableListOf<Feature>()
@@ -112,6 +125,20 @@ object TrackEditOverlay {
                 .apply { addStringProperty("role", role) }
         }
         val last = visible.size - 1
+        if (split != null) {
+            line("kept", visible.subList(0, split + 1))
+            line("second", visible.subList(split, last + 1))
+            visible.forEach { p ->
+                features += Feature.fromGeometry(Point.fromLngLat(p.lon, p.lat)).apply {
+                    addStringProperty("role", "point")
+                    addNumberProperty("t", p.t)
+                }
+            }
+            val at = visible[split]
+            features += Feature.fromGeometry(Point.fromLngLat(at.lon, at.lat)).apply { addStringProperty("role", "knob") }
+            source.setGeoJson(FeatureCollection.fromFeatures(features))
+            return
+        }
         val cutting = preview == EditPreview.CUT && hi - lo >= 2
         if (cutting) {
             line("kept", visible.subList(0, lo + 1))

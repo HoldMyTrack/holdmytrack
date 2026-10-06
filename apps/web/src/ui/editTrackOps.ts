@@ -20,7 +20,10 @@ export type EditOp =
   /** Put one point somewhere else — a drag in Move point mode. */
   | { kind: 'move'; t: number; to: [number, number] }
   /** Discard every earlier edit, including the one saved before this session. */
-  | { kind: 'reset' };
+  | { kind: 'reset' }
+  /** Split the activity in two at one point (§4.7.8) — the Split button. Not part of the
+   *  edit: Save sends it beside the folded edit, which then applies to both pieces. */
+  | { kind: 'split'; t: number };
 
 /** Folds `base` and the op stack into one edit. Never returns empty arrays — an unedited
  *  track folds to `{}`. */
@@ -49,6 +52,8 @@ export function foldEdit(base: TrackEdit | null, ops: readonly EditOp[]): TrackE
       case 'move':
         // A point dragged twice ends where it was dropped last.
         move[String(op.t)] = op.to;
+        break;
+      case 'split':
         break;
     }
   }
@@ -103,6 +108,21 @@ export function chopOp(visible: readonly TrackPoint[], lo: number, hi: number): 
 export function cutOp(visible: readonly TrackPoint[], lo: number, hi: number): EditOp | null {
   if (hi - lo < 2) return null;
   return { kind: 'cut', remove: [visible[lo + 1]![2], visible[hi - 1]![2]] };
+}
+
+/** The point the session splits the activity at, or null — at most one split per session. */
+export function splitPoint(ops: readonly EditOp[]): number | null {
+  const op = ops.find((o) => o.kind === 'split');
+  return op?.kind === 'split' ? op.t : null;
+}
+
+/** The index the Split button would split `visible` at: the one knob moved off its end, as
+ *  long as it leaves two points on each side (the point itself counting on both). Null with
+ *  both knobs at the ends, or both moved — a split is one point, not a range. */
+export function splitIndex(visible: readonly TrackPoint[], lo: number, hi: number): number | null {
+  const last = visible.length - 1;
+  const at = lo > 0 && hi >= last ? lo : lo <= 0 && hi < last ? hi : null;
+  return at !== null && at >= 1 && at <= last - 1 ? at : null;
 }
 
 /** Cumulative walked distance in metres at each point — the slider's readout. */

@@ -186,7 +186,9 @@ data class SyncHistory(
  * [description], [distanceMeters] and [durationSeconds] are null when the source never set
  * them; [bbox] (`[minLon, minLat, maxLon, maxLat]`) is null for an activity with no drawn
  * track. [pending] is a reprocess still running (a track edit, a Private location change):
- * the tracks tile leaves such a row out until it lands (`docs/SPEC.md` FR-5.15).
+ * the tracks tile leaves such a row out until it lands (`docs/SPEC.md` FR-5.15). [isPrivate] is an
+ * activity entirely inside the account's Private locations (FR-5.1): kept, with no track, so its
+ * zero distance and duration mean nothing.
  */
 data class Activity(
     val id: String,
@@ -199,6 +201,7 @@ data class Activity(
     val bbox: List<Double>?,
     val pending: Boolean,
     val edited: Boolean,
+    val isPrivate: Boolean = false,
     /** The Stories it's in, newest first — what its row's Story badge names. */
     val stories: List<StoryRef> = emptyList(),
 )
@@ -420,6 +423,10 @@ class ApiException(val code: Int, message: String, val errorCode: String? = null
  * so callers touch views directly without re-dispatching.
  */
 object HoldMyTrackApi {
+
+    /** [ApiException.errorCode] of a split that would leave a part entirely inside a Private
+     *  location (`docs/SPEC.md` FR-5.17 behavior 7) — asked about, then sent with allowHidden. */
+    const val SPLIT_HIDES_PART = "split_hides_part"
 
     private const val API_V1 = "/v1"
 
@@ -1170,11 +1177,18 @@ object HoldMyTrackApi {
 
     /**
      * `POST /v1/activities/track-edit/{id}` — the whole new edit, or null (or an empty one) to
-     * go back to the track as recorded. The server answers `202` and reprocesses it in the
-     * background, the activity Pending meanwhile; `409` when a reprocess is already running.
+     * go back to the track as recorded, and [splitAt], a point's time, to also split the activity
+     * there (`docs/SPEC.md` FR-5.17). The server answers `202` and reprocesses it in the
+     * background, the activity Pending meanwhile; `409` when a reprocess is already running; a
+     * `422` [SPLIT_HIDES_PART] for a split that would leave a part inside a Private location,
+     * which goes ahead when sent again with [allowHidden].
      */
-    fun trackEdit(id: String, edit: TrackEdit?, onResult: (Result<Unit>) -> Unit) {
+    fun trackEdit(id: String, edit: TrackEdit?, splitAt: Long? = null, allowHidden: Boolean = false, onResult: (Result<Unit>) -> Unit) {
         val body = JSONObject().put("edit", edit?.let(::trackEditJson) ?: JSONObject.NULL)
+        if (splitAt != null) {
+            body.put("split_at", splitAt)
+            if (allowHidden) body.put("allow_hidden", true)
+        }
         val request = Request.Builder()
             .url(BuildConfig.API_BASE_URL + API_V1 + "/activities/track-edit/" + id)
             .post(body.toString().toRequestBody(JSON))
@@ -1454,6 +1468,7 @@ object HoldMyTrackApi {
             bbox = box?.let { b -> List(4) { b.getDouble(it) } },
             pending = row.optBoolean("pending"),
             edited = row.optBoolean("edited"),
+            isPrivate = row.optBoolean("private"),
             stories = List(stories.length()) { i ->
                 stories.getJSONObject(i).let { StoryRef(it.getString("id"), it.optString("name")) }
             },

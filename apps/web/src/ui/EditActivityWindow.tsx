@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { deletePhoto, saveActivityTrackEdit, updateActivity, updatePhoto, uploadPhoto, type Activity, type Photo, type TrackEdit } from '../api';
+import { deletePhoto, saveActivityTrackEdit, SplitHidesPartError, updateActivity, updatePhoto, uploadPhoto, type Activity, type Photo, type TrackEdit } from '../api';
 import type { PhotoMarkerOverlay } from '../map/photos';
 import { draftIsEmpty, draftSize, EMPTY_DRAFT, isoSeconds, waitingPhotos, type PhotoDraft } from './photoDraft';
 import type { TypeFacet } from './activityFacets';
@@ -19,6 +19,9 @@ const MAX_NAME_LEN = 200;
 const MAX_DESCRIPTION_LEN = 2000;
 
 export type EditTab = 'activity' | 'track' | 'photos';
+
+/** The Track tab's unsaved session: the edit Save sends, and the point to split at, if any. */
+type TrackPending = { edit: TrackEdit | null; splitAt: number | null };
 
 /** What `updateActivity` writes — the PATCH endpoint is a full replace of all three. */
 interface ActivityFields {
@@ -163,8 +166,11 @@ export function EditActivityWindow({
   const [activityType, setActivityType] = useState(mixedTypes ? '' : activities[0]!.activityType);
   const [name, setName] = useState(single?.name ?? '');
   const [description, setDescription] = useState(single?.description ?? '');
-  const [trackPending, setTrackPending] = useState<{ edit: TrackEdit | null } | null>(null);
+  const [trackPending, setTrackPending] = useState<TrackPending | null>(null);
   const [saving, setSaving] = useState(false);
+  // A split that would leave a part inside a Private location (FR-5.17): the server's
+  // explanation, asked about before saving again with allowHidden.
+  const [hiddenSplitWarning, setHiddenSplitWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Photos still being prepared (PhotosTab's Add): Save would leave the rest of the batch
   // behind, and Cancel would drop it without asking.
@@ -174,7 +180,7 @@ export function EditActivityWindow({
   // failure compares against these, and a Cancel still reports them so the list picks them up.
   const written = useRef(new Map<string, ActivityFields>());
 
-  const onTrackChange = useCallback((pending: { edit: TrackEdit | null } | null) => {
+  const onTrackChange = useCallback((pending: TrackPending | null) => {
     setTrackPending(pending);
     setError(null);
   }, []);
@@ -277,12 +283,19 @@ export function EditActivityWindow({
       }
       if (single && !draftIsEmpty(photoDraft)) await savePhotos(single.id, photoDraft);
       if (single && trackPending) {
-        await saveActivityTrackEdit(single.id, trackPending.edit);
+        await saveActivityTrackEdit(single.id, trackPending.edit, trackPending.splitAt);
         onClose({ saved: true, trackApplied: true, photosSaved: photosSaved.current });
         return;
       }
       onClose({ saved: written.current.size > 0, trackApplied: false, photosSaved: photosSaved.current });
     } catch (err) {
+      if (err instanceof SplitHidesPartError) {
+        // Everything before the track is written; the question is about the split alone.
+        setHiddenSplitWarning(err.message);
+        setSaving(false);
+        setPhotoProgress(null);
+        return;
+      }
       setError(err instanceof Error ? err.message : t('edit.save_failed'));
       setSaving(false);
       setPhotoProgress(null);
@@ -478,6 +491,19 @@ export function EditActivityWindow({
           cancelLabel={t('edit.keep_editing')}
           onConfirm={async () => cancel()}
           onClose={() => setConfirmDiscard(false)}
+        />
+      )}
+      {hiddenSplitWarning !== null && single && trackPending && (
+        <ConfirmDialog
+          title={t('edit_track.split_hidden_title')}
+          message={hiddenSplitWarning}
+          confirmLabel={t('edit_track.split_hidden_confirm')}
+          busyLabel={t('common.saving')}
+          onConfirm={async () => {
+            await saveActivityTrackEdit(single.id, trackPending.edit, trackPending.splitAt, true);
+            onClose({ saved: true, trackApplied: true, photosSaved: photosSaved.current });
+          }}
+          onClose={() => setHiddenSplitWarning(null)}
         />
       )}
     </section>

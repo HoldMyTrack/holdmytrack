@@ -6,16 +6,19 @@ import type { TrackPoint } from '../api';
  * being edited, built client-side from its full-resolution points — the shared MVT tracks
  * layer only has the simplified geometry, and is hidden entirely while editing anyway. Four
  * layers over it: the kept line, the preview of what the knobs would remove (faded and
- * dashed), every recorded point, and the two knob points.
+ * dashed), every recorded point, and the two knob points — plus, for a split (§4.7.8), the
+ * second piece's line in a color of its own.
  */
 export const TRACK_EDIT_SOURCE_ID = 'track-edit';
 const LINE_LAYER_ID = 'track-edit-line';
+const SECOND_LAYER_ID = 'track-edit-second';
 const PREVIEW_LAYER_ID = 'track-edit-preview';
 export const TRACK_EDIT_POINTS_LAYER_ID = 'track-edit-points';
 const KNOBS_LAYER_ID = 'track-edit-knobs';
 
 const ACCENT = '#b07e2e';
 const REMOVED = '#c53030';
+const SECOND = '#2b6cb0';
 
 // A little wider than tracks.ts's CLICK_TOLERANCE_PX — a 3px dot is a smaller target than a line.
 const CLICK_TOLERANCE_PX = 5;
@@ -54,6 +57,14 @@ export function ensureTrackEditLayer(map: MapLibreMap, beforeId: string | undefi
     paint: { 'line-color': ACCENT, 'line-width': 4, 'line-opacity': 0.95 },
   });
   add({
+    id: SECOND_LAYER_ID,
+    type: 'line',
+    source: TRACK_EDIT_SOURCE_ID,
+    filter: ['==', ['get', 'role'], 'second'],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': SECOND, 'line-width': 4, 'line-opacity': 0.95 },
+  });
+  add({
     id: TRACK_EDIT_POINTS_LAYER_ID,
     type: 'circle',
     source: TRACK_EDIT_SOURCE_ID,
@@ -78,12 +89,15 @@ export function ensureTrackEditLayer(map: MapLibreMap, beforeId: string | undefi
   });
 }
 
-/** What the knobs would do if pressed now — Chop removes outside them, Cut between them. */
-export type EditPreview = 'chop' | 'cut';
+/** What the knobs would do if pressed now — Chop removes outside them, Cut between them,
+ *  Split divides the track at the one knob moved. */
+export type EditPreview = 'chop' | 'cut' | 'split';
 
 /**
  * Redraws the overlay for the currently visible points, the two knob indices into them, and
- * which removal to preview. Knobs at both ends preview nothing.
+ * which removal to preview. Knobs at both ends preview nothing. `split` is the index of a
+ * split already made, or the one Split would make while it's previewed: the track is drawn
+ * as its two pieces, with no knobs but the point between them.
  */
 export function setTrackEditData(
   map: MapLibreMap,
@@ -91,6 +105,7 @@ export function setTrackEditData(
   lo: number,
   hi: number,
   preview: EditPreview,
+  split: number | null,
 ): void {
   const source = map.getSource(TRACK_EDIT_SOURCE_ID) as GeoJSONSource | undefined;
   if (!source) return;
@@ -99,6 +114,16 @@ export function setTrackEditData(
     c.length >= 2 ? [{ type: 'Feature', properties: { role }, geometry: { type: 'LineString', coordinates: c } }] : [];
 
   const last = visible.length - 1;
+  if (split !== null) {
+    const features = [...line('kept', coords(0, split)), ...line('second', coords(split, last))];
+    visible.forEach(([lon, lat, t]) => {
+      features.push({ type: 'Feature', properties: { role: 'point', t }, geometry: { type: 'Point', coordinates: [lon, lat] } });
+    });
+    const p = visible[split]!;
+    features.push({ type: 'Feature', properties: { role: 'knob' }, geometry: { type: 'Point', coordinates: [p[0], p[1]] } });
+    source.setData({ type: 'FeatureCollection', features });
+    return;
+  }
   const cutting = preview === 'cut' && hi - lo >= 2;
   let features: Feature[];
   if (cutting) {

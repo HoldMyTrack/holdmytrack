@@ -24,6 +24,10 @@ sealed interface EditOp {
 
     /** Back to the track as recorded — itself a step, so Undo brings the edits back. */
     data object Reset : EditOp
+
+    /** Split the activity in two at the point at [t] (`docs/SPEC.md` FR-5.17). Not part of the
+     *  edit: Save sends it beside the folded edit, which then applies to both parts. */
+    data class Split(val t: Long) : EditOp
 }
 
 /**
@@ -54,6 +58,7 @@ object EditTrackOps {
                 is EditOp.Drop -> drop += op.t
                 // A point moved twice ends where it was let go last.
                 is EditOp.Move -> move[op.t] = op.lon to op.lat
+                is EditOp.Split -> Unit
             }
         }
         return TrackEdit(keep, remove, drop, move)
@@ -90,6 +95,22 @@ object EditTrackOps {
     fun cut(visible: List<TrackPoint>, lo: Int, hi: Int): EditOp? {
         if (hi - lo < 2) return null
         return EditOp.Cut(visible[lo + 1].t to visible[hi - 1].t)
+    }
+
+    /** The time the session splits the activity at, or null — at most one split a session. */
+    fun splitPoint(ops: List<EditOp>): Long? = ops.firstNotNullOfOrNull { (it as? EditOp.Split)?.t }
+
+    /** The index Split would split [visible] at: the one knob moved off its end, as long as it
+     *  leaves two points on each side (the point itself counting on both). Null with both knobs
+     *  at the ends, or both moved — a split is one point, not a stretch. */
+    fun splitIndex(visible: List<TrackPoint>, lo: Int, hi: Int): Int? {
+        val last = visible.size - 1
+        val at = when {
+            lo > 0 && hi >= last -> lo
+            lo <= 0 && hi < last -> hi
+            else -> return null
+        }
+        return at.takeIf { it in 1..last - 1 }
     }
 
     /** Distance along [points] to each one, in meters (haversine). */

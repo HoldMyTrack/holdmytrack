@@ -6,6 +6,7 @@ import androidx.annotation.DrawableRes
 import android.widget.PopupMenu
 import android.widget.TextView
 import androidx.appcompat.widget.TooltipCompat
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import android.content.res.ColorStateList
 import dev.holdmytrack.android.R
@@ -55,6 +56,15 @@ class ActivityRowHolder(view: View) : RecyclerView.ViewHolder(view) {
     private val badges: View = view.findViewById(R.id.activity_badges)
     private val pending: View = view.findViewById(R.id.activity_pending)
     private val hidden: View = view.findViewById(R.id.activity_hidden)
+    private val privateBadge: TextView = view.findViewById<TextView>(R.id.activity_private).apply {
+        // The web's lock before the word, at the badge's own text size and color.
+        val size = textSize.toInt()
+        val lock = ContextCompat.getDrawable(context, R.drawable.ic_lock)?.mutate()?.apply {
+            setBounds(0, 0, size, size)
+            setTint(currentTextColor)
+        }
+        setCompoundDrawablesRelative(lock, null, null, null)
+    }
     private val story: TextView = view.findViewById(R.id.activity_story)
     private val remove: View = view.findViewById(R.id.activity_remove)
 
@@ -77,8 +87,12 @@ class ActivityRowHolder(view: View) : RecyclerView.ViewHolder(view) {
         // The date moves down here once a name has taken the title.
         meta.text = buildString {
             if (named) append(PanelFormat.startedAt(res, activity.startedAt)).append(" · ")
-            append(PanelFormat.distance(res, activity.distanceMeters)).append(" · ")
-            append(PanelFormat.duration(res, activity.durationSeconds)).append(" · ")
+            // A private activity has no track, so no distance or duration: "0.0 km · 0m" would
+            // read as broken data. Its badge says why instead.
+            if (!activity.isPrivate) {
+                append(PanelFormat.distance(res, activity.distanceMeters)).append(" · ")
+                append(PanelFormat.duration(res, activity.durationSeconds)).append(" · ")
+            }
             append(RecordingTypes.format(res, activity.activityType))
         }
         val dim = when {
@@ -89,8 +103,11 @@ class ActivityRowHolder(view: View) : RecyclerView.ViewHolder(view) {
         title.alpha = dim
         meta.alpha = dim
         val others = activity.stories.filter { it.id != openStoryId }
-        badges.visibility = if (activity.pending || isHidden || others.isNotEmpty()) View.VISIBLE else View.GONE
+        val isPrivate = activity.isPrivate && !activity.pending
+        badges.visibility = if (activity.pending || isHidden || isPrivate || others.isNotEmpty()) View.VISIBLE else View.GONE
         pending.visibility = if (activity.pending) View.VISIBLE else View.GONE
+        privateBadge.visibility = if (isPrivate) View.VISIBLE else View.GONE
+        TooltipCompat.setTooltipText(privateBadge, res.getString(R.string.activity_private_note))
         hidden.visibility = if (isHidden) View.VISIBLE else View.GONE
         val names = others.joinToString(", ") { it.name }
         val storiesNote = when {

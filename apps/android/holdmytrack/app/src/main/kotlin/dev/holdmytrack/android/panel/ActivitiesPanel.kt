@@ -118,6 +118,8 @@ class ActivitiesPanel(
     private val cardPaceLabel: TextView = sheet.findViewById(R.id.card_pace_label)
     private val cardPace: TextView = sheet.findViewById(R.id.card_pace)
     private val cardBands: View = sheet.findViewById(R.id.card_bands)
+    private val cardStats: View = sheet.findViewById(R.id.card_stats)
+    private val cardPrivate: View = sheet.findViewById(R.id.card_private)
     private val cardVisibility: MaterialButton = sheet.findViewById(R.id.card_visibility)
 
     /** The actions over the toolbar's target, twice: the selection bar's icons, and the selected
@@ -776,6 +778,9 @@ class ActivitiesPanel(
             PanelFormat.startedAt(res, activity.startedAt).takeIf { named },
             RecordingTypes.format(res, activity.activityType),
         ).joinToString(" · ")
+        // A private activity has no stats worth showing (FR-5.1): what it is stands in for them.
+        cardStats.visibility = if (activity.isPrivate) View.GONE else View.VISIBLE
+        cardPrivate.visibility = if (activity.isPrivate) View.VISIBLE else View.GONE
         cardDistance.text = PanelFormat.distance(res, activity.distanceMeters)
         cardMoving.text = PanelFormat.duration(res, activity.durationSeconds)
         cardPaceLabel.setText(if (kind.showsPace) R.string.card_pace else R.string.card_speed)

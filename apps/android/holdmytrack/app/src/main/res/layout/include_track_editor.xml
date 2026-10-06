@@ -2,8 +2,8 @@
 <!-- The Edit window's Track tab (panel/TrackEditor), after the web's TrackEditor.tsx: RANGE with
      the knobs' distances and times, a two-knob slider over the track's points — by point, not
      distance, so a stretch of standing still gets room to be picked out — the ends and the
-     point count under it, Undo and Reset beside RANGE, and the four tools under it all — Chop,
-     Cut, Move point, Delete point. While points load, or when they can't be, a line says so
+     point count under it, Undo and Reset beside RANGE, and the five tools under it all, in two
+     rows — Chop, Cut and Split over the knobs, then Move point and Delete point over the map. While points load, or when they can't be, a line says so
      instead. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -114,12 +114,15 @@
                 tools:text="8.4 km" />
         </LinearLayout>
 
-        <!-- The tools, a grid of four: Chop and Cut over the stretch between the knobs, and Move
-             point and Delete point, toggles each turning the other off, over the map's points. -->
+        <!-- The tools, in two rows — five across broke Russian labels mid-word. Chop and Cut over
+             the stretch between the knobs and Split at the one knob moved; then Move point and
+             Delete point, toggles each turning the other off, over the map's points. Not
+             baseline-aligned: a label wrapped to two lines would otherwise push its button down. -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/hmt_space_8"
+            android:baselineAligned="false"
             android:orientation="horizontal">
 
             <com.google.android.material.button.MaterialButton
@@ -142,11 +145,28 @@
                 app:icon="@drawable/ic_scissors" />
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/edit_track_move_point"
+                android:id="@+id/edit_track_split"
                 style="@style/Widget.HoldMyTrack.Button.EditTool"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/hmt_space_6"
+                android:layout_weight="1"
+                android:text="@string/edit_track_split"
+                app:icon="@drawable/ic_split" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_6"
+            android:baselineAligned="false"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/edit_track_move_point"
+                style="@style/Widget.HoldMyTrack.Button.EditTool"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="@string/edit_track_move_point"
                 app:icon="@drawable/ic_move" />

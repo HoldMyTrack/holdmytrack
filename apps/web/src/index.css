@@ -701,6 +701,14 @@ body {
   white-space: nowrap;
 }
 
+/* Private (FR-8.1): an activity entirely inside a Private location, kept with no track. A lock
+   before the word, in the same neutral chip as Pending and Hidden — it's a state, not an error. */
+.activities-panel__private-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fm-space-2);
+}
+
 /* Story sits beside Pending and Hidden, in the accent: it says where an activity belongs, not
    a state it's in. */
 .activities-panel__story-badge {
