@@ -42,6 +42,8 @@ import dev.holdmytrack.android.recording.TypeCount
  */
 class EditActivityWindow(
     private val card: View,
+    /** The edit bar over the top of the map — Cancel, the title, Save — shown with [card]. */
+    private val bar: View,
     /** The Track tab opened on [Activity] for the first time. */
     private val onStartTrack: (Activity) -> Unit,
     /** The track editor's overlay — see [TrackEditor]. */
@@ -61,8 +63,8 @@ class EditActivityWindow(
     private val context = card.context
     private val res = context.resources
 
-    private val title: TextView = card.findViewById(R.id.edit_title)
-    private val subtitle: TextView = card.findViewById(R.id.edit_subtitle)
+    private val title: TextView = bar.findViewById(R.id.edit_title)
+    private val subtitle: TextView = bar.findViewById(R.id.edit_subtitle)
     private val typeLayout: TextInputLayout = card.findViewById(R.id.edit_type_layout)
     private val typeField: TextInputEditText = card.findViewById(R.id.edit_type)
     private val nameLayout: TextInputLayout = card.findViewById(R.id.edit_name_layout)
@@ -71,8 +73,8 @@ class EditActivityWindow(
     private val descriptionField: TextInputEditText = card.findViewById(R.id.edit_description)
     private val multiNote: View = card.findViewById(R.id.edit_multi_note)
     private val error: TextView = card.findViewById(R.id.edit_error)
-    private val cancel: Button = card.findViewById(R.id.edit_cancel)
-    private val save: Button = card.findViewById(R.id.edit_save)
+    private val cancel: Button = bar.findViewById(R.id.edit_cancel)
+    private val save: Button = bar.findViewById(R.id.edit_save)
     private val tabActivity: TextView = card.findViewById(R.id.edit_tab_activity)
     private val tabTrack: TextView = card.findViewById(R.id.edit_tab_track)
     private val trackDot: View = card.findViewById(R.id.edit_tab_track_dot)
@@ -252,7 +254,11 @@ class EditActivityWindow(
         showError(null)
         renderBusy()
         renderTabs()
+        // Scrolls past most of the screen, so the map keeps a band to edit on above it.
+        card.findViewById<MaxHeightScrollView>(R.id.edit_scroll).maxHeight =
+            (res.displayMetrics.heightPixels * MAX_HEIGHT_FRACTION).toInt()
         card.visibility = View.VISIBLE
+        bar.visibility = View.VISIBLE
     }
 
     /** The saved photos of the one activity the window is open on, or why they couldn't be read
@@ -408,6 +414,7 @@ class EditActivityWindow(
         val photosSaved = photosTab.photosSaved
         photosTab.close()
         card.visibility = View.GONE
+        bar.visibility = View.GONE
         onClose(fieldsSaved || trackApplied, trackApplied, photosSaved)
     }
 
@@ -439,6 +446,9 @@ class EditActivityWindow(
     }
 
     private companion object {
+        /** The window's tallest, as a share of the screen, before it scrolls. */
+        const val MAX_HEIGHT_FRACTION = 0.55f
+
         /** The server's own bounds (`activities.go`'s maxActivityTypeLen and friends). */
         const val MAX_TYPE = ActivityTypePicker.MAX_LENGTH
         const val MAX_NAME = 200

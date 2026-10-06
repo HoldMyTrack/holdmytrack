@@ -670,10 +670,30 @@
         <item name="android:paddingEnd">@dimen/hmt_space_10</item>
     </style>
 
-    <!-- Reset, the quiet one of them (the web's quiet edit-track button): no fill, ink at 65%. -->
+    <!-- The track editor's four tools (include_track_editor): the edit-track look, an icon over
+         its label, 64dp tall, a quarter of the row each; checked (Move point, Delete point), the
+         accent tint. -->
+    <style name="Widget.HoldMyTrack.Button.EditTool" parent="Widget.HoldMyTrack.Button.EditTrack">
+        <item name="android:minHeight">64dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:paddingStart">@dimen/hmt_space_2</item>
+        <item name="android:paddingEnd">@dimen/hmt_space_2</item>
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.LabelMedium</item>
+        <item name="android:maxLines">2</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.HoldMyTrack.Medium</item>
+        <item name="iconGravity">top</item>
+        <item name="iconPadding">@dimen/hmt_space_4</item>
+        <item name="iconSize">22dp</item>
+        <item name="iconTint">@color/edit_track_btn_text</item>
+    </style>
+
+    <!-- Undo and Reset, the quiet ones (the web's quiet edit-track button): no fill, ink at 65%,
+         faint while disabled. -->
     <style name="Widget.HoldMyTrack.Button.EditTrack.Quiet">
         <item name="backgroundTint">@android:color/transparent</item>
-        <item name="android:textColor">@color/hmt_ink_hint</item>
+        <item name="android:textColor">@color/edit_track_quiet_text</item>
+        <item name="iconTint">@color/edit_track_quiet_text</item>
     </style>
 
     <!-- A tab's title in the Activities panel's head, the web's .activities-panel__heading-text:

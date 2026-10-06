@@ -28,6 +28,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import com.google.android.material.button.MaterialButton
@@ -173,7 +175,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
     /** Whether the Privacy tab has the map — its tab showing, in Normal mode. */
     private var privacyShowing = false
-    private lateinit var editLock: View
 
     /** Back closes an open sheet before it leaves the map. */
     private val collapseSheetOnBack = object : OnBackPressedCallback(false) {
@@ -511,22 +512,27 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             map = { map },
             style = { style?.takeIf { overlaysAttached } },
             onEditorOpen = {
-                panel.setExpanded(false)
                 placeEditWindow()
                 renderRail()
+                renderDateFooter()
+                host?.setBottomBarShown(false)
             },
-            onEditorClose = ::renderRail,
+            onEditorClose = {
+                renderRail()
+                renderDateFooter()
+                host?.setBottomBarShown(true)
+            },
             onChanged = ::onPrivateLocationsChanged,
             openAreaCenterY = {
                 val editor = findViewById<View>(R.id.private_editor)
-                val top = if (editor.isVisible) editor.bottom else findViewById<View>(R.id.top_bar).bottom
-                val bottom = mapView.height - if (sheet.isVisible) panel.peekHeight else 0
+                val top = findViewById<View>(R.id.top_bar).bottom
+                val bottom = if (editor.isVisible) editor.top else mapView.height - if (sheet.isVisible) panel.peekHeight else 0
                 (top + bottom) / 2f
             },
         )
-        editLock = findViewById(R.id.edit_lock)
         editWindow = EditActivityWindow(
             findViewById(R.id.edit_window),
+            findViewById(R.id.edit_bar),
             onStartTrack = ::startEditTrack,
             onDrawTrack = ::drawTrackEdit,
             onPickPhotos = {
@@ -765,6 +771,11 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             applyCompassMargin()
             insets
         }
+        // The attribution sits above an editor along the bottom, whose height is only known once
+        // it's laid out.
+        for (id in listOf(R.id.edit_window, R.id.private_editor)) {
+            findViewById<View>(id).addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyAttributionMargin() }
+        }
         // The compass sits below the top row and any notice under it, whose heights are only
         // known once they're laid out; the expanded sheet stops under the row likewise. The
         // attribution follows the sheet's head (onSheetChanged).
@@ -826,7 +837,14 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             attributionBaseMarginBottom = settings.attributionMarginBottom
             attributionBaseCaptured = true
         }
-        val above = if (sheet.isVisible) panel.peekHeight else 0
+        // Above an editor open along the bottom, which has the screen meanwhile.
+        val root = findViewById<View>(R.id.map_root)
+        val editor = listOf(R.id.edit_window, R.id.private_editor).map { findViewById<View>(it) }.firstOrNull { it.isVisible }
+        val above = when {
+            editor != null -> root.height - editor.top
+            sheet.isVisible -> panel.peekHeight
+            else -> 0
+        }
         settings.setLogoMargins(
             settings.logoMarginLeft,
             settings.logoMarginTop,
@@ -1114,9 +1132,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         // The photos follow the window: its one activity's, which its Photos tab manages.
         refreshPhotos(force = false)
         closeEditOnBack.isEnabled = true
-        editLock.visibility = View.VISIBLE
         placeEditWindow()
-        placeEditLock()
+        renderDateFooter()
+        host?.setBottomBarShown(false)
         renderSelectionBar()
         renderModeBar()
         renderRail()
@@ -1157,8 +1175,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
         editingTrackId = null
         closeEditOnBack.isEnabled = false
-        editLock.visibility = View.GONE
         panel.hold(false)
+        renderDateFooter()
+        host?.setBottomBarShown(!privacyEditing())
         renderSelectionBar()
         renderModeBar()
         renderRail()
@@ -1166,25 +1185,31 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         if (saved) reloadList()
     }
 
-    /** The Edit window and the Private location editor sit just under the chrome row, the
-     *  web's `top: 54px`. */
+    /** The Edit window and the Private location editor sit along the bottom of the map, which
+     *  reaches the screen's edge while either is open — the bottom bar is gone — so their margin
+     *  clears the gesture bar. */
     private fun placeEditWindow() {
-        val top = findViewById<View>(R.id.top_bar).bottom + resources.getDimensionPixelSize(R.dimen.hmt_space_8)
+        val insets = ViewCompat.getRootWindowInsets(requireView())
+        val gesture = insets?.getInsets(WindowInsetsCompat.Type.navigationBars())?.bottom ?: 0
+        val bottom = resources.getDimensionPixelSize(R.dimen.hmt_space_10) + gesture
         for (id in listOf(R.id.edit_window, R.id.private_editor)) {
             val card = findViewById<View>(id)
             val params = card.layoutParams as MarginLayoutParams
-            if (params.topMargin != top) {
-                params.topMargin = top
+            if (params.bottomMargin != bottom) {
+                params.bottomMargin = bottom
                 card.layoutParams = params
             }
         }
     }
 
+    /** Whether the Private location editor is open over the map. */
+    private fun privacyEditing() = ::privacyTab.isInitialized && privacyTab.isEditing
+
     /** The Privacy tab takes the map while its tab shows in Normal mode, and gives it back —
      *  circles and any unsaved draft gone — the moment either stops. */
     private fun renderPrivacy() {
         if (!::privacyTab.isInitialized) return
-        val next = sheet.isVisible && panel.tab == PanelTab.PRIVACY
+        val next = normalMode() && panel.tab == PanelTab.PRIVACY
         if (next == privacyShowing) return
         privacyShowing = next
         if (next) privacyTab.start() else privacyTab.stop()
@@ -1206,15 +1231,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             updateTrackMetrics(refetch = true)
             refreshPhotos(force = true)
             panel.storiesTab.reloadOpen()
-        }
-    }
-
-    private fun placeEditLock() {
-        if (!::editLock.isInitialized || editLock.visibility != View.VISIBLE) return
-        val params = editLock.layoutParams
-        if (params.height != panel.peekHeight) {
-            params.height = panel.peekHeight
-            editLock.layoutParams = params
         }
     }
 
@@ -1473,7 +1489,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             }
             spotPopup.close()
         }
-        if (!sheet.isVisible) return false
+        if (!normalMode()) return false
         // The Privacy tab has the map to itself while it shows.
         if (privacyShowing) {
             privacyTab.onMapTap(point)
@@ -1496,11 +1512,10 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         return true
     }
 
-    /** The sheet came to rest or its head changed height: the attribution and the edit lock
-     *  follow its head, and Back closes it while it's open. */
+    /** The sheet came to rest or its head changed height: the attribution follows its head, and
+     *  Back closes it while it's open. */
     private fun onSheetChanged() {
         applyAttributionMargin()
-        placeEditLock()
         collapseSheetOnBack.isEnabled = sheet.isVisible && panel.expanded && !editWindow.isOpen
     }
 
@@ -1511,11 +1526,13 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  range is the Activities tab's alone: Stories and Privacy take none (`docs/SPEC.md` FR-6),
      *  and have their titles at the head instead. */
     private fun renderDateFooter() {
-        val normal = modeBarReady && mode == MapMode.NORMAL && !isRecording()
+        val normal = normalMode()
         // The selected activity's card takes the range's place at the head.
         val footer = normal && panel.tab == PanelTab.ACTIVITIES && !panel.showsCard && activityDays.ready && activityDays.earliest != null
         dateFooter.visibility = if (footer) View.VISIBLE else View.GONE
-        sheet.visibility = if (normal) View.VISIBLE else View.GONE
+        // An editor over the map has the screen, the sheet stepping aside for it.
+        val editing = editWindow.isOpen || privacyEditing()
+        sheet.visibility = if (normal && !editing) View.VISIBLE else View.GONE
         if (!normal) panel.dismissPopups()
         onSheetChanged()
         renderSelectionBar()
@@ -1524,6 +1541,10 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     private fun isRecording() = (recorder?.state ?: RecordingState.IDLE) != RecordingState.IDLE
+
+    /** Normal mode with the session ready and no recording: when the sheet, its tabs and their
+     *  editors are the map's. */
+    private fun normalMode() = modeBarReady && mode == MapMode.NORMAL && !isRecording()
 
     private fun hasPermission(permission: String) =
         ContextCompat.checkSelfPermission(requireContext(), permission) == PackageManager.PERMISSION_GRANTED
@@ -1978,14 +1999,18 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         val top = maxOf(
             FRAME_PADDING_PX,
             findViewById<View>(R.id.top_bar).bottom,
-            if (card.isVisible) card.bottom + FRAME_PADDING_PX / 2 else 0,
             if (banner.isVisible) topChrome.top + banner.bottom + FRAME_PADDING_PX / 2 else 0,
         )
         // Above the height the sheet rests at or is heading to, not mid-drag: a View on map
         // collapses it and flies in the same moment, and fitting to where it was pushed the
         // activity to the top of the screen.
         val root = findViewById<View>(R.id.map_root)
-        val bottom = FRAME_PADDING_PX + if (sheet.isVisible) root.height - panel.restingTop(root.height) else 0
+        val editor = listOf(card, findViewById<View>(R.id.private_editor)).firstOrNull { it.isVisible }
+        val bottom = FRAME_PADDING_PX + when {
+            editor != null -> root.height - editor.top
+            sheet.isVisible -> root.height - panel.restingTop(root.height)
+            else -> 0
+        }
         val padding = intArrayOf(FRAME_PADDING_PX, top, FRAME_PADDING_PX, bottom)
         val fitted = instance.getCameraForLatLngBounds(bounds, padding) ?: return
         val target = CameraPosition.Builder(fitted)

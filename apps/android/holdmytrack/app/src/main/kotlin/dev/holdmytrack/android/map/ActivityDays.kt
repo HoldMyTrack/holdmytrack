@@ -108,7 +108,12 @@ class ActivityDays(private val windowDays: Int, private val onChange: (reloaded:
     fun canShift(range: DateRange, dir: Int) =
         shiftRange(days.map { it.date }, hasEarlier, range, dir) != RangeShift.None
 
-    /** Re-reads from the newest end, back to the window's opening position. */
+    /**
+     * Re-reads from the newest end — on every return to the map, since Sync or a recording may
+     * have added days. The window stays where it was: its anchor still names the same day, and
+     * when that day is older than the fresh page, the page before it is fetched ([changed]) and
+     * the window lands back on it. Pinned to the newest end, it stays pinned there.
+     */
     fun reload() {
         val gen = ++generation
         HoldMyTrackApi.activityDayPage(PAGE_SIZE, null) { result ->
@@ -116,7 +121,6 @@ class ActivityDays(private val windowDays: Int, private val onChange: (reloaded:
             result.onSuccess { page ->
                 days = page.days
                 earliest = page.earliest
-                anchor = null
                 carry = 0
                 extending = false
                 ready = true

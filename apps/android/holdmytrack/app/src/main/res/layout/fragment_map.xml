@@ -4,6 +4,7 @@
      the map as in a FrameLayout. -->
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/map_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
@@ -265,6 +266,63 @@
                         android:src="@drawable/ic_focus" />
                 </LinearLayout>
 
+                <!-- While the Edit window is open (panel/EditActivityWindow), the edit bar in the mode
+                     toggle's place, the rail away: Cancel, the window's title and whose it is, and
+                     Save. -->
+                <LinearLayout
+                    android:id="@+id/edit_bar"
+                    style="@style/Widget.HoldMyTrack.MapPanel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingEnd="@dimen/hmt_space_8"
+                    android:visibility="gone">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/edit_cancel"
+                        style="@style/Widget.HoldMyTrack.Button.MapIcon"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:contentDescription="@string/edit_cancel"
+                        app:icon="@drawable/ic_x" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/hmt_space_4"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/edit_title"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleMedium"
+                            tools:text="Edit activity" />
+
+                        <TextView
+                            android:id="@+id/edit_subtitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="@color/hmt_ink_meta"
+                            android:textSize="@dimen/hmt_text_sm"
+                            tools:text="Sep 24, 2026, 4:00 AM" />
+                    </LinearLayout>
+
+                    <Button
+                        android:id="@+id/edit_save"
+                        style="@style/Widget.HoldMyTrack.Button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/hmt_space_8"
+                        android:text="@string/edit_save" />
+                </LinearLayout>
+
                 <!-- "Show in this area" (map/ShowInArea): centred under the toggle, wrapping to a
                      second line rather than running under the rail. Gone outside zoom 10–13 and
                      with no place shown. -->
@@ -441,17 +499,4 @@
          (include_activities_sheet, panel/ActivitiesPanel). -->
     <include layout="@layout/include_activities_sheet" />
 
-    <!-- Laid over the collapsed sheet while the Edit window is open, taking every touch: the
-         window edits the toolbar's target, which mustn't change underneath it, as the web makes
-         the panel inert then. Its height follows the sheet's peek (MapFragment.placeEditLock). -->
-    <View
-        android:id="@+id/edit_lock"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_gravity="bottom"
-        android:clickable="true"
-        android:elevation="9dp"
-        android:focusable="false"
-        android:importantForAccessibility="no"
-        android:visibility="gone" />
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
