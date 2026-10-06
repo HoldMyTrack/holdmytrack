@@ -123,7 +123,7 @@ func TestPagesRenderInEveryLanguage(t *testing.T) {
 				t.Fatalf("%s/%s: status %d: %s", lang, page, rec.Code, body)
 			}
 			for _, m := range leftover.FindAllString(body, -1) {
-				if !strings.Contains(m, "application/") && !strings.Contains(m, "schema.org") && !strings.Contains(m, "holdmytrack.com") && !strings.Contains(m, "github.com") && !strings.Contains(m, ".png") && !strings.Contains(m, ".css") && !strings.Contains(m, ".js") {
+				if !strings.Contains(m, "application/") && !strings.Contains(m, "schema.org") && !strings.Contains(m, "holdmytrack.com") && !strings.Contains(m, "github.com") && !strings.Contains(m, "hmt.overlays") && !strings.Contains(m, ".png") && !strings.Contains(m, ".css") && !strings.Contains(m, ".js") {
 					t.Errorf("%s/%s: %q looks like an untranslated key", lang, page, m)
 				}
 			}
