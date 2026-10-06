@@ -159,3 +159,54 @@ func TestActiveImportsUnpacking(t *testing.T) {
 		t.Fatalf("failed archive's error = %q", a.Error)
 	}
 }
+
+// The history says when each import finished, and names the copy that replaced an import's
+// activity as a duplicate — live, so the row follows the activity when it's promoted back.
+func TestUploadHistoryDuplicates(t *testing.T) {
+	d := newDBTest(t)
+	me := d.newAccount(false)
+	d.insertImportJob(me, "done", "healthconnect", "hc-1", "", "")
+	d.insertImportJob(me, "done", "upload", "walk.gpx", "", "")
+	d.insertImportJob(me, "pending", "upload", "next.gpx", "", "")
+	kept := d.newActivity(me, testActivity{activityType: "walk", distanceMeters: 1000})
+	dup := d.newActivity(me, testActivity{activityType: "walk", distanceMeters: 1000, supersededBy: kept})
+	ctx := context.Background()
+	if _, err := d.pool.Exec(ctx, `UPDATE activities SET source = 'upload', external_id = 'walk.gpx' WHERE id = $1`, kept); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.pool.Exec(ctx, `UPDATE activities SET source = 'healthconnect', external_id = 'hc-1' WHERE id = $1`, dup); err != nil {
+		t.Fatal(err)
+	}
+
+	byName := func() map[string]uploadRow {
+		var resp uploadsResponse
+		d.decode(d.do(me, "GET", "/v1/uploads?limit=10", nil), http.StatusOK, &resp)
+		rows := map[string]uploadRow{}
+		for _, u := range resp.Uploads {
+			rows[u.Filename] = u
+		}
+		return rows
+	}
+	rows := byName()
+	hc := rows["hc-1"]
+	if hc.Status != "done" || hc.SupersededBy == nil || hc.SupersededBy.ID != kept || hc.SupersededBy.Source != "upload" {
+		t.Fatalf("duplicate row: status %q, superseded_by %+v; want done, replaced by %s from upload", hc.Status, hc.SupersededBy, kept)
+	}
+	if hc.FinishedAt == nil {
+		t.Error("a finished row has no finished_at")
+	}
+	if w := rows["walk.gpx"]; w.SupersededBy != nil || w.ActivityID == nil || *w.ActivityID != kept {
+		t.Errorf("kept row: superseded_by %+v, activity %v; want none, %s", w.SupersededBy, w.ActivityID, kept)
+	}
+	if n := rows["next.gpx"]; n.Status != "processing" || n.FinishedAt != nil {
+		t.Errorf("pending row: status %q, finished_at %v; want processing with none", n.Status, n.FinishedAt)
+	}
+
+	// Deleting the kept copy promotes the duplicate, and its row stops being one.
+	if _, err := d.pool.Exec(ctx, `UPDATE activities SET superseded_by = NULL WHERE id = $1`, dup); err != nil {
+		t.Fatal(err)
+	}
+	if hc := byName()["hc-1"]; hc.SupersededBy != nil {
+		t.Errorf("promoted row still superseded by %+v", hc.SupersededBy)
+	}
+}
