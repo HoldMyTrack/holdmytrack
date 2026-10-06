@@ -252,9 +252,12 @@
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
         <item name="android:checkable">true</item>
+        <item name="iconSize">18dp</item>
+        <item name="iconPadding">@dimen/hmt_space_6</item>
+        <item name="iconTint">@color/map_mode_text</item>
     </style>
 
-    <!-- A square icon-only button on the map's chrome (the menu, Find my location). It sits in
+    <!-- A square icon-only button on the map's chrome (Layers, Find my location). It sits in
          a MapPanel frame, the mode toggle's own panel, rather than carrying the panel color and
          shadow itself: a translucent MaterialButton with elevation draws its shadow through its
          own fill, as a lighter square around the icon. -->
@@ -348,6 +351,19 @@
         <item name="android:paddingEnd">@dimen/hmt_space_4</item>
         <item name="android:background">?attr/selectableItemBackground</item>
         <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyLarge</item>
+        <item name="android:textColor">@color/hmt_ink</item>
+    </style>
+
+    <!-- The chip saying what Fog or Heatmap shows (fragment_map.xml): the map chrome's panel,
+         its text in the body size, a 40dp line. -->
+    <style name="Widget.HoldMyTrack.ModeChip" parent="">
+        <item name="android:background">@drawable/bg_map_chrome</item>
+        <item name="android:elevation">2dp</item>
+        <item name="android:minHeight">40dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:paddingStart">@dimen/hmt_space_16</item>
+        <item name="android:paddingEnd">@dimen/hmt_space_16</item>
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
         <item name="android:textColor">@color/hmt_ink</item>
     </style>
 
@@ -547,6 +563,15 @@
     <style name="Widget.HoldMyTrack.LayersOption.Check" parent="Widget.Material3.CompoundButton.CheckBox">
         <item name="android:textSize">@dimen/hmt_text_md</item>
         <item name="android:textColor">@color/hmt_ink</item>
+    </style>
+
+    <!-- The Layers menu's two switches, Show layers and Satellite: the checkboxes' row height and
+         text, the label at the start and the switch at the end. -->
+    <style name="Widget.HoldMyTrack.LayersOption.Switch" parent="Widget.Material3.CompoundButton.MaterialSwitch">
+        <item name="android:minHeight">48dp</item>
+        <item name="android:textSize">@dimen/hmt_text_md</item>
+        <item name="android:textColor">@color/hmt_ink</item>
+        <item name="android:paddingStart">@dimen/hmt_space_4</item>
     </style>
 
     <!-- The Activities panel's toolbar actions (Show/Hide, Edit, Delete), after the web's

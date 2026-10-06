@@ -37,294 +37,238 @@
         android:clipToPadding="false"
         android:orientation="vertical">
 
-        <!-- Floating chrome over the map, one row along the top: the map-mode toggle at the
-             start, mirroring the web client's own top-left mode control
-             (apps/web/src/index.css's .map-mode-toggle), and Find my location at the end, where
-             the web has its geolocate control. MapLibre's compass, also top-end, is pushed below
-             both (MapFragment.applyCompassMargin). The row itself takes no touches, so the
-             map still pans through the gap. Styled from the theme (res/values/themes.xml). -->
+        <!-- Floating chrome over the map, one row along the top. At the start, the map-mode
+             toggle, mirroring the web client's own top-left mode control
+             (apps/web/src/index.css's .map-mode-toggle) — or, while recording, the recording's
+             status card in its place — with Show in this area under it. At the end, a rail of two
+             round buttons: Layers, then Find my location, where the web has its geolocate
+             control. MapLibre's compass, also top-end, is pushed below the row
+             (MapFragment.applyCompassMargin). The row itself takes no touches, so the map still
+             pans through the gaps. Styled from the theme (res/values/themes.xml). -->
         <LinearLayout
             android:id="@+id/top_bar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_margin="@dimen/hmt_space_12"
             android:baselineAligned="false"
+            android:clipChildren="false"
+            android:clipToPadding="false"
             android:orientation="horizontal">
 
-            <!-- Only shown to a signed-in account: all three layers the toggle switches between
-                 are behind requireAuth, so there is nothing for it to do without a session.
-                 A divider sets Normal apart from the two coverage views (Fog, Heatmap), as the
-                 web's .map-mode-toggle__divider does: the choice is two-level. Plain checkable
-                 buttons, not a MaterialButtonToggleGroup (which admits no divider child) —
-                 MapFragment.setMode checks exactly one of the three.
-
-                 It sits in a weighted scroll container rather than taking its own width first:
-                 LinearLayout sizes weighted children last, so Find my location always gets its
-                 own, and at a large font size, where the three labels outgrow the
-                 row, the toggle scrolls sideways instead of pushing Find my location off the
-                 screen. -->
-            <HorizontalScrollView
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="@dimen/hmt_space_6"
+                android:layout_marginEnd="@dimen/hmt_space_8"
                 android:layout_weight="1"
-                android:clipToPadding="false"
-                android:overScrollMode="never"
-                android:paddingBottom="@dimen/hmt_space_4"
-                android:scrollbars="none">
+                android:orientation="vertical">
 
-                <LinearLayout
-                    android:id="@+id/mode_bar"
+                <!-- Only shown to a signed-in account: all three layers the toggle switches between
+                     are behind requireAuth, so there is nothing for it to do without a session.
+                     Plain checkable buttons, each an icon and its label — MapFragment.setMode
+                     checks exactly one of the three.
+
+                     It sits in a weighted scroll container rather than taking its own width first:
+                     LinearLayout sizes weighted children last, so the rail always gets its own,
+                     and at a large font size, where the three labels outgrow the row, the toggle
+                     scrolls sideways instead of pushing the rail off the screen. -->
+                <HorizontalScrollView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    style="@style/Widget.HoldMyTrack.MapPanel"
-                    android:orientation="horizontal"
-                    android:visibility="gone">
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/mode_normal"
-                        style="@style/Widget.HoldMyTrack.Button.MapMode"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/mode_normal" />
-
-                    <View
-                        android:layout_width="1dp"
-                        android:layout_height="match_parent"
-                        android:layout_marginStart="@dimen/hmt_space_4"
-                        android:layout_marginTop="@dimen/hmt_space_8"
-                        android:layout_marginEnd="@dimen/hmt_space_4"
-                        android:layout_marginBottom="@dimen/hmt_space_8"
-                        android:background="@color/hmt_border_strong" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/mode_fog"
-                        style="@style/Widget.HoldMyTrack.Button.MapMode"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/mode_fog" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/mode_heatmap"
-                        style="@style/Widget.HoldMyTrack.Button.MapMode"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/hmt_space_2"
-                        android:text="@string/mode_heatmap" />
-                </LinearLayout>
-            </HorizontalScrollView>
-
-            <!-- Find my location (MapFragment.onLocateTap): shows the position dot and flies the
-                 camera to it, the counterpart of the web map's geolocate control. Hidden while
-                 recording, when the camera already follows the recording. -->
-            <FrameLayout
-                android:id="@+id/locate_panel"
-                style="@style/Widget.HoldMyTrack.MapPanel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/locate_button"
-                    style="@style/Widget.HoldMyTrack.Button.MapIcon"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:contentDescription="@string/locate_button"
-                    app:icon="@drawable/ic_locate_fixed" />
-            </FrameLayout>
-        </LinearLayout>
-
-        <!-- The second row, under the chrome row: Layers at the start, under the mode toggle, and
-             the recording's status at the end, under Find my location, 6dp below the row above —
-             its own gap between panels. Hidden while an editor covers it
-             (MapFragment.renderSecondRow). It takes no touches itself, so the map still pans
-             through the gap. -->
-        <FrameLayout
-            android:id="@+id/second_row"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/hmt_space_12"
-            android:layout_marginTop="-6dp"
-            android:layout_marginEnd="@dimen/hmt_space_12"
-            android:layout_marginBottom="@dimen/hmt_space_12"
-            android:clipChildren="false"
-            android:clipToPadding="false">
-
-            <!-- Layers and Satellite, at the second row's start. Layers (map/LayersMenu) is a pill:
-                 a checkbox that shows or hides every picked path and place at once, then the icon
-                 that opens the menu, filled like the active mode while picks show, with a badge on
-                 its corner counting them. Satellite (MapSatellite) is an icon toggle of its own
-                 under it, rather than beside it, so the row keeps its width for Show in this area;
-                 gone when the served style has no imagery. -->
-            <LinearLayout
-                android:id="@+id/layers_group"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="start|top"
-                android:clipChildren="false"
-                android:clipToPadding="false"
-                android:orientation="vertical"
-                android:visibility="gone">
-
-                <LinearLayout
-                    android:id="@+id/layers_panel"
-                    style="@style/Widget.HoldMyTrack.MapPanel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:clipChildren="false"
                     android:clipToPadding="false"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    android:overScrollMode="never"
+                    android:paddingBottom="@dimen/hmt_space_4"
+                    android:scrollbars="none">
 
-                    <com.google.android.material.checkbox.MaterialCheckBox
-                        android:id="@+id/layers_master"
-                        android:layout_width="wrap_content"
-                        android:layout_height="48dp"
-                        android:contentDescription="@string/layers_master"
-                        android:minWidth="40dp"
-                        android:minHeight="48dp" />
-
-                    <FrameLayout
+                    <LinearLayout
+                        android:id="@+id/mode_bar"
+                        style="@style/Widget.HoldMyTrack.MapPanel"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:clipChildren="false"
-                        android:clipToPadding="false">
+                        android:orientation="horizontal"
+                        android:visibility="gone">
 
                         <com.google.android.material.button.MaterialButton
-                            android:id="@+id/layers_button"
-                            style="@style/Widget.HoldMyTrack.Button.MapIcon.Toggle"
+                            android:id="@+id/mode_normal"
+                            style="@style/Widget.HoldMyTrack.Button.MapMode"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:contentDescription="@string/layers_button"
-                            app:icon="@drawable/ic_layers" />
+                            android:text="@string/mode_normal"
+                            app:icon="@drawable/ic_route" />
 
-                        <TextView
-                            android:id="@+id/layers_count"
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/mode_fog"
+                            style="@style/Widget.HoldMyTrack.Button.MapMode"
                             android:layout_width="wrap_content"
-                            android:layout_height="16dp"
-                            android:layout_gravity="end|top"
-                            android:layout_marginTop="-2dp"
-                            android:layout_marginEnd="-2dp"
-                            android:background="@drawable/bg_layers_count"
-                            android:elevation="2dp"
-                            android:gravity="center"
-                            android:importantForAccessibility="no"
-                            android:minWidth="16dp"
-                            android:paddingStart="@dimen/hmt_space_4"
-                            android:paddingEnd="@dimen/hmt_space_4"
-                            android:textColor="@color/hmt_on_accent"
-                            android:textSize="@dimen/hmt_text_3xs"
-                            android:textStyle="bold"
-                            android:visibility="gone" />
-                    </FrameLayout>
-                </LinearLayout>
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/hmt_space_2"
+                            android:text="@string/mode_fog"
+                            app:icon="@drawable/ic_cloud_fog" />
 
-                <FrameLayout
-                    android:id="@+id/satellite_panel"
-                    style="@style/Widget.HoldMyTrack.MapPanel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/hmt_space_6"
-                    android:visibility="gone">
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/mode_heatmap"
+                            style="@style/Widget.HoldMyTrack.Button.MapMode"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/hmt_space_2"
+                            android:text="@string/mode_heatmap"
+                            app:icon="@drawable/ic_flame" />
+                    </LinearLayout>
+                </HorizontalScrollView>
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/satellite_button"
-                        style="@style/Widget.HoldMyTrack.Button.MapIcon.Toggle"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:contentDescription="@string/layers_satellite"
-                        app:icon="@drawable/ic_satellite" />
-                </FrameLayout>
-            </LinearLayout>
-
-            <!-- "Show in this area" (map/ShowInArea): centred in the row, wrapping to a second line
-                 rather than running under Layers: its start margin follows the Layers pill's width
-                 (MapFragment.fitShowInArea), and the end one matches it. Gone outside zoom 10–13
-                 and with no place shown. -->
-            <TextView
-                android:id="@+id/show_in_area"
-                style="@style/Widget.HoldMyTrack.ShowInArea"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center_horizontal|top"
-                android:layout_marginStart="72dp"
-                android:layout_marginTop="@dimen/hmt_space_10"
-                android:layout_marginEnd="72dp"
-                android:accessibilityLiveRegion="polite"
-                android:visibility="gone" />
-
-            <!-- While a recording is in progress (MapFragment.renderRecordingStatus), a status pill
-                 at the second row's end: a dot, the moving time, and the distance or "Waiting for
-                 GPS…" before the first fix — and, during a hold on the record button in the bottom
-                 bar, the stop countdown, where a finger on the button can't hide it. -->
-            <LinearLayout
-                android:id="@+id/record_row"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="end|top"
-                android:clipChildren="false"
-                android:clipToPadding="false"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
+                <!-- While a recording is in progress (MapFragment.renderRecordingStatus), the
+                     recording's status in the mode toggle's place: a dot, the moving time large,
+                     the distance or "Waiting for GPS…" before the first fix — and, during a hold on
+                     the record button in the bottom bar, the stop countdown, where a finger on the
+                     button can't hide it — and Stop, which asks first (MapFragment.confirmStop). -->
                 <LinearLayout
                     android:id="@+id/recording_status"
                     style="@style/Widget.HoldMyTrack.MapPanel"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
                     android:paddingStart="@dimen/hmt_space_12"
-                    android:paddingEnd="@dimen/hmt_space_12"
                     android:visibility="gone">
 
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:minHeight="32dp"
-                        android:orientation="horizontal">
+                    <View
+                        android:id="@+id/recording_status_dot"
+                        android:layout_width="10dp"
+                        android:layout_height="10dp"
+                        android:layout_marginEnd="@dimen/hmt_space_12"
+                        android:background="@drawable/bg_recording_dot" />
 
-                        <View
-                            android:id="@+id/recording_status_dot"
-                            android:layout_width="10dp"
-                            android:layout_height="10dp"
-                            android:layout_marginEnd="@dimen/hmt_space_8"
-                            android:background="@drawable/bg_recording_dot" />
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:paddingTop="@dimen/hmt_space_4"
+                        android:paddingBottom="@dimen/hmt_space_4">
 
                         <Chronometer
                             android:id="@+id/recording_status_time"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:textAppearance="@style/TextAppearance.HoldMyTrack.LabelLarge"
+                            android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleLarge"
                             android:textColor="?android:attr/textColorPrimary" />
 
                         <TextView
                             android:id="@+id/recording_status_detail"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="@dimen/hmt_space_8"
                             android:ellipsize="end"
                             android:maxLines="1"
                             android:textAppearance="@style/TextAppearance.HoldMyTrack.BodyMedium"
                             android:textColor="?android:attr/textColorSecondary" />
+
+                        <com.google.android.material.progressindicator.LinearProgressIndicator
+                            android:id="@+id/recording_status_hold"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/hmt_space_4"
+                            android:max="1000"
+                            android:visibility="gone"
+                            app:indicatorColor="@color/hmt_record"
+                            app:trackCornerRadius="2dp"
+                            app:trackStopIndicatorSize="0dp"
+                            app:trackThickness="4dp" />
                     </LinearLayout>
 
-                    <com.google.android.material.progressindicator.LinearProgressIndicator
-                        android:id="@+id/recording_status_hold"
-                        android:layout_width="match_parent"
+                    <Button
+                        android:id="@+id/recording_status_stop"
+                        style="@style/Widget.HoldMyTrack.Button.Outlined"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="@dimen/hmt_space_4"
-                        android:max="1000"
-                        android:visibility="gone"
-                        app:indicatorColor="@color/hmt_record"
-                        app:trackCornerRadius="2dp"
-                        app:trackStopIndicatorSize="0dp"
-                        app:trackThickness="4dp" />
+                        android:layout_marginStart="@dimen/hmt_space_8"
+                        android:text="@string/recording_stop" />
                 </LinearLayout>
+
+                <!-- "Show in this area" (map/ShowInArea): centred under the toggle, wrapping to a
+                     second line rather than running under the rail. Gone outside zoom 10–13 and
+                     with no place shown. -->
+                <TextView
+                    android:id="@+id/show_in_area"
+                    style="@style/Widget.HoldMyTrack.ShowInArea"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="@dimen/hmt_space_8"
+                    android:accessibilityLiveRegion="polite"
+                    android:visibility="gone" />
             </LinearLayout>
-        </FrameLayout>
+
+            <!-- The rail: Layers (map/LayersMenu) — its icon filled like the active mode while picks
+                 show, with a badge on its corner counting them, opening the menu of paths, places,
+                 the show-or-hide switch and Satellite — then Find my location
+                 (MapFragment.onLocateTap), which shows the position dot and flies the camera to it,
+                 the counterpart of the web map's geolocate control, hidden while recording, when
+                 the camera already follows the recording. The rail steps aside while an editor
+                 opens over the top of the map (MapFragment.renderRail). -->
+            <LinearLayout
+                android:id="@+id/map_rail"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:orientation="vertical">
+
+                <FrameLayout
+                    android:id="@+id/layers_panel"
+                    style="@style/Widget.HoldMyTrack.MapPanel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="@dimen/hmt_space_8"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
+                    android:visibility="gone">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/layers_button"
+                        style="@style/Widget.HoldMyTrack.Button.MapIcon.Toggle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:contentDescription="@string/layers_button"
+                        app:icon="@drawable/ic_layers" />
+
+                    <TextView
+                        android:id="@+id/layers_count"
+                        android:layout_width="wrap_content"
+                        android:layout_height="16dp"
+                        android:layout_gravity="end|top"
+                        android:layout_marginTop="-6dp"
+                        android:layout_marginEnd="-6dp"
+                        android:background="@drawable/bg_layers_count"
+                        android:elevation="2dp"
+                        android:gravity="center"
+                        android:importantForAccessibility="no"
+                        android:minWidth="16dp"
+                        android:paddingStart="@dimen/hmt_space_4"
+                        android:paddingEnd="@dimen/hmt_space_4"
+                        android:textColor="@color/hmt_on_accent"
+                        android:textSize="@dimen/hmt_text_3xs"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
+                </FrameLayout>
+
+                <FrameLayout
+                    android:id="@+id/locate_panel"
+                    style="@style/Widget.HoldMyTrack.MapPanel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/locate_button"
+                        style="@style/Widget.HoldMyTrack.Button.MapIcon"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:contentDescription="@string/locate_button"
+                        app:icon="@drawable/ic_locate_fixed" />
+                </FrameLayout>
+            </LinearLayout>
+        </LinearLayout>
 
         <!-- Which level Fog and Heatmap draw at (map/ZoomLevelNotice), the web's
-             .zoom-level-notice: a line of its own under the second row, faded out a few seconds
+             .zoom-level-notice: a line of its own under the top row, faded out a few seconds
              after it shows. Not clickable, so the map still takes touches through it. -->
         <TextView
             android:id="@+id/zoom_level_notice"
@@ -398,11 +342,23 @@
          Edit window would be. -->
     <include layout="@layout/include_private_location_editor" />
 
+    <!-- Fog and Heatmap ignore the date range, so with the panel gone a chip at the bottom says
+         what they show instead: every activity, or the last 365 days (MapFragment.renderModeChip).
+         Centred, clear of MapLibre's logo and attribution at the start, and of the record button
+         raised out of the bottom bar below it. -->
+    <TextView
+        android:id="@+id/mode_chip"
+        style="@style/Widget.HoldMyTrack.ModeChip"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="@dimen/hmt_space_32"
+        android:visibility="gone" />
+
     <!-- The bottom of the map, Normal mode's alone, the web's phone layout: the Activities panel
          (include_activities_sheet, panel/ActivitiesPanel) sitting on the date-range footer, one
          white block the width of the screen with a hairline and a shadow along its top. Gone
-         when neither is up. The gesture bar's inset is added to its bottom padding in
-         MapFragment.insetSystemBars. -->
+         when neither is up. -->
     <LinearLayout
         android:id="@+id/bottom_chrome"
         android:layout_width="match_parent"

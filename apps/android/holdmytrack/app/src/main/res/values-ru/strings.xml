@@ -108,6 +108,8 @@
     <string name="mode_normal">Обычный</string>
     <string name="mode_fog">Туман</string>
     <string name="mode_heatmap">Тепловая</string>
+    <string name="mode_chip_fog">Все занятия, за всё время</string>
+    <string name="mode_chip_heatmap">Последние 365 дней</string>
     <string name="map_level_fog_city">Город — открыто ровно там, где вы были</string>
     <string name="map_level_fog_country">Страны — страна открывается целиком, если вы были в ней хоть раз</string>
     <string name="map_level_fog_region">Регионы — штат или область открывается целиком, если вы были в нём хоть раз</string>

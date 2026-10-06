@@ -19,7 +19,7 @@ object MapPaths {
         val count: Int get() = listOf(trails, tracks, bikePaths).count { it }
     }
 
-    /** Every kind hidden: what's drawn while the Layers checkbox is off ([MapLayersSwitch]). */
+    /** Every kind hidden: what's drawn while Show layers is off ([MapLayersSwitch]). */
     val NONE = Paths(trails = false, tracks = false, bikePaths = false)
 
     /** Must match `TRAIL_LAYER_IDS`, `TRACK_LAYER_IDS` and `BIKE_PATH_LAYER_IDS` in

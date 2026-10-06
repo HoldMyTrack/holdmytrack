@@ -141,10 +141,12 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     /** Created with the map instance it reads the camera of. */
     private var showInArea: ShowInArea? = null
     private lateinit var recordButton: RecordButton
-    private lateinit var secondRow: View
-    private lateinit var layersGroup: View
-    private lateinit var satellitePanel: View
-    private lateinit var satelliteButton: MaterialButton
+    private lateinit var mapRail: View
+    private lateinit var layersPanel: View
+    private lateinit var modeChip: TextView
+
+    /** Whether the served style has satellite imagery — the Layers menu offers it only then. */
+    private var satelliteAvailable = false
     private lateinit var recordingStatus: View
     private lateinit var recordingStatusDot: View
     private lateinit var recordingStatusTime: Chronometer
@@ -415,9 +417,10 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             button.minWidth = minTouchTargetPx()
             button.minimumWidth = minTouchTargetPx()
         }
-        layersGroup = findViewById(R.id.layers_group)
+        mapRail = findViewById(R.id.map_rail)
+        layersPanel = findViewById(R.id.layers_panel)
+        modeChip = findViewById(R.id.mode_chip)
         layersMenu = LayersMenu(
-            master = findViewById(R.id.layers_master),
             button = findViewById(R.id.layers_button),
             count = findViewById(R.id.layers_count),
             paths = { MapPaths.get(requireContext()) },
@@ -426,12 +429,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             onPaths = ::setPaths,
             onSpots = ::setSpots,
             onShown = ::setLayersShown,
+            satellite = { if (satelliteAvailable) MapSatellite.isOn(requireContext()) else null },
+            onSatellite = ::setSatellite,
         )
-        satellitePanel = findViewById(R.id.satellite_panel)
-        satelliteButton = findViewById(R.id.satellite_button)
-        satelliteButton.setOnClickListener { setSatellite(!MapSatellite.isOn(requireContext())) }
-        renderSatelliteButton()
-        layersGroup.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> fitShowInArea() }
         spotPopup = SpotPopup(findViewById(R.id.spot_popup), { topChrome.bottom }, ::onCaptureTap)
         photoMarkers = PhotoMarkers(findViewById(R.id.photo_markers), ::openPhotoMarker)
         photoPopup = PhotoPopup(findViewById(R.id.photo_popup), { topChrome.bottom }) { renderPhotoMarkers() }
@@ -446,8 +446,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         recordButton.setOnClickListener { onRecordTap() }
         recordButton.onHoldComplete = ::stopRecording
         recordButton.onHoldProgress = ::renderHoldProgress
-        secondRow = findViewById(R.id.second_row)
         recordingStatus = findViewById(R.id.recording_status)
+        findViewById<View>(R.id.recording_status_stop).setOnClickListener { confirmStop() }
         recordingStatusDot = findViewById(R.id.recording_status_dot)
         recordingStatusTime = findViewById(R.id.recording_status_time)
         recordingStatusDetail = findViewById(R.id.recording_status_detail)
@@ -500,9 +500,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             onEditorOpen = {
                 panel.setExpanded(false)
                 placeEditWindow()
-                renderSecondRow()
+                renderRail()
             },
-            onEditorClose = ::renderSecondRow,
+            onEditorClose = ::renderRail,
             onChanged = ::onPrivateLocationsChanged,
             openAreaCenterY = {
                 val editor = findViewById<View>(R.id.private_editor)
@@ -658,8 +658,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             hideNotice(Notice.MAP_FAILED)
             // The served style ships the path layers hidden; a fresh style needs the saved choice.
             MapPaths.apply(loaded, shownPaths(MapPaths.get(requireContext())))
-            // Only a deployment with imagery serves it; without, there is no Satellite button.
-            satellitePanel.isVisible = MapSatellite.isAvailable(loaded)
+            // Only a deployment with imagery serves it; without, the Layers menu has no Satellite.
+            satelliteAvailable = MapSatellite.isAvailable(loaded)
             MapSatellite.apply(loaded, MapSatellite.isOn(requireContext()))
             MapOverlays.attachLiveTrack(loaded)
             syncSession()
@@ -772,8 +772,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     /**
      * MapLibre's own compass control defaults to top-end with a small fixed margin, unaware of
      * the status bar — found sitting directly behind the clock/battery indicator on a real
-     * device — and of the top row, whose Find my location button shares that corner, as does
-     * the recording's status under it. Called from both `insetSystemBars` and `getMapAsync` because whichever of the
+     * device — and of the top row, whose rail of Layers and Find my location shares that
+     * corner. Called from both `insetSystemBars` and `getMapAsync` because whichever of the
      * inset callback and the map-ready callback fires second is the one that actually has
      * everything it needs.
      */
@@ -784,12 +784,11 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             compassBaseMarginTop = settings.compassMarginTop
             compassBaseMarginCaptured = true
         }
-        // Below the top row (modes, Find my location), which already sits below the status
-        // bar, the second row under it and the notice while either is up; before the row is
-        // laid out, below the status bar at least.
+        // Below the top row (the modes and the rail), which already sits below the status bar,
+        // and the notice while one is up; before the row is laid out, below the status bar at
+        // least.
         val belowTopBar = maxOf(
             findViewById<View>(R.id.top_bar).bottom,
-            if (secondRow.isVisible) secondRow.bottom else 0,
             if (notice.isVisible) notice.bottom else 0,
         )
         settings.setCompassMargins(
@@ -1108,7 +1107,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         placeEditWindow()
         placeEditLock()
         renderModeBar()
-        renderSecondRow()
+        renderRail()
         renderTrackMetrics()
     }
 
@@ -1149,7 +1148,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         editLock.visibility = View.GONE
         panel.hold(false)
         renderModeBar()
-        renderSecondRow()
+        renderRail()
         renderTrackMetrics()
         if (saved) reloadList()
     }
@@ -1225,8 +1224,21 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun renderModeBar() {
         if (!modeBarReady) return
         modeBar.visibility = if (isRecording() || editWindow.isOpen) View.GONE else View.VISIBLE
-        layersGroup.visibility = View.VISIBLE
+        layersPanel.visibility = View.VISIBLE
         renderZoomLevelNotice()
+        renderModeChip()
+    }
+
+    /** What Fog or Heatmap shows, since neither takes the date range: once the session allows,
+     *  and not while recording, which draws neither. */
+    private fun renderModeChip() {
+        val text = when (mode) {
+            MapMode.NORMAL -> null
+            MapMode.FOG -> R.string.mode_chip_fog
+            MapMode.HEATMAP -> R.string.mode_chip_heatmap
+        }
+        modeChip.isVisible = text != null && modeBarReady && !isRecording()
+        if (text != null) modeChip.setText(text)
     }
 
     /** Names Fog's and Heatmap's level in view — once the session allows, and not while
@@ -1235,11 +1247,11 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         zoomLevelNotice.render(mode, active = modeBarReady && !isRecording())
     }
 
-    /** Layers and the recording's status, on the second row under the chrome row: away while the
-     *  Edit window or the Private location editor is open, since both open over that row. */
-    private fun renderSecondRow() {
+    /** Layers and Find my location, on the rail at the top row's end: away while the Edit window
+     *  or the Private location editor is open, since both open over the top of the map. */
+    private fun renderRail() {
         val editing = editWindow.isOpen || (::privacyTab.isInitialized && privacyTab.isEditing)
-        secondRow.visibility = if (editing) View.GONE else View.VISIBLE
+        mapRail.visibility = if (editing) View.GONE else View.VISIBLE
         if (editing) layersMenu.dismiss()
     }
 
@@ -1647,6 +1659,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         renderRecordingStatus(state, hasFix = points.isNotEmpty())
         renderModeBar()
         locatePanel.visibility = if (active) View.GONE else View.VISIBLE
+        renderModeChip()
         renderDateFooter()
         updateNoticeVisibility()
         // Like every history layer, the photos give the map to the live track.
@@ -1837,6 +1850,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
         style?.takeIf { overlaysAttached }?.let { MapOverlays.setMode(it, next) }
         renderZoomLevelNotice()
+        renderModeChip()
         renderDateFooter()
         refreshPhotos(force = false)
     }
@@ -1853,7 +1867,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         style?.let { MapPaths.apply(it, shownPaths(paths)) }
     }
 
-    /** The Layers checkbox: shows or hides every pick at once, keeping them. A capture in progress
+    /** The Layers menu's Show layers: shows or hides every pick at once, keeping them. A capture in progress
      *  carries on, since hiding the places is about the view, not about going to one. */
     private fun setLayersShown(on: Boolean) {
         MapLayersSwitch.set(requireContext(), on)
@@ -1861,7 +1875,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         showSpots(shownSpots(MapSpots.get(requireContext())))
     }
 
-    /** What the map draws of the picks: all of them while the Layers checkbox is on, none while off. */
+    /** What the map draws of the picks: all of them while Show layers is on, none while off. */
     private fun shownPaths(paths: MapPaths.Paths) = if (MapLayersSwitch.isOn(requireContext())) paths else MapPaths.NONE
 
     private fun shownSpots(categories: List<MapSpots.Category>) =
@@ -1874,25 +1888,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         showInArea?.setCategories(shown)
     }
 
-    /** Keeps Show in this area centred between the Layers pill and Record, clear of both: its
-     *  start margin follows the pill's width, plus the row's gap; the end one, from the layout,
-     *  clears Record. */
-    private fun fitShowInArea() {
-        val view = findViewById<View>(R.id.show_in_area)
-        val params = view.layoutParams as MarginLayoutParams
-        val start = layersGroup.width + resources.getDimensionPixelSize(R.dimen.hmt_space_12)
-        if (params.marginStart == start) return
-        params.marginStart = start
-        view.layoutParams = params
-    }
-
-    private fun renderSatelliteButton() {
-        satelliteButton.isChecked = MapSatellite.isOn(requireContext())
-    }
-
     private fun setSatellite(on: Boolean) {
         MapSatellite.set(requireContext(), on)
-        renderSatelliteButton()
         val loaded = style ?: return
         MapSatellite.apply(loaded, on)
         if (overlaysAttached) MapOverlays.setDarkVeil(loaded, darkBase(loaded))

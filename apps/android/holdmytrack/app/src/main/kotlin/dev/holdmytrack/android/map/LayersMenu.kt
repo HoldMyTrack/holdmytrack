@@ -2,6 +2,7 @@ package dev.holdmytrack.android.map
 
 import android.annotation.SuppressLint
 import android.os.SystemClock
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,22 +11,23 @@ import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.core.view.isVisible
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.materialswitch.MaterialSwitch
 import dev.holdmytrack.android.R
 
 /**
- * The Layers pill under the mode toggle and the menu it opens — the web's `OverlaysMenu`
+ * The Layers button on the map's rail and the menu it opens — the web's `OverlaysMenu`
  * (`docs/SPEC.md` FR-4.13): Paths — Trails, Tracks and Bike paths — and Points of interest, one
  * entry per [MapSpots.Category], each picked over any mode.
  *
- * The pill is a checkbox, which shows or hides every pick at once and keeps them ([shown]), then
- * the icon, filled like the active map mode while picks show, with a badge on its corner counting
- * them, greyed while the checkbox is off. Picking an entry while it's off turns it back on, or the
- * pick would seem to do nothing; with nothing picked it can't be changed. A tap on the icon
- * toggles the menu, and a tap outside it or Back closes it, like the Activities panel's Type
- * dropdown.
+ * The button is filled like the active map mode while picks show, with a badge on its corner
+ * counting them, greyed while they're hidden. The menu opens with a switch that shows or hides
+ * every pick at once and keeps them ([shown]) — picking an entry while it's off turns it back on,
+ * or the pick would seem to do nothing; with nothing picked it can't be changed — and, where the
+ * served style has imagery ([satellite] isn't null), Satellite (`MapSatellite`). A tap on the
+ * button toggles the menu, and a tap outside it or Back closes it, like the Activities panel's
+ * Type dropdown.
  */
 class LayersMenu(
-    private val master: CheckBox,
     private val button: MaterialButton,
     private val count: TextView,
     private val paths: () -> MapPaths.Paths,
@@ -34,17 +36,15 @@ class LayersMenu(
     private val onPaths: (MapPaths.Paths) -> Unit,
     private val onSpots: (List<MapSpots.Category>) -> Unit,
     private val onShown: (Boolean) -> Unit,
+    private val satellite: () -> Boolean?,
+    private val onSatellite: (Boolean) -> Unit,
 ) {
     private val res = button.resources
     private var popup: PopupWindow? = null
+    private var master: MaterialSwitch? = null
     private var closedAt = 0L
 
     init {
-        // A click, not a checked-change listener: render() sets the box from the saved choice.
-        master.setOnClickListener {
-            onShown(master.isChecked)
-            render()
-        }
         button.setOnClickListener {
             // The button is checkable for the filled look, so a tap just flipped it; that follows
             // the paths, not taps.
@@ -58,13 +58,15 @@ class LayersMenu(
         render()
     }
 
-    /** The checkbox, the filled look and the badge, from the saved choice. */
+    /** The filled look, the badge and the open menu's switch, from the saved choice. */
     fun render() {
         val picked = paths().count + spots().size
         val on = shown()
-        master.isChecked = on
-        master.isEnabled = picked > 0
-        master.tooltipText = if (picked > 0) null else res.getString(R.string.layers_master_empty)
+        master?.let {
+            it.isChecked = on
+            it.isEnabled = picked > 0
+            it.tooltipText = if (picked > 0) null else res.getString(R.string.layers_master_empty)
+        }
         button.isChecked = on && picked > 0
         count.isVisible = picked > 0
         count.alpha = if (on) 1f else OFF_ALPHA
@@ -86,6 +88,20 @@ class LayersMenu(
     private fun show() {
         if (popup != null) return
         val content = LayoutInflater.from(button.context).inflate(R.layout.popup_layers, null)
+
+        // A click, not a checked-change listener: render() sets the switch from the saved choice.
+        master = content.findViewById<MaterialSwitch>(R.id.layers_master).apply {
+            setOnClickListener {
+                onShown(isChecked)
+                render()
+            }
+        }
+        content.findViewById<MaterialSwitch>(R.id.layers_satellite).apply {
+            val on = satellite()
+            isVisible = on != null
+            isChecked = on == true
+            setOnClickListener { onSatellite(isChecked) }
+        }
 
         val current = paths()
         fun bind(id: Int, checked: Boolean, next: (MapPaths.Paths, Boolean) -> MapPaths.Paths) {
@@ -128,11 +144,13 @@ class LayersMenu(
         window.elevation = res.getDimension(R.dimen.hmt_space_8)
         window.setOnDismissListener {
             popup = null
+            master = null
             closedAt = SystemClock.uptimeMillis()
         }
         popup = window
-        // Under the pill, lined up with its edge, the row's own 6dp gap below it.
-        window.showAsDropDown(master.parent as View, 0, res.getDimensionPixelSize(R.dimen.hmt_space_6))
+        render()
+        // Under the button's panel, lined up with its end edge, 6dp below it.
+        window.showAsDropDown(button.parent as View, 0, res.getDimensionPixelSize(R.dimen.hmt_space_6), Gravity.END)
     }
 
     private companion object {
