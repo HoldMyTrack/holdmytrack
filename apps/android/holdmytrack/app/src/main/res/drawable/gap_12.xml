@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- An empty 12dp divider, as gap_16 is: a vertical LinearLayout's showDividers="middle" with
+     this spaces its visible children, skipping GONE ones. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <size android:height="@dimen/hmt_space_12" />
+    <solid android:color="@android:color/transparent" />
+</shape>

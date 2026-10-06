@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The hairline between a card's rows (LinearLayout's showDividers). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/hmt_divider_tint" />
+    <size android:height="1dp" />
+</shape>

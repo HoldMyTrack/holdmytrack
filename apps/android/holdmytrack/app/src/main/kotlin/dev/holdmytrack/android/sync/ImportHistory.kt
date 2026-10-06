@@ -20,24 +20,31 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
- * The Sync screen's history and duplicates — the web's `/sync` page
- * (`apps/android/docs/SPEC.md` FR-4): every ingest job the account has produced, from any path,
- * as `GET /v1/uploads` lists them — a Health Connect session, a GPS recording and a file
- * uploaded on the web are the same kind of job, so they share one history — then the
- * activities cross-source deduplication set aside. Twenty a page with the web's pager, re-read
- * every 1.5 seconds while anything is still processing (the web shows those in its Upload menu;
- * this app has no other place for them), and a finished row that became an activity has View on
- * map.
+ * The sync history and duplicates — the web's `/sync` page (`apps/android/docs/SPEC.md` FR-4):
+ * every ingest job the account has produced, from any path, as `GET /v1/uploads` lists them — a
+ * Health Connect session, a GPS recording and a file uploaded on the web are the same kind of
+ * job, so they share one history — then the activities cross-source deduplication set aside.
+ * Re-read every 1.5 seconds while anything is still processing (the web shows those in its
+ * Upload menu; this app has no other place for them), and a finished row that became an
+ * activity has View on map.
+ *
+ * Two sizes over the same `include_sync_history`: the Sync tab's [preview], the latest
+ * [PREVIEW_ROWS] rows with See all ([onSeeAll]), and `SyncHistoryActivity`'s whole of it, twenty
+ * a page with the web's pager, and the duplicates under it.
  */
 class ImportHistory(
     private val root: View,
+    private val preview: Boolean,
     /** A row's View on map: the activity it became, and when it started. */
     private val onViewOnMap: (activityId: String, startedAt: String) -> Unit,
+    /** The preview's See all. */
+    private val onSeeAll: () -> Unit = {},
 ) {
     private val context = root.context
     private val res = context.resources
 
-    private val summary: TextView
+    private val summary: TextView = root.findViewById(R.id.sync_summary)
+    private val seeAll: View = root.findViewById(R.id.sync_see_all)
     private val error: TextView = root.findViewById(R.id.sync_error)
     private val empty: View = root.findViewById(R.id.sync_empty)
     private val rows: LinearLayout = root.findViewById(R.id.sync_rows)
@@ -60,13 +67,13 @@ class ImportHistory(
 
     private val poll = Runnable { load() }
 
+    private val pageSize = if (preview) PREVIEW_ROWS else HISTORY_PAGE
+
     init {
-        val head: View = root.findViewById(R.id.sync_head)
-        head.findViewById<TextView>(R.id.list_title).setText(R.string.status_history)
-        summary = head.findViewById(R.id.list_summary)
         summary.setText(R.string.status_loading)
-        newer.setOnClickListener { showPage(maxOf(0, offset - HISTORY_PAGE)) }
-        older.setOnClickListener { showPage(offset + HISTORY_PAGE) }
+        seeAll.setOnClickListener { onSeeAll() }
+        newer.setOnClickListener { showPage(maxOf(0, offset - pageSize)) }
+        older.setOnClickListener { showPage(offset + pageSize) }
     }
 
     /** Reads the page in view and the duplicates, and keeps the page current while anything
@@ -74,7 +81,7 @@ class ImportHistory(
     fun start() {
         started = true
         load()
-        HoldMyTrackApi.duplicates { result -> if (started) renderDuplicates(result.getOrNull().orEmpty()) }
+        if (!preview) HoldMyTrackApi.duplicates { result -> if (started) renderDuplicates(result.getOrNull().orEmpty()) }
     }
 
     fun stop() {
@@ -91,7 +98,7 @@ class ImportHistory(
     private fun load() {
         main.removeCallbacks(poll)
         val gen = ++generation
-        HoldMyTrackApi.syncHistory(HISTORY_PAGE, offset) { result ->
+        HoldMyTrackApi.syncHistory(pageSize, offset) { result ->
             if (gen != generation) return@syncHistory
             result.onSuccess { render(it) }.onFailure {
                 error.text = res.getString(R.string.status_failed, it.message.orEmpty())
@@ -114,7 +121,8 @@ class ImportHistory(
         rows.visibility = if (history.entries.isEmpty()) View.GONE else View.VISIBLE
         rows.removeAllViews()
         history.entries.forEach(::addRow)
-        renderPager(history)
+        seeAll.visibility = if (preview && history.total > 0) View.VISIBLE else View.GONE
+        if (!preview) renderPager(history)
 
         // Only while something is in flight: a settled history makes no further requests.
         if (started && history.processing > 0) main.postDelayed(poll, POLL_INTERVAL_MS)
@@ -246,6 +254,9 @@ class ImportHistory(
     private companion object {
         /** The web's `/sync` page size. */
         const val HISTORY_PAGE = 20
+
+        /** The Sync tab's rows: enough to see the latest run landed. */
+        const val PREVIEW_ROWS = 3
         const val POLL_INTERVAL_MS = 1_500L
     }
 }

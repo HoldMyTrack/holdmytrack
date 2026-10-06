@@ -10,10 +10,13 @@ import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.panel.PanelTab
 import dev.holdmytrack.android.recording.RecordingService
+import dev.holdmytrack.android.recording.db.RecordedActivityStore
+import kotlinx.coroutines.launch
 
 /**
  * The app's main window: the bottom bar — Map, Stories, Record, Sync, You — and the tab above it
@@ -22,6 +25,7 @@ import dev.holdmytrack.android.recording.RecordingService
  * [SyncFragment] and You is [YouFragment]. Tabs are shown and hidden rather than replaced, so the
  * map — its camera, its layers, a recording on it — is just as it was on coming back to it.
  * The record button over the bar's middle slot is the map's to drive (`MapFragment.onRecordTap`).
+ * Sync carries a badge with the number of recordings waiting to be sent.
  *
  * Never shows the map without a session: a signed-out visitor is handed straight to
  * `SignInActivity`, mirroring web's `AuthGate` (`docs/IMPLEMENTATION.md` §4.13), before any layout
@@ -91,6 +95,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Back from a recording's Save screen, or anywhere a recording was added or sent.
+        if (::nav.isInitialized) refreshSyncBadge()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         // The notification's Stop and a View on map are both about the map.
@@ -137,6 +147,25 @@ class MainActivity : AppCompatActivity() {
      *  — left on Stories if that's where it is, since that's the map too. */
     fun showMap() {
         if (tab == Tab.SYNC || tab == Tab.YOU) showTab(Tab.MAP)
+    }
+
+    /** The Sync tab's badge: the recordings on this phone waiting to be sent — none for the
+     *  demo account, which can't send them. */
+    fun setSyncWaiting(count: Int) {
+        if (count <= 0 || Session.isDemo) {
+            nav.removeBadge(R.id.nav_sync)
+            return
+        }
+        nav.getOrCreateBadge(R.id.nav_sync).apply {
+            backgroundColor = getColor(R.color.hmt_danger)
+            badgeTextColor = getColor(R.color.hmt_surface)
+            number = count
+            setContentDescriptionQuantityStringsResource(R.plurals.sync_waiting)
+        }
+    }
+
+    private fun refreshSyncBadge() {
+        lifecycleScope.launch { setSyncWaiting(RecordedActivityStore(this@MainActivity).count()) }
     }
 
     /** The bottom bar, and the record button over it — gone while the map's Edit window or

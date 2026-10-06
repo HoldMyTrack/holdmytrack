@@ -10,7 +10,7 @@ import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.settings.SettingsActivity
 
 /**
- * The bottom bar's You tab: the app's own screens that aren't tabs — Profile, Upload, Settings,
+ * The bottom bar's You tab: the app's own screens that aren't tabs — Profile, Settings,
  * and the map's Private locations —
  * then the web header's Donate and Info pages (About, Help, Contacts, Privacy), opened in a
  * browser tab, and last the app's version, a line to read rather than an action. Donate only
@@ -23,9 +23,6 @@ class YouFragment : Fragment(R.layout.fragment_you) {
         val context = requireContext()
         view.findViewById<View>(R.id.you_profile).setOnClickListener {
             startActivity(Intent(context, ProfileActivity::class.java))
-        }
-        view.findViewById<View>(R.id.you_upload).setOnClickListener {
-            startActivity(Intent(context, UploadActivity::class.java))
         }
         view.findViewById<View>(R.id.you_settings).setOnClickListener { SettingsActivity.open(context) }
         view.findViewById<View>(R.id.you_private_locations).setOnClickListener { (activity as? MainActivity)?.showPrivacy() }

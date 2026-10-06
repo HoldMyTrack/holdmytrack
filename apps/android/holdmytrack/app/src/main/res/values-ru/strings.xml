@@ -182,7 +182,6 @@
     <string name="nav_sync">Синхр.</string>
     <string name="nav_you">Вы</string>
     <string name="menu_profile">Профиль</string>
-    <string name="menu_upload">Загрузить</string>
     <string name="menu_donate">Поддержать</string>
     <string name="menu_about">О проекте</string>
     <string name="menu_help">Справка</string>
@@ -290,7 +289,7 @@
     <string name="unit_ft">%1$.0f фт</string>
     <string name="unit_mph">%1$.1f ми/ч</string>
 
-    <string name="recorded_empty">Записанных занятий пока нет.</string>
+    <string name="recorded_empty">Ничего не ждёт. Записи с кнопки записи ждут здесь, пока не синхронизируются.</string>
     <string name="recorded_row_edit_named">Изменить: %1$s</string>
     <string name="recorded_row_delete_named">Удалить: %1$s</string>
     <string name="recording_delete">Удалить</string>
@@ -300,7 +299,7 @@
 
     <string name="sync_title">Синхронизация</string>
     <string name="sync_rationale">HoldMyTrack читает из Health Connect ваши записанные тренировки и их GPS-маршруты и добавляет тренировки на улице на вашу карту. Больше он ничего не читает — ни пульс, ни вес, ни сон — и никогда ничего не записывает обратно. У тренировок в помещении нет маршрута, поэтому они пропускаются.</string>
-    <string name="sync_section_recorded">Записанные занятия</string>
+    <string name="sync_section_recorded">Записано на этом телефоне</string>
     <string name="sync_source_health_connect">Health Connect</string>
     <string name="sync_health_connect_info">О синхронизации с Health Connect</string>
     <string name="privacy_policy">Политика конфиденциальности</string>
@@ -317,7 +316,6 @@
     <string name="sync_open_health_connect">Открыть Health Connect</string>
     <string name="sync_now">Синхронизировать</string>
     <string name="sync_never">никогда</string>
-    <string name="sync_ready">Можно синхронизировать. Синхронизировано по: %1$s</string>
     <string name="sync_running">Читаем Health Connect…</string>
     <string name="sync_progress">Прочитано тренировок: %1$d, синхронизировано: %2$d…</string>
     <string name="sync_done">Синхронизация завершена.</string>
@@ -333,9 +331,31 @@
     <string name="sync_no_report">сервер ничего не сообщил об этом занятии (статус %1$s)</string>
     <string name="sync_recorded_summary">Записанные занятия: синхронизировано %1$d.</string>
     <string name="sync_recorded_summary_with_failed">Записанные занятия: синхронизировано %1$d, не удалось %2$d — попробуем снова в следующий раз.</string>
-    <string name="sync_needs_history_permission">Можно синхронизировать, но только последние 30 дней. Синхронизировано по: %1$s</string>
     <string name="sync_history_hint">Health Connect отдаёт только последние 30 дней, если не разрешить доступ к прошлым данным. HoldMyTrack показывает всё, где вы побывали, так что 30 дней — это совсем маленькая карта.</string>
     <string name="sync_allow_history">Разрешить доступ к прошлым данным</string>
+    <plurals name="sync_waiting">
+        <item quantity="one">%1$d запись ждёт</item>
+        <item quantity="few">%1$d записи ждут</item>
+        <item quantity="many">%1$d записей ждут</item>
+        <item quantity="other">%1$d записи ждут</item>
+    </plurals>
+    <string name="sync_nothing_waiting">Ничего не ждёт</string>
+    <string name="sync_syncing">Синхронизация…</string>
+    <string name="sync_detail_with_health_connect">И всё новое в Health Connect · последняя синхронизация: %1$s</string>
+    <string name="sync_detail_health_connect">Прочитает всё новое в Health Connect · последняя синхронизация: %1$s</string>
+    <string name="sync_hc_ready">Готово к чтению</string>
+    <string name="sync_hc_ready_30_days">Готово, но только последние 30 дней</string>
+    <string name="sync_hc_setup">Остался один шаг</string>
+    <string name="sync_hc_unavailable">Недоступно</string>
+    <string name="sync_hc_update">Нужно обновление</string>
+    <string name="sync_hc_reads">Только тренировки и их маршруты — никогда не пульс и никакие другие данные о здоровье.</string>
+    <string name="sync_section_files">Загрузить файлы</string>
+    <string name="sync_upload_title">Файлы</string>
+    <string name="sync_upload_sub">GPX, FIT, TCX, .zip или экспорт Google Health</string>
+    <string name="sync_timeline_title">Хронология Карт</string>
+    <string name="sync_timeline_sub">Экспорт Google Карт на этом телефоне</string>
+    <string name="sync_see_all">Все</string>
+    <string name="sync_history_title">История синхронизации</string>
     <string name="status_history">История</string>
     <string name="status_loading">Загрузка…</string>
     <string name="status_summary_empty">Пока ничего не импортировано.</string>

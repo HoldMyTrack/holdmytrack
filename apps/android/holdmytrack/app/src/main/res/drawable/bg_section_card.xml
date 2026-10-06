@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A card on the Sync, You and Privacy screens: the surface on the page's cream, the card
+     radius, no border — the two tones are the edge. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/hmt_surface" />
+    <corners android:radius="@dimen/hmt_radius_card" />
+</shape>

@@ -75,6 +75,13 @@
             android:label="@string/settings_title"
             android:theme="@style/Theme.HoldMyTrack" />
 
+        <!-- Not exported: the Sync tab's See all. -->
+        <activity
+            android:name=".SyncHistoryActivity"
+            android:exported="false"
+            android:label="@string/sync_history_title"
+            android:theme="@style/Theme.HoldMyTrack" />
+
         <!-- Not exported: reached only from MainActivity's You tab, never by another app. -->
         <activity
             android:name=".ProfileActivity"

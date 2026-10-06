@@ -34,8 +34,9 @@ import kotlinx.coroutines.launch
 /**
  * Sync: every place activities come from on this device and one "Sync now" that sends all of
  * it — Health Connect, once it can be read, and every GPS recording on the device
- * (`RecordedActivityRows`) — then everything imported so far, the web's `/sync` page
- * ([ImportHistory]). Health Connect's onboarding lives here too — Path 2's on-device half
+ * (`RecordedActivityRows`) — then the ways to bring in files from elsewhere, and the latest of
+ * everything imported so far, the web's `/sync` page ([ImportHistory]), the whole of it in
+ * `SyncHistoryActivity`. Health Connect's onboarding lives here too — Path 2's on-device half
  * (`docs/adr/0001-three-independent-ingest-paths.md`).
  *
  * The bottom bar's Sync tab in `MainActivity`, and the whole of `SyncActivity`, which is the
@@ -60,6 +61,13 @@ import kotlinx.coroutines.launch
 class SyncFragment : Fragment(R.layout.fragment_sync) {
 
     private lateinit var accountNotice: TextView
+    private lateinit var hero: View
+    private lateinit var headline: TextView
+    private lateinit var detail: TextView
+    private lateinit var progress: View
+    private lateinit var filesSection: View
+    private lateinit var statusDot: View
+    private lateinit var statusTitle: TextView
     private lateinit var recordedSection: View
     private lateinit var recordedRows: RecordedActivityRows
     private lateinit var healthConnectSection: View
@@ -92,6 +100,13 @@ class SyncFragment : Fragment(R.layout.fragment_sync) {
         findViewById<View>(R.id.sync_title).visibility = if (activity is MainActivity) View.VISIBLE else View.GONE
 
         accountNotice = findViewById(R.id.sync_account_notice)
+        hero = findViewById(R.id.sync_hero)
+        headline = findViewById(R.id.sync_headline)
+        detail = findViewById(R.id.sync_detail)
+        progress = findViewById(R.id.sync_progress)
+        filesSection = findViewById(R.id.sync_files_section)
+        statusDot = findViewById(R.id.sync_status_dot)
+        statusTitle = findViewById(R.id.sync_status_title)
         recordedSection = findViewById(R.id.sync_recorded_section)
         recordedRows = RecordedActivityRows(
             requireActivity() as AppCompatActivity,
@@ -101,7 +116,12 @@ class SyncFragment : Fragment(R.layout.fragment_sync) {
         )
         healthConnectSection = findViewById(R.id.sync_health_connect_section)
         historySection = findViewById(R.id.sync_history_section)
-        history = ImportHistory(view, onViewOnMap = ::viewOnMap)
+        history = ImportHistory(
+            view,
+            preview = true,
+            onViewOnMap = ::viewOnMap,
+            onSeeAll = { startActivity(Intent(requireContext(), SyncHistoryActivity::class.java)) },
+        )
         status = findViewById(R.id.sync_status)
         instructions = findViewById(R.id.sync_instructions)
         results = findViewById(R.id.sync_results)
@@ -111,6 +131,12 @@ class SyncFragment : Fragment(R.layout.fragment_sync) {
 
         findViewById<Button>(R.id.sync_health_connect_info).setOnClickListener { showRationale() }
         syncNow.setOnClickListener { startSync() }
+        findViewById<View>(R.id.sync_upload).setOnClickListener {
+            startActivity(Intent(requireContext(), UploadActivity::class.java))
+        }
+        findViewById<View>(R.id.sync_timeline).setOnClickListener {
+            startActivity(Intent(requireContext(), TimelineImportActivity::class.java))
+        }
 
         // Health Connect asked "why does this app want my data" — answer it straight away,
         // rather than making the user find the info button. Only on a fresh start, so a
@@ -200,23 +226,25 @@ class SyncFragment : Fragment(R.layout.fragment_sync) {
         // same way it rejects upload/edit/delete for every other client — but the web app
         // doesn't rely on that alone: it disables the Upload control up front, with an
         // explanation, rather than letting the user discover the block from a server error.
-        // This is that same treatment on Android: Sync now and the Health Connect section are
-        // hidden rather than left to fail. Recordings stay listed — a demo account can still
-        // record, edit and delete them locally — and so does its history, as on the web.
+        // This is that same treatment on Android: Sync now, the Health Connect section and the
+        // files are hidden rather than left to fail. Recordings stay listed — a demo account can
+        // still record, edit and delete them locally — and so does its history, as on the web.
         historySection.visibility = View.VISIBLE
         history.start()
         if (Session.isDemo) {
             showAccountNotice(getString(R.string.sync_demo_read_only))
             recordedSection.visibility = View.VISIBLE
+            hero.visibility = View.GONE
             healthConnectSection.visibility = View.GONE
-            syncNow.visibility = View.GONE
+            filesSection.visibility = View.GONE
             return
         }
 
         accountNotice.visibility = View.GONE
         recordedSection.visibility = View.VISIBLE
+        hero.visibility = View.VISIBLE
         healthConnectSection.visibility = View.VISIBLE
-        syncNow.visibility = View.VISIBLE
+        filesSection.visibility = View.VISIBLE
         renderHealthConnect(readiness)
         updateSyncNow()
     }
@@ -224,9 +252,10 @@ class SyncFragment : Fragment(R.layout.fragment_sync) {
     /** Signed out or unconfirmed: nothing here can sync, so only the reason is shown. */
     private fun showAccountBlock(text: String) {
         showAccountNotice(text)
+        hero.visibility = View.GONE
         recordedSection.visibility = View.GONE
         healthConnectSection.visibility = View.GONE
-        syncNow.visibility = View.GONE
+        filesSection.visibility = View.GONE
         historySection.visibility = View.GONE
     }
 
@@ -236,13 +265,22 @@ class SyncFragment : Fragment(R.layout.fragment_sync) {
     }
 
     /**
-     * Where Health Connect's setup stands, and its one remaining step as the section's button.
-     * Sync now includes Health Connect whenever it can be read — READY, or READY-but-30-days,
-     * which still syncs, just not as far back.
+     * Where Health Connect's setup stands — a dot, a title and the line under it — and its one
+     * remaining step as the card's button. Sync now includes Health Connect whenever it can be
+     * read — READY, or READY-but-30-days, which still syncs, just not as far back.
      */
     private fun renderHealthConnect(readiness: HealthConnect.Readiness) {
         primary.visibility = View.VISIBLE
         instructions.visibility = View.GONE
+        val (title, dot) = when (readiness) {
+            HealthConnect.Readiness.READY -> R.string.sync_hc_ready to R.color.hmt_success
+            HealthConnect.Readiness.NEEDS_HISTORY_PERMISSION -> R.string.sync_hc_ready_30_days to R.color.hmt_success
+            HealthConnect.Readiness.UNAVAILABLE -> R.string.sync_hc_unavailable to R.color.hmt_ink_faint
+            HealthConnect.Readiness.UPDATE_REQUIRED -> R.string.sync_hc_update to R.color.hmt_accent
+            else -> R.string.sync_hc_setup to R.color.hmt_accent
+        }
+        statusTitle.setText(title)
+        statusDot.backgroundTintList = requireContext().getColorStateList(dot)
 
         when (readiness) {
             HealthConnect.Readiness.UNAVAILABLE -> {
@@ -274,7 +312,7 @@ class SyncFragment : Fragment(R.layout.fragment_sync) {
                 primary.setOnClickListener { openSettings() }
             }
             HealthConnect.Readiness.NEEDS_HISTORY_PERMISSION -> {
-                showStatus(getString(R.string.sync_needs_history_permission, lastSyncedLabel()))
+                showStatus(getString(R.string.sync_hc_reads))
                 instructions.setText(R.string.sync_history_hint)
                 instructions.visibility = View.VISIBLE
                 // Unlike the routes permission, this one *is* requestable, so the app asks
@@ -288,8 +326,8 @@ class SyncFragment : Fragment(R.layout.fragment_sync) {
                 }
             }
             HealthConnect.Readiness.READY -> {
-                showStatus(getString(R.string.sync_ready, lastSyncedLabel()))
-                // Sync now, below both sections, is the action here.
+                showStatus(getString(R.string.sync_hc_reads))
+                // Sync now, in the card above, is the action here.
                 primary.visibility = View.GONE
             }
         }
@@ -301,9 +339,33 @@ class SyncFragment : Fragment(R.layout.fragment_sync) {
     /** Health Connect is in this run whenever it can be read. */
     private fun includesHealthConnect() = readiness?.isSyncable() == true
 
-    /** Enabled when there's something to send and no run already going. */
+    /** Enabled when there's something to send and no run already going; over it, what a run
+     *  would send, or what one is doing. The bottom bar's badge follows the recordings. */
     private fun updateSyncNow() {
-        syncNow.isEnabled = syncJob == null && (includesHealthConnect() || recordedRows.count > 0)
+        val running = syncJob != null
+        syncNow.isEnabled = !running && (includesHealthConnect() || recordedRows.count > 0)
+        progress.visibility = if (running) View.VISIBLE else View.GONE
+        (activity as? MainActivity)?.setSyncWaiting(recordedRows.count)
+        if (running) {
+            headline.setText(R.string.sync_syncing)
+            return
+        }
+        val waiting = recordedRows.count
+        headline.text = if (waiting > 0) {
+            resources.getQuantityString(R.plurals.sync_waiting, waiting, waiting)
+        } else {
+            getString(R.string.sync_nothing_waiting)
+        }
+        if (includesHealthConnect()) {
+            showDetail(getString(if (waiting > 0) R.string.sync_detail_with_health_connect else R.string.sync_detail_health_connect, lastSyncedLabel()))
+        } else {
+            detail.visibility = View.GONE
+        }
+    }
+
+    private fun showDetail(text: CharSequence) {
+        detail.text = text
+        detail.visibility = View.VISIBLE
     }
 
     private fun lastSyncedLabel(): String {
@@ -326,7 +388,7 @@ class SyncFragment : Fragment(R.layout.fragment_sync) {
     private fun startSync() {
         val client = if (includesHealthConnect()) HealthConnect.clientOrNull(requireContext()) else null
         problems.visibility = View.GONE
-        showResults(getString(if (client != null) R.string.sync_running else R.string.sync_running_recorded))
+        results.visibility = View.GONE
 
         syncJob = viewLifecycleOwner.lifecycleScope.launch {
             try {
@@ -334,7 +396,6 @@ class SyncFragment : Fragment(R.layout.fragment_sync) {
                 show(report, flushRecordedQueue())
             } catch (e: Exception) {
                 showProblems(listOf(getString(R.string.sync_failed, e.message.orEmpty())))
-                results.visibility = View.GONE
                 flushRecordedQueue()
             } finally {
                 syncJob = null
@@ -345,6 +406,7 @@ class SyncFragment : Fragment(R.layout.fragment_sync) {
             }
         }
         updateSyncNow()
+        showDetail(getString(if (client != null) R.string.sync_running else R.string.sync_running_recorded))
     }
 
     /** Submits every GPS recording on the device (`RecordedActivityStore`) and deletes each
@@ -372,7 +434,7 @@ class SyncFragment : Fragment(R.layout.fragment_sync) {
     private data class RecordedSyncResult(val synced: Int, val failed: Int)
 
     private fun showProgress(progress: SyncProgress) {
-        showResults(getString(R.string.sync_progress, progress.scanned, progress.synced))
+        showDetail(getString(R.string.sync_progress, progress.scanned, progress.synced))
     }
 
     private fun showResults(text: CharSequence) {
@@ -427,12 +489,11 @@ class SyncFragment : Fragment(R.layout.fragment_sync) {
         problems.visibility = if (lines.isEmpty()) View.GONE else View.VISIBLE
     }
 
-    /** Where Health Connect stands, in a notice — or in the error box's colors when it's a
-     *  failure. */
+    /** Where Health Connect stands, said in full under its title — in the danger color when
+     *  it's a failure. */
     private fun showStatus(text: CharSequence, failed: Boolean = false) {
         status.text = text
-        status.setBackgroundResource(if (failed) R.drawable.bg_notice_error else R.drawable.bg_notice)
-        status.setTextColor(requireContext().getColor(if (failed) R.color.hmt_danger else R.color.hmt_ink))
+        status.setTextColor(requireContext().getColor(if (failed) R.color.hmt_danger else R.color.hmt_ink_secondary))
     }
 
     /**

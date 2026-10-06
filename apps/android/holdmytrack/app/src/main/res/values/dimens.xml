@@ -22,6 +22,8 @@
     <dimen name="hmt_radius_sm">6dp</dimen>
     <dimen name="hmt_radius_md">8dp</dimen>
     <dimen name="hmt_radius_lg">12dp</dimen>
+    <!-- The app's own: the Sync, You and Privacy screens' cards (bg_section_card). -->
+    <dimen name="hmt_radius_card">20dp</dimen>
 
     <dimen name="hmt_text_3xs">9sp</dimen>
     <dimen name="hmt_text_2xs">10sp</dimen>
