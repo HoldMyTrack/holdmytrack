@@ -12,6 +12,7 @@ import dev.holdmytrack.android.R
 import dev.holdmytrack.android.map.EditPreview
 import dev.holdmytrack.android.map.PhotoMarkerOverlay
 import dev.holdmytrack.android.net.Activity
+import dev.holdmytrack.android.net.ApiException
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Photo
 import dev.holdmytrack.android.net.TrackPoint
@@ -47,7 +48,7 @@ class EditActivityWindow(
     /** The Track tab opened on [Activity] for the first time. */
     private val onStartTrack: (Activity) -> Unit,
     /** The track editor's overlay — see [TrackEditor]. */
-    onDrawTrack: (visible: List<TrackPoint>?, lo: Int, hi: Int, preview: EditPreview) -> Unit,
+    onDrawTrack: (visible: List<TrackPoint>?, lo: Int, hi: Int, preview: EditPreview, split: Int?) -> Unit,
     /** Add photos: open the system photo picker, and hand what's picked to [photosTab]. */
     onPickPhotos: () -> Unit,
     /** The Photos tab's draft on the map — see [PhotosTab]. */
@@ -240,12 +241,14 @@ class EditActivityWindow(
         trackUnavailable = when {
             single == null -> res.getString(R.string.edit_track_check_one)
             single.pending -> res.getString(R.string.edit_track_processing)
+            single.isPrivate -> res.getString(R.string.activity_private_note)
             single.bbox == null -> res.getString(R.string.edit_track_no_track)
             else -> null
         }
         // Photos belong to one activity, each with a place on its track.
         photosUnavailable = when {
             single == null -> res.getString(R.string.photos_check_one)
+            single.isPrivate -> res.getString(R.string.activity_private_note)
             single.bbox == null -> res.getString(R.string.photos_no_track)
             else -> null
         }
@@ -397,14 +400,36 @@ class EditActivityWindow(
         }
         saving = true
         renderBusy()
-        HoldMyTrackApi.trackEdit(single.id, trackEditor.pending) { result ->
+        sendTrack(single.id, allowHidden = false)
+    }
+
+    private fun sendTrack(id: String, allowHidden: Boolean) {
+        saving = true
+        renderBusy()
+        HoldMyTrackApi.trackEdit(id, trackEditor.pending, trackEditor.splitAt, allowHidden) { result ->
             result.onSuccess { finish(trackApplied = true) }
                 .onFailure { failure ->
                     saving = false
                     renderBusy()
+                    if ((failure as? ApiException)?.errorCode == HoldMyTrackApi.SPLIT_HIDES_PART) {
+                        // Everything before the track is written; the question is the split alone.
+                        confirmHiddenSplit(id, failure.message.orEmpty())
+                        return@onFailure
+                    }
                     showError(failure.message?.takeIf { it.isNotBlank() } ?: res.getString(R.string.edit_save_failed))
                 }
         }
+    }
+
+    /** A split leaving one part inside a Private location: the server's explanation, and the
+     *  choice to go ahead (`docs/SPEC.md` FR-5.17 behavior 7). */
+    private fun confirmHiddenSplit(id: String, message: String) {
+        MaterialAlertDialogBuilder(context, R.style.ThemeOverlay_HoldMyTrack_Dialog)
+            .setTitle(R.string.edit_track_split_hidden_title)
+            .setMessage(message)
+            .setPositiveButton(R.string.edit_track_split_hidden_confirm) { _, _ -> sendTrack(id, allowHidden = true) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun finish(trackApplied: Boolean) {

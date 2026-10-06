@@ -479,6 +479,8 @@
     <string name="panel_none_match">No activities match the current filters.</string>
     <string name="panel_pending">Pending</string>
     <string name="panel_hidden">Hidden</string>
+    <string name="activity_private_badge">Private</string>
+    <string name="activity_private_note">Entirely inside one of your private locations, so it isn\'t on the map and has no distance. Moving or removing that location brings it back.</string>
     <string name="panel_row_check">Add %1$s to selection</string>
     <string name="panel_row_uncheck">Remove %1$s from selection</string>
     <string name="panel_fly_to">Fly to %1$s</string>
@@ -514,6 +516,11 @@
     <string name="edit_track_chop">Chop</string>
     <string name="edit_track_chop_title">Keep only the part between the knobs</string>
     <string name="edit_track_cut">Cut</string>
+    <string name="edit_track_split">Split</string>
+    <string name="edit_track_split_title">Split the activity in two at the knob you moved</string>
+    <string name="edit_track_split_note">Saving splits this activity in two at %1$s. The new part gets the same type, name and description.</string>
+    <string name="edit_track_split_hidden_title">Split into a private location?</string>
+    <string name="edit_track_split_hidden_confirm">Split anyway</string>
     <string name="edit_track_cut_title">Remove the part between the knobs and join its two ends. Hold to preview.</string>
     <string name="edit_track_delete_point">Delete point</string>
     <string name="edit_track_delete_point_title">Tap points on the map to delete them</string>

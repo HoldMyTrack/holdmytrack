@@ -1198,9 +1198,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /** The track editor's overlay: the points as edited, its knobs and what would go. */
-    private fun drawTrackEdit(visible: List<TrackPoint>?, lo: Int, hi: Int, preview: EditPreview) {
+    private fun drawTrackEdit(visible: List<TrackPoint>?, lo: Int, hi: Int, preview: EditPreview, split: Int?) {
         val loaded = style ?: return
-        if (visible == null) TrackEditOverlay.clear(loaded) else TrackEditOverlay.set(loaded, visible, lo, hi, preview)
+        if (visible == null) TrackEditOverlay.clear(loaded) else TrackEditOverlay.set(loaded, visible, lo, hi, preview, split)
     }
 
     private fun onEditClosed(saved: Boolean, trackApplied: Boolean, photosSaved: Boolean) {

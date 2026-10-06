@@ -144,6 +144,18 @@
         </LinearLayout>
     </LinearLayout>
 
+    <!-- A private activity's stand-in for the stats (docs/SPEC.md FR-5.1): no track, so no
+         distance, time or pace — what it is and how it comes back instead. -->
+    <TextView
+        android:id="@+id/card_private"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/hmt_space_12"
+        android:text="@string/activity_private_note"
+        android:textColor="@color/hmt_ink_meta"
+        android:textSize="@dimen/hmt_text_sm"
+        android:visibility="gone" />
+
     <!-- The pace bands' legend, slowest to fastest — only while the map draws them. -->
     <LinearLayout
         android:id="@+id/card_bands"

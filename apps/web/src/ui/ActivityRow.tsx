@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { X } from 'lucide-react';
+import { Lock, X } from 'lucide-react';
 import type { Activity } from '../api';
 import { formatActivityType, formatDistance, formatDuration, formatStartedAt } from './format';
 import type { UnitSystem } from './units';
@@ -91,7 +91,7 @@ export function ActivityRow({
         disabled={isPending}
         aria-pressed={focused}
         aria-label={t('activities.fly_to', { label })}
-        title={activity.bbox === null ? t('activities.no_track') : label}
+        title={activity.private ? t('activities.private_title') : activity.bbox === null ? t('activities.no_track') : label}
         onClick={onFocus}
       >
         <span className={`activities-panel__title${hovered ? ' activities-panel__title--hovered' : ''}`}>{label}</span>
@@ -100,11 +100,17 @@ export function ActivityRow({
               place as the title above — otherwise it's already the title and repeating it here
               would be redundant. Type trails the line. */}
           {displayName && `${formatStartedAt(activity.startedAt)} · `}
-          {formatDistance(activity.distanceMeters, system)} · {formatDuration(activity.durationSeconds)} ·{' '}
+          {/* A private activity has no track, so no distance or duration — "0.0 mi · 0m" would
+              read as broken data rather than as hidden on purpose. Its badge says why. */}
+          {!activity.private && (
+            <>
+              {formatDistance(activity.distanceMeters, system)} · {formatDuration(activity.durationSeconds)} ·{' '}
+            </>
+          )}
           {formatActivityType(activity.activityType)}
         </span>
       </button>
-      {(isPending || hidden || otherStories.length > 0) && (
+      {(isPending || hidden || activity.private || otherStories.length > 0) && (
         // One right-aligned group, so the badges share one right edge whatever the text beside
         // them does, and a row that's both stacks them there together.
         <span className="activities-panel__badges">
@@ -112,6 +118,12 @@ export function ActivityRow({
           {isPending && (
             <span className="activities-panel__hidden-badge" title={t('activities.pending_title')}>
               {t('activities.pending')}
+            </span>
+          )}
+          {activity.private && !isPending && (
+            <span className="activities-panel__hidden-badge activities-panel__private-badge" title={t('activities.private_title')}>
+              <Lock size={10} aria-hidden="true" />
+              {t('activities.private')}
             </span>
           )}
           {hidden && <span className="activities-panel__hidden-badge">{t('activities.hidden')}</span>}

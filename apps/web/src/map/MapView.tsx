@@ -1230,17 +1230,21 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
       ? t('activities.edit_track_check_one')
       : editWindowActivities[0]!.pending
         ? t('activities.edit_track_processing')
-        : editWindowActivities[0]!.bbox === null
-          ? t('activities.no_track')
-          : null;
+        : editWindowActivities[0]!.private
+          ? t('activities.private_title')
+          : editWindowActivities[0]!.bbox === null
+            ? t('activities.no_track')
+            : null;
 
   // Photos belong to one activity, and need a track to sit on (FR-16.6).
   const editPhotosUnavailable =
     editWindowActivities === null || editWindowActivities.length !== 1
       ? t('photos.check_one')
-      : editWindowActivities[0]!.bbox === null
-        ? t('photos.no_track')
-        : null;
+      : editWindowActivities[0]!.private
+        ? t('activities.private_title')
+        : editWindowActivities[0]!.bbox === null
+          ? t('photos.no_track')
+          : null;
   // The Edit window opens on its Activity tab, with nothing being moved on the map.
   useEffect(() => {
     setEditTab('activity');

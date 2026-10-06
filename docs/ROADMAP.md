@@ -42,6 +42,13 @@ Country/Region matching (`IMPLEMENTATION.md` §4.2.4) uses Natural Earth's 1:50m
 - [ ] Keep the Country/Region tiles fast, since they are drawn live from these polygons per request (ADR-0008): likely a simplified copy for low zooms, with the detailed one used for matching at ingest.
 - [ ] Re-match existing activities against the new boundaries, and confirm the Niagara Falls trip shows only the United States and New York, and the Italy Story's Vatican City walk and Ostia seafront walk show Vatican City and Italy.
 
+### Merge a split activity back — server built, no control yet
+
+Splitting an activity is built on the web (`SPEC.md` FR-5.17), and so is merging its parts back on the server (`POST /v1/activities/track-merge`, `IMPLEMENTATION.md` §4.7.8). Neither client offers Merge yet, so a split can't be undone from the app.
+
+- [ ] Decide where Merge lives — a toolbar action over checked neighboring parts, or a "Merge with the next part" in the Edit window — and build it on the web, from the list rows' `split` field.
+- [ ] Carry it to the Android app, next to its Split tool (`apps/android/docs/SPEC.md` FR-2.7 item 12).
+
 ### Sign in with Facebook — built, not live
 
 Sign in with Facebook is built (`SPEC.md` FR-1.10) and the Meta app exists, but Meta won't publish an app until its business portfolio passes Business Verification (`docs/DEPLOY.md` §4). Until then `holdmytrack.com` runs with `FACEBOOK_APP_ID` empty, so it shows no Facebook button. This isn't a launch gate: Google and email sign-in cover everyone.

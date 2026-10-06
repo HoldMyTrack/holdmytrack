@@ -93,4 +93,22 @@ class EditTrackOpsTest {
         assertEquals(111.19, d[1], 0.1)
         assertEquals(9 * 111.19, d[9], 1.0)
     }
+
+    @Test
+    fun `split goes at the one knob moved, two points each side`() {
+        assertNull(EditTrackOps.splitIndex(track, 0, 9))
+        assertEquals(4, EditTrackOps.splitIndex(track, 4, 9))
+        assertEquals(6, EditTrackOps.splitIndex(track, 0, 6))
+        assertNull(EditTrackOps.splitIndex(track, 2, 6))
+        assertNull(EditTrackOps.splitIndex(track, 9, 9))
+        assertNull(EditTrackOps.splitIndex(track, 0, 0))
+    }
+
+    @Test
+    fun `a split rides beside the edit, not in it`() {
+        val ops = listOf(EditTrackOps.chop(track, 1, 9)!!, EditOp.Split(50L))
+        assertEquals(10L to 90L, EditTrackOps.fold(null, ops).keep)
+        assertEquals(50L, EditTrackOps.splitPoint(ops))
+        assertNull(EditTrackOps.splitPoint(ops.take(1)))
+    }
 }

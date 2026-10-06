@@ -165,6 +165,9 @@ export interface Activity {
   pending: boolean;
   /** The track carries a user edit, so "Reset to original track" has something to undo. */
   edited: boolean;
+  /** Entirely inside the account's Private locations (FR-8.1): kept with no track, so its
+   *  distance and duration mean nothing — the row shows a Private badge instead. */
+  private: boolean;
   /** The Stories it's in, newest first — the Activities panel's Story badge. */
   stories: { id: string; name: string }[];
 }
@@ -192,6 +195,7 @@ interface ActivityRowBody {
   bbox: number[] | null;
   pending: boolean;
   edited: boolean;
+  private: boolean;
   stories: { id: string; name: string }[];
 }
 
@@ -223,6 +227,7 @@ function toActivity(a: ActivityRowBody): Activity {
     bbox: a.bbox && a.bbox.length === 4 ? ([...a.bbox] as BBox) : null,
     pending: a.pending,
     edited: a.edited,
+    private: a.private ?? false,
     stories: a.stories ?? [],
   };
 }
@@ -441,20 +446,35 @@ export async function getActivityTrackPoints(activityId: string, signal?: AbortS
   return (await res.json()) as ActivityTrackPoints;
 }
 
+/** A split would leave one part entirely inside a Private location (`split_hides_part`,
+ *  FR-5.17): nothing was saved, and saving again with `allowHidden` goes ahead. The message
+ *  says what the part will be. */
+export class SplitHidesPartError extends Error {}
+
 /**
  * `POST /v1/activities/track-edit/{id}` — the editor's Apply. Sends the complete new edit
- * (null resets to the original track); the server marks the activity pending and reprocesses
- * it in the background, so this resolves as soon as that's queued (`202`).
+ * (null resets to the original track), and `splitAt`, a point's unix ms, to also split the
+ * activity there (§4.7.8); the server marks the activity — both pieces, for a split — pending
+ * and reprocesses it in the background, so this resolves as soon as that's queued (`202`).
+ * Throws `SplitHidesPartError` for a split the user hasn't yet agreed may hide a part.
  */
-export async function saveActivityTrackEdit(activityId: string, edit: TrackEdit | null): Promise<void> {
+export async function saveActivityTrackEdit(
+  activityId: string,
+  edit: TrackEdit | null,
+  splitAt: number | null = null,
+  allowHidden = false,
+): Promise<void> {
   const res = await fetch(`${API_BASE_URL}${API_V1}/activities/track-edit/${activityId}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ edit }),
+    body: JSON.stringify(splitAt === null ? { edit } : { edit, split_at: splitAt, ...(allowHidden ? { allow_hidden: true } : {}) }),
   });
   if (!res.ok) {
-    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
+    const text = await res.text().catch(() => '');
+    const message = messageFromErrorBody(text, t('common.request_failed', { status: res.status }));
+    if (res.status === 422 && text.includes('"split_hides_part"')) throw new SplitHidesPartError(message);
+    throw new Error(message);
   }
 }
 

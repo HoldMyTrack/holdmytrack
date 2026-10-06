@@ -26,7 +26,8 @@ import org.maplibre.android.maps.MapLibreMap
  * The Edit window's Track tab — the web's `apps/web/src/ui/TrackEditor.tsx` (`docs/SPEC.md`
  * FR-5.14): one activity's recorded points and the edit already saved on them, a two-knob range
  * over the points as the edit leaves them, and **Chop** (keep the range), **Cut** (take out
- * what's between the knobs and join them), **Delete point** (a toggle: a tap on the map takes
+ * what's between the knobs and join them), **Split** (split the activity in two at the one
+ * knob moved, FR-5.17), **Delete point** (a toggle: a tap on the map takes
  * out the point under it), **Move point** (a toggle: a point pressed on the map follows the
  * finger and stays where it's let go), **Undo** and **Reset**. Nothing is sent from here: [pending] is the
  * whole edit for the window's Save to send, and every change is drawn over the map through
@@ -34,12 +35,16 @@ import org.maplibre.android.maps.MapLibreMap
  *
  * The knobs are held as the times of the points they sit on, not as indices, so a deleted point
  * elsewhere never moves them; null is "at that end".
+ *
+ * Split is a step like the others, so Undo takes it back, but it isn't part of the edit: it's
+ * [splitAt], beside [pending], and the window's Save sends both in one request. One split a
+ * session; once it's made the other tools wait for Undo, since the edit applies to both parts.
  */
 class TrackEditor(
     private val root: View,
-    /** Redraws the map overlay: the points as edited, the knobs' indices, what to preview.
-     *  Null clears it. */
-    private val onDraw: (visible: List<TrackPoint>?, lo: Int, hi: Int, preview: EditPreview) -> Unit,
+    /** Redraws the map overlay: the points as edited, the knobs' indices, what to preview, and
+     *  the index the track splits at (made, or previewed), if any. Null clears it. */
+    private val onDraw: (visible: List<TrackPoint>?, lo: Int, hi: Int, preview: EditPreview, split: Int?) -> Unit,
     /** The session changed, or finished loading — the window's tab dot and Save follow it. */
     private val onChange: () -> Unit,
 ) {
@@ -55,6 +60,7 @@ class TrackEditor(
     private val end: TextView = root.findViewById(R.id.edit_track_end)
     private val chop: MaterialButton = root.findViewById(R.id.edit_track_chop)
     private val cut: MaterialButton = root.findViewById(R.id.edit_track_cut)
+    private val split: MaterialButton = root.findViewById(R.id.edit_track_split)
     private val deletePoint: MaterialButton = root.findViewById(R.id.edit_track_delete_point)
     private val movePoint: MaterialButton = root.findViewById(R.id.edit_track_move_point)
     private val undo: MaterialButton = root.findViewById(R.id.edit_track_undo)
@@ -109,7 +115,15 @@ class TrackEditor(
             preview = EditPreview.CHOP
             push(EditTrackOps.cut(visible, lo, hi))
         }
-        holdToPreviewCut()
+        split.setOnClickListener {
+            val (lo, hi) = knobs()
+            val at = EditTrackOps.splitIndex(visible, lo, hi) ?: return@setOnClickListener
+            preview = EditPreview.CHOP
+            pointModesOff()
+            push(EditOp.Split(visible[at].t))
+        }
+        holdToPreview(cut, EditPreview.CUT)
+        holdToPreview(split, EditPreview.SPLIT)
         deletePoint.addOnCheckedChangeListener { _, checked ->
             deleteMode = checked
             if (checked) movePoint.isChecked = false
@@ -128,6 +142,7 @@ class TrackEditor(
         reset.setOnClickListener { push(EditOp.Reset) }
         TooltipCompat.setTooltipText(chop, res.getString(R.string.edit_track_chop_title))
         TooltipCompat.setTooltipText(cut, res.getString(R.string.edit_track_cut_title))
+        TooltipCompat.setTooltipText(split, res.getString(R.string.edit_track_split_title))
         TooltipCompat.setTooltipText(deletePoint, res.getString(R.string.edit_track_delete_point_title))
         TooltipCompat.setTooltipText(movePoint, res.getString(R.string.edit_track_move_point_title))
         TooltipCompat.setTooltipText(undo, res.getString(R.string.edit_track_undo_title))
@@ -186,7 +201,7 @@ class TrackEditor(
         points = null
         ops = emptyList()
         pointModesOff()
-        onDraw(null, 0, 0, EditPreview.CHOP)
+        onDraw(null, 0, 0, EditPreview.CHOP, null)
     }
 
     /** Whether the session changed anything — what Save sends, and the tab's dot. */
@@ -198,9 +213,13 @@ class TrackEditor(
     val pending: TrackEdit?
         get() = EditTrackOps.fold(base, ops).takeUnless { it.isEmpty }
 
+    /** The time to split the activity at, sent beside [pending] — null for no split. */
+    val splitAt: Long?
+        get() = EditTrackOps.splitPoint(ops)
+
     /** A map tap in Delete point mode, on the point at [t]; a track keeps at least two. */
     fun dropPoint(t: Long) {
-        if (!deleteMode || busy || visible.size <= 2) return
+        if (!deleteMode || busy || visible.size <= 2 || splitAt != null) return
         push(EditOp.Drop(t))
     }
 
@@ -280,7 +299,7 @@ class TrackEditor(
         visible = EditTrackOps.apply(recorded, EditTrackOps.fold(base, ops))
         if (visible.size < 2) {
             body.visibility = View.GONE
-            onDraw(null, 0, 0, preview)
+            onDraw(null, 0, 0, preview, null)
             return
         }
         body.visibility = View.VISIBLE
@@ -304,18 +323,21 @@ class TrackEditor(
         count.text = res.getQuantityString(R.plurals.edit_track_points, visible.size, visible.size)
         end.text = PanelFormat.distance(res, distances[last])
 
-        chop.isEnabled = !busy && EditTrackOps.chop(visible, lo, hi) != null
-        cut.isEnabled = !busy && EditTrackOps.cut(visible, lo, hi) != null
-        deletePoint.isEnabled = !busy
-        movePoint.isEnabled = !busy
+        val splitting = splitAt
+        chop.isEnabled = !busy && splitting == null && EditTrackOps.chop(visible, lo, hi) != null
+        cut.isEnabled = !busy && splitting == null && EditTrackOps.cut(visible, lo, hi) != null
+        split.isEnabled = !busy && splitting == null && EditTrackOps.splitIndex(visible, lo, hi) != null
+        deletePoint.isEnabled = !busy && splitting == null
+        movePoint.isEnabled = !busy && splitting == null
         undo.isEnabled = !busy && ops.isNotEmpty()
-        reset.visibility = if (!EditTrackOps.fold(base, ops).isEmpty) View.VISIBLE else View.GONE
+        reset.visibility = if (!EditTrackOps.fold(base, ops).isEmpty && splitting == null) View.VISIBLE else View.GONE
         reset.isEnabled = !busy
         when {
+            splitting != null -> modeNote.text = res.getString(R.string.edit_track_split_note, clock(splitting))
             deleteMode -> modeNote.setText(R.string.edit_track_delete_point_note)
             moveMode -> modeNote.setText(R.string.edit_track_move_point_note)
         }
-        modeNote.visibility = if (deleteMode || moveMode) View.VISIBLE else View.GONE
+        modeNote.visibility = if (splitting != null || deleteMode || moveMode) View.VISIBLE else View.GONE
 
         draw()
     }
@@ -327,17 +349,20 @@ class TrackEditor(
         val (lo, hi) = knobs()
         val held = dragging
         val shown = if (held == null) visible else visible.map { if (it.t == held.t) it.copy(lon = held.lon, lat = held.lat) else it }
-        onDraw(shown, lo, hi, if (preview == EditPreview.CUT && cut.isEnabled) EditPreview.CUT else EditPreview.CHOP)
+        // The split made, else the one Split would make while it's held.
+        val splitIndex = splitAt?.let { t -> visible.indexOfFirst { it.t == t }.takeIf { it >= 0 } }
+            ?: if (preview == EditPreview.SPLIT && split.isEnabled) EditTrackOps.splitIndex(visible, lo, hi) else null
+        onDraw(shown, lo, hi, if (preview == EditPreview.CUT && cut.isEnabled) EditPreview.CUT else EditPreview.CHOP, splitIndex)
     }
 
-    /** The web previews Cut while its button is hovered or focused; on a phone, while it's
-     *  held — the tap that follows is the Cut itself. */
-    @SuppressLint("ClickableViewAccessibility") // Only a preview; the click still performs Cut.
-    private fun holdToPreviewCut() {
-        cut.setOnTouchListener { _, event ->
+    /** The web previews Cut and Split while their buttons are hovered or focused; on a phone,
+     *  while one is held — the tap that follows is the Cut or Split itself. */
+    @SuppressLint("ClickableViewAccessibility") // Only a preview; the click still performs it.
+    private fun holdToPreview(button: MaterialButton, what: EditPreview) {
+        button.setOnTouchListener { _, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    preview = EditPreview.CUT
+                    preview = what
                     render()
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {

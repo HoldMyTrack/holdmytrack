@@ -105,7 +105,7 @@ const activityStoriesColumn = `COALESCE((
 const listActivitiesQuery = `
 SELECT id, started_at, activity_type, name, distance_meters, duration_seconds, description,
        ST_XMin(trajectory), ST_YMin(trajectory), ST_XMax(trajectory), ST_YMax(trajectory),
-       edit_pending, track_edit IS NOT NULL,
+       edit_pending, track_edit IS NOT NULL, trajectory IS NULL, split_group, split_from, split_to,
        ` + activityStoriesColumn + `
 FROM activities
 WHERE user_id = $1
@@ -149,8 +149,23 @@ type activityRow struct {
 	// a user edit, which is what makes "Reset to original track" meaningful.
 	Pending bool `json:"pending"`
 	Edited  bool `json:"edited"`
+	// Private is an activity entirely inside the account's Private locations (FR-8.1): kept,
+	// with no track, so no distance or duration worth showing — the panel badges it instead.
+	// A NULL trajectory has no other cause (§3.3).
+	Private bool `json:"private"`
+	// Split is set on a piece of a split activity (§4.7.8): which split, and the stretch of the
+	// recording it covers — what the Activities panel's Merge checks a group against.
+	Split *splitRef `json:"split"`
 	// Stories are the Stories it's in, newest first — the Activities panel's Story badge.
 	Stories []storyRef `json:"stories"`
+}
+
+// splitRef places a piece within its split: From and To are unix-ms point timestamps, null
+// at the recording's own ends. Pieces meet where one's To is the next one's From.
+type splitRef struct {
+	Group string `json:"group"`
+	From  *int64 `json:"from"`
+	To    *int64 `json:"to"`
 }
 
 // storyRef names a Story an activity is in.
@@ -172,9 +187,15 @@ func scanActivityRow(row rowScanner) (activityRow, error) {
 	// Four nullable floats rather than one bbox type: they are null together, since a row
 	// either has a trajectory or doesn't, but pgx has no reason to know that.
 	var minLon, minLat, maxLon, maxLat *float64
+	var splitGroup *string
+	var split splitRef
 	if err := row.Scan(&a.ID, &a.StartedAt, &a.ActivityType, &a.Name, &a.DistanceMeters, &a.DurationSeconds, &a.Description,
-		&minLon, &minLat, &maxLon, &maxLat, &a.Pending, &a.Edited, &a.Stories); err != nil {
+		&minLon, &minLat, &maxLon, &maxLat, &a.Pending, &a.Edited, &a.Private, &splitGroup, &split.From, &split.To, &a.Stories); err != nil {
 		return activityRow{}, err
+	}
+	if splitGroup != nil {
+		split.Group = *splitGroup
+		a.Split = &split
 	}
 	if minLon != nil && minLat != nil && maxLon != nil && maxLat != nil {
 		a.BBox = []float64{*minLon, *minLat, *maxLon, *maxLat}
@@ -247,7 +268,7 @@ const maxActivityNameLen = 200
 const activityByIDQuery = `
 SELECT id, started_at, activity_type, name, distance_meters, duration_seconds, description,
        ST_XMin(trajectory), ST_YMin(trajectory), ST_XMax(trajectory), ST_YMax(trajectory),
-       edit_pending, track_edit IS NOT NULL,
+       edit_pending, track_edit IS NOT NULL, trajectory IS NULL, split_group, split_from, split_to,
        ` + activityStoriesColumn + `
 FROM activities
 WHERE id = $1 AND user_id = $2`

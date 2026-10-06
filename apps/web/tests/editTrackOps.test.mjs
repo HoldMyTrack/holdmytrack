@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 // Plain .mjs so tsc (which has no Node types here) leaves it alone; Node strips the types
 // from the imported .ts module itself. Run with `npm run test:unit`.
-import { applyEdit, chopOp, cutOp, foldEdit, isEmptyEdit, moveOp } from '../src/ui/editTrackOps.ts';
+import { applyEdit, chopOp, cutOp, foldEdit, isEmptyEdit, moveOp, splitIndex, splitPoint } from '../src/ui/editTrackOps.ts';
 
 // Ten points one second apart, walking north; each point's index is recoverable from its time.
 const T0 = Date.UTC(2026, 8, 1, 8);
@@ -97,4 +97,20 @@ test('a moved point that is then deleted is gone, and a reset clears the saved m
 
 test('a move is rounded to the 1e-6 degrees points come in', () => {
   assert.deepEqual(moveOp(1, 13.12345678, 52.98765432).to, [13.123457, 52.987654]);
+});
+
+test('split goes at the one knob moved, two points each side', () => {
+  assert.equal(splitIndex(points, 0, 9), null);
+  assert.equal(splitIndex(points, 4, 9), 4);
+  assert.equal(splitIndex(points, 0, 6), 6);
+  assert.equal(splitIndex(points, 2, 6), null);
+  assert.equal(splitIndex(points, 9, 9), null);
+  assert.equal(splitIndex(points, 0, 0), null);
+});
+
+test('a split rides beside the edit, not in it', () => {
+  const ops = [chopOp(points, 1, 9), { kind: 'split', t: points[5][2] }];
+  assert.deepEqual(foldEdit(null, ops), { keep: [points[1][2], points[9][2]] });
+  assert.equal(splitPoint(ops), points[5][2]);
+  assert.equal(splitPoint(ops.slice(0, 1)), null);
 });
