@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The sync history (the web's /sync list), filled by sync/ImportHistory: its heading with the
      count, then the rows in a card. On the Sync tab only the latest few, with See all; on
-     SyncHistoryActivity every row a page at a time, the pager under them, and the duplicates. -->
+     SyncHistoryActivity every row a page at a time, the pager under them. -->
 <merge xmlns:android="http://schemas.android.com/apk/res/android">
 
     <LinearLayout
@@ -97,38 +97,5 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/status_older" />
-    </LinearLayout>
-
-    <!-- The duplicates cross-source detection set aside (the web's /sync, under the history):
-         gone when there are none, and on the Sync tab. -->
-    <LinearLayout
-        android:id="@+id/sync_duplicates_section"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/hmt_space_20"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <TextView
-            style="@style/Widget.HoldMyTrack.SectionHeading"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/duplicates_title" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/hmt_space_4"
-            android:layout_marginBottom="@dimen/hmt_space_8"
-            android:paddingStart="@dimen/hmt_space_4"
-            android:paddingEnd="@dimen/hmt_space_4"
-            android:text="@string/duplicates_subtext"
-            android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowSub" />
-
-        <LinearLayout
-            android:id="@+id/sync_duplicates_rows"
-            style="@style/Widget.HoldMyTrack.SectionCard"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
     </LinearLayout>
 </merge>

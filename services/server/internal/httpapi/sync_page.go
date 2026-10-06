@@ -20,13 +20,16 @@ import (
 
 const syncPageSize = 20
 
-// syncHistoryQuery is uploadsListQuery's finished rows only, most recently finished first.
+// syncHistoryQuery is uploadsListQuery's finished rows only, most recently finished first:
+// each with when it finished and, for an activity set aside as a duplicate, the source of the
+// copy kept in its place.
 const syncHistoryQuery = `
 SELECT j.payload->>'source_detail', j.payload->>'source',
-       j.state, j.last_error, j.error_code, a.started_at, a.distance_meters, a.id
+       j.state, j.last_error, j.error_code, j.finished_at, a.started_at, a.distance_meters, a.id, w.source
 FROM jobs j
 LEFT JOIN activities a
   ON a.user_id = j.user_id AND a.source = j.payload->>'source' AND a.external_id = j.payload->>'external_id'
+LEFT JOIN activities w ON w.id = a.superseded_by
 WHERE j.kind = 'ingest' AND j.user_id = $1 AND j.state IN ('done', 'failed')
 ORDER BY j.finished_at DESC NULLS LAST, j.id DESC
 LIMIT $2 OFFSET $3`
@@ -36,26 +39,25 @@ SELECT COUNT(*) FROM jobs WHERE kind = 'ingest' AND user_id = $1 AND state IN ('
 
 // syncView is what templates/pages/sync.html reads from PageData.Page.
 type syncView struct {
-	IsDemo     bool
-	Rows       []syncRow
-	Range      string // the pager's "1–20 of 57", "" with nothing imported
-	NewerHref  string // "" on the first page
-	OlderHref  string // "" on the last
-	Duplicates []syncDuplicate
+	IsDemo    bool
+	Rows      []syncRow
+	Range     string // the pager's "1–20 of 57", "" with nothing imported
+	NewerHref string // "" on the first page
+	OlderHref string // "" on the last
 }
 
 type syncRow struct {
-	Title  string
-	Failed bool
-	// Detail is a Ready row's "Sep 26 · 4.1 mi", or a Failed row's reason.
+	Title     string
+	Failed    bool
+	Duplicate bool
+	// Detail is a Ready row's "Sep 26 · 4.1 mi", a Duplicate's "Sep 26 · 4.1 mi · Kept the copy
+	// from Health Connect", or a Failed row's reason.
 	Detail string
-	// MapHref opens the map on the activity (`/?activity=…&day=…`), "" when there is none.
+	// SyncedAt is when the import finished, "Oct 6, 14:31" in the account's timezone.
+	SyncedAt string
+	// MapHref opens the map on the activity (`/?activity=…&day=…`), "" when there is none — a
+	// duplicate's included, its activity being on no map.
 	MapHref string
-}
-
-type syncDuplicate struct {
-	When string // "Sep 26, 13:31 · 4.1 mi"
-	From string // "From Health Connect — replaced by the copy from an uploaded file."
 }
 
 // GET /sync.
@@ -110,13 +112,16 @@ func (s *Server) buildSync(ctx context.Context, l *i18n.Localizer, acct *pageAcc
 	defer rows.Close()
 	for rows.Next() {
 		var filename, source, state string
-		var lastError, errorCode, activityID *string
-		var startedAt *time.Time
+		var lastError, errorCode, activityID, keptSource *string
+		var finishedAt, startedAt *time.Time
 		var distance *float64
-		if err := rows.Scan(&filename, &source, &state, &lastError, &errorCode, &startedAt, &distance, &activityID); err != nil {
+		if err := rows.Scan(&filename, &source, &state, &lastError, &errorCode, &finishedAt, &startedAt, &distance, &activityID, &keptSource); err != nil {
 			return view, err
 		}
-		row := syncRow{Title: importTitle(l, source, "", filename), Failed: state == "failed"}
+		row := syncRow{Title: importTitle(l, source, "", filename), Failed: state == "failed", Duplicate: keptSource != nil}
+		if finishedAt != nil {
+			row.SyncedAt = web.LocalTime(l, *finishedAt, acct.info.timezone)
+		}
 		switch {
 		case row.Failed:
 			row.Detail = jobErrorMessage(l, errorCode, lastError)
@@ -126,7 +131,9 @@ func (s *Server) buildSync(ctx context.Context, l *i18n.Localizer, acct *pageAcc
 			if distance != nil {
 				row.Detail += " · " + web.FormatDistance(l, *distance, imperial)
 			}
-			if activityID != nil {
+			if row.Duplicate {
+				row.Detail += " · " + l.T("sync.duplicate_kept", "kept", sourcePhrase(l, *keptSource))
+			} else if activityID != nil {
 				row.MapHref = "/?" + url.Values{"activity": {*activityID}, "day": {day}}.Encode()
 			}
 		}
@@ -154,27 +161,7 @@ func (s *Server) buildSync(ctx context.Context, l *i18n.Localizer, acct *pageAcc
 		}
 	}
 
-	dups, err := s.pool.Query(ctx, duplicatesQuery, userID)
-	if err != nil {
-		return view, err
-	}
-	defer dups.Close()
-	for dups.Next() {
-		var d duplicateRow
-		if err := dups.Scan(&d.ID, &d.StartedAt, &d.ActivityType, &d.DistanceMeters, &d.Source,
-			&d.SupersededBy.ID, &d.SupersededBy.Source, &d.SupersededBy.StartedAt); err != nil {
-			return view, err
-		}
-		when := web.LocalTime(l, d.StartedAt, acct.info.timezone)
-		if d.DistanceMeters != nil {
-			when += " · " + web.FormatDistance(l, *d.DistanceMeters, imperial)
-		}
-		view.Duplicates = append(view.Duplicates, syncDuplicate{
-			When: when,
-			From: l.T("sync.duplicate_from", "source", sourcePhrase(l, d.Source), "kept", sourcePhrase(l, d.SupersededBy.Source)),
-		})
-	}
-	return view, dups.Err()
+	return view, nil
 }
 
 // sourcePhrase is a source said in a sentence — "an uploaded file", "Health Connect" — the web
