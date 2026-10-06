@@ -84,6 +84,25 @@ test('an activity that never leaves one place is skipped', () => {
   assert.equal(skipped, 1);
 });
 
+test('a start or end the path beside it could not have been reached from is left out', () => {
+  // 150 km in the 10 minutes before the first path point, 44 km in the 5 after the last: 900 and 530 km/h.
+  const far = structuredClone(exportFile);
+  far.semanticSegments[1].activity.start.latLng = '11.0000000°, 21.0000000°';
+  far.semanticSegments[1].activity.end.latLng = '9.8000000°, 19.8000000°';
+  const drive = readTimeline(far).segments[0];
+  assert.deepEqual(drive.points.map((p) => p.time), ['2026-07-07T09:10:00.000-04:00', '2026-07-07T09:15:00.000-04:00']);
+  assert.ok(drive.distanceM < 7000, `distance ${drive.distanceM}`);
+  // With no path inside, there's nothing to measure them against.
+  assert.equal(readTimeline(far).segments[1].points.length, 2);
+  // 5 s before the first path point: 550 m away is kept, 2.2 km away isn't.
+  const fast = structuredClone(exportFile);
+  fast.semanticSegments[1].startTime = '2026-07-07T09:09:55.000-04:00';
+  fast.semanticSegments[1].activity.start.latLng = '10.0550000°, 20.0400000°';
+  assert.equal(readTimeline(fast).segments[0].points[0].time, '2026-07-07T09:09:55.000-04:00');
+  fast.semanticSegments[1].activity.start.latLng = '10.0700000°, 20.0400000°';
+  assert.equal(readTimeline(fast).segments[0].points[0].time, '2026-07-07T09:10:00.000-04:00');
+});
+
 test('the other location exports are recognized and refused', () => {
   const ios = [{ startTime: '2026-07-07T09:00:00.000-04:00', activity: { start: 'geo:10,20' } }];
   assert.throws(() => readTimeline(ios), (e) => e instanceof TimelineFormatError && e.format === 'ios');
