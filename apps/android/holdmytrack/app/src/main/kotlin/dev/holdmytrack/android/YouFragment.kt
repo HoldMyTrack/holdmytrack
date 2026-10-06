@@ -10,7 +10,8 @@ import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.settings.SettingsActivity
 
 /**
- * The bottom bar's You tab: the app's own screens that aren't tabs — Profile, Upload, Settings —
+ * The bottom bar's You tab: the app's own screens that aren't tabs — Profile, Upload, Settings,
+ * and the map's Private locations —
  * then the web header's Donate and Info pages (About, Help, Contacts, Privacy), opened in a
  * browser tab, and last the app's version, a line to read rather than an action. Donate only
  * where `BuildConfig.DONATE_LINK` allows it, which the Play build doesn't.
@@ -27,6 +28,7 @@ class YouFragment : Fragment(R.layout.fragment_you) {
             startActivity(Intent(context, UploadActivity::class.java))
         }
         view.findViewById<View>(R.id.you_settings).setOnClickListener { SettingsActivity.open(context) }
+        view.findViewById<View>(R.id.you_private_locations).setOnClickListener { (activity as? MainActivity)?.showPrivacy() }
         view.findViewById<View>(R.id.you_donate).apply {
             visibility = if (BuildConfig.DONATE_LINK) View.VISIBLE else View.GONE
             setOnClickListener { openWebPage("/about#funding") }

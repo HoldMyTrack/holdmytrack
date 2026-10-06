@@ -1,6 +1,5 @@
 package dev.holdmytrack.android.panel
 
-import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.view.GestureDetector
 import android.view.LayoutInflater
@@ -20,6 +19,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import androidx.appcompat.app.AlertDialog
+import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.slider.RangeSlider
@@ -35,14 +35,16 @@ import kotlin.math.abs
 enum class PanelTab { ACTIVITIES, STORIES, PRIVACY }
 
 /**
- * The map's Activities panel, as the web draws it at phone width
- * (`apps/web/src/ui/ActivitiesPanel.tsx` and index.css's phone layer): a bottom sheet over the
- * date-range footer, collapsed to its tab row, expanded to most of the screen by the chevron at
- * the row's end or a tab. The Activities tab
- * holds the Type dropdown and the DISTANCE slider, a toolbar over the toolbar's target, the
- * rows and the target's summary; the Stories tab, the account's Stories with one open on the
- * map ([StoriesTab]); the Privacy tab, the Private locations ([PrivacyTab], which
- * `MapFragment` owns, since it works on the map).
+ * The map's Activities sheet (`apps/web/src/ui/ActivitiesPanel.tsx`, redrawn for a phone): a
+ * bottom sheet dragged between collapsed — its head alone — half the map and nearly all of it
+ * (`BottomSheetBehavior`), a tap on its handle opening it halfway or closing it. On the
+ * Activities tab its head is the date range (`map/DateRangeSlider`, `MapFragment`'s) with the
+ * listed activities' totals ([render]), and under it the Type dropdown and the DISTANCE slider,
+ * a toolbar over the toolbar's target, the rows and the target's summary. The Stories tab — the
+ * bottom bar's Stories — has the account's Stories with one open on the map ([StoriesTab]); the
+ * Privacy tab, the Private locations ([PrivacyTab], which `MapFragment` owns, since it works on
+ * the map). Both are headed by their title instead of the range, Private locations' with a close
+ * button back to Activities.
  *
  * The rules live in [PanelState]; this draws it and turns taps into state changes.
  * `MapFragment` owns the map and the fetch: it hands over each list ([setActivities]) and
@@ -54,9 +56,6 @@ enum class PanelTab { ACTIVITIES, STORIES, PRIVACY }
 class ActivitiesPanel(
     private val sheet: View,
     private val state: PanelState,
-    /** The sheet's height when expanded — the web's 78% of the screen, less the footer under
-     *  it — asked each time, since the screen can rotate. */
-    private val expandedHeight: () -> Int,
     private val onMapChanged: () -> Unit,
     private val onFly: (List<Activity>) -> Unit,
     private val onEdit: (List<Activity>) -> Unit,
@@ -76,19 +75,22 @@ class ActivitiesPanel(
     private val onStoriesChanged: () -> Unit,
     /** An activity was taken out of the open Story on the Stories tab. */
     private val onRemovedFromStory: (activityId: String) -> Unit,
+    /** The sheet came to rest at another height, or its peek changed. */
+    private val onSheetChanged: () -> Unit,
 ) {
     private val context = sheet.context
     private val res = context.resources
 
-    private val count: TextView = sheet.findViewById(R.id.panel_count)
-    private val tabActivities: View = sheet.findViewById(R.id.panel_tab_activities)
-    private val tabStories: View = sheet.findViewById(R.id.panel_tab_stories)
+    private val behavior = BottomSheetBehavior.from(sheet)
+    private val handle: View = sheet.findViewById(R.id.panel_handle)
+    private val summary: TextView = sheet.findViewById(R.id.panel_summary)
+    private val titleHead: View = sheet.findViewById(R.id.panel_title_head)
+    private val title: TextView = sheet.findViewById(R.id.panel_title)
+    private val titleClose: View = sheet.findViewById(R.id.panel_title_close)
     private val storiesContent: View = sheet.findViewById(R.id.panel_stories_content)
     private val activitiesContent: View = sheet.findViewById(R.id.panel_activities_content)
-    private val tabPrivacy: View = sheet.findViewById(R.id.panel_tab_privacy)
     private val privacyContent: View = sheet.findViewById(R.id.panel_privacy_content)
     private val head: View = sheet.findViewById(R.id.panel_head)
-    private val toggle: ImageButton = sheet.findViewById(R.id.panel_toggle)
     private val subtext: TextView = sheet.findViewById(R.id.panel_subtext)
     private val typeTrigger: View = sheet.findViewById(R.id.panel_type_trigger)
     private val typeDot: View = sheet.findViewById(R.id.panel_type_dot)
@@ -132,16 +134,16 @@ class ActivitiesPanel(
     private var loading = false
     private var error: String? = null
 
+    /** Whether the sheet is open — half the map or more — or heading there. */
     var expanded = false
         private set
 
-    /** Forced down to the peek strip from outside without forgetting [expanded] — a recording
-     *  or an edit window over the map; the sheet comes back as it was. */
-    private var held = false
-    private var heightAnimator: ValueAnimator? = null
+    /** Where the sheet is or is heading: collapsed, half or expanded, never a moving state. */
+    private var resting = BottomSheetBehavior.STATE_COLLAPSED
 
-    /** Where [heightAnimator] is taking the sheet. */
-    private var heightTarget = 0
+    /** Forced down to its head from outside without forgetting [expanded] — an edit window
+     *  over the map; the sheet comes back as it was. */
+    private var held = false
     private var typePopup: PopupWindow? = null
 
     /** Add to story's menu while it's open, and the target it was opened over — a different
@@ -157,18 +159,34 @@ class ActivitiesPanel(
         list.itemAnimator = null
         clearFocusOnEmptyTap()
 
-        toggle.setOnClickListener { setExpanded(!expanded) }
-        tabActivities.setOnClickListener { selectTab(PanelTab.ACTIVITIES) }
-        tabStories.setOnClickListener { selectTab(PanelTab.STORIES) }
-        tabPrivacy.setOnClickListener { selectTab(PanelTab.PRIVACY) }
-        // The collapsed height is the tab row's bottom edge, whatever the font scale makes of it —
-        // applied when that height changes, and after the layout pass rather than inside it: a
-        // new height set mid-layout isn't laid out until something else asks for a layout, which
-        // left an expand started by the chevron (whose own icon change re-lays out the row) at
-        // the collapsed height until the next tap.
-        head.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
-            if (bottom - top != oldBottom - oldTop || right - left != oldRight - oldLeft) head.post { applyHeight(animate = false) }
+        handle.setOnClickListener { setExpanded(!expanded) }
+        titleClose.setOnClickListener { showActivities() }
+        // The collapsed height is the head's bottom edge, whatever the font scale and the range
+        // or title in it make of it — set after the layout pass rather than inside it.
+        head.addOnLayoutChangeListener { _, _, _, _, bottom, _, _, _, oldBottom ->
+            if (bottom != oldBottom) head.post {
+                if (behavior.peekHeight != head.bottom) {
+                    behavior.peekHeight = head.bottom
+                    // The open sheet's height depends on the head's.
+                    (sheet.parent as? View)?.let { setExpandedOffset(expandedOffsetWanted, it.height) }
+                    onSheetChanged()
+                }
+            }
         }
+        behavior.isHideable = false
+        behavior.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
+            override fun onStateChanged(bottomSheet: View, newState: Int) {
+                if (newState !in RESTING_STATES) return
+                resting = newState
+                // Dragged by hand: that's the sheet's height now. Held down, the drag is off and
+                // the wish to come back open stays.
+                if (!held) expanded = newState != BottomSheetBehavior.STATE_COLLAPSED
+                render()
+                onSheetChanged()
+            }
+
+            override fun onSlide(bottomSheet: View, slideOffset: Float) = Unit
+        })
 
         typeTrigger.setOnClickListener { showTypeFilter() }
         distanceSlider.addOnChangeListener { slider, _, fromUser ->
@@ -211,13 +229,6 @@ class ActivitiesPanel(
         render()
     }
 
-    /** A tab tapped: the sheet opens onto it, as the web's phone sheet does — collapsed, the
-     *  tab row is all there is of it. */
-    private fun selectTab(next: PanelTab) {
-        showTab(next)
-        if (!expanded) setExpanded(true)
-    }
-
     private fun showTab(next: PanelTab) {
         if (tab == next) return
         tab = next
@@ -227,9 +238,18 @@ class ActivitiesPanel(
         onTabChanged(next)
     }
 
-    /** Onto the Stories tab from outside — a Story Create story just made, which
-     *  `MapFragment` opens straight away. */
-    fun showStories() = showTab(PanelTab.STORIES)
+    /** Onto the Stories tab, the sheet halfway up so its Stories show — the bottom bar's
+     *  Stories, or a Story Create story just made, which `MapFragment` opens straight away. */
+    fun showStories() {
+        showTab(PanelTab.STORIES)
+        setExpanded(true)
+    }
+
+    /** Onto the Private locations, the sheet halfway up — from the You tab. */
+    fun showPrivacy() {
+        showTab(PanelTab.PRIVACY)
+        setExpanded(true)
+    }
 
     /** The Activities tab, collapsed — the Sync screen's View on map, which is about the map. */
     fun showActivities() {
@@ -271,18 +291,53 @@ class ActivitiesPanel(
         changed()
     }
 
+    /** Halfway up, or down to its head. */
     fun setExpanded(next: Boolean) {
         expanded = next
-        applyHeight(animate = true)
+        if (!held) moveTo(if (next) BottomSheetBehavior.STATE_HALF_EXPANDED else BottomSheetBehavior.STATE_COLLAPSED)
         render()
     }
 
-    /** See [held]. */
+    /** See [held]. The sheet can't be dragged while held. */
     fun hold(down: Boolean) {
         if (held == down) return
         held = down
-        applyHeight(animate = true)
+        behavior.isDraggable = !down
+        moveTo(if (expanded && !down) BottomSheetBehavior.STATE_HALF_EXPANDED else BottomSheetBehavior.STATE_COLLAPSED)
         render()
+    }
+
+    private fun moveTo(state: Int) {
+        resting = state
+        behavior.state = state
+    }
+
+    /** Where the sheet's top edge is, or is heading, in a parent [parentHeight] tall — what the
+     *  camera frames above. */
+    fun restingTop(parentHeight: Int): Int = when (resting) {
+        BottomSheetBehavior.STATE_EXPANDED -> behavior.expandedOffset
+        BottomSheetBehavior.STATE_HALF_EXPANDED -> (parentHeight * (1 - behavior.halfExpandedRatio)).toInt()
+        else -> parentHeight - behavior.peekHeight
+    }
+
+    /** The offset last asked for, before [setExpandedOffset] clamps it. */
+    private var expandedOffsetWanted = 0
+
+    /** How far down the expanded sheet's top stops — under the map's top row, where there's
+     *  room — in a parent [parentHeight] tall. The sheet is that much shorter than its parent, so expanded, its
+     *  bottom — the list's last rows — is still on screen. */
+    fun setExpandedOffset(offset: Int, parentHeight: Int) {
+        // Never so far down that the open sheet is shorter than its own head — a landscape
+        // phone, whose top row takes much of its height.
+        expandedOffsetWanted = offset
+        val clamped = offset.coerceAtMost((parentHeight - head.height).coerceAtLeast(0))
+        if (behavior.expandedOffset != clamped) behavior.expandedOffset = clamped
+        val params = sheet.layoutParams
+        val height = (parentHeight - clamped).coerceAtLeast(0)
+        if (params.height != height) {
+            params.height = height
+            sheet.layoutParams = params
+        }
     }
 
     fun dismissPopups() {
@@ -290,9 +345,9 @@ class ActivitiesPanel(
         storyPopup?.dismiss()
     }
 
-    /** The collapsed sheet's height: the tab row. */
+    /** The collapsed sheet's height: its head. */
     val peekHeight: Int
-        get() = head.bottom
+        get() = behavior.peekHeight
 
     private fun select(id: String) {
         state.focus(id)
@@ -306,44 +361,17 @@ class ActivitiesPanel(
         render()
     }
 
-    private fun applyHeight(animate: Boolean) {
-        val peek = peekHeight
-        if (peek == 0) return
-        val target = if (expanded && !held) maxOf(expandedHeight(), peek) else peek
-        val params = sheet.layoutParams
-        if (params.height == target) return
-        // Already on its way there: let it arrive rather than jump.
-        if (heightAnimator?.isRunning == true && heightTarget == target) return
-        heightAnimator?.cancel()
-        heightTarget = target
-        if (!animate || params.height <= 0) {
-            params.height = target
-            sheet.layoutParams = params
-            return
-        }
-        heightAnimator = ValueAnimator.ofInt(params.height, target).apply {
-            duration = SHEET_ANIMATION_MS
-            addUpdateListener {
-                params.height = it.animatedValue as Int
-                sheet.layoutParams = params
-            }
-            start()
-        }
-    }
-
     private fun render() {
         val listed = state.listed
-        // The Activities tab's own count: an open Story's rows are the list meanwhile, and
-        // aren't what the badge counts, as on the web.
-        if (tab != PanelTab.STORIES) count.text = PanelFormat.count(res, listed.size)
+        // The Activities tab's own totals: an open Story's rows are the list meanwhile, and
+        // aren't what the range's heading counts, as on the web.
+        if (tab != PanelTab.STORIES) summary.text = summaryOf(listed)
         renderTabs()
         subtext.visibility = if (tab == PanelTab.ACTIVITIES) View.GONE else View.VISIBLE
         subtext.setText(if (tab == PanelTab.PRIVACY) R.string.private_subtitle else R.string.story_subtext)
         // Held down under an edit, the sheet is collapsed whatever it was.
         val open = expanded && !held
-        toggle.setImageResource(if (open) R.drawable.ic_chevron_down else R.drawable.ic_chevron_up)
-        toggle.contentDescription = res.getString(if (open) R.string.panel_collapse else R.string.panel_expand)
-        TooltipCompat.setTooltipText(toggle, toggle.contentDescription)
+        handle.contentDescription = res.getString(if (open) R.string.panel_collapse else R.string.panel_expand)
 
         typeDot.visibility = if (state.excludedTypes.isNotEmpty()) View.VISIBLE else View.GONE
         renderDistance()
@@ -370,17 +398,19 @@ class ActivitiesPanel(
         if (storyPopup != null && targets.map { it.id } != storyPopupTarget) storyPopup?.dismiss()
     }
 
-    /** The selected tab at full strength over the accent underline, the other at 45% — the
-     *  web's `.activities-panel__tab` — and its content in the sheet. */
+    /** "6 activities · 74.8 km · 9h 6m", what's listed under the range. */
+    private fun summaryOf(listed: List<Activity>): String = listOf(
+        res.getQuantityString(R.plurals.story_activity_count, listed.size, listed.size),
+        PanelFormat.totalDistance(res, listed.sumOf { it.distanceMeters ?: 0.0 }),
+        PanelFormat.duration(res, listed.sumOf { it.durationSeconds ?: 0L }),
+    ).joinToString(" · ")
+
+    /** The tab's head — the range is `MapFragment`'s to show; Stories and Private locations
+     *  have their titles — and its content in the sheet. */
     private fun renderTabs() {
-        val tabs = listOf(tabActivities to PanelTab.ACTIVITIES, tabStories to PanelTab.STORIES, tabPrivacy to PanelTab.PRIVACY)
-        for ((view, which) in tabs) {
-            val selected = tab == which
-            view.alpha = if (selected) 1f else UNSELECTED_TAB_ALPHA
-            if (selected) view.setBackgroundResource(R.drawable.bg_panel_tab_selected) else view.background = null
-            view.isSelected = selected
-            view.contentDescription = null
-        }
+        titleHead.visibility = if (tab == PanelTab.ACTIVITIES) View.GONE else View.VISIBLE
+        title.setText(if (tab == PanelTab.PRIVACY) R.string.panel_private_title else R.string.panel_tab_stories)
+        titleClose.visibility = if (tab == PanelTab.PRIVACY) View.VISIBLE else View.GONE
         activitiesContent.visibility = if (tab == PanelTab.ACTIVITIES) View.VISIBLE else View.GONE
         storiesContent.visibility = if (tab == PanelTab.STORIES) View.VISIBLE else View.GONE
         privacyContent.visibility = if (tab == PanelTab.PRIVACY) View.VISIBLE else View.GONE
@@ -789,10 +819,13 @@ class ActivitiesPanel(
     }
 
     private companion object {
-        const val SHEET_ANIMATION_MS = 150L
         const val TYPE_LIST_MAX_DP = 192
         const val SNAP_METERS = 1.0
-        const val UNSELECTED_TAB_ALPHA = 0.45f
+        val RESTING_STATES = setOf(
+            BottomSheetBehavior.STATE_COLLAPSED,
+            BottomSheetBehavior.STATE_HALF_EXPANDED,
+            BottomSheetBehavior.STATE_EXPANDED,
+        )
         const val DISABLED_ROW_ALPHA = 0.5f
         const val SELECT_ALL = 1
         const val SELECT_NONE = 2

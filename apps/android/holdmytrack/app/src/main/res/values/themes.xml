@@ -285,47 +285,6 @@
         <item name="android:checkable">true</item>
     </style>
 
-    <!-- The title is named directly: the Material 3 action bar's own title style is a fixed
-         style rather than the theme's TitleLarge role, so it would otherwise stay in the
-         system face. -->
-    <!-- The floating panel every piece of map chrome sits on, after the web's .map-mode-toggle:
-         near-white, medium radius, a small shadow (fm-shadow-sm). -->
-    <!-- The date-range slider's Earlier/Later, after the web's .date-range-slider__page: a small
-         bordered chevron, 32dp across as on the web's phone footer, inside a 48dp-tall touch
-         target. -->
-    <style name="Widget.HoldMyTrack.Button.MapPage" parent="Widget.Material3.Button.IconButton.Outlined">
-        <item name="shapeAppearance">@style/ShapeAppearance.HoldMyTrack.Small</item>
-        <item name="backgroundTint">@color/map_page_bg</item>
-        <item name="strokeColor">@color/map_page_stroke</item>
-        <item name="strokeWidth">1dp</item>
-        <item name="iconTint">@color/map_page_icon</item>
-        <item name="iconSize">16dp</item>
-        <item name="iconGravity">textStart</item>
-        <item name="iconPadding">0dp</item>
-        <item name="android:minWidth">32dp</item>
-        <item name="android:minHeight">48dp</item>
-        <item name="android:insetTop">8dp</item>
-        <item name="android:insetBottom">8dp</item>
-        <item name="android:padding">@dimen/hmt_space_8</item>
-    </style>
-
-    <!-- A date under the date-range slider (.date-range-slider__labels): 12sp semibold, lightly
-         tracked, at 65% ink. -->
-    <!-- The inner pair, ‹ ›, that shift the range (the web's page buttons, shift variant):
-         Earlier/Later's look, 4dp narrower to leave the track more width. -->
-    <style name="Widget.HoldMyTrack.Button.MapShift" parent="Widget.HoldMyTrack.Button.MapPage">
-        <item name="android:minWidth">28dp</item>
-        <item name="android:padding">@dimen/hmt_space_6</item>
-    </style>
-
-    <style name="Widget.HoldMyTrack.DateRangeLabel" parent="">
-        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.LabelMedium</item>
-        <item name="android:textColor">@color/hmt_ink_hint</item>
-        <item name="android:letterSpacing">0.02</item>
-        <item name="android:paddingStart">@dimen/hmt_space_2</item>
-        <item name="android:paddingEnd">@dimen/hmt_space_2</item>
-    </style>
-
     <!-- The bottom bar (activity_main.xml): every label always shown, the selected tab on an
          accent-container pill, on the page background with a hairline above it. -->
     <style name="Widget.HoldMyTrack.BottomNav" parent="Widget.Material3.BottomNavigationView">
@@ -367,12 +326,29 @@
         <item name="android:textColor">@color/hmt_ink</item>
     </style>
 
+    <!-- ‹ › beside the date range in the Activities sheet (include_activities_sheet): a 44dp round
+         icon button on the tinted surface. -->
+    <style name="Widget.HoldMyTrack.Button.SheetShift" parent="Widget.Material3.Button.IconButton.Filled.Tonal">
+        <item name="android:minWidth">44dp</item>
+        <item name="android:minHeight">44dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="backgroundTint">@color/hmt_surface_tint_strong</item>
+        <item name="iconTint">@color/hmt_ink</item>
+        <item name="iconSize">20dp</item>
+    </style>
+
+    <!-- The floating panel every piece of map chrome sits on, after the web's .map-mode-toggle:
+         near-white, medium radius, a small shadow (fm-shadow-sm). -->
     <style name="Widget.HoldMyTrack.MapPanel" parent="">
         <item name="android:background">@drawable/bg_map_chrome</item>
         <item name="android:elevation">2dp</item>
         <item name="android:padding">@dimen/hmt_space_4</item>
     </style>
 
+    <!-- The title is named directly: the Material 3 action bar's own title style is a fixed
+         style rather than the theme's TitleLarge role, so it would otherwise stay in the
+         system face. -->
     <style name="Widget.HoldMyTrack.ActionBar" parent="Widget.Material3.ActionBar.Solid">
         <item name="background">@color/hmt_bg</item>
         <item name="elevation">0dp</item>

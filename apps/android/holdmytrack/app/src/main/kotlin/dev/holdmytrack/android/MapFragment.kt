@@ -161,8 +161,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     /** Find my location's panel — what hides while recording, so no empty panel is left. */
     private lateinit var locatePanel: View
 
-    /** The Activities panel and, under it, the date-range footer. */
-    private lateinit var bottomChrome: View
+    /** The Activities sheet, the date range at its head. */
     private lateinit var sheet: View
     private lateinit var panel: ActivitiesPanel
     private val panelState = PanelState()
@@ -172,6 +171,11 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     /** Whether the Privacy tab has the map — its tab showing, in Normal mode. */
     private var privacyShowing = false
     private lateinit var editLock: View
+
+    /** Back closes an open sheet before it leaves the map. */
+    private val collapseSheetOnBack = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() = panel.setExpanded(false)
+    }
 
     /** Back closes the Edit window before it leaves the map. */
     private val closeEditOnBack = object : OnBackPressedCallback(false) {
@@ -386,6 +390,11 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         if (::panel.isInitialized) panel.showStories()
     }
 
+    /** The You tab's Private locations: the panel's Privacy tab. */
+    fun showPrivacy() {
+        if (::panel.isInitialized) panel.showPrivacy()
+    }
+
     /** The bottom bar's Map: the panel's Activities tab, collapsed. */
     fun showActivities() {
         if (::panel.isInitialized) panel.showActivities()
@@ -461,14 +470,12 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         locatePanel = findViewById(R.id.locate_panel)
         locateButton.setOnClickListener { onLocateTap() }
 
-        bottomChrome = findViewById(R.id.bottom_chrome)
         dateFooter = findViewById(R.id.date_footer)
         zoomLevelNotice = ZoomLevelNotice(findViewById(R.id.zoom_level_notice))
         sheet = findViewById(R.id.activities_sheet)
         panel = ActivitiesPanel(
             sheet,
             panelState,
-            expandedHeight = ::expandedSheetHeight,
             onMapChanged = ::applyTrackFilter,
             onFly = ::flyToActivities,
             onEdit = ::openEditWindow,
@@ -491,6 +498,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
                 refreshPhotos(force = true)
             },
             onRemovedFromStory = ::onRemovedFromStory,
+            onSheetChanged = ::onSheetChanged,
         )
         privacyTab = PrivacyTab(
             findViewById(R.id.panel_privacy_content),
@@ -507,7 +515,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             openAreaCenterY = {
                 val editor = findViewById<View>(R.id.private_editor)
                 val top = if (editor.isVisible) editor.bottom else findViewById<View>(R.id.top_bar).bottom
-                val bottom = mapView.height - if (bottomChrome.isVisible) bottomChrome.height - sheetExtraHeight() else 0
+                val bottom = mapView.height - if (sheet.isVisible) panel.peekHeight else 0
                 (top + bottom) / 2f
             },
         )
@@ -526,6 +534,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             onTabChanged = ::renderPhotoMarkers,
             onClose = ::onEditClosed,
         )
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, collapseSheetOnBack)
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, closeEditOnBack)
         activityDays = ActivityDays(DateRangeSlider.WINDOW_DAYS, ::onActivityDaysChanged)
         dateSlider = DateRangeSlider(
@@ -742,30 +751,27 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun insetSystemBars() {
         val topBar: View = findViewById(R.id.top_bar)
         val barTopMargin = (topBar.layoutParams as MarginLayoutParams).topMargin
-        val bottomPadding = bottomChrome.paddingBottom
-        findViewById<View>(R.id.map_root).setOnApplyWindowInsetsListener { _, insets ->
+        val mapRoot = findViewById<View>(R.id.map_root)
+        mapRoot.setOnApplyWindowInsetsListener { _, insets ->
             val bars = insets.getInsets(WindowInsets.Type.systemBars())
             (topBar.layoutParams as MarginLayoutParams).topMargin = barTopMargin + bars.top
             topBar.requestLayout()
-            bottomChrome.setPadding(
-                bottomChrome.paddingLeft,
-                bottomChrome.paddingTop,
-                bottomChrome.paddingRight,
-                bottomPadding + bars.bottom,
-            )
             systemBarInsetTop = bars.top
             applyCompassMargin()
             insets
         }
         // The compass sits below the top row and any notice under it, whose heights are only
-        // known once they're laid out; the attribution above the date-range footer likewise.
+        // known once they're laid out; the expanded sheet stops under the row likewise. The
+        // attribution follows the sheet's head (onSheetChanged).
         topChrome.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
             applyCompassMargin()
             placeEditWindow()
+            panel.setExpandedOffset(topBar.bottom + resources.getDimensionPixelSize(R.dimen.hmt_space_8), mapRoot.height)
         }
-        bottomChrome.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-            applyAttributionMargin()
-            placeEditLock()
+        mapRoot.addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
+            if (bottom - top != oldBottom - oldTop) {
+                panel.setExpandedOffset(topBar.bottom + resources.getDimensionPixelSize(R.dimen.hmt_space_8), bottom - top)
+            }
         }
     }
 
@@ -815,7 +821,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             attributionBaseMarginBottom = settings.attributionMarginBottom
             attributionBaseCaptured = true
         }
-        val above = if (bottomChrome.isVisible) bottomChrome.height - sheetExtraHeight() else 0
+        val above = if (sheet.isVisible) panel.peekHeight else 0
         settings.setLogoMargins(
             settings.logoMarginLeft,
             settings.logoMarginTop,
@@ -1199,8 +1205,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun placeEditLock() {
         if (!::editLock.isInitialized || editLock.visibility != View.VISIBLE) return
         val params = editLock.layoutParams
-        if (params.height != bottomChrome.height) {
-            params.height = bottomChrome.height
+        if (params.height != panel.peekHeight) {
+            params.height = panel.peekHeight
             editLock.layoutParams = params
         }
     }
@@ -1463,30 +1469,27 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         return true
     }
 
-    /** The web's `78dvh` less the footer under the sheet: most of the screen, the top of the
-     *  map still showing above it. */
-    private fun expandedSheetHeight(): Int {
-        val root = findViewById<View>(R.id.map_root)
-        val below = bottomChrome.height - sheet.bottom
-        return (root.height * EXPANDED_SHEET_FRACTION).toInt() - below
+    /** The sheet came to rest or its head changed height: the attribution and the edit lock
+     *  follow its head, and Back closes it while it's open. */
+    private fun onSheetChanged() {
+        applyAttributionMargin()
+        placeEditLock()
+        collapseSheetOnBack.isEnabled = sheet.isVisible && panel.expanded && !editWindow.isOpen
     }
 
-    /** How much taller than its collapsed strip the panel is right now — 0 collapsed. */
-    private fun sheetExtraHeight(): Int = if (sheet.isVisible) (sheet.height - panel.peekHeight).coerceAtLeast(0) else 0
-
-    /** The panel and the footer are Normal mode's alone, as on the web (Fog and Heatmap
-     *  ignore the range and select nothing — `docs/SPEC.md` FR-4.2), and step aside while
-     *  recording. Both wait for the session; the footer also for the first page of days, and
-     *  an account with no activity at all has nothing to pick from — the empty notice speaks
-     *  for it instead. The footer is the Activities tab's alone: Stories and Privacy take no
-     *  range (`docs/SPEC.md` FR-6), and the sheet sits on the bottom edge without it. */
+    /** The sheet is Normal mode's alone, as on the web (Fog and Heatmap ignore the range and
+     *  select nothing — `docs/SPEC.md` FR-4.2), and steps aside while recording. It waits for
+     *  the session; the range at its head also for the first page of days, and an account with
+     *  no activity at all has nothing to pick from — the empty notice speaks for it instead. The
+     *  range is the Activities tab's alone: Stories and Privacy take none (`docs/SPEC.md` FR-6),
+     *  and have their titles at the head instead. */
     private fun renderDateFooter() {
         val normal = modeBarReady && mode == MapMode.NORMAL && !isRecording()
         val footer = normal && panel.tab == PanelTab.ACTIVITIES && activityDays.ready && activityDays.earliest != null
         dateFooter.visibility = if (footer) View.VISIBLE else View.GONE
         sheet.visibility = if (normal) View.VISIBLE else View.GONE
-        bottomChrome.visibility = if (normal) View.VISIBLE else View.GONE
         if (!normal) panel.dismissPopups()
+        onSheetChanged()
         renderTrackMetrics()
         renderPrivacy()
     }
@@ -1949,11 +1952,11 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             if (card.isVisible) card.bottom + FRAME_PADDING_PX / 2 else 0,
             if (banner.isVisible) topChrome.top + banner.bottom + FRAME_PADDING_PX / 2 else 0,
         )
-        // The panel's height it's heading to, not mid-animation: a View on map collapses it and
-        // flies in the same moment, and fitting to the expanded sheet pushed the activity to
-        // the top of the screen.
-        val sheetExtra = if (panel.expanded) 0 else sheetExtraHeight()
-        val bottom = FRAME_PADDING_PX + if (bottomChrome.isVisible) bottomChrome.height - sheetExtra else 0
+        // Above the height the sheet rests at or is heading to, not mid-drag: a View on map
+        // collapses it and flies in the same moment, and fitting to where it was pushed the
+        // activity to the top of the screen.
+        val root = findViewById<View>(R.id.map_root)
+        val bottom = FRAME_PADDING_PX + if (sheet.isVisible) root.height - panel.restingTop(root.height) else 0
         val padding = intArrayOf(FRAME_PADDING_PX, top, FRAME_PADDING_PX, bottom)
         val fitted = instance.getCameraForLatLngBounds(bounds, padding) ?: return
         val target = CameraPosition.Builder(fitted)
@@ -2084,9 +2087,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
         /** How often a list with Pending rows is read again. */
         private const val PENDING_POLL_MS = 2_000L
-
-        /** The expanded panel's share of the screen, the web's `78dvh`. */
-        private const val EXPANDED_SHEET_FRACTION = 0.78
 
         /** Where the camera flies to on a recording's first fix — street level, so the line
          *  visibly grows from the first few metres rather than being a dot on a city. */

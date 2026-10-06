@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Activities sheet's drag handle: a short rounded bar in the strong border colour. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/hmt_border_strong" />
+    <corners android:radius="2dp" />
+</shape>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- You (YouFragment), the bottom bar's last tab: the app's own screens — Profile, Upload,
-     Settings — then the web's pages, opened in a browser tab, and last the app's version. -->
+     Settings, the map's Private locations — then the web's pages, opened in a browser tab, and last the app's version. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -41,6 +41,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/menu_settings" />
+
+        <!-- The map's sheet, on its Private locations (MainActivity.showPrivacy). -->
+        <TextView
+            android:id="@+id/you_private_locations"
+            style="@style/Widget.HoldMyTrack.ListRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/panel_private_title" />
 
         <View
             android:layout_width="match_parent"
