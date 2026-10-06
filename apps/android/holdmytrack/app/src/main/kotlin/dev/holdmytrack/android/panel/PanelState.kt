@@ -8,9 +8,10 @@ import dev.holdmytrack.android.net.Activity
  * the session — the state the web keeps in `apps/web/src/map/MapView.tsx`, with the same rules.
  * Plain data and rules, no views, so it's what the unit tests exercise.
  *
- * Selection and the checked group are independent (`docs/SPEC.md` FR-5.5, FR-5.6): tapping a
- * row or a track *selects* it — at most one, bold on the map, flown to — and never touches a
- * checkbox; a checkbox only adds or removes its row from the group the toolbar acts on.
+ * Selection and the checked group take turns (`apps/android/docs/SPEC.md` FR-2.7 items 5–6):
+ * outside selecting, tapping a row or a track *selects* it — at most one, bold on the map, flown
+ * to. Checking a row — its tile, or a long press — starts selecting, the selected one joining
+ * the group, and the list is selecting for exactly as long as anything is checked.
  */
 class PanelState {
 
@@ -35,23 +36,14 @@ class PanelState {
     var distanceFilter: DistanceRange? = null
         private set
 
-    /** Whether the rows show their checkboxes — the list's Select. Off, a row's tap selects it,
-     *  as the map's tap on its track does; on, it checks it. */
-    var selecting: Boolean = false
-        private set
+    /** Whether the list is selecting: anything checked. Off, a row's tap selects it, as the
+     *  map's tap on its track does; on, a tap checks or unchecks it. */
+    val selecting: Boolean
+        get() = checked.isNotEmpty()
 
-    /** Select: the rows show their checkboxes, the selection giving way to the group. */
-    fun startSelecting() {
-        selecting = true
-        focused = null
-    }
-
-    /** Done, or the selection bar's ×: the checkboxes go, and the group with them, since
-     *  nothing could show it any more. */
-    fun endSelecting() {
-        selecting = false
-        checked = emptySet()
-    }
+    /** What the map draws bold: the checked group while selecting, else the selected one. */
+    val highlighted: Set<String>
+        get() = if (selecting) checked else setOfNotNull(focused)
 
     /** A fresh list for the same range — after a sync or an edit. Selection, the group and the
      *  hidden set keep whatever of theirs still exists. */
@@ -66,7 +58,6 @@ class PanelState {
     /** A new date range changes which rows exist, so everything built against the old one goes
      *  (`docs/SPEC.md` FR-6.6) — a stale DISTANCE band in particular could exclude everything. */
     fun resetForNewRange() {
-        selecting = false
         checked = emptySet()
         focused = null
         hidden = emptySet()
@@ -104,7 +95,9 @@ class PanelState {
             return listed.filter { it.id in ids }
         }
 
+    /** Selects [id] alone — which ends selecting, as the two never show at once. */
     fun focus(id: String) {
+        checked = emptySet()
         focused = id
     }
 
@@ -112,8 +105,17 @@ class PanelState {
         focused = null
     }
 
-    fun toggleChecked(id: String) {
-        checked = if (id in checked) checked - id else checked + id
+    /** Checks [id], or unchecks it; true when it's now checked. The first check starts
+     *  selecting, and the selected activity, if any, joins the group rather than vanishing. */
+    fun toggleChecked(id: String): Boolean {
+        if (id in checked) {
+            checked = checked - id
+            return false
+        }
+        if (checked.isEmpty()) focused?.let { checked = checked + it }
+        focused = null
+        checked = checked + id
+        return true
     }
 
     /** The master checkbox from unchecked or partial: every row listed — not the ones

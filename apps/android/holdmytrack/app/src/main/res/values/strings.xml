@@ -458,8 +458,6 @@
     <string name="panel_target_one">“%1$s”</string>
     <string name="panel_footer">%1$d selected · %2$s</string>
     <string name="panel_reset">Reset</string>
-    <string name="panel_select">Select</string>
-    <string name="panel_select_done">Done</string>
     <string name="selection_close">Stop selecting</string>
     <string name="card_close">Clear the selection</string>
     <string name="card_distance">Distance</string>

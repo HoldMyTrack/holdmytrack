@@ -59,18 +59,9 @@ class PanelStateTest {
         s.focus("b")
         assertEquals(setOf("b"), s.targetIds)
         s.toggleChecked("a")
+        assertEquals(setOf("a", "b"), s.targetIds)
+        s.toggleChecked("b")
         assertEquals(setOf("a"), s.targetIds)
-        s.toggleChecked("a")
-        assertEquals(setOf("b"), s.targetIds)
-    }
-
-    @Test
-    fun `selecting a row never touches the checked group`() {
-        val s = state(walk, run)
-        s.toggleChecked("a")
-        s.focus("b")
-        s.clearFocus()
-        assertEquals(setOf("a"), s.checked)
     }
 
     @Test
@@ -134,32 +125,49 @@ class PanelStateTest {
     @Test
     fun `a refreshed list keeps what still exists`() {
         val s = state(walk, run)
-        s.toggleChecked("a")
-        s.toggleChecked("b")
         s.focus("b")
         s.setActivities(listOf(walk))
-        assertEquals(setOf("a"), s.checked)
         assertNull(s.focused)
+        s.setActivities(listOf(walk, run))
+        s.toggleChecked("a")
+        s.toggleChecked("b")
+        s.setActivities(listOf(walk))
+        assertEquals(setOf("a"), s.checked)
     }
 
     @Test
-    fun `selecting gives the selection way to the group, and ending it drops the group`() {
+    fun `the first check starts selecting, bringing the selected one into the group`() {
         val s = state(walk, run)
         s.focus("a")
-        s.startSelecting()
+        assertTrue(s.toggleChecked("b"))
         assertTrue(s.selecting)
         assertNull(s.focused)
-        s.toggleChecked("b")
-        assertEquals(listOf(run), s.targets)
-        s.endSelecting()
+        assertEquals(setOf("a", "b"), s.checked)
+        assertEquals(setOf("a", "b"), s.highlighted)
+    }
+
+    @Test
+    fun `unchecking the last one ends selecting`() {
+        val s = state(walk, run)
+        s.toggleChecked("a")
+        assertFalse(s.toggleChecked("a"))
         assertFalse(s.selecting)
-        assertEquals(emptySet<String>(), s.checked)
+        assertEquals(emptySet<String>(), s.highlighted)
+    }
+
+    @Test
+    fun `selecting one activity ends selecting`() {
+        val s = state(walk, run)
+        s.toggleChecked("a")
+        s.focus("b")
+        assertFalse(s.selecting)
+        assertEquals(setOf("b"), s.highlighted)
     }
 
     @Test
     fun `a new range ends selecting`() {
         val s = state(walk)
-        s.startSelecting()
+        s.toggleChecked("a")
         s.resetForNewRange()
         assertFalse(s.selecting)
     }

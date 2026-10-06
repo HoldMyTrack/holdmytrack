@@ -7,7 +7,7 @@ import android.widget.PopupMenu
 import android.widget.TextView
 import androidx.appcompat.widget.TooltipCompat
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.checkbox.MaterialCheckBox
+import android.content.res.ColorStateList
 import dev.holdmytrack.android.R
 import dev.holdmytrack.android.net.Activity
 import dev.holdmytrack.android.net.Session
@@ -21,7 +21,7 @@ data class ActivityRowItem(
     val checked: Boolean,
     val focused: Boolean,
     val hidden: Boolean,
-    /** Whether the list is selecting — a row then shows its checkbox, and its tap checks it. */
+    /** Whether the list is selecting — a row's tap then checks or unchecks it. */
     val selecting: Boolean = false,
 )
 
@@ -40,12 +40,14 @@ fun kindIcon(kind: ActivityKind): Int = when (kind) {
  * and the "[date ·] distance · duration · type" line, dimmed with a Pending or Hidden badge,
  * and a Story badge for the Stories it's in — all but [openStoryId]'s, since every row under
  * an open Story is in that one (`docs/SPEC.md` FR-5.1). The badge opens its Story, or, for
- * several, a menu of their names. [onCheck] null leaves the checkbox out; [onRemove] shows the
- * × that takes the row out of the open Story (`docs/SPEC.md` FR-14.6 item 3).
+ * several, a menu of their names. The tile of its kind is its checkbox, as Gmail's avatar is: a
+ * tap on it, or a long press on the row, is [onCheck], and a checked row's tile is a ✓ on the
+ * accent; [onCheck] null leaves it a plain tile. [onRemove] shows the × that takes the row out
+ * of the open Story (`docs/SPEC.md` FR-14.6 item 3).
  */
 class ActivityRowHolder(view: View) : RecyclerView.ViewHolder(view) {
     private val res = view.resources
-    private val check: MaterialCheckBox = view.findViewById(R.id.activity_check)
+    private val tileTarget: View = view.findViewById(R.id.activity_tile_target)
     private val kindTile: ImageView = view.findViewById(R.id.activity_type_icon)
     private val text: View = view.findViewById(R.id.activity_text)
     private val title: TextView = view.findViewById(R.id.activity_title)
@@ -134,22 +136,35 @@ class ActivityRowHolder(view: View) : RecyclerView.ViewHolder(view) {
             remove.setOnClickListener { onRemove(activity.id) }
         }
 
-        check.visibility = if (onCheck == null) View.GONE else View.VISIBLE
-        // Without a checkbox, a tile of the activity's kind holds its place.
-        kindTile.visibility = if (onCheck == null) View.VISIBLE else View.GONE
-        kindTile.setImageResource(kindIcon(ActivityKind.of(activity.activityType)))
-        check.setOnCheckedChangeListener(null)
-        check.isChecked = isChecked
-        // Pending is disabled until its reprocess lands, except that a checked one can still
-        // be unchecked.
-        check.isEnabled = !activity.pending || isChecked
-        check.contentDescription = res.getString(if (isChecked) R.string.panel_row_uncheck else R.string.panel_row_check, label)
-        if (onCheck != null) check.setOnCheckedChangeListener { _, _ -> onCheck(activity.id) }
+        val context = itemView.context
+        val ticked = isChecked && onCheck != null
+        kindTile.setImageResource(if (ticked) R.drawable.ic_check else kindIcon(ActivityKind.of(activity.activityType)))
+        kindTile.backgroundTintList = if (ticked) ColorStateList.valueOf(context.getColor(R.color.hmt_accent)) else null
+        kindTile.imageTintList = ColorStateList.valueOf(context.getColor(if (ticked) R.color.hmt_on_accent else R.color.hmt_ink_secondary))
+        val checkLabel = res.getString(if (isChecked) R.string.panel_row_uncheck else R.string.panel_row_check, label)
+        // Pending can't be checked until its reprocess lands, though a checked one can still be
+        // unchecked.
+        val checkable = onCheck != null && (!activity.pending || isChecked)
+        tileTarget.isClickable = checkable
+        tileTarget.isEnabled = checkable
+        tileTarget.importantForAccessibility =
+            if (onCheck == null) View.IMPORTANT_FOR_ACCESSIBILITY_NO else View.IMPORTANT_FOR_ACCESSIBILITY_YES
+        tileTarget.contentDescription = if (onCheck == null) null else checkLabel
+        tileTarget.setOnClickListener(if (checkable) View.OnClickListener { onCheck?.invoke(activity.id) } else null)
 
         text.isEnabled = !activity.pending
-        text.contentDescription = listOfNotNull(res.getString(R.string.panel_fly_to, label), meta.text, storiesNote)
-            .joinToString(". ")
+        val action = if (row.selecting) checkLabel else res.getString(R.string.panel_fly_to, label)
+        text.contentDescription = listOfNotNull(action, meta.text, storiesNote).joinToString(". ")
         text.setOnClickListener { onSelect(activity.id) }
+        if (onCheck != null) {
+            text.setOnLongClickListener {
+                onCheck(activity.id)
+                true
+            }
+        } else {
+            text.setOnLongClickListener(null)
+            text.isLongClickable = false
+        }
     }
 
     private companion object {

@@ -182,6 +182,11 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         override fun handleOnBackPressed() = panel.setExpanded(false)
     }
 
+    /** Back unchecks every row, ending selecting, before it does anything else on the map. */
+    private val endSelectingOnBack = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() = panel.endSelecting()
+    }
+
     /** Back closes the Edit window before it leaves the map. */
     private val closeEditOnBack = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() = editWindow.back()
@@ -574,6 +579,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             onClose = ::onEditClosed,
         )
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, collapseSheetOnBack)
+        // Added after the sheet's, so it's asked first: Back ends selecting before it closes the sheet.
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, endSelectingOnBack)
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, closeEditOnBack)
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, closePrivateOnBack)
         activityDays = ActivityDays(DateRangeSlider.WINDOW_DAYS, ::onActivityDaysChanged)
@@ -947,7 +954,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         val loaded = style ?: return
         if (!overlaysAttached) {
             MapOverlays.attach(loaded, mode, selectedRange, darkBase(loaded), storyId)
-            MapOverlays.setTrackFilter(loaded, panelState.mapHidden, panelState.focused)
+            MapOverlays.setTrackFilter(loaded, panelState.mapHidden, panelState.highlighted)
             // Last, so the places are over everything else, labels included.
             MapSpots.attach(loaded, requireContext(), shownSpots(MapSpots.get(requireContext())))
             overlaysAttached = true
@@ -1320,7 +1327,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  and the selected activity's bands with them; and the sheet's head and the selection bar,
      *  which follow the selection and the checking. */
     private fun applyTrackFilter() {
-        style?.takeIf { overlaysAttached }?.let { MapOverlays.setTrackFilter(it, panelState.mapHidden, panelState.focused) }
+        style?.takeIf { overlaysAttached }?.let { MapOverlays.setTrackFilter(it, panelState.mapHidden, panelState.highlighted) }
         updateTrackMetrics(refetch = false)
         refreshPhotos(force = false)
         if (::panel.isInitialized) renderDateFooter()
@@ -1335,6 +1342,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  rail stepping aside for it. */
     private fun renderSelectionBar() {
         val shown = selectionShown()
+        endSelectingOnBack.isEnabled = shown
         if (selectionBar.isVisible == shown) return
         selectionBar.visibility = if (shown) View.VISIBLE else View.GONE
         if (!shown) panel.dismissPopups()
@@ -1540,7 +1548,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         val box = RectF(screen.x - tolerance, screen.y - tolerance, screen.x + tolerance, screen.y + tolerance)
         val id = instance.queryRenderedFeatures(box, MapOverlays.TRACKS_LAYER_ID)
             .firstNotNullOfOrNull { it.getStringProperty("id") }
-        if (id != null && panelState.activities.any { it.id == id }) panel.focusFromMap(id) else panel.clearFocus()
+        if (id != null && panelState.activities.any { it.id == id }) panel.trackTapped(id) else panel.clearFocus()
         return true
     }
 
