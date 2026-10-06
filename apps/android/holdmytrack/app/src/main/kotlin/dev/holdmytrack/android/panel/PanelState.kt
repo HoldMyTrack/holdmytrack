@@ -35,6 +35,24 @@ class PanelState {
     var distanceFilter: DistanceRange? = null
         private set
 
+    /** Whether the rows show their checkboxes — the list's Select. Off, a row's tap selects it,
+     *  as the map's tap on its track does; on, it checks it. */
+    var selecting: Boolean = false
+        private set
+
+    /** Select: the rows show their checkboxes, the selection giving way to the group. */
+    fun startSelecting() {
+        selecting = true
+        focused = null
+    }
+
+    /** Done, or the selection bar's ×: the checkboxes go, and the group with them, since
+     *  nothing could show it any more. */
+    fun endSelecting() {
+        selecting = false
+        checked = emptySet()
+    }
+
     /** A fresh list for the same range — after a sync or an edit. Selection, the group and the
      *  hidden set keep whatever of theirs still exists. */
     fun setActivities(next: List<Activity>) {
@@ -48,6 +66,7 @@ class PanelState {
     /** A new date range changes which rows exist, so everything built against the old one goes
      *  (`docs/SPEC.md` FR-6.6) — a stale DISTANCE band in particular could exclude everything. */
     fun resetForNewRange() {
+        selecting = false
         checked = emptySet()
         focused = null
         hidden = emptySet()

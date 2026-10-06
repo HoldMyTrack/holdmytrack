@@ -338,6 +338,68 @@
         <item name="iconSize">20dp</item>
     </style>
 
+    <!-- One of the selected activity's numbers (include_activity_card): a tinted box, its label
+         over its value. -->
+    <style name="Widget.HoldMyTrack.CardStat" parent="">
+        <item name="android:background">@drawable/bg_card_stat</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:paddingStart">@dimen/hmt_space_12</item>
+        <item name="android:paddingTop">@dimen/hmt_space_8</item>
+        <item name="android:paddingEnd">@dimen/hmt_space_12</item>
+        <item name="android:paddingBottom">@dimen/hmt_space_8</item>
+    </style>
+
+    <style name="Widget.HoldMyTrack.CardStat.Label" parent="">
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.PanelFilterLabel</item>
+        <item name="android:maxLines">1</item>
+    </style>
+
+    <style name="Widget.HoldMyTrack.CardStat.Value" parent="">
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.TitleSmall</item>
+        <item name="android:textColor">@color/hmt_ink</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:layout_marginTop">2dp</item>
+    </style>
+
+    <!-- The selected activity's actions (include_activity_card): an icon over a short label, in
+         ink, filling a 60dp-tall share of the row. -->
+    <style name="Widget.HoldMyTrack.Button.CardAction" parent="Widget.Material3.Button.TextButton.Icon">
+        <item name="android:minHeight">60dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:paddingStart">0dp</item>
+        <item name="android:paddingEnd">0dp</item>
+        <item name="android:textSize">@dimen/hmt_text_xs</item>
+        <item name="android:textColor">@color/card_action</item>
+        <item name="android:maxLines">1</item>
+        <item name="iconTint">@color/card_action</item>
+        <item name="iconGravity">top</item>
+        <item name="iconPadding">@dimen/hmt_space_4</item>
+        <item name="iconSize">22dp</item>
+    </style>
+
+    <style name="Widget.HoldMyTrack.Button.CardAction.Danger">
+        <item name="android:textColor">@color/card_action_danger</item>
+        <item name="iconTint">@color/card_action_danger</item>
+    </style>
+
+    <!-- A filter in the Activities sheet (Type, Distance): a bordered pill holding its label and
+         a ▾, 40dp tall. -->
+    <style name="Widget.HoldMyTrack.FilterChip" parent="">
+        <item name="android:background">@drawable/bg_panel_type_trigger</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:minHeight">40dp</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:paddingStart">@dimen/hmt_space_12</item>
+        <item name="android:paddingEnd">@dimen/hmt_space_8</item>
+    </style>
+
+    <style name="TextAppearance.HoldMyTrack.FilterChip" parent="TextAppearance.HoldMyTrack.BodyMedium">
+        <item name="android:textColor">@color/hmt_ink</item>
+    </style>
+
     <!-- The floating panel every piece of map chrome sits on, after the web's .map-mode-toggle:
          near-white, medium radius, a small shadow (fm-shadow-sm). -->
     <style name="Widget.HoldMyTrack.MapPanel" parent="">

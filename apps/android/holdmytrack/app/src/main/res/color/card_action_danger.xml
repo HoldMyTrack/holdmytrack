@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The selected activity's Delete: the danger colour, faded while disabled. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:alpha="0.38" android:color="@color/hmt_danger" android:state_enabled="false" />
+    <item android:color="@color/hmt_danger" />
+</selector>

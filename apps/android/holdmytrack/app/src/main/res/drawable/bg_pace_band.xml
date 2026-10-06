@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One step of the pace bands' legend (include_activity_card): a short rounded bar, tinted in
+     code with its band's colour (TrackBands.COLORS). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#FFFFFFFF" />
+    <corners android:radius="3dp" />
+</shape>

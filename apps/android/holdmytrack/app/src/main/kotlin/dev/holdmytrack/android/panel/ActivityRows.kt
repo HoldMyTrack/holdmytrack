@@ -1,6 +1,8 @@
 package dev.holdmytrack.android.panel
 
 import android.view.View
+import android.widget.ImageView
+import androidx.annotation.DrawableRes
 import android.widget.PopupMenu
 import android.widget.TextView
 import androidx.appcompat.widget.TooltipCompat
@@ -14,7 +16,23 @@ import dev.holdmytrack.android.recording.RecordingTypes
 /** One row as drawn: the activity and its marks, so a diff rebinds only what changed — a
  *  tick, the selection moving, a refetch — rather than every row, which also cancelled a tap
  *  on another row landing mid-rebind. */
-data class ActivityRowItem(val activity: Activity, val checked: Boolean, val focused: Boolean, val hidden: Boolean)
+data class ActivityRowItem(
+    val activity: Activity,
+    val checked: Boolean,
+    val focused: Boolean,
+    val hidden: Boolean,
+    /** Whether the list is selecting — a row then shows its checkbox, and its tap checks it. */
+    val selecting: Boolean = false,
+)
+
+/** The icon for an activity's kind, on its row's tile and its card. */
+@DrawableRes
+fun kindIcon(kind: ActivityKind): Int = when (kind) {
+    ActivityKind.FOOT -> R.drawable.ic_footprints
+    ActivityKind.WHEELS -> R.drawable.ic_bike
+    ActivityKind.MOTOR -> R.drawable.ic_car
+    ActivityKind.OTHER -> R.drawable.ic_route
+}
 
 /**
  * One activity row over `item_activity_row` — the web's `ActivityRow.tsx`, shared the same way
@@ -28,6 +46,7 @@ data class ActivityRowItem(val activity: Activity, val checked: Boolean, val foc
 class ActivityRowHolder(view: View) : RecyclerView.ViewHolder(view) {
     private val res = view.resources
     private val check: MaterialCheckBox = view.findViewById(R.id.activity_check)
+    private val kindTile: ImageView = view.findViewById(R.id.activity_type_icon)
     private val text: View = view.findViewById(R.id.activity_text)
     private val title: TextView = view.findViewById(R.id.activity_title)
     private val meta: TextView = view.findViewById(R.id.activity_meta)
@@ -116,6 +135,9 @@ class ActivityRowHolder(view: View) : RecyclerView.ViewHolder(view) {
         }
 
         check.visibility = if (onCheck == null) View.GONE else View.VISIBLE
+        // Without a checkbox, a tile of the activity's kind holds its place.
+        kindTile.visibility = if (onCheck == null) View.VISIBLE else View.GONE
+        kindTile.setImageResource(kindIcon(ActivityKind.of(activity.activityType)))
         check.setOnCheckedChangeListener(null)
         check.isChecked = isChecked
         // Pending is disabled until its reprocess lands, except that a checked one can still

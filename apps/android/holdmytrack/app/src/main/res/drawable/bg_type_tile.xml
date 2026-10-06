@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- An activity's kind as a tile (a row, the selected activity's card): the tinted surface, the
+     large radius, the kind's icon in it. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/hmt_surface_tint" />
+    <corners android:radius="@dimen/hmt_radius_lg" />
+</shape>

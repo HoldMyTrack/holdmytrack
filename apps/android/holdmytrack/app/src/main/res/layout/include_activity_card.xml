@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The selected activity, at the head of the Activities sheet in the range's place
+     (panel/ActivitiesPanel.renderCard): its kind, name and start, a close button that clears the
+     selection; its distance, moving time and pace or speed; the pace bands' legend while the map
+     draws them; and its actions — the toolbar's, over it. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/activity_card"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="@dimen/hmt_space_16"
+    android:paddingEnd="@dimen/hmt_space_16"
+    android:visibility="gone">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/card_type_icon"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_type_tile"
+            android:importantForAccessibility="no"
+            android:padding="@dimen/hmt_space_10"
+            android:src="@drawable/ic_route"
+            app:tint="@color/hmt_accent_strong" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/hmt_space_12"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/card_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:accessibilityHeading="true"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleLarge"
+                tools:text="Long run" />
+
+            <TextView
+                android:id="@+id/card_meta"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/hmt_ink_meta"
+                android:textSize="@dimen/hmt_text_sm"
+                tools:text="Sep 27, 2026, 7:12 AM · Running" />
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/card_close"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/card_close"
+            android:padding="14dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_x"
+            app:tint="@color/hmt_ink_secondary" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/hmt_space_12"
+        android:baselineAligned="false"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            style="@style/Widget.HoldMyTrack.CardStat"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1">
+
+            <TextView
+                style="@style/Widget.HoldMyTrack.CardStat.Label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/card_distance" />
+
+            <TextView
+                android:id="@+id/card_distance"
+                style="@style/Widget.HoldMyTrack.CardStat.Value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                tools:text="8.9 mi" />
+        </LinearLayout>
+
+        <LinearLayout
+            style="@style/Widget.HoldMyTrack.CardStat"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/hmt_space_8"
+            android:layout_weight="1">
+
+            <TextView
+                style="@style/Widget.HoldMyTrack.CardStat.Label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/card_moving" />
+
+            <TextView
+                android:id="@+id/card_moving"
+                style="@style/Widget.HoldMyTrack.CardStat.Value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                tools:text="1h 18m" />
+        </LinearLayout>
+
+        <LinearLayout
+            style="@style/Widget.HoldMyTrack.CardStat"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/hmt_space_8"
+            android:layout_weight="1">
+
+            <TextView
+                android:id="@+id/card_pace_label"
+                style="@style/Widget.HoldMyTrack.CardStat.Label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                tools:text="Pace" />
+
+            <TextView
+                android:id="@+id/card_pace"
+                style="@style/Widget.HoldMyTrack.CardStat.Value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                tools:text="8:47 /mi" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- The pace bands' legend, slowest to fastest — only while the map draws them. -->
+    <LinearLayout
+        android:id="@+id/card_bands"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/hmt_space_12"
+        android:gravity="center_vertical"
+        android:importantForAccessibility="noHideDescendants"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/card_slower"
+            android:textColor="@color/hmt_ink_meta"
+            android:textSize="@dimen/hmt_text_xs" />
+
+        <LinearLayout
+            android:id="@+id/card_band_steps"
+            android:layout_width="0dp"
+            android:layout_height="6dp"
+            android:layout_marginStart="@dimen/hmt_space_8"
+            android:layout_marginEnd="@dimen/hmt_space_8"
+            android:layout_weight="1"
+            android:orientation="horizontal" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/card_faster"
+            android:textColor="@color/hmt_ink_meta"
+            android:textSize="@dimen/hmt_text_xs" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/hmt_space_8"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/card_visibility"
+            style="@style/Widget.HoldMyTrack.Button.CardAction"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/card_hide"
+            app:icon="@drawable/ic_eye" />
+
+        <Button
+            android:id="@+id/card_edit"
+            style="@style/Widget.HoldMyTrack.Button.CardAction"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/card_edit"
+            app:icon="@drawable/ic_pencil" />
+
+        <Button
+            android:id="@+id/card_add_to_story"
+            style="@style/Widget.HoldMyTrack.Button.CardAction"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/card_story"
+            app:icon="@drawable/ic_book_plus" />
+
+        <Button
+            android:id="@+id/card_focus"
+            style="@style/Widget.HoldMyTrack.Button.CardAction"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/card_focus"
+            app:icon="@drawable/ic_focus" />
+
+        <Button
+            android:id="@+id/card_delete"
+            style="@style/Widget.HoldMyTrack.Button.CardAction.Danger"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/card_delete"
+            app:icon="@drawable/ic_trash_2" />
+    </LinearLayout>
+</LinearLayout>
