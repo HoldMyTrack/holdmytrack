@@ -23,6 +23,7 @@ import dev.holdmytrack.android.settings.AppLanguage
 import dev.holdmytrack.android.settings.AppTheme
 import dev.holdmytrack.android.settings.ChoicePicker
 import dev.holdmytrack.android.settings.SettingsActivity
+import dev.holdmytrack.android.ui.LargeText
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Locale
@@ -95,6 +96,9 @@ class YouFragment : Fragment(R.layout.fragment_you) {
             setOnClickListener { AccountDeletion.confirm(requireActivity() as AppCompatActivity) }
         }
         findViewById<TextView>(R.id.you_version).text = getString(R.string.menu_version, HoldMyTrackApi.appVersion)
+        for (row in listOf(R.id.you_stats_row, R.id.you_theme_inner, R.id.you_language_inner, R.id.you_web_row)) {
+            LargeText.stack(findViewById(row))
+        }
         bindTheme()
         renderAccount()
     }

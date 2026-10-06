@@ -2,8 +2,10 @@
 <!-- The main window (MainActivity): the tab showing — the map (fragment_map.xml), Sync or You —
      above the bottom bar, which takes the gesture bar's inset as its own padding.
 
-     The record button sits over the bar's empty middle slot, raised half out of it, so neither
-     the bar nor the root clips it — nor the ring and pulse RecordButton draws around itself.
+     The record button sits over the bar's empty middle slot, raised out of it. The bar's frame
+     reaches up over the tab by the raise (a negative top margin) so the raised part is inside it
+     and takes touches; elsewhere that strip is empty and a touch goes through to the tab under
+     it. Neither the frame nor the root clips the ring and pulse RecordButton draws around itself.
      MapFragment drives it (onRecordTap, renderRecording), since the recording is the map's. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -25,6 +27,7 @@
         android:id="@+id/bottom_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="-14dp"
         android:clipChildren="false"
         android:clipToPadding="false">
 
@@ -33,11 +36,13 @@
             style="@style/Widget.HoldMyTrack.BottomNav"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
             app:menu="@menu/bottom_nav" />
 
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
+            android:layout_marginTop="14dp"
             android:background="@color/hmt_border" />
 
         <dev.holdmytrack.android.recording.RecordButton
@@ -50,7 +55,6 @@
             android:elevation="6dp"
             android:padding="@dimen/hmt_space_12"
             android:scaleType="fitCenter"
-            android:src="@drawable/ic_record_start"
-            android:translationY="-14dp" />
+            android:src="@drawable/ic_record_start" />
     </FrameLayout>
 </LinearLayout>

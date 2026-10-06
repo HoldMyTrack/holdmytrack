@@ -91,7 +91,7 @@
                         android:orientation="horizontal"
                         android:visibility="gone">
 
-                        <com.google.android.material.button.MaterialButton
+                        <dev.holdmytrack.android.map.MapModeButton
                             android:id="@+id/mode_normal"
                             style="@style/Widget.HoldMyTrack.Button.MapMode"
                             android:layout_width="wrap_content"
@@ -99,7 +99,7 @@
                             android:text="@string/mode_normal"
                             app:icon="@drawable/ic_route" />
 
-                        <com.google.android.material.button.MaterialButton
+                        <dev.holdmytrack.android.map.MapModeButton
                             android:id="@+id/mode_fog"
                             style="@style/Widget.HoldMyTrack.Button.MapMode"
                             android:layout_width="wrap_content"
@@ -108,7 +108,7 @@
                             android:text="@string/mode_fog"
                             app:icon="@drawable/ic_cloud_fog" />
 
-                        <com.google.android.material.button.MaterialButton
+                        <dev.holdmytrack.android.map.MapModeButton
                             android:id="@+id/mode_heatmap"
                             style="@style/Widget.HoldMyTrack.Button.MapMode"
                             android:layout_width="wrap_content"
@@ -203,7 +203,7 @@
 
                     <ImageButton
                         android:id="@+id/selection_close"
-                        android:layout_width="44dp"
+                        android:layout_width="48dp"
                         android:layout_height="48dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:contentDescription="@string/selection_close"
@@ -219,12 +219,15 @@
 
                     <ImageButton
                         android:id="@+id/panel_select_menu"
-                        android:layout_width="28dp"
+                        android:layout_width="48dp"
                         android:layout_height="48dp"
-                        android:layout_marginStart="-10dp"
+                        android:layout_marginStart="-12dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:contentDescription="@string/panel_select_menu"
-                        android:padding="7dp"
+                        android:paddingStart="12dp"
+                        android:paddingTop="17dp"
+                        android:paddingEnd="22dp"
+                        android:paddingBottom="17dp"
                         android:scaleType="fitCenter"
                         android:src="@drawable/ic_chevron_down"
                         app:tint="@color/panel_select_icon" />

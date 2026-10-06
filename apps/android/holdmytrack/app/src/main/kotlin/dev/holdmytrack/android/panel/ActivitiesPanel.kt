@@ -34,6 +34,7 @@ import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.net.Story
 import dev.holdmytrack.android.map.TrackBands
 import dev.holdmytrack.android.recording.RecordingTypes
+import dev.holdmytrack.android.ui.LargeText
 import kotlin.math.abs
 
 /** The panel's three tabs, the web's `PanelTab`. */
@@ -197,6 +198,7 @@ class ActivitiesPanel(
         clearFocusOnEmptyTap()
 
         handle.setOnClickListener { setExpanded(!expanded) }
+        LargeText.stack(sheet.findViewById(R.id.card_stats))
         // The collapsed height is the head's bottom edge, whatever the font scale and the range
         // or title in it make of it — set after the layout pass rather than inside it.
         head.addOnLayoutChangeListener { _, _, _, _, bottom, _, _, _, oldBottom ->
@@ -382,9 +384,11 @@ class ActivitiesPanel(
      *  bottom — the list's last rows — is still on screen. */
     fun setExpandedOffset(offset: Int, parentHeight: Int) {
         // Never so far down that the open sheet is shorter than its own head — a landscape
-        // phone, whose top row takes much of its height.
+        // phone, whose top row, the rail's two buttons stacked, takes much of its height. The
+        // head's own height, not the one it was laid out at: a sheet already too short squeezes
+        // its head, which would then never ask for more.
         expandedOffsetWanted = offset
-        val clamped = offset.coerceAtMost((parentHeight - head.height).coerceAtLeast(0))
+        val clamped = offset.coerceAtMost((parentHeight - naturalHeadHeight()).coerceAtLeast(0))
         if (behavior.expandedOffset != clamped) behavior.expandedOffset = clamped
         val params = sheet.layoutParams
         val height = (parentHeight - clamped).coerceAtLeast(0)
@@ -392,6 +396,16 @@ class ActivitiesPanel(
             params.height = height
             sheet.layoutParams = params
         }
+    }
+
+    /** The head's height at the sheet's width with nothing limiting it. */
+    private fun naturalHeadHeight(): Int {
+        val width = sheet.width.takeIf { it > 0 } ?: return head.height
+        head.measure(
+            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+        )
+        return head.measuredHeight
     }
 
     fun dismissPopups() {

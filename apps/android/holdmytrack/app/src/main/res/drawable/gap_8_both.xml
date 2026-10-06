@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- An empty 8dp divider both ways: a LinearLayout that turns from a row into a column
+     (YouFragment.stackWhenLarge) keeps its gap either way. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <size
+        android:width="@dimen/hmt_space_8"
+        android:height="@dimen/hmt_space_8" />
+    <solid android:color="@android:color/transparent" />
+</shape>

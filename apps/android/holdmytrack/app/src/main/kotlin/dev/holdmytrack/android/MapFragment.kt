@@ -28,9 +28,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.AccessibilityDelegateCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.fragment.app.Fragment
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -43,6 +45,7 @@ import dev.holdmytrack.android.map.TrackEditOverlay
 import dev.holdmytrack.android.map.DateRange
 import dev.holdmytrack.android.map.DateRangeSlider
 import dev.holdmytrack.android.map.MapMode
+import dev.holdmytrack.android.map.MapModeButton
 import dev.holdmytrack.android.map.MapOverlays
 import dev.holdmytrack.android.map.LayersMenu
 import dev.holdmytrack.android.map.MapLayersSwitch
@@ -74,6 +77,7 @@ import dev.holdmytrack.android.panel.PanelState
 import dev.holdmytrack.android.recording.RecordButton
 import dev.holdmytrack.android.recording.RecordingFormat
 import dev.holdmytrack.android.recording.RecordingService
+import dev.holdmytrack.android.ui.LargeText
 import dev.holdmytrack.android.recording.RecordingState
 import dev.holdmytrack.android.recording.db.LiveRecordingJournal
 import dev.holdmytrack.android.settings.AppLanguage
@@ -277,6 +281,10 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  re-framing on every resume would fight the user for control of the camera. */
     private var framed = false
 
+    /** Whether the map view is coming back from a recreation — a rotation, a theme or language
+     *  change — with the camera MapLibre saved, which the opening world view mustn't replace. */
+    private var restoringCamera = false
+
     /** Guards against a second `GET /v1/auth/me` while the first is still in flight — every
      *  `onResume` calls `syncSession`, and returning from the Profile screen is one. */
     private var verifying = false
@@ -434,6 +442,14 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             MapMode.FOG to findViewById(R.id.mode_fog),
             MapMode.HEATMAP to findViewById(R.id.mode_heatmap),
         )
+        // One choice of three: each reads as a radio button, "1 of 3" (map/MapModeButton).
+        modeButtons.values.forEachIndexed { index, button -> (button as? MapModeButton)?.position = index }
+        ViewCompat.setAccessibilityDelegate(modeBar, object : AccessibilityDelegateCompat() {
+            override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfoCompat) {
+                super.onInitializeAccessibilityNodeInfo(host, info)
+                info.setCollectionInfo(AccessibilityNodeInfoCompat.CollectionInfoCompat.obtain(1, modeButtons.size, false, AccessibilityNodeInfoCompat.CollectionInfoCompat.SELECTION_MODE_SINGLE))
+            }
+        })
         modeButtons.forEach { (value, button) ->
             button.setOnClickListener { setMode(value) }
             button.minWidth = minTouchTargetPx()
@@ -595,6 +611,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
 
         mapView = findViewById(R.id.map_view)
+        restoringCamera = savedInstanceState?.getBoolean(STATE_FRAMED) == true
+        // The camera comes back with the view; framing it again would undo where the user was.
+        if (restoringCamera) framed = true
         mapView.onCreate(savedInstanceState)
         takeHandleDrags()
 
@@ -606,11 +625,14 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             map = instance
             // A whole-world view is the honest starting camera until the session is verified
             // and the activity extent is known; `frameActivities` replaces it with the user's
-            // own, and leaves it for an account with no geometry yet.
-            instance.cameraPosition = CameraPosition.Builder()
-                .target(LatLng(20.0, 0.0))
-                .zoom(1.0)
-                .build()
+            // own, and leaves it for an account with no geometry yet. Not over a camera a
+            // recreation brought back.
+            if (!restoringCamera) {
+                instance.cameraPosition = CameraPosition.Builder()
+                    .target(LatLng(20.0, 0.0))
+                    .zoom(1.0)
+                    .build()
+            }
             applyCompassMargin()
             applyAttributionMargin()
             mapView.post { enlargeAttributionTarget() }
@@ -1905,11 +1927,25 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
     }
 
+    /**
+     * At a large font size the three labels don't fit beside the rail, so only the active mode
+     * keeps its label and the other two are their icons (`ui/LargeText`); each is still named
+     * for TalkBack. The label is the button's own text from the layout, kept in its tag.
+     */
+    private fun renderModeLabel(button: MaterialButton, active: Boolean) {
+        val label = (button.tag as? CharSequence) ?: button.text.also { button.tag = it }
+        button.contentDescription = label
+        if (!LargeText.isOn(resources)) return
+        button.text = if (active) label else ""
+        button.iconPadding = if (active) resources.getDimensionPixelSize(R.dimen.hmt_space_6) else 0
+    }
+
     private fun setMode(next: MapMode) {
         mode = next
         modeButtons.forEach { (value, button) ->
             val active = value == next
             button.isChecked = active
+            renderModeLabel(button, active)
         }
         style?.takeIf { overlaysAttached }?.let { MapOverlays.setMode(it, next) }
         renderZoomLevelNotice()
@@ -2021,7 +2057,12 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             sheet.isVisible -> root.height - panel.restingTop(root.height)
             else -> 0
         }
-        val padding = intArrayOf(FRAME_PADDING_PX, top, FRAME_PADDING_PX, bottom)
+        // A landscape phone's top row (the rail's two buttons stacked) and sheet can leave
+        // nothing between them; the fit then gets at least a strip, taken from the top first.
+        val minSpan = (MIN_FRAME_SPAN_DP * resources.displayMetrics.density).toInt()
+        val fitTop = top.coerceAtMost(maxOf(FRAME_PADDING_PX, root.height - bottom - minSpan))
+        val fitBottom = bottom.coerceAtMost(maxOf(FRAME_PADDING_PX, root.height - fitTop - minSpan))
+        val padding = intArrayOf(FRAME_PADDING_PX, fitTop, FRAME_PADDING_PX, fitBottom)
         val fitted = instance.getCameraForLatLngBounds(bounds, padding) ?: return
         val target = CameraPosition.Builder(fitted)
             .zoom(minOf(fitted.zoom, maxZoom))
@@ -2031,7 +2072,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
     /**
      * Flavor follows the app's night mode, the same one its own colors follow: the system's
-     * day/night setting, or Settings' Theme toggle when that overrides it (`AppTheme`). The
+     * day/night setting, or the You tab's Theme toggle when that overrides it (`AppTheme`). The
      * API serves five (`light`, `dark`, `white`, `black`, `grayscale`); this picks between the
      * two general-purpose ones.
      */
@@ -2100,7 +2141,11 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        if (view != null) mapView.onSaveInstanceState(outState)
+        if (view != null) {
+            mapView.onSaveInstanceState(outState)
+            // The camera MapLibre just saved is where the user left it, once it's been framed.
+            outState.putBoolean(STATE_FRAMED, framed)
+        }
         outState.putString(STATE_MODE, mode.name)
         // The panel comes back on its Activities tab; an open Story never changed the range.
         selectedRange?.let {
@@ -2139,6 +2184,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         private const val FRAME_PADDING_PX = 64
         private const val MAX_FRAME_ZOOM = 15.0
 
+        /** The least height of map a fit keeps between the top row and the sheet. */
+        private const val MIN_FRAME_SPAN_DP = 96
+
         /** A photo group whose photos lie further apart than this zooms in to split them; one
          *  closer opens its popup, since no zoom would — the web's `GROUP_SPREAD_M`. */
         private const val PHOTO_GROUP_SPREAD_M = 15.0
@@ -2171,6 +2219,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         /** The default range's length in activity days (`docs/SPEC.md` FR-6.1). */
         private const val DEFAULT_RANGE_DAYS = 5
         private const val STATE_MODE = "mode"
+        private const val STATE_FRAMED = "framed"
         private const val STATE_RANGE_FROM = "range_from"
         private const val STATE_RANGE_TO = "range_to"
         private const val STATE_RANGE_CHOSEN = "range_chosen"

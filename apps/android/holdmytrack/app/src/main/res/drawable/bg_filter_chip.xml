@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A filter chip (Widget.HoldMyTrack.FilterChip): the Type trigger's look with a press ripple,
+     drawn 40dp tall in a 48dp touch target. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:insetTop="4dp"
+    android:insetBottom="4dp">
+    <ripple android:color="?attr/colorControlHighlight">
+        <item android:drawable="@drawable/bg_panel_type_trigger" />
+    </ripple>
+</inset>

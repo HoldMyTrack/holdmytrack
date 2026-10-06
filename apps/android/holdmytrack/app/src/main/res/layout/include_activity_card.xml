@@ -70,7 +70,10 @@
             app:tint="@color/hmt_ink_secondary" />
     </LinearLayout>
 
+    <!-- Distance, moving time and pace or speed: three across, or one above another at a large
+         font size (ui/LargeText.stack). -->
     <LinearLayout
+        android:id="@+id/card_stats"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="@dimen/hmt_space_12"
