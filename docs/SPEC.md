@@ -493,7 +493,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Outputs**: At most one live `Activity` per real-world activity, regardless of how many sources reported it.
 
-5. The web's Sync page (FR-3.9) lists the superseded activities under its history whenever there are any, with each one's start time, distance and source and which source's copy superseded it; so does the Android app's Sync screen (`apps/android/docs/SPEC.md` FR-4.2). `GET /v1/activities/duplicates` returns the same rows.
+5. The import that brought a superseded activity in is a **Duplicate** in the history itself — the web's Sync page (FR-3.9) and the Android app's (`apps/android/docs/SPEC.md` FR-4.1) — naming the source whose copy was kept (FR-3.4's Outputs). `GET /v1/activities/duplicates` lists the superseded activities on their own: each one's start time, distance and source and which source's copy superseded it.
 
 ### FR-3.8 In-app GPS recording (Android)
 
@@ -524,17 +524,16 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 ### FR-3.9 The Sync page
 
-**Description**: **Sync**, an item of its own in the header of every page for a signed-in account (after Upload), opens `/sync`, which lists every import that has finished — uploaded files, the files inside an archive and activities synced from the phone alike — and the duplicates cross-source detection took out of circulation (FR-3.7).
+**Description**: **Sync**, an item of its own in the header of every page for a signed-in account (after Upload), opens `/sync`, which lists every import that has finished — uploaded files, the files inside an archive and activities synced from the phone alike — those whose activity cross-source detection took out of circulation (FR-3.7) included.
 
 **Preconditions**: Signed in; signed out, the page sends you to sign in.
 
 **Behavior**:
 1. Newest first by when each finished, 20 per page. With more than one page, a pager under the list: **← Newer** on the left, "1–20 of 57" (or "21 of 21") between, **Older →** on the right — both always in their places, the one with nowhere to go shown disabled. An import still being processed is not listed: the page shows only finished ones, so it doesn't change while it's open.
-2. Each row has a title — the file's name, or for a phone sync its source ("Health Connect", "GPS Logger") — then **Ready** with the activity's date and distance and a **View on map** link, or **Failed** with the reason in the reader's language (§17's error messages).
+2. Each row has a title — the file's name, or for a phone sync its source ("Health Connect", "GPS Logger") — then how it ended, with when it finished in the account's timezone ("Oct 6, 14:31"): **Ready** with the activity's date and distance and a **View on map** link; **Duplicate** with the activity's date and distance and which copy was kept — "Kept the copy from an uploaded file" — and no link, its activity being on no map; or **Failed** with the reason in the reader's language (§17's error messages). The line under the page's title says what a Duplicate is.
 3. **View on map** opens the map on that activity: on the Activities tab, the date range narrowed to its day if it isn't already in view, the date slider's window moved to show that day with both knobs on it (FR-6), the activity selected (FR-5.5) and the camera fitted to it; on a phone the Activities sheet stays collapsed, so the track is visible. The link's parameters leave the address bar once read, so a refresh doesn't do it again.
-4. Under the history, when there are any, the duplicates: each one's start date and time and distance, and which source it came from and which copy replaced it — "From Health Connect, replaced by the copy from an uploaded file."
-5. A failed import the account hasn't seen yet puts a red dot on the header's Sync item, its tooltip saying how many ("Failed imports: 1"); opening the page counts every failure so far as seen and clears it. The item is highlighted while the page is open, and on a phone it's its icon alone.
-6. A demo session sees the Demo Customer's history, with a line saying to create an account to import one's own.
+4. A failed import the account hasn't seen yet puts a red dot on the header's Sync item, its tooltip saying how many ("Failed imports: 1"); opening the page counts every failure so far as seen and clears it. The item is highlighted while the page is open, and on a phone it's its icon alone.
+5. A demo session sees the Demo Customer's history, with a line saying to create an account to import one's own.
 
 ### FR-3.10 Google Maps Timeline import
 

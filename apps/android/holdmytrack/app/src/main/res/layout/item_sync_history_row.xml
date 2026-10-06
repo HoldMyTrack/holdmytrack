@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One sync history or duplicate row, a card's row (include_sync_history): on the left the name,
-     one line, and under it a finished row's date and distance (.sync__detail); on the right the
-     status, and under it View on map (.sync__map) for a row that became an activity. Filled by
-     sync/ImportHistory. -->
+<!-- One sync history row, a card's row (include_sync_history): on the left the name,
+     one line, and under it a finished row's date and distance, a duplicate's kept copy too
+     (.sync__detail); on the right the status, when it finished (.sync__when), and View on map
+     (.sync__map) for a Ready row. Filled by sync/ImportHistory. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -56,6 +56,17 @@
             android:textAppearance="?attr/textAppearanceLabelSmall"
             android:textColor="@color/hmt_ink_meta"
             android:textFontWeight="400" />
+
+        <!-- When the import finished: when it was synced. -->
+        <TextView
+            android:id="@+id/row_when"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_2"
+            android:textAppearance="?attr/textAppearanceLabelSmall"
+            android:textColor="@color/hmt_ink_meta"
+            android:textFontWeight="400"
+            android:visibility="gone" />
 
         <!-- The web's underlined accent text rather than a button, padded out to a 48dp
              touch target without changing how it reads. -->

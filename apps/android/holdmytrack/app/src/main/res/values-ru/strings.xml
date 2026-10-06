@@ -429,6 +429,8 @@
     <string name="status_row_ready">Готово</string>
     <string name="status_row_failed">Ошибка</string>
     <string name="status_row_failed_with">Ошибка: %1$s</string>
+    <string name="status_row_duplicate">Дубликат</string>
+    <string name="status_row_kept">Оставлена копия из %1$s</string>
     <string name="status_view_on_map">Показать на карте</string>
     <string name="status_range">%1$d–%2$d из %3$d</string>
     <string name="status_range_one">%1$d из %2$d</string>
@@ -497,9 +499,6 @@
     <string name="panel_row_check">Отметить «%1$s»</string>
     <string name="panel_row_uncheck">Снять отметку с «%1$s»</string>
     <string name="panel_fly_to">Перейти к «%1$s»</string>
-    <string name="duplicate_from">Из %1$s, заменено копией из %2$s.</string>
-    <string name="duplicates_title">Дубликаты</string>
-    <string name="duplicates_subtext">Занятия, записанные дважды, например часами и телефоном. На карте остаётся только более полная копия.</string>
     <string name="panel_duration_hm">%1$d ч %2$d мин</string>
     <string name="panel_duration_m">%1$d мин</string>
     <string name="panel_duration_s">%1$d с</string>

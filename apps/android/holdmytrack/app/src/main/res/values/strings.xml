@@ -411,6 +411,8 @@
     <string name="status_row_ready">Ready</string>
     <string name="status_row_failed">Failed</string>
     <string name="status_row_failed_with">Failed: %1$s</string>
+    <string name="status_row_duplicate">Duplicate</string>
+    <string name="status_row_kept">Kept the copy from %1$s</string>
     <string name="status_view_on_map">View on map</string>
     <string name="status_range">%1$d–%2$d of %3$d</string>
     <string name="status_range_one">%1$d of %2$d</string>
@@ -482,9 +484,6 @@
     <string name="panel_row_check">Add %1$s to selection</string>
     <string name="panel_row_uncheck">Remove %1$s from selection</string>
     <string name="panel_fly_to">Fly to %1$s</string>
-    <string name="duplicate_from">From %1$s, replaced by the copy from %2$s.</string>
-    <string name="duplicates_title">Duplicates</string>
-    <string name="duplicates_subtext">Activities recorded twice, by your watch and your phone, say. Only the fuller copy is kept on the map.</string>
     <string name="panel_duration_hm">%1$dh %2$dm</string>
     <string name="panel_duration_m">%1$dm</string>
     <string name="panel_duration_s">%1$ds</string>

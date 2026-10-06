@@ -66,7 +66,7 @@ Everything is under `app/src/main/kotlin/dev/holdmytrack/android/`:
 - `health/ExerciseTypes.kt` — Health Connect's exercise type to HoldMyTrack's `activity_type`, normalised onto the vocabulary the other ingest paths already produce.
 - `sync/SyncCursor.kt` — the watermark. Read its comment before changing anything about it.
 - `sync/SyncRunner.kt` — one foreground sync run: read, classify, batch, post, advance.
-- `sync/ImportHistory.kt` — the history of every import and the duplicates, the web's `/sync` page: its latest rows on the Sync screen, and all of it on `SyncHistoryActivity.kt`, See all's screen.
+- `sync/ImportHistory.kt` — the history of every import, duplicates among them, the web's `/sync` page: its latest rows on the Sync screen, and all of it on `SyncHistoryActivity.kt`, See all's screen.
 - `panel/` — the map's Activities panel, the web's phone sheet: `ActivitiesPanel.kt` (the sheet and its Activities tab), `PanelState.kt` and `ActivityFacets.kt` (its rules, unit-tested), `EditActivityWindow.kt` (Edit), `TrackEditor.kt` and `EditTrackOps.kt` (its Track tab, the rules unit-tested), `StoriesTab.kt` (Stories), `PrivateLocationEditor.kt` (a Private location, edited on the map).
 - `privacy/` — the Privacy screen, from the You tab: `PrivacyActivity.kt` (the Private locations and what's kept), `CirclePreviewView.kt` (a location drawn small) and `DataExportActivity.kt` (Download your data).
 - `ui/LargeText.kt` — rows that stack instead of breaking words at a large font size.

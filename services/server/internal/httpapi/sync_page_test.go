@@ -57,3 +57,27 @@ func TestSyncPage(t *testing.T) {
 		t.Errorf("signed out: %d, want 303", rec.Code)
 	}
 }
+
+// An import whose activity was set aside as a duplicate is in the one list, marked Duplicate
+// with the source of the copy kept, and has no link to the map, its activity being on none.
+func TestSyncPageDuplicate(t *testing.T) {
+	d := newDBTest(t)
+	me := d.newAccount(false)
+	ctx := context.Background()
+	kept := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60})
+	dup := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, supersededBy: kept})
+	if _, err := d.pool.Exec(ctx, `UPDATE activities SET source = 'healthconnect', external_id = 'hc-1' WHERE id = $1`, dup); err != nil {
+		t.Fatal(err)
+	}
+	d.insertImportJob(me, "done", "healthconnect", "hc-1", "", "")
+
+	body := d.do(me, "GET", "/sync", nil).Body.String()
+	for _, want := range []string{"sync__row--duplicate", "Kept the copy from an uploaded file"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("page is missing %q", want)
+		}
+	}
+	if strings.Contains(body, "activity="+dup) {
+		t.Error("a duplicate links to the map")
+	}
+}

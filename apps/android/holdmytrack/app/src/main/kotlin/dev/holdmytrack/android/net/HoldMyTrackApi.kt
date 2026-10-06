@@ -154,16 +154,21 @@ data class UnpackedArchive(val batch: String, val already: Int, val skipped: Int
  * became; the web's `UploadHistoryRow`. [filename] is the job's `source_detail`: a real name for
  * an uploaded file or a Takeout entry, a raw external id for everything else. [startedAt],
  * [distanceMeters] and [activityId] are null while the job is still processing, or forever if
- * it failed: there is no activity behind it to describe.
+ * it failed: there is no activity behind it to describe. [finishedAt] is when the import finished
+ * — when it was synced — and [keptSource], for an activity cross-source deduplication set aside
+ * as a duplicate (`docs/IMPLEMENTATION.md` §4.6), is the source of the copy kept in its place;
+ * such a row's [status] is still "done", the import itself having succeeded.
  */
 data class SyncHistoryEntry(
     val filename: String,
     val source: String,
     val status: String,
     val error: String,
+    val finishedAt: String?,
     val startedAt: String?,
     val distanceMeters: Double?,
     val activityId: String?,
+    val keptSource: String?,
 )
 
 /** A page of the sync history, plus the counts that describe the whole of it. */
@@ -173,19 +178,6 @@ data class SyncHistory(
     val limit: Int,
     val offset: Int,
     val entries: List<SyncHistoryEntry>,
-)
-
-/**
- * One activity cross-source deduplication took out of circulation, and the copy that displaced
- * it (`docs/IMPLEMENTATION.md` §4.6). Carries both sources, because that is the actual answer
- * to "why is this not on my map": the same ride, already in from somewhere else.
- */
-data class Duplicate(
-    val startedAt: String,
-    val activityType: String,
-    val distanceMeters: Double?,
-    val source: String,
-    val supersededBySource: String,
 )
 
 /**
@@ -454,7 +446,7 @@ object HoldMyTrackApi {
      * inheriting OkHttp's default here would throttle the map relative to the SDK's own
      * behaviour for no reason.
      */
-    /** This build: the release number and the commit, "0.6 (62da50b)" — what the You tab shows
+    /** This build: the release number and the commit, "0.7 (62da50b)" — what the You tab shows
      *  and the User-Agent carries. */
     val appVersion: String = "${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_SHA})"
 
@@ -491,7 +483,7 @@ object HoldMyTrackApi {
     }
 
     /**
-     * Names the app and its build — `HoldMyTrack-Android/0.6 (62da50b)` — on HoldMyTrack's own
+     * Names the app and its build — `HoldMyTrack-Android/0.7 (62da50b)` — on HoldMyTrack's own
      * requests, so the server's logs say which build made a call. Other origins keep what the
      * request already had: MapLibre's own agent on the basemap's assets.
      */
@@ -682,9 +674,11 @@ object HoldMyTrackApi {
                         source = row.optString("source"),
                         status = row.optString("status"),
                         error = row.optString("error"),
+                        finishedAt = row.optString("finished_at").ifBlank { null },
                         startedAt = row.optString("started_at").ifBlank { null },
                         distanceMeters = if (row.isNull("distance_meters")) null else row.optDouble("distance_meters"),
                         activityId = row.optString("activity_id").ifBlank { null },
+                        keptSource = row.optJSONObject("superseded_by")?.optString("source")?.ifBlank { null },
                     )
                 },
             )
@@ -706,26 +700,6 @@ object HoldMyTrackApi {
                     skipped = row.optInt("skipped"),
                     truncated = row.optBoolean("truncated"),
                     error = row.optString("error"),
-                )
-            }
-        }, onResult)
-    }
-
-    /** `GET /v1/activities/duplicates` — see [Duplicate]. */
-    fun duplicates(onResult: (Result<List<Duplicate>>) -> Unit) {
-        val request = Request.Builder()
-            .url(BuildConfig.API_BASE_URL + API_V1 + "/activities/duplicates")
-            .build()
-        call(request, { body ->
-            val rows = JSONObject(body).getJSONArray("duplicates")
-            List(rows.length()) { i ->
-                val row = rows.getJSONObject(i)
-                Duplicate(
-                    startedAt = row.optString("started_at"),
-                    activityType = row.optString("activity_type"),
-                    distanceMeters = row.optNullableDouble("distance_meters"),
-                    source = row.optString("source"),
-                    supersededBySource = row.getJSONObject("superseded_by").optString("source"),
                 )
             }
         }, onResult)

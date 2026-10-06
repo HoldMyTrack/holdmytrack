@@ -9,7 +9,6 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import dev.holdmytrack.android.R
-import dev.holdmytrack.android.net.Duplicate
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.SyncHistory
 import dev.holdmytrack.android.net.SyncHistoryEntry
@@ -20,17 +19,17 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
- * The sync history and duplicates — the web's `/sync` page (`apps/android/docs/SPEC.md` FR-4):
- * every ingest job the account has produced, from any path, as `GET /v1/uploads` lists them — a
- * Health Connect session, a GPS recording and a file uploaded on the web are the same kind of
- * job, so they share one history — then the activities cross-source deduplication set aside.
+ * The sync history — the web's `/sync` page (`apps/android/docs/SPEC.md` FR-4): every ingest job
+ * the account has produced, from any path, as `GET /v1/uploads` lists them — a Health Connect
+ * session, a GPS recording and a file uploaded on the web are the same kind of job, so they
+ * share one history. Each row says how it ended — Ready, Duplicate (its activity set aside for a
+ * fuller copy from elsewhere), Failed — or that it's still processing, and when it finished.
  * Re-read every 1.5 seconds while anything is still processing (the web shows those in its
- * Upload menu; this app has no other place for them), and a finished row that became an
- * activity has View on map.
+ * Upload menu; this app has no other place for them), and a Ready row has View on map.
  *
  * Two sizes over the same `include_sync_history`: the Sync tab's [preview], the latest
  * [PREVIEW_ROWS] rows with See all ([onSeeAll]), and `SyncHistoryActivity`'s whole of it, twenty
- * a page with the web's pager, and the duplicates under it.
+ * a page with the web's pager.
  */
 class ImportHistory(
     private val root: View,
@@ -52,8 +51,6 @@ class ImportHistory(
     private val range: TextView = root.findViewById(R.id.sync_range)
     private val newer: Button = root.findViewById(R.id.sync_newer)
     private val older: Button = root.findViewById(R.id.sync_older)
-    private val duplicatesSection: View = root.findViewById(R.id.sync_duplicates_section)
-    private val duplicateRows: LinearLayout = root.findViewById(R.id.sync_duplicates_rows)
 
     private val main = Handler(Looper.getMainLooper())
 
@@ -76,12 +73,11 @@ class ImportHistory(
         older.setOnClickListener { showPage(offset + pageSize) }
     }
 
-    /** Reads the page in view and the duplicates, and keeps the page current while anything
-     *  is processing. Also how a finished sync is picked up. */
+    /** Reads the page in view, and keeps it current while anything is processing. Also how a
+     *  finished sync is picked up. */
     fun start() {
         started = true
         load()
-        if (!preview) HoldMyTrackApi.duplicates { result -> if (started) renderDuplicates(result.getOrNull().orEmpty()) }
     }
 
     fun stop() {
@@ -149,8 +145,8 @@ class ImportHistory(
     /**
      * One row, as the web's `/sync` draws it: a file's own name, or for anything synced the
      * source it came from — a synced row's `filename` is a raw external id, never meant to be
-     * read — with "9 Sep · 34.7 km" under it once finished. At the other end the status, and
-     * View on map.
+     * read — with "9 Sep · 34.7 km" under it once finished, and for a duplicate which copy was
+     * kept. At the other end the status, when it finished, and a Ready row's View on map.
      */
     private fun addRow(entry: SyncHistoryEntry) {
         val title = when (entry.source) {
@@ -161,13 +157,20 @@ class ImportHistory(
         view.findViewById<TextView>(R.id.row_name).text = title
         val status = view.findViewById<TextView>(R.id.row_status)
         val detail = view.findViewById<TextView>(R.id.row_detail)
-        when (entry.status) {
-            "done" -> {
+        val duplicate = entry.status == "done" && entry.keptSource != null
+        when {
+            duplicate -> {
+                status.setText(R.string.status_row_duplicate)
+                status.setTextColor(context.getColor(R.color.hmt_accent_strong))
+                val kept = res.getString(R.string.status_row_kept, sourceName(entry.keptSource.orEmpty()))
+                showDetail(detail, meta(entry)?.let { "$it · $kept" } ?: kept)
+            }
+            entry.status == "done" -> {
                 status.setText(R.string.status_row_ready)
                 status.setTextColor(context.getColor(R.color.hmt_success))
                 meta(entry)?.let { showDetail(detail, it) }
             }
-            "failed" -> {
+            entry.status == "failed" -> {
                 status.text = if (entry.error.isBlank()) {
                     res.getString(R.string.status_row_failed)
                 } else {
@@ -177,35 +180,22 @@ class ImportHistory(
             }
             else -> status.setText(R.string.status_row_processing)
         }
+        finishedLabel(entry.finishedAt)?.let { finished ->
+            view.findViewById<TextView>(R.id.row_when).apply {
+                text = finished
+                visibility = View.VISIBLE
+            }
+        }
         val activityId = entry.activityId
         val startedAt = entry.startedAt
-        if (entry.status == "done" && activityId != null && startedAt != null) {
+        // A duplicate's activity is on no map, so it has nowhere to go.
+        if (entry.status == "done" && !duplicate && activityId != null && startedAt != null) {
             view.findViewById<TextView>(R.id.row_action).apply {
                 visibility = View.VISIBLE
                 setOnClickListener { onViewOnMap(activityId, startedAt) }
             }
         }
         rows.addView(view)
-    }
-
-    /** The web's duplicates list: when it started and how far, then where it came from and
-     *  which copy replaced it. Gone with none, and when the read fails. */
-    private fun renderDuplicates(duplicates: List<Duplicate>) {
-        duplicatesSection.visibility = if (duplicates.isEmpty()) View.GONE else View.VISIBLE
-        duplicateRows.removeAllViews()
-        for (d in duplicates) {
-            val view = LayoutInflater.from(context).inflate(R.layout.item_sync_history_row, duplicateRows, false)
-            view.findViewById<TextView>(R.id.row_name).text = buildString {
-                append(PanelFormat.startedAt(res, d.startedAt))
-                d.distanceMeters?.let { append(" · ").append(PanelFormat.distance(res, it)) }
-            }
-            showDetail(
-                view.findViewById(R.id.row_detail),
-                res.getString(R.string.duplicate_from, sourceName(d.source), sourceName(d.supersededBySource)),
-            )
-            view.findViewById<View>(R.id.row_status).visibility = View.GONE
-            duplicateRows.addView(view)
-        }
     }
 
     private fun showDetail(detail: TextView, text: String) {
@@ -219,6 +209,17 @@ class ImportHistory(
         val meters = entry.distanceMeters ?: return null
         val date = runCatching { shortDate().format(Instant.parse(startedAt)) }.getOrDefault(startedAt)
         return date + " · " + PanelFormat.distance(res, meters)
+    }
+
+    /** When the import finished, "Oct 6, 14:31" in the phone's zone and clock, or null while
+     *  it's still processing. */
+    private fun finishedLabel(finishedAt: String?): String? {
+        val at = finishedAt?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: return null
+        val locale = res.configuration.locales[0] ?: Locale.getDefault()
+        val skeleton = if (DateFormat.is24HourFormat(context)) "MMMdHm" else "MMMdhm"
+        return DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, skeleton), locale)
+            .withZone(ZoneId.systemDefault())
+            .format(at)
     }
 
     /** A row's title for anything that isn't a file — the web's `formatSourceLabel`. */
