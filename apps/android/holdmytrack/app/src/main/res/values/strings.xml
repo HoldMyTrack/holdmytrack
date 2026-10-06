@@ -28,8 +28,6 @@
     <string name="facebook_no_email">Your Facebook account didn\'t share an email address, and HoldMyTrack needs one. Try again and allow access to your email, or sign up with email and password.</string>
     <string name="facebook_email_in_use">An account with this email already exists. Sign in the way you usually do, or use “Forgot password?” to set a password.</string>
 
-    <string name="signed_in_as">Signed in as %1$s</string>
-    <string name="signed_in_demo">Signed in to the demo account</string>
     <string name="checking_session">Checking your session…</string>
 
     <!-- Profile's activity graph and Trends, the web's /profile (services/server/internal/i18n/locales/en.json, profile.*). -->
@@ -172,14 +170,19 @@
     <string name="nav_stories">Stories</string>
     <string name="nav_sync">Sync</string>
     <string name="nav_you">You</string>
-    <string name="menu_profile">Profile</string>
-    <string name="menu_upload">Upload</string>
     <string name="menu_donate">Donate</string>
     <string name="menu_about">About</string>
     <string name="menu_help">Help</string>
     <string name="menu_contacts">Contacts</string>
     <string name="menu_privacy">Privacy</string>
     <string name="menu_version">Version %1$s</string>
+    <string name="you_section_app">App</string>
+    <string name="you_graph_link">Activity graph &amp; trends</string>
+    <string name="you_privacy_sub">Private locations and your data</string>
+    <plurals name="you_privacy_count">
+        <item quantity="one">%1$d private location · your data</item>
+        <item quantity="other">%1$d private locations · your data</item>
+    </plurals>
 
     <string name="settings_title">Settings</string>
     <string name="settings_onboarding_title">Welcome — set up your account</string>
@@ -204,7 +207,6 @@
     <string name="settings_language_hint">The language of the app, the website and the emails we send you. Automatic follows your phone\'s language.</string>
     <string name="settings_save">Save</string>
     <string name="settings_theme">Theme</string>
-    <string name="settings_theme_hint">On this phone only. Applies at once.</string>
     <string name="settings_export_title">Download your data</string>
     <string name="settings_export_hint">A copy of everything in your account, as zip archives: the files you uploaded or synced, every activity as GPX, your photos, and your settings, Stories, Private locations and captured places.</string>
     <string name="settings_export_request">Request a download</string>
@@ -230,7 +232,6 @@
     <string name="settings_avatar_removed">Avatar removed.</string>
     <string name="settings_search_hint">Search</string>
     <string name="settings_no_match">Nothing matches.</string>
-    <string name="menu_settings">Settings</string>
 
     <string name="recording_name_hint">Name</string>
     <string name="recording_type_hint">Activity type</string>
@@ -282,7 +283,7 @@
     <string name="unit_ft">%1$.0f ft</string>
     <string name="unit_mph">%1$.1f mph</string>
 
-    <string name="recorded_empty">No recorded activities yet.</string>
+    <string name="recorded_empty">Nothing waiting. Recordings from the record button wait here until they sync.</string>
     <string name="recorded_row_edit_named">Edit %1$s</string>
     <string name="recorded_row_delete_named">Delete %1$s</string>
     <string name="recording_delete">Delete</string>
@@ -292,7 +293,7 @@
 
     <string name="sync_title">Sync</string>
     <string name="sync_rationale">HoldMyTrack reads your recorded exercise sessions and their GPS routes from Health Connect, and adds the outdoor ones to your map. It reads nothing else — no heart rate, no weight, no sleep — and it never writes anything back. Sessions recorded indoors have no route, so they are skipped.</string>
-    <string name="sync_section_recorded">Recorded activities</string>
+    <string name="sync_section_recorded">Recorded on this phone</string>
     <string name="sync_source_health_connect">Health Connect</string>
     <string name="sync_health_connect_info">About Health Connect sync</string>
     <string name="privacy_policy">Privacy policy</string>
@@ -309,7 +310,6 @@
     <string name="sync_open_health_connect">Open Health Connect</string>
     <string name="sync_now">Sync now</string>
     <string name="sync_never">never</string>
-    <string name="sync_ready">Ready to sync. Last synced through: %1$s</string>
     <string name="sync_running">Reading Health Connect…</string>
     <string name="sync_progress">Read %1$d sessions, synced %2$d…</string>
     <string name="sync_done">Sync finished.</string>
@@ -325,9 +325,29 @@
     <string name="sync_no_report">the server did not report on this activity (status %1$s)</string>
     <string name="sync_recorded_summary">Recorded activities: %1$d synced.</string>
     <string name="sync_recorded_summary_with_failed">Recorded activities: %1$d synced, %2$d failed — will retry next time.</string>
-    <string name="sync_needs_history_permission">Ready to sync, but only the last 30 days. Last synced through: %1$s</string>
     <string name="sync_history_hint">Health Connect only shares the past 30 days unless you allow access to past data. HoldMyTrack is built around the whole shape of where you have been, so 30 days is not much of a map.</string>
     <string name="sync_allow_history">Allow access to past data</string>
+    <plurals name="sync_waiting">
+        <item quantity="one">%1$d recording waiting</item>
+        <item quantity="other">%1$d recordings waiting</item>
+    </plurals>
+    <string name="sync_nothing_waiting">Nothing waiting</string>
+    <string name="sync_syncing">Syncing…</string>
+    <string name="sync_detail_with_health_connect">Plus anything new in Health Connect · last synced %1$s</string>
+    <string name="sync_detail_health_connect">Reads anything new in Health Connect · last synced %1$s</string>
+    <string name="sync_hc_ready">Ready to read</string>
+    <string name="sync_hc_ready_30_days">Ready, the last 30 days only</string>
+    <string name="sync_hc_setup">One more step</string>
+    <string name="sync_hc_unavailable">Not available</string>
+    <string name="sync_hc_update">Needs an update</string>
+    <string name="sync_hc_reads">Exercise sessions and their routes only — never heart rate or any other health data.</string>
+    <string name="sync_section_files">Bring in files</string>
+    <string name="sync_upload_title">Upload files</string>
+    <string name="sync_upload_sub">GPX, FIT, TCX, a .zip, or a Google Health export</string>
+    <string name="sync_timeline_title">Maps Timeline</string>
+    <string name="sync_timeline_sub">The Google Maps export on this phone</string>
+    <string name="sync_see_all">See all</string>
+    <string name="sync_history_title">Sync history</string>
     <string name="upload_title">Upload</string>
     <string name="upload_demo">Not available for demo accounts — create an account to upload your own activities.</string>
     <string name="upload_see_sync">Follow them in Sync</string>
@@ -592,12 +612,9 @@
     <string name="photos_zoom_fit">Fit to screen</string>
     <string name="photos_unavailable">Couldn\'t load this photo.</string>
 
-    <!-- The panel's Privacy tab (panel/PrivacyTab.kt), after the web's private.* messages. -->
-    <string name="panel_tab_privacy">Privacy</string>
-    <string name="private_subtitle">Tracks never start or end inside these circles.</string>
-    <string name="panel_close_private">Back to activities</string>
+    <!-- Private locations: the Privacy screen and the editor on the map (privacy/PrivacyActivity.kt, panel/PrivateLocationEditor.kt), after the web's private.* messages. -->
+    <string name="private_subtitle">Tracks never start or end inside these circles — the part inside is clipped off every activity, so nobody can trace a track back to your door.</string>
     <string name="panel_private_title">Private locations</string>
-    <string name="private_create">Create</string>
     <string name="private_none">None yet.</string>
     <string name="private_unnamed">Unnamed</string>
     <string name="private_radius">Radius</string>
@@ -609,8 +626,16 @@
     <string name="private_reprocess_note">Saving a change reprocesses the activities it touches — they show Pending until done.</string>
     <string name="private_delete_title">Delete this private location?</string>
     <string name="private_delete_body">Activities that start or end inside it will show those parts again once they\'re reprocessed.</string>
-    <string name="private_delete_label">Delete %1$s</string>
     <string name="private_delete_failed">Could not delete it: %1$s</string>
+    <string name="private_add_on_map">Add a location on the map</string>
+    <string name="private_delete">Delete</string>
+    <string name="privacy_keeps_title">What HoldMyTrack keeps</string>
+    <string name="privacy_keeps_map">Nobody else sees your map.</string>
+    <string name="privacy_keeps_health">No heart rate or other health data is ever read or stored.</string>
+    <string name="privacy_keeps_photos">Photos are kept as a resized copy, never the original.</string>
+    <string name="privacy_your_data">Your data</string>
+    <string name="privacy_download_sub">A copy of everything, emailed when it\'s ready</string>
+    <string name="privacy_opens_browser">Opens in the browser</string>
 
     <!-- Stories (panel/StoriesTab.kt, panel/StoryDialog.kt, Add to story (panel/ActivitiesPanel.kt) and the
          rows' Story badge), after the web's stories.* messages. -->

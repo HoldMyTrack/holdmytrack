@@ -37,7 +37,7 @@ import dev.holdmytrack.android.recording.RecordingTypes
 import kotlin.math.abs
 
 /** The panel's three tabs, the web's `PanelTab`. */
-enum class PanelTab { ACTIVITIES, STORIES, PRIVACY }
+enum class PanelTab { ACTIVITIES, STORIES }
 
 /**
  * The map's Activities sheet (`apps/web/src/ui/ActivitiesPanel.tsx`, redrawn for a phone): a
@@ -46,10 +46,8 @@ enum class PanelTab { ACTIVITIES, STORIES, PRIVACY }
  * Activities tab its head is the date range (`map/DateRangeSlider`, `MapFragment`'s) with the
  * listed activities' totals ([render]), and under it the Type dropdown and the DISTANCE slider,
  * a toolbar over the toolbar's target, the rows and the target's summary. The Stories tab — the
- * bottom bar's Stories — has the account's Stories with one open on the map ([StoriesTab]); the
- * Privacy tab, the Private locations ([PrivacyTab], which `MapFragment` owns, since it works on
- * the map). Both are headed by their title instead of the range, Private locations' with a close
- * button back to Activities.
+ * bottom bar's Stories — has the account's Stories with one open on the map ([StoriesTab]),
+ * headed by its title instead of the range.
  *
  * The rules live in [PanelState]; this draws it and turns taps into state changes.
  * `MapFragment` owns the map and the fetch: it hands over each list ([setActivities]) and
@@ -69,8 +67,7 @@ class ActivitiesPanel(
     /** Every id the toolbar's Delete removed — the map, the list and the footer need
      *  fetching again. */
     private val onDeleted: (List<String>) -> Unit,
-    /** The tab changed — the Privacy tab has the map to itself while it shows, and leaving the
-     *  Stories tab closes its Story. */
+    /** The tab changed — leaving the Stories tab closes its Story. */
     private val onTabChanged: (PanelTab) -> Unit,
     /** The Stories tab opened a Story (`docs/SPEC.md` FR-14.6). */
     private val onOpenStory: (storyId: String) -> Unit,
@@ -93,10 +90,8 @@ class ActivitiesPanel(
     private val summary: TextView = sheet.findViewById(R.id.panel_summary)
     private val titleHead: View = sheet.findViewById(R.id.panel_title_head)
     private val title: TextView = sheet.findViewById(R.id.panel_title)
-    private val titleClose: View = sheet.findViewById(R.id.panel_title_close)
     private val storiesContent: View = sheet.findViewById(R.id.panel_stories_content)
     private val activitiesContent: View = sheet.findViewById(R.id.panel_activities_content)
-    private val privacyContent: View = sheet.findViewById(R.id.panel_privacy_content)
     private val head: View = sheet.findViewById(R.id.panel_head)
     private val subtext: TextView = sheet.findViewById(R.id.panel_subtext)
     private val typeTrigger: View = sheet.findViewById(R.id.panel_type_trigger)
@@ -202,7 +197,6 @@ class ActivitiesPanel(
         clearFocusOnEmptyTap()
 
         handle.setOnClickListener { setExpanded(!expanded) }
-        titleClose.setOnClickListener { showActivities() }
         // The collapsed height is the head's bottom edge, whatever the font scale and the range
         // or title in it make of it — set after the layout pass rather than inside it.
         head.addOnLayoutChangeListener { _, _, _, _, bottom, _, _, _, oldBottom ->
@@ -308,12 +302,6 @@ class ActivitiesPanel(
      *  Stories, or a Story Create story just made, which `MapFragment` opens straight away. */
     fun showStories() {
         showTab(PanelTab.STORIES)
-        setExpanded(true)
-    }
-
-    /** Onto the Private locations, the sheet halfway up — from the You tab. */
-    fun showPrivacy() {
-        showTab(PanelTab.PRIVACY)
         setExpanded(true)
     }
 
@@ -448,7 +436,7 @@ class ActivitiesPanel(
         if (tab != PanelTab.STORIES) summary.text = summaryOf(listed)
         renderTabs()
         subtext.visibility = if (tab == PanelTab.ACTIVITIES) View.GONE else View.VISIBLE
-        subtext.setText(if (tab == PanelTab.PRIVACY) R.string.private_subtitle else R.string.story_subtext)
+        subtext.setText(R.string.story_subtext)
         // Held down under an edit, the sheet is collapsed whatever it was.
         val open = expanded && !held
         handle.contentDescription = res.getString(if (open) R.string.panel_collapse else R.string.panel_expand)
@@ -487,15 +475,13 @@ class ActivitiesPanel(
         PanelFormat.duration(res, listed.sumOf { it.durationSeconds ?: 0L }),
     ).joinToString(" · ")
 
-    /** The tab's head — the range is `MapFragment`'s to show; Stories and Private locations
-     *  have their titles — and its content in the sheet. */
+    /** The tab's head — the range is `MapFragment`'s to show; Stories has its title — and its
+     *  content in the sheet. */
     private fun renderTabs() {
         titleHead.visibility = if (tab == PanelTab.ACTIVITIES) View.GONE else View.VISIBLE
-        title.setText(if (tab == PanelTab.PRIVACY) R.string.panel_private_title else R.string.panel_tab_stories)
-        titleClose.visibility = if (tab == PanelTab.PRIVACY) View.VISIBLE else View.GONE
+        title.setText(R.string.panel_tab_stories)
         activitiesContent.visibility = if (tab == PanelTab.ACTIVITIES) View.VISIBLE else View.GONE
         storiesContent.visibility = if (tab == PanelTab.STORIES) View.VISIBLE else View.GONE
-        privacyContent.visibility = if (tab == PanelTab.PRIVACY) View.VISIBLE else View.GONE
     }
 
     /** DISTANCE, the web's `DistanceFilter`: gone while the list has no spread of distances. */

@@ -37,6 +37,10 @@
     <color name="hmt_danger_container">#F6DEDA</color>
     <color name="hmt_success">#2F8A4E</color>
 
+    <!-- A Private location's circle off the map (the Privacy screen's previews): the map's own
+         purple (map/PrivateLocationsOverlay). -->
+    <color name="hmt_private">#7A4BC2</color>
+
     <!-- Facebook's brand blue, for its sign-in button only (Meta's login-button guidelines). -->
     <color name="hmt_facebook">#1877F2</color>
 

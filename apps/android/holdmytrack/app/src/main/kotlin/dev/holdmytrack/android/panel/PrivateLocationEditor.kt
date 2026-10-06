@@ -1,13 +1,13 @@
 package dev.holdmytrack.android.panel
 
+import android.content.res.Resources
 import android.graphics.PointF
-import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
-import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.core.widget.doAfterTextChanged
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -29,20 +29,20 @@ import java.text.NumberFormat
 import kotlin.math.roundToInt
 
 /**
- * The Activities panel's Privacy tab — the web's `apps/web/src/ui/PrivateLocationsPanel.tsx`
- * (`docs/SPEC.md` FR-8.1): the account's Private locations, circles whose contents are clipped
- * off the ends of every track, listed and drawn on the map (`map/PrivateLocationsOverlay`).
- * **Create** places a 200 m circle at the map's centre, flying in first when the map is too far
- * out to place one sensibly; a row, or a circle on the map, opens it in an editor over the top
- * of the map — Name, Radius, Cancel and Save — and moving it is dragging its handle. Saving or
- * deleting one reprocesses the activities it touches ([onChanged]).
+ * The Private location editor on the map — the web's `apps/web/src/ui/PrivateLocationsPanel.tsx`
+ * window (`docs/SPEC.md` FR-8.1), opened from the Privacy screen (`PrivacyActivity`): the
+ * account's Private locations, circles whose contents are clipped off the ends of every track,
+ * drawn on the map (`map/PrivateLocationsOverlay`), and one of them — or a new one — in a card
+ * along the bottom: Name, Radius, Delete for a saved one, Cancel and Save. A new one is a 200 m
+ * circle at the map's centre, flying in first when the map is too far out to place one
+ * sensibly; moving it is dragging its handle, and another circle tapped on the map opens that
+ * one instead. Saving or deleting one reprocesses the activities it touches ([onChanged]).
  *
- * The map is only this tab's while it shows: [start] draws the circles and [stop] clears them
- * and throws an unsaved draft away, as the web's panel unmounting does. The demo account can
- * look but not change: no Create, no Delete, no editor — a tap only highlights a circle.
+ * The map is this editor's from [start] to [stop], which clears the circles and throws an
+ * unsaved draft away; the editor closing ([onEditorClose]) is the end of it. The demo account
+ * never opens it — the Privacy screen only lists its locations.
  */
-class PrivacyTab(
-    private val content: View,
+class PrivateLocationEditor(
     private val editor: View,
     private val map: () -> MapLibreMap?,
     private val style: () -> Style?,
@@ -56,15 +56,9 @@ class PrivacyTab(
      *  map pixels — where a circle being edited is brought to, so the editor never covers it. */
     private val openAreaCenterY: () -> Float,
 ) {
-    private val context = content.context
+    private val context = editor.context
     private val res = context.resources
     private val density = res.displayMetrics.density
-
-    private val create: Button = content.findViewById(R.id.privacy_create)
-    private val toolbar: View = content.findViewById(R.id.privacy_toolbar)
-    private val rows: LinearLayout = content.findViewById(R.id.privacy_rows)
-    private val note: TextView = content.findViewById(R.id.privacy_note)
-    private val footer: View = content.findViewById(R.id.privacy_footer)
 
     private val editorTitle: TextView = editor.findViewById(R.id.private_editor_title)
     private val nameField: TextInputEditText = editor.findViewById(R.id.private_editor_name)
@@ -73,22 +67,26 @@ class PrivacyTab(
     private val error: TextView = editor.findViewById(R.id.private_editor_error)
     private val cancel: Button = editor.findViewById(R.id.private_editor_cancel)
     private val save: Button = editor.findViewById(R.id.private_editor_save)
+    private val delete: Button = editor.findViewById(R.id.private_editor_delete)
 
     private data class Draft(val id: String?, val name: String, val lon: Double, val lat: Double, val radiusM: Int)
 
     private var locations: List<PrivateLocation>? = null
-    private var loadError: String? = null
     private var draft: Draft? = null
     private var busy = false
     private var shown = false
     private var dragging = false
 
+    /** What [start] was asked to open, until the list and the map are both in: an id, or
+     *  [NEW] for a new one. */
+    private var pending: String? = null
+
     private val readOnly: Boolean
         get() = Session.isDemo
 
     init {
-        create.setOnClickListener { create() }
         cancel.setOnClickListener { closeEditor() }
+        delete.setOnClickListener { locations?.firstOrNull { it.id == draft?.id }?.let(::confirmDelete) }
         save.setOnClickListener { save() }
         slider.addOnChangeListener { _, value, fromUser ->
             if (!fromUser) return@addOnChangeListener
@@ -108,43 +106,72 @@ class PrivacyTab(
     val isEditing: Boolean
         get() = editor.visibility == View.VISIBLE
 
-    /** The tab is showing: read the list (again), draw it. */
-    fun start() {
+    /** Whether the map is this editor's, from [start] to [stop]. */
+    val isShowing: Boolean
+        get() = shown
+
+    /** Takes the map: reads the list, draws it, and opens [open] — a saved location's id, or
+     *  [NEW] — once both the list and the map are in. A list that can't be read ends it. */
+    fun start(open: String) {
         shown = true
-        render()
+        pending = open
+        locations = null
         HoldMyTrackApi.privateLocations { result ->
+            if (!shown) return@privateLocations
             result.onSuccess {
                 locations = it
-                loadError = null
-            }.onFailure { loadError = it.message?.takeIf { m -> m.isNotBlank() } ?: res.getString(R.string.map_unreachable) }
-            render()
-            draw()
+                draw()
+                openPending()
+            }.onFailure {
+                Toast.makeText(context, it.message?.takeIf { m -> m.isNotBlank() } ?: res.getString(R.string.map_unreachable), Toast.LENGTH_LONG).show()
+                stop()
+            }
         }
-        draw()
     }
 
-    /** The tab is gone — another tab, another map mode: the circles and any unsaved draft go. */
+    /** The map's style is (again) in: the circles go back on it, and what was asked for opens. */
+    fun onStyleReady() {
+        if (!shown) return
+        draw()
+        openPending()
+    }
+
+    /** Gives the map back — the editor closed, or another map mode: the circles and any unsaved
+     *  draft go. */
     fun stop() {
         shown = false
+        pending = null
         dragging = false
         draft = null
         hideEditor()
         style()?.let(PrivateLocationsOverlay::clear)
     }
 
-    /** A tap on the map while this tab shows — a saved circle opens it; for the demo account,
-     *  a tap on empty map clears the highlight. */
+    private fun openPending() {
+        val id = pending ?: return
+        val list = locations ?: return
+        val instance = map() ?: return
+        if (style() == null) return
+        pending = null
+        if (id == NEW) {
+            create()
+            return
+        }
+        val location = list.firstOrNull { it.id == id }
+        if (location == null) {
+            stop()
+            return
+        }
+        open(location)
+        bringIntoView(LatLng(location.lat, location.lon), maxOf(instance.cameraPosition.zoom, OPEN_ZOOM))
+    }
+
+    /** A tap on the map while the editor has it — another saved circle opens that one. */
     fun onMapTap(point: LatLng) {
         val instance = map() ?: return
-        when (val hit = PrivateLocationsOverlay.hit(instance, instance.projection.toScreenLocation(point), density)) {
-            is CircleHit.Saved -> locations?.firstOrNull { it.id == hit.id }?.let(::open)
-            CircleHit.Empty -> if (readOnly) {
-                draft = null
-                draw()
-                render()
-            }
-            CircleHit.Selected -> Unit
-        }
+        if (busy) return
+        val hit = PrivateLocationsOverlay.hit(instance, instance.projection.toScreenLocation(point), density)
+        if (hit is CircleHit.Saved) locations?.firstOrNull { it.id == hit.id }?.let(::open)
     }
 
     /**
@@ -213,8 +240,7 @@ class PrivacyTab(
 
     private fun open(location: PrivateLocation) {
         draft = Draft(location.id, location.name, location.lon, location.lat, location.radiusM)
-        if (!readOnly) showEditor() else draw()
-        render()
+        showEditor()
     }
 
     private fun showEditor() {
@@ -223,10 +249,10 @@ class PrivacyTab(
         nameField.setText(current.name)
         slider.value = current.radiusM.coerceIn(PrivateLocation.MIN_RADIUS_M, PrivateLocation.MAX_RADIUS_M).toFloat()
         showError(null)
+        delete.visibility = if (current.id == null) View.GONE else View.VISIBLE
         editor.visibility = View.VISIBLE
         renderEditor()
         draw()
-        render()
         onEditorOpen()
     }
 
@@ -234,11 +260,10 @@ class PrivacyTab(
         if (busy) return
         draft = null
         hideEditor()
-        draw()
-        render()
     }
 
     private fun hideEditor() {
+        if (editor.visibility != View.VISIBLE) return
         context.getSystemService(InputMethodManager::class.java)?.hideSoftInputFromWindow(editor.windowToken, 0)
         editor.findFocus()?.clearFocus()
         editor.visibility = View.GONE
@@ -264,10 +289,8 @@ class PrivacyTab(
                 val list = locations.orEmpty()
                 locations = if (current.id == null) list + savedLocation else list.map { if (it.id == savedLocation.id) savedLocation else it }
                 draft = null
-                hideEditor()
-                draw()
-                render()
                 onChanged()
+                hideEditor()
             }.onFailure {
                 showError(it.message?.takeIf { m -> m.isNotBlank() } ?: res.getString(R.string.edit_save_failed))
                 renderEditor()
@@ -291,13 +314,9 @@ class PrivacyTab(
                     result.onSuccess {
                         dialog.dismiss()
                         locations = locations.orEmpty().filterNot { it.id == location.id }
-                        if (draft?.id == location.id) {
-                            draft = null
-                            hideEditor()
-                        }
-                        draw()
-                        render()
+                        draft = null
                         onChanged()
+                        hideEditor()
                     }.onFailure {
                         confirm.isEnabled = true
                         confirm.setText(R.string.panel_delete_confirm)
@@ -320,48 +339,12 @@ class PrivacyTab(
         )
     }
 
-    private fun render() {
-        toolbar.visibility = if (readOnly) View.GONE else View.VISIBLE
-        footer.visibility = if (readOnly) View.GONE else View.VISIBLE
-        create.isEnabled = locations != null
-        val list = locations
-        note.visibility = View.VISIBLE
-        note.setTextColor(context.getColor(if (loadError != null) R.color.hmt_danger else R.color.panel_ink_50))
-        note.text = when {
-            loadError != null -> loadError
-            list == null -> res.getString(R.string.panel_loading)
-            list.isEmpty() -> res.getString(R.string.private_none)
-            else -> {
-                note.visibility = View.GONE
-                null
-            }
-        }
-        rows.removeAllViews()
-        val inflater = LayoutInflater.from(context)
-        for (location in list.orEmpty()) {
-            val row = inflater.inflate(R.layout.item_private_location, rows, false)
-            val label = location.name.ifEmpty { res.getString(R.string.private_unnamed) }
-            row.isSelected = draft?.id == location.id
-            row.findViewById<TextView>(R.id.private_title).text = label
-            row.findViewById<TextView>(R.id.private_meta).text = res.getString(R.string.private_row_meta, radius(location.radiusM))
-            row.findViewById<View>(R.id.private_text).setOnClickListener {
-                open(location)
-                map()?.let { instance -> bringIntoView(LatLng(location.lat, location.lon), maxOf(instance.cameraPosition.zoom, OPEN_ZOOM)) }
-            }
-            row.findViewById<View>(R.id.private_delete).apply {
-                visibility = if (readOnly) View.GONE else View.VISIBLE
-                contentDescription = res.getString(R.string.private_delete_label, label)
-                setOnClickListener { confirmDelete(location) }
-            }
-            rows.addView(row)
-        }
-    }
-
     private fun renderEditor() {
         val current = draft ?: return
         radiusReadout.text = radius(current.radiusM)
         save.isEnabled = !busy && dirty
         cancel.isEnabled = !busy
+        delete.isEnabled = !busy
         save.setText(if (busy) R.string.edit_saving else R.string.edit_save)
         slider.isEnabled = !busy
         nameField.isEnabled = !busy
@@ -372,18 +355,23 @@ class PrivacyTab(
         error.visibility = if (message == null) View.GONE else View.VISIBLE
     }
 
-    /** "200 m", or in feet for the imperial countries — the web's radius readout. */
-    private fun radius(meters: Int): String {
-        val imperial = RecordingFormat.imperial()
-        val value = if (imperial) meters * FEET_PER_METER else meters.toDouble()
-        val number = NumberFormat.getIntegerInstance(res.configuration.locales[0]).format(value.roundToInt())
-        return "$number " + res.getString(if (imperial) R.string.panel_unit_ft else R.string.panel_unit_m)
-    }
+    private fun radius(meters: Int) = radius(res, meters)
 
-    private companion object {
-        const val DEFAULT_RADIUS_M = 200
-        const val OPEN_ZOOM = 14.0
-        const val FEET_PER_METER = 3.28084
-        const val CAMERA_MS = 600
+    companion object {
+        /** [start]'s "a new one". */
+        const val NEW = ""
+
+        /** "200 m", or in feet for the imperial countries — the web's radius readout. */
+        fun radius(res: Resources, meters: Int): String {
+            val imperial = RecordingFormat.imperial()
+            val value = if (imperial) meters * FEET_PER_METER else meters.toDouble()
+            val number = NumberFormat.getIntegerInstance(res.configuration.locales[0]).format(value.roundToInt())
+            return "$number " + res.getString(if (imperial) R.string.panel_unit_ft else R.string.panel_unit_m)
+        }
+
+        private const val DEFAULT_RADIUS_M = 200
+        private const val OPEN_ZOOM = 14.0
+        private const val FEET_PER_METER = 3.28084
+        private const val CAMERA_MS = 600
     }
 }

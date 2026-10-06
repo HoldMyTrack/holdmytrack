@@ -478,7 +478,7 @@
     <!-- The Edit window (include_edit_window, panel/EditActivityWindow), under the chrome row. -->
     <include layout="@layout/include_edit_window" />
 
-    <!-- The Privacy tab's editor (include_private_location_editor, panel/PrivacyTab), where the
+    <!-- The Private location editor (include_private_location_editor, panel/PrivateLocationEditor), where the
          Edit window would be. -->
     <include layout="@layout/include_private_location_editor" />
 

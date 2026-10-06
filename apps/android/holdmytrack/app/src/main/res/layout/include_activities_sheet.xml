@@ -3,7 +3,7 @@
      collapsed — its head alone — half the map and nearly all of it (BottomSheetBehavior; the
      expanded top stops under the map's top row). Its head is the date range on the Activities
      tab — the range as a heading, ‹ › to move it, and the day scrubber under them — or the
-     title of the Stories or Private locations content showing instead. Everything under the
+     title of the Stories content showing instead. Everything under the
      head stays laid out while collapsed, just covered, so the list keeps its scroll position.
      Clickable, so a touch on it never reaches the map underneath. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -123,8 +123,7 @@
         <!-- The selected activity, in the range's place while one is selected. -->
         <include layout="@layout/include_activity_card" />
 
-        <!-- The Stories and Private locations head: the content's title, and for Private
-             locations a close button back to the Activities tab. -->
+        <!-- The Stories head: the content's title. -->
         <LinearLayout
             android:id="@+id/panel_title_head"
             android:layout_width="match_parent"
@@ -144,20 +143,9 @@
                 android:accessibilityHeading="true"
                 android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleLarge"
                 tools:text="Stories" />
-
-            <ImageButton
-                android:id="@+id/panel_title_close"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/panel_close_private"
-                android:padding="14dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_x"
-                app:tint="@color/hmt_ink_secondary" />
         </LinearLayout>
 
-        <!-- What the Stories and Private locations contents are (.activities-panel__subtext);
+        <!-- What the Stories content is (.activities-panel__subtext);
              the Activities tab has none, its range and filters saying what's listed. -->
         <TextView
             android:id="@+id/panel_subtext"
@@ -370,76 +358,6 @@
                     android:contentDescription="@string/story_by_type"
                     android:shrinkColumns="1" />
             </LinearLayout>
-        </LinearLayout>
-
-        <!-- The Privacy tab (apps/web/src/ui/PrivateLocationsPanel.tsx), laid out as the
-             Activities tab is: a toolbar strip with Create, the circles as rows, and a footer
-             note. Filled by panel/PrivacyTab. -->
-        <LinearLayout
-            android:id="@+id/panel_privacy_content"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:visibility="gone">
-
-            <LinearLayout
-                android:id="@+id/privacy_toolbar"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_row_divider"
-                android:orientation="horizontal"
-                android:paddingStart="@dimen/hmt_space_16"
-                android:paddingTop="@dimen/hmt_space_6"
-                android:paddingEnd="@dimen/hmt_space_16"
-                android:paddingBottom="@dimen/hmt_space_6">
-
-                <Button
-                    android:id="@+id/privacy_create"
-                    style="@style/Widget.HoldMyTrack.Button"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/private_create" />
-            </LinearLayout>
-
-            <ScrollView
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
-
-                    <LinearLayout
-                        android:id="@+id/privacy_rows"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical" />
-
-                    <TextView
-                        android:id="@+id/privacy_note"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:padding="@dimen/hmt_space_16"
-                        android:textColor="@color/panel_ink_50"
-                        android:textSize="@dimen/hmt_text_md"
-                        android:visibility="gone" />
-                </LinearLayout>
-            </ScrollView>
-
-            <TextView
-                android:id="@+id/privacy_footer"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_list_top"
-                android:paddingStart="@dimen/hmt_space_16"
-                android:paddingTop="@dimen/hmt_space_12"
-                android:paddingEnd="@dimen/hmt_space_16"
-                android:paddingBottom="@dimen/hmt_space_12"
-                android:text="@string/private_reprocess_note"
-                android:textColor="@color/hmt_ink_meta"
-                android:textSize="@dimen/hmt_text_sm" />
         </LinearLayout>
     </FrameLayout>
 </LinearLayout>

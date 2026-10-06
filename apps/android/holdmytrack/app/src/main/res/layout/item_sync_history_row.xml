@@ -1,16 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One sync history or duplicate row, after the web's /sync .sync__row: on the left the name,
+<!-- One sync history or duplicate row, a card's row (include_sync_history): on the left the name,
      one line, and under it a finished row's date and distance (.sync__detail); on the right the
      status, and under it View on map (.sync__map) for a row that became an activity. Filled by
      sync/ImportHistory. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@drawable/bg_row_divider"
+    android:baselineAligned="false"
     android:gravity="center_vertical"
+    android:minHeight="60dp"
     android:orientation="horizontal"
-    android:paddingTop="@dimen/hmt_space_8"
-    android:paddingBottom="@dimen/hmt_space_8">
+    android:paddingStart="@dimen/hmt_space_16"
+    android:paddingTop="@dimen/hmt_space_10"
+    android:paddingEnd="@dimen/hmt_space_16"
+    android:paddingBottom="@dimen/hmt_space_10">
 
     <LinearLayout
         android:layout_width="0dp"
@@ -24,15 +27,14 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textAppearance="?attr/textAppearanceTitleSmall" />
+            android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowTitle" />
 
         <TextView
             android:id="@+id/row_detail"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/hmt_space_2"
-            android:textColor="@color/hmt_ink_meta"
-            android:textSize="@dimen/hmt_text_2xs"
+            android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowSub"
             android:visibility="gone" />
     </LinearLayout>
 

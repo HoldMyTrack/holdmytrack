@@ -833,4 +833,130 @@
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
     </style>
+
+    <!-- The Sync, You and Privacy screens (fragment_sync, fragment_you, activity_privacy): a
+         serif title over cream, uppercase section headings, and white cards of rows. -->
+    <style name="TextAppearance.HoldMyTrack.ScreenTitle" parent="TextAppearance.HoldMyTrack.TitleLarge">
+        <item name="android:textSize">30sp</item>
+        <item name="android:lineHeight">36sp</item>
+        <item name="lineHeight">36sp</item>
+        <item name="android:textFontWeight">500</item>
+    </style>
+
+    <style name="Widget.HoldMyTrack.SectionHeading" parent="">
+        <item name="android:accessibilityHeading">true</item>
+        <item name="android:paddingStart">@dimen/hmt_space_4</item>
+        <item name="android:paddingEnd">@dimen/hmt_space_4</item>
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.Overline</item>
+    </style>
+
+    <!-- A card: rows with a hairline between them, inset from both edges. -->
+    <style name="Widget.HoldMyTrack.SectionCard" parent="">
+        <item name="android:background">@drawable/bg_section_card</item>
+        <item name="android:clipToOutline">true</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:divider">@drawable/bg_card_divider</item>
+        <item name="android:showDividers">middle</item>
+        <item name="android:dividerPadding">@dimen/hmt_space_16</item>
+    </style>
+
+    <!-- A card's row: 60dp at least, the press ripple, an icon tile or preview, its text, and a
+         chevron or buttons at the end. -->
+    <style name="Widget.HoldMyTrack.CardRow" parent="">
+        <item name="android:minHeight">60dp</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:paddingStart">@dimen/hmt_space_16</item>
+        <item name="android:paddingEnd">@dimen/hmt_space_12</item>
+        <item name="android:paddingTop">@dimen/hmt_space_10</item>
+        <item name="android:paddingBottom">@dimen/hmt_space_10</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
+    </style>
+
+    <style name="TextAppearance.HoldMyTrack.CardRowTitle" parent="TextAppearance.HoldMyTrack.BodyLarge">
+        <item name="android:textFontWeight">500</item>
+        <item name="android:textColor">@color/hmt_ink</item>
+    </style>
+
+    <style name="TextAppearance.HoldMyTrack.CardRowSub" parent="TextAppearance.HoldMyTrack.BodyMedium">
+        <item name="android:textColor">@color/hmt_ink_secondary</item>
+    </style>
+
+    <!-- A row's icon: 36dp, the tinted tile, the icon in the secondary ink. -->
+    <style name="Widget.HoldMyTrack.IconTile" parent="">
+        <item name="android:layout_width">36dp</item>
+        <item name="android:layout_height">36dp</item>
+        <item name="android:layout_marginEnd">@dimen/hmt_space_16</item>
+        <item name="android:background">@drawable/bg_type_tile</item>
+        <item name="android:padding">@dimen/hmt_space_8</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="tint">@color/hmt_ink_secondary</item>
+    </style>
+
+    <!-- The row's trailing chevron. -->
+    <style name="Widget.HoldMyTrack.RowChevron" parent="">
+        <item name="android:layout_width">18dp</item>
+        <item name="android:layout_height">18dp</item>
+        <item name="android:layout_marginStart">@dimen/hmt_space_8</item>
+        <item name="android:src">@drawable/ic_chevron_right</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="tint">@color/hmt_ink_muted</item>
+    </style>
+
+    <!-- The screen's one main action (Sync now): a full-width ink pill, 48dp. -->
+    <style name="Widget.HoldMyTrack.Button.Hero" parent="Widget.Material3.Button.Icon">
+        <item name="backgroundTint">@color/hero_button_bg</item>
+        <item name="android:textColor">@color/hero_button_text</item>
+        <item name="iconTint">@color/hero_button_text</item>
+        <item name="iconGravity">textStart</item>
+        <item name="cornerRadius">24dp</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.LabelLarge</item>
+    </style>
+
+    <!-- A tile (Sync's Bring in files): a card standing alone, its icon in an accent tile over a
+         title and a line under it. -->
+    <style name="Widget.HoldMyTrack.Tile" parent="">
+        <item name="android:background">@drawable/bg_section_card</item>
+        <item name="android:foreground">?attr/selectableItemBackground</item>
+        <item name="android:clipToOutline">true</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:padding">@dimen/hmt_space_16</item>
+        <item name="android:minHeight">120dp</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <!-- A link to one of the web's pages (the You tab's About, Help, Contacts): a short card,
+         its icon over its label. -->
+    <style name="Widget.HoldMyTrack.WebTile" parent="">
+        <item name="android:background">@drawable/bg_section_card</item>
+        <item name="android:foreground">?attr/selectableItemBackground</item>
+        <item name="android:clipToOutline">true</item>
+        <item name="android:gravity">center</item>
+        <item name="android:minHeight">72dp</item>
+        <item name="android:paddingTop">@dimen/hmt_space_12</item>
+        <item name="android:paddingBottom">@dimen/hmt_space_12</item>
+        <item name="android:drawablePadding">@dimen/hmt_space_6</item>
+        <item name="drawableTint">@color/hmt_ink_secondary</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
+        <item name="android:textColor">@color/hmt_ink</item>
+    </style>
+
+    <!-- One of the Privacy screen's facts: a check in the success color, then the sentence. -->
+    <style name="Widget.HoldMyTrack.PrivacyFact" parent="">
+        <item name="drawableStartCompat">@drawable/ic_check</item>
+        <item name="android:drawablePadding">@dimen/hmt_space_12</item>
+        <item name="drawableTint">@color/hmt_success</item>
+        <item name="android:paddingTop">@dimen/hmt_space_12</item>
+        <item name="android:paddingBottom">@dimen/hmt_space_12</item>
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
+        <item name="android:textColor">@color/hmt_ink</item>
+    </style>
 </resources>

@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- You (YouFragment), the bottom bar's last tab: the app's own screens — Profile, Upload,
-     Settings, the map's Private locations — then the web's pages, opened in a browser tab, and last the app's version. -->
+<!-- You (YouFragment), the bottom bar's last tab: the account and its all-time numbers in one
+     card — Settings and Profile behind its two halves — then Privacy, this phone's Theme and
+     the account's Language, the web's pages, Sign out and Delete account, and the version. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true"
@@ -10,106 +12,402 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:divider="@drawable/gap_20"
         android:orientation="vertical"
-        android:padding="@dimen/hmt_space_16">
+        android:padding="@dimen/hmt_space_16"
+        android:showDividers="middle">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/hmt_space_8"
-            android:layout_marginBottom="@dimen/hmt_space_8"
+            android:paddingStart="@dimen/hmt_space_4"
+            android:paddingEnd="@dimen/hmt_space_4"
             android:text="@string/nav_you"
-            android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleLarge" />
+            android:textAppearance="@style/TextAppearance.HoldMyTrack.ScreenTitle" />
 
-        <TextView
-            android:id="@+id/you_profile"
-            style="@style/Widget.HoldMyTrack.ListRow"
+        <!-- The account (Settings) over its all-time numbers and the last weeks of the graph
+             (Profile). -->
+        <LinearLayout
+            style="@style/Widget.HoldMyTrack.SectionCard"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/menu_profile" />
+            android:layout_height="wrap_content">
 
-        <TextView
-            android:id="@+id/you_upload"
-            style="@style/Widget.HoldMyTrack.ListRow"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/menu_upload" />
+            <LinearLayout
+                android:id="@+id/you_account"
+                style="@style/Widget.HoldMyTrack.CardRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="88dp">
 
-        <TextView
-            android:id="@+id/you_settings"
-            style="@style/Widget.HoldMyTrack.ListRow"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/menu_settings" />
+                <!-- The avatar, or the name's initials on the accent until one loads. -->
+                <FrameLayout
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:layout_marginEnd="@dimen/hmt_space_16"
+                    android:importantForAccessibility="noHideDescendants">
 
-        <!-- The map's sheet, on its Private locations (MainActivity.showPrivacy). -->
-        <TextView
-            android:id="@+id/you_private_locations"
-            style="@style/Widget.HoldMyTrack.ListRow"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/panel_private_title" />
+                    <TextView
+                        android:id="@+id/you_initials"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/bg_status_dot"
+                        android:backgroundTint="@color/hmt_accent_container"
+                        android:gravity="center"
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleLarge"
+                        android:textColor="@color/hmt_accent_strong" />
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="@dimen/hmt_space_8"
-            android:layout_marginBottom="@dimen/hmt_space_8"
-            android:background="@color/hmt_border" />
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/you_avatar"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop"
+                        android:visibility="gone"
+                        app:shapeAppearanceOverlay="@style/ShapeAppearance.HoldMyTrack.Round" />
+                </FrameLayout>
 
-        <!-- Only where BuildConfig.DONATE_LINK allows it, which the Play build doesn't
-             (YouFragment). -->
-        <TextView
-            android:id="@+id/you_donate"
-            style="@style/Widget.HoldMyTrack.ListRow"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/menu_donate"
-            android:visibility="gone" />
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/you_about"
-            style="@style/Widget.HoldMyTrack.ListRow"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/menu_about" />
+                    <TextView
+                        android:id="@+id/you_name"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleMedium" />
 
-        <TextView
-            android:id="@+id/you_help"
-            style="@style/Widget.HoldMyTrack.ListRow"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/menu_help" />
+                    <TextView
+                        android:id="@+id/you_email"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/hmt_space_2"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowSub" />
 
-        <TextView
-            android:id="@+id/you_contacts"
-            style="@style/Widget.HoldMyTrack.ListRow"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/menu_contacts" />
+                    <TextView
+                        android:id="@+id/you_place"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/hmt_space_4"
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.BodySmall"
+                        android:textColor="@color/hmt_ink_secondary"
+                        android:visibility="gone" />
+                </LinearLayout>
 
-        <TextView
+                <ImageView
+                    style="@style/Widget.HoldMyTrack.RowChevron"
+                    android:contentDescription="@null" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/you_stats"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="?attr/selectableItemBackground"
+                android:orientation="vertical"
+                android:paddingStart="@dimen/hmt_space_16"
+                android:paddingTop="@dimen/hmt_space_12"
+                android:paddingEnd="@dimen/hmt_space_12"
+                android:paddingBottom="@dimen/hmt_space_16">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:baselineAligned="false"
+                    android:orientation="horizontal">
+
+                    <include
+                        android:id="@+id/you_stat_activities"
+                        layout="@layout/item_you_stat" />
+
+                    <include
+                        android:id="@+id/you_stat_distance"
+                        layout="@layout/item_you_stat" />
+
+                    <include
+                        android:id="@+id/you_stat_active_days"
+                        layout="@layout/item_you_stat" />
+
+                    <include
+                        android:id="@+id/you_stat_streak"
+                        layout="@layout/item_you_stat" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/hmt_space_12"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <dev.holdmytrack.android.profile.RecentWeeksView
+                        android:id="@+id/you_weeks"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:importantForAccessibility="no" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/hmt_space_8"
+                        android:layout_weight="1"
+                        android:gravity="end"
+                        android:text="@string/you_graph_link"
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.LabelLarge"
+                        android:textColor="@color/hmt_accent_strong" />
+
+                    <ImageView
+                        style="@style/Widget.HoldMyTrack.RowChevron"
+                        android:layout_marginStart="@dimen/hmt_space_4"
+                        android:contentDescription="@null"
+                        app:tint="@color/hmt_accent_strong" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Privacy: its own screen (privacy/PrivacyActivity). -->
+        <LinearLayout
             android:id="@+id/you_privacy"
-            style="@style/Widget.HoldMyTrack.ListRow"
+            style="@style/Widget.HoldMyTrack.CardRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/menu_privacy" />
+            android:background="@drawable/bg_section_card"
+            android:foreground="?attr/selectableItemBackground"
+            android:minHeight="68dp">
 
-        <View
+            <ImageView
+                style="@style/Widget.HoldMyTrack.IconTile"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_shield" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/menu_privacy"
+                    android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowTitle" />
+
+                <TextView
+                    android:id="@+id/you_privacy_sub"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/hmt_space_2"
+                    android:text="@string/you_privacy_sub"
+                    android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowSub" />
+            </LinearLayout>
+
+            <ImageView
+                    style="@style/Widget.HoldMyTrack.RowChevron"
+                    android:contentDescription="@null" />
+        </LinearLayout>
+
+        <!-- This phone's Theme (AppTheme), and the account's Language. -->
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="@dimen/hmt_space_8"
-            android:layout_marginBottom="@dimen/hmt_space_8"
-            android:background="@color/hmt_border" />
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/Widget.HoldMyTrack.SectionHeading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/hmt_space_8"
+                android:text="@string/you_section_app" />
+
+            <LinearLayout
+                style="@style/Widget.HoldMyTrack.SectionCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <LinearLayout
+                    style="@style/Widget.HoldMyTrack.CardRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@null"
+                    android:minHeight="64dp">
+
+                    <ImageView
+                        style="@style/Widget.HoldMyTrack.IconTile"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_contrast" />
+
+                    <TextView
+                        android:id="@+id/you_theme_label"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/settings_theme"
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowTitle" />
+
+                    <com.google.android.material.button.MaterialButtonToggleGroup
+                        android:id="@+id/you_theme"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:contentDescription="@string/settings_theme"
+                        app:selectionRequired="true"
+                        app:singleSelection="true">
+
+                        <Button
+                            android:id="@+id/you_theme_system"
+                            style="@style/Widget.HoldMyTrack.Button.ProfileToggle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/settings_theme_system" />
+
+                        <Button
+                            android:id="@+id/you_theme_light"
+                            style="@style/Widget.HoldMyTrack.Button.ProfileToggle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/settings_theme_light" />
+
+                        <Button
+                            android:id="@+id/you_theme_dark"
+                            style="@style/Widget.HoldMyTrack.Button.ProfileToggle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/settings_theme_dark" />
+                    </com.google.android.material.button.MaterialButtonToggleGroup>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/you_language"
+                    style="@style/Widget.HoldMyTrack.CardRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <ImageView
+                        style="@style/Widget.HoldMyTrack.IconTile"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_globe" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/settings_language"
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowTitle" />
+
+                    <TextView
+                        android:id="@+id/you_language_value"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/hmt_space_8"
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowSub" />
+
+                    <ImageView
+                    style="@style/Widget.HoldMyTrack.RowChevron"
+                    android:contentDescription="@null" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- The web's own pages, in a browser tab: Donate only where BuildConfig.DONATE_LINK
+             allows it, which the Play build doesn't (YouFragment). -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/Widget.HoldMyTrack.SectionHeading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/hmt_space_8"
+                android:text="@string/app_name" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:baselineAligned="false"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/you_about"
+                    style="@style/Widget.HoldMyTrack.WebTile"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    app:drawableTopCompat="@drawable/ic_info"
+                    android:text="@string/menu_about" />
+
+                <TextView
+                    android:id="@+id/you_help"
+                    style="@style/Widget.HoldMyTrack.WebTile"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/hmt_space_8"
+                    android:layout_weight="1"
+                    app:drawableTopCompat="@drawable/ic_circle_help"
+                    android:text="@string/menu_help" />
+
+                <TextView
+                    android:id="@+id/you_contacts"
+                    style="@style/Widget.HoldMyTrack.WebTile"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/hmt_space_8"
+                    android:layout_weight="1"
+                    app:drawableTopCompat="@drawable/ic_mail"
+                    android:text="@string/menu_contacts" />
+
+                <TextView
+                    android:id="@+id/you_donate"
+                    style="@style/Widget.HoldMyTrack.WebTile"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/hmt_space_8"
+                    android:layout_weight="1"
+                    app:drawableTopCompat="@drawable/ic_heart"
+                    android:text="@string/menu_donate"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Leaving: Sign out, and Delete account… (AccountDeletion) — gone for the demo account,
+             which deletes itself within the day. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/you_sign_out"
+                style="@style/Widget.HoldMyTrack.Button.Outlined"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/sign_out"
+                app:cornerRadius="24dp" />
+
+            <Button
+                android:id="@+id/you_delete"
+                style="@style/Widget.HoldMyTrack.Button.Text"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/hmt_space_8"
+                android:layout_weight="1"
+                android:text="@string/settings_delete_open"
+                android:textColor="@color/hmt_danger"
+                app:cornerRadius="24dp" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/you_version"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingStart="@dimen/hmt_space_4"
-            android:paddingTop="@dimen/hmt_space_8"
-            android:paddingEnd="@dimen/hmt_space_4"
-            android:textAppearance="@style/TextAppearance.HoldMyTrack.BodyMedium"
+            android:gravity="center"
+            android:textAppearance="@style/TextAppearance.HoldMyTrack.BodySmall"
             android:textColor="@color/hmt_ink_muted" />
     </LinearLayout>
 </ScrollView>

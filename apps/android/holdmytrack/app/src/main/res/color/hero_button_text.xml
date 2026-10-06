@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget.HoldMyTrack.Button.Hero's label and icon: the page's cream on ink, muted while
+     disabled. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/hmt_ink_muted" android:state_enabled="false" />
+    <item android:color="@color/hmt_bg" />
+</selector>

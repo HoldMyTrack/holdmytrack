@@ -10,10 +10,13 @@ import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.panel.PanelTab
 import dev.holdmytrack.android.recording.RecordingService
+import dev.holdmytrack.android.recording.db.RecordedActivityStore
+import kotlinx.coroutines.launch
 
 /**
  * The app's main window: the bottom bar — Map, Stories, Record, Sync, You — and the tab above it
@@ -22,6 +25,7 @@ import dev.holdmytrack.android.recording.RecordingService
  * [SyncFragment] and You is [YouFragment]. Tabs are shown and hidden rather than replaced, so the
  * map — its camera, its layers, a recording on it — is just as it was on coming back to it.
  * The record button over the bar's middle slot is the map's to drive (`MapFragment.onRecordTap`).
+ * Sync carries a badge with the number of recordings waiting to be sent.
  *
  * Never shows the map without a session: a signed-out visitor is handed straight to
  * `SignInActivity`, mirroring web's `AuthGate` (`docs/IMPLEMENTATION.md` §4.13), before any layout
@@ -82,6 +86,7 @@ class MainActivity : AppCompatActivity() {
         if (savedInstanceState == null) {
             showTab(Tab.MAP)
             tabFor(intent)?.let(::showTab)
+            editPrivateLocation(intent)
         } else {
             tab = savedInstanceState.getString(STATE_TAB)?.let(Tab::valueOf) ?: Tab.MAP
             markTab(tab)
@@ -91,6 +96,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Back from a recording's Save screen, or anywhere a recording was added or sent.
+        if (::nav.isInitialized) refreshSyncBadge()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         // The notification's Stop and a View on map are both about the map.
@@ -98,6 +109,7 @@ class MainActivity : AppCompatActivity() {
         if (forMap) showMap()
         tabFor(intent)?.let(::showTab)
         map()?.onNewIntent(intent)
+        editPrivateLocation(intent)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -139,16 +151,36 @@ class MainActivity : AppCompatActivity() {
         if (tab == Tab.SYNC || tab == Tab.YOU) showTab(Tab.MAP)
     }
 
+    /** The Sync tab's badge: the recordings on this phone waiting to be sent — none for the
+     *  demo account, which can't send them. */
+    fun setSyncWaiting(count: Int) {
+        if (count <= 0 || Session.isDemo) {
+            nav.removeBadge(R.id.nav_sync)
+            return
+        }
+        nav.getOrCreateBadge(R.id.nav_sync).apply {
+            backgroundColor = getColor(R.color.hmt_danger)
+            badgeTextColor = getColor(R.color.hmt_surface)
+            number = count
+            setContentDescriptionQuantityStringsResource(R.plurals.sync_waiting)
+        }
+    }
+
+    private fun refreshSyncBadge() {
+        lifecycleScope.launch { setSyncWaiting(RecordedActivityStore(this@MainActivity).count()) }
+    }
+
     /** The bottom bar, and the record button over it — gone while the map's Edit window or
      *  Private location editor has the screen. */
     fun setBottomBarShown(shown: Boolean) {
         findViewById<View>(R.id.bottom_bar).visibility = if (shown) View.VISIBLE else View.GONE
     }
 
-    /** The You tab's Private locations: the map, its sheet on them. */
-    fun showPrivacy() {
+    /** The Privacy screen's Add a location on the map, or a row: the map, the editor on it. */
+    private fun editPrivateLocation(intent: Intent?) {
+        val id = intent?.getStringExtra(EXTRA_PRIVATE_LOCATION) ?: return
         showTab(Tab.MAP)
-        map()?.showPrivacy()
+        map()?.editPrivateLocation(id)
     }
 
     /** The map's panel moved between its tabs: the bar marks Stories while it shows Stories. */
@@ -205,6 +237,7 @@ class MainActivity : AppCompatActivity() {
         private const val EXTRA_TAB = "dev.holdmytrack.android.TAB"
         internal const val EXTRA_VIEW_ACTIVITY = "dev.holdmytrack.android.VIEW_ACTIVITY"
         internal const val EXTRA_VIEW_STARTED_AT = "dev.holdmytrack.android.VIEW_STARTED_AT"
+        private const val EXTRA_PRIVATE_LOCATION = "dev.holdmytrack.android.PRIVATE_LOCATION"
 
         /** Opens the main window on [tab] — Upload's "See Sync". Clears whatever is over an
          *  existing one. */
@@ -212,6 +245,16 @@ class MainActivity : AppCompatActivity() {
             context.startActivity(
                 Intent(context, MainActivity::class.java)
                     .putExtra(EXTRA_TAB, tab.name)
+                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            )
+        }
+
+        /** Opens the map with the Private location editor on [id], or on a new one with
+         *  `PrivateLocationEditor.NEW` — the Privacy screen's. Clears whatever is over the map. */
+        fun editPrivateLocation(context: Context, id: String) {
+            context.startActivity(
+                Intent(context, MainActivity::class.java)
+                    .putExtra(EXTRA_PRIVATE_LOCATION, id)
                     .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             )
         }

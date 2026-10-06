@@ -75,11 +75,31 @@
             android:label="@string/settings_title"
             android:theme="@style/Theme.HoldMyTrack" />
 
+        <!-- Not exported: the You tab's Privacy, and its Download your data. -->
+        <activity
+            android:name=".privacy.PrivacyActivity"
+            android:exported="false"
+            android:label="@string/menu_privacy"
+            android:theme="@style/Theme.HoldMyTrack" />
+
+        <activity
+            android:name=".privacy.DataExportActivity"
+            android:exported="false"
+            android:label="@string/settings_export_title"
+            android:theme="@style/Theme.HoldMyTrack" />
+
+        <!-- Not exported: the Sync tab's See all. -->
+        <activity
+            android:name=".SyncHistoryActivity"
+            android:exported="false"
+            android:label="@string/sync_history_title"
+            android:theme="@style/Theme.HoldMyTrack" />
+
         <!-- Not exported: reached only from MainActivity's You tab, never by another app. -->
         <activity
             android:name=".ProfileActivity"
             android:exported="false"
-            android:label="@string/menu_profile"
+            android:label="@string/you_graph_link"
             android:theme="@style/Theme.HoldMyTrack" />
 
         <!-- Not exported: reached only from MainActivity, never by another app. No action bar:
