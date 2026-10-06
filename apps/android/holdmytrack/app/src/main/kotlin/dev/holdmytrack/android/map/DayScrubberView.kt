@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.graphics.drawable.Drawable
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
@@ -33,6 +34,10 @@ import kotlin.math.roundToInt
  *   days follow the finger, as a list does), and the selection stays as it was.
  * - **A tap.** A press elsewhere let go without moving is [onPress] at the nearest boundary, then
  *   [onRelease] — the nearer handle moves there.
+ *
+ * A small ‹ in the left padding says the window can scroll further into the past, and a › in the
+ * right padding further toward the present ([earlier], [later]); at the first or most recent
+ * activity day it's gone.
  */
 class DayScrubberView @JvmOverloads constructor(
     context: Context,
@@ -45,6 +50,8 @@ class DayScrubberView @JvmOverloads constructor(
         private set
     var end = 0
         private set
+    private var earlier = false
+    private var later = false
     private var levels: List<Float> = emptyList()
     private var labels: List<ScrubberBars.Label> = emptyList()
 
@@ -87,16 +94,31 @@ class DayScrubberView @JvmOverloads constructor(
     }
     private val monthTypeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
     private val dayTypeface = Typeface.DEFAULT
+    private val chevronSize = (CHEVRON_DP * density).roundToInt()
+    private val chevronLeft = context.getDrawable(R.drawable.ic_chevron_left)!!.mutate().apply { setTint(mutedColor) }
+    private val chevronRight = context.getDrawable(R.drawable.ic_chevron_right)!!.mutate().apply { setTint(mutedColor) }
     private val rect = RectF()
     private val locale = resources.configuration.locales[0]
 
-    fun set(slots: Int, start: Int, end: Int, levels: List<Float>, labels: List<ScrubberBars.Label>) {
-        if (slots == this.slots && start == this.start && end == this.end && levels == this.levels && labels == this.labels) return
+    fun set(
+        slots: Int,
+        start: Int,
+        end: Int,
+        levels: List<Float>,
+        labels: List<ScrubberBars.Label>,
+        earlier: Boolean,
+        later: Boolean,
+    ) {
+        if (slots == this.slots && start == this.start && end == this.end && levels == this.levels &&
+            labels == this.labels && earlier == this.earlier && later == this.later
+        ) return
         this.slots = slots
         this.start = start
         this.end = end
         this.levels = levels
         this.labels = labels
+        this.earlier = earlier
+        this.later = later
         invalidate()
     }
 
@@ -135,12 +157,22 @@ class DayScrubberView @JvmOverloads constructor(
             canvas.drawText(text, cx, top + barAreaHeight + labelSize + 2 * density, labelPaint)
         }
         val cy = top + barAreaHeight / 2
+        if (earlier) drawChevron(canvas, chevronLeft, paddingLeft / 2f, cy)
+        if (later) drawChevron(canvas, chevronRight, width - paddingRight / 2f, cy)
         for (boundary in intArrayOf(start, end)) {
             if (boundary < 0 || boundary > slots) continue
             val x = xOf(boundary).coerceIn(left + handleWidth / 2, width - paddingRight - handleWidth / 2)
             rect.set(x - handleWidth / 2, cy - handleHeight / 2, x + handleWidth / 2, cy + handleHeight / 2)
             canvas.drawRoundRect(rect, handleWidth / 2, handleWidth / 2, handlePaint)
         }
+    }
+
+    /** [chevron] centred on ([cx], [cy]) — the icon's box, its stroke only the middle of it. */
+    private fun drawChevron(canvas: Canvas, chevron: Drawable, cx: Float, cy: Float) {
+        val l = (cx - chevronSize / 2f).roundToInt()
+        val t = (cy - chevronSize / 2f).roundToInt()
+        chevron.setBounds(l, t, l + chevronSize, t + chevronSize)
+        chevron.draw(canvas)
     }
 
     /** The drawn handle within reach of [x], if any — the nearer of the two. */
@@ -214,5 +246,9 @@ class DayScrubberView @JvmOverloads constructor(
         /** How near a handle a press grabs it rather than starting a swipe or a tap — 24dp, half
          *  a 48dp target either side of a 5dp handle. */
         const val HANDLE_GRAB_DP = 24f
+
+        /** The ‹ ›'s icon box: Lucide's chevron is the middle quarter of it, about 4 × 8dp in the
+         *  12dp padding beside the bars. */
+        const val CHEVRON_DP = 16f
     }
 }

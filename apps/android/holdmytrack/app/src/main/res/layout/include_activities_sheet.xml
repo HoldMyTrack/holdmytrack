@@ -119,9 +119,9 @@
                 android:id="@+id/date_range_track"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/hmt_space_12"
                 android:layout_marginTop="@dimen/hmt_space_10"
-                android:layout_marginEnd="@dimen/hmt_space_12" />
+                android:paddingStart="@dimen/hmt_space_12"
+                android:paddingEnd="@dimen/hmt_space_12" />
         </LinearLayout>
 
         <!-- The selected activity, in the range's place while one is selected. -->

@@ -307,7 +307,7 @@ class DateRangeSlider(
     private fun render() {
         val sel = current
         if (sel == null) {
-            track.set(0, 0, 0, emptyList(), emptyList())
+            track.set(0, 0, 0, emptyList(), emptyList(), earlier = false, later = false)
             label.text = null
             shiftEarlier.isEnabled = false
             shiftLater.isEnabled = false
@@ -319,6 +319,8 @@ class DateRangeSlider(
             endOf(sel.to),
             ScrubberBars.levels(days.map { it.distanceMeters }),
             ScrubberBars.labels(days.map { it.date }),
+            earlier = canPanEarlier,
+            later = canPanLater,
         )
         label.text = ScrubberBars.rangeLabel(LocalDate.parse(sel.from), LocalDate.parse(sel.to), locale)
         shiftEarlier.isEnabled = canShift(sel, -1)
