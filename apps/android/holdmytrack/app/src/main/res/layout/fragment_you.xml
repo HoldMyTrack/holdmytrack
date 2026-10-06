@@ -170,7 +170,7 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Privacy: its own screen (PrivacyActivity). -->
+        <!-- Privacy: its own screen (privacy/PrivacyActivity). -->
         <LinearLayout
             android:id="@+id/you_privacy"
             style="@style/Widget.HoldMyTrack.CardRow"

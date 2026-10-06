@@ -14,6 +14,7 @@ import dev.holdmytrack.android.net.Profile
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.net.SettingsOptions
 import dev.holdmytrack.android.panel.PanelFormat
+import dev.holdmytrack.android.privacy.PrivacyActivity
 import dev.holdmytrack.android.profile.ProfileStats
 import dev.holdmytrack.android.profile.RecentWeeksView
 import dev.holdmytrack.android.recording.RecordingFormat
@@ -71,7 +72,9 @@ class YouFragment : Fragment(R.layout.fragment_you) {
         findViewById<View>(R.id.you_stats).setOnClickListener {
             startActivity(Intent(context, ProfileActivity::class.java))
         }
-        findViewById<View>(R.id.you_privacy).setOnClickListener { (activity as? MainActivity)?.showPrivacy() }
+        findViewById<View>(R.id.you_privacy).setOnClickListener {
+            startActivity(Intent(context, PrivacyActivity::class.java))
+        }
         findViewById<View>(R.id.you_language).apply {
             isEnabled = !Session.isDemo
             setOnClickListener { pickLanguage() }

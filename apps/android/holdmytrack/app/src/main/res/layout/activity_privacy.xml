@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Privacy (PrivacyActivity), from the You tab: the Private locations, each opening the editor
+     on the map, and Add a location on the map; what HoldMyTrack keeps; and the account's data —
+     Download your data (DataExportActivity) and the privacy policy. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:divider="@drawable/gap_20"
+        android:orientation="vertical"
+        android:padding="@dimen/hmt_space_16"
+        android:showDividers="middle">
+
+        <!-- Private locations. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/Widget.HoldMyTrack.SectionHeading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/panel_private_title" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_8"
+                android:layout_marginBottom="@dimen/hmt_space_12"
+                android:lineHeight="20sp"
+                android:paddingStart="@dimen/hmt_space_4"
+                android:paddingEnd="@dimen/hmt_space_4"
+                android:text="@string/private_subtitle"
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.BodyMedium"
+                android:textColor="@color/hmt_ink_secondary" />
+
+            <LinearLayout
+                style="@style/Widget.HoldMyTrack.SectionCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:dividerPadding="0dp">
+
+                <!-- Loading, none yet, or the read failing (PrivacyActivity.render). -->
+                <TextView
+                    android:id="@+id/privacy_note"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="@dimen/hmt_space_16"
+                    android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowSub" />
+
+                <LinearLayout
+                    android:id="@+id/privacy_rows"
+                    style="@style/Widget.HoldMyTrack.SectionCard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@null" />
+
+                <LinearLayout
+                    android:id="@+id/privacy_add"
+                    style="@style/Widget.HoldMyTrack.CardRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="56dp">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_marginEnd="@dimen/hmt_space_10"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_plus"
+                        app:tint="@color/hmt_accent_strong" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/private_add_on_map"
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.LabelLarge"
+                        android:textColor="@color/hmt_accent_strong" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/privacy_reprocess"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_8"
+                android:paddingStart="@dimen/hmt_space_4"
+                android:paddingEnd="@dimen/hmt_space_4"
+                android:text="@string/private_reprocess_note"
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.BodySmall"
+                android:textColor="@color/hmt_ink_secondary" />
+        </LinearLayout>
+
+        <!-- What HoldMyTrack keeps: three facts, each with a check. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/Widget.HoldMyTrack.SectionHeading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/hmt_space_8"
+                android:text="@string/privacy_keeps_title" />
+
+            <LinearLayout
+                style="@style/Widget.HoldMyTrack.SectionCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="@dimen/hmt_space_16"
+                android:paddingTop="@dimen/hmt_space_4"
+                android:paddingEnd="@dimen/hmt_space_16"
+                android:paddingBottom="@dimen/hmt_space_4"
+                android:dividerPadding="0dp">
+
+                <TextView
+                    style="@style/Widget.HoldMyTrack.PrivacyFact"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/privacy_keeps_map" />
+
+                <TextView
+                    style="@style/Widget.HoldMyTrack.PrivacyFact"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/privacy_keeps_health" />
+
+                <TextView
+                    style="@style/Widget.HoldMyTrack.PrivacyFact"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/privacy_keeps_photos" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Your data. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/Widget.HoldMyTrack.SectionHeading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/hmt_space_8"
+                android:text="@string/privacy_your_data" />
+
+            <LinearLayout
+                style="@style/Widget.HoldMyTrack.SectionCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <!-- Gone for the demo account, whose data is deleted within the day. -->
+                <LinearLayout
+                    android:id="@+id/privacy_download"
+                    style="@style/Widget.HoldMyTrack.CardRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="64dp">
+
+                    <ImageView
+                        style="@style/Widget.HoldMyTrack.IconTile"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_download" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/settings_export_title"
+                            android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowTitle" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/hmt_space_2"
+                            android:text="@string/privacy_download_sub"
+                            android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowSub" />
+                    </LinearLayout>
+
+                    <ImageView
+                        style="@style/Widget.HoldMyTrack.RowChevron"
+                        android:contentDescription="@null" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/privacy_policy"
+                    style="@style/Widget.HoldMyTrack.CardRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <ImageView
+                        style="@style/Widget.HoldMyTrack.IconTile"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_lock" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/privacy_policy"
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowTitle" />
+
+                    <ImageView
+                        style="@style/Widget.HoldMyTrack.RowChevron"
+                        android:contentDescription="@string/privacy_opens_browser"
+                        android:src="@drawable/ic_external_link" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

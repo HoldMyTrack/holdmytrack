@@ -24,7 +24,7 @@ import kotlin.math.sin
 /** A Private location's circle — a saved one ([id] set) or the one being drawn. */
 data class Circle(val id: String?, val lon: Double, val lat: Double, val radiusM: Int)
 
-/** What a tap on the map hit while the Privacy tab is up. */
+/** What a tap on the map hit while the Private location editor has it. */
 sealed interface CircleHit {
     /** The circle being edited, or its handle. */
     data object Selected : CircleHit
@@ -35,7 +35,7 @@ sealed interface CircleHit {
 }
 
 /**
- * The Privacy tab's circles on the map — the web's `apps/web/src/map/privateLocations.ts`:
+ * The Private location editor's circles on the map — the web's `apps/web/src/map/privateLocations.ts`:
  * every saved one as a light purple fill with an outline and a small dot at its centre, and the
  * one being edited stronger, with a bigger handle at its centre to drag it by. Drawn from the
  * draft, not its saved copy, so the circle moves as it's edited. One GeoJSON source, four

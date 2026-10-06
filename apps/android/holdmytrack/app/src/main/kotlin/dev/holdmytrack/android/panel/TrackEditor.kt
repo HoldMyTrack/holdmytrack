@@ -206,7 +206,7 @@ class TrackEditor(
 
     /**
      * The map's own touches, before it pans, in Move point mode: a press on a point takes the
-     * gesture — the map stays put, as the Privacy tab's handle drag does — each move draws the
+     * gesture — the map stays put, as a Private location's handle drag does — each move draws the
      * point under the finger, and letting go is one step; let go unmoved, or a second finger
      * down, and nothing changes. Returns whether the touch was taken.
      */

@@ -637,12 +637,9 @@
     <string name="photos_zoom_fit">Вписать в экран</string>
     <string name="photos_unavailable">Не удалось загрузить фотографию.</string>
 
-    <!-- The panel's Privacy tab (panel/PrivacyTab.kt), after the web's private.* messages. -->
-    <string name="panel_tab_privacy">Приватность</string>
-    <string name="private_subtitle">Треки никогда не начинаются и не заканчиваются внутри этих кругов.</string>
-    <string name="panel_close_private">Назад к занятиям</string>
+    <!-- Private locations: the Privacy screen and the editor on the map (privacy/PrivacyActivity.kt, panel/PrivateLocationEditor.kt), after the web's private.* messages. -->
+    <string name="private_subtitle">Треки никогда не начинаются и не заканчиваются внутри этих кругов — часть внутри отрезается от каждого занятия, так что никто не проследит трек до вашей двери.</string>
     <string name="panel_private_title">Приватные места</string>
-    <string name="private_create">Создать</string>
     <string name="private_none">Пока нет.</string>
     <string name="private_unnamed">Без названия</string>
     <string name="private_radius">Радиус</string>
@@ -654,8 +651,16 @@
     <string name="private_reprocess_note">Сохранение изменения запускает повторную обработку затронутых занятий — до её окончания они помечены «Ожидает».</string>
     <string name="private_delete_title">Удалить это приватное место?</string>
     <string name="private_delete_body">Занятия, которые начинаются или заканчиваются внутри него, снова покажут эти части после повторной обработки.</string>
-    <string name="private_delete_label">Удалить «%1$s»</string>
     <string name="private_delete_failed">Не удалось удалить: %1$s</string>
+    <string name="private_add_on_map">Добавить место на карте</string>
+    <string name="private_delete">Удалить</string>
+    <string name="privacy_keeps_title">Что хранит HoldMyTrack</string>
+    <string name="privacy_keeps_map">Вашу карту не видит никто, кроме вас.</string>
+    <string name="privacy_keeps_health">Пульс и другие данные о здоровье никогда не читаются и не хранятся.</string>
+    <string name="privacy_keeps_photos">Фотографии хранятся уменьшенной копией, никогда не оригиналом.</string>
+    <string name="privacy_your_data">Ваши данные</string>
+    <string name="privacy_download_sub">Копия всего, письмо придёт, когда она будет готова</string>
+    <string name="privacy_opens_browser">Откроется в браузере</string>
 
     <!-- Stories (panel/StoriesTab.kt, panel/StoryDialog.kt, Add to story (panel/ActivitiesPanel.kt) and the
          rows' Story badge), after the web's stories.* messages. -->

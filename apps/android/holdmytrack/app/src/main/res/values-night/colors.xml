@@ -32,6 +32,10 @@
     <color name="hmt_danger_container">#4A2626</color>
     <color name="hmt_success">#5FC382</color>
 
+    <!-- A Private location's circle off the map (the Privacy screen's previews): the map's own
+         purple (map/PrivateLocationsOverlay). -->
+    <color name="hmt_private">#A27DE0</color>
+
     <color name="hmt_facebook">#1877F2</color>
 
     <!-- The floating map chrome's background: the surface at 92%, as on the light side. -->

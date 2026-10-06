@@ -86,6 +86,7 @@ class MainActivity : AppCompatActivity() {
         if (savedInstanceState == null) {
             showTab(Tab.MAP)
             tabFor(intent)?.let(::showTab)
+            editPrivateLocation(intent)
         } else {
             tab = savedInstanceState.getString(STATE_TAB)?.let(Tab::valueOf) ?: Tab.MAP
             markTab(tab)
@@ -108,6 +109,7 @@ class MainActivity : AppCompatActivity() {
         if (forMap) showMap()
         tabFor(intent)?.let(::showTab)
         map()?.onNewIntent(intent)
+        editPrivateLocation(intent)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -174,10 +176,11 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.bottom_bar).visibility = if (shown) View.VISIBLE else View.GONE
     }
 
-    /** The You tab's Private locations: the map, its sheet on them. */
-    fun showPrivacy() {
+    /** The Privacy screen's Add a location on the map, or a row: the map, the editor on it. */
+    private fun editPrivateLocation(intent: Intent?) {
+        val id = intent?.getStringExtra(EXTRA_PRIVATE_LOCATION) ?: return
         showTab(Tab.MAP)
-        map()?.showPrivacy()
+        map()?.editPrivateLocation(id)
     }
 
     /** The map's panel moved between its tabs: the bar marks Stories while it shows Stories. */
@@ -234,6 +237,7 @@ class MainActivity : AppCompatActivity() {
         private const val EXTRA_TAB = "dev.holdmytrack.android.TAB"
         internal const val EXTRA_VIEW_ACTIVITY = "dev.holdmytrack.android.VIEW_ACTIVITY"
         internal const val EXTRA_VIEW_STARTED_AT = "dev.holdmytrack.android.VIEW_STARTED_AT"
+        private const val EXTRA_PRIVATE_LOCATION = "dev.holdmytrack.android.PRIVATE_LOCATION"
 
         /** Opens the main window on [tab] — Upload's "See Sync". Clears whatever is over an
          *  existing one. */
@@ -241,6 +245,16 @@ class MainActivity : AppCompatActivity() {
             context.startActivity(
                 Intent(context, MainActivity::class.java)
                     .putExtra(EXTRA_TAB, tab.name)
+                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            )
+        }
+
+        /** Opens the map with the Private location editor on [id], or on a new one with
+         *  `PrivateLocationEditor.NEW` — the Privacy screen's. Clears whatever is over the map. */
+        fun editPrivateLocation(context: Context, id: String) {
+            context.startActivity(
+                Intent(context, MainActivity::class.java)
+                    .putExtra(EXTRA_PRIVATE_LOCATION, id)
                     .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             )
         }

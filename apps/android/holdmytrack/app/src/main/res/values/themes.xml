@@ -948,4 +948,15 @@
         <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
         <item name="android:textColor">@color/hmt_ink</item>
     </style>
+
+    <!-- One of the Privacy screen's facts: a check in the success color, then the sentence. -->
+    <style name="Widget.HoldMyTrack.PrivacyFact" parent="">
+        <item name="drawableStartCompat">@drawable/ic_check</item>
+        <item name="android:drawablePadding">@dimen/hmt_space_12</item>
+        <item name="drawableTint">@color/hmt_success</item>
+        <item name="android:paddingTop">@dimen/hmt_space_12</item>
+        <item name="android:paddingBottom">@dimen/hmt_space_12</item>
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
+        <item name="android:textColor">@color/hmt_ink</item>
+    </style>
 </resources>

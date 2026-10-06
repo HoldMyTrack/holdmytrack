@@ -69,7 +69,7 @@ import dev.holdmytrack.android.panel.ActivityFacets
 import dev.holdmytrack.android.panel.EditActivityWindow
 import dev.holdmytrack.android.panel.PanelFormat
 import dev.holdmytrack.android.panel.PanelTab
-import dev.holdmytrack.android.panel.PrivacyTab
+import dev.holdmytrack.android.panel.PrivateLocationEditor
 import dev.holdmytrack.android.panel.PanelState
 import dev.holdmytrack.android.recording.RecordButton
 import dev.holdmytrack.android.recording.RecordingFormat
@@ -171,10 +171,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private lateinit var panel: ActivitiesPanel
     private val panelState = PanelState()
     private lateinit var editWindow: EditActivityWindow
-    private lateinit var privacyTab: PrivacyTab
-
-    /** Whether the Privacy tab has the map — its tab showing, in Normal mode. */
-    private var privacyShowing = false
+    private lateinit var privateEditor: PrivateLocationEditor
 
     /** Back closes an open sheet before it leaves the map. */
     private val collapseSheetOnBack = object : OnBackPressedCallback(false) {
@@ -184,6 +181,11 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     /** Back closes the Edit window before it leaves the map. */
     private val closeEditOnBack = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() = editWindow.back()
+    }
+
+    /** Back closes the Private location editor, unsaved, before it leaves the map. */
+    private val closePrivateOnBack = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() = privateEditor.stop()
     }
 
     /** Fog and Heatmap fetched again once the server has re-rendered them after a delete or a
@@ -394,9 +396,16 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         if (::panel.isInitialized) panel.showStories()
     }
 
-    /** The You tab's Private locations: the panel's Privacy tab. */
-    fun showPrivacy() {
-        if (::panel.isInitialized) panel.showPrivacy()
+    /**
+     * The Privacy screen's Add a location on the map ([PrivateLocationEditor.NEW]) or one of its
+     * rows: the editor on the map, in Normal mode, the circles drawn. Not while recording, which
+     * has the map.
+     */
+    fun editPrivateLocation(id: String) {
+        if (!::privateEditor.isInitialized || isRecording()) return
+        if (mode != MapMode.NORMAL) setMode(MapMode.NORMAL)
+        privateEditor.start(id)
+        privateEditor.onStyleReady()
     }
 
     /** The bottom bar's Map: the panel's Activities tab, collapsed. */
@@ -506,18 +515,21 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             onRemovedFromStory = ::onRemovedFromStory,
             onSheetChanged = ::onSheetChanged,
         )
-        privacyTab = PrivacyTab(
-            findViewById(R.id.panel_privacy_content),
+        privateEditor = PrivateLocationEditor(
             findViewById(R.id.private_editor),
             map = { map },
             style = { style?.takeIf { overlaysAttached } },
             onEditorOpen = {
+                closePrivateOnBack.isEnabled = true
                 placeEditWindow()
                 renderRail()
                 renderDateFooter()
                 host?.setBottomBarShown(false)
             },
+            // Closing the editor gives the map back.
             onEditorClose = {
+                closePrivateOnBack.isEnabled = false
+                if (privateEditor.isShowing) privateEditor.stop()
                 renderRail()
                 renderDateFooter()
                 host?.setBottomBarShown(true)
@@ -547,6 +559,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         )
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, collapseSheetOnBack)
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, closeEditOnBack)
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, closePrivateOnBack)
         activityDays = ActivityDays(DateRangeSlider.WINDOW_DAYS, ::onActivityDaysChanged)
         dateSlider = DateRangeSlider(
             dateFooter,
@@ -618,7 +631,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
     }
 
-    /** Dragging a Private location's handle (`PrivacyTab.onMapTouch`), or a track point in the
+    /** Dragging a Private location's handle (`PrivateLocationEditor.onMapTouch`), or a track point in the
      *  editor's Move point mode (`TrackEditor.onMapTouch`), takes the touch before the map can
      *  pan with it. Only a press on the handle or a point is taken; every other touch, taps
      *  included, still reaches the map, which performs its own clicks. */
@@ -626,7 +639,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun takeHandleDrags() {
         mapView.setOnTouchListener { _, event ->
             when {
-                privacyShowing -> privacyTab.onMapTouch(event)
+                privateEditor.isShowing -> privateEditor.onMapTouch(event)
                 editWindow.isOpen -> map?.let { editWindow.trackEditor.onMapTouch(event, it, resources.displayMetrics.density) } ?: false
                 else -> false
             }
@@ -919,8 +932,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             loadSpotCaptures()
             captureMode.onStyleAttached()
             renderTrackMetrics()
-            // A new style has none of the circles; draw them again if the tab has the map.
-            if (privacyShowing) privacyTab.start()
+            // A new style has none of the circles; draw them again if the editor has the map.
+            privateEditor.onStyleReady()
             if (isRecording()) MapOverlays.setRecording(loaded, true, mode)
             frameActivities()
             checkTileVersion()
@@ -1203,16 +1216,13 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /** Whether the Private location editor is open over the map. */
-    private fun privacyEditing() = ::privacyTab.isInitialized && privacyTab.isEditing
+    private fun privacyEditing() = ::privateEditor.isInitialized && privateEditor.isEditing
 
-    /** The Privacy tab takes the map while its tab shows in Normal mode, and gives it back —
-     *  circles and any unsaved draft gone — the moment either stops. */
+    /** The Private location editor has the map in Normal mode only: another mode, or a
+     *  recording started, gives it back — circles and any unsaved draft gone. */
     private fun renderPrivacy() {
-        if (!::privacyTab.isInitialized) return
-        val next = normalMode() && panel.tab == PanelTab.PRIVACY
-        if (next == privacyShowing) return
-        privacyShowing = next
-        if (next) privacyTab.start() else privacyTab.stop()
+        if (!::privateEditor.isInitialized || !privateEditor.isShowing) return
+        if (modeBarReady && !normalMode()) privateEditor.stop()
     }
 
     /**
@@ -1279,7 +1289,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     /** Layers and Find my location, on the rail at the top row's end: away while the Edit window
      *  or the Private location editor is open, since both open over the top of the map. */
     private fun renderRail() {
-        val editing = editWindow.isOpen || (::privacyTab.isInitialized && privacyTab.isEditing)
+        val editing = editWindow.isOpen || privacyEditing()
         mapRail.visibility = if (editing || selectionShown()) View.GONE else View.VISIBLE
         if (editing) layersMenu.dismiss()
     }
@@ -1480,8 +1490,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      */
     private fun onMapTap(instance: MapLibreMap, point: LatLng): Boolean {
         // A spot's badge first, in every mode: it opens the spot's popup, and a tap anywhere
-        // else closes it. Not while the Privacy tab or the Edit window has the map.
-        if (!privacyShowing && !editWindow.isOpen) {
+        // else closes it. Not while the Private location editor or the Edit window has the map.
+        if (!privateEditor.isShowing && !editWindow.isOpen) {
             val spot = MapSpots.spotAt(instance, instance.projection.toScreenLocation(point), resources.displayMetrics.density)
             if (spot != null) {
                 spotPopup.show(instance, spot)
@@ -1490,9 +1500,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             spotPopup.close()
         }
         if (!normalMode()) return false
-        // The Privacy tab has the map to itself while it shows.
-        if (privacyShowing) {
-            privacyTab.onMapTap(point)
+        // The Private location editor has the map to itself while it's open.
+        if (privateEditor.isShowing) {
+            privateEditor.onMapTap(point)
             return true
         }
         // The Edit window's group mustn't change underneath it; the one thing a tap does then
@@ -1523,8 +1533,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  select nothing — `docs/SPEC.md` FR-4.2), and steps aside while recording. It waits for
      *  the session; the range at its head also for the first page of days, and an account with
      *  no activity at all has nothing to pick from — the empty notice speaks for it instead. The
-     *  range is the Activities tab's alone: Stories and Privacy take none (`docs/SPEC.md` FR-6),
-     *  and have their titles at the head instead. */
+     *  range is the Activities tab's alone: Stories takes none (`docs/SPEC.md` FR-6), and has
+     *  its title at the head instead. */
     private fun renderDateFooter() {
         val normal = normalMode()
         // The selected activity's card takes the range's place at the head.

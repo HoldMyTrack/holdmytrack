@@ -303,7 +303,7 @@ A new account made this way is unverified, like one made on the web; the Android
 2. On a match the account is closed at once: every session of it ends, on every device, its Google and Facebook links and any unused reset, verification or app sign-in link stop working, and it can no longer be signed in to by any means. The email address is free: a new account can be made with it straight away. The response is `204 No Content` and clears the session cookie.
 3. Within a few minutes, everything the account held is deleted: its activities and their uploaded files, tiles, photos, Stories, Private locations, captures, import history, avatar and settings. A file still being processed for it finishes first.
 4. Backups keep it for up to 8 weeks (FR-10.6).
-5. **In the Android app**, Settings ends with the same section and a dialog (`apps/android/docs/SPEC.md` FR-1.5), which also clears the account's unsynced recordings on that phone.
+5. **In the Android app**, the You tab's Delete account… opens a dialog saying the same (`apps/android/docs/SPEC.md` FR-2.9), which also clears the account's unsynced recordings on that phone.
 6. **On the web**, the Settings page (FR-1.7) ends with a **Delete account** section (`#delete-account`) saying what is deleted, that it can't be undone, and the backups, linking to the privacy policy. **Delete account…** opens a field asking for the account's email, shown beside it, and **Delete my account and data**, which posts `POST /settings/delete` (refused from another origin, like every form). It works without JavaScript. On success it signs out and lands on `/signin?deleted`, which says "Your account was deleted. Everything in it will be gone within a few minutes." A demo session doesn't see the section. An unverified account can't reach Settings (FR-1.8), so on the web it deletes by verifying first, or through Help's email route (FR-10.2).
 
 **Error cases**:
@@ -689,7 +689,7 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 
 **Behavior**:
 1. On the web, the Settings page has a Theme control: System (the default), Light, Dark. A choice applies at once, without a reload, and is kept by this browser only — not on the account, and not on the user's other devices; every page opened afterwards, the map included, draws in it.
-2. In the Android app, Settings has the same three-way Theme control, applied at once and kept on the phone only.
+2. In the Android app, the You tab has the same three-way Theme control, applied at once and kept on the phone only.
 3. With System chosen, a change of the device's own setting applies while the page or app is open.
 4. The map follows the theme: the light basemap flavor in the light theme, the dark flavor in the dark one (FR-4.5), with Fog of War's veil switching to match (FR-4.2).
 5. A page opened with a saved dark choice draws dark from its first frame, never flashing light first.
@@ -1150,8 +1150,8 @@ A read-only view of every account and every account's activities, for the people
 4. Counts take the language's plural forms (`1 занятие`, `2 занятия`, `5 занятий`).
 5. The verification and password-reset emails (FR-1.8, FR-1.5) are in the account's language, or when it has none set, the language of the request that sent them.
 6. Error messages a person can see (a wrong password, a taken email, a rejected upload or track edit) are full sentences in the request's language, in page forms and in the JSON API's plain-text and `message` bodies alike. Machine-readable codes (`email_not_verified`, `demo_read_only`) never change with language. An import's failure reason, in the upload history, and the Android app's per-activity sync rejections are in the language of the request reading them, however long ago the import failed.
-7. A language chosen in the header's menu (FR-13.2) takes effect from that choice's own reload onward; other open pages change on their next load. Saved from the Android app's Settings, it applies to the web from each page's next load.
-8. The Android app follows its own per-app language (Android's Settings → Apps → HoldMyTrack → Language), else the phone's. Its Settings screen's Language sets that per-app language and the account's setting together, and signing in applies the account's language when it is English or Русский (`apps/android/docs/SPEC.md` FR-1.5). It sends its language as `Accept-Language`, so the server's messages match it.
+7. A language chosen in the header's menu (FR-13.2) takes effect from that choice's own reload onward; other open pages change on their next load. Saved from the Android app, it applies to the web from each page's next load.
+8. The Android app follows its own per-app language (Android's Settings → Apps → HoldMyTrack → Language), else the phone's. Its Language, on Settings or the You tab, sets that per-app language and the account's setting together, and signing in applies the account's language when it is English or Русский (`apps/android/docs/SPEC.md` FR-1.5). It sends its language as `Accept-Language`, so the server's messages match it.
 
 **Not translated**: activity names and descriptions people type, place names on the map, activity types outside the common set (shown as recorded), and the reason a `.zip` entry was skipped.
 

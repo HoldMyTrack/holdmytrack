@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Download your data (DataExportActivity): what the copy holds, where the latest stands, its
+     archives when ready, and the request. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:divider="@drawable/gap_12"
+        android:orientation="vertical"
+        android:padding="@dimen/hmt_space_16"
+        android:showDividers="middle">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:lineHeight="20sp"
+            android:text="@string/settings_export_hint"
+            android:textAppearance="@style/TextAppearance.HoldMyTrack.BodyMedium"
+            android:textColor="@color/hmt_ink_secondary" />
+
+        <TextView
+            android:id="@+id/export_notice"
+            style="@style/Widget.HoldMyTrack.Notice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:accessibilityLiveRegion="polite"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/export_error"
+            style="@style/Widget.HoldMyTrack.Notice.Error"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/export_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:accessibilityLiveRegion="polite"
+            android:textAppearance="@style/TextAppearance.HoldMyTrack.BodyMedium"
+            android:visibility="gone" />
+
+        <!-- One Download button per archive, filled by DataExportActivity.show. -->
+        <LinearLayout
+            android:id="@+id/export_parts"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <Button
+            android:id="@+id/export_request"
+            style="@style/Widget.HoldMyTrack.Button.Outlined"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_export_request" />
+    </LinearLayout>
+</ScrollView>

@@ -2,8 +2,8 @@
 <!-- The Private location editor, after the web's .private-locations__window: a card along the
      bottom of the map, as the Edit window is (MapFragment sets its bottom margin), so the circle
      it edits stays in view above it. The title, Name, RADIUS with its readout and slider, a note, an error
-     line, and Cancel and Save. Moving the circle is dragging its handle on the map. Filled by
-     panel/PrivacyTab. -->
+     line, and Delete (a saved one's), Cancel and Save. Moving the circle is dragging its handle on
+     the map. Filled by panel/PrivateLocationEditor. -->
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/private_editor"
@@ -103,6 +103,20 @@
             android:layout_marginTop="@dimen/hmt_space_12"
             android:gravity="end"
             android:orientation="horizontal">
+
+            <!-- A saved location's Delete, at the other end from Save. -->
+            <Button
+                android:id="@+id/private_editor_delete"
+                style="@style/Widget.HoldMyTrack.Button.Text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/private_delete"
+                android:textColor="@color/hmt_danger" />
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
 
             <Button
                 android:id="@+id/private_editor_cancel"

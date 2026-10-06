@@ -75,6 +75,19 @@
             android:label="@string/settings_title"
             android:theme="@style/Theme.HoldMyTrack" />
 
+        <!-- Not exported: the You tab's Privacy, and its Download your data. -->
+        <activity
+            android:name=".privacy.PrivacyActivity"
+            android:exported="false"
+            android:label="@string/menu_privacy"
+            android:theme="@style/Theme.HoldMyTrack" />
+
+        <activity
+            android:name=".privacy.DataExportActivity"
+            android:exported="false"
+            android:label="@string/settings_export_title"
+            android:theme="@style/Theme.HoldMyTrack" />
+
         <!-- Not exported: the Sync tab's See all. -->
         <activity
             android:name=".SyncHistoryActivity"
