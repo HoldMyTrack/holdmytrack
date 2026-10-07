@@ -1365,12 +1365,12 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 4. A badge from it opens the same popup (FR-15.3). From zoom 13 up the tiles' badges take over and these aren't drawn.
 5. If the request fails, the button reads "Couldn't load places — try again".
 
-**Inputs** (`GET /v1/spots`): `bbox` — `west,south,east,north` in degrees, west below east and south below north (clamped to the world); `categories` — one or more of `playground`, `dog_park`, `monument`, `viewpoint`, `history`, comma-separated.
+**Inputs** (`GET /v1/spots`): `bbox` — `west,south,east,north` in degrees, south below north (clamped to the world). A view across the antimeridian is taken either way round: east past 180 (`170,…,190,…`) or west past east (`170,…,−170,…`), both the places from 170° to 180° and from −180° to −170°; `categories` — one or more of `playground`, `dog_park`, `monument`, `viewpoint`, `history`, comma-separated.
 
 **Outputs**: `{spots, total}`: `spots`, up to 2,000 places whose anchor is inside the box — a retired one (FR-15.1) only for an account that captured it — each with `id`, `category`, `lon`, `lat` and the text fields of FR-15.4's `spots` layer (absent when none); `total`, how many of those the box holds in those categories.
 
 **Error cases**:
-- A missing or malformed `bbox`, a box with west at or past east (the antimeridian), or a missing or unknown category → `400`.
+- A missing or malformed `bbox`, a box with no width or south at or past north, or a missing or unknown category → `400`.
 - No session → `401`.
 
 ### FR-15.4 The tiles
