@@ -191,17 +191,67 @@ function toBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promi
   return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 }
 
-/** The bitmap drawn at most maxSide on its long side, as WebP — or JPEG where the browser
- *  can't encode WebP (Safari hands back a PNG instead, which the server refuses). */
-async function encode(bitmap: ImageBitmap, maxSide: number): Promise<Blob> {
-  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+/** The picked file as a loaded `<img>`: its header read, its natural size the picture as it's
+ *  shown — turned the way its EXIF Orientation says, as drawing it also is — and its pixels not
+ *  yet decoded. */
+async function loadImage(file: File): Promise<HTMLImageElement> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+      img.src = url;
+    });
+    if (img.naturalWidth === 0 || img.naturalHeight === 0) throw new UnreadablePhotoError();
+    return img;
+  } catch {
+    throw new UnreadablePhotoError();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/** The file decoded by WebCodecs straight at width × height — the upright size — or null where
+ *  that isn't what comes back: no ImageDecoder, a type it doesn't take, or a frame at another
+ *  size (Chromium treats the size as a hint, scaling a JPEG by a power of two below it). */
+async function decodeAt(file: File, width: number, height: number): Promise<HTMLCanvasElement | null> {
+  if (typeof ImageDecoder === 'undefined' || !file.type) return null;
+  try {
+    if (!(await ImageDecoder.isTypeSupported(file.type))) return null;
+    const decoder = new ImageDecoder({ data: file.stream(), type: file.type, desiredWidth: width, desiredHeight: height });
+    try {
+      const { image } = await decoder.decode();
+      try {
+        if (image.displayWidth !== width || image.displayHeight !== height) return null;
+        return draw(image, width, height, Math.max(width, height));
+      } finally {
+        image.close();
+      }
+    } finally {
+      decoder.close();
+    }
+  } catch {
+    return null;
+  }
+}
+
+/** The source drawn at most maxSide on its long side. */
+function draw(source: CanvasImageSource, width: number, height: number, maxSide: number): HTMLCanvasElement {
+  const scale = Math.min(1, maxSide / Math.max(width, height));
   const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  canvas.width = Math.max(1, Math.round(width * scale));
+  canvas.height = Math.max(1, Math.round(height * scale));
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new UnreadablePhotoError();
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+/** The canvas as WebP — or JPEG where the browser can't encode WebP (Safari hands back a PNG
+ *  instead, which the server refuses). */
+async function encode(canvas: HTMLCanvasElement): Promise<Blob> {
   const webp = await toBlob(canvas, 'image/webp', QUALITY);
   if (webp && webp.type === 'image/webp') return webp;
   const jpeg = await toBlob(canvas, 'image/jpeg', QUALITY);
@@ -221,17 +271,20 @@ export async function preparePhoto(file: File): Promise<PreparedPhoto> {
   } catch {
     // A malformed EXIF block isn't a reason to refuse the picture; it just goes unplaced.
   }
-  let bitmap: ImageBitmap;
-  try {
-    // 'from-image' turns a portrait photo the way its EXIF Orientation says, before the
-    // redraw drops that tag.
-    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
-  } catch {
-    throw new UnreadablePhotoError();
-  }
-  try {
-    return { file: await encode(bitmap, PHOTO_MAX_SIDE), thumb: await encode(bitmap, PHOTO_THUMB_SIDE), exif };
-  } finally {
-    bitmap.close();
-  }
+  // A large photo isn't decoded at full size (4 bytes a pixel: 770 MB for 192 MP) where the
+  // browser can avoid it. ImageDecoder decodes straight at the target size where it honors one
+  // (Firefox); otherwise the <img> is drawn onto a canvas of the target size, which Chromium
+  // decodes a JPEG for at a fraction of its size and Safari subsamples. createImageBitmap
+  // decodes it whole in all three, even when asked for a smaller one. The thumbnail is drawn
+  // from the resized copy.
+  const img = await loadImage(file);
+  const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+  const width = Math.max(1, Math.round(img.naturalWidth * scale));
+  const height = Math.max(1, Math.round(img.naturalHeight * scale));
+  let photo = scale < 1 ? await decodeAt(file, width, height) : null;
+  // Not img.decode() first: that decodes it at full size, where drawing it leaves the size to
+  // the browser.
+  photo ??= draw(img, img.naturalWidth, img.naturalHeight, PHOTO_MAX_SIDE);
+  const thumb = draw(photo, photo.width, photo.height, PHOTO_THUMB_SIDE);
+  return { file: await encode(photo), thumb: await encode(thumb), exif };
 }
