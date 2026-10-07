@@ -1,7 +1,7 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { API_BASE_URL, TILES_V1 } from '../api';
 import { versionedTileURL } from './coverageVersion';
-import { CITY_MIN_ZOOM, COUNTRY_MAX_ZOOM, REGION_MAX_ZOOM, REGION_MIN_ZOOM } from './zoomTiers';
+import { BOUNDARIES_ATTRIBUTION, CITY_MIN_ZOOM, COUNTRY_MAX_ZOOM, REGION_MAX_ZOOM, REGION_MIN_ZOOM } from './zoomTiers';
 
 /**
  * The Fog of War raster layer (IMPLEMENTATION.md §4.2). Unlike tracks, Fog of War is never
@@ -90,6 +90,7 @@ export function ensureFogLayer(map: MapLibreMap, beforeId: string | undefined, d
     map.addSource(COUNTRY_FOG_SOURCE_ID, {
       type: 'vector',
       tiles: [versionedTileURL(COUNTRY_FOG_TILE_URL)],
+      attribution: BOUNDARIES_ATTRIBUTION,
       minzoom: 0,
       maxzoom: COUNTRY_MAX_ZOOM,
     });
@@ -114,6 +115,7 @@ export function ensureFogLayer(map: MapLibreMap, beforeId: string | undefined, d
     map.addSource(REGION_FOG_SOURCE_ID, {
       type: 'vector',
       tiles: [versionedTileURL(REGION_FOG_TILE_URL)],
+      attribution: BOUNDARIES_ATTRIBUTION,
       minzoom: REGION_MIN_ZOOM,
       maxzoom: REGION_MAX_ZOOM,
     });

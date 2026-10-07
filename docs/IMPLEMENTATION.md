@@ -285,43 +285,58 @@ CREATE INDEX idx_activity_tile_masks_tile ON activity_tile_masks (zoom, tile_x, 
 
 ### 3.12 `admin_countries`
 
-Natural Earth's 1:50m Admin-0 country polygons, loaded once by the `seed-admin-boundaries` subcommand (§4.2.4) and never derived from user data. `adm0_a3` — Natural Earth's own stable per-country code — is the seed's idempotency key, not `iso_a2`: a few small dependencies share their parent country's ISO code (Australia's Indian Ocean Territory and Ashmore & Cartier Islands both carry `AU`), so `iso_a2` is nullable and intentionally not unique, informational only, never joined on.
+Overture Maps' land-clipped countries and dependencies, from its divisions theme (OpenStreetMap's borders, ADR-0034), loaded by the `seed-admin-boundaries` subcommand (§4.2.4) and never derived from user data. `code` is the country's ISO 3166-1 alpha-2 code, or Overture's own `X`-prefixed one for a disputed area (`XW` West Bank), unique across countries and dependencies alike. `geom` is the outline simplified for the Country tiles, which draw it on every request; the full-detail outline is kept only in `admin_country_parts`, cut by `ST_Subdivide` into pieces of at most 256 vertices, which is what matching tests (§4.2.4), so a track crossing Norway's coast is an index lookup over a few small polygons rather than a test against the whole country.
 
 ```sql
 CREATE TABLE admin_countries (
-    id       SERIAL PRIMARY KEY,
-    adm0_a3  TEXT NOT NULL UNIQUE,
-    iso_a2   CHAR(2),
-    name     TEXT NOT NULL,
-    geom     GEOMETRY(MultiPolygon, 4326) NOT NULL
+    id    SERIAL PRIMARY KEY,
+    code  TEXT NOT NULL UNIQUE,
+    name  TEXT NOT NULL,
+    geom  GEOMETRY(MultiPolygon, 4326) NOT NULL
 );
 
 CREATE INDEX idx_admin_countries_geom ON admin_countries USING GIST (geom);
+
+CREATE TABLE admin_country_parts (
+    country_id INT NOT NULL REFERENCES admin_countries(id) ON DELETE CASCADE,
+    geom       GEOMETRY(Polygon, 4326) NOT NULL
+);
+
+CREATE INDEX idx_admin_country_parts_geom ON admin_country_parts USING GIST (geom);
+CREATE INDEX idx_admin_country_parts_country ON admin_country_parts (country_id);
 ```
 
 ### 3.13 `admin_regions`
 
-Natural Earth's 1:10m Admin-1 (state/province) polygons — 1:10m, not 1:50m, because Natural Earth's own 1:50m Admin-1 export only covers 9 of 242 countries (Russia, the US, India, Indonesia, China, Brazil, Canada, Australia, South Africa); the 1:10m export covers every one. Confirmed directly against the vendored data: every `admin_countries` row has at least one `admin_regions` row, even single-region sovereign states like Monaco or Vatican City, so no synthetic "whole country as one region" row is ever needed. `adm1_code` — again Natural Earth's own stable code, globally unique and already prefixed with its country's `adm0_a3` — is the seed's idempotency key; `code` holds ISO 3166-2 where Natural Earth has one and is NULL otherwise.
+Overture's land-clipped regions (its `region` subtype: states, provinces, and whatever a country's first level below the national one is), kept the same two ways: `geom` simplified for the Region tiles, the full detail in `admin_region_parts`. `overture_id` is Overture's division id, since not every region has an ISO 3166-2 code (Puerto Rico's municipalities have none); `code` holds one where it exists. A country or dependency with no region of its own (Aruba, Antarctica, a disputed area) gets one row that is the whole country, `overture_id` `country:<code>`, so the Region tier veils and reveals it too.
 
 ```sql
 CREATE TABLE admin_regions (
-    id         SERIAL PRIMARY KEY,
-    country_id INT NOT NULL REFERENCES admin_countries(id),
-    adm1_code  TEXT NOT NULL UNIQUE,
-    code       TEXT,
-    name       TEXT NOT NULL,
-    geom       GEOMETRY(MultiPolygon, 4326) NOT NULL
+    id          SERIAL PRIMARY KEY,
+    country_id  INT NOT NULL REFERENCES admin_countries(id),
+    overture_id TEXT NOT NULL UNIQUE,
+    code        TEXT,
+    name        TEXT NOT NULL,
+    geom        GEOMETRY(MultiPolygon, 4326) NOT NULL
 );
 
 CREATE INDEX idx_admin_regions_geom ON admin_regions USING GIST (geom);
 CREATE INDEX idx_admin_regions_country ON admin_regions (country_id);
+
+CREATE TABLE admin_region_parts (
+    region_id INT NOT NULL REFERENCES admin_regions(id) ON DELETE CASCADE,
+    geom      GEOMETRY(Polygon, 4326) NOT NULL
+);
+
+CREATE INDEX idx_admin_region_parts_geom ON admin_region_parts USING GIST (geom);
+CREATE INDEX idx_admin_region_parts_region ON admin_region_parts (region_id);
 ```
 
-A handful of the 1:10m export's rows (16 of 4,596, confirmed live) carry an `adm0_a3` with no matching `admin_countries` row at all — disputed micro-territories the coarser 1:50m country layer drops (Gibraltar, Bir Tawil, and similarly small cases). The seed step skips these and logs a count rather than failing the whole load; there is no `country_id` to attach them to.
+`admin_boundaries_source` is one row naming the extract the outlines were loaded from, so the seed can skip a re-run with the same one (§4.2.4).
 
 ### 3.14 `activity_country` / 3.15 `activity_region`
 
-One row per (activity, country/region) its trajectory touches — computed once by `internal/geo.MatchActivity`, called from `ingest.Process` right after the activity is persisted (§4.2.4), and backfilled once for pre-existing activities by `seed-admin-boundaries`. This is what lets the Country/Region tile queries do a cheap indexed lookup instead of the geometry test itself at request time (ADR-0008).
+One row per (activity, country/region) its trajectory touches — computed once by `internal/geo.MatchActivity`, called from `ingest.Process` right after the activity is persisted (§4.2.4), and redone for every activity by `seed-admin-boundaries` whenever it loads new outlines. This is what lets the Country/Region tile queries do a cheap indexed lookup instead of the geometry test itself at request time (ADR-0008).
 
 ```sql
 CREATE TABLE activity_country (
@@ -785,9 +800,11 @@ Below a threshold zoom, Fog and Heatmap's per-pixel raster (§4.2, §4.2.2) is r
 
 Tracks never draw in Fog or Heatmap at any zoom (FR-4.2, FR-4.3); the tiers only exist in those two modes. Fog is always all-time; Heatmap, including its Country/Region fills, only counts activities inside its rolling 365-day window, so a country whose only activity aged out shows no fill.
 
-**Boundary data**: `admin_countries`/`admin_regions` (§3.12–§3.13) hold Natural Earth's country and state/province polygons, loaded once by the `seed-admin-boundaries` subcommand (`cmd/holdmytrack`) — an idempotent, re-runnable load mirroring `seed-demo-customer`'s own shape, embedded via `go:embed` from `internal/geo/seed-data/*.geojson` rather than fetched over the network at deploy time. The vendored files are pre-simplified (Douglas-Peucker, ~800m tolerance) and coordinate-rounded from Natural Earth's raw shapefiles, since the raw 1:10m region export is ~52 MB of full-precision vertices for a layer that only ever renders below z7 — simplified, it's ~9 MB.
+**Boundary data**: `admin_countries`/`admin_regions` (§3.12–§3.13) hold Overture Maps' land-clipped countries, dependencies and regions — OpenStreetMap's borders, ADR-0034 for the choice. `scripts/boundaries-extract.sh` cuts them out of one pinned Overture release with DuckDB (`scripts/boundaries-extract.sql`), off the server, into a gzipped CSV in the column order the seed's `COPY` takes, the geometry as hex WKB: the land outline of every `country`/`dependency`/`region`, the English name where Overture has one, and no region that is the code-less second drawing of a disputed one (a region with no ISO 3166-2 code that lies more than half inside one with a code: 7 in 2026-09-23.0, Aksai Chin and Western Sahara among them). The file goes into the app bucket under `geo.BoundariesKey` by hand (`docs/DEPLOY.md` §6). `seed-admin-boundaries` (`internal/geo/seed.go`) reads it from there, or from `--file`, and in one transaction: `COPY`s it into a temporary table; refuses it if it has fewer than 250 countries or 3,500 regions, since a cut-short file would otherwise erase the rest of the world; makes each outline valid and polygonal (`ST_MakeValid`, `ST_CollectionExtract`); replaces every row — `activity_country`/`activity_region` first, then the outlines — storing each outline simplified for its tiles (`ST_Simplify`, then made valid again: 0.05°, about 5 km, for countries, drawn below z3, and 0.01°, about 1 km, for regions, drawn to z6 — each under a pixel where it's drawn; the islets this drops are smaller still, and a country it would erase whole, like Vatican City, keeps its full outline) and, in full detail, cut into `ST_Subdivide` pieces of at most 256 vertices; gives every country with no region one region that is all of it; re-matches every activity; records the file's name in `admin_boundaries_source`; and bumps every account's tile version (§4.2.6). A run whose file is the one already recorded does nothing, unless `--force`.
 
-**Matching**: `internal/geo.MatchActivity` runs once per activity, called from `ingest.Process` right after the row is persisted, and inserts into `activity_country`/`activity_region` (§3.14–§3.15) for every polygon the activity's trajectory intersects. `seed-admin-boundaries` also backfills this for every activity that predates the feature — not optional: without it, every existing account (including the Demo Customer) would show every country locked until its next upload.
+**Matching**: `internal/geo.MatchActivity` runs once per activity, called from `ingest.Process` right after the row is persisted, and inserts into `activity_country`/`activity_region` (§3.14–§3.15) the country or region of every full-detail piece the activity's trajectory intersects (`SELECT DISTINCT … FROM admin_country_parts`), never testing the simplified outlines the tiles draw. `seed-admin-boundaries` runs the same two queries over every activity at once.
+
+**What it costs**, measured on the 2026-09-23.0 extract (521 MB gzipped, 272 countries and 3,922 regions): the seed took 6 minutes on a development laptop, almost all of it in `ST_MakeValid` and `ST_Subdivide`, and re-matched 1,682 activities in under a second. The four tables hold about 660 MB: 1.4 MB and 13 MB of simplified outlines (70,000 and 708,000 vertices, against Natural Earth's 95,000 and 437,000), 114 MB and 529 MB of pieces. The reload's deleted rows take as much again until autovacuum reclaims them. The heaviest tiles draw about as fast as Natural Earth's did: the world's z0 Country Fog tile in 230 ms (110 KB), a z3 Region Fog tile over Europe in 150 ms (214 KB), everything deeper in under 25 ms. Simplifying the tiles' outlines to 200 m instead had made the z0 tile take 1.4 s.
 
 **Serving**: live vector tiles (MVT), not a precomputed raster — see ADR-0008 for the reasoning. Four endpoints, mirroring `handleTracksTile`'s live-query shape:
 
@@ -800,7 +817,7 @@ GET /tiles/v1/region-heatmap/{z}/{x}/{y}.mvt
 
 Fog's query returns the **locked** set — countries/regions with no matching `activity_country`/`activity_region` row for the current user (`superseded_by IS NULL`, not Pending — §4.2.5) — rendered as a flat fill in fog's own veil colour (`LightVeil`/`DarkVeil`'s colour and opacity for the basemap's theme, identical to the raster tier's, so nothing shifts hue crossing the zoom boundary); unlocked polygons are simply absent from the tile, same "no veil = revealed" semantic as the raster tier. Heatmap's query returns the **unlocked** set — with a matching row *and* `in_heatmap_window` true, so a country visited only long ago cools off at this tier exactly as it already does at city zoom — rendered as a flat fill in the heatmap ramp's single-visit colour (`#b3261e`) at a fixed opacity (0.55), on both clients, so nothing shifts colour crossing into city zoom: "you've been here," not graded by how much — a whole-country intensity gradient would be a second scoring dimension nobody asked for.
 
-**Why a live query is safe here despite the cost that ruled it out for Heatmap's own raster tier (§4.2.3)**: `admin_countries`/`admin_regions` have a small, fixed row count (~250 / ~4,600) that never grows with a user's activity history; each query is one indexed `EXISTS`/`NOT EXISTS` join against `activity_country`/`activity_region`, never the `ST_Intersects` geometry test itself, which only ever runs once, at ingest.
+**Why a live query is safe here despite the cost that ruled it out for Heatmap's own raster tier (§4.2.3)**: `admin_countries`/`admin_regions` have a small, fixed row count (~270 / ~3,950) that never grows with a user's activity history; each query is one indexed `EXISTS`/`NOT EXISTS` join against `activity_country`/`activity_region`, never the `ST_Intersects` geometry test itself, which only ever runs once, at ingest.
 
 **Deletion**: `ON DELETE CASCADE` on `activity_country`/`activity_region` means `handleDeleteActivity` needs no new code — a deleted activity's membership rows disappear with it, and the next tile request simply sees a different join result. There is no dirty flag, cache, or rebuild step for this tier to invalidate.
 
@@ -1232,7 +1249,7 @@ Avatar is three more endpoints, not folded into the settings PATCH, since it's a
 
 **The zero-history fallback effect uses `useActivityDays()`'s `earliest`/`ready`, not `activities.length === 0`, to detect "genuinely no history."** `activities` is scoped to `selectedRange`, which degenerates to `{today, today}` for a brand-new account regardless of whether it actually has any history at all (§4.7's own note on the same trap for the default-range effect) — `earliest` stays permanently `null` only for an account with no activities ever, which is the real signal this fallback needs.
 
-**`countryView.ts` (new)** is a hand-authored `Record<ISO 3166-1 alpha-2, ViewState>`, generated once, offline, from the same Admin-0 country polygons already seeded server-side for Fog/Heatmap's country unlocking (`admin_countries`, §3.12, §4.2.4): `ST_PointOnSurface(geom)` per `iso_a2` (not `ST_Centroid`, which can land outside a concave or archipelago shape) for the point, and a zoom derived from the polygon's own bounding-box extent so a small country lands close and a large one lands wide. A handful of countries needed a hand override rather than the derived value: every antimeridian-crossing country (Russia, the United States, Fiji, Kiribati, New Zealand, Antarctica) breaks the bbox-extent calculation outright at the ±180° seam, and three more (France, the Netherlands, Norway) bundle a far-flung overseas dependency into the same `admin_countries` polygon as the mainland — France and the Netherlands still centroid correctly onto the mainland but with a wildly oversized derived zoom, while Norway's centroid lands on Svalbard instead. Scoped to exactly the codes the Settings page's Country list (`internal/web/places_data.go`) can write into `users.country`; a handful of small territories in that list have no polygon in `admin_countries` and simply have no entry, falling through to `WORLD_VIEW` like an unset country does. `countryView(country)` mirrors `units.ts`'s `unitSystemForCountry` null-handling convention (`''` or an unmapped code both resolve to `null`).
+**`countryView.ts` (new)** is a hand-authored `Record<ISO 3166-1 alpha-2, ViewState>`, generated once, offline, from Natural Earth's Admin-0 country polygons: `ST_PointOnSurface(geom)` per ISO code (not `ST_Centroid`, which can land outside a concave or archipelago shape) for the point, and a zoom derived from the polygon's own bounding-box extent so a small country lands close and a large one lands wide. A handful of countries needed a hand override rather than the derived value: every antimeridian-crossing country (Russia, the United States, Fiji, Kiribati, New Zealand, Antarctica) breaks the bbox-extent calculation outright at the ±180° seam, and three more (France, the Netherlands, Norway) bundle a far-flung overseas dependency into the same Natural Earth polygon as the mainland — France and the Netherlands still centroid correctly onto the mainland but with a wildly oversized derived zoom, while Norway's centroid lands on Svalbard instead. Scoped to exactly the codes the Settings page's Country list (`internal/web/places_data.go`) can write into `users.country`; a handful of small territories in that list had no polygon there and simply have no entry, falling through to `WORLD_VIEW` like an unset country does. `countryView(country)` mirrors `units.ts`'s `unitSystemForCountry` null-handling convention (`''` or an unmapped code both resolve to `null`).
 
 **`WORLD_VIEW` (`config.ts`) replaced `DEFAULT_VIEW`**, a hardcoded Columbus, OH point that predated this fallback chain entirely and had no design rationale behind it beyond "roughly the centre of the [dev] extract" — it served as the no-hash opening view before fly-to-most-recent-activity existed, and remained the silent, undocumented result of every zero-history load afterward, with no fallback logic at all. `WORLD_VIEW` (`{ longitude: 10, latitude: 15, zoom: 1.3 }`) is deliberately zoomed out far enough to keep every continent in frame, and is now the one fallback used both by the resolution chain's last tier and by `MapView`'s own no-hash-at-all default.
 

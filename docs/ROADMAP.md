@@ -33,15 +33,6 @@ The phases below sit inside three milestones (`VISION.md` §5, ADR-0031):
 - [ ] Stand up the funding page (Open Collective, public ledger — `VISION.md` §6.1) before any public launch, not retrofitted after. The app side is built (`IMPLEMENTATION.md` §4.16), and the `holdmytrack` collective applied to Open Source Collective as fiscal host on 2026-09-24; what's left: once approved, set the slug — `services/server/internal/web/web.go`'s `OpenCollectiveSlug` — and replace the About page template's "donations are not open yet" line with a link to it.
 - [ ] Post concept renders to r/running, r/cycling, r/Garmin, r/Strava, r/FogOfWorld (`VISION.md` §5.1, §8.1) — validate "free, funded by its users" as credible before the public launch.
 
-### Accurate country and region borders — before the public launch
-
-Country/Region matching (`IMPLEMENTATION.md` §4.2.4) uses Natural Earth's 1:50m countries and 1:10m states/provinces, small enough to embed in the server, at the cost of borders that can be about a kilometre off. That cost lands on everyone who lives or travels near a country or region border: a walk in Niagara Falls, NY lands inside Canada and Ontario by up to 843 m, so the demo's Niagara Falls trip shows Canada although it never crossed the border. Coastlines and small countries are off too: the demo's Italy Story has a walk along the seafront at Ostia that matches no country at all, its whole track out at sea, and its Vatican City walk shows only Italy, while a drive past it shows Vatican City, whose outline sits about 1.6 km west of the real one.
-
-- [ ] Choose more accurate boundary data (geoBoundaries, or OpenStreetMap-based outlines) for countries and regions, and check its licence fits a public repository and a free service.
-- [ ] Load it without bloating the repository and server image: likely fetched at deploy time by `seed-admin-boundaries` rather than embedded (`internal/geo/geo.go`), with its seed time and database size measured.
-- [ ] Keep the Country/Region tiles fast, since they are drawn live from these polygons per request (ADR-0008): likely a simplified copy for low zooms, with the detailed one used for matching at ingest.
-- [ ] Re-match existing activities against the new boundaries, and confirm the Niagara Falls trip shows only the United States and New York, and the Italy Story's Vatican City walk and Ostia seafront walk show Vatican City and Italy.
-
 ### Merge a split activity back — server built, no control yet
 
 Splitting an activity is built on the web (`SPEC.md` FR-5.17), and so is merging its parts back on the server (`POST /v1/activities/track-merge`, `IMPLEMENTATION.md` §4.7.8). Neither client offers Merge yet, so a split can't be undone from the app.

@@ -7,7 +7,7 @@ import (
 // countryFogQuery answers "is this country still veiled" per docs/IMPLEMENTATION.md §4.2.4 —
 // the locked side (no matching activity at all) of the Fog Country tier. Deliberately a live
 // MVT query, not a precomputed raster like fog/heatmap's own city-tier tiles: admin_countries
-// has a small, fixed row count (~250), so a per-request NOT EXISTS join against
+// has a small, fixed row count (~270), so a per-request NOT EXISTS join against
 // activity_country (populated once at ingest by internal/geo.MatchActivity, never at request
 // time) costs nothing like the old live-heatmap-compositing path did, which scaled with a
 // user's own activity count instead, not a fixed polygon count.

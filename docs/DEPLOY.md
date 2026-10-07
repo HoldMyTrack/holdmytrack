@@ -85,7 +85,17 @@ This builds all four images, runs `migrate` once (api/worker wait for it to fini
 
 Container logs are bounded in `compose.prod.yml` (`x-logging`): Docker's `local` driver, compressed, at most 5 files of 10 MB per container. Docker's default `json-file` driver never rotates, so without the limit `api`, `worker` and Caddy logs would grow until the disk filled. `docker compose -f compose.prod.yml logs <service>` reads them as usual, but only back to the oldest file kept. A change to the logging settings only applies to a recreated container, which the next `up -d` does.
 
-On a new (or recreated) database, seed it once `api` is up — `migrate` creates the Demo Customer's account row but none of its activities, and nothing in `up` runs these. An **existing** database needs the same step once when a deploy first brings in a seed it has never had: a database created before the Country/Region zoom tiers shipped has no boundary rows until `seed-admin-boundaries` runs, and nothing fails loudly — the tiers just render blank:
+On a new (or recreated) database, seed it once `api` is up — `migrate` creates the Demo Customer's account row but none of its activities, and nothing in `up` runs these.
+
+The country and region outlines (ADR-0034) are a file the seed reads from the app bucket, under the key `geo.BoundariesKey` names (`boundaries/overture-<release>-boundaries.csv.gz`), so it has to be there first. It's made **off the server** by `scripts/boundaries-extract.sh`, on any machine with the [duckdb](https://duckdb.org/docs/installation) CLI (`brew install duckdb`): it reads about 4.5 GB from Overture's public bucket, takes a few minutes, and prints how many countries and regions it kept (272 and 3,922 for 2026-09-23.0). Copy the file to the server and into the bucket:
+
+```
+scripts/boundaries-extract.sh ~/boundaries
+scp ~/boundaries/overture-2026-09-23.0-boundaries.csv.gz holdmytrack:/tmp/
+docker compose -f compose.prod.yml --env-file .env.prod run --rm -v /tmp:/in:ro rclone copyto /in/overture-2026-09-23.0-boundaries.csv.gz data:boundaries/overture-2026-09-23.0-boundaries.csv.gz
+```
+
+`seed-admin-boundaries` then replaces every outline and re-matches every activity in one transaction. That takes several minutes, and activities ingested meanwhile wait on it for their country matches, so on a database with users take a backup and turn maintenance mode on first (§7, §11). Run it again whenever a deploy brings a new `geo.BoundariesKey`; with the file already loaded it does nothing, and the tiers render blank until it has run once. Delete the copy in `/tmp` afterwards. Then seed both, boundaries first:
 
 ```
 docker compose -f compose.prod.yml --env-file .env.prod run --rm api seed-admin-boundaries

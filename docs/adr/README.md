@@ -42,6 +42,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0031](0031-three-milestones-funding-decided-on-evidence.md) | Three milestones (MVP, community, social graph); the funding model is decided on Milestone 2's evidence, and data is never sold |
 | [0032](0032-accept-and-enqueue.md) | A request that brings activities only accepts them; the worker does the storage work, and unpacks archives |
 | [0033](0033-android-bottom-navigation-single-activity.md) | Android's main screens are tabs of one Activity, each a Fragment, under a bottom navigation bar |
+| [0034](0034-country-region-outlines-from-overture.md) | Country and region outlines come from Overture Maps' divisions, land-clipped, loaded from our own copy at deploy time |
 
 ## Writing a new one
 
