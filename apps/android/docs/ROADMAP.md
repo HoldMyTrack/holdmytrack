@@ -72,7 +72,7 @@ Everything between a tested app and its Play Store listing, roughly in the order
   - The content rating questionnaire (IARC), the target audience (not aimed at children), and no ads.
   - App access: reviewers need a way in. The demo account gets them onto the map, but it can't sync Health Connect or edit anything, so supply a review account's credentials and say what's in it.
 - [ ] **The store listing, in English and Russian**
-  - Name, short description (80 characters), full description (4,000), the 512 × 512 icon (`brand/make_icons.py` renders the launcher icon from the same logo), a 1024 × 500 feature graphic, and at least two phone screenshots, plus a category, a contact email, the website and the privacy policy URL.
+  - Name, short description (80 characters), full description (4,000), the 512 × 512 icon (`brand/make_icons.py` renders the launcher icon from the same logo), a 1024 × 500 feature graphic (`brand/play-feature-graphic.png`, and `-ru` for the Russian listing, rendered by the same script), and at least two phone screenshots, plus a category, a contact email, the website and the privacy policy URL.
 - [ ] **Testing tracks, then production**
   - An internal test first, to install the Play-signed build and check Google sign-in against its key. Then the closed test, with its 12 testers for 14 days on a personal account, and its pre-launch report read. Then apply for production access and release in stages.
 - [ ] **Confirm the wider launch gates are met**
