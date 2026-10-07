@@ -201,7 +201,7 @@
     <string name="settings_country_choose">Choose a country</string>
     <string name="settings_country_hint">Decides whether distance and elevation show in km/m or mi/ft, here and on the website.</string>
     <string name="settings_timezone">Timezone</string>
-    <string name="settings_timezone_hint">Decides which calendar day an activity falls on everywhere in HoldMyTrack. Set from your phone when you signed up; change it here if you\'re somewhere else now.</string>
+    <string name="settings_timezone_hint">Decides which day is today. Each activity shows the date and time where it was recorded; this zone stands in when that place isn\'t known. Set from your phone when you signed up; change it here if you\'ve moved.</string>
     <string name="settings_language">Language</string>
     <string name="settings_language_auto">Automatic (phone)</string>
     <string name="settings_language_hint">The language of the app, the website and the emails we send you. Automatic follows your phone\'s language.</string>

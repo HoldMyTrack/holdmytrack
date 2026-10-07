@@ -88,9 +88,9 @@ object Session {
      */
     val country: String get() = prefs.getString(KEY_COUNTRY, "").orEmpty()
 
-    /** The account's Timezone (an IANA name), which decides which calendar day an activity
-     *  falls on — the server's, and so the map's date range's. Empty until the first profile
-     *  that carries it. */
+    /** The account's Timezone (an IANA name), which decides which day is today and stands in
+     *  for an activity's own zone where that isn't known (`docs/IMPLEMENTATION.md` §4.30).
+     *  Empty until the first profile that carries it. */
     val timezone: String get() = prefs.getString(KEY_TIMEZONE, "").orEmpty()
 
     /** The account's Language, empty for automatic — see `AppLanguage`. */
