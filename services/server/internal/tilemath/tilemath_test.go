@@ -1,6 +1,7 @@
 package tilemath
 
 import (
+	"math"
 	"testing"
 )
 
@@ -115,5 +116,33 @@ func TestSegmentTilesBufferedFarFromEdgeNoNeighbors(t *testing.T) {
 	want := map[[2]int]bool{{100, 100}: true}
 	if len(got) != len(want) || !got[[2]int{100, 100}] {
 		t.Fatalf("mid-tile segment pulled in unexpected neighbors: got %v", got)
+	}
+}
+
+// TestSegmentTilesLongSlantedSegmentMissesNone: every tile a long segment passes through is
+// listed, checked by sampling the segment every pixel. The first is a real Google Maps Timeline
+// leg, 14 km across Cleveland, some of whose tiles a Bresenham walk between its endpoints'
+// tile indices skipped, leaving the drive cleared in pieces.
+func TestSegmentTilesLongSlantedSegmentMissesNone(t *testing.T) {
+	const zoom = 14
+	const tileSize = 512.0
+	segments := [][4]float64{
+		{-81.74419, 41.39501, -81.88719, 41.46337},
+		{-81.88719, 41.46337, -81.74419, 41.39501},
+		{-81.80, 41.30, -81.79, 41.55},
+		{-81.95, 41.42, -81.60, 41.43},
+	}
+	for _, s := range segments {
+		got := tileSet(SegmentTiles(s[0], s[1], s[2], s[3], zoom))
+		x1, y1 := WorldPixel(s[0], s[1], zoom, tileSize)
+		x2, y2 := WorldPixel(s[2], s[3], zoom, tileSize)
+		steps := int(math.Hypot(x2-x1, y2-y1))
+		for i := 0; i <= steps; i++ {
+			f := float64(i) / float64(steps)
+			tile := [2]int{int(math.Floor((x1 + (x2-x1)*f) / tileSize)), int(math.Floor((y1 + (y2-y1)*f) / tileSize))}
+			if !got[tile] {
+				t.Fatalf("segment %v passes through tile %v, not listed in %v", s, tile, got)
+			}
+		}
 	}
 }
