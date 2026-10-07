@@ -15,7 +15,7 @@ This document specifies HoldMyTrack's functional behavior as currently implement
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web and in the Android app, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Google Maps Timeline import — FR-3.10, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, pace-colored segments, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), splitting an activity in two (FR-5.17), Private locations (FR-8.1), the date slider, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help, Contacts and Privacy policy pages (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), the interface language — English or Russian (FR-13), Stories on the web and in the Android app (FR-14), Spots' places on the web and in the Android app (FR-15), and photos on an activity, on the web (FR-16).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web and in the Android app, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Google Maps Timeline import — FR-3.10, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), cross-source duplicate detection (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, pace-colored segments, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), splitting an activity in two (FR-5.17), Private locations (FR-8.1), the date slider, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help, Contacts and Privacy policy pages and the Android test suite page (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), the interface language — English or Russian (FR-13), Stories on the web and in the Android app (FR-14), Spots' places on the web and in the Android app (FR-15), and photos on an activity, on the web (FR-16).
 
 **Out of scope**: anything not yet built (`docs/ROADMAP.md` tracks it), and what `VISION.md` §1.1 rules out — performance analysis and any health data (ADR-0017); §20 lists the deliberate limits. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
@@ -1030,7 +1030,7 @@ Hovering a day shows its date, activity count and distance. The page needs a ses
 
 **Notes**: "Moving time" falls back to elapsed time for any activity without a moving-time figure of its own, so this bucket-level total uses whichever one each activity actually has, rather than a bucket going silently short. Best-effort curves and personal bests are deliberately out of scope (§1.2, §20).
 
-## 12. FR-10 — Public pages: About, Help, Contacts, export guides, privacy policy
+## 12. FR-10 — Public pages: About, Help, Contacts, export guides, privacy policy, Android test suite
 
 These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HTML page that needs no JavaScript and makes no API calls from the browser, with the page header every page shares (FR-10.4).
 
@@ -1110,6 +1110,18 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 7. It lists the cookies (`holdmytrack_session`, 30 days or 24 hours for the demo, and `hmt_lang`) and the `hmt_theme` local-storage key, and why there is no cookie banner.
 8. Retention: an account until it's deleted; deleting an activity deletes its route, file and photos; sign-ins last 30 days; a requested download of the account's data, 7 days (FR-1.12); logs are rotated on the server and kept 14 days with Grafana Labs; deleted data stays in backups for up to 8 weeks (ADR-0029).
 9. Rights: a copy of the data (the original files included), correction, a copy of the data — in Settings (FR-1.12) — deletion — in Settings (FR-1.11, pointing to Help's `#delete-account`, FR-10.2), or by email for someone who can't sign in — and objection, answered within a month, and a complaint to a data protection authority. The service isn't meant for children under 16.
+
+### FR-10.7 Android test suite
+
+**Description**: A public page at `/testing` for the Android app's closed testers (`apps/android/docs/ROADMAP.md`): step-by-step tests of everything the app does, each with an ID, its steps and the expected result, and the sample files to use. It is English only.
+
+**Preconditions**: None.
+
+**Behavior**:
+1. `GET /testing` returns the page. It is marked `noindex`, carries no canonical link, isn't in `/sitemap.xml`, and nothing on the site or in the app links to it; testers get its URL with their invitation.
+2. Setup comes first: install the app, create an account, set it up (FR-1.7), and import `holdmytrack-sample.zip` — 20 of the Demo Customer's activities, in Vietnam, Estonia, Italy and Cleveland (FR-2.1). The tests after it assume that account: uploads and imports (FR-3, including each failure reason and the duplicate cases), the map's modes and layers (FR-4), the date slider, the Activities panel, editing and splitting (FR-5), Private locations (FR-8.1), Stories (FR-14), photos (FR-16), points of interest (FR-15), and the Android-only Health Connect sync, recording, You tab and Settings, account and demo screens (`apps/android/docs/SPEC.md`). It ends with how to report a problem, by email to the Contacts address (FR-10.3).
+3. Its expected results quote the app's own text, so a change to what the Android app shows or says, or to a server message it shows, is a change to this page too.
+4. Each sample file is a link under `/static/testing/` that downloads under its own name: single GPX, TCX and FIT activities, a TCX duplicating one of the zip's activities, a file for each import failure (unreadable, no timestamps, no GPS points, one point, empty, an unsupported type), a zip with a bad entry and a non-activity file, a Google Health Takeout export, a Google Maps Timeline export, and photos whose capture time places them on one of the activities, or on none.
 
 ## 13. FR-11 — Donations
 

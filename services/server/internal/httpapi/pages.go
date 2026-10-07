@@ -21,11 +21,21 @@ import (
 // canonicalPath is for a page that shares its content with another URL (About with `/`).
 // titleKey and descriptionKey are catalog keys.
 func (s *Server) staticPage(page, titleKey, descriptionKey, canonicalPath string) http.HandlerFunc {
+	return s.publicPage(page, titleKey, descriptionKey, canonicalPath, false)
+}
+
+// unlistedPage is staticPage for a page meant only for whoever is given its link — the
+// Android test suite (`/testing`, SPEC.md FR-10.7): marked noindex, and in no sitemap or menu.
+func (s *Server) unlistedPage(page, titleKey, descriptionKey string) http.HandlerFunc {
+	return s.publicPage(page, titleKey, descriptionKey, "", true)
+}
+
+func (s *Server) publicPage(page, titleKey, descriptionKey, canonicalPath string, noIndex bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		acct := s.pageAccount(r)
 		lang := pageLang(acct, r)
 		l := i18n.Get(lang)
-		data := web.PageData{Title: l.T(titleKey), Description: l.T(descriptionKey), Path: r.URL.Path, CanonicalPath: canonicalPath, Lang: lang}
+		data := web.PageData{Title: l.T(titleKey), Description: l.T(descriptionKey), Path: r.URL.Path, CanonicalPath: canonicalPath, NoIndex: noIndex, Lang: lang}
 		if acct != nil {
 			data.User = acct.user
 		}
