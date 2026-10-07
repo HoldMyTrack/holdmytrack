@@ -53,8 +53,8 @@ type pixelPoint struct{ x, y float64 }
 // *unblurred*: this is the per-activity artifact stored in activity_tile_masks and shared by
 // both fog and heatmap compositing (compositeFogMask, compositeHeatmapMask below), each of
 // which applies feathering at its own appropriate point in its own compositing order rather
-// than baking it in here.
-func renderActivityMask(pts []pixelPoint) *image.Gray {
+// than baking it in here. Each of lines is the track in one copy of the world (projectToTile).
+func renderActivityMask(lines ...[]pixelPoint) *image.Gray {
 	dc := gg.NewContext(TileSize, TileSize)
 	dc.SetRGBA(0, 0, 0, 1) // nothing here yet: opaque black = coverage 0
 	dc.Clear()
@@ -63,21 +63,23 @@ func renderActivityMask(pts []pixelPoint) *image.Gray {
 	dc.SetLineWidth(strokeRadiusPx * 2)
 	dc.SetRGBA(1, 1, 1, 1) // revealed: opaque white = coverage 255
 
-	switch len(pts) {
-	case 0:
-		// nothing to draw; fall through to the blank canvas
-	case 1:
-		// An isolated point (a one-point activity, or a segment that only touches this
-		// tile at a single vertex) still deserves a dot of reveal, not nothing.
-		dc.DrawCircle(pts[0].x, pts[0].y, strokeRadiusPx)
-		dc.Fill()
-	default:
-		dc.NewSubPath()
-		dc.MoveTo(pts[0].x, pts[0].y)
-		for _, p := range pts[1:] {
-			dc.LineTo(p.x, p.y)
+	for _, pts := range lines {
+		switch len(pts) {
+		case 0:
+			// nothing to draw; fall through to the blank canvas
+		case 1:
+			// An isolated point (a one-point activity, or a segment that only touches this
+			// tile at a single vertex) still deserves a dot of reveal, not nothing.
+			dc.DrawCircle(pts[0].x, pts[0].y, strokeRadiusPx)
+			dc.Fill()
+		default:
+			dc.NewSubPath()
+			dc.MoveTo(pts[0].x, pts[0].y)
+			for _, p := range pts[1:] {
+				dc.LineTo(p.x, p.y)
+			}
+			dc.Stroke()
 		}
-		dc.Stroke()
 	}
 
 	gray := image.NewGray(image.Rect(0, 0, TileSize, TileSize))

@@ -53,8 +53,10 @@ func (e TrackEdit) Validate() error {
 			return errors.New("remove range starts after it ends")
 		}
 	}
+	// A longitude past ±180 is a point on the track's own side of the antimeridian, as the
+	// stored track has it (unwrapLons): one world copy either way.
 	for _, c := range e.Move {
-		if !(c[0] >= -180 && c[0] <= 180 && c[1] >= -90 && c[1] <= 90) {
+		if !(c[0] >= -540 && c[0] <= 540 && c[1] >= -90 && c[1] <= 90) {
 			return errors.New("moved point is off the map")
 		}
 	}
@@ -94,7 +96,8 @@ func (e TrackEdit) Apply(points []parse.Point) []parse.Point {
 		}
 		out = append(out, p)
 	}
-	return out
+	// A moved point comes in whichever world copy it was dropped on.
+	return unwrapLons(out)
 }
 
 // ApplyClipped applies the edit to points already clipped against zones, then clips the

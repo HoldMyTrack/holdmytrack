@@ -38,6 +38,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import dev.holdmytrack.android.map.ActivityDays
+import dev.holdmytrack.android.map.BoxUnion
 import dev.holdmytrack.android.map.CaptureMode
 import dev.holdmytrack.android.map.CoverageWatch
 import dev.holdmytrack.android.map.EditPreview
@@ -1496,16 +1497,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
     /** Frames every one of [activities] that has a track — nothing, for none. */
     private fun flyToActivities(activities: List<Activity>) {
-        val boxes = activities.mapNotNull { it.bbox }
-        if (boxes.isEmpty()) return
-        flyTo(
-            doubleArrayOf(
-                boxes.minOf { it[0] },
-                boxes.minOf { it[1] },
-                boxes.maxOf { it[2] },
-                boxes.maxOf { it[3] },
-            ),
-        )
+        flyTo(BoxUnion.of(activities.mapNotNull { it.bbox }) ?: return)
     }
 
     /**
@@ -2035,7 +2027,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * Flies the camera to fit [box] (`[minLon, minLat, maxLon, maxLat]`). The zoom is capped
+     * Flies the camera to fit [box] (`[west, south, east, north]`, east past 180 for one across
+     * the antimeridian, which `LatLngBounds.from` takes as it is). The zoom is capped
      * because a single short activity — or one clipped to almost nothing by a Private location —
      * has a near-zero extent, and fitting the camera to that box lands well past the basemap's
      * z14 data, on a grey rectangle.

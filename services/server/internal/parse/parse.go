@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"path/filepath"
 	"strings"
 	"time"
@@ -104,4 +105,14 @@ func ParseJSON(r io.Reader) (Activity, error) {
 		activityType = "unknown"
 	}
 	return Activity{ActivityType: activityType, Points: points, Name: a.Name, Description: a.Description}, nil
+}
+
+// WrapLon brings a longitude into −180…180 (180 itself stays 180): a point of a track stored
+// continuing past ±180 across the antimeridian, put back on the world for a file that expects
+// it there.
+func WrapLon(lon float64) float64 {
+	if lon >= -180 && lon <= 180 {
+		return lon
+	}
+	return lon - 360*math.Floor((lon+180)/360)
 }

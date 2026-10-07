@@ -585,6 +585,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 4. Clicking anywhere on the map that is not a track clears the row-click focus, if any — the focused activity loses its focus treatment and returns to Normal. Clicking empty space in the Activities panel's list does the same (FR-5.5). Neither affects the checkbox group.
 5. Tracks are drawn from zoom 4 — a few states on screen — inward. Zoomed out further, Normal mode shows the base map alone; unlike Fog and Heatmap, it has no country/region fallback (FR-4.2, FR-4.3). Fitting the camera to an activity (FR-5.5, FR-5.7) lands at zoom 4 or closer for anything spanning up to about 60° of longitude at desktop width — a US coast-to-coast drive included — and about 25° on a phone; a wider activity is flown to but isn't drawn until the user zooms in.
 6. Every track is always in one of three states — Normal, Hovered, or Focused — each drawn distinctly (*Track states*, below). Checking a row's checkbox (FR-5.6) is not a track state: a checked track draws in whichever of these it's otherwise in, and its row shows only the ticked checkbox.
+7. A track across the 180° meridian (Fiji, Tonga, the western Aleutians, a Pacific crossing) is drawn the short way across it, and clears Fog of War and counts in Heatmap on both sides of it, as any other track does; the countries and regions it passes through are the ones either side.
 
 **Track states**:
 
@@ -1365,12 +1366,12 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 4. A badge from it opens the same popup (FR-15.3). From zoom 13 up the tiles' badges take over and these aren't drawn.
 5. If the request fails, the button reads "Couldn't load places — try again".
 
-**Inputs** (`GET /v1/spots`): `bbox` — `west,south,east,north` in degrees, west below east and south below north (clamped to the world); `categories` — one or more of `playground`, `dog_park`, `monument`, `viewpoint`, `history`, comma-separated.
+**Inputs** (`GET /v1/spots`): `bbox` — `west,south,east,north` in degrees, south below north (clamped to the world). A view across the antimeridian is taken either way round: east past 180 (`170,…,190,…`) or west past east (`170,…,−170,…`), both the places from 170° to 180° and from −180° to −170°; `categories` — one or more of `playground`, `dog_park`, `monument`, `viewpoint`, `history`, comma-separated.
 
 **Outputs**: `{spots, total}`: `spots`, up to 2,000 places whose anchor is inside the box — a retired one (FR-15.1) only for an account that captured it — each with `id`, `category`, `lon`, `lat` and the text fields of FR-15.4's `spots` layer (absent when none); `total`, how many of those the box holds in those categories.
 
 **Error cases**:
-- A missing or malformed `bbox`, a box with west at or past east (the antimeridian), or a missing or unknown category → `400`.
+- A missing or malformed `bbox`, a box with no width or south at or past north, or a missing or unknown category → `400`.
 - No session → `401`.
 
 ### FR-15.4 The tiles

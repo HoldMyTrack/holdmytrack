@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/geo"
 )
 
 // tracksQuery is IMPLEMENTATION.md §4.3 verbatim, with three changes: user_id
@@ -12,21 +14,29 @@ import (
 // requiring the caller to pass an explicit wide-open range, and a Pending activity
 // (edit_pending, §4.7.7) is left out — its trajectory is the pre-reprocess one, and it comes
 // back once the reprocess lands.
+//
+// A track across the antimeridian is stored continuing past ±180 (§4.1). It's drawn wrapped
+// back into −180…180 (geo.WrappedSQL: a part each side of the antimeridian), since PROJ itself
+// wraps a longitude past 180 when projecting and would join the parts the long way round the
+// world again; only such a track pays for the wrap. It matches a tile on the far side of the
+// antimeridian through the tile moved a world's width, which keeps each test an index lookup.
 var tracksQuery = `
 SELECT ST_AsMVT(t, 'tracks', 4096, 'geom')
 FROM (
     SELECT id,
            activity_type,
            ST_AsMVTGeom(
-               ST_Transform(ST_Force2D(trajectory), 3857),
+               ST_Transform(ST_Force2D(
+                   CASE WHEN ST_XMin(trajectory) < -180 OR ST_XMax(trajectory) > 180
+                        THEN ` + geo.WrappedSQL("trajectory") + ` ELSE trajectory END), 3857),
                ST_TileEnvelope($1, $2, $3),
                4096, 64, true
            ) AS geom
-    FROM activities
+    FROM activities, ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) AS env
     WHERE user_id = $4
       AND superseded_by IS NULL
       AND NOT edit_pending
-      AND trajectory && ST_Transform(ST_TileEnvelope($1, $2, $3), 4326)
+      AND (trajectory && env OR trajectory && ST_Translate(env, 360, 0) OR trajectory && ST_Translate(env, -360, 0))
       AND ` + inDateRange("$5", "$6") + `
       AND ($7::text[] IS NULL OR activity_type = ANY($7))
       AND ($8::uuid IS NULL OR activities.id IN (SELECT activity_id FROM story_activities WHERE story_id = $8))
