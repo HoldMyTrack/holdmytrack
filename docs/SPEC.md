@@ -185,7 +185,7 @@ The JSON endpoints in this section are refused (`403`) the same way when a brows
 1. Avatar uploads and removals take effect immediately — each is its own action (`POST /settings/avatar`, `POST /settings/avatar/remove`; for an API client, `POST`/`DELETE /v1/account/avatar`), not gated behind a separate save step; choosing a file uploads it. The page, header included, shows the new avatar when it reloads after the upload.
 2. Name, Country and Timezone save together as one action (`POST /settings`, which leaves the account's language as it is; for an API client, `PATCH /v1/account/settings`, which also takes Language as `locale`, optional and left unchanged when absent) — editing one and leaving without saving discards all of them, not just the one touched. A successful save reloads the page with "Saved."; a failed one shows the error with the submitted values kept.
 3. **Country decides which unit system the entire app displays distance, pace, and elevation in** — metric (km, min/km, meters) for every country except the United States, Liberia, and Myanmar, which see imperial (mi, min/mi, feet). An account that has never saved a Country (only possible before its first save — behavior 6) displays metric. It applies everywhere one of these values is shown (the Activities panel, the activity graph, Trends, the per-activity pace/elevation profile, and the map's own distance scale) from the next time that page is opened after saving — Settings is a page of its own, so leaving it is a page load. Save can't be submitted until a Country is chosen.
-4. **Timezone decides which calendar day an activity is grouped under everywhere the app buckets by day** — the date slider's days (FR-6), the activity graph's daily grid and stat cards, `GET /v1/activities/trends`, and date-range filtering. Auto-resolved from the browser at signup (FR-1.1) and editable here afterward; unlike Country, it has no "unset" state — every account always has one, defaulting to UTC until changed.
+4. **Timezone decides what "today" is** — where the date slider's and Trends' default windows end, and the activity graph's current year — and **stands in for an activity's own timezone where that isn't known** (FR-3.11). Every activity is otherwise shown and grouped by day in the timezone it was recorded in, not this one. Auto-resolved from the browser at signup (FR-1.1) and editable here afterward; unlike Country, it has no "unset" state — every account always has one, defaulting to UTC until changed.
 5. **First run.** A real, verified account with no Country — one that has never saved this page, which is every new account right after FR-1.8's verification link — is sent here from the map and Profile (and from sign-in), titled "Welcome — set up your account", with a short explanation of why Country and Timezone matter. There is no way past it: no back link, and the header's links to the map and Profile lead back here. Timezone is prefilled with the one auto-detected at signup, to confirm or change; Country starts on "Choose a country". "Save and continue" can't be submitted until a Country is chosen; saving goes on to the map, and every later visit goes directly to the map. Reloading before saving shows this page again. A demo account never sees it.
 6. **A demo account** sees the page with every field and button disabled and a note that the shared demo account can't be changed, linking to "Create your own account" (FR-2.3); a save or avatar change submitted anyway is refused (`403`).
 7. **A native client** reads the lists this page offers from `GET /v1/account/settings/options` — every Country (code and name in the request's language), every Timezone grouped by region (with the region's name in that language, and the account's own zone always included), and every Language — and saves through the API endpoints above. The Android app's Settings screen is built on it (`apps/android/docs/SPEC.md` FR-1.5).
@@ -554,6 +554,20 @@ All upload functionality requires an active session (demo or registered — FR-1
 8. Each activity is ingested as FR-3.1 describes, attributed to the Google Maps Timeline source, its type taken from Timeline's mode. Its route is the points Timeline kept for that trip, minutes apart in a car, and is drawn and clears Fog of War as given. The trip's own start and end places are its first and last points, unless one is more than 1.5 km from the route point beside it and would take more than 200 km/h to reach (a start a few kilometres from the route and seconds before it), in which case it's left out. A trip that duplicates a recording of the same time from another source is resolved as FR-3.7 describes, and the recording is kept.
 
 **Outputs**: One new `Activity` per selected trip not imported before.
+
+### FR-3.11 An activity's own timezone
+
+**Description**: Every activity carries the timezone it was recorded in, and its times and dates are the wall clock where it happened: a run at 07:30 on 10 March in Tokyo is "Mar 10, 07:30", on the 10th, whatever the account's timezone (FR-1.7) or the viewer's browser or phone.
+
+**Preconditions**: An activity is ingested (FR-3.1–FR-3.10), or reprocessed (FR-5.14, FR-5.17, FR-8.1).
+
+**Behavior**:
+1. The timezone is the one the activity's first recorded point lies in, before Private locations (FR-8.1) clip the track, so an activity they hide entirely still has one. A point at sea has the nautical zone it lies in. A piece of a split activity (FR-5.17) takes the zone its own first point lies in.
+2. Where no zone is known for that point, the activity takes the account's timezone at the time it's ingested.
+3. Every day an activity is counted on is its local date in that zone: the date slider's days (FR-6), date-range filtering of the Activities panel, its totals and the tracks drawn, the activity graph's grid and stat cards (FR-7), and Trends (FR-9). Two activities started at the same instant on opposite sides of the world can fall on different days.
+4. The offset is the one in force on the activity's date: a zone that has changed its offset or its summer time since shows an older activity at the offset it had then.
+
+**Outputs**: The activity's `timezone` (an IANA name, e.g. `Asia/Tokyo`).
 
 ## 6. FR-4 — Map Visualization
 
@@ -943,7 +957,7 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 
 The date range is picked with a two-knob slider at the top of the Activities tab (FR-5), above the Type and Distance filters, in one row with two pairs of buttons either side, « ‹ track › »: the outer pair is Earlier/Later (FR-6.4), the inner pair shifts the range (FR-6.7). The selected start and end dates sit under the track. It exists on that tab alone: the Stories and Privacy tabs (FR-14.6, FR-8.1) are not filtered by a date range, and neither are Fog of War and Heatmap (FR-4.2, FR-4.3). Switching to another tab and back keeps the range as it was. On a phone it sits at the bottom of the screen instead (§19 item 2).
 
-The slider counts only days with at least one activity; days without one take no room on the track. The track shows a window of 15 activity days, which on load is the 15 most recent. Every day boundary on the track has a tick: a taller one where the month changes, and a doubled one where the two neighbouring activity days aren't consecutive calendar days. Ticks inside the selection are in the accent colour. A selection is applied when a knob or a held button is released, not while it moves.
+The slider counts only days with at least one activity, each activity on its local date where it was recorded (FR-3.11); days without one take no room on the track. The track shows a window of 15 activity days, which on load is the 15 most recent. Every day boundary on the track has a tick: a taller one where the month changes, and a doubled one where the two neighbouring activity days aren't consecutive calendar days. Ticks inside the selection are in the accent colour. A selection is applied when a knob or a held button is released, not while it moves.
 
 ### FR-6.1 Default selection
 
@@ -969,7 +983,7 @@ The slider counts only days with at least one activity; days without one take no
 
 ### FR-7.1 Contribution grid
 
-**Description**: A private, per-account page at `/profile` (reached from the header's account menu) showing a GitHub-style daily contribution grid — one cell per calendar day, one block per calendar year (most recent first, back to the account's first-ever activity).
+**Description**: A private, per-account page at `/profile` (reached from the header's account menu) showing a GitHub-style daily contribution grid — one cell per calendar day, each activity on its local date where it was recorded (FR-3.11), one block per calendar year (most recent first, back to the account's first-ever activity).
 
 **Behavior**: Each day's cell is shaded by intensity, toggle-able between two measures (the "Shade by" switch — `/profile?shade=distance` for Distance, the plain `/profile` for Count):
 - **Count**: number of activities that day (empty / one / two / three-or-more).
@@ -1022,7 +1036,7 @@ Hovering a day shows its date, activity count and distance. The page needs a ses
 **Inputs**: `bucket` — `week` or `month`; `from`/`to` (`YYYY-MM-DD`, both optional, default to the trailing 12 months).
 
 **Behavior**:
-1. Every activity in the window is grouped into the requested bucket by its `started_at` date, in the account's own timezone (FR-1.7), one bucket per calendar week or month that has at least one activity — buckets with nothing recorded are omitted rather than returned as zeroes, the same convention the date slider's days (FR-6) use.
+1. Every activity in the window is grouped into the requested bucket by its `started_at` date, in the timezone it was recorded in (FR-3.11), one bucket per calendar week or month that has at least one activity — buckets with nothing recorded are omitted rather than returned as zeroes, the same convention the date slider's days (FR-6) use.
 2. Each bucket reports: activity count, total distance, total moving time, and total elevation gain.
 3. The Profile page renders the trailing 12 months as one bar per bucket, height scaled (logarithmically) to the window's busiest bucket by distance, with a Week/Month switch (`?bucket=month`; the Distance/Count grid setting is kept). Hovering a bar shows that bucket's full breakdown (distance, activity count, moving time, elevation gain); tapping or clicking one shows it in a line under the chart, and tapping it again hides it.
 

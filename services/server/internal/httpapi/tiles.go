@@ -12,7 +12,7 @@ import (
 // requiring the caller to pass an explicit wide-open range, and a Pending activity
 // (edit_pending, §4.7.7) is left out — its trajectory is the pre-reprocess one, and it comes
 // back once the reprocess lands.
-const tracksQuery = `
+var tracksQuery = `
 SELECT ST_AsMVT(t, 'tracks', 4096, 'geom')
 FROM (
     SELECT id,
@@ -27,8 +27,7 @@ FROM (
       AND superseded_by IS NULL
       AND NOT edit_pending
       AND trajectory && ST_Transform(ST_TileEnvelope($1, $2, $3), 4326)
-      AND ($5::timestamptz IS NULL OR started_at >= $5)
-      AND ($6::timestamptz IS NULL OR started_at <= $6)
+      AND ` + inDateRange("$5", "$6") + `
       AND ($7::text[] IS NULL OR activity_type = ANY($7))
       AND ($8::uuid IS NULL OR activities.id IN (SELECT activity_id FROM story_activities WHERE story_id = $8))
 ) t;`
@@ -71,7 +70,7 @@ func (s *Server) handleTracksTile(w http.ResponseWriter, r *http.Request) {
 
 	// The same from/to/types/story shape §4.7's listing endpoints parse — one parser, so the
 	// "absent means no restriction" convention can't drift between the map and the list.
-	filter, err := parseActivityFilter(r.URL.Query(), locationFromContext(r.Context()))
+	filter, err := parseActivityFilter(r.URL.Query())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

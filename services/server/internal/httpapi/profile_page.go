@@ -116,18 +116,18 @@ func (s *Server) buildProfile(ctx context.Context, l *i18n.Localizer, acct *page
 	if err != nil {
 		return profileView{}, err
 	}
-	if earliest != nil && earliest.In(loc).Year() < currentYear {
-		firstYear = earliest.In(loc).Year()
+	if earliest != nil && earliest.Year() < currentYear {
+		firstYear = earliest.Year()
 	}
 	days, err := s.dailyTotals(ctx, userID,
 		time.Date(firstYear, time.January, 1, 0, 0, 0, 0, loc),
-		time.Date(currentYear+1, time.January, 1, 0, 0, 0, 0, loc), tz, nil)
+		time.Date(currentYear+1, time.January, 1, 0, 0, 0, 0, loc), nil)
 	if err != nil {
 		return profileView{}, err
 	}
 
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
-	periods, err := s.activityTrends(ctx, userID, bucket, today.AddDate(0, -histogramWindowMonths, 0), today.AddDate(0, 0, 1), tz)
+	periods, err := s.activityTrends(ctx, userID, bucket, today.AddDate(0, -histogramWindowMonths, 0), today.AddDate(0, 0, 1))
 	if err != nil {
 		return profileView{}, err
 	}
