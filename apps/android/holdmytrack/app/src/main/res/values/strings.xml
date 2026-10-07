@@ -11,7 +11,7 @@
     <string name="create_account">Create account</string>
     <string name="try_demo">Try the demo</string>
     <string name="sign_in_title">Sign in to HoldMyTrack</string>
-    <string name="sign_in_intro">Sign in to see your tracks, fog of war and heatmap on the map. The demo account needs no signup and is deleted after a day.</string>
+    <string name="sign_in_intro">Sign in to see your tracks, fog of war and heatmap on the map. The demo needs no signup: a shared, ready-made account you can look around but not change.</string>
     <string name="sign_up_title">Create your account</string>
     <string name="forgot_password">Forgot password?</string>
     <string name="to_sign_up">Don\'t have an account? Create one</string>
