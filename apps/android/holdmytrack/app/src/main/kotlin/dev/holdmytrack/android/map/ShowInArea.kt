@@ -69,8 +69,9 @@ class ShowInArea(private val view: TextView, private val map: MapLibreMap, priva
         loading = true
         failed = false
         render()
+        val (west, east) = BoxUnion.viewEdges(bounds.longitudeWest, bounds.longitudeEast)
         HoldMyTrackApi.spotsInArea(
-            bounds.longitudeWest, bounds.latitudeSouth, bounds.longitudeEast, bounds.latitudeNorth,
+            west, bounds.latitudeSouth, east, bounds.latitudeNorth,
             wanted.map { it.wire },
         ) { result ->
             if (id != request) return@spotsInArea

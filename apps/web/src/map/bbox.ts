@@ -28,13 +28,30 @@ const FLY_FILL = 0.75;
 /** Long enough to read as a flight rather than a cut, short enough not to feel slow. */
 const FLY_DURATION_MS = 900;
 
-/** The smallest box containing all of them, or null if there were none. */
+/**
+ * The smallest box containing all of them, or null if there were none. Longitude goes the
+ * shorter way round, as each activity's own bbox does (IMPLEMENTATION.md §4.7): New Zealand
+ * and Hawaii make a box across the Pacific, east past 180, not one across every other
+ * longitude. The box starts at some box's west edge, so each is tried as the start, every box
+ * moved to begin at or after it; the narrowest wins. A group's few hundred boxes at most keep
+ * that quadratic search cheap.
+ */
 export function unionBBox(boxes: readonly BBox[]): BBox | null {
   if (boxes.length === 0) return null;
-  return boxes.reduce<BBox>(
-    (acc, b) => [Math.min(acc[0], b[0]), Math.min(acc[1], b[1]), Math.max(acc[2], b[2]), Math.max(acc[3], b[3])],
-    [...boxes[0]!] as BBox,
-  );
+  const south = Math.min(...boxes.map((b) => b[1]));
+  const north = Math.max(...boxes.map((b) => b[3]));
+  // Each box's west within −180…180, its width kept: east may pass 180.
+  const arcs = boxes.map((b) => {
+    const shift = 360 * Math.floor((b[0] + 180) / 360);
+    return [b[0] - shift, b[2] - shift] as const;
+  });
+  let best: [number, number] = [-180, 180];
+  for (const [start] of arcs) {
+    let end = start;
+    for (const [west, east] of arcs) end = Math.max(end, west < start ? east + 360 : east);
+    if (end - start < best[1] - best[0]) best = [start, end];
+  }
+  return [best[0], south, best[1], north];
 }
 
 export function flyToBBox(map: MapLibreMap, bbox: BBox): void {

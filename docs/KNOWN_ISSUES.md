@@ -34,9 +34,10 @@ FR-9 behavior 3 says the Profile page renders the trailing 12 months as one bar 
 
 - [ ] Decode at the target size (`createImageBitmap`'s `resizeWidth`/`resizeHeight`, which need the oriented dimensions first), and check that an EXIF-rotated portrait still comes out upright and undistorted in Chrome, Firefox and Safari.
 
-### Flying to an activity across the 180° meridian zooms out to the whole world
+### A track across the 180° meridian is drawn around the world, and its import never finishes
 
-An activity's `bbox` (`GET /v1/activities`, §4.7) is its points' minimum and maximum longitude, so a track with points at 179.9 and −179.9 (Fiji, Tonga, Samoa, Chukotka, the western Aleutians, a Pacific crossing) gets −179.9…179.9, nearly the whole globe. `flyToBBox` (`apps/web/src/map/bbox.ts`) fits that at about zoom 1, below the tracks' zoom-4 minimum, and the map arrives empty; the Android app does the same. `unionBBox` does the same for a checked group on either side of the meridian (New Zealand and Hawaii), spanning the long way round. Found in the frontend audit; not reproduced against real data.
+Longitude is a plain −180…180 range in the stored trajectory and everything drawn from it, so two points either side of the antimeridian (179.95 and −179.98, near Taveuni in Fiji) are joined by a segment running the long way round the world. The tracks tile draws it as a line off both edges of the map. Ingest's mask rendering walks that segment too: a four-point GPX crossing near Taveuni kept the worker at 100% CPU for over a minute with no masks written and its job still pending, and the worker had to be killed, since it didn't stop on SIGTERM. Reproduced on a local stack. Fiji, Tonga, Samoa, Chukotka, the western Aleutians and Pacific crossings all hit it.
 
-- [ ] Give a track the shorter way round its own `bbox`, with east past 180 where it crosses, and fit groups along the shortest arc that covers them, on the web and Android.
-- [ ] Check against a track that crosses the meridian.
+- [ ] Split a track into parts at the antimeridian at ingest, wherever a step between two points is over 180° of longitude: in the stored trajectory (a `MultiLineStringM`, or the line shifted past 180 and drawn twice), and in the points the masks, touched tiles and Country/Region matching are worked out from.
+- [ ] Check that distances and durations, which already measure the step the short way, stay as they are.
+- [ ] Check a crossing track's import, tiles, Fog and Heatmap on a local stack.

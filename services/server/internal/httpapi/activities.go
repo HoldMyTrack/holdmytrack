@@ -64,6 +64,21 @@ func parseActivityFilter(q url.Values) (activityFilter, error) {
 	return f, nil
 }
 
+// activityBBoxColumns is an activity's bbox as four columns, west, south, east, north, the
+// shorter way round in longitude: a track across the antimeridian (points at 179.9 and −179.9)
+// is 179.9…180.1 rather than −179.9…179.9, read off ST_ShiftLongitude's copy, which moves the
+// western hemisphere's points past 180. East is past 180 then, the form MapLibre fits as it
+// is. The shifted copy is only made for a box over 180° wide, which no other track has.
+var activityBBoxColumns = shorterWay("ST_XMin") + `, ST_YMin(trajectory), ` + shorterWay("ST_XMax") + `, ST_YMax(trajectory)`
+
+func shorterWay(edge string) string {
+	plainWidth := `ST_XMax(trajectory) - ST_XMin(trajectory)`
+	shiftedWidth := `ST_XMax(ST_ShiftLongitude(trajectory)) - ST_XMin(ST_ShiftLongitude(trajectory))`
+	return `CASE WHEN ` + plainWidth + ` > 180 THEN
+           CASE WHEN ` + shiftedWidth + ` < ` + plainWidth + ` THEN ` + edge + `(ST_ShiftLongitude(trajectory)) ELSE ` + edge + `(trajectory) END
+         ELSE ` + edge + `(trajectory) END`
+}
+
 // localStartedAt is an activity's start as the wall clock read where it was recorded: every
 // day, week or month an activity is grouped or filtered by is this one's (§4.30). The zone is
 // a name, so the tz database gives the offset in force on that date.
@@ -116,7 +131,7 @@ const activityStoriesColumn = `COALESCE((
 // below shares that same order for the same reason.
 var listActivitiesQuery = `
 SELECT id, started_at, timezone, activity_type, name, distance_meters, duration_seconds, description,
-       ST_XMin(trajectory), ST_YMin(trajectory), ST_XMax(trajectory), ST_YMax(trajectory),
+       ` + activityBBoxColumns + `,
        edit_pending, track_edit IS NOT NULL, trajectory IS NULL, split_group, split_from, split_to,
        ` + activityStoriesColumn + `
 FROM activities
@@ -279,9 +294,9 @@ const maxActivityNameLen = 200
 // activityByIDQuery is the single-row counterpart to listActivitiesQuery, same column order
 // (scanActivityRow's Scan call is shared between both), scoped by id and owner exactly like
 // trackMetricsQuery — a non-owned or nonexistent id is indistinguishable from "not found."
-const activityByIDQuery = `
+var activityByIDQuery = `
 SELECT id, started_at, timezone, activity_type, name, distance_meters, duration_seconds, description,
-       ST_XMin(trajectory), ST_YMin(trajectory), ST_XMax(trajectory), ST_YMax(trajectory),
+       ` + activityBBoxColumns + `,
        edit_pending, track_edit IS NOT NULL, trajectory IS NULL, split_group, split_from, split_to,
        ` + activityStoriesColumn + `
 FROM activities
