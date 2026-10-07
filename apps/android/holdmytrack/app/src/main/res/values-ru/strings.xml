@@ -14,7 +14,7 @@
     <string name="create_account">Создать аккаунт</string>
     <string name="try_demo">Попробовать демо</string>
     <string name="sign_in_title">Вход в HoldMyTrack</string>
-    <string name="sign_in_intro">Войдите, чтобы увидеть свои треки, «туман войны» и тепловую карту. Демо-аккаунт не требует регистрации и удаляется через день.</string>
+    <string name="sign_in_intro">Войдите, чтобы увидеть свои треки, «туман войны» и тепловую карту. Демо не требует регистрации: это общий готовый аккаунт, его можно смотреть, но не изменять.</string>
     <string name="sign_up_title">Создание аккаунта</string>
     <string name="forgot_password">Забыли пароль?</string>
     <string name="to_sign_up">Нет аккаунта? Создайте его</string>

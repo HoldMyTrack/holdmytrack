@@ -100,4 +100,4 @@ The run is foreground-only and stops when the screen does, which is a platform c
 
 ## Signing in against a dev stack
 
-There is no seeded Android account. Create one from the app itself (**Create account**), or tap **Try the demo** for an ephemeral account that needs no signup and is purged after a day. A session survives restarts, and is checked against `GET /v1/auth/me` at startup before any user layer is attached — a token revoked or expired while the app was closed would otherwise show up only as 401s in logcat, behind a map that looks merely empty.
+There is no seeded Android account. Create one from the app itself (**Create account**), or tap **Try the demo** for the shared, read-only Demo Customer account, which needs no signup (root `docs/SPEC.md` FR-2.1). A session survives restarts, and is checked against `GET /v1/auth/me` at startup before any user layer is attached — a token revoked or expired while the app was closed would otherwise show up only as 401s in logcat, behind a map that looks merely empty.
