@@ -564,8 +564,9 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Behavior**:
 1. The timezone is the one the activity's first recorded point lies in, before Private locations (FR-8.1) clip the track, so an activity they hide entirely still has one. A point at sea has the nautical zone it lies in. A piece of a split activity (FR-5.17) takes the zone its own first point lies in.
 2. Where no zone is known for that point, the activity takes the account's timezone at the time it's ingested.
-3. Every day an activity is counted on is its local date in that zone: the date slider's days (FR-6), date-range filtering of the Activities panel, its totals and the tracks drawn, the activity graph's grid and stat cards (FR-7), and Trends (FR-9). Two activities started at the same instant on opposite sides of the world can fall on different days.
-4. The offset is the one in force on the activity's date: a zone that has changed its offset or its summer time since shows an older activity at the offset it had then.
+3. Every date and time of the activity's is shown in that zone, on the web and in the Android app: its row's start where it has no name, the Edit window's, the times of its track's points and of its photos, and its photos' capture times. A browser or phone that doesn't know the zone yet shows its own instead.
+4. Every day an activity is counted on is its local date in that zone: the date slider's days (FR-6), date-range filtering of the Activities panel, its totals and the tracks drawn, the activity graph's grid and stat cards (FR-7), and Trends (FR-9). Two activities started at the same instant on opposite sides of the world can fall on different days.
+5. The offset is the one in force on the activity's date: a zone that has changed its offset or its summer time since shows an older activity at the offset it had then.
 
 **Outputs**: The activity's `timezone` (an IANA name, e.g. `Asia/Tokyo`).
 
@@ -1477,7 +1478,7 @@ What is planned but not yet built is in `docs/ROADMAP.md`.
 ### FR-16.3 Listing and images
 
 **Behavior**:
-1. `GET /v1/photos?activity={id}` answers `{photos}`: the activity's photos as `{id, activity_id, taken_at, route_at, lon, lat, caption, width, height, url, thumb_url}`, in route order (by `route_at`, then upload). `lon`/`lat` are null only when the activity has no track left at all. `width`/`height` are the stored copy's. `GET /v1/photos?story={id}` answers the same for every activity in a Story (FR-14) that isn't a superseded duplicate, in the same order across all of them.
+1. `GET /v1/photos?activity={id}` answers `{photos}`: the activity's photos as `{id, activity_id, taken_at, route_at, timezone, lon, lat, caption, width, height, url, thumb_url}` (`timezone` the activity's, FR-3.11, which the photo's times are shown in), in route order (by `route_at`, then upload). `lon`/`lat` are null only when the activity has no track left at all. `width`/`height` are the stored copy's. `GET /v1/photos?story={id}` answers the same for every activity in a Story (FR-14) that isn't a superseded duplicate, in the same order across all of them.
 2. `GET /v1/photos/{id}` and `GET /v1/photos/{id}/thumb` serve the stored copy and its thumbnail with their sniffed content type, to their owner only, cacheable for good (a photo's images never change).
 
 **Error cases**:

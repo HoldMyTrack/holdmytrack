@@ -4,9 +4,9 @@ import { getActivityTrackPoints, type Activity, type TrackEdit, type TrackPoint 
 import { labelInsertionPoint } from '../map/layers';
 import { clearTrackEdit, ensureTrackEditLayer, onTrackEditPointClick, onTrackEditPointDrag, setTrackEditData, type EditPreview } from '../map/trackEdit';
 import { applyEdit, chopOp, cumulativeDistances, cutOp, foldEdit, isEmptyEdit, moveOp, splitIndex, splitPoint, type EditOp } from './editTrackOps';
-import { distanceValue, unitLabel } from './format';
+import { distanceValue, formatClockTime, unitLabel } from './format';
 import { useUnitSystem } from './units';
-import { lang, t, tn } from '../i18n';
+import { t, tn } from '../i18n';
 
 /**
  * The Edit window's Track tab (IMPLEMENTATION.md §4.7.7) — one activity's recorded points,
@@ -200,7 +200,7 @@ export function TrackEditor({ map, activity, active, busy, onChange }: TrackEdit
           <span className="activity-filters__label">{t('edit_track.range')}</span>
           <span className="activity-filters__readout" data-testid="edit-track-readout">
             {distanceValue(distances[lo]!, system)} – {distanceValue(distances[hi]!, system)} {unit} ·{' '}
-            {clockTime(visible[lo]![2])}–{clockTime(visible[hi]![2])}
+            {formatClockTime(visible[lo]![2], activity.timezone)}–{formatClockTime(visible[hi]![2], activity.timezone)}
           </span>
         </div>
         <div className="activity-filters__track-wrap">
@@ -334,7 +334,7 @@ export function TrackEditor({ map, activity, active, busy, onChange }: TrackEdit
       </div>
       {splitting && (
         <p className="edit-track__note" data-testid="edit-track-split-note">
-          {t('edit_track.split_note', { time: clockTime(splitAt) })}
+          {t('edit_track.split_note', { time: formatClockTime(splitAt, activity.timezone) })}
         </p>
       )}
       {pointMode === 'delete' && <p className="edit-track__note">{t('edit_track.delete_point_note')}</p>}
@@ -346,8 +346,4 @@ export function TrackEditor({ map, activity, active, busy, onChange }: TrackEdit
 function findLastIndex<T>(items: readonly T[], pred: (item: T) => boolean): number {
   for (let i = items.length - 1; i >= 0; i--) if (pred(items[i]!)) return i;
   return -1;
-}
-
-function clockTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' });
 }

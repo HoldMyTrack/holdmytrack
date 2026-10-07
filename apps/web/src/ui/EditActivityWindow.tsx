@@ -352,7 +352,7 @@ export function EditActivityWindow({
       <header className="edit-track__head">
         <span className="edit-track__title">{single ? t('edit.title_one') : tn('edit.title_many', activities.length)}</span>
         <span className="edit-track__subtitle">
-          {single ? single.name?.trim() || formatStartedAt(single.startedAt) : t('edit.multi_subtitle')}
+          {single ? single.name?.trim() || formatStartedAt(single.startedAt, single.timezone) : t('edit.multi_subtitle')}
         </span>
       </header>
 

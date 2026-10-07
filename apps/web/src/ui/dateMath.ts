@@ -13,10 +13,10 @@ export interface DateRange {
 }
 
 /** "What day is it" for the caller's own browser — the local calendar day, matching what a
- *  person looking at the app understands "today" to mean, and the account's own local day the
- *  server now buckets activities by (docs/KNOWN_ISSUES.md's fixed "UTC-day bucketing" entry).
- *  Only ever the *fallback* `today` a zero-activity account's degenerate range collapses to
- *  (MapView.tsx) — real activity data always takes precedence once there is any. */
+ *  person looking at the app understands "today" to mean. Only ever the *fallback* `today` a
+ *  zero-activity account's degenerate range collapses to (MapView.tsx) — real activity data,
+ *  whose days the server gives in each activity's own zone, always takes precedence once
+ *  there is any. */
 export function todayLocal(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;

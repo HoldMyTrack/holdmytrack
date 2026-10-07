@@ -1,5 +1,6 @@
 import type { UnitSystem } from './units';
 import { lang, t, tMaybe } from '../i18n';
+import { knownTimeZone } from './timeZone';
 
 /**
  * Display formatting for real activity rows and totals. Kept apart from api.ts so the
@@ -41,11 +42,13 @@ export function metersToFeet(meters: number): number {
 }
 
 /**
- * A row's fallback primary line, for an activity with no name set (ActivitiesPanel.tsx
- * prefers `activity.name` when present — §4.7's revised decision). The full local datetime,
- * not a bare date, since it's carrying the whole "when" on its own in that case.
+ * A date and time of an activity's, in `timeZone`, the zone it was recorded in
+ * (IMPLEMENTATION.md §4.30): a row's fallback primary line for an activity with no name set
+ * (ActivitiesPanel.tsx prefers `activity.name` when present — §4.7's revised decision), and a
+ * photo's capture time. The full datetime, not a bare date, since it's carrying the whole
+ * "when" on its own.
  */
-export function formatStartedAt(iso: string): string {
+export function formatStartedAt(iso: string, timeZone: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleString(lang, {
@@ -54,7 +57,14 @@ export function formatStartedAt(iso: string): string {
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: knownTimeZone(timeZone),
   });
+}
+
+/** The time of day of `ms` (epoch milliseconds) in `timeZone`, an activity's own: the times of
+ *  its points and photos in the Edit window. */
+export function formatClockTime(ms: number, timeZone: string): string {
+  return new Date(ms).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit', timeZone: knownTimeZone(timeZone) });
 }
 
 /** `distanceValue` returns just the number (no unit suffix) — for the one place

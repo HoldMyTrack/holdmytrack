@@ -3,7 +3,9 @@ import { createPortal } from 'react-dom';
 import { Popup, type Map as MapLibreMap } from 'maplibre-gl';
 import { BookOpen, Check, Copy, Flag } from 'lucide-react';
 import type { Spot, SpotCategory } from '../map/spots';
+import { useAuth } from '../auth/AuthContext';
 import { lang, t } from '../i18n';
+import { knownTimeZone } from './timeZone';
 import type { MessageKey } from '../i18n/en';
 
 export interface SpotPopupProps {
@@ -55,6 +57,8 @@ export function memorialLabel(memorial: string): string {
  * ExportControl renders into its map control.
  */
 export function SpotPopup({ map, spot, capturedAt, onClose }: SpotPopupProps) {
+  // A capture belongs to no activity, so its date is the account's (FR-1.7), like "today".
+  const { user } = useAuth();
   const [container, setContainer] = useState<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -118,7 +122,7 @@ export function SpotPopup({ map, spot, capturedAt, onClose }: SpotPopupProps) {
       {capturedAt && (
         <div className="spot-popup__captured">
           <Flag size={14} aria-hidden="true" />
-          {t('spots.captured_on', { date: new Date(capturedAt).toLocaleDateString(lang, { dateStyle: 'medium' }) })}
+          {t('spots.captured_on', { date: new Date(capturedAt).toLocaleDateString(lang, { dateStyle: 'medium', timeZone: knownTimeZone(user.timezone) }) })}
         </div>
       )}
       <div className="spot-popup__actions">

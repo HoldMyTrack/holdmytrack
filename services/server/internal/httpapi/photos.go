@@ -77,13 +77,15 @@ type photoJSON struct {
 	ActivityID string     `json:"activity_id"`
 	TakenAt    *time.Time `json:"taken_at"`
 	RouteAt    time.Time  `json:"route_at"`
-	Lon        *float64   `json:"lon"`
-	Lat        *float64   `json:"lat"`
-	Caption    *string    `json:"caption"`
-	Width      int        `json:"width"`
-	Height     int        `json:"height"`
-	URL        string     `json:"url"`
-	ThumbURL   string     `json:"thumb_url"`
+	// Timezone is its activity's (§4.30), which a client shows TakenAt and RouteAt in.
+	Timezone string   `json:"timezone"`
+	Lon      *float64 `json:"lon"`
+	Lat      *float64 `json:"lat"`
+	Caption  *string  `json:"caption"`
+	Width    int      `json:"width"`
+	Height   int      `json:"height"`
+	URL      string   `json:"url"`
+	ThumbURL string   `json:"thumb_url"`
 }
 
 type photosResponse struct {
@@ -99,7 +101,7 @@ type photosResponse struct {
 // (VISION.md §7), so a photo on it shows nothing the track doesn't. %s is the rest of the WHERE
 // clause; $1 is always the owner.
 const photoSelect = `
-SELECT p.id, p.activity_id, p.taken_at, p.route_at, p.caption, p.width, p.height,
+SELECT p.id, p.activity_id, p.taken_at, p.route_at, a.timezone, p.caption, p.width, p.height,
        ST_X(pos.pt), ST_Y(pos.pt)
 FROM activity_photos p
 JOIN activities a ON a.id = p.activity_id
@@ -121,7 +123,7 @@ func (s *Server) loadPhotos(ctx context.Context, where string, args ...any) ([]p
 	photos := []photoJSON{}
 	for rows.Next() {
 		var p photoJSON
-		if err := rows.Scan(&p.ID, &p.ActivityID, &p.TakenAt, &p.RouteAt, &p.Caption, &p.Width, &p.Height, &p.Lon, &p.Lat); err != nil {
+		if err := rows.Scan(&p.ID, &p.ActivityID, &p.TakenAt, &p.RouteAt, &p.Timezone, &p.Caption, &p.Width, &p.Height, &p.Lon, &p.Lat); err != nil {
 			return nil, err
 		}
 		p.URL = apiPrefix + "/photos/" + p.ID
