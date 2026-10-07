@@ -15,6 +15,8 @@
   "meta.guide_timeline_description": "Step by step, with screenshots: exporting Timeline.json from an Android phone and importing its trips into HoldMyTrack.",
   "meta.guide_google_health_title": "Export your Google Health data — HoldMyTrack",
   "meta.guide_google_health_description": "Step by step, with screenshots: exporting Google Health (Fitbit) workouts with Google Takeout and importing them into HoldMyTrack.",
+  "meta.testing_title": "Testing the Android app — HoldMyTrack",
+  "meta.testing_description": "Step-by-step tests for everything the HoldMyTrack Android app does, with the sample files to use.",
   "meta.notfound_title": "Page not found — HoldMyTrack",
   "meta.profile_title": "Profile — HoldMyTrack",
   "meta.stories_title": "Stories — HoldMyTrack",

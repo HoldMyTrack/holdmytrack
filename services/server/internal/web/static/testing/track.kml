@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Placemark><name>Lakewood Park</name>
+    <LineString><coordinates>-81.80119,41.49461 -81.79852,41.49512 -81.79533,41.49498</coordinates></LineString>
+  </Placemark>
+</kml>

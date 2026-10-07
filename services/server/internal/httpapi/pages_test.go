@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"path"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -72,6 +74,35 @@ func TestPagesRenderSignedOut(t *testing.T) {
 		}
 		if !tc.noIndex && (!strings.Contains(body, `<meta property="og:image" content="https://app.example/static/og-image.jpg?v=test"`) || !strings.Contains(body, `content="summary_large_image"`)) {
 			t.Errorf("%s: no large link-preview image", tc.path)
+		}
+	}
+}
+
+// TestTestingPage: the Android test suite is public but unlisted, and every sample file it
+// links to is served.
+func TestTestingPage(t *testing.T) {
+	s := newPagesTestServer(t)
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/testing", nil))
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK || !strings.Contains(body, "<title>Testing the Android app — HoldMyTrack") {
+		t.Fatalf("/testing: status %d", rec.Code)
+	}
+	if !strings.Contains(body, `name="robots" content="noindex"`) || strings.Contains(body, `rel="canonical"`) {
+		t.Errorf("/testing: should be noindex, without a canonical link")
+	}
+	links := regexp.MustCompile(`href="(/static/testing/[^"?]+)\?v=test" download="([^"]+)"`).FindAllStringSubmatch(body, -1)
+	if len(links) == 0 {
+		t.Fatal("/testing: no sample file links")
+	}
+	for _, m := range links {
+		if path.Base(m[1]) != m[2] {
+			t.Errorf("%s: downloads as %q", m[1], m[2])
+		}
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, m[1], nil))
+		if rec.Code != http.StatusOK {
+			t.Errorf("%s: status %d", m[1], rec.Code)
 		}
 	}
 }

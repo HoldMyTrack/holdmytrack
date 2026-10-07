@@ -1,0 +1,511 @@
+{{define "content"}}
+<main class="page-main help testing">
+  <section class="page-hero">
+    <h1>Testing HoldMyTrack for Android</h1>
+    <p class="page-lede">Thank you for testing! This page walks through everything the Android app does, one test at a time, with the files to use. Start with Setup: it fills your account with activities from four countries, which most of the other tests need. After that, the sections can be done in any order.</p>
+    <nav class="help__toc" aria-label="On this page">
+      <a href="#setup">0. Setup</a>
+      <a href="#upload">1. Uploads and imports</a>
+      <a href="#map">2. The map</a>
+      <a href="#dates">3. Date slider</a>
+      <a href="#activities">4. Activities panel</a>
+      <a href="#edit">5. Editing</a>
+      <a href="#private">6. Private locations</a>
+      <a href="#stories">7. Stories</a>
+      <a href="#photos">8. Photos</a>
+      <a href="#places">9. Points of interest</a>
+      <a href="#health-connect">10. Health Connect</a>
+      <a href="#recording">11. Recording</a>
+      <a href="#you">12. You and Settings</a>
+      <a href="#account">13. Your account</a>
+      <a href="#demo">14. The demo</a>
+      <a href="#report">Reporting a problem</a>
+    </nav>
+  </section>
+
+  <section class="page-section">
+    <h2>Before you start</h2>
+    <ul class="page-list">
+      <li>Open this page on the phone you are testing with. Tapping a file link saves it to the phone's <strong>Downloads</strong> folder, and that's where the app's file picker finds it.</li>
+      <li>Each test has an ID, such as <strong>UP-3</strong>. Put it in your report, so we know exactly which step went wrong.</li>
+      <li><strong>Expected</strong> is what the app should do. If anything is different, even slightly, please report it, including wording that's confusing.</li>
+      <li>Tests marked <em>optional</em> need something not every tester has, such as Health Connect data or a walk to a real place.</li>
+    </ul>
+  </section>
+
+  <section class="page-section" id="setup">
+    <h2>0. Setup</h2>
+
+    <h3 id="SU-1">SU-1 · Install the app</h3>
+    <ol class="page-list">
+      <li>Join the test from the Google Play link you were given, then install <strong>HoldMyTrack</strong> from Google Play.</li>
+      <li>Open it.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> the sign-in screen, "Sign in to HoldMyTrack", with Continue with Google, an email and password form, "Forgot password?", "Don't have an account? Create one", and Try the demo.</p>
+
+    <h3 id="SU-2">SU-2 · Create an account</h3>
+    <p>Use either way. Google is the quickest.</p>
+    <ol class="page-list">
+      <li><strong>With Google:</strong> tap Continue with Google and pick an account.</li>
+      <li><strong>With email:</strong> tap "Don't have an account? Create one", enter an email you can read and a password of at least 8 characters, then Create account.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> Google goes straight on to SU-3. Email shows "Verify your email". Tapping Continue before opening the link says "Your email isn't confirmed yet. Open the link in the email we sent, then tap Continue." Opening the link in the email, then coming back to the app, moves on by itself.</p>
+
+    <h3 id="SU-3">SU-3 · Set up your account</h3>
+    <ol class="page-list">
+      <li>On "Welcome — set up your account", try to leave without choosing a country.</li>
+      <li>Choose your Country (the list is searchable: try typing two letters of its code, like "de"). Check the Timezone, which is filled in from your phone.</li>
+      <li>Tap Save and continue.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> there is no way past the screen without a country. After saving, the map opens with "Nothing on your map yet. Sync from Health Connect, or record a walk with the button below."</p>
+
+    <h3 id="SU-4">SU-4 · Import the sample activities</h3>
+    <p>Download <a class="testing__file" href="{{asset "testing/holdmytrack-sample.zip"}}" download="holdmytrack-sample.zip">holdmytrack-sample.zip</a> (400 KB). It holds 20 activities: 5 days in Vietnam (January 2026), 3 in Estonia (May), 8 in Italy (August) and 4 walks around Cleveland, Ohio (September).</p>
+    <ol class="page-list">
+      <li>Open the <strong>Sync</strong> tab and tap Upload files.</li>
+      <li>Tap Choose files…, open Downloads and pick holdmytrack-sample.zip.</li>
+      <li>Watch the file's row, then tap Follow them in Sync.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> the row shows "Uploading …%", then the archive is unpacked and processed. Sync history fills up with rows marked Ready, one per activity. Back on the Map tab, the map flies to the newest activity, a walk in Clague Park, Cleveland, and the date slider shows the 5 most recent days with activities.</p>
+    <p>Everything below assumes Setup is done.</p>
+  </section>
+
+  <section class="page-section" id="upload">
+    <h2>1. Uploads and imports</h2>
+    <p>All of these start from <strong>Sync → Upload files → Choose files…</strong>. After each, check Sync history.</p>
+
+    <h3 id="UP-1">UP-1 · A GPX file</h3>
+    <p>File: <a class="testing__file" href="{{asset "testing/west-side.gpx"}}" download="west-side.gpx">west-side.gpx</a>, a 22 km ride across Cleveland on 1 October 2026.</p>
+    <p class="testing__expect"><strong>Expected:</strong> a Ready row in Sync history. View on map flies to the ride and selects it. The track is colored by pace, blue where slowest and red where fastest, with a "Slower … Faster" legend on its card.</p>
+
+    <h3 id="UP-2">UP-2 · A TCX file</h3>
+    <p>File: <a class="testing__file" href="{{asset "testing/evening-loop.tcx"}}" download="evening-loop.tcx">evening-loop.tcx</a>, a short ride on 5 October 2026.</p>
+    <p class="testing__expect"><strong>Expected:</strong> a Ready row, and the activity on the map as Biking.</p>
+
+    <h3 id="UP-3">UP-3 · A FIT file</h3>
+    <p>File: <a class="testing__file" href="{{asset "testing/mill-creek-falls.fit"}}" download="mill-creek-falls.fit">mill-creek-falls.fit</a>, the kind of file a watch saves: a ride to Mill Creek Falls on 6 October 2026.</p>
+    <p class="testing__expect"><strong>Expected:</strong> a Ready row, and the activity on the map as Cycling.</p>
+
+    <h3 id="UP-4">UP-4 · The same file twice</h3>
+    <p>Once UP-1's row is Ready, upload <strong>west-side.gpx</strong> again.</p>
+    <p class="testing__expect"><strong>Expected:</strong> "west-side.gpx was already uploaded before." No second copy appears on the map or in the list.</p>
+
+    <h3 id="UP-5">UP-5 · The same zip twice</h3>
+    <p>Upload <strong>holdmytrack-sample.zip</strong> again.</p>
+    <p class="testing__expect"><strong>Expected:</strong> "Already uploaded before, in holdmytrack-sample.zip: 20". Nothing new on the map.</p>
+
+    <h3 id="UP-6">UP-6 · The same activity from another source</h3>
+    <p>File: <a class="testing__file" href="{{asset "testing/duplicate.tcx"}}" download="duplicate.tcx">duplicate.tcx</a>, the Clague Park walk from the sample zip again, as a different file without elevation.</p>
+    <p class="testing__expect"><strong>Expected:</strong> Sync history shows it as Duplicate, "Kept the copy from an uploaded file". There is still only one Clague Park walk on 27 September, and it still has its elevation.</p>
+
+    <h3 id="UP-7">UP-7 · Files that can't be imported</h3>
+    <p>Upload each of these, one at a time:</p>
+    <ul class="page-list">
+      <li><a class="testing__file" href="{{asset "testing/broken.gpx"}}" download="broken.gpx">broken.gpx</a>, cut off half-way. <strong>Expected:</strong> a Failed row: "The file couldn't be read. It may be damaged, or not the format its name says."</li>
+      <li><a class="testing__file" href="{{asset "testing/planned-route.gpx"}}" download="planned-route.gpx">planned-route.gpx</a>, a route drawn on a map, not recorded. <strong>Expected:</strong> Failed: "The file has no timestamps. It's a planned route, not a recorded activity."</li>
+      <li><a class="testing__file" href="{{asset "testing/indoor.gpx"}}" download="indoor.gpx">indoor.gpx</a>, a treadmill run. <strong>Expected:</strong> Failed: "The file has no GPS points. It may be from an indoor workout."</li>
+      <li><a class="testing__file" href="{{asset "testing/one-point.gpx"}}" download="one-point.gpx">one-point.gpx</a>. <strong>Expected:</strong> Failed: "The file has fewer than two GPS points, so there's no track to draw."</li>
+      <li><a class="testing__file" href="{{asset "testing/empty.gpx"}}" download="empty.gpx">empty.gpx</a>, 0 bytes. <strong>Expected:</strong> refused straight away, "empty.gpx: Empty file."</li>
+      <li><a class="testing__file" href="{{asset "testing/track.kml"}}" download="track.kml">track.kml</a>, a format HoldMyTrack doesn't read. <strong>Expected:</strong> not sent at all, "track.kml isn't a .gpx, .fit, .tcx, .zip or Timeline .json file, so it wasn't sent."</li>
+    </ul>
+    <p class="testing__expect">None of them adds anything to the map.</p>
+
+    <h3 id="UP-8">UP-8 · A zip with some bad files in it</h3>
+    <p>File: <a class="testing__file" href="{{asset "testing/mixed.zip"}}" download="mixed.zip">mixed.zip</a>: two drives on 3 October 2026, the broken GPX from UP-7, and a text file.</p>
+    <p class="testing__expect"><strong>Expected:</strong> "Skipped in mixed.zip: 1" (the text file). The two drives are added, and broken.gpx gets a Failed row.</p>
+
+    <h3 id="UP-9">UP-9 · Several files at once</h3>
+    <p>Pick <strong>evening-loop.tcx</strong>, <strong>mill-creek-falls.fit</strong> and <strong>track.kml</strong> together.</p>
+    <p class="testing__expect"><strong>Expected:</strong> one row per file. The two activities say they were already uploaded (from UP-2 and UP-3), and track.kml is named as not sent.</p>
+
+    <h3 id="UP-10">UP-10 · A Google Health (Takeout) export</h3>
+    <p>File: <a class="testing__file" href="{{asset "testing/takeout-sample.zip"}}" download="takeout-sample.zip">takeout-sample.zip</a>, a tiny made-up Google Health export: walks and rides in July 2026.</p>
+    <p class="testing__expect"><strong>Expected:</strong> recognised as a Google Health export without being asked, and its outdoor activities appear in Sync history as Ready, from a Google Takeout import. A workout with no GPS is left out.</p>
+
+    <h3 id="UP-11">UP-11 · A Google Maps Timeline export</h3>
+    <p>File: <a class="testing__file" href="{{asset "testing/Timeline.json"}}" download="Timeline.json">Timeline.json</a>, a made-up export with a drive and a walk on 26 September 2026, a flight from Cleveland to Rome, and a trip that never left one place.</p>
+    <ol class="page-list">
+      <li>Sync → Maps Timeline → Choose Timeline.json, and pick the file.</li>
+      <li>Look at the dates and the list of modes, then tap Import.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> From and To span 1 August to 26 September 2026. The modes listed are Driving, Walking and Flying, with Flying left unticked. The screen says "1 trip that never left one place is left out." Import shows "Sending …", then "Sent 2: 2 new, 0 imported before, 0 refused. They appear on the map as they are processed."</p>
+
+    <h3 id="UP-12">UP-12 · The same Timeline again</h3>
+    <p>Once UP-11's drive and walk are on the map, import <strong>Timeline.json</strong> again, the same way.</p>
+    <p class="testing__expect"><strong>Expected:</strong> "Sent 2: 0 new, 2 imported before, 0 refused." Nothing new on the map.</p>
+
+    <h3 id="UP-13">UP-13 · Sync history</h3>
+    <ol class="page-list">
+      <li>On the Sync tab, look at the latest rows, then tap See all.</li>
+      <li>Page with Older → and ← Newer.</li>
+      <li>Tap View on map on any Ready row.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> every upload and import from this section is listed, each with its status. View on map opens the map on that activity's day with it selected.</p>
+  </section>
+
+  <section class="page-section" id="map">
+    <h2>2. The map</h2>
+
+    <h3 id="MA-1">MA-1 · Normal mode</h3>
+    <ol class="page-list">
+      <li>Tap a track on the map.</li>
+      <li>Tap an empty part of the map.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> the tapped track is highlighted, colored by pace, and the map flies to it. Its card shows Distance, Moving and Pace or Speed. Tapping empty map clears the selection.</p>
+
+    <h3 id="MA-2">MA-2 · Fog of War, zoomed out</h3>
+    <ol class="page-list">
+      <li>Switch to <strong>Fog</strong>.</li>
+      <li>Zoom all the way out to the whole world.</li>
+      <li>Zoom in to Europe, then to Italy, then to the streets of Rome.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> the chip reads "Every activity, any date". At world level, Vietnam, Estonia, Italy and the United States are clear, with the note "Country view — a whole country clears once you've been anywhere in it". Closer in, whole regions clear (Lazio, Ohio…): "Region view — a whole state or province clears once you've been anywhere in it". At street level only the streets you covered are clear: "City view — cleared exactly where you've been". Each note fades after a few seconds.</p>
+
+    <h3 id="MA-3">MA-3 · Fog ignores the date range</h3>
+    <p>In Normal, pick a date range with only the Cleveland walks, then switch to Fog and look at Vietnam.</p>
+    <p class="testing__expect"><strong>Expected:</strong> Vietnam is still clear: Fog is your whole history. Switching back to Normal brings back the same range, without moving the map.</p>
+
+    <h3 id="MA-4">MA-4 · Heatmap</h3>
+    <p>Switch to <strong>Heatmap</strong> and zoom out and in as in MA-2.</p>
+    <p class="testing__expect"><strong>Expected:</strong> the chip reads "The last 365 days". Zoomed out: "Country view — every country you've been to in the last year is highlighted", then the region view. Close in, routes glow from red to yellow, brighter where you went more often: "City view — the more often you go somewhere, the hotter it glows".</p>
+
+    <h3 id="MA-5">MA-5 · Paths</h3>
+    <ol class="page-list">
+      <li>Zoom in over a park near Cleveland or Rome (street level).</li>
+      <li>Open Layers and tick Trails, Tracks and Bike paths. Tap the info button next to Tracks.</li>
+      <li>Untick Show layers, then tick it again.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> trails show as green dashes, tracks brown, bike paths blue. Tracks' info says "Dirt, farm and forest roads: unpaved tracks wide enough for a vehicle." The Layers button shows how many are on. Show layers hides them all and brings the same ones back. Your choices are still there after closing and reopening the app.</p>
+
+    <h3 id="MA-6">MA-6 · Satellite</h3>
+    <p>Layers → Satellite, in each of Normal, Fog and Heatmap.</p>
+    <p class="testing__expect"><strong>Expected:</strong> aerial imagery with roads faintly on top. The map doesn't move when switching, and the imagery provider is credited in the map's attribution.</p>
+
+    <h3 id="MA-7">MA-7 · Find my location</h3>
+    <p>Tap Find my location. Allow location access when asked.</p>
+    <p class="testing__expect"><strong>Expected:</strong> the map flies to where you are and follows you until you pan it. If you deny access: "HoldMyTrack needs location access to show where you are."</p>
+
+    <h3 id="MA-8">MA-8 · Theme</h3>
+    <p>You tab → Theme: try Light, Dark and System.</p>
+    <p class="testing__expect"><strong>Expected:</strong> the whole app and the map switch at once. In Fog, the fog is dark over the light map and cream over the dark map.</p>
+
+    <h3 id="MA-9">MA-9 · No connection</h3>
+    <p>Turn on airplane mode, close the app completely, and open it again. Then turn airplane mode off and tap Try again.</p>
+    <p class="testing__expect"><strong>Expected:</strong> "Couldn't reach HoldMyTrack, so your tracks aren't on the map yet." with Try again. You stay signed in, and Try again brings everything back.</p>
+  </section>
+
+  <section class="page-section" id="dates">
+    <h2>3. Date slider</h2>
+
+    <h3 id="DS-1">DS-1 · Picking days</h3>
+    <ol class="page-list">
+      <li>In Normal mode, look at the date slider above the Activities panel.</li>
+      <li>Drag one end to include more days, and let go.</li>
+      <li>Swipe the bars to scroll back in time. Hold a knob at the edge to page further back.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> only days with activities take up room, and taller bars mean more activity. The heading names the range (for example "24 Sep – 3 Oct 2026") with its activity count, distance and time. Letting go flies the map to the range and lists its activities.</p>
+
+    <h3 id="DS-2">DS-2 · Jumping a range</h3>
+    <p>Use the arrows to move the range earlier and later.</p>
+    <p class="testing__expect"><strong>Expected:</strong> the range moves by its own length, through Italy, Estonia and Vietnam, and the map follows.</p>
+  </section>
+
+  <section class="page-section" id="activities">
+    <h2>4. Activities panel</h2>
+
+    <h3 id="AP-1">AP-1 · The panel</h3>
+    <p>Drag the panel up and down between its three heights. Pick a range with the 8 Italy days.</p>
+    <p class="testing__expect"><strong>Expected:</strong> activities are listed newest first, named where they have a name, otherwise by date and time.</p>
+
+    <h3 id="AP-2">AP-2 · Filters</h3>
+    <ol class="page-list">
+      <li>Tap Type and choose Driving, then All types.</li>
+      <li>Tap Distance and narrow it with the two knobs, then tap Reset.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> the list and the map show only what matches. The chip shows a dot while filtering. If nothing matches: "No activities match the current filters."</p>
+
+    <h3 id="AP-3">AP-3 · Checking several</h3>
+    <ol class="page-list">
+      <li>Long-press a row (or tap its icon) to start checking, then check two more.</li>
+      <li>Use the Select menu: All, None, Invert.</li>
+      <li>With some checked, tap Focus.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> the footer counts them, "3 selected · …", with their total distance. Focus fits the map to the checked activities. With nothing selected or checked, the actions say "Select an activity, or check some, first".</p>
+
+    <h3 id="AP-4">AP-4 · Hide</h3>
+    <p>Select an activity and tap Hide, then Show.</p>
+    <p class="testing__expect"><strong>Expected:</strong> hidden, it disappears from the map and its row is dimmed with "Hidden". Fog and Heatmap still count it. It comes back when shown again, and after the app is restarted.</p>
+  </section>
+
+  <section class="page-section" id="edit">
+    <h2>5. Editing</h2>
+
+    <h3 id="ED-1">ED-1 · Type, name and description</h3>
+    <ol class="page-list">
+      <li>Select the Evening loop (5 October) and tap Edit.</li>
+      <li>In Type, search "solo" and tap Add "solo…" to make a new type, such as Solowheel. Give it a name and a description.</li>
+      <li>Change something again, then press Back.</li>
+      <li>Save.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> Back asks whether to discard your changes. After saving, the row shows the new name, and the type filter lists Solowheel.</p>
+
+    <h3 id="ED-2">ED-2 · Type for several at once</h3>
+    <p>Check two activities of different types and tap Edit.</p>
+    <p class="testing__expect"><strong>Expected:</strong> only Type can be changed: "Mixed types — pick one to set it for all". Saving sets it on both.</p>
+
+    <h3 id="ED-3">ED-3 · Editing the track</h3>
+    <ol class="page-list">
+      <li>Select the Cleveland West Side ride (from UP-1), tap Edit, then the Track tab.</li>
+      <li>Move the knobs and try Chop, then Undo. Try Cut (hold it to preview), Delete point and Move point.</li>
+      <li>Tap Reset, then make one change and Save.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> each tool changes the line on the map at once, and Undo steps back. After saving, the activity shows Pending for a moment, then comes back with its new shape and distance. Fog and Heatmap follow it.</p>
+
+    <h3 id="ED-4">ED-4 · Track tab, when it isn't available</h3>
+    <p>Check two activities and open Edit → Track.</p>
+    <p class="testing__expect"><strong>Expected:</strong> "Check exactly one activity to edit its track".</p>
+
+    <h3 id="ED-5">ED-5 · Split</h3>
+    <ol class="page-list">
+      <li>Select the Big Creek walk (5 September), Edit → Track.</li>
+      <li>Move one knob to the middle of the walk and tap Split.</li>
+      <li>Save.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> the part after the knob is drawn in blue, with "Saving splits this activity in two at …". After saving there are two activities with the same type and name, both Pending for a moment.</p>
+
+    <h3 id="ED-6">ED-6 · Delete</h3>
+    <p>Select one of the 3 October drives (from UP-8) and tap Delete. Then check both drives and delete them together.</p>
+    <p class="testing__expect"><strong>Expected:</strong> "Delete this activity?" (or "Delete this group?") naming what goes, with its distance. After deleting, it's gone from the list, the map, and, a little later, Fog and Heatmap.</p>
+  </section>
+
+  <section class="page-section" id="private">
+    <h2>6. Private locations</h2>
+    <p>The Lakefront walk (11 September) and the West Side ride (from UP-1) both start near <strong>41.4863, -81.7458</strong>, in Lakewood, Ohio. Pretend that's your home.</p>
+
+    <h3 id="PL-1">PL-1 · Hide where a track starts</h3>
+    <ol class="page-list">
+      <li>Before you start, zoom in on the start of the Lakefront walk and look at where it begins.</li>
+      <li>You tab → Privacy → Add a location on the map.</li>
+      <li>Drag the circle's center to that spot, name it "Home", leave the radius at 200 m, and save.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> the activities touched show Pending for a moment. Then the Lakefront walk starts and ends at the circle's edge instead of at the door, and the West Side ride starts there. The circle itself isn't drawn on the map once you leave the editor.</p>
+
+    <h3 id="PL-2">PL-2 · An activity entirely inside</h3>
+    <p>Add a second location at <strong>41.3909, -81.7485</strong> (Radlick Park) with a radius of 300 m.</p>
+    <p class="testing__expect"><strong>Expected:</strong> the Radlick Park walk (19 September) disappears from the map. Its row shows Private and no distance, and its Track and Photos tabs can't be opened. The Big Creek walk, which starts nearby, is clipped at the circle's edge.</p>
+
+    <h3 id="PL-3">PL-3 · Changing and deleting</h3>
+    <ol class="page-list">
+      <li>Open "Home", change the radius and move it a little, and save.</li>
+      <li>Delete the Radlick Park location.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> each change reprocesses the activities it touches. Deleting asks "Delete this private location?", and the Radlick Park walk comes back whole.</p>
+
+    <h3 id="PL-4">PL-4 · Splitting into a private location</h3>
+    <p>Select the Lakefront walk, Edit → Track, and move a knob into the "Home" circle before tapping Split, then Save.</p>
+    <p class="testing__expect"><strong>Expected:</strong> "Split into a private location?" with Split anyway.</p>
+  </section>
+
+  <section class="page-section" id="stories">
+    <h2>7. Stories</h2>
+
+    <h3 id="ST-1">ST-1 · Make a story</h3>
+    <ol class="page-list">
+      <li>Pick a range with the Italy days and check all 8 activities.</li>
+      <li>Tap Story → New story…, name it "Rome", and Create story.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> the dialog says "A story of 8 checked activities (…). Only you can see it." Each Italy row gets a Story badge.</p>
+
+    <h3 id="ST-2">ST-2 · The Stories tab</h3>
+    <p>Open the Stories tab.</p>
+    <p class="testing__expect"><strong>Expected:</strong> "Rome" is open, listing its activities, with the map fitted to them whatever the date range was. The footer gives totals by activity type.</p>
+
+    <h3 id="ST-3">ST-3 · Add, remove, rename, delete</h3>
+    <ol class="page-list">
+      <li>Make a second story, "Estonia", from the 3 Estonia days. Add one Vietnam day to it from the Story menu.</li>
+      <li>In the Stories tab, remove that Vietnam day with ×.</li>
+      <li>Rename "Estonia" with the pencil.</li>
+      <li>Delete it with the bin.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> in the Story menu, a story already holding all the checked activities shows as "Already in this story". Deleting asks "Delete “…”? Its activities stay.", and the activities are still on the map afterwards.</p>
+  </section>
+
+  <section class="page-section" id="photos">
+    <h2>8. Photos</h2>
+    <p>Download these four photos. The first three were taken during the West Side ride (UP-1). The fourth was taken on a day with no activity.</p>
+    <p class="testing__files">
+      <a class="testing__file" href="{{asset "testing/photo-1.jpg"}}" download="photo-1.jpg">photo-1.jpg</a>
+      <a class="testing__file" href="{{asset "testing/photo-2.jpg"}}" download="photo-2.jpg">photo-2.jpg</a>
+      <a class="testing__file" href="{{asset "testing/photo-3.jpg"}}" download="photo-3.jpg">photo-3.jpg</a>
+      <a class="testing__file" href="{{asset "testing/photo-unplaced.jpg"}}" download="photo-unplaced.jpg">photo-unplaced.jpg</a>
+    </p>
+
+    <h3 id="PH-1">PH-1 · Add photos</h3>
+    <ol class="page-list">
+      <li>Select the West Side ride, Edit → Photos → Add photos, and pick photo-1, photo-2 and photo-3.</li>
+      <li>Save.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> "Preparing 1 of 3…", then each photo is placed on the route by the time it was taken, marked New. After saving, photo markers appear along the ride.</p>
+
+    <h3 id="PH-2">PH-2 · A photo that needs placing</h3>
+    <ol class="page-list">
+      <li>Add photo-unplaced.jpg to the same ride and try to Save.</li>
+      <li>Move its slider to a spot on the route and tap Place here, then Save.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> "Couldn't tell where this was taken. Move the slider to its place on the route." Saving first says "Place every new photo on the route before saving."</p>
+
+    <h3 id="PH-3">PH-3 · Look at them</h3>
+    <p>Tap a photo marker on the map. Zoom in with two fingers, double-tap, and swipe to the next one.</p>
+    <p class="testing__expect"><strong>Expected:</strong> markers close together are grouped with a count. The viewer zooms in, double-tap zooms to 3×, and "1 of 4" counts through them.</p>
+
+    <h3 id="PH-4">PH-4 · Caption, move, delete</h3>
+    <ol class="page-list">
+      <li>Edit → Photos. Give one photo a caption, move another along the route, and delete a third.</li>
+      <li>Press Back before saving, and choose Keep editing. Then Save.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> the rows show Changed and Will be deleted (with Keep this photo to undo it). Back asks "Discard photo changes?". After saving, the map shows the changes.</p>
+  </section>
+
+  <section class="page-section" id="places">
+    <h2>9. Points of interest</h2>
+
+    <h3 id="PO-1">PO-1 · Turn them on</h3>
+    <ol class="page-list">
+      <li>Layers → tick Playgrounds and Monuments.</li>
+      <li>Zoom in to a city park (anywhere you like) at street level.</li>
+      <li>Tap a badge, then Copy address (or Copy location).</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> badges and outlined areas for those places. The popup shows the name or category, with details where known, and copying says "Copied". A Wikipedia link opens when the place has one.</p>
+
+    <h3 id="PO-2">PO-2 · Show in this area</h3>
+    <p>Zoom out a few steps, until the badges disappear, and tap Show in this area.</p>
+    <p class="testing__expect"><strong>Expected:</strong> "Loading places…", then the places in view and a count, such as "68 places in this area", or "No places in this area".</p>
+
+    <h3 id="PO-3">PO-3 · Capture a place <em>(optional)</em></h3>
+    <p>This needs you to walk to a playground or monument near you.</p>
+    <ol class="page-list">
+      <li>Tap the place's badge, then Capture. Allow precise location.</li>
+      <li>Follow the arrow. Once inside, stay there.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> "Get into …" with the distance and an arrow, then "Stay here" with a 30-second countdown, then "Captured!". The badge is filled in from then on, and the popup says when you captured it.</p>
+  </section>
+
+  <section class="page-section" id="health-connect">
+    <h2>10. Health Connect <em>(optional)</em></h2>
+    <p>This needs exercise sessions with GPS routes in Health Connect, for example from Fitbit, Samsung Health or Google Fit.</p>
+
+    <h3 id="HC-1">HC-1 · Allow access</h3>
+    <ol class="page-list">
+      <li>Sync tab → Health Connect → Allow Health Connect access. Allow exercise.</li>
+      <li>Follow the steps on screen to allow exercise routes inside Health Connect, then come back.</li>
+      <li>Tap the info button next to Health Connect.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> after each step the screen moves on: "One more step" until routes are allowed, then "Ready, the last 30 days only" until past data is allowed, then "Ready to read". The info explains that only exercise sessions and their routes are read, never heart rate or other health data.</p>
+
+    <h3 id="HC-2">HC-2 · Sync</h3>
+    <p>Tap Sync now.</p>
+    <p class="testing__expect"><strong>Expected:</strong> "Reading Health Connect…", then "Read … sessions, synced …", then a summary such as "Synced 3 new, 0 already in HoldMyTrack, out of 12 sessions read." Indoor sessions are counted as skipped. The new activities appear on the map.</p>
+
+    <h3 id="HC-3">HC-3 · Interrupted and run again</h3>
+    <p>Start Sync now and switch to another app straight away. Come back and sync again.</p>
+    <p class="testing__expect"><strong>Expected:</strong> the first run stops early and says so. The second picks up where it stopped. No activity appears twice.</p>
+  </section>
+
+  <section class="page-section" id="recording">
+    <h2>11. Recording</h2>
+    <p>Do this outdoors, walking for at least two minutes.</p>
+
+    <h3 id="RC-1">RC-1 · Record a walk</h3>
+    <ol class="page-list">
+      <li>Tap the record button in the middle of the bottom bar. Allow location and notifications.</li>
+      <li>Walk. Tap the button once to pause, and again to resume.</li>
+      <li>Hold the button for 2 seconds to stop. Try letting go early once.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> "Waiting for GPS…" until there is a fix, then the time and distance count up and the route draws live. Pausing shows "Paused · …" and "Hold to stop recording". While holding: "Keep holding to stop…", and letting go early carries on. Stopping opens Save recording.</p>
+
+    <h3 id="RC-2">RC-2 · Save and sync it</h3>
+    <ol class="page-list">
+      <li>Choose a type and Save.</li>
+      <li>On the Sync tab, look under "Recorded on this phone", then tap Sync now.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> "Recording saved. It will appear on the map after you sync." The Sync tab shows a badge and "1 recording waiting" with a route preview. After syncing, the row goes and the walk is on the map.</p>
+
+    <h3 id="RC-3">RC-3 · The notification</h3>
+    <p>Start a recording, then lock the phone and use the notification's Pause, Resume and Stop.</p>
+    <p class="testing__expect"><strong>Expected:</strong> the notification shows time, distance, speed and altitude. Stop asks "Stop recording?" with Keep recording as the other choice.</p>
+
+    <h3 id="RC-4">RC-4 · Too short</h3>
+    <p>Start a recording and stop it within a few seconds.</p>
+    <p class="testing__expect"><strong>Expected:</strong> "Too short — not saved."</p>
+
+    <h3 id="RC-5">RC-5 · The app is closed while recording</h3>
+    <p>Start a recording, walk a little, then force-stop HoldMyTrack from Android's app settings and open it again.</p>
+    <p class="testing__expect"><strong>Expected:</strong> "Unfinished recording" with Resume, Save and Discard.</p>
+
+    <h3 id="RC-6">RC-6 · Edit, download, delete before syncing</h3>
+    <p>Record another short walk and save it. Under "Recorded on this phone", Edit it (change the type), use Download GPX, then Delete it.</p>
+    <p class="testing__expect"><strong>Expected:</strong> Download GPX says "Track saved." Delete warns "It hasn't been synced, so this is the only copy. This can't be undone."</p>
+  </section>
+
+  <section class="page-section" id="you">
+    <h2>12. You and Settings</h2>
+
+    <h3 id="YO-1">YO-1 · Your numbers</h3>
+    <p>Open the You tab, then Activity graph &amp; trends.</p>
+    <p class="testing__expect"><strong>Expected:</strong> totals for all time: Activities, Distance, Active days, Longest streak. A grid for 2026 with a square per day. Tapping a day gives its totals. Shade by switches between Activities and Distance. Trends shows bars per Week or Month. Tapping a bar gives its distance, count, moving time and gain.</p>
+
+    <h3 id="YO-2">YO-2 · Settings</h3>
+    <ol class="page-list">
+      <li>Open Settings from the You tab. Choose an avatar from your photos, set a Name, and Save.</li>
+      <li>Change Country to United States and Save. Look at distances on the map and in the panel.</li>
+      <li>Change it back.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> "Avatar updated." and "Saved.". With United States, distances show in miles and feet. With most other countries, kilometres and metres.</p>
+
+    <h3 id="YO-3">YO-3 · Language</h3>
+    <p>Set Language to Русский, look around, then set it back to Automatic (phone).</p>
+    <p class="testing__expect"><strong>Expected:</strong> the app switches language at once, with Russian number formats (1 234,5 км). Please report any text left in English.</p>
+  </section>
+
+  <section class="page-section" id="account">
+    <h2>13. Your account</h2>
+
+    <h3 id="AC-1">AC-1 · Sign out and back in</h3>
+    <p>You tab → Sign out, then sign in again.</p>
+    <p class="testing__expect"><strong>Expected:</strong> the sign-in screen, and Back leaves the app. After signing in, everything is where you left it. A wrong password says "Invalid email or password."</p>
+
+    <h3 id="AC-2">AC-2 · Forgot password <em>(email accounts)</em></h3>
+    <p>Sign out, tap Forgot password?, and follow the email.</p>
+    <p class="testing__expect"><strong>Expected:</strong> the browser opens a "Forgot password" page, and the email's link lets you set a new password that then works in the app.</p>
+
+    <h3 id="AC-3">AC-3 · Download your data</h3>
+    <p>You tab → Privacy → Download your data → Request a download.</p>
+    <p class="testing__expect"><strong>Expected:</strong> "Preparing your archive…", then an email when it's ready, and a download button. The zip holds your uploaded files, a GPX for each activity, your photos and your settings.</p>
+
+    <h3 id="AC-4">AC-4 · Delete your account <em>(do this last)</em></h3>
+    <ol class="page-list">
+      <li>You tab → Delete account…. Type a wrong email first, then your own.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> a wrong email is refused. With the right one: "Your account was deleted. Everything in it will be gone within a few minutes." You can then sign up again with the same email.</p>
+  </section>
+
+  <section class="page-section" id="demo">
+    <h2>14. The demo</h2>
+
+    <h3 id="DM-1">DM-1 · Look around without an account</h3>
+    <p>Signed out, tap Try the demo.</p>
+    <p class="testing__expect"><strong>Expected:</strong> a ready-made account with activities in Cleveland, Niagara Falls, Rome, Tallinn and Vietnam, Stories and photos. Everything can be looked at, but nothing can be changed. Editing says "Not available for demo accounts — create an account to edit activities", Upload says the same for uploading, and Sync now isn't there.</p>
+  </section>
+
+  <section class="page-section" id="report">
+    <h2>Reporting a problem</h2>
+    <p>Email <a href="mailto:hello@holdmytrack.com">hello@holdmytrack.com</a> with:</p>
+    <ul class="page-list">
+      <li>the test ID, such as UP-3,</li>
+      <li>what you expected, and what happened instead,</li>
+      <li>your phone's model and Android version,</li>
+      <li>a screenshot or screen recording, if you can.</li>
+    </ul>
+  </section>
+</main>
+{{end}}
