@@ -221,7 +221,7 @@ scp app/build/outputs/apk/debug/app-debug.apk <vps>:/srv/holdmytrack/downloads/h
 
 The APK carries its own version — `versionName` (the release number) and the commit's short SHA, shown at the foot of the app's You tab — and a `versionCode` that is the commit count, so a newer build always installs over an older one (`apps/android/docs/IMPLEMENTATION.md` §8). Build from the commit you deployed and the app's SHA matches `/healthz`'s `version`.
 
-It's served with `Cache-Control: no-cache`, so a replaced file is never masked by a cached copy. There's no release signing config yet, so this is a debug-signed APK: installable by sideloading, but not a Play Store build, and a later release-signed APK can't install over it without uninstalling first. Google sign-in works in it only if that debug key's SHA-1 has an Android OAuth client (step 4).
+It's served with `Cache-Control: no-cache`, so a replaced file is never masked by a cached copy. This is a debug-signed APK: installable by sideloading, and it keeps Donate, which the Play build leaves out. The Play build is the release-signed bundle (`apps/android/holdmytrack/README.md`, Release build), and the two can't install over each other without uninstalling first. Google sign-in works in it only if that debug key's SHA-1 has an Android OAuth client (step 4).
 
 ## 11. Backups and the restore drill
 

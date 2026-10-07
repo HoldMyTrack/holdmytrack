@@ -22,7 +22,7 @@ Gradle itself is not a prerequisite — the committed wrapper (`./gradlew`) pins
 
 ## Pointing the app at an API
 
-`BuildConfig.API_BASE_URL` is baked in at build time from the `holdmytrack.apiBaseUrl` Gradle property, which `gradle.properties` defaults to `http://10.0.2.2:8080` — the emulator's alias for the host's loopback, so it reaches a `make up` stack on the host. Override it for anything else:
+`BuildConfig.API_BASE_URL` is baked in at build time. A debug build takes it from the `holdmytrack.apiBaseUrl` Gradle property, which `gradle.properties` defaults to `http://10.0.2.2:8080` — the emulator's alias for the host's loopback, so it reaches a `make up` stack on the host. A release build takes `holdmytrack.releaseApiBaseUrl` instead, `https://holdmytrack.com` (see Release build below). Override the debug one for anything else:
 
 ```sh
 # Physical device over USB, against a host stack whose API is published on 8081.
@@ -38,6 +38,23 @@ adb reverse tcp:5173 tcp:5173
 ```
 
 Cleartext `http://` is permitted in debug builds only (`app/src/debug/AndroidManifest.xml`), so a release build cannot quietly ship pointing at one.
+
+## Release build
+
+The release build is the Play build: an Android App Bundle signed with the upload key, which Play App Signing re-signs with the key Google holds. The upload keystore and its passwords are kept out of the repository, in four properties in `~/.gradle/gradle.properties`:
+
+```properties
+holdmytrack.uploadStoreFile=/Users/<you>/.android/holdmytrack-upload.jks
+holdmytrack.uploadStorePassword=…
+holdmytrack.uploadKeyAlias=upload
+holdmytrack.uploadKeyPassword=…
+```
+
+```sh
+./gradlew bundleRelease   # app/build/outputs/bundle/release/app-release.aab
+```
+
+Without the properties, `bundleRelease` stops at `validateSigningRelease` ("Keystore file not set for signing config release"); debug builds don't need them. Keep a copy of the keystore and its password somewhere other than this machine: a lost upload key can be replaced only by asking Google to reset it from Play Console.
 
 ## Sign in with Google and Facebook
 
