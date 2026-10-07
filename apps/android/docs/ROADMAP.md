@@ -66,10 +66,11 @@ Everything between a tested app and its Play Store listing, roughly in the order
 - [x] **The foreground-service declaration for recording**
   - No Location permissions declaration: Play asks for one only from an app targeting Android 10 or newer that declares `ACCESS_BACKGROUND_LOCATION` (Play Console Help, "Location permissions declaration", checked 2026-10-03), and recording is foreground-only, `ACCESS_FINE_LOCATION` asked for on the record button's first tap.
   - `RecordingService` declares `foregroundServiceType="location"`, so the Foreground service permissions declaration on the App content page is needed. Filed 2026-10-07 under Background location updates as Other, not User-initiated location sharing, since a recording goes to the user's own map and is shared with no one: a description of the feature, what the user loses if it's interrupted, and a link to a 60-second emulator video of a recording started from the record button, through the location dialog, the notification, the screen off and pause.
-- [ ] **The rest of the App content page**
-  - The Data safety form: email address, precise location, exercise sessions and routes, and photos are collected; all of it travels encrypted; none of it is shared or used for ads; accounts can be deleted.
-  - The content rating questionnaire (IARC), the target audience (not aimed at children), and no ads.
-  - App access: reviewers need a way in. The demo account gets them onto the map, but it can't sync Health Connect or edit anything, so supply a review account's credentials and say what's in it.
+- [x] **The rest of the App content page**
+  - Data safety: nothing shared; collected are the email address, user IDs and an optional name (account management), precise location, fitness info (Health Connect sessions), photos, files and docs (uploads), other user-generated content (names, descriptions, Stories, Private locations, captures), all for app functionality, and diagnostics (the server's logs and metrics, analytics); all of it travels encrypted, and an account or any part of its data can be deleted.
+  - The content rating questionnaire (IARC), the target audience (16 and over, not aimed at children), no ads and no advertising ID.
+  - Sign in details (App access): the demo can't sync, edit or upload, so reviewers get `review@holdmytrack.com`, a production account with eleven of the Demo Customer's GPX files uploaded and its email marked confirmed, and instructions for Health Connect sync and recording. Its password is in Play Console only.
+  - Filled in 2026-10-07; sent for review from Publishing overview.
 - [ ] **The store listing, in English and Russian**
   - Name, short description (80 characters), full description (4,000), the 512 × 512 icon (`brand/make_icons.py` renders the launcher icon from the same logo), a 1024 × 500 feature graphic (`brand/play-feature-graphic.png`, and `-ru` for the Russian listing, rendered by the same script), and at least two phone screenshots, plus a category, a contact email, the website and the privacy policy URL.
 - [ ] **Testing tracks, then production**
