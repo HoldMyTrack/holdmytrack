@@ -1469,7 +1469,7 @@ What is planned but not yet built is in `docs/ROADMAP.md`.
 1. Every photo has a place on its activity's track: a moment on it (`route_at`), never a stored position. Its position is that moment's point on the track, worked out on every read.
 2. A `route_at` the user chose places it there, clamped to the track's first and last moment.
 3. Otherwise it's placed at its capture time when that falls within the track; a capture time up to 5 minutes before the track starts or after it ends places it at that end.
-4. A `taken_local` time is read in the account's time zone; if that misses the track, in the UTC offset (in 15-minute steps, −12:00 to +14:00) nearest the account's own that puts it on the track. `taken_at` (FR-16.3) is the instant it resolved to.
+4. A `taken_local` time is read in the time zone the activity was recorded in (FR-3.11), where the camera's clock most likely was; if that misses the track, in the UTC offset (in 15-minute steps, −12:00 to +14:00) nearest that zone's that puts it on the track. `taken_at` (FR-16.3) is the instant it resolved to.
 5. Without a capture time that places it, an EXIF position within 500 m of the track places it at the track's nearest point.
 6. With none of these, the upload is refused for the user to choose (FR-16.1).
 7. A photo is always on the track as it's drawn: a moment the track no longer covers — cut off by Edit track or a Private location at its start or end — reads as the track's nearest end, and `route_at` is kept, so the photo returns to its moment if the track does. A track that passes through a Private location is drawn whole (FR-8.1), so a photo on that stretch shows nothing the track doesn't.

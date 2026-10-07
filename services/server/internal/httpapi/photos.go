@@ -531,9 +531,10 @@ func (s *Server) trackSpan(ctx context.Context, activityID string) (start, end f
 // photoSnapMaxM. With none of these, routeAt is nil: the user has to say. errPhotoNoTrack for an
 // activity with no track, which can't hold a photo.
 //
-// A wall-clock time with no zone is read in the account's own zone first; if that misses the
-// track, in whichever UTC offset puts it on the track, the nearest to the account's own.
-func (s *Server) placePhoto(ctx context.Context, activityID string, clock photoClock, home *time.Location, at *[2]float64, chosen *time.Time) (takenAt, routeAt *time.Time, err error) {
+// A wall-clock time with no zone is read in the activity's own zone first (§4.30: where the
+// camera's clock was, most likely), or the account's (accountLoc) if that one can't be loaded;
+// if that misses the track, in whichever UTC offset puts it on the track, the nearest to it.
+func (s *Server) placePhoto(ctx context.Context, activityID string, clock photoClock, accountLoc *time.Location, at *[2]float64, chosen *time.Time) (takenAt, routeAt *time.Time, err error) {
 	start, end, hasTrack, err := s.trackSpan(ctx, activityID)
 	if err != nil {
 		return nil, nil, err
@@ -548,6 +549,14 @@ func (s *Server) placePhoto(ctx context.Context, activityID string, clock photoC
 
 	takenAt = clock.at
 	if clock.local != nil {
+		home := accountLoc
+		var tz string
+		if err := s.pool.QueryRow(ctx, `SELECT timezone FROM activities WHERE id = $1`, activityID).Scan(&tz); err != nil {
+			return nil, nil, err
+		}
+		if loc, err := time.LoadLocation(tz); err == nil {
+			home = loc
+		}
 		takenAt = resolveWallClock(*clock.local, home, onTrack)
 	}
 	if chosen != nil {

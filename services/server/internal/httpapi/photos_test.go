@@ -63,6 +63,26 @@ func near(a *float64, b float64) bool { return a != nil && math.Abs(*a-b) < 1e-6
 // (10.0005, 50.0005) is 10:00:30.
 var photoTrackStart = time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
 
+// A camera clock with no zone is read in the zone the activity was recorded in (§4.30), not the
+// account's: placed by the user's choice, a time that's on no part of the track is kept as that
+// zone's wall clock. (Two days before the track, no UTC offset puts it on the track.)
+func TestPhotoWallClockInTheActivitysZone(t *testing.T) {
+	d := newDBTestWithS3(t, newMemS3())
+	me := d.newAccount(false)
+	if _, err := d.pool.Exec(context.Background(), `UPDATE users SET timezone = 'Europe/Berlin' WHERE id = $1`, me.id); err != nil {
+		t.Fatal(err)
+	}
+	walk := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, startedAt: photoTrackStart,
+		at: &[2]float64{10, 50}, timezone: "Asia/Tokyo"})
+	var p photoJSON
+	d.decode(d.uploadPhoto(me, testJPEG(t, 400, 300), testJPEG(t, 32, 24), map[string]string{
+		"activity_id": walk, "taken_local": "2026-04-29T08:00:00", "route_at": "2026-05-01T10:00:30Z",
+	}), http.StatusCreated, &p)
+	if want := time.Date(2026, 4, 28, 23, 0, 0, 0, time.UTC); p.TakenAt == nil || !p.TakenAt.Equal(want) {
+		t.Errorf("taken at %v, want %v (08:00 in Tokyo)", p.TakenAt, want)
+	}
+}
+
 func TestPhotoPlacement(t *testing.T) {
 	s3 := newMemS3()
 	d := newDBTestWithS3(t, s3)
@@ -81,7 +101,7 @@ func TestPhotoPlacement(t *testing.T) {
 		{"capture time, mid-track", map[string]string{"taken_at": "2026-05-01T10:00:30Z"}, 10.0005, 50.0005},
 		{"capture time just before the start clamps to it", map[string]string{"taken_at": "2026-05-01T09:57:00Z"}, 10, 50},
 		{"capture time well off the track", map[string]string{"taken_at": "2026-05-01T12:00:00Z"}, 0, 0},
-		{"wall clock in the account's zone", map[string]string{"taken_local": "2026-05-01T12:00:30"}, 10.0005, 50.0005},
+		{"wall clock in the activity's zone", map[string]string{"taken_local": "2026-05-01T12:00:30"}, 10.0005, 50.0005},
 		{"wall clock in another zone", map[string]string{"taken_local": "2026-05-01T19:00:30"}, 10.0005, 50.0005},
 		{"position only, near the track", map[string]string{"lon": "10.0006", "lat": "50.0004"}, 10.0005, 50.0005},
 		{"position only, far from it", map[string]string{"lon": "11", "lat": "50"}, 0, 0},
