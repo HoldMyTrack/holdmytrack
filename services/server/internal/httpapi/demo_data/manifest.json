@@ -301,6 +301,66 @@
           "height": 1536
         }
       ]
+    },
+    "2026-10-06 Mill Creek Falls.gpx": {
+      "name": "Mill Creek Falls",
+      "type": "Solowheel",
+      "photos": [
+        {
+          "file": "2026-10-06 Mill Creek Falls 1.webp",
+          "thumb": "2026-10-06 Mill Creek Falls 1-thumb.webp",
+          "taken_at": "2026-10-06T21:22:31Z",
+          "route_at": "2026-10-06T21:25:06Z",
+          "width": 2048,
+          "height": 1536
+        },
+        {
+          "file": "2026-10-06 Mill Creek Falls 2.webp",
+          "thumb": "2026-10-06 Mill Creek Falls 2-thumb.webp",
+          "taken_at": "2026-10-06T21:13:22Z",
+          "route_at": "2026-10-06T21:35:50Z",
+          "width": 2048,
+          "height": 1536
+        },
+        {
+          "file": "2026-10-06 Mill Creek Falls 3.webp",
+          "thumb": "2026-10-06 Mill Creek Falls 3-thumb.webp",
+          "taken_at": "2026-10-06T21:12:35Z",
+          "route_at": "2026-10-06T21:35:58Z",
+          "width": 2048,
+          "height": 1536
+        }
+      ]
+    },
+    "2026-10-05 Evening loop.gpx": {
+      "name": "Evening loop",
+      "type": "Solowheel",
+      "photos": [
+        {
+          "file": "2026-10-05 Evening loop 1.webp",
+          "thumb": "2026-10-05 Evening loop 1-thumb.webp",
+          "taken_at": "2026-10-05T20:58:16Z",
+          "route_at": "2026-10-05T21:44:59Z",
+          "width": 2048,
+          "height": 1536
+        },
+        {
+          "file": "2026-10-05 Evening loop 2.webp",
+          "thumb": "2026-10-05 Evening loop 2-thumb.webp",
+          "taken_at": "2026-10-05T20:56:19Z",
+          "route_at": "2026-10-05T21:46:50Z",
+          "width": 2048,
+          "height": 1536
+        },
+        {
+          "file": "2026-10-05 Evening loop 3.webp",
+          "thumb": "2026-10-05 Evening loop 3-thumb.webp",
+          "taken_at": "2026-10-05T20:52:15Z",
+          "route_at": "2026-10-05T21:47:55Z",
+          "width": 2048,
+          "height": 1536
+        }
+      ]
     }
   },
   "stories": [
@@ -412,6 +472,22 @@
       "osm_id": 983648985,
       "name": "Historical game court",
       "captured_at": "2026-10-04T19:49:05.152444Z"
+    },
+    {
+      "osm_type": "way",
+      "osm_id": 1201821292,
+      "captured_at": "2026-10-05T20:54:49.471265Z"
+    },
+    {
+      "osm_type": "node",
+      "osm_id": 4066048425,
+      "captured_at": "2026-10-06T21:23:32.213152Z"
+    },
+    {
+      "osm_type": "node",
+      "osm_id": 4066048415,
+      "name": "Mill Creek Falls Overlook",
+      "captured_at": "2026-10-06T21:24:07.167148Z"
     }
   ]
 }
