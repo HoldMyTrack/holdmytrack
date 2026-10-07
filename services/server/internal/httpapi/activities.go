@@ -115,7 +115,7 @@ const activityStoriesColumn = `COALESCE((
 // Column order here has to match scanActivityRow's Scan call exactly — activityByIDQuery
 // below shares that same order for the same reason.
 var listActivitiesQuery = `
-SELECT id, started_at, activity_type, name, distance_meters, duration_seconds, description,
+SELECT id, started_at, timezone, activity_type, name, distance_meters, duration_seconds, description,
        ST_XMin(trajectory), ST_YMin(trajectory), ST_XMax(trajectory), ST_YMax(trajectory),
        edit_pending, track_edit IS NOT NULL, trajectory IS NULL, split_group, split_from, split_to,
        ` + activityStoriesColumn + `
@@ -145,13 +145,16 @@ ORDER BY started_at DESC, id DESC`
 // The three metric fields are nullable in §3.3 and stay nullable here rather than being
 // coerced to 0: a file that carried no distance is not a zero-distance activity.
 type activityRow struct {
-	ID              string    `json:"id"`
-	StartedAt       time.Time `json:"started_at"`
-	ActivityType    string    `json:"activity_type"`
-	Name            *string   `json:"name"`
-	DistanceMeters  *float64  `json:"distance_meters"`
-	DurationSeconds *int32    `json:"duration_seconds"`
-	Description     *string   `json:"description"`
+	ID        string    `json:"id"`
+	StartedAt time.Time `json:"started_at"`
+	// Timezone is the IANA zone it was recorded in (§4.30): a client shows StartedAt, and any
+	// other time of this activity's, in it.
+	Timezone        string   `json:"timezone"`
+	ActivityType    string   `json:"activity_type"`
+	Name            *string  `json:"name"`
+	DistanceMeters  *float64 `json:"distance_meters"`
+	DurationSeconds *int32   `json:"duration_seconds"`
+	Description     *string  `json:"description"`
 	// [minLon, minLat, maxLon, maxLat] — GeoJSON's bbox ordering — or null when the row has
 	// no geometry. §3.3 allows a null trajectory, and a client must not fly the map nowhere.
 	BBox []float64 `json:"bbox"`
@@ -200,7 +203,7 @@ func scanActivityRow(row rowScanner) (activityRow, error) {
 	var minLon, minLat, maxLon, maxLat *float64
 	var splitGroup *string
 	var split splitRef
-	if err := row.Scan(&a.ID, &a.StartedAt, &a.ActivityType, &a.Name, &a.DistanceMeters, &a.DurationSeconds, &a.Description,
+	if err := row.Scan(&a.ID, &a.StartedAt, &a.Timezone, &a.ActivityType, &a.Name, &a.DistanceMeters, &a.DurationSeconds, &a.Description,
 		&minLon, &minLat, &maxLon, &maxLat, &a.Pending, &a.Edited, &a.Private, &splitGroup, &split.From, &split.To, &a.Stories); err != nil {
 		return activityRow{}, err
 	}
@@ -277,7 +280,7 @@ const maxActivityNameLen = 200
 // (scanActivityRow's Scan call is shared between both), scoped by id and owner exactly like
 // trackMetricsQuery — a non-owned or nonexistent id is indistinguishable from "not found."
 const activityByIDQuery = `
-SELECT id, started_at, activity_type, name, distance_meters, duration_seconds, description,
+SELECT id, started_at, timezone, activity_type, name, distance_meters, duration_seconds, description,
        ST_XMin(trajectory), ST_YMin(trajectory), ST_XMax(trajectory), ST_YMax(trajectory),
        edit_pending, track_edit IS NOT NULL, trajectory IS NULL, split_group, split_from, split_to,
        ` + activityStoriesColumn + `
@@ -1194,8 +1197,8 @@ func (s *Server) handleActivityTrackMetrics(w http.ResponseWriter, r *http.Reque
 // beside the history they came from, and the question this answers ("what went missing, and
 // why") is asked about all of them at once.
 const duplicatesQuery = `
-SELECT a.id, a.started_at, a.activity_type, a.distance_meters, a.source,
-       w.id, w.source, w.started_at
+SELECT a.id, a.started_at, a.timezone, a.activity_type, a.distance_meters, a.source,
+       w.id, w.source, w.started_at, w.timezone
 FROM activities a
 JOIN activities w ON w.id = a.superseded_by
 WHERE a.user_id = $1
@@ -1207,11 +1210,13 @@ type supersedingActivity struct {
 	ID        string    `json:"id"`
 	Source    string    `json:"source"`
 	StartedAt time.Time `json:"started_at"`
+	Timezone  string    `json:"timezone"` // the zone it was recorded in (§4.30)
 }
 
 type duplicateRow struct {
 	ID           string    `json:"id"`
 	StartedAt    time.Time `json:"started_at"`
+	Timezone     string    `json:"timezone"` // the zone it was recorded in (§4.30)
 	ActivityType string    `json:"activity_type"`
 	// Nullable for the same reason every other per-row metric here is: a source that reported
 	// no distance is not a zero-distance activity.
@@ -1237,8 +1242,8 @@ func (s *Server) handleListDuplicates(w http.ResponseWriter, r *http.Request) {
 	list := make([]duplicateRow, 0)
 	for rows.Next() {
 		var d duplicateRow
-		if err := rows.Scan(&d.ID, &d.StartedAt, &d.ActivityType, &d.DistanceMeters, &d.Source,
-			&d.SupersededBy.ID, &d.SupersededBy.Source, &d.SupersededBy.StartedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.StartedAt, &d.Timezone, &d.ActivityType, &d.DistanceMeters, &d.Source,
+			&d.SupersededBy.ID, &d.SupersededBy.Source, &d.SupersededBy.StartedAt, &d.SupersededBy.Timezone); err != nil {
 			s.log.Error("duplicates scan failed", "err", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return

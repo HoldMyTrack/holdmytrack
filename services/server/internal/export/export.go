@@ -85,9 +85,21 @@ func Build(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID
 		return nil, err
 	}
 
-	loc, err := time.LoadLocation(doc.Account.Timezone)
+	// Each activity is named by its local start where it was recorded (IMPLEMENTATION.md §4.30).
+	accountLoc, err := time.LoadLocation(doc.Account.Timezone)
 	if err != nil {
-		loc = time.UTC
+		accountLoc = time.UTC
+	}
+	locs := map[string]*time.Location{}
+	locationOf := func(tz string) *time.Location {
+		loc, ok := locs[tz]
+		if !ok {
+			if loc, err = time.LoadLocation(tz); err != nil {
+				loc = accountLoc
+			}
+			locs[tz] = loc
+		}
+		return loc
 	}
 	names := map[string]bool{}
 	originals := map[string]string{} // raw key -> its file in the archive
@@ -97,7 +109,7 @@ func Build(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID
 		if act.Name != "" {
 			label = act.Name
 		}
-		base := uniqueName(names, act.StartedAt.In(loc).Format("2006-01-02 1504")+" "+Slug(label))
+		base := uniqueName(names, act.StartedAt.In(locationOf(act.Timezone)).Format("2006-01-02 1504")+" "+Slug(label))
 
 		if act.rawKey != "" {
 			if file, ok := originals[act.rawKey]; ok {
@@ -308,6 +320,7 @@ type activity struct {
 	Source           string    `json:"source"`
 	Description      string    `json:"description,omitempty"`
 	StartedAt        time.Time `json:"started_at"`
+	Timezone         string    `json:"timezone"` // where it was recorded, an IANA name
 	DistanceMeters   *float64  `json:"distance_m,omitempty"`
 	ElapsedSeconds   *int64    `json:"elapsed_s,omitempty"`
 	MovingSeconds    *int64    `json:"moving_s,omitempty"`
@@ -365,7 +378,7 @@ func loadAccount(ctx context.Context, pool *pgxpool.Pool, userID string) (*docum
 	a.CreatedAt = a.CreatedAt.UTC()
 
 	rows, err := pool.Query(ctx, `
-		SELECT id, COALESCE(name, ''), activity_type, source, COALESCE(description, ''), started_at,
+		SELECT id, COALESCE(name, ''), activity_type, source, COALESCE(description, ''), started_at, timezone,
 		       distance_meters::float8, duration_seconds, moving_seconds, elevation_gain_m::float8,
 		       COALESCE(superseded_by::text, ''), COALESCE(raw_payload_key, '')
 		FROM activities WHERE user_id = $1 ORDER BY started_at, id`, userID)
@@ -375,7 +388,7 @@ func loadAccount(ctx context.Context, pool *pgxpool.Pool, userID string) (*docum
 	index := map[string]int{}
 	for rows.Next() {
 		var v activity
-		if err := rows.Scan(&v.ID, &v.Name, &v.Type, &v.Source, &v.Description, &v.StartedAt,
+		if err := rows.Scan(&v.ID, &v.Name, &v.Type, &v.Source, &v.Description, &v.StartedAt, &v.Timezone,
 			&v.DistanceMeters, &v.ElapsedSeconds, &v.MovingSeconds, &v.ElevationGainM, &v.DuplicateOf, &v.rawKey); err != nil {
 			rows.Close()
 			return nil, fmt.Errorf("activities: %w", err)

@@ -9,8 +9,9 @@ import (
 )
 
 // Every day an activity is grouped or filtered by is the local date where it was recorded
-// (IMPLEMENTATION.md §4.30), not the account's: for an account on New York time, a run at
-// 07:30 on 10 March in Tokyo (22:30 on the 9th in New York) is on the 10th everywhere.
+// (IMPLEMENTATION.md §4.30), not the account's, and its row names that zone: for an account on
+// New York time, a run at 07:30 on 10 March in Tokyo (22:30 on the 9th in New York) is on the
+// 10th everywhere.
 func TestActivitiesGroupByTheirOwnTimezone(t *testing.T) {
 	d := newDBTest(t)
 	me := d.newAccount(false)
@@ -42,6 +43,13 @@ func TestActivitiesGroupByTheirOwnTimezone(t *testing.T) {
 	} {
 		if got := list(query); !slices.Equal(got, want) {
 			t.Errorf("list ?%s = %v, want %v", query, got, want)
+		}
+	}
+
+	// Each row names its zone, for a client to show its times in.
+	for _, a := range d.listActivities(me) {
+		if want := map[string]string{tokyo: "Asia/Tokyo", home: "America/New_York"}[a.ID]; a.Timezone != want {
+			t.Errorf("activity %s: timezone %q, want %q", a.ID, a.Timezone, want)
 		}
 	}
 

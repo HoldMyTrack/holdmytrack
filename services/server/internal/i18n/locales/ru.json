@@ -202,7 +202,7 @@
   "admin.live_activities.one": "{n} действующее занятие",
   "admin.live_activities.few": "{n} действующих занятия",
   "admin.live_activities.many": "{n} действующих занятий",
-  "admin.times_note": "Время ниже — в часовом поясе этого аккаунта.",
+  "admin.times_note": "Даты и время занятий — местные, там, где занятие записано; дата регистрации — в часовом поясе этого аккаунта.",
   "admin.pages": "Страницы",
   "admin.newer": "← Новее",
   "admin.older": "Старше →",

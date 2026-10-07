@@ -198,7 +198,7 @@
   "admin.signed_up": "signed up {date}",
   "admin.live_activities.one": "{n} live activity",
   "admin.live_activities.other": "{n} live activities",
-  "admin.times_note": "Times below are in this account's timezone.",
+  "admin.times_note": "Each activity's dates and times are local to where it was recorded; the signup date is in this account's timezone.",
   "admin.pages": "Pages",
   "admin.newer": "← Newer",
   "admin.older": "Older →",
