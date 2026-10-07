@@ -12,10 +12,10 @@ import androidx.core.view.isVisible
 import com.google.android.material.button.MaterialButton
 import dev.holdmytrack.android.R
 import dev.holdmytrack.android.net.Session
+import dev.holdmytrack.android.panel.ActivityZone
 import dev.holdmytrack.android.net.Spot
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
@@ -102,7 +102,7 @@ class SpotPopup(private val view: View, private val top: () -> Int, private val 
     fun renderCaptured() {
         val at = spot?.let { MapSpots.captured[it.id] }
         captured.text = at?.let {
-            val date = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.getDefault()).format(it.atZone(ZoneId.systemDefault()))
+            val date = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.getDefault()).format(it.atZone(ActivityZone.of(null, Session.timezone)))
             res.getString(R.string.spots_captured_on, date)
         }
         captured.isVisible = at != null

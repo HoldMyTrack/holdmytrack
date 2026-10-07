@@ -70,9 +70,9 @@ export interface UserProfile {
   avatarUrl: string;
   /** IANA zone name (e.g. "America/New_York"), never `''` — unlike displayName/country there
    *  is no "unset" state (services/server/migrations/0001_users_and_auth.sql's column is
-   *  `NOT NULL DEFAULT 'UTC'`). Drives every day-bucketing query server-side
-   *  (docs/KNOWN_ISSUES.md's "UTC-day bucketing" entry) — the client never buckets by day
-   *  itself, it only offers this value for editing in Settings. */
+   *  `NOT NULL DEFAULT 'UTC'`). Decides "today" server-side and stands in for an activity's own
+   *  zone where that isn't known (IMPLEMENTATION.md §4.30); the client shows a time with no
+   *  activity of its own in it (a Spot's capture). */
   timezone: string;
 }
 
@@ -153,6 +153,9 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
 export interface Activity {
   id: string;
   startedAt: string;
+  /** The IANA zone it was recorded in (IMPLEMENTATION.md §4.30): every time of this activity
+   *  is shown in it, not the browser's or the account's. */
+  timezone: string;
   activityType: string;
   name: string | null;
   distanceMeters: number | null;
@@ -187,6 +190,7 @@ export interface ActivityQuery {
 interface ActivityRowBody {
   id: string;
   started_at: string;
+  timezone: string;
   activity_type: string;
   name: string | null;
   distance_meters: number | null;
@@ -219,6 +223,7 @@ function toActivity(a: ActivityRowBody): Activity {
   return {
     id: a.id,
     startedAt: a.started_at,
+    timezone: a.timezone,
     activityType: a.activity_type,
     name: a.name,
     distanceMeters: a.distance_meters,
@@ -776,6 +781,8 @@ export interface Photo {
   activityId: string;
   takenAt: string | null;
   routeAt: string;
+  /** Its activity's zone, which `takenAt` and `routeAt` are shown in. */
+  timezone: string;
   lon: number | null;
   lat: number | null;
   caption: string | null;
@@ -790,6 +797,7 @@ interface PhotoBody {
   activity_id: string;
   taken_at: string | null;
   route_at: string;
+  timezone: string;
   lon: number | null;
   lat: number | null;
   caption: string | null;
@@ -805,6 +813,7 @@ function toPhoto(b: PhotoBody): Photo {
     activityId: b.activity_id,
     takenAt: b.taken_at,
     routeAt: b.route_at,
+    timezone: b.timezone,
     lon: b.lon,
     lat: b.lat,
     caption: b.caption,

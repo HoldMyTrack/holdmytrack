@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { ImagePlus, Pencil, Trash2, Undo2 } from 'lucide-react';
 import { API_BASE_URL, checkPhotoPlace, getActivityTrackMetrics, PhotoNeedsPlaceError, type Activity, type Photo } from '../api';
-import { lang, t } from '../i18n';
+import { t } from '../i18n';
 import type { PhotoMarkerItem, PhotoMarkerOverlay } from '../map/photos';
+import { formatClockTime } from './format';
 import { draftRows, waitingPhotos, type NewPhoto, type PhotoDraft } from './photoDraft';
 import { fractionAt, photoTrack, pointAt, startFraction, type PhotoTrack, type PlaceAnchor } from './photoTrack';
 import { preparePhoto, UnreadablePhotoError } from './photoPrep';
@@ -28,10 +29,6 @@ export interface PhotosTabProps {
   onPreparingChange: (preparing: boolean) => void;
   /** How the map should show the draft: photos moved, added or deleted, and the one in hand. */
   onOverlay: (overlay: PhotoMarkerOverlay | null) => void;
-}
-
-function timeOfDay(seconds: number): string {
-  return new Date(seconds * 1000).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' });
 }
 
 /**
@@ -201,7 +198,7 @@ export function PhotosTab({ activity, photos, error, draft, setDraft, active, bu
       <label className="photos-tab__slider">
         <span className="photos-tab__slider-label">
           {t('photos.slider')}
-          {at && <span className="photos-tab__slider-time">{timeOfDay(at.t)}</span>}
+          {at && <span className="photos-tab__slider-time">{formatClockTime(at.t * 1000, activity.timezone)}</span>}
         </span>
         <input
           type="range"
@@ -310,7 +307,7 @@ export function PhotosTab({ activity, photos, error, draft, setDraft, active, bu
                 <span className="photos-tab__text">
                   <span className="photos-tab__title">{row.caption || t('photos.photo_n', { n: i + 1 })}</span>
                   <span className="photos-tab__meta">
-                    {timeOfDay(row.routeAt)}
+                    {formatClockTime(row.routeAt * 1000, activity.timezone)}
                     {row.kind === 'new' && <span className="photos-tab__badge">{t('photos.new')}</span>}
                     {changed && !deleted && <span className="photos-tab__badge">{t('photos.changed')}</span>}
                     {deleted && <span className="photos-tab__badge photos-tab__badge--deleted">{t('photos.deleted')}</span>}

@@ -35,7 +35,7 @@ class ImportHistory(
     private val root: View,
     private val preview: Boolean,
     /** A row's View on map: the activity it became, and when it started. */
-    private val onViewOnMap: (activityId: String, startedAt: String) -> Unit,
+    private val onViewOnMap: (activityId: String, day: String) -> Unit,
     /** The preview's See all. */
     private val onSeeAll: () -> Unit = {},
 ) {
@@ -187,12 +187,14 @@ class ImportHistory(
             }
         }
         val activityId = entry.activityId
-        val startedAt = entry.startedAt
+        val day = entry.startedAt?.let { startedAt ->
+            runCatching { Instant.parse(startedAt).atZone(PanelFormat.zone(entry.timezone)).toLocalDate().toString() }.getOrNull()
+        }
         // A duplicate's activity is on no map, so it has nowhere to go.
-        if (entry.status == "done" && !duplicate && activityId != null && startedAt != null) {
+        if (entry.status == "done" && !duplicate && activityId != null && day != null) {
             view.findViewById<TextView>(R.id.row_action).apply {
                 visibility = View.VISIBLE
-                setOnClickListener { onViewOnMap(activityId, startedAt) }
+                setOnClickListener { onViewOnMap(activityId, day) }
             }
         }
         rows.addView(view)
@@ -203,11 +205,12 @@ class ImportHistory(
         detail.visibility = View.VISIBLE
     }
 
-    /** "9 Sep · 34.7 km" — only when both halves are known. */
+    /** "9 Sep · 34.7 km" — only when both halves are known; the date where the activity was
+     *  recorded (`docs/IMPLEMENTATION.md` §4.30). */
     private fun meta(entry: SyncHistoryEntry): String? {
         val startedAt = entry.startedAt ?: return null
         val meters = entry.distanceMeters ?: return null
-        val date = runCatching { shortDate().format(Instant.parse(startedAt)) }.getOrDefault(startedAt)
+        val date = runCatching { shortDate().withZone(PanelFormat.zone(entry.timezone)).format(Instant.parse(startedAt)) }.getOrDefault(startedAt)
         return date + " · " + PanelFormat.distance(res, meters)
     }
 

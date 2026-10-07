@@ -68,6 +68,8 @@ class TrackEditor(
     private val modeNote: TextView = root.findViewById(R.id.edit_track_mode_note)
 
     private var activityId: String? = null
+    /** The zone the open activity was recorded in, which its points' times are shown in. */
+    private var zone: ZoneId = ZoneId.systemDefault()
     private var points: List<TrackPoint>? = null
     private var base: TrackEdit? = null
     private var ops: List<EditOp> = emptyList()
@@ -157,6 +159,7 @@ class TrackEditor(
             return
         }
         activityId = activity.id
+        zone = PanelFormat.zone(activity.timezone)
         points = null
         base = null
         ops = emptyList()
@@ -374,9 +377,10 @@ class TrackEditor(
         }
     }
 
+    /** A point's time of day in the zone the activity was recorded in. */
     private fun clock(ms: Long): String =
         DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
             .withLocale(res.configuration.locales[0])
-            .withZone(ZoneId.systemDefault())
+            .withZone(zone)
             .format(Instant.ofEpochMilli(ms))
 }

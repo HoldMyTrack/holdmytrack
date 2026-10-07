@@ -37,6 +37,7 @@ type uploadRow struct {
 	// Populated only when Status == "done" — the frontend shows a finished
 	// row as "READY · 11 Sep · 8.2 km" rather than repeating the filename's own status.
 	StartedAt      *time.Time `json:"started_at,omitempty"`
+	Timezone       *string    `json:"timezone,omitempty"` // StartedAt's zone, where it was recorded (§4.30)
 	DistanceMeters *float64   `json:"distance_meters,omitempty"`
 	// The resulting activity's own id, once one exists — ROADMAP.md's "View on map" item:
 	// nothing before this could point a click handler at the activity a finished row became.
@@ -93,8 +94,8 @@ SELECT j.payload->>'source_detail' AS filename,
        j.payload->>'external_id' AS external_id,
        j.payload->>'source' AS source,
        j.state, j.last_error, j.error_code, j.created_at, j.finished_at,
-       a.started_at, a.distance_meters, a.id,
-       w.id, w.source, w.started_at
+       a.started_at, a.timezone, a.distance_meters, a.id,
+       w.id, w.source, w.started_at, w.timezone
 FROM jobs j
 LEFT JOIN activities a
   ON a.user_id = j.user_id AND a.source = j.payload->>'source' AND a.external_id = j.payload->>'external_id'
@@ -182,10 +183,10 @@ func (s *Server) handleListUploads(w http.ResponseWriter, r *http.Request) {
 		var u uploadRow
 		var state string
 		var lastError, errorCode *string
-		var keptID, keptSource *string
+		var keptID, keptSource, keptTimezone *string
 		var keptStartedAt *time.Time
 		if err := rows.Scan(&u.Filename, &u.ExternalID, &u.Source, &state, &lastError, &errorCode, &u.SubmittedAt, &u.FinishedAt,
-			&u.StartedAt, &u.DistanceMeters, &u.ActivityID, &keptID, &keptSource, &keptStartedAt); err != nil {
+			&u.StartedAt, &u.Timezone, &u.DistanceMeters, &u.ActivityID, &keptID, &keptSource, &keptStartedAt, &keptTimezone); err != nil {
 			s.log.Error("uploads scan failed", "err", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
@@ -205,7 +206,7 @@ func (s *Server) handleListUploads(w http.ResponseWriter, r *http.Request) {
 			u.Status = state
 		}
 		if keptID != nil && keptSource != nil && keptStartedAt != nil {
-			u.SupersededBy = &supersedingActivity{ID: *keptID, Source: *keptSource, StartedAt: *keptStartedAt}
+			u.SupersededBy = &supersedingActivity{ID: *keptID, Source: *keptSource, StartedAt: *keptStartedAt, Timezone: *keptTimezone}
 		}
 		uploads = append(uploads, u)
 	}

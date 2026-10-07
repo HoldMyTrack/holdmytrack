@@ -98,7 +98,7 @@ export function PhotoPopup({ map, photos, index, onIndex, onClose }: PhotoPopupP
       )}
       {photo.caption && <p className="photo-popup__caption">{photo.caption}</p>}
       <div className="photo-popup__meta">
-        {photo.takenAt && <span>{t('photos.taken', { when: formatStartedAt(photo.takenAt) })}</span>}
+        {photo.takenAt && <span>{t('photos.taken', { when: formatStartedAt(photo.takenAt, photo.timezone) })}</span>}
         <a className="photo-popup__full" href={full} target="_blank" rel="noopener noreferrer">
           <ExternalLink size={13} aria-hidden="true" />
           {t('photos.full_size')}

@@ -185,7 +185,7 @@ The JSON endpoints in this section are refused (`403`) the same way when a brows
 1. Avatar uploads and removals take effect immediately — each is its own action (`POST /settings/avatar`, `POST /settings/avatar/remove`; for an API client, `POST`/`DELETE /v1/account/avatar`), not gated behind a separate save step; choosing a file uploads it. The page, header included, shows the new avatar when it reloads after the upload.
 2. Name, Country and Timezone save together as one action (`POST /settings`, which leaves the account's language as it is; for an API client, `PATCH /v1/account/settings`, which also takes Language as `locale`, optional and left unchanged when absent) — editing one and leaving without saving discards all of them, not just the one touched. A successful save reloads the page with "Saved."; a failed one shows the error with the submitted values kept.
 3. **Country decides which unit system the entire app displays distance, pace, and elevation in** — metric (km, min/km, meters) for every country except the United States, Liberia, and Myanmar, which see imperial (mi, min/mi, feet). An account that has never saved a Country (only possible before its first save — behavior 6) displays metric. It applies everywhere one of these values is shown (the Activities panel, the activity graph, Trends, the per-activity pace/elevation profile, and the map's own distance scale) from the next time that page is opened after saving — Settings is a page of its own, so leaving it is a page load. Save can't be submitted until a Country is chosen.
-4. **Timezone decides which calendar day an activity is grouped under everywhere the app buckets by day** — the date slider's days (FR-6), the activity graph's daily grid and stat cards, `GET /v1/activities/trends`, and date-range filtering. Auto-resolved from the browser at signup (FR-1.1) and editable here afterward; unlike Country, it has no "unset" state — every account always has one, defaulting to UTC until changed.
+4. **Timezone decides what "today" is** — where the date slider's and Trends' default windows end, and the activity graph's current year — and **stands in for an activity's own timezone where that isn't known** (FR-3.11). Every activity is otherwise shown and grouped by day in the timezone it was recorded in, not this one. Auto-resolved from the browser at signup (FR-1.1) and editable here afterward; unlike Country, it has no "unset" state — every account always has one, defaulting to UTC until changed.
 5. **First run.** A real, verified account with no Country — one that has never saved this page, which is every new account right after FR-1.8's verification link — is sent here from the map and Profile (and from sign-in), titled "Welcome — set up your account", with a short explanation of why Country and Timezone matter. There is no way past it: no back link, and the header's links to the map and Profile lead back here. Timezone is prefilled with the one auto-detected at signup, to confirm or change; Country starts on "Choose a country". "Save and continue" can't be submitted until a Country is chosen; saving goes on to the map, and every later visit goes directly to the map. Reloading before saving shows this page again. A demo account never sees it.
 6. **A demo account** sees the page with every field and button disabled and a note that the shared demo account can't be changed, linking to "Create your own account" (FR-2.3); a save or avatar change submitted anyway is refused (`403`).
 7. **A native client** reads the lists this page offers from `GET /v1/account/settings/options` — every Country (code and name in the request's language), every Timezone grouped by region (with the region's name in that language, and the account's own zone always included), and every Language — and saves through the API endpoints above. The Android app's Settings screen is built on it (`apps/android/docs/SPEC.md` FR-1.5).
@@ -448,7 +448,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 6. What's in progress is read from the server every 2 seconds while anything is, every 20 otherwise.
 7. A demo session sees the button disabled, its tooltip saying why.
 
-**Outputs**: `GET /v1/uploads/active` returns the imports still in progress — each with a title, its source, how many of its jobs have finished and how many there are, whether it's an archive still being unpacked, and when it was submitted — the archives unpacked in the last hour with their batch id, how many of their files were already imported or skipped, whether they were truncated, and for one that failed, why — and how many failed imports the account hasn't seen yet on the Sync page. `GET /v1/uploads?limit=&offset=&source=` (the Android app's Sync screen) returns one page of every import, the total count (scoped to `source` when given), and how many are still processing; each row carries `source`, when it was submitted and — once finished — when it finished, and, once the job has produced one, the resulting activity's own `id`. A finished row whose activity cross-source detection set aside as a duplicate (FR-3.7) also names the copy that replaced it (`superseded_by`: its `id`, `source` and start time); its status stays `done`, since the import itself succeeded. That's read live: the row becomes a duplicate when a fuller copy arrives later, and stops being one when deleting the kept copy promotes it (FR-3.7 behavior 4).
+**Outputs**: `GET /v1/uploads/active` returns the imports still in progress — each with a title, its source, how many of its jobs have finished and how many there are, whether it's an archive still being unpacked, and when it was submitted — the archives unpacked in the last hour with their batch id, how many of their files were already imported or skipped, whether they were truncated, and for one that failed, why — and how many failed imports the account hasn't seen yet on the Sync page. `GET /v1/uploads?limit=&offset=&source=` (the Android app's Sync screen) returns one page of every import, the total count (scoped to `source` when given), and how many are still processing; each row carries `source`, when it was submitted and — once finished — when it finished, and, once the job has produced one, the resulting activity's own `id`, start time and `timezone` (FR-3.11). A finished row whose activity cross-source detection set aside as a duplicate (FR-3.7) also names the copy that replaced it (`superseded_by`: its `id`, `source`, start time and `timezone`); its status stays `done`, since the import itself succeeded. That's read live: the row becomes a duplicate when a fuller copy arrives later, and stops being one when deleting the kept copy promotes it (FR-3.7 behavior 4).
 
 ### FR-3.5 Duplicate detection
 
@@ -493,7 +493,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Outputs**: At most one live `Activity` per real-world activity, regardless of how many sources reported it.
 
-5. The import that brought a superseded activity in is a **Duplicate** in the history itself — the web's Sync page (FR-3.9) and the Android app's (`apps/android/docs/SPEC.md` FR-4.1) — naming the source whose copy was kept (FR-3.4's Outputs). `GET /v1/activities/duplicates` lists the superseded activities on their own: each one's start time, distance and source and which source's copy superseded it.
+5. The import that brought a superseded activity in is a **Duplicate** in the history itself — the web's Sync page (FR-3.9) and the Android app's (`apps/android/docs/SPEC.md` FR-4.1) — naming the source whose copy was kept (FR-3.4's Outputs). `GET /v1/activities/duplicates` lists the superseded activities on their own: each one's start time and timezone (FR-3.11), distance and source and which source's copy superseded it.
 
 ### FR-3.8 In-app GPS recording (Android)
 
@@ -530,7 +530,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Behavior**:
 1. Newest first by when each finished, 20 per page. With more than one page, a pager under the list: **← Newer** on the left, "1–20 of 57" (or "21 of 21") between, **Older →** on the right — both always in their places, the one with nowhere to go shown disabled. An import still being processed is not listed: the page shows only finished ones, so it doesn't change while it's open.
-2. Each row has a title — the file's name, or for a phone sync its source ("Health Connect", "GPS Logger") — then how it ended, with when it finished in the account's timezone ("Oct 6, 14:31"): **Ready** with the activity's date and distance and a **View on map** link; **Duplicate** with the activity's date and distance and which copy was kept — "Kept the copy from an uploaded file" — and no link, its activity being on no map; or **Failed** with the reason in the reader's language (§17's error messages). The line under the page's title says what a Duplicate is.
+2. Each row has a title — the file's name, or for a phone sync its source ("Health Connect", "GPS Logger") — then how it ended, with when it finished in the account's timezone ("Oct 6, 14:31"): **Ready** with the activity's date where it was recorded (FR-3.11) and distance and a **View on map** link; **Duplicate** with the activity's date and distance and which copy was kept — "Kept the copy from an uploaded file" — and no link, its activity being on no map; or **Failed** with the reason in the reader's language (§17's error messages). The line under the page's title says what a Duplicate is.
 3. **View on map** opens the map on that activity: on the Activities tab, the date range narrowed to its day if it isn't already in view, the date slider's window moved to show that day with both knobs on it (FR-6), the activity selected (FR-5.5) and the camera fitted to it; on a phone the Activities sheet stays collapsed, so the track is visible. The link's parameters leave the address bar once read, so a refresh doesn't do it again.
 4. A failed import the account hasn't seen yet puts a red dot on the header's Sync item, its tooltip saying how many ("Failed imports: 1"); opening the page counts every failure so far as seen and clears it. The item is highlighted while the page is open, and on a phone it's its icon alone.
 5. A demo session sees the Demo Customer's history, with a line saying to create an account to import one's own.
@@ -554,6 +554,21 @@ All upload functionality requires an active session (demo or registered — FR-1
 8. Each activity is ingested as FR-3.1 describes, attributed to the Google Maps Timeline source, its type taken from Timeline's mode. Its route is the points Timeline kept for that trip, minutes apart in a car, and is drawn and clears Fog of War as given. The trip's own start and end places are its first and last points, unless one is more than 1.5 km from the route point beside it and would take more than 200 km/h to reach (a start a few kilometres from the route and seconds before it), in which case it's left out. A trip that duplicates a recording of the same time from another source is resolved as FR-3.7 describes, and the recording is kept.
 
 **Outputs**: One new `Activity` per selected trip not imported before.
+
+### FR-3.11 An activity's own timezone
+
+**Description**: Every activity carries the timezone it was recorded in, and its times and dates are the wall clock where it happened: a run at 07:30 on 10 March in Tokyo is "Mar 10, 07:30", on the 10th, whatever the account's timezone (FR-1.7) or the viewer's browser or phone.
+
+**Preconditions**: An activity is ingested (FR-3.1–FR-3.10), or reprocessed (FR-5.14, FR-5.17, FR-8.1).
+
+**Behavior**:
+1. The timezone is the one the activity's first recorded point lies in, before Private locations (FR-8.1) clip the track, so an activity they hide entirely still has one. A point at sea has the nautical zone it lies in. A piece of a split activity (FR-5.17) takes the zone its own first point lies in.
+2. Where no zone is known for that point, the activity takes the account's timezone at the time it's ingested.
+3. Every date and time of the activity's is shown in that zone, on the web and in the Android app: its row's start where it has no name, the Edit window's, the times of its track's points and of its photos, and its photos' capture times. A browser or phone that doesn't know the zone yet shows its own instead.
+4. Every day an activity is counted on is its local date in that zone: the date slider's days (FR-6), date-range filtering of the Activities panel, its totals and the tracks drawn, the activity graph's grid and stat cards (FR-7), and Trends (FR-9). Two activities started at the same instant on opposite sides of the world can fall on different days.
+5. The offset is the one in force on the activity's date: a zone that has changed its offset or its summer time since shows an older activity at the offset it had then.
+
+**Outputs**: The activity's `timezone` (an IANA name, e.g. `Asia/Tokyo`).
 
 ## 6. FR-4 — Map Visualization
 
@@ -943,7 +958,7 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 
 The date range is picked with a two-knob slider at the top of the Activities tab (FR-5), above the Type and Distance filters, in one row with two pairs of buttons either side, « ‹ track › »: the outer pair is Earlier/Later (FR-6.4), the inner pair shifts the range (FR-6.7). The selected start and end dates sit under the track. It exists on that tab alone: the Stories and Privacy tabs (FR-14.6, FR-8.1) are not filtered by a date range, and neither are Fog of War and Heatmap (FR-4.2, FR-4.3). Switching to another tab and back keeps the range as it was. On a phone it sits at the bottom of the screen instead (§19 item 2).
 
-The slider counts only days with at least one activity; days without one take no room on the track. The track shows a window of 15 activity days, which on load is the 15 most recent. Every day boundary on the track has a tick: a taller one where the month changes, and a doubled one where the two neighbouring activity days aren't consecutive calendar days. Ticks inside the selection are in the accent colour. A selection is applied when a knob or a held button is released, not while it moves.
+The slider counts only days with at least one activity, each activity on its local date where it was recorded (FR-3.11); days without one take no room on the track. The track shows a window of 15 activity days, which on load is the 15 most recent. Every day boundary on the track has a tick: a taller one where the month changes, and a doubled one where the two neighbouring activity days aren't consecutive calendar days. Ticks inside the selection are in the accent colour. A selection is applied when a knob or a held button is released, not while it moves.
 
 ### FR-6.1 Default selection
 
@@ -969,7 +984,7 @@ The slider counts only days with at least one activity; days without one take no
 
 ### FR-7.1 Contribution grid
 
-**Description**: A private, per-account page at `/profile` (reached from the header's account menu) showing a GitHub-style daily contribution grid — one cell per calendar day, one block per calendar year (most recent first, back to the account's first-ever activity).
+**Description**: A private, per-account page at `/profile` (reached from the header's account menu) showing a GitHub-style daily contribution grid — one cell per calendar day, each activity on its local date where it was recorded (FR-3.11), one block per calendar year (most recent first, back to the account's first-ever activity).
 
 **Behavior**: Each day's cell is shaded by intensity, toggle-able between two measures (the "Shade by" switch — `/profile?shade=distance` for Distance, the plain `/profile` for Count):
 - **Count**: number of activities that day (empty / one / two / three-or-more).
@@ -1022,7 +1037,7 @@ Hovering a day shows its date, activity count and distance. The page needs a ses
 **Inputs**: `bucket` — `week` or `month`; `from`/`to` (`YYYY-MM-DD`, both optional, default to the trailing 12 months).
 
 **Behavior**:
-1. Every activity in the window is grouped into the requested bucket by its `started_at` date, in the account's own timezone (FR-1.7), one bucket per calendar week or month that has at least one activity — buckets with nothing recorded are omitted rather than returned as zeroes, the same convention the date slider's days (FR-6) use.
+1. Every activity in the window is grouped into the requested bucket by its `started_at` date, in the timezone it was recorded in (FR-3.11), one bucket per calendar week or month that has at least one activity — buckets with nothing recorded are omitted rather than returned as zeroes, the same convention the date slider's days (FR-6) use.
 2. Each bucket reports: activity count, total distance, total moving time, and total elevation gain.
 3. The Profile page renders the trailing 12 months as one bar per bucket, height scaled (logarithmically) to the window's busiest bucket by distance, with a Week/Month switch (`?bucket=month`; the Distance/Count grid setting is kept). Hovering a bar shows that bucket's full breakdown (distance, activity count, moving time, elevation gain); tapping or clicking one shows it in a line under the chart, and tapping it again hides it.
 
@@ -1160,7 +1175,7 @@ A read-only view of every account and every account's activities, for the people
 
 **Description**: `/admin` lists every account, demo accounts included, newest signup first.
 
-**Behavior**: Each row shows the email (a link to FR-12.3's page), the display name when set, badges for admin, demo and unverified email, the signup date, country, timezone, the number of live activities, the first and last activity's dates, and their total distance. Counts, dates and distance cover live activities only — a duplicate superseded by another copy (FR-3.7) isn't counted. Dates are in that account's timezone, distance in the admin's own units (FR-1.7).
+**Behavior**: Each row shows the email (a link to FR-12.3's page), the display name when set, badges for admin, demo and unverified email, the signup date, country, timezone, the number of live activities, the first and last activity's dates, and their total distance. Counts, dates and distance cover live activities only — a duplicate superseded by another copy (FR-3.7) isn't counted. The signup date is in that account's timezone, each activity date in the timezone it was recorded in (FR-3.11), distance in the admin's own units (FR-1.7).
 
 ### FR-12.3 An account's activities
 
@@ -1169,7 +1184,7 @@ A read-only view of every account and every account's activities, for the people
 **Behavior**:
 1. The header repeats FR-12.2's row, plus the account id.
 2. Activities are listed newest first, 100 per page, with "← Newer" and "Older →" links (`?page=`) and a "1–100 of 250" count.
-3. Each row shows the full activity id (selected whole with one click), the start date and time in the account's timezone, type, name, distance, duration (hours:minutes), source (`upload`, `takeout`, `healthconnect`, `recorded`, …), and the countries and regions it passes through (FR-4.2's boundary tiers).
+3. Each row shows the full activity id (selected whole with one click), the start date and time where it was recorded, followed by that timezone's name (FR-3.11), type, name, distance, duration (hours:minutes), source (`upload`, `takeout`, `healthconnect`, `recorded`, …), and the countries and regions it passes through (FR-4.2's boundary tiers).
 4. Unlike every other list in the product, superseded duplicates and activities entirely inside a Private location are included, badged "duplicate of <id>" (linking to that row when it's on the same page) and "hidden"; an activity with a track edit (FR-5.14) is badged "edited".
 5. An id that isn't a UUID, or no account's, is `404`. A page past the last shows no rows and a link back to the first.
 6. The pages only read. Nothing on them changes an account or an activity.
@@ -1455,7 +1470,7 @@ What is planned but not yet built is in `docs/ROADMAP.md`.
 1. Every photo has a place on its activity's track: a moment on it (`route_at`), never a stored position. Its position is that moment's point on the track, worked out on every read.
 2. A `route_at` the user chose places it there, clamped to the track's first and last moment.
 3. Otherwise it's placed at its capture time when that falls within the track; a capture time up to 5 minutes before the track starts or after it ends places it at that end.
-4. A `taken_local` time is read in the account's time zone; if that misses the track, in the UTC offset (in 15-minute steps, −12:00 to +14:00) nearest the account's own that puts it on the track. `taken_at` (FR-16.3) is the instant it resolved to.
+4. A `taken_local` time is read in the time zone the activity was recorded in (FR-3.11), where the camera's clock most likely was; if that misses the track, in the UTC offset (in 15-minute steps, −12:00 to +14:00) nearest that zone's that puts it on the track. `taken_at` (FR-16.3) is the instant it resolved to.
 5. Without a capture time that places it, an EXIF position within 500 m of the track places it at the track's nearest point.
 6. With none of these, the upload is refused for the user to choose (FR-16.1).
 7. A photo is always on the track as it's drawn: a moment the track no longer covers — cut off by Edit track or a Private location at its start or end — reads as the track's nearest end, and `route_at` is kept, so the photo returns to its moment if the track does. A track that passes through a Private location is drawn whole (FR-8.1), so a photo on that stretch shows nothing the track doesn't.
@@ -1463,7 +1478,7 @@ What is planned but not yet built is in `docs/ROADMAP.md`.
 ### FR-16.3 Listing and images
 
 **Behavior**:
-1. `GET /v1/photos?activity={id}` answers `{photos}`: the activity's photos as `{id, activity_id, taken_at, route_at, lon, lat, caption, width, height, url, thumb_url}`, in route order (by `route_at`, then upload). `lon`/`lat` are null only when the activity has no track left at all. `width`/`height` are the stored copy's. `GET /v1/photos?story={id}` answers the same for every activity in a Story (FR-14) that isn't a superseded duplicate, in the same order across all of them.
+1. `GET /v1/photos?activity={id}` answers `{photos}`: the activity's photos as `{id, activity_id, taken_at, route_at, timezone, lon, lat, caption, width, height, url, thumb_url}` (`timezone` the activity's, FR-3.11, which the photo's times are shown in), in route order (by `route_at`, then upload). `lon`/`lat` are null only when the activity has no track left at all. `width`/`height` are the stored copy's. `GET /v1/photos?story={id}` answers the same for every activity in a Story (FR-14) that isn't a superseded duplicate, in the same order across all of them.
 2. `GET /v1/photos/{id}` and `GET /v1/photos/{id}/thumb` serve the stored copy and its thumbnail with their sniffed content type, to their owner only, cacheable for good (a photo's images never change).
 
 **Error cases**:

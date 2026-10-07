@@ -21,11 +21,12 @@ import (
 const syncPageSize = 20
 
 // syncHistoryQuery is uploadsListQuery's finished rows only, most recently finished first:
-// each with when it finished and, for an activity set aside as a duplicate, the source of the
-// copy kept in its place.
+// each with when it finished, its activity's local date where it was recorded (§4.30) and, for
+// an activity set aside as a duplicate, the source of the copy kept in its place.
 const syncHistoryQuery = `
 SELECT j.payload->>'source_detail', j.payload->>'source',
-       j.state, j.last_error, j.error_code, j.finished_at, a.started_at, a.distance_meters, a.id, w.source
+       j.state, j.last_error, j.error_code, j.finished_at,
+       to_char(a.started_at AT TIME ZONE a.timezone, 'YYYY-MM-DD'), a.distance_meters, a.id, w.source
 FROM jobs j
 LEFT JOIN activities a
   ON a.user_id = j.user_id AND a.source = j.payload->>'source' AND a.external_id = j.payload->>'external_id'
@@ -94,10 +95,6 @@ func (s *Server) handleSyncPage(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) buildSync(ctx context.Context, l *i18n.Localizer, acct *pageAccount, offset int) (syncView, error) {
 	userID := acct.info.userID
-	loc, err := time.LoadLocation(acct.info.timezone)
-	if err != nil {
-		loc = time.UTC
-	}
 	imperial := web.Imperial(acct.profile.Country)
 	view := syncView{IsDemo: acct.info.isDemo}
 
@@ -112,10 +109,10 @@ func (s *Server) buildSync(ctx context.Context, l *i18n.Localizer, acct *pageAcc
 	defer rows.Close()
 	for rows.Next() {
 		var filename, source, state string
-		var lastError, errorCode, activityID, keptSource *string
-		var finishedAt, startedAt *time.Time
+		var lastError, errorCode, startedOn, activityID, keptSource *string
+		var finishedAt *time.Time
 		var distance *float64
-		if err := rows.Scan(&filename, &source, &state, &lastError, &errorCode, &finishedAt, &startedAt, &distance, &activityID, &keptSource); err != nil {
+		if err := rows.Scan(&filename, &source, &state, &lastError, &errorCode, &finishedAt, &startedOn, &distance, &activityID, &keptSource); err != nil {
 			return view, err
 		}
 		row := syncRow{Title: importTitle(l, source, "", filename), Failed: state == "failed", Duplicate: keptSource != nil}
@@ -125,8 +122,8 @@ func (s *Server) buildSync(ctx context.Context, l *i18n.Localizer, acct *pageAcc
 		switch {
 		case row.Failed:
 			row.Detail = jobErrorMessage(l, errorCode, lastError)
-		case startedAt != nil:
-			day := startedAt.In(loc).Format("2006-01-02")
+		case startedOn != nil:
+			day := *startedOn
 			row.Detail = web.ShortDate(l, day)
 			if distance != nil {
 				row.Detail += " · " + web.FormatDistance(l, *distance, imperial)

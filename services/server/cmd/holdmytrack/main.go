@@ -47,7 +47,7 @@ func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: holdmytrack <serve|work|migrate|seed-demo-customer|export-demo-activities|seed-admin-boundaries|rerender-coverage|import-spots|set-admin>")
+		fmt.Fprintln(os.Stderr, "usage: holdmytrack <serve|work|migrate|seed-demo-customer|export-demo-activities|seed-admin-boundaries|seed-timezones|rerender-coverage|import-spots|set-admin>")
 		os.Exit(2)
 	}
 
@@ -274,6 +274,54 @@ func main() {
 		log.Info("seed-admin-boundaries: done", "countries", stats.Countries, "regions", stats.Regions,
 			"skipped_regions", stats.SkippedRegions, "whole_country_regions", stats.WholeCountryRegions,
 			"activity_countries", stats.ActivityCountries, "activity_regions", stats.ActivityRegions)
+
+	case "seed-timezones":
+		// The timezone polygons each activity's own zone is looked up in (IMPLEMENTATION.md
+		// §4.30), from timezone-boundary-builder's release zip (docs/DEPLOY.md §6), and a
+		// re-match of every activity against them. Safe to re-run: the file already loaded is
+		// skipped unless --force. Reads geo.TimezonesKey from the app bucket, or --file's local
+		// copy. See internal/geo.SeedTimezones's own doc comment.
+		var file string
+		force := false
+		for i := 2; i < len(os.Args); i++ {
+			switch {
+			case os.Args[i] == "--force":
+				force = true
+			case os.Args[i] == "--file" && i+1 < len(os.Args):
+				file = os.Args[i+1]
+				i++
+			default:
+				fmt.Fprintln(os.Stderr, "usage: holdmytrack seed-timezones [--force] [--file <timezones-with-oceans.geojson.zip>]")
+				os.Exit(2)
+			}
+		}
+		var src io.ReadCloser
+		name := path.Base(geo.TimezonesKey)
+		if file != "" {
+			src, err = os.Open(file)
+			name = filepath.Base(file)
+		} else {
+			var store *storage.Store
+			if store, err = storage.New(cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3Bucket); err == nil {
+				src, err = store.Get(ctx, geo.TimezonesKey)
+			}
+		}
+		if err != nil {
+			log.Error("seed-timezones", "err", err)
+			os.Exit(1)
+		}
+		log.Info("seed-timezones: starting", "file", name, "force", force)
+		stats, err := geo.SeedTimezones(ctx, pool, log, src, name, force)
+		src.Close()
+		if err != nil {
+			log.Error("seed-timezones", "err", err)
+			os.Exit(1)
+		}
+		if stats.Unchanged {
+			log.Info("seed-timezones: already loaded, nothing to do (--force reloads it)", "file", name)
+			break
+		}
+		log.Info("seed-timezones: done", "zones", stats.Zones, "unknown_zones", len(stats.UnknownZones), "activities", stats.Activities)
 
 	case "import-spots":
 		// The load, and each quarterly refresh, of the Spots places from an OpenStreetMap extract

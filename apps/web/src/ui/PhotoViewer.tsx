@@ -182,7 +182,7 @@ export function PhotoViewer({ photos, index, onIndex, onClose }: PhotoViewerProp
         )}
         <div className="photo-viewer__text">
           {photo.caption && <span className="photo-viewer__caption">{photo.caption}</span>}
-          {photo.takenAt && <span className="photo-viewer__taken">{t('photos.taken', { when: formatStartedAt(photo.takenAt) })}</span>}
+          {photo.takenAt && <span className="photo-viewer__taken">{t('photos.taken', { when: formatStartedAt(photo.takenAt, photo.timezone) })}</span>}
         </div>
         <div className="photo-viewer__tools">
           <button type="button" className="photo-viewer__btn" aria-label={t('photos.zoom_out')} title={t('photos.zoom_out')} disabled={!zoomed} onClick={zoomOut}>

@@ -8,7 +8,7 @@ import { t, tn } from '../i18n';
 /** A row's primary line: its user-entered name (§4.7's revised decision) when it has one, else
  *  its start date/time — also how the toolbar names a single selected activity. */
 export function rowLabel(activity: Activity): string {
-  return activity.name?.trim() || formatStartedAt(activity.startedAt);
+  return activity.name?.trim() || formatStartedAt(activity.startedAt, activity.timezone);
 }
 
 export interface ActivityRowProps {
@@ -99,7 +99,7 @@ export function ActivityRow({
           {/* The date moves down here, ahead of distance/duration, once a name has taken its
               place as the title above — otherwise it's already the title and repeating it here
               would be redundant. Type trails the line. */}
-          {displayName && `${formatStartedAt(activity.startedAt)} · `}
+          {displayName && `${formatStartedAt(activity.startedAt, activity.timezone)} · `}
           {/* A private activity has no track, so no distance or duration — "0.0 mi · 0m" would
               read as broken data rather than as hidden on purpose. Its badge says why. */}
           {!activity.private && (

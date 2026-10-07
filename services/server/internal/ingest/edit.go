@@ -327,6 +327,12 @@ func reprocessActivity(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 	if rng.From != nil {
 		startedAt = time.UnixMilli(*rng.From)
 	}
+	// The zone is the piece's first recorded point's, before Private locations and the edit,
+	// as ingest looks it up (§4.30): a split piece starts somewhere else, an edit doesn't.
+	zonePoint := act.Points[0]
+	if piece := rng.Apply(act.Points, nil); len(piece) > 0 {
+		zonePoint = piece[0]
+	}
 	var pp preparedTrack
 	if points != nil {
 		if pp, err = prepareTrack(ctx, pool, points); err != nil {
@@ -356,12 +362,14 @@ func reprocessActivity(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 			elevation_gain_m = $6, avg_speed_mps = $7, started_at = $8,
 			trajectory = `+trajectorySQL("$9", "$10", "$11")+`,
 			track_edit = CASE WHEN $14 THEN $12::jsonb ELSE track_edit END,
-			in_heatmap_window = ($8 >= NOW() - make_interval(days => $13))
+			in_heatmap_window = ($8 >= NOW() - make_interval(days => $13)),
+			timezone = `+geo.TimezoneAtSQL("$15::float8", "$16::float8", "$2")+`
 		WHERE id = $1 AND user_id = $2
 	`, activityID, userID,
 		m.distanceM, m.durationS, m.movingS, m.elevationGainM, m.avgSpeedMps, startedAt,
 		pp.simpLons, pp.simpLats, pp.simpTs,
 		editJSON, fog.HeatmapWindowDays, userEdit,
+		zonePoint.Lon, zonePoint.Lat,
 	); err != nil {
 		return fmt.Errorf("update activity: %w", err)
 	}

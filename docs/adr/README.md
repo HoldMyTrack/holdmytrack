@@ -43,6 +43,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0032](0032-accept-and-enqueue.md) | A request that brings activities only accepts them; the worker does the storage work, and unpacks archives |
 | [0033](0033-android-bottom-navigation-single-activity.md) | Android's main screens are tabs of one Activity, each a Fragment, under a bottom navigation bar |
 | [0034](0034-country-region-outlines-from-overture.md) | Country and region outlines come from Overture Maps' divisions, land-clipped, loaded from our own copy at deploy time |
+| [0035](0035-activity-local-timezone.md) | An activity's times show, and its days group, in the timezone it was recorded in |
 
 ## Writing a new one
 

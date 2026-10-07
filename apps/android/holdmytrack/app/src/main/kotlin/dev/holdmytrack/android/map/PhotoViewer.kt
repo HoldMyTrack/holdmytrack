@@ -109,7 +109,7 @@ class PhotoViewer(
         val photo = photos[index]
         caption.text = photo.caption
         caption.isVisible = photo.caption != null
-        taken.text = photo.takenAt?.let { context.getString(R.string.photos_taken, PanelFormat.startedAt(context.resources, it.toString())) }
+        taken.text = photo.takenAt?.let { context.getString(R.string.photos_taken, PanelFormat.startedAt(context.resources, it.toString(), photo.timezone)) }
         taken.isVisible = photo.takenAt != null
         val group = photos.size > 1
         position.text = context.getString(R.string.photos_position, index + 1, photos.size)

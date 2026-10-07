@@ -3,6 +3,7 @@ package dev.holdmytrack.android.panel
 import android.content.res.Resources
 import dev.holdmytrack.android.R
 import dev.holdmytrack.android.net.Activity
+import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.recording.RecordingFormat
 import java.text.NumberFormat
 import java.time.OffsetDateTime
@@ -87,14 +88,18 @@ object PanelFormat {
     /** A row's primary line: its name when it has one, else its start time — also how the
      *  toolbar names one selected activity. */
     fun rowLabel(res: Resources, activity: Activity): String =
-        activity.name?.trim()?.takeIf { it.isNotEmpty() } ?: startedAt(res, activity.startedAt)
+        activity.name?.trim()?.takeIf { it.isNotEmpty() } ?: startedAt(res, activity.startedAt, activity.timezone)
 
-    /** "Sep 24, 2026, 4:00 AM", in the phone's timezone, as the web shows it in the browser's. */
-    fun startedAt(res: Resources, iso: String): String =
+    /** The zone an activity's times are shown in, from its own [timezone] ([ActivityZone]). */
+    fun zone(timezone: String?): ZoneId = ActivityZone.of(timezone, Session.timezone)
+
+    /** "Sep 24, 2026, 4:00 AM", in [timezone], the zone the activity was recorded in
+     *  (`docs/IMPLEMENTATION.md` §4.30), as the web shows it. */
+    fun startedAt(res: Resources, iso: String, timezone: String?): String =
         runCatching {
             DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
                 .withLocale(locale(res))
-                .withZone(ZoneId.systemDefault())
+                .withZone(zone(timezone))
                 .format(OffsetDateTime.parse(iso))
         }.getOrDefault(iso)
 }

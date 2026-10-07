@@ -124,6 +124,8 @@ type testActivity struct {
 	supersededBy   string
 	// at, when set, gives the activity a short track starting at this [lon, lat].
 	at *[2]float64
+	// timezone is the zone it was recorded in; the owner's when empty.
+	timezone string
 }
 
 func (d *dbTest) newActivity(owner account, a testActivity) string {
@@ -139,9 +141,10 @@ func (d *dbTest) newActivity(owner account, a testActivity) string {
 	}
 	var id string
 	if err := d.pool.QueryRow(context.Background(), `
-		INSERT INTO activities (user_id, source, activity_type, distance_meters, moving_seconds, duration_seconds, started_at, superseded_by, trajectory)
-		VALUES ($1, 'upload', $2, $3, $4, $5, $6, NULLIF($7, '')::uuid, ST_GeomFromText($8, 4326)) RETURNING id
-	`, owner.id, a.activityType, a.distanceMeters, a.movingSeconds, a.durationSecs, a.startedAt, a.supersededBy, track).Scan(&id); err != nil {
+		INSERT INTO activities (user_id, source, activity_type, distance_meters, moving_seconds, duration_seconds, started_at, superseded_by, trajectory, timezone)
+		VALUES ($1, 'upload', $2, $3, $4, $5, $6, NULLIF($7, '')::uuid, ST_GeomFromText($8, 4326),
+		        COALESCE(NULLIF($9, ''), (SELECT timezone FROM users WHERE id = $1))) RETURNING id
+	`, owner.id, a.activityType, a.distanceMeters, a.movingSeconds, a.durationSecs, a.startedAt, a.supersededBy, track, a.timezone).Scan(&id); err != nil {
 		d.t.Fatalf("create activity: %v", err)
 	}
 	return id

@@ -144,7 +144,7 @@ func (s *Server) adminUsers(ctx context.Context, l *i18n.Localizer, userID strin
 	rows, err := s.pool.Query(ctx, `
 		SELECT u.id, u.email, COALESCE(u.display_name, ''), u.created_at, COALESCE(u.country, ''),
 		       u.timezone, u.demo_expires_at IS NOT NULL, u.is_admin, u.email_verified,
-		       count(a.id), min(a.started_at), max(a.started_at),
+		       count(a.id), min((a.started_at AT TIME ZONE a.timezone)::date), max((a.started_at AT TIME ZONE a.timezone)::date),
 		       COALESCE(sum(a.distance_meters), 0)::float8
 		FROM users u
 		LEFT JOIN activities a ON a.user_id = u.id AND a.superseded_by IS NULL
@@ -174,7 +174,7 @@ func (s *Server) adminUsers(ctx context.Context, l *i18n.Localizer, userID strin
 		u.Activities = l.Int(count)
 		u.Distance = web.FormatTotalDistance(l, meters, imperial)
 		if first != nil && last != nil {
-			u.First, u.Last = first.In(loc).Format("2006-01-02"), last.In(loc).Format("2006-01-02")
+			u.First, u.Last = first.Format("2006-01-02"), last.Format("2006-01-02")
 		}
 		users = append(users, u)
 	}
@@ -201,7 +201,8 @@ func (s *Server) adminUserActivities(ctx context.Context, l *i18n.Localizer, u a
 	}
 
 	rows, err := s.pool.Query(ctx, `
-		SELECT a.id, a.started_at, a.activity_type, COALESCE(a.name, ''),
+		SELECT a.id, to_char(a.started_at AT TIME ZONE a.timezone, 'YYYY-MM-DD HH24:MI') || ' ' || a.timezone,
+		       a.activity_type, COALESCE(a.name, ''),
 		       COALESCE(a.distance_meters, 0)::float8, COALESCE(a.duration_seconds, 0), a.source,
 		       COALESCE(a.superseded_by::text, ''), a.trajectory IS NULL, a.track_edit IS NOT NULL,
 		       COALESCE((SELECT string_agg(c.name, ', ' ORDER BY c.name)
@@ -219,17 +220,14 @@ func (s *Server) adminUserActivities(ctx context.Context, l *i18n.Localizer, u a
 		return view, fmt.Errorf("admin: list activities: %w", err)
 	}
 	defer rows.Close()
-	loc := adminLocation(u.Timezone)
 	for rows.Next() {
 		var a adminActivityRow
-		var started time.Time
 		var meters float64
 		var seconds int64
-		if err := rows.Scan(&a.ID, &started, &a.Type, &a.Name, &meters, &seconds, &a.Source,
+		if err := rows.Scan(&a.ID, &a.Started, &a.Type, &a.Name, &meters, &seconds, &a.Source,
 			&a.SupersededBy, &a.Hidden, &a.Edited, &a.Countries, &a.Regions); err != nil {
 			return view, fmt.Errorf("admin: scan activity: %w", err)
 		}
-		a.Started = started.In(loc).Format("2006-01-02 15:04")
 		a.Distance = web.FormatDistance(l, meters, imperial)
 		a.Duration = adminDuration(seconds)
 		view.Activities = append(view.Activities, a)

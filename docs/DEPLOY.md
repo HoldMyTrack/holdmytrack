@@ -95,14 +95,24 @@ scp ~/boundaries/overture-2026-09-23.0-boundaries.csv.gz holdmytrack:/tmp/
 docker compose -f compose.prod.yml --env-file .env.prod run --rm -v /tmp:/in:ro rclone copyto /in/overture-2026-09-23.0-boundaries.csv.gz data:boundaries/overture-2026-09-23.0-boundaries.csv.gz
 ```
 
-`seed-admin-boundaries` then replaces every outline and re-matches every activity in one transaction. That takes several minutes, and activities ingested meanwhile wait on it for their country matches, so on a database with users take a backup and turn maintenance mode on first (§7, §11). Run it again whenever a deploy brings a new `geo.BoundariesKey`; with the file already loaded it does nothing, and the tiers render blank until it has run once. Delete the copy in `/tmp` afterwards. Then seed both, boundaries first:
+`seed-admin-boundaries` then replaces every outline and re-matches every activity in one transaction. That takes several minutes, and activities ingested meanwhile wait on it for their country matches, so on a database with users take a backup and turn maintenance mode on first (§7, §11). Run it again whenever a deploy brings a new `geo.BoundariesKey`; with the file already loaded it does nothing, and the tiers render blank until it has run once. Delete the copy in `/tmp` afterwards.
+
+The timezone polygons each activity's zone is looked up in (ADR-0035) are also a file in the app bucket, under the key `geo.TimezonesKey` names (`timezones/timezones-with-oceans-<release>.geojson.zip`). It's timezone-boundary-builder's release asset as published, renamed to carry its release, so there's nothing to make:
+
+```
+ssh holdmytrack 'curl -sSfL -o /tmp/timezones-with-oceans-2026d.geojson.zip https://github.com/evansiroky/timezone-boundary-builder/releases/download/2026d/timezones-with-oceans.geojson.zip'
+docker compose -f compose.prod.yml --env-file .env.prod run --rm -v /tmp:/in:ro rclone copyto /in/timezones-with-oceans-2026d.geojson.zip data:timezones/timezones-with-oceans-2026d.geojson.zip
+```
+
+`seed-timezones` then replaces the polygons and re-matches every activity in one transaction, in a couple of minutes. Run it again whenever a deploy brings a new `geo.TimezonesKey`; with the file already loaded it does nothing, and until it has run once every activity shows its account's zone. It logs any zone the database's tz data doesn't know yet and leaves it out; pulling a newer `postgis/postgis` image (and recreating `db`) updates that tz data, after which `seed-timezones --force` brings those zones in. Delete the copy in `/tmp` afterwards. Then seed all three, boundaries and timezones before the demo, so its activities are matched as they're ingested:
 
 ```
 docker compose -f compose.prod.yml --env-file .env.prod run --rm api seed-admin-boundaries
+docker compose -f compose.prod.yml --env-file .env.prod run --rm api seed-timezones
 docker compose -f compose.prod.yml --env-file .env.prod run --rm api seed-demo-customer
 ```
 
-Skip them and "Try it now" opens an empty demo account (`SPEC.md` FR-2.2), and Fog/Heatmap's Country/Region zoom tiers have no boundaries to draw. Both are idempotent — safe to re-run on a later deploy, they skip whatever is already loaded — so running them after every deploy is harmless, just unnecessary. Boundaries first, so the demo's activities are matched to countries/regions as they're ingested (`docs/DEVELOPMENT.md`'s "Seeding a fresh database" has the detail). A deploy that changes the demo history itself (`services/server/internal/httpapi/demo_data/`) needs `seed-demo-customer --reset` once instead, since a plain re-run leaves already-seeded activities as they were.
+Skip them and "Try it now" opens an empty demo account (`SPEC.md` FR-2.2), Fog/Heatmap's Country/Region zoom tiers have no boundaries to draw, and every activity shows its account's timezone. All three are idempotent — safe to re-run on a later deploy, they skip whatever is already loaded — so running them after every deploy is harmless, just unnecessary. Boundaries first, so the demo's activities are matched to countries/regions as they're ingested (`docs/DEVELOPMENT.md`'s "Seeding a fresh database" has the detail). A deploy that changes the demo history itself (`services/server/internal/httpapi/demo_data/`) needs `seed-demo-customer --reset` once instead, since a plain re-run leaves already-seeded activities as they were.
 
 A deploy that changes how Fog/Heatmap tiles are drawn (`services/server/internal/fog`, `IMPLEMENTATION.md` §4.2) needs every account's tiles re-rendered once, or they keep the old look: `docker compose -f compose.prod.yml --env-file .env.prod run --rm api rerender-coverage`, with `--masks` when the change is to the stroke itself (its width) or to which tiles a track reaches (`internal/tilemath`), which redraws every activity's stored masks first and takes a while. It only queues the renders, so the worker must be up; they finish in the background.
 

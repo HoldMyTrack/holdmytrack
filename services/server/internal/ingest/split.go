@@ -128,13 +128,13 @@ func insertSplitPiece(ctx context.Context, tx pgx.Tx, userID, activityID string,
 		INSERT INTO activities (
 			user_id, source, source_detail, external_id, activity_type, started_at,
 			raw_payload_key, name, description, track_edit, edit_pending,
-			split_group, split_from, split_to
+			split_group, split_from, split_to, timezone
 		)
 		SELECT user_id, source, source_detail,
 		       CASE WHEN external_id IS NULL THEN NULL
 		            ELSE left(split_part(external_id, '#split:', 1), 200) || '#split:' || $3::bigint::text END,
 		       activity_type, to_timestamp($3::bigint / 1000.0), raw_payload_key, name, description,
-		       track_edit, true, COALESCE(split_group, id), $3::bigint, split_to
+		       track_edit, true, COALESCE(split_group, id), $3::bigint, split_to, timezone
 		FROM activities WHERE id = $1 AND user_id = $2
 		RETURNING id
 	`, activityID, userID, at).Scan(&pieceID); err != nil {

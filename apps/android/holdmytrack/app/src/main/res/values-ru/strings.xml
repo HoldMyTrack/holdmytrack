@@ -212,7 +212,7 @@
     <string name="settings_country_choose">Выберите страну</string>
     <string name="settings_country_hint">Определяет, в каких единицах показывать расстояние и высоту — км/м или мили/футы — здесь и на сайте.</string>
     <string name="settings_timezone">Часовой пояс</string>
-    <string name="settings_timezone_hint">Определяет, к какому календарному дню относится занятие во всём HoldMyTrack. Определён по телефону при регистрации; измените его, если сейчас вы в другом месте.</string>
+    <string name="settings_timezone_hint">Определяет, какой день сегодня. Каждое занятие показывает дату и время того места, где оно записано; этот пояс нужен, если место неизвестно. Определён по телефону при регистрации; измените его, если вы переехали.</string>
     <string name="settings_language">Язык</string>
     <string name="settings_language_auto">Автоматически (как на телефоне)</string>
     <string name="settings_language_hint">Язык приложения, сайта и писем, которые мы вам отправляем. «Автоматически» — язык вашего телефона.</string>

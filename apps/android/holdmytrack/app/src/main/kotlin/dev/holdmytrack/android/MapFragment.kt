@@ -92,8 +92,6 @@ import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import java.time.LocalDate
-import java.time.OffsetDateTime
-import java.time.ZoneId
 
 /**
  * The map, and everything that hangs off it: the served basemap, the session the user layers
@@ -213,7 +211,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  (`viewActivityOnMap`). */
     private var pendingFocusId: String? = null
 
-    /** A View on map from the Sync screen ([viewOnMap]) — the activity and when it started —
+    /** A View on map from the Sync screen ([viewOnMap]) — the activity and its day —
      *  waiting for the session to be confirmed. */
     private var viewOnMapRequest: Pair<String, String>? = null
 
@@ -742,8 +740,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         // A relaunch from recents replays the intent; it has been handled.
         if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
         val id = intent.getStringExtra(MainActivity.EXTRA_VIEW_ACTIVITY) ?: return
-        val startedAt = intent.getStringExtra(MainActivity.EXTRA_VIEW_STARTED_AT) ?: return
-        viewOnMapRequest = id to startedAt
+        val day = intent.getStringExtra(MainActivity.EXTRA_VIEW_DAY) ?: return
+        viewOnMapRequest = id to day
         framed = true
     }
 
@@ -946,9 +944,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             panel.storiesTab.reloadOpen()
         }
         renderDateFooter()
-        viewOnMapRequest?.let { (id, startedAt) ->
+        viewOnMapRequest?.let { (id, day) ->
             viewOnMapRequest = null
-            viewActivityOnMap(id, startedAt)
+            viewActivityOnMap(id, day)
         }
 
         val loaded = style ?: return
@@ -1102,17 +1100,15 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
     /**
      * A Sync history row's View on map — the web's `viewActivityOnMap`: Normal mode and the
-     * collapsed Activities tab, then the activity selected and flown to, as a row tap does. When its day (in the account's
-     * timezone, the day the server files it under) is outside the range, the range becomes
-     * that one day, as if picked, and the selection waits for that range's list.
+     * collapsed Activities tab, then the activity selected and flown to, as a row tap does. When
+     * its [day] (its local date where it was recorded, the day the server files it under) is
+     * outside the range, the range becomes that one day, as if picked, and the selection waits
+     * for that range's list.
      */
-    private fun viewActivityOnMap(activityId: String, startedAt: String) {
+    private fun viewActivityOnMap(activityId: String, day: String) {
         setMode(MapMode.NORMAL)
         // The expanded sheet would stay drawn over the very map the link is meant to show.
         panel.showActivities()
-        val zone = runCatching { ZoneId.of(Session.timezone) }.getOrDefault(ZoneId.systemDefault())
-        val day = runCatching { OffsetDateTime.parse(startedAt).atZoneSameInstant(zone).toLocalDate().toString() }
-            .getOrNull() ?: return
         val range = selectedRange
         if (range != null && day >= range.from && day <= range.to && panelState.activities.any { it.id == activityId }) {
             panel.focusFromMap(activityId)

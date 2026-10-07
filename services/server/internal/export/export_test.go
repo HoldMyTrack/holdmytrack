@@ -61,15 +61,15 @@ func TestBuildWritesEverythingAcrossParts(t *testing.T) {
 	var walk, copyOf string
 	started := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
 	if err := pool.QueryRow(ctx, `
-		INSERT INTO activities (user_id, source, source_detail, activity_type, name, started_at, raw_payload_key, distance_meters)
-		VALUES ($1, 'upload', 'walk.gpx', 'walking', 'Lake / Loop', $2, $3, 260) RETURNING id`, userID, started, rawKey).Scan(&walk); err != nil {
+		INSERT INTO activities (user_id, source, source_detail, activity_type, name, started_at, raw_payload_key, distance_meters, timezone)
+		VALUES ($1, 'upload', 'walk.gpx', 'walking', 'Lake / Loop', $2, $3, 260, 'Europe/Berlin') RETURNING id`, userID, started, rawKey).Scan(&walk); err != nil {
 		t.Fatal(err)
 	}
 	// A second activity on the same raw file (a cross-source duplicate): the original is
 	// written once, and both point at it.
 	if err := pool.QueryRow(ctx, `
-		INSERT INTO activities (user_id, source, source_detail, activity_type, name, started_at, raw_payload_key, superseded_by)
-		VALUES ($1, 'takeout', 'walk.gpx', 'walking', 'Lake / Loop', $2, $3, $4) RETURNING id`, userID, started.Add(time.Minute), rawKey, walk).Scan(&copyOf); err != nil {
+		INSERT INTO activities (user_id, source, source_detail, activity_type, name, started_at, raw_payload_key, superseded_by, timezone)
+		VALUES ($1, 'takeout', 'walk.gpx', 'walking', 'Lake / Loop', $2, $3, $4, 'Europe/Berlin') RETURNING id`, userID, started.Add(time.Minute), rawKey, walk).Scan(&copyOf); err != nil {
 		t.Fatal(err)
 	}
 	var photoID string

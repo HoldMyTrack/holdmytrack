@@ -141,7 +141,7 @@ class PhotoPopup(private val view: View, private val top: () -> Int, private val
         next.alpha = if (index < photos.size - 1) 1f else DISABLED_ALPHA
         caption.text = photo.caption
         caption.isVisible = photo.caption != null
-        taken.text = photo.takenAt?.let { res.getString(R.string.photos_taken, PanelFormat.startedAt(res, it.toString())) }
+        taken.text = photo.takenAt?.let { res.getString(R.string.photos_taken, PanelFormat.startedAt(res, it.toString(), photo.timezone)) }
         taken.isVisible = photo.takenAt != null
         image.contentDescription = photo.caption ?: res.getString(R.string.photos_marker)
         // The stored copy at the popup's width: the thumbnail stands in until it's here.

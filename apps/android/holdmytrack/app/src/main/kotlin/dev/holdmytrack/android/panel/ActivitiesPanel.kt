@@ -775,7 +775,7 @@ class ActivitiesPanel(
         // The start moves under the title once a name has taken it, as on a row.
         val named = activity.name?.trim()?.isNotEmpty() == true
         cardMeta.text = listOfNotNull(
-            PanelFormat.startedAt(res, activity.startedAt).takeIf { named },
+            PanelFormat.startedAt(res, activity.startedAt, activity.timezone).takeIf { named },
             RecordingTypes.format(res, activity.activityType),
         ).joinToString(" · ")
         // A private activity has no stats worth showing (FR-5.1): what it is stands in for them.

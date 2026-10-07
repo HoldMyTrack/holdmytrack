@@ -86,7 +86,7 @@ class ActivityRowHolder(view: View) : RecyclerView.ViewHolder(view) {
         title.text = label
         // The date moves down here once a name has taken the title.
         meta.text = buildString {
-            if (named) append(PanelFormat.startedAt(res, activity.startedAt)).append(" · ")
+            if (named) append(PanelFormat.startedAt(res, activity.startedAt, activity.timezone)).append(" · ")
             // A private activity has no track, so no distance or duration: "0.0 km · 0m" would
             // read as broken data. Its badge says why instead.
             if (!activity.isPrivate) {
