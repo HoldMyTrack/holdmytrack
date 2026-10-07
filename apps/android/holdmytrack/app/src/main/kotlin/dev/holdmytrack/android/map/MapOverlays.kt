@@ -82,6 +82,10 @@ object MapOverlays {
     private const val REGION_HEATMAP_SOURCE_ID = "region-heatmap"
     private const val REGION_HEATMAP_LAYER_ID = "region-heatmap-fill"
 
+    /** The Country/Region sources' credit, the web's `zoomTiers.ts` `BOUNDARIES_ATTRIBUTION`: their
+     *  outlines are Overture Maps' divisions, built from OpenStreetMap (ODbL, root ADR-0034). */
+    private const val BOUNDARIES_ATTRIBUTION = "<a href=\"https://overturemaps.org\">Overture Maps</a>"
+
     /** Heatmap mode's wash over the basemap, beneath the heat — the web's `heatmap-dim`. */
     private const val HEATMAP_DIM_LAYER_ID = "heatmap-dim"
 
@@ -547,7 +551,12 @@ object MapOverlays {
         opacity: Float,
     ) {
         if (style.getSource(sourceId) == null) {
-            style.addSource(VectorSource(sourceId, tileSet(url).apply { this.minZoom = minZoom; this.maxZoom = maxZoom }))
+            val tiles = tileSet(url).apply {
+                this.minZoom = minZoom
+                this.maxZoom = maxZoom
+                attribution = BOUNDARIES_ATTRIBUTION
+            }
+            style.addSource(VectorSource(sourceId, tiles))
         }
         if (style.getLayer(layerId) == null) {
             val layer = FillLayer(layerId, sourceId)

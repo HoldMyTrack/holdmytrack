@@ -24,3 +24,8 @@ export function zoomTier(zoom: number): ZoomTier {
   if (zoom < REGION_MAX_ZOOM) return 'region';
   return 'city';
 }
+
+/** The Country/Region tier sources' credit: their outlines are Overture Maps' divisions, built
+ *  from OpenStreetMap (ODbL, ADR-0034). MapLibre shows a source's attribution while it's in use,
+ *  beside the basemap's OpenStreetMap credit. */
+export const BOUNDARIES_ATTRIBUTION = '<a href="https://overturemaps.org">Overture Maps</a>';

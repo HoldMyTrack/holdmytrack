@@ -4,16 +4,15 @@ import type { ViewState } from './viewState';
  * Per-country opening view for MapView's zero-history fallback (docs/SPEC.md FR-4.5) — a
  * point + zoom that keeps roughly the whole country in frame, not a real-time lookup.
  *
- * Generated once, offline, from the same Admin-0 country polygons already seeded server-side
- * for Fog/Heatmap's country unlocking (`admin_countries`, IMPLEMENTATION.md §4.4/§4.4.x):
- * `ST_PointOnSurface(geom)` per `iso_a2` (not `ST_Centroid`, which can land outside a concave
+ * Generated once, offline, from Natural Earth's Admin-0 country polygons (IMPLEMENTATION.md
+ * §4.13): `ST_PointOnSurface(geom)` per ISO code (not `ST_Centroid`, which can land outside a concave
  * or archipelago shape), zoom derived from the polygon's own bounding-box extent so a small
  * country lands close and a large one lands wide. Scoped to exactly the codes
  * the Settings page's Country list (`services/server/internal/web/places_data.go`) can write into `users.country` — a handful of
- * small territories in that list have no polygon in `admin_countries` and simply have no entry
+ * small territories in that list had no polygon there and simply have no entry
  * here, falling through to WORLD_VIEW (config.ts) like an unset country does.
  *
- * A few entries are hand-corrected rather than derived: countries whose `admin_countries`
+ * A few entries are hand-corrected rather than derived: countries whose Natural Earth
  * polygon bundles a far-flung overseas dependency into the same geometry as the mainland
  * (France, Netherlands — a correct mainland centroid but a wildly oversized bbox; Norway — a
  * centroid pulled all the way to Svalbard) would otherwise produce a broken or absurdly

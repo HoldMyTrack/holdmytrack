@@ -5,11 +5,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"path"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -223,16 +226,54 @@ func main() {
 		}
 
 	case "seed-admin-boundaries":
-		// One-time (idempotent — safe to re-run on redeploy) load of the Natural Earth
-		// country/region polygons backing Fog/Heatmap's Country/Region zoom tiers, plus a
-		// backfill of activity_country/activity_region for every activity ingested before
-		// this feature existed. See internal/geo.SeedAdminBoundaries's own doc comment.
-		log.Info("seed-admin-boundaries: starting")
-		if err := geo.SeedAdminBoundaries(ctx, pool, log); err != nil {
+		// The country/region outlines behind Fog/Heatmap's Country/Region zoom tiers, from the
+		// extract scripts/boundaries-extract.sh makes (docs/DEPLOY.md §6), and a re-match of every
+		// activity against them. Safe to re-run: the extract already loaded is skipped unless
+		// --force. Reads geo.BoundariesKey from the app bucket, or --file's local copy. See
+		// internal/geo.SeedAdminBoundaries's own doc comment.
+		var file string
+		force := false
+		for i := 2; i < len(os.Args); i++ {
+			switch {
+			case os.Args[i] == "--force":
+				force = true
+			case os.Args[i] == "--file" && i+1 < len(os.Args):
+				file = os.Args[i+1]
+				i++
+			default:
+				fmt.Fprintln(os.Stderr, "usage: holdmytrack seed-admin-boundaries [--force] [--file <boundaries.csv.gz>]")
+				os.Exit(2)
+			}
+		}
+		var src io.ReadCloser
+		name := path.Base(geo.BoundariesKey)
+		if file != "" {
+			src, err = os.Open(file)
+			name = filepath.Base(file)
+		} else {
+			var store *storage.Store
+			if store, err = storage.New(cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3Bucket); err == nil {
+				src, err = store.Get(ctx, geo.BoundariesKey)
+			}
+		}
+		if err != nil {
 			log.Error("seed-admin-boundaries", "err", err)
 			os.Exit(1)
 		}
-		log.Info("seed-admin-boundaries: done")
+		log.Info("seed-admin-boundaries: starting", "file", name, "force", force)
+		stats, err := geo.SeedAdminBoundaries(ctx, pool, log, src, name, force)
+		src.Close()
+		if err != nil {
+			log.Error("seed-admin-boundaries", "err", err)
+			os.Exit(1)
+		}
+		if stats.Unchanged {
+			log.Info("seed-admin-boundaries: already loaded, nothing to do (--force reloads it)", "file", name)
+			break
+		}
+		log.Info("seed-admin-boundaries: done", "countries", stats.Countries, "regions", stats.Regions,
+			"skipped_regions", stats.SkippedRegions, "whole_country_regions", stats.WholeCountryRegions,
+			"activity_countries", stats.ActivityCountries, "activity_regions", stats.ActivityRegions)
 
 	case "import-spots":
 		// The load, and each quarterly refresh, of the Spots places from an OpenStreetMap extract

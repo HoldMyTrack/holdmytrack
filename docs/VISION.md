@@ -284,7 +284,7 @@ Non-negotiable. A Fog of War map is a precise map of where a person lives — th
 * **Health Connect declarations** — Android health data types must be declared in the Play Console with justified use. Requesting more types than the product demonstrably uses is a known rejection cause. HoldMyTrack requests exercise sessions and their routes (plus the history window over them) and no health measurement at all.
 * **Photos are stored stripped and placed after clipping** — the browser re-encodes a photo before upload, so no EXIF field (the position included) reaches the server inside the file; its place on the map is worked out from the clipped track on every read, so a photo taken inside a Private location — even one added afterwards — shows at the visible end of the track, never inside it (ADR-0024).
 * **Spot captures are private** — visible only to the account itself.
-* **OpenStreetMap's licence** — Spots is an unmodified OSM extract: the map already credits OSM contributors, and the data stays available under the ODbL by pointing to OSM itself.
+* **OpenStreetMap's licence** — Spots is an unmodified OSM extract: the map already credits OSM contributors, and the data stays available under the ODbL by pointing to OSM itself. The country and region outlines are OSM's too, by way of Overture Maps, credited on the map beside OSM; their derivation is a public script, which keeps the derived outlines available under the ODbL (ADR-0034).
 * **No data sales, ever, stated in the privacy policy.** For a free product this is the question every user will ask, and the answer needs to be a written commitment rather than a reassuring tone.
 
 ---

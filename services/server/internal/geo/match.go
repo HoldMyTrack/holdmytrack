@@ -13,9 +13,10 @@ import (
 // upstream needs to hold onto it for this.
 //
 // Matches against the already-persisted display trajectory, not the raw pre-simplification
-// points fog masks use: admin polygons are kilometers across, so ingest's ~3 m simplification
-// tolerance cannot plausibly change which one a segment intersects, and reading the column
-// back avoids a second geometry pass in Go. Every polygon touched gets a row, however
+// points fog masks use: ingest's ~3 m simplification tolerance is well inside the outlines' own
+// accuracy, and reading the column back avoids a second geometry pass in Go. It tests the
+// full-detail outlines' pieces (admin_country_parts/admin_region_parts), never the simplified
+// ones the tiles draw. Every polygon touched gets a row, however
 // briefly — matching the product requirement that a visit's size or duration doesn't matter,
 // only whether it happened.
 //
@@ -26,8 +27,8 @@ import (
 func MatchActivity(ctx context.Context, pool *pgxpool.Pool, activityID string) error {
 	_, err := pool.Exec(ctx, `
 		INSERT INTO activity_country (activity_id, country_id)
-		SELECT $1, c.id FROM admin_countries c
-		WHERE ST_Intersects(c.geom, (SELECT trajectory FROM activities WHERE id = $1))
+		SELECT DISTINCT $1::uuid, p.country_id FROM admin_country_parts p
+		WHERE ST_Intersects(p.geom, (SELECT trajectory FROM activities WHERE id = $1))
 		ON CONFLICT DO NOTHING
 	`, activityID)
 	if err != nil {
@@ -35,8 +36,8 @@ func MatchActivity(ctx context.Context, pool *pgxpool.Pool, activityID string) e
 	}
 	_, err = pool.Exec(ctx, `
 		INSERT INTO activity_region (activity_id, region_id)
-		SELECT $1, r.id FROM admin_regions r
-		WHERE ST_Intersects(r.geom, (SELECT trajectory FROM activities WHERE id = $1))
+		SELECT DISTINCT $1::uuid, p.region_id FROM admin_region_parts p
+		WHERE ST_Intersects(p.geom, (SELECT trajectory FROM activities WHERE id = $1))
 		ON CONFLICT DO NOTHING
 	`, activityID)
 	if err != nil {
