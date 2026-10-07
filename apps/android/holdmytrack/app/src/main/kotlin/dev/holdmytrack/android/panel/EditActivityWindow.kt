@@ -223,7 +223,7 @@ class EditActivityWindow(
             res.getQuantityString(R.plurals.edit_title_many, group.size, group.size)
         }
         subtitle.text = if (single != null) {
-            single.name?.trim()?.takeIf { it.isNotEmpty() } ?: PanelFormat.startedAt(res, single.startedAt)
+            single.name?.trim()?.takeIf { it.isNotEmpty() } ?: PanelFormat.startedAt(res, single.startedAt, single.timezone)
         } else {
             res.getString(R.string.edit_multi_subtitle)
         }

@@ -243,7 +243,7 @@ class MainActivity : AppCompatActivity() {
         private const val STATE_TAB = "tab"
         private const val EXTRA_TAB = "dev.holdmytrack.android.TAB"
         internal const val EXTRA_VIEW_ACTIVITY = "dev.holdmytrack.android.VIEW_ACTIVITY"
-        internal const val EXTRA_VIEW_STARTED_AT = "dev.holdmytrack.android.VIEW_STARTED_AT"
+        internal const val EXTRA_VIEW_DAY = "dev.holdmytrack.android.VIEW_DAY"
         private const val EXTRA_PRIVATE_LOCATION = "dev.holdmytrack.android.PRIVATE_LOCATION"
 
         /** Opens the main window on [tab] — Upload's "See Sync". Clears whatever is over an
@@ -266,13 +266,14 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        /** Opens the map on [activityId], started at [startedAt] — the Sync screen's View on
-         *  map. Clears whatever is over an existing map, which then selects it. */
-        fun viewOnMap(context: Context, activityId: String, startedAt: String) {
+        /** Opens the map on [activityId], on [day] (`YYYY-MM-DD`, its local date where it was
+         *  recorded) — the Sync screen's View on map. Clears whatever is over an existing map,
+         *  which then selects it. */
+        fun viewOnMap(context: Context, activityId: String, day: String) {
             context.startActivity(
                 Intent(context, MainActivity::class.java)
                     .putExtra(EXTRA_VIEW_ACTIVITY, activityId)
-                    .putExtra(EXTRA_VIEW_STARTED_AT, startedAt)
+                    .putExtra(EXTRA_VIEW_DAY, day)
                     .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             )
         }

@@ -169,6 +169,8 @@ data class SyncHistoryEntry(
     val distanceMeters: Double?,
     val activityId: String?,
     val keptSource: String?,
+    /** The zone [startedAt]'s activity was recorded in (`docs/IMPLEMENTATION.md` §4.30). */
+    val timezone: String? = null,
 )
 
 /** A page of the sync history, plus the counts that describe the whole of it. */
@@ -182,7 +184,8 @@ data class SyncHistory(
 
 /**
  * One row of `GET /v1/activities` (`docs/IMPLEMENTATION.md` §4.7) — what the map's Activities
- * panel lists, the web's `Activity`. [startedAt] is the server's RFC 3339 instant. [name],
+ * panel lists, the web's `Activity`. [startedAt] is the server's RFC 3339 instant, shown in
+ * [timezone], the zone it was recorded in (§4.30; empty from an older server). [name],
  * [description], [distanceMeters] and [durationSeconds] are null when the source never set
  * them; [bbox] (`[minLon, minLat, maxLon, maxLat]`) is null for an activity with no drawn
  * track. [pending] is a reprocess still running (a track edit, a Private location change):
@@ -194,6 +197,7 @@ data class Activity(
     val id: String,
     val startedAt: String,
     val activityType: String,
+    val timezone: String = "",
     val name: String?,
     val distanceMeters: Double?,
     val durationSeconds: Long?,
@@ -281,7 +285,8 @@ data class TrackPoints(val points: List<TrackPoint>, val edit: TrackEdit?)
  * One photo on an activity (`docs/SPEC.md` FR-16.3), always with a place on its track:
  * [routeAt], a moment on it. [lon]/[lat] are that moment's point on the track as drawn, null
  * only for an activity with no track left at all. [url] and [thumbUrl] are API paths
- * (`/v1/photos/…`); [width]/[height] are the stored copy's.
+ * (`/v1/photos/…`); [width]/[height] are the stored copy's. [timezone] is its activity's, which
+ * its times are shown in.
  */
 data class Photo(
     val id: String,
@@ -295,6 +300,7 @@ data class Photo(
     val height: Int,
     val url: String,
     val thumbUrl: String,
+    val timezone: String = "",
 )
 
 /**
@@ -686,6 +692,7 @@ object HoldMyTrackApi {
                         distanceMeters = if (row.isNull("distance_meters")) null else row.optDouble("distance_meters"),
                         activityId = row.optString("activity_id").ifBlank { null },
                         keptSource = row.optJSONObject("superseded_by")?.optString("source")?.ifBlank { null },
+                        timezone = row.optString("timezone").ifBlank { null },
                     )
                 },
             )
@@ -1331,6 +1338,7 @@ object HoldMyTrackApi {
         height = json.optInt("height"),
         url = json.optString("url"),
         thumbUrl = json.optString("thumb_url"),
+        timezone = json.optString("timezone"),
     )
 
     /** `GET /v1/private-locations` — every one, oldest first. */
@@ -1461,6 +1469,7 @@ object HoldMyTrackApi {
             id = row.getString("id"),
             startedAt = row.optString("started_at"),
             activityType = row.optString("activity_type"),
+            timezone = row.optString("timezone"),
             name = row.optNullableString("name"),
             distanceMeters = row.optNullableDouble("distance_meters"),
             durationSeconds = row.optNullableDouble("duration_seconds")?.toLong(),

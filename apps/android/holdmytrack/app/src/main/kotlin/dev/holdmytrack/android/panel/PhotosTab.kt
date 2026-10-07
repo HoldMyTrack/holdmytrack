@@ -37,7 +37,6 @@ import dev.holdmytrack.android.photos.PreparedPhoto
 import dev.holdmytrack.android.photos.TimedPoint
 import dev.holdmytrack.android.photos.UnreadablePhotoException
 import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.concurrent.Executors
@@ -463,10 +462,11 @@ class PhotosTab(
         onOverlay(PhotoMarkerOverlay(upserts, draft.deleted.toSet(), waiting?.key ?: editingId))
     }
 
+    /** A moment's time of day in the zone the activity was recorded in. */
     private fun clock(seconds: Long): String =
         DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
             .withLocale(res.configuration.locales[0])
-            .withZone(ZoneId.systemDefault())
+            .withZone(PanelFormat.zone(activity?.timezone))
             .format(Instant.ofEpochSecond(seconds))
 
     /** A slider along the track (`include_photo_slider`) and the time at its point. [onMove]

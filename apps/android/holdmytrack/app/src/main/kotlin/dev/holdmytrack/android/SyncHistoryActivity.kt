@@ -16,8 +16,8 @@ class SyncHistoryActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_sync_history)
-        history = ImportHistory(findViewById(R.id.sync_history_root), preview = false, onViewOnMap = { activityId, startedAt ->
-            MainActivity.viewOnMap(this, activityId, startedAt)
+        history = ImportHistory(findViewById(R.id.sync_history_root), preview = false, onViewOnMap = { activityId, day ->
+            MainActivity.viewOnMap(this, activityId, day)
             finish()
         })
     }

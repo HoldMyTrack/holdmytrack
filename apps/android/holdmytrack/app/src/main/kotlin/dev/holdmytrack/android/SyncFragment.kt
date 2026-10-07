@@ -192,8 +192,8 @@ class SyncFragment : Fragment(R.layout.fragment_sync) {
 
     /** A history row's View on map: the map, on that activity (`MainActivity.viewOnMap`) — the
      *  Map tab, or, from SyncActivity, the map under it. */
-    private fun viewOnMap(activityId: String, startedAt: String) {
-        MainActivity.viewOnMap(requireContext(), activityId, startedAt)
+    private fun viewOnMap(activityId: String, day: String) {
+        MainActivity.viewOnMap(requireContext(), activityId, day)
         if (activity !is MainActivity) activity?.finish()
     }
 
