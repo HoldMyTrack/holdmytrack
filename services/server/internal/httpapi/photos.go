@@ -162,6 +162,9 @@ func (s *Server) handleListPhotos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if ok, err := owns(ctx, userID, id); err != nil {
+		if clientGone(w, r) {
+			return
+		}
 		s.log.Error("photo list: owner lookup failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -171,6 +174,9 @@ func (s *Server) handleListPhotos(w http.ResponseWriter, r *http.Request) {
 	}
 	photos, err := s.loadPhotos(ctx, where, userID, id)
 	if err != nil {
+		if clientGone(w, r) {
+			return
+		}
 		s.log.Error("photo list failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
