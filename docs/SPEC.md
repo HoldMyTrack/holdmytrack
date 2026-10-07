@@ -585,6 +585,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 4. Clicking anywhere on the map that is not a track clears the row-click focus, if any — the focused activity loses its focus treatment and returns to Normal. Clicking empty space in the Activities panel's list does the same (FR-5.5). Neither affects the checkbox group.
 5. Tracks are drawn from zoom 4 — a few states on screen — inward. Zoomed out further, Normal mode shows the base map alone; unlike Fog and Heatmap, it has no country/region fallback (FR-4.2, FR-4.3). Fitting the camera to an activity (FR-5.5, FR-5.7) lands at zoom 4 or closer for anything spanning up to about 60° of longitude at desktop width — a US coast-to-coast drive included — and about 25° on a phone; a wider activity is flown to but isn't drawn until the user zooms in.
 6. Every track is always in one of three states — Normal, Hovered, or Focused — each drawn distinctly (*Track states*, below). Checking a row's checkbox (FR-5.6) is not a track state: a checked track draws in whichever of these it's otherwise in, and its row shows only the ticked checkbox.
+7. A track across the 180° meridian (Fiji, Tonga, the western Aleutians, a Pacific crossing) is drawn the short way across it, and clears Fog of War and counts in Heatmap on both sides of it, as any other track does; the countries and regions it passes through are the ones either side.
 
 **Track states**:
 

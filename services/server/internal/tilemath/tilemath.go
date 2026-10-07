@@ -82,15 +82,20 @@ func SegmentTiles(lon1, lat1, lon2, lat2 float64, zoom int) [][2]int {
 // them) skips tiles a long, slanted segment cuts across near a corner. The margin is square,
 // so a tile only the stroke's round end would reach diagonally is included too: an empty mask,
 // never a missing one.
+//
+// A longitude past ±180 (a track continuing across the antimeridian, ingest's unwrapLons) is
+// a column past the world's edge, which wraps round to the other side's.
 func SegmentTilesBuffered(lon1, lat1, lon2, lat2 float64, zoom int, marginPx, tileSize float64) [][2]int {
 	x1, y1 := WorldPixel(lon1, lat1, zoom, tileSize)
 	x2, y2 := WorldPixel(lon2, lat2, zoom, tileSize)
-	last := int(math.Pow(2, float64(zoom))) - 1
+	n := int(math.Pow(2, float64(zoom)))
+	last := n - 1
 	clamp := func(v int) int { return min(max(v, 0), last) }
+	wrap := func(v int) int { return ((v % n) + n) % n }
 
 	var out [][2]int
-	lo := clamp(int(math.Floor((math.Min(x1, x2) - marginPx) / tileSize)))
-	hi := clamp(int(math.Floor((math.Max(x1, x2) + marginPx) / tileSize)))
+	lo := int(math.Floor((math.Min(x1, x2) - marginPx) / tileSize))
+	hi := int(math.Floor((math.Max(x1, x2) + marginPx) / tileSize))
 	for tx := lo; tx <= hi; tx++ {
 		// The segment's y range where its x is within this column, widened by the margin.
 		left, right := float64(tx)*tileSize-marginPx, float64(tx+1)*tileSize+marginPx
@@ -103,7 +108,7 @@ func SegmentTilesBuffered(lon1, lat1, lon2, lat2 float64, zoom int, marginPx, ti
 		top := clamp(int(math.Floor((math.Min(ya, yb) - marginPx) / tileSize)))
 		bottom := clamp(int(math.Floor((math.Max(ya, yb) + marginPx) / tileSize)))
 		for ty := top; ty <= bottom; ty++ {
-			out = append(out, [2]int{tx, ty})
+			out = append(out, [2]int{wrap(tx), ty})
 		}
 	}
 	return out

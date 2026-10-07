@@ -33,11 +33,3 @@ FR-9 behavior 3 says the Profile page renders the trailing 12 months as one bar 
 `preparePhoto` (`apps/web/src/ui/photoPrep.ts`) decodes the whole picture with `createImageBitmap` (about 4 bytes a pixel) and only then draws it at 2048 px and 320 px. A 100–200 MP panorama or drone image needs 400–800 MB for that one bitmap, which can kill a phone's tab and the unsaved Edit window with it. Found in the frontend audit; not yet reproduced on a device.
 
 - [ ] Decode at the target size (`createImageBitmap`'s `resizeWidth`/`resizeHeight`, which need the oriented dimensions first), and check that an EXIF-rotated portrait still comes out upright and undistorted in Chrome, Firefox and Safari.
-
-### A track across the 180° meridian is drawn around the world, and its import never finishes
-
-Longitude is a plain −180…180 range in the stored trajectory and everything drawn from it, so two points either side of the antimeridian (179.95 and −179.98, near Taveuni in Fiji) are joined by a segment running the long way round the world. The tracks tile draws it as a line off both edges of the map. Ingest's mask rendering walks that segment too: a four-point GPX crossing near Taveuni kept the worker at 100% CPU for over a minute with no masks written and its job still pending, and the worker had to be killed, since it didn't stop on SIGTERM. Reproduced on a local stack. Fiji, Tonga, Samoa, Chukotka, the western Aleutians and Pacific crossings all hit it.
-
-- [ ] Split a track into parts at the antimeridian at ingest, wherever a step between two points is over 180° of longitude: in the stored trajectory (a `MultiLineStringM`, or the line shifted past 180 and drawn twice), and in the points the masks, touched tiles and Country/Region matching are worked out from.
-- [ ] Check that distances and durations, which already measure the step the short way, stay as they are.
-- [ ] Check a crossing track's import, tiles, Fog and Heatmap on a local stack.

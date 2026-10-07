@@ -124,8 +124,14 @@ func TestTrackEditValidate(t *testing.T) {
 	if err := (TrackEdit{Keep: &[2]int64{1, 1}, Remove: [][2]int64{{2, 2}}}).Validate(); err != nil {
 		t.Errorf("single-instant ranges are valid: %v", err)
 	}
-	if err := (TrackEdit{Move: map[int64][2]float64{1: {181, 0}}}).Validate(); err == nil {
+	if err := (TrackEdit{Move: map[int64][2]float64{1: {541, 0}}}).Validate(); err == nil {
 		t.Error("a point moved off the map must be rejected")
+	}
+	if err := (TrackEdit{Move: map[int64][2]float64{1: {0, 91}}}).Validate(); err == nil {
+		t.Error("a point moved past the pole must be rejected")
+	}
+	if err := (TrackEdit{Move: map[int64][2]float64{1: {180.5, 0}}}).Validate(); err != nil {
+		t.Errorf("a point moved on a track continuing past 180 is valid: %v", err)
 	}
 	if err := (TrackEdit{Move: map[int64][2]float64{1: {-180, 90}}}).Validate(); err != nil {
 		t.Errorf("a point moved to the map's edge is valid: %v", err)

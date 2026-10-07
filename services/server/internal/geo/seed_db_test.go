@@ -140,3 +140,51 @@ func TestLoadBoundaries(t *testing.T) {
 		t.Errorf("too few countries: %v", err)
 	}
 }
+
+// A track stored continuing past 180 across the antimeridian (ingest's unwrapLons) matches the
+// countries either side of it, and not one the same parallel crosses on the far side of the
+// world.
+func TestMatchAcrossTheAntimeridian(t *testing.T) {
+	tx := testTx(t)
+	ctx := context.Background()
+	log := slog.New(slog.DiscardHandler)
+	box := func(lon1, lat1, lon2, lat2 float64) string {
+		var hex string
+		if err := tx.QueryRow(ctx, `SELECT encode(ST_AsBinary(ST_MakeEnvelope($1, $2, $3, $4)), 'hex')`,
+			lon1, lat1, lon2, lat2).Scan(&hex); err != nil {
+			t.Fatal(err)
+		}
+		return hex
+	}
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	gz.Write([]byte(strings.Join([]string{
+		"country,EE,EE,,East of it," + box(179, -61, 180, -60),
+		"country,WW,WW,,West of it," + box(-180, -61, -179, -60),
+		"country,FF,FF,,Far away," + box(0, -61, 1, -60),
+	}, "\n") + "\n"))
+	gz.Close()
+
+	var userID, activityID string
+	if err := tx.QueryRow(ctx, `INSERT INTO users (email) VALUES ($1) RETURNING id`,
+		fmt.Sprintf("geo-am-%d@holdmytrack.invalid", time.Now().UnixNano())).Scan(&userID); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO activities (user_id, source, activity_type, started_at, trajectory, timezone)
+		VALUES ($1, 'upload', 'sailing', now(), ST_GeomFromText('LINESTRING M(179.5 -60.5 0, 180.5 -60.5 60)', 4326), 'UTC')
+		RETURNING id`, userID).Scan(&activityID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadBoundaries(ctx, tx, log, &buf, "am.csv.gz", true, 3, 0); err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	var got string
+	if err := tx.QueryRow(ctx, `SELECT string_agg(c.code, ',' ORDER BY c.code)
+		FROM activity_country ac JOIN admin_countries c ON c.id = ac.country_id WHERE ac.activity_id = $1`, activityID).Scan(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got != "EE,WW" {
+		t.Errorf("matched %q, want EE,WW", got)
+	}
+}

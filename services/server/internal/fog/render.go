@@ -8,6 +8,7 @@ import (
 	"image"
 	"image/draw"
 	"image/png"
+	"math"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -233,7 +234,7 @@ func RenderActivityMasks(ctx context.Context, pool *pgxpool.Pool, store *storage
 	keys := make([]string, 0, len(tiles))
 	for _, t := range tiles {
 		x, y := t[0], t[1]
-		mask := renderActivityMask(projectToTile(points, x, y, Zoom))
+		mask := renderActivityMask(projectToTile(points, x, y, Zoom)...)
 		key := activityMaskObjectKey(activityID, Zoom, x, y)
 		if err := storeTilePNG(ctx, store, key, mask); err != nil {
 			return fmt.Errorf("store activity mask z%d/%d/%d: %w", Zoom, x, y, err)
@@ -286,13 +287,37 @@ func activityMaskObjectKey(activityID string, zoom, x, y int) string {
 	return fmt.Sprintf("activity-masks/%s/%d/%d/%d.png", activityID, zoom, x, y)
 }
 
-func projectToTile(points []parse.Point, tileX, tileY, zoom int) []pixelPoint {
+// projectToTile places points in the tile's own pixels, once for each copy of the world that
+// reaches it: a track continuing past ±180 (ingest's unwrapLons) lies partly in the next copy
+// over, whose pixels are a world's width away, so a tile on the other side of the
+// antimeridian is drawn from the track shifted by that width. A copy that doesn't come within
+// TileMarginPx of the tile is left out: the rasterizer still pays for a path a world away
+// from its canvas, over a minute at z14.
+func projectToTile(points []parse.Point, tileX, tileY, zoom int) [][]pixelPoint {
+	world := math.Pow(2, float64(zoom)) * TileSize
 	originX := float64(tileX) * TileSize
 	originY := float64(tileY) * TileSize
-	out := make([]pixelPoint, len(points))
+	base := make([]pixelPoint, len(points))
+	minX, maxX := math.Inf(1), math.Inf(-1)
 	for i, p := range points {
 		wx, wy := tilemath.WorldPixel(p.Lon, p.Lat, zoom, TileSize)
-		out[i] = pixelPoint{x: wx - originX, y: wy - originY}
+		base[i] = pixelPoint{x: wx - originX, y: wy - originY}
+		minX, maxX = math.Min(minX, base[i].x), math.Max(maxX, base[i].x)
+	}
+	var out [][]pixelPoint
+	for _, shift := range []float64{0, -world, world} {
+		if maxX+shift < -TileMarginPx || minX+shift > TileSize+TileMarginPx {
+			continue
+		}
+		if shift == 0 {
+			out = append(out, base)
+			continue
+		}
+		shifted := make([]pixelPoint, len(base))
+		for i, p := range base {
+			shifted[i] = pixelPoint{x: p.x + shift, y: p.y}
+		}
+		out = append(out, shifted)
 	}
 	return out
 }

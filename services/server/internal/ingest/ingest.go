@@ -236,6 +236,10 @@ func loadClippedPoints(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 		return parse.Activity{}, nil, nil, fmt.Errorf("ingest: %w (%d)", errTooFewPoints, len(act.Points))
 	}
 
+	// Continuous across the antimeridian from here on: every reader of these points, and the
+	// trajectory built from them, sees a crossing as a short step.
+	act.Points = unwrapLons(act.Points)
+
 	zones, err := LoadZones(ctx, pool, userID)
 	if err != nil {
 		return parse.Activity{}, nil, nil, fmt.Errorf("ingest: load private locations: %w", err)

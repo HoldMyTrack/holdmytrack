@@ -28,7 +28,7 @@ func MatchActivity(ctx context.Context, pool *pgxpool.Pool, activityID string) e
 	_, err := pool.Exec(ctx, `
 		INSERT INTO activity_country (activity_id, country_id)
 		SELECT DISTINCT $1::uuid, p.country_id FROM admin_country_parts p
-		WHERE ST_Intersects(p.geom, (SELECT trajectory FROM activities WHERE id = $1))
+		WHERE ST_Intersects(p.geom, (SELECT `+WrappedSQL("trajectory")+` FROM activities WHERE id = $1))
 		ON CONFLICT DO NOTHING
 	`, activityID)
 	if err != nil {
@@ -37,11 +37,19 @@ func MatchActivity(ctx context.Context, pool *pgxpool.Pool, activityID string) e
 	_, err = pool.Exec(ctx, `
 		INSERT INTO activity_region (activity_id, region_id)
 		SELECT DISTINCT $1::uuid, p.region_id FROM admin_region_parts p
-		WHERE ST_Intersects(p.geom, (SELECT trajectory FROM activities WHERE id = $1))
+		WHERE ST_Intersects(p.geom, (SELECT `+WrappedSQL("trajectory")+` FROM activities WHERE id = $1))
 		ON CONFLICT DO NOTHING
 	`, activityID)
 	if err != nil {
 		return fmt.Errorf("geo: match regions: %w", err)
 	}
 	return nil
+}
+
+// WrappedSQL is the SQL for the geometry col names moved into −180…180: a trajectory stored
+// continuing past ±180 across the antimeridian (IMPLEMENTATION.md §4.1) comes back as parts,
+// one each side, which is what testing it against the world's outlines needs. A geometry
+// already inside comes back as it is.
+func WrappedSQL(col string) string {
+	return `ST_WrapX(ST_WrapX(` + col + `, 180, -360), -180, 360)`
 }

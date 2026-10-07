@@ -27,7 +27,7 @@ func WriteGPX(w io.Writer, activityType string, points []parse.Point) error {
 	b.WriteString("</type>\n    <trkseg>\n")
 	for _, p := range points {
 		fmt.Fprintf(&b, `      <trkpt lat="%s" lon="%s">`,
-			strconv.FormatFloat(p.Lat, 'f', -1, 64), strconv.FormatFloat(p.Lon, 'f', -1, 64))
+			strconv.FormatFloat(p.Lat, 'f', -1, 64), strconv.FormatFloat(parse.WrapLon(p.Lon), 'f', -1, 64))
 		if p.Elevation != nil {
 			fmt.Fprintf(&b, "<ele>%s</ele>", strconv.FormatFloat(float64(*p.Elevation), 'f', -1, 32))
 		}

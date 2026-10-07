@@ -148,10 +148,10 @@ func loadBoundaries(ctx context.Context, tx pgx.Tx, log *slog.Logger, r io.Reade
 			JOIN admin_country_parts p ON p.country_id = c.id`, nil},
 		{"activity countries", `
 			INSERT INTO activity_country (activity_id, country_id)
-			SELECT DISTINCT a.id, p.country_id FROM activities a JOIN admin_country_parts p ON ST_Intersects(p.geom, a.trajectory)`, &stats.ActivityCountries},
+			SELECT DISTINCT a.id, p.country_id FROM activities a JOIN admin_country_parts p ON ST_Intersects(p.geom, ` + WrappedSQL("a.trajectory") + `)`, &stats.ActivityCountries},
 		{"activity regions", `
 			INSERT INTO activity_region (activity_id, region_id)
-			SELECT DISTINCT a.id, p.region_id FROM activities a JOIN admin_region_parts p ON ST_Intersects(p.geom, a.trajectory)`, &stats.ActivityRegions},
+			SELECT DISTINCT a.id, p.region_id FROM activities a JOIN admin_region_parts p ON ST_Intersects(p.geom, ` + WrappedSQL("a.trajectory") + `)`, &stats.ActivityRegions},
 	}
 	for _, s := range steps {
 		tag, err := tx.Exec(ctx, s.sql)

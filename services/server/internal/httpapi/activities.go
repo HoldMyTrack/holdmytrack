@@ -65,10 +65,12 @@ func parseActivityFilter(q url.Values) (activityFilter, error) {
 }
 
 // activityBBoxColumns is an activity's bbox as four columns, west, south, east, north, the
-// shorter way round in longitude: a track across the antimeridian (points at 179.9 and −179.9)
-// is 179.9…180.1 rather than −179.9…179.9, read off ST_ShiftLongitude's copy, which moves the
-// western hemisphere's points past 180. East is past 180 then, the form MapLibre fits as it
-// is. The shifted copy is only made for a box over 180° wide, which no other track has.
+// shorter way round in longitude. A track across the antimeridian is stored continuing past
+// ±180 (§4.1), so its plain bbox already is (179.9…180.1, east past 180, the form MapLibre
+// fits as it is). One stored jumping back across the world, before that and with no raw
+// payload to reprocess it from, spans −179.9…179.9; it's read off ST_ShiftLongitude's copy
+// instead, which moves the western hemisphere's points past 180. The shifted copy is only
+// made for a box over 180° wide, which no other track has.
 var activityBBoxColumns = shorterWay("ST_XMin") + `, ST_YMin(trajectory), ` + shorterWay("ST_XMax") + `, ST_YMax(trajectory)`
 
 func shorterWay(edge string) string {
