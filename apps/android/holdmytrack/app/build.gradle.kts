@@ -13,6 +13,9 @@ fun gitOutput(vararg args: String): String? = runCatching {
     }.standardOutput.asText.get().trim().takeIf { it.isNotEmpty() }
 }.getOrNull()
 
+/** The Gradle property [name]'s origin as a quoted Java string, for a BuildConfig field. */
+fun apiBaseUrl(name: String): String = "\"${providers.gradleProperty(name).get().trimEnd('/')}\""
+
 android {
     namespace = "dev.holdmytrack.android"
     compileSdk = 37
@@ -36,14 +39,19 @@ android {
         versionCode = gitOutput("rev-list", "--count", "HEAD")?.toIntOrNull() ?: 1
         versionName = "0.8"
         buildConfigField("String", "GIT_SHA", "\"${gitOutput("rev-parse", "--short", "HEAD") ?: "dev"}\"")
+    }
 
-        // The API origin is a build input, not a constant: the same source builds against a
-        // dev stack on the host and against a deployed server. See gradle.properties.
-        buildConfigField(
-            "String",
-            "API_BASE_URL",
-            "\"${providers.gradleProperty("holdmytrack.apiBaseUrl").get().trimEnd('/')}\"",
-        )
+    // The release build is the Play build, signed with the upload key (Play App Signing re-signs
+    // it with Google's). The keystore and its passwords stay out of the repository: these four
+    // properties live in ~/.gradle/gradle.properties. Without them, bundleRelease stops at
+    // validateSigningRelease, naming what's missing; debug builds don't need them.
+    signingConfigs {
+        create("release") {
+            providers.gradleProperty("holdmytrack.uploadStoreFile").orNull?.let { storeFile = file(it) }
+            storePassword = providers.gradleProperty("holdmytrack.uploadStorePassword").orNull
+            keyAlias = providers.gradleProperty("holdmytrack.uploadKeyAlias").orNull
+            keyPassword = providers.gradleProperty("holdmytrack.uploadKeyPassword").orNull
+        }
     }
 
     // The languages the app ships (res/values-ru/, res/xml/locales_config.xml): without this
@@ -64,13 +72,19 @@ android {
         // and Play's Payments policy doesn't allow pointing users at a payment method outside
         // Play's billing (apps/android/docs/ROADMAP.md Phase 6); the debug build is the APK the
         // website offers (docs/DEPLOY.md), which keeps it.
+        // The API origin is a build input, not a constant: the same source builds against a
+        // dev stack on the host and against a deployed server. Each build type reads its own
+        // property, so a release never picks up the dev stack's address. See gradle.properties.
         debug {
             enableUnitTestCoverage = true
             buildConfigField("boolean", "DONATE_LINK", "true")
+            buildConfigField("String", "API_BASE_URL", apiBaseUrl("holdmytrack.apiBaseUrl"))
         }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             buildConfigField("boolean", "DONATE_LINK", "false")
+            buildConfigField("String", "API_BASE_URL", apiBaseUrl("holdmytrack.releaseApiBaseUrl"))
         }
     }
     compileOptions {

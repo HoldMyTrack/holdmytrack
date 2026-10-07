@@ -48,9 +48,8 @@ Everything between a tested app and its Play Store listing, roughly in the order
   - Done end to end on a physical device, with the Health Connect toolbox on the host.
 - [x] **A Play Console developer account**
   - A personal account, owned by `admin@holdmytrack.com`, registered and verified 2026-10-03, including the Android device check. Being personal, it can't publish to production until a closed test has had at least 12 testers opted in continuously for 14 days (Play Console Help, "App testing requirements for new personal developer accounts"). To distribute in the EU, it also needs the Digital Services Act trader-status declaration.
-- [ ] **A release build**
-  - `holdmytrack.apiBaseUrl` set to `https://holdmytrack.com` for release: `gradle.properties`' default is the emulator's `http://10.0.2.2:8080`, so a release built without `-P` points at nothing.
-  - An upload key kept outside the repository, a `release` `signingConfig` that reads it, and `./gradlew bundleRelease`: Play takes an Android App Bundle, not an APK, and with Play App Signing it re-signs the app with a key Google holds. `release` has `isMinifyEnabled = false` today; R8 is optional, and would need MapLibre's and OkHttp's keep rules checked.
+- [x] **A release build**
+  - Release takes its API address from `holdmytrack.releaseApiBaseUrl`, `https://holdmytrack.com`, and is signed by a `release` `signingConfig` reading an upload key kept outside the repository; `./gradlew bundleRelease` makes the App Bundle Play takes, which Play App Signing re-signs with a key Google holds (`apps/android/holdmytrack/README.md`, Release build). Checked 2026-10-06: the bundle verifies with the upload key's certificate, and its `BuildConfig` has the production address and no Donate. `release` has `isMinifyEnabled = false`; R8 is optional, and would need MapLibre's and OkHttp's keep rules checked.
   - Already met, checked 2026-10-02: `targetSdk = 37` is above Play's requirement (API 36 for new apps and updates from 31 August 2026), and MapLibre's native libraries pass the 16 KB page-size check (`zipalign -c -P 16 -v 4` on the debug APK: every `libmaplibre.so` OK).
 - [ ] **Google sign-in in the Play build**
   - Credential Manager only answers for an app whose signing certificate is registered on the Android OAuth client, and only this Mac's debug key is today. Add the SHA-1 of Play's app signing key (Play Console → App integrity), and the upload key's for any build installed outside Play. Facebook needs nothing: its sign-in is a browser-tab handoff to the server (ADR-0016), with no app signature involved.
@@ -72,7 +71,7 @@ Everything between a tested app and its Play Store listing, roughly in the order
   - The content rating questionnaire (IARC), the target audience (not aimed at children), and no ads.
   - App access: reviewers need a way in. The demo account gets them onto the map, but it can't sync Health Connect or edit anything, so supply a review account's credentials and say what's in it.
 - [ ] **The store listing, in English and Russian**
-  - Name, short description (80 characters), full description (4,000), the 512 × 512 icon (`brand/make_icons.py` renders the launcher icon from the same logo), a 1024 × 500 feature graphic, and at least two phone screenshots, plus a category, a contact email, the website and the privacy policy URL.
+  - Name, short description (80 characters), full description (4,000), the 512 × 512 icon (`brand/make_icons.py` renders the launcher icon from the same logo), a 1024 × 500 feature graphic (`brand/play-feature-graphic.png`, and `-ru` for the Russian listing, rendered by the same script), and at least two phone screenshots, plus a category, a contact email, the website and the privacy policy URL.
 - [ ] **Testing tracks, then production**
   - An internal test first, to install the Play-signed build and check Google sign-in against its key. Then the closed test, with its 12 testers for 14 days on a personal account, and its pre-launch report read. Then apply for production access and release in stages.
 - [ ] **Confirm the wider launch gates are met**

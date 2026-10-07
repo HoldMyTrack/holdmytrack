@@ -9,7 +9,7 @@ import os
 import struct
 import subprocess
 
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 BRAND = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(BRAND)
@@ -124,3 +124,35 @@ write(f'{ios}/AppIcon.appiconset/Contents.json', json.dumps({
     'images': [{'filename': 'AppIcon-1024.png', 'idiom': 'universal', 'platform': 'ios', 'size': '1024x1024'}],
     'info': {'author': 'xcode', 'version': 1}}, indent=2) + '\n')
 write(f'{ios}/Contents.json', json.dumps({'info': {'author': 'xcode', 'version': 1}}, indent=2) + '\n')
+
+# Play's 1024 × 500 feature graphic, one per store-listing language: the mark beside the page
+# header's wordmark ("HoldMy" regular, "Track" bold, Fraunces) over its tagline, on the dark
+# surface, centred and well clear of the edges Play crops or covers. Fraunces has no Cyrillic,
+# so the Russian tagline is Source Serif 4, as on the web (tokens.css :lang(ru)).
+fonts = f'{main}/res/font'
+mark_png = os.path.join(BRAND, 'source/.mark.png')
+subprocess.run(['rsvg-convert', '-h', '190', '-o', mark_png, os.path.join(BRAND, 'source/logo-on-dark.svg')], check=True)
+logo = Image.open(mark_png).convert('RGBA')
+os.remove(mark_png)
+
+
+def font(name, px, weight):
+    f = ImageFont.truetype(os.path.join(ROOT, fonts, name), px)
+    f.set_variation_by_axes([weight])
+    return f
+
+
+for lang, serif in [('en', 'fraunces.ttf'), ('ru', 'source_serif_4.ttf')]:
+    tagline = json.load(open(os.path.join(ROOT, f'services/server/internal/i18n/locales/{lang}.json')))['header.tagline']
+    img = Image.new('RGB', (1024, 500), GREEN)
+    d = ImageDraw.Draw(img)
+    light, bold, small = font('fraunces.ttf', 78, 400), font('fraunces.ttf', 78, 800), font(serif, 29, 400)
+    w1, w2 = d.textlength('HoldMy', font=light), d.textlength('Track', font=bold)
+    x = (1024 - (logo.width + 38 + max(w1 + w2, d.textlength(tagline, font=small) + 4))) / 2
+    y = (500 - logo.height) // 2
+    img.paste(logo, (int(x), y), logo)
+    tx, base = x + logo.width + 38, y + logo.height * 0.52
+    d.text((tx, base), 'HoldMy', font=light, fill='#C7C3B7', anchor='ls')  # header's ink at 82% on GREEN
+    d.text((tx + w1, base), 'Track', font=bold, fill=GOLD, anchor='ls')
+    d.text((tx + 4, base + 52), tagline, font=small, fill='#A8B2A9', anchor='ls')  # --fm-ink-secondary, dark
+    img.save(os.path.join(BRAND, 'play-feature-graphic.png' if lang == 'en' else f'play-feature-graphic-{lang}.png'))
