@@ -86,8 +86,8 @@ func TestLoadBoundaries(t *testing.T) {
 	}
 	// From West Aland into Bland, never touching Aland's east half on its own.
 	if err := tx.QueryRow(ctx, `
-		INSERT INTO activities (user_id, source, activity_type, started_at, trajectory)
-		VALUES ($1, 'upload', 'walking', now(), ST_GeomFromText('LINESTRING M(-40.8 -60.5 0, -39.5 -60.5 60)', 4326))
+		INSERT INTO activities (user_id, source, activity_type, started_at, trajectory, timezone)
+		VALUES ($1, 'upload', 'walking', now(), ST_GeomFromText('LINESTRING M(-40.8 -60.5 0, -39.5 -60.5 60)', 4326), 'UTC')
 		RETURNING id`, userID).Scan(&activityID); err != nil {
 		t.Fatalf("create activity: %v", err)
 	}

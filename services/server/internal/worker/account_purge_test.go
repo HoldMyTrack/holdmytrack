@@ -23,7 +23,7 @@ func TestPurgeDeletedAccountRemovesItsObjectsAndRows(t *testing.T) {
 	}
 	var activityID string
 	if err := pool.QueryRow(ctx, `
-		INSERT INTO activities (user_id, source, activity_type, started_at) VALUES ($1, 'upload', 'run', NOW()) RETURNING id
+		INSERT INTO activities (user_id, source, activity_type, started_at, timezone) VALUES ($1, 'upload', 'run', NOW(), 'UTC') RETURNING id
 	`, userID).Scan(&activityID); err != nil {
 		t.Fatalf("create activity: %v", err)
 	}

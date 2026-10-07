@@ -91,6 +91,9 @@ CREATE TABLE activities (
     elevation_gain_m  NUMERIC(8,2),
     avg_speed_mps     NUMERIC(6,3),
     started_at        TIMESTAMPTZ  NOT NULL,
+    -- §4.30: the IANA zone it was recorded in ('Asia/Tokyo'), from its first recorded point;
+    -- the account's zone where none is known. Its times show, and its days group, in this zone.
+    timezone          TEXT         NOT NULL,
 
     -- Display geometry: simplified for rendering. Coverage is NOT derived from this
     -- column -- see §4.1. M dimension carries epoch seconds.
@@ -509,6 +512,25 @@ CREATE INDEX idx_exports_expiry ON exports (expires_at) WHERE expires_at IS NOT 
 ```
 
 **No state column.** Until `ready_at` is set, where a request stands is its job's: pending is "preparing", failed (or gone) is "failed". Ready lasts until `expires_at`.
+
+### 3.24 `tz_parts`
+
+The world's timezone polygons, from timezone-boundary-builder's `timezones-with-oceans` release (ADR-0035), loaded by `seed-timezones` (§4.30) and never derived from user data. Each polygon is cut by `ST_Subdivide` into pieces of at most 256 vertices, as `admin_country_parts` is (§3.12), so finding a point's zone is an index lookup. `tz_boundaries_source` holds the loaded file's name, as `admin_boundaries_source` does.
+
+```sql
+CREATE TABLE tz_parts (
+    tzid TEXT NOT NULL,                       -- IANA name, e.g. 'Asia/Tokyo', 'Etc/GMT+5' at sea
+    geom GEOMETRY(Polygon, 4326) NOT NULL
+);
+
+CREATE INDEX idx_tz_parts_geom ON tz_parts USING GIST (geom);
+
+CREATE TABLE tz_boundaries_source (
+    only_row  BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (only_row),
+    name      TEXT NOT NULL,
+    loaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
 
 ---
 
@@ -1563,6 +1585,18 @@ The app then posts `{code, verifier}` to `POST /v1/auth/handoff` (`handleAuthHan
 **The sweep** — `sweepExports`, hourly and at start: removes every export past `expires_at`, parts then row, and any request whose job failed or vanished more than 7 days ago. Deleting the account (§4.28) removes `exports/{id}/` with the rest.
 
 **Tested**: `internal/export`'s `Build` over a real database and `storagetest.MemS3` (a small `PartLimit` forcing a split; every folder's files, the original byte for byte, `account.json`'s contents, a rebuild leaving no stale part); `exports_test.go` (one export per request while preparing, a demo refused, a download whole and resumed by Range, someone else's and a missing part refused — MemS3 now answers ranged reads); `TestSettingsExportForm` (the section, a request, and the preparing state); `export_job_test.go` (the export lane takes the job and the main lane doesn't, ready with its email and link, and the sweep removing it once expired).
+
+### 4.30 Each activity's own timezone (ADR-0035)
+
+**Stored as a zone name.** `activities.timezone` (§3.3) is the IANA name of the zone the activity was recorded in, never an offset: the tz database keeps each zone's history, so `started_at AT TIME ZONE timezone` gives the offset in force on the activity's own date (Moscow: UTC+4 in summer 2010 and 2013, UTC+3 in 2015).
+
+**Looked up at ingest.** `ingest.Process` sets it in the same `INSERT` as the row, from the first recorded point, before Private locations clip it, so a track they hide still has one: `geo.TimezoneAtSQL` is the `tzid` of the `tz_parts` piece (§3.24) containing the point, or the account's `users.timezone` where none does. A reprocess (`reprocessActivity`: an edit, a Private location change) looks it up again from the first recorded point of its piece, which only changes for a piece of a split (§4.7.8); a new piece starts with its original's zone and gets its own when its reprocess runs.
+
+**The polygons** are timezone-boundary-builder's `timezones-with-oceans.geojson.zip`, the full set: its ocean zones (`Etc/GMT±N`) give a point at sea a zone, and its `-now` variant would merge zones whose clocks agree only today, giving an older activity the wrong offset. The release's zip goes into the app bucket by hand under `geo.TimezonesKey` (`docs/DEPLOY.md` §6). `seed-timezones` (`internal/geo/timezones.go`) reads it from there, or from `--file`, and in one transaction: streams the zip's one GeoJSON file a feature at a time into a temporary table; refuses it if it has fewer than 400 zones; leaves out any zone the database's own tz data doesn't know (`pg_timezone_names`), since a query converting to it would fail, and logs them; replaces `tz_parts` with every zone made valid and polygonal and cut by `ST_Subdivide`; sets every activity with a track to the zone its stored trajectory starts in; and records the file's name in `tz_boundaries_source`. A run whose file is the one already recorded does nothing, unless `--force`. Until it has run, every activity has its account's zone.
+
+**What it costs**, measured on release 2026d (56 MB zipped, 444 zones): the seed took under 2 minutes on a development laptop, almost all of it in `ST_MakeValid` and `ST_Subdivide`, made 74,982 pieces, and re-matched 1,702 activities in under a second. The development database's `tzdata` (Debian's 2024a) didn't know `America/Coyhaique` (added in 2025b), so that zone was left out and its area takes the account's zone until the image's `tzdata` is updated.
+
+**Tested**: `internal/geo`'s `TestLoadTimezones` (a zone per activity from its track's start, a point at sea, a zone the database doesn't know and a point no polygon covers falling back to the account's zone, an activity with no track left as it was, the same file skipped and a short one refused) and `TestTimezoneHistory` (Moscow's offsets across its 2011 and 2014 changes).
 
 ## 5. Engineering Risks & Mitigations
 
