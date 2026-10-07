@@ -60,97 +60,51 @@ func tileYToLat(y, n float64) float64 {
 // SegmentTiles returns every tile at the given zoom a straight segment between two points
 // passes through, walking tile space rather than just the two endpoints' tiles —
 // consecutive GPS fixes are usually within one tile at 1 Hz, but a fast segment (a car
-// commute logged by mistake, a GPS glitch) can span several, and a gap here would leave a
-// strip of genuinely-covered ground stuck fogged.
+// commute logged by mistake, a GPS glitch) or a sparse source (a Google Maps Timeline drive,
+// a point every few minutes) can span many, and a gap here would leave a strip of
+// genuinely-covered ground stuck fogged.
 func SegmentTiles(lon1, lat1, lon2, lat2 float64, zoom int) [][2]int {
-	x1, y1 := LonLatToTile(lon1, lat1, zoom)
-	x2, y2 := LonLatToTile(lon2, lat2, zoom)
-	return bresenham(x1, y1, x2, y2)
+	return SegmentTilesBuffered(lon1, lat1, lon2, lat2, zoom, 0, 256)
 }
 
-// SegmentTilesBuffered is SegmentTiles plus every neighboring tile a marginPx-wide margin
-// around either endpoint spills into — the tile a bare coordinate floors into isn't the only
-// tile the *rendered* stroke can touch, since fog/heatmap draws each point as a
-// strokeRadiusPx-wide, then featherPx-blurred mark, not an infinitesimal dot. A point that
-// lands within marginPx (tile-local pixels, at tileSize) of a tile edge has part of that
-// drawn mark geometrically inside the neighboring tile even though the point's own bare tile
-// index never crosses over — without this, that neighbor is never rendered for the activity
-// and gg's rasterizer silently clips the overflow at the canvas edge instead.
+// SegmentTilesBuffered is SegmentTiles plus every tile the segment comes within marginPx of
+// (tile-local pixels, at tileSize) — the tile a bare coordinate floors into isn't the only
+// tile the *rendered* stroke can touch, since fog/heatmap draws a track as a
+// strokeRadiusPx-wide, then featherPx-blurred line, not an infinitesimal one. A segment that
+// runs within marginPx of a tile edge has part of that drawn line geometrically inside the
+// neighboring tile even though the segment itself never crosses over — without this, that
+// neighbor is never rendered for the activity and gg's rasterizer silently clips the overflow
+// at the canvas edge instead.
+//
+// It works on the segment's exact pixel coordinates, one tile column at a time: the part of
+// the segment inside a column (widened by the margin) spans a range of rows, and every tile in
+// that range is in. Walking the endpoints' tile indices instead (a Bresenham line between
+// them) skips tiles a long, slanted segment cuts across near a corner. The margin is square,
+// so a tile only the stroke's round end would reach diagonally is included too: an empty mask,
+// never a missing one.
 func SegmentTilesBuffered(lon1, lat1, lon2, lat2 float64, zoom int, marginPx, tileSize float64) [][2]int {
-	seen := map[[2]int]struct{}{}
-	for _, t := range SegmentTiles(lon1, lat1, lon2, lat2, zoom) {
-		seen[t] = struct{}{}
-	}
-
-	n := int(math.Pow(2, float64(zoom)))
-	addBufferedNeighbors := func(lon, lat float64) {
-		wx, wy := WorldPixel(lon, lat, zoom, tileSize)
-		tx, ty := int(math.Floor(wx/tileSize)), int(math.Floor(wy/tileSize))
-		localX, localY := wx-float64(tx)*tileSize, wy-float64(ty)*tileSize
-		for dx := -1; dx <= 1; dx++ {
-			for dy := -1; dy <= 1; dy++ {
-				if dx == 0 && dy == 0 {
-					continue
-				}
-				withinX := dx == 0 || (dx < 0 && localX < marginPx) || (dx > 0 && localX > tileSize-marginPx)
-				withinY := dy == 0 || (dy < 0 && localY < marginPx) || (dy > 0 && localY > tileSize-marginPx)
-				if !withinX || !withinY {
-					continue
-				}
-				nx, ny := tx+dx, ty+dy
-				if nx < 0 || ny < 0 || nx >= n || ny >= n {
-					continue
-				}
-				seen[[2]int{nx, ny}] = struct{}{}
-			}
-		}
-	}
-	addBufferedNeighbors(lon1, lat1)
-	addBufferedNeighbors(lon2, lat2)
-
-	out := make([][2]int, 0, len(seen))
-	for t := range seen {
-		out = append(out, t)
-	}
-	return out
-}
-
-// bresenham walks integer tile coordinates from (x0,y0) to (x1,y1) inclusive.
-func bresenham(x0, y0, x1, y1 int) [][2]int {
-	dx := abs(x1 - x0)
-	dy := -abs(y1 - y0)
-	sx, sy := 1, 1
-	if x0 > x1 {
-		sx = -1
-	}
-	if y0 > y1 {
-		sy = -1
-	}
-	err := dx + dy
+	x1, y1 := WorldPixel(lon1, lat1, zoom, tileSize)
+	x2, y2 := WorldPixel(lon2, lat2, zoom, tileSize)
+	last := int(math.Pow(2, float64(zoom))) - 1
+	clamp := func(v int) int { return min(max(v, 0), last) }
 
 	var out [][2]int
-	x, y := x0, y0
-	for {
-		out = append(out, [2]int{x, y})
-		if x == x1 && y == y1 {
-			break
+	lo := clamp(int(math.Floor((math.Min(x1, x2) - marginPx) / tileSize)))
+	hi := clamp(int(math.Floor((math.Max(x1, x2) + marginPx) / tileSize)))
+	for tx := lo; tx <= hi; tx++ {
+		// The segment's y range where its x is within this column, widened by the margin.
+		left, right := float64(tx)*tileSize-marginPx, float64(tx+1)*tileSize+marginPx
+		ya, yb := y1, y2
+		if x1 != x2 {
+			ta := math.Max(0, math.Min(1, (left-x1)/(x2-x1)))
+			tb := math.Max(0, math.Min(1, (right-x1)/(x2-x1)))
+			ya, yb = y1+(y2-y1)*ta, y1+(y2-y1)*tb
 		}
-		e2 := 2 * err
-		if e2 >= dy {
-			err += dy
-			x += sx
-		}
-		if e2 <= dx {
-			err += dx
-			y += sy
+		top := clamp(int(math.Floor((math.Min(ya, yb) - marginPx) / tileSize)))
+		bottom := clamp(int(math.Floor((math.Max(ya, yb) + marginPx) / tileSize)))
+		for ty := top; ty <= bottom; ty++ {
+			out = append(out, [2]int{tx, ty})
 		}
 	}
 	return out
-}
-
-func abs(v int) int {
-	if v < 0 {
-		return -v
-	}
-	return v
 }
