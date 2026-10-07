@@ -21,9 +21,12 @@ git fetch -q origin
 DEPLOYED=$(curl -s https://holdmytrack.com/healthz | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
 git log --oneline $DEPLOYED..origin/main
 git diff --stat $DEPLOYED origin/main -- services/server/migrations apps/android
+git diff $DEPLOYED origin/main -- services/server/internal/geo | grep -E '^[-+].*(BoundariesKey|TimezonesKey) *='
+git diff --stat $DEPLOYED origin/main -- services/server/internal/fog services/server/internal/tilemath services/server/internal/httpapi/demo_data
+git diff $DEPLOYED origin/main -- docs/DEPLOY.md
 ```
 
-Tell the user: what's deployed, the target `origin/main` short SHA, the commits in between, and whether there are **new migrations** (files under `services/server/migrations/`) and **Android changes** (anything under `apps/android/` outside `docs/`). Only `origin/main` deploys — unmerged branches never do. If `/healthz` doesn't answer, say so and ask before going on. Confirm with the user before starting; a deploy changes the live site.
+Tell the user: what's deployed, the target `origin/main` short SHA, the commits in between, and whether there are **new migrations** (files under `services/server/migrations/`), **Android changes** (anything under `apps/android/` outside `docs/`) and **one-time server steps** (step 3's last part). Read the `DEPLOY.md` diff whole: a feature that needs an operator step (a file to load, a command to run once) adds it there, and nothing else in this plan would show it. Only `origin/main` deploys — unmerged branches never do. If `/healthz` doesn't answer, say so and ask before going on. Confirm with the user before starting; a deploy changes the live site.
 
 ### Android version bump (only if the app changed)
 
@@ -70,7 +73,12 @@ If `git pull --ff-only` refuses, the server checkout has drifted: stop and show 
 
 `/healthz`'s `version` must equal the target short SHA; `migrate` is `Exited (0)`; `api`, `worker`, `web`, `db` are up. Then, from the Mac (no SSH needed), curl the public pages the deployed commits touched and confirm they return 200 — e.g. a new page, `/sitemap.xml` listing it.
 
-A change to Fog/Heatmap drawing (`services/server/internal/fog`) also needs `run --rm api rerender-coverage` (DEPLOY.md §6) — call it out if the commits touch it, and ask first.
+Then the one-time steps the plan found, each from DEPLOY.md §6, after maintenance is off unless §6 says otherwise. Each writes to the production database, so list them in the step 1 confirmation and ask before running them:
+
+- **A new or changed `geo.TimezonesKey`**: download that release's `timezones-with-oceans.geojson.zip` to `/tmp` on the server, `rclone copyto` it into the app bucket under the key, run `run --rm api seed-timezones`, then delete the `/tmp` copy. Without it `tz_parts` stays empty and every activity keeps its account's zone, which nothing else reports: check `select count(*) from tz_parts` is non-zero afterwards.
+- **A new or changed `geo.BoundariesKey`**: the file is made off the server (`scripts/boundaries-extract.sh`), so ask the user for it, copy it into the bucket the same way, and run `seed-admin-boundaries`, behind a backup and maintenance mode (§6).
+- **Changed `demo_data/`**: `run --rm api seed-demo-customer --reset`.
+- **Changed `internal/fog` or `internal/tilemath`**: `run --rm api rerender-coverage`, with `--masks` when the stroke or which tiles a track reaches changed (§6). Say which commits touched it and what they change, so the user can decide whether existing tiles look different.
 
 ## 4. Android APK (only if the app changed)
 
@@ -86,4 +94,4 @@ Check `curl -sI https://holdmytrack.com/download/holdmytrack.apk` — singular `
 
 ## 5. Report and record
 
-Tell the user the deployed SHA, whether migrations ran (and the backup's name), whether the APK was republished and at which `versionName`, and what was verified. If you keep notes on the deployment's state between sessions, record the deployed SHA there.
+Tell the user the deployed SHA, whether migrations ran (and the backup's name), which one-time steps ran or were skipped and why, whether the APK was republished and at which `versionName`, and what was verified. If you keep notes on the deployment's state between sessions, record the deployed SHA there.
