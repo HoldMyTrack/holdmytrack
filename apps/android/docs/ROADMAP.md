@@ -71,8 +71,8 @@ Everything between a tested app and its Play Store listing, roughly in the order
   - The content rating questionnaire (IARC), the target audience (16 and over, not aimed at children), no ads and no advertising ID.
   - Sign in details (App access): the demo can't sync, edit or upload, so reviewers get `review@holdmytrack.com`, a production account with eleven of the Demo Customer's GPX files uploaded and its email marked confirmed, and instructions for Health Connect sync and recording. Its password is in Play Console only.
   - Filled in 2026-10-07; sent for review from Publishing overview.
-- [ ] **The store listing, in English and Russian**
-  - Name, short description (80 characters), full description (4,000), the 512 × 512 icon (`brand/make_icons.py` renders the launcher icon from the same logo), a 1024 × 500 feature graphic (`brand/play-feature-graphic.png`, and `-ru` for the Russian listing, rendered by the same script), and at least two phone screenshots, plus a category, a contact email, the website and the privacy policy URL.
+- [x] **The store listing, in English and Russian**
+  - Name, short description (80 characters), full description (4,000), the 512 × 512 icon (`brand/make_icons.py` renders the launcher icon from the same logo), a 1024 × 500 feature graphic (`brand/play-feature-graphic.png`, and `-ru` for the Russian listing, rendered by the same script), and at least two phone screenshots, plus a category, a contact email, the website and the privacy policy URL. Entered 2026-10-07: Maps & Navigation, `hello@holdmytrack.com`, `https://holdmytrack.com`; eight phone, eight 7-inch and eight 10-inch tablet screenshots of the Demo Customer on production, alternating light and dark, which the Russian listing shares.
 - [ ] **Testing tracks, then production**
   - The internal test is running: version 860 (`0.8`) is on the internal track, installed from Play and signed in with Google against its key. Next, the closed test, with its 12 testers for 14 days on a personal account, and its pre-launch report read. Then apply for production access and release in stages.
 - [ ] **Confirm the wider launch gates are met**
