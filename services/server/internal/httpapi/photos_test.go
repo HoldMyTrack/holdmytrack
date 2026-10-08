@@ -224,11 +224,11 @@ func TestPhotoEditsAndTrackChanges(t *testing.T) {
 	}
 
 	// Deleting removes both images.
-	if !s3.Has(photoKey(me.id, p.ID)) || !s3.Has(photoThumbKey(me.id, p.ID)) {
+	if !s3.Has(photoKey(me.id, p.ID)) || !s3.Has(photoThumbKey(photoKey(me.id, p.ID))) {
 		t.Fatalf("images not stored")
 	}
 	d.decode(d.do(me, "DELETE", p.URL, nil), http.StatusNoContent, nil)
-	if s3.Has(photoKey(me.id, p.ID)) || s3.Has(photoThumbKey(me.id, p.ID)) {
+	if s3.Has(photoKey(me.id, p.ID)) || s3.Has(photoThumbKey(photoKey(me.id, p.ID))) {
 		t.Errorf("images left behind after delete")
 	}
 	d.decode(d.do(me, "GET", p.URL, nil), http.StatusNotFound, nil)
@@ -270,8 +270,8 @@ func TestPhotoUploadRefusals(t *testing.T) {
 
 	// The account limit.
 	if _, err := d.pool.Exec(context.Background(), `
-		INSERT INTO activity_photos (user_id, activity_id, route_at, content_type, thumb_content_type, width, height, bytes)
-		SELECT $1, $2, NOW(), 'image/jpeg', 'image/jpeg', 1, 1, 1 FROM generate_series(1, $3)
+		INSERT INTO activity_photos (user_id, activity_id, route_at, content_type, thumb_content_type, width, height, bytes, image_key)
+		SELECT $1::uuid, $2, NOW(), 'image/jpeg', 'image/jpeg', 1, 1, 1, 'photos/' || $1::uuid::text || '/' || gen_random_uuid() FROM generate_series(1, $3)
 	`, me.id, walk, maxPhotosPerAccount); err != nil {
 		t.Fatal(err)
 	}
@@ -308,7 +308,7 @@ func TestPhotosFollowTheirActivity(t *testing.T) {
 
 	// Deleting the activity deletes its photos, images and all.
 	d.decode(d.do(me, "DELETE", "/v1/activities/"+tracked, nil), http.StatusNoContent, nil)
-	if s3.Has(photoKey(me.id, p.ID)) || s3.Has(photoThumbKey(me.id, p.ID)) {
+	if s3.Has(photoKey(me.id, p.ID)) || s3.Has(photoThumbKey(photoKey(me.id, p.ID))) {
 		t.Errorf("images left behind after the activity's delete")
 	}
 	d.decode(d.do(me, "GET", p.URL, nil), http.StatusNotFound, nil)
@@ -436,8 +436,8 @@ func TestPhotoLimitHoldsUnderConcurrency(t *testing.T) {
 	me := d.newAccount(false)
 	act := d.newActivity(me, testActivity{activityType: "walk", startedAt: photoTrackStart, durationSecs: 60, at: &[2]float64{10, 50}})
 	if _, err := d.pool.Exec(context.Background(), `
-		INSERT INTO activity_photos (user_id, activity_id, route_at, content_type, thumb_content_type, width, height, bytes)
-		SELECT $1, $2, $3, 'image/jpeg', 'image/jpeg', 40, 30, 1 FROM generate_series(1, $4)
+		INSERT INTO activity_photos (user_id, activity_id, route_at, content_type, thumb_content_type, width, height, bytes, image_key)
+		SELECT $1::uuid, $2, $3, 'image/jpeg', 'image/jpeg', 40, 30, 1, 'photos/' || $1::uuid::text || '/' || gen_random_uuid() FROM generate_series(1, $4)
 	`, me.id, act, photoTrackStart, maxPhotosPerAccount-1); err != nil {
 		t.Fatal(err)
 	}
@@ -458,5 +458,59 @@ func TestPhotoLimitHoldsUnderConcurrency(t *testing.T) {
 	}
 	if n != maxPhotosPerAccount {
 		t.Fatalf("%d photos, want %d", n, maxPhotosPerAccount)
+	}
+}
+
+// sharePhoto gives owner a row over p's image files, as a copied Story's photo is (§4.23).
+func (d *dbTest) sharePhoto(owner account, activityID string, p photoJSON) {
+	d.t.Helper()
+	if _, err := d.pool.Exec(context.Background(), `
+		INSERT INTO activity_photos (user_id, activity_id, route_at, content_type, thumb_content_type, width, height, bytes, image_key)
+		SELECT $1, $2, route_at, content_type, thumb_content_type, width, height, bytes, image_key
+		FROM activity_photos WHERE id = $3`, owner.id, activityID, p.ID); err != nil {
+		d.t.Fatal(err)
+	}
+}
+
+func TestSharedPhotoFilesGoWithTheirLastRow(t *testing.T) {
+	s3 := newMemS3()
+	d := newDBTestWithS3(t, s3)
+	me, other := d.newAccount(false), d.newAccount(false)
+	file, thumb := testJPEG(t, 40, 30), testJPEG(t, 8, 6)
+	walk := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, startedAt: photoTrackStart, at: &[2]float64{10, 50}})
+	theirs := d.newActivity(other, testActivity{activityType: "walking", durationSecs: 60, startedAt: photoTrackStart, at: &[2]float64{10, 50}})
+	var p photoJSON
+	d.decode(d.uploadPhoto(me, file, thumb, map[string]string{"activity_id": walk, "taken_at": "2026-05-01T10:00:30Z"}), http.StatusCreated, &p)
+	d.sharePhoto(other, theirs, p)
+	key := photoKey(me.id, p.ID)
+	stored := func() bool { return s3.Has(key) && s3.Has(photoThumbKey(key)) }
+
+	// The other account's row is served from the same files.
+	var list photosResponse
+	d.decode(d.do(other, "GET", "/v1/photos?activity="+theirs, nil), http.StatusOK, &list)
+	if len(list.Photos) != 1 {
+		t.Fatalf("shared row: %+v", list.Photos)
+	}
+	if rec := d.do(other, "GET", list.Photos[0].ThumbURL, nil); rec.Code != http.StatusOK || rec.Body.Len() == 0 {
+		t.Fatalf("shared thumbnail: %d", rec.Code)
+	}
+
+	// Deleting the first row, or its whole activity, leaves the files to the other row.
+	d.decode(d.do(me, "DELETE", p.URL, nil), http.StatusNoContent, nil)
+	if !stored() {
+		t.Fatalf("files removed while another row still uses them")
+	}
+	d.decode(d.uploadPhoto(me, file, thumb, map[string]string{"activity_id": walk, "taken_at": "2026-05-01T10:00:30Z"}), http.StatusCreated, &p)
+	d.sharePhoto(other, theirs, p)
+	second := photoKey(me.id, p.ID)
+	d.decode(d.do(me, "DELETE", "/v1/activities/"+walk, nil), http.StatusNoContent, nil)
+	if !s3.Has(second) {
+		t.Fatalf("activity delete removed files another row still uses")
+	}
+
+	// The last row takes them.
+	d.decode(d.do(other, "DELETE", "/v1/activities/"+theirs, nil), http.StatusNoContent, nil)
+	if stored() || s3.Has(second) || s3.Has(photoThumbKey(second)) {
+		t.Errorf("files left behind after their last row")
 	}
 }

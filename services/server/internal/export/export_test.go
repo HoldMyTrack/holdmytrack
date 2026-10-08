@@ -74,8 +74,9 @@ func TestBuildWritesEverythingAcrossParts(t *testing.T) {
 	}
 	var photoID string
 	if err := pool.QueryRow(ctx, `
-		INSERT INTO activity_photos (user_id, activity_id, route_at, width, height, bytes, caption, content_type, thumb_content_type)
-		VALUES ($1, $2, $3, 10, 10, 3, 'The bridge', 'image/jpeg', 'image/jpeg') RETURNING id`, userID, walk, started).Scan(&photoID); err != nil {
+		WITH n AS (SELECT gen_random_uuid() AS id)
+		INSERT INTO activity_photos (id, user_id, activity_id, route_at, width, height, bytes, caption, content_type, thumb_content_type, image_key)
+		SELECT n.id, $1::uuid, $2, $3, 10, 10, 3, 'The bridge', 'image/jpeg', 'image/jpeg', 'photos/' || $1::uuid::text || '/' || n.id FROM n RETURNING id`, userID, walk, started).Scan(&photoID); err != nil {
 		t.Fatal(err)
 	}
 	s3.Put("photos/"+userID+"/"+photoID, []byte("jpg"))

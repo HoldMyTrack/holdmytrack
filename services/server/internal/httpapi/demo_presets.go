@@ -350,7 +350,7 @@ func seedDemoPhotos(ctx context.Context, pool *pgxpool.Pool, store *storage.Stor
 		var size int
 		for _, img := range []struct{ file, key string }{
 			{p.File, photoKey(userID, photoID)},
-			{p.Thumb, photoThumbKey(userID, photoID)},
+			{p.Thumb, photoThumbKey(photoKey(userID, photoID))},
 		} {
 			b, err := fs.ReadFile(fsys, path.Join(demoPhotoDir, img.file))
 			if err != nil {
@@ -362,14 +362,14 @@ func seedDemoPhotos(ctx context.Context, pool *pgxpool.Pool, store *storage.Stor
 			size += len(b)
 		}
 		if _, err := pool.Exec(ctx, `
-			INSERT INTO activity_photos (id, user_id, activity_id, taken_at, route_at, caption, content_type, thumb_content_type, width, height, bytes)
-			VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''), $7, $8, $9, $10, $11)
+			INSERT INTO activity_photos (id, user_id, activity_id, taken_at, route_at, caption, content_type, thumb_content_type, width, height, bytes, image_key)
+			VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''), $7, $8, $9, $10, $11, $12)
 			ON CONFLICT (id) DO UPDATE SET activity_id = EXCLUDED.activity_id, taken_at = EXCLUDED.taken_at,
 				route_at = EXCLUDED.route_at, caption = EXCLUDED.caption, content_type = EXCLUDED.content_type,
 				thumb_content_type = EXCLUDED.thumb_content_type, width = EXCLUDED.width, height = EXCLUDED.height,
 				bytes = EXCLUDED.bytes`,
 			photoID, userID, activityID, p.TakenAt, p.RouteAt, p.Caption,
-			demoPhotoContentType(p.File), demoPhotoContentType(p.Thumb), p.Width, p.Height, size,
+			demoPhotoContentType(p.File), demoPhotoContentType(p.Thumb), p.Width, p.Height, size, photoKey(userID, photoID),
 		); err != nil {
 			return fmt.Errorf("photo %q: %w", p.File, err)
 		}

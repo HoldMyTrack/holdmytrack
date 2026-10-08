@@ -234,7 +234,7 @@ func TestDemoPhotosRoundTrip(t *testing.T) {
 	if !near(p.Lon, 10.0005) || !near(p.Lat, 50.0005) || p.Caption == nil || *p.Caption != "The bridge" || p.TakenAt == nil {
 		t.Errorf("seeded photo %+v", p)
 	}
-	if !s3.Has(photoKey(demo.id, p.ID)) || !s3.Has(photoThumbKey(demo.id, p.ID)) {
+	if !s3.Has(photoKey(demo.id, p.ID)) || !s3.Has(photoThumbKey(photoKey(demo.id, p.ID))) {
 		t.Errorf("seeded images not stored under the new owner")
 	}
 }

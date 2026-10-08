@@ -450,13 +450,11 @@ func (s *Server) handleDeleteActivity(w http.ResponseWriter, r *http.Request) {
 		s.log.Error("activity delete: mask cleanup failed, deleting row anyway", "activity_id", activityID, "err", err)
 	}
 	// The activity's photos (§4.27) go with it; the cascade takes their rows, so their images
-	// have to be removed explicitly.
-	if photoIDs, err := s.activityPhotoIDs(ctx, activityID); err != nil {
+	// have to be removed explicitly — after the rows, since a copied Story's photo (§4.23) can
+	// share them and keeps them.
+	photoKeys, err := s.activityPhotoKeys(ctx, activityID)
+	if err != nil {
 		s.log.Error("activity delete: photo lookup failed, deleting row anyway", "activity_id", activityID, "err", err)
-	} else {
-		for _, photoID := range photoIDs {
-			s.removePhotoObjects(ctx, userID, photoID)
-		}
 	}
 	if rawKey != nil {
 		// raw_payload_key is content-addressed (raw/{userID}/{sha256(bytes)}{ext}), not
@@ -499,6 +497,7 @@ func (s *Server) handleDeleteActivity(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "activity not found", http.StatusNotFound)
 		return
 	}
+	s.removeUnreferencedPhotoFiles(ctx, photoKeys)
 	// The track is gone from the tracks tiles now; the render below only bumps once it runs.
 	if err := fog.BumpMapVersion(ctx, s.pool, userID); err != nil {
 		s.log.Error("activity delete: bump map version failed", "activity_id", activityID, "err", err)

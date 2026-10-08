@@ -208,19 +208,19 @@ func exportDemoActivity(ctx context.Context, pool *pgxpool.Pool, store *storage.
 // away isn't carried into the file.
 func exportDemoPhotos(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, outDir, activityID, base string, points []parse.Point) ([]demoManifestPhoto, error) {
 	rows, err := pool.Query(ctx, `
-		SELECT id, user_id, taken_at, route_at, COALESCE(caption, ''), content_type, thumb_content_type, width, height
+		SELECT id, image_key, taken_at, route_at, COALESCE(caption, ''), content_type, thumb_content_type, width, height
 		FROM activity_photos WHERE activity_id = $1 ORDER BY route_at, created_at`, activityID)
 	if err != nil {
 		return nil, err
 	}
 	type stored struct {
-		id, userID, contentType, thumbContentType string
+		id, imageKey, contentType, thumbContentType string
 		photo                                     demoManifestPhoto
 	}
 	var all []stored
 	for rows.Next() {
 		var s stored
-		if err := rows.Scan(&s.id, &s.userID, &s.photo.TakenAt, &s.photo.RouteAt, &s.photo.Caption, &s.contentType, &s.thumbContentType, &s.photo.Width, &s.photo.Height); err != nil {
+		if err := rows.Scan(&s.id, &s.imageKey, &s.photo.TakenAt, &s.photo.RouteAt, &s.photo.Caption, &s.contentType, &s.thumbContentType, &s.photo.Width, &s.photo.Height); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -255,8 +255,8 @@ func exportDemoPhotos(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 		p.File = fmt.Sprintf("%s %d.%s", base, n+1, ext)
 		p.Thumb = fmt.Sprintf("%s %d-thumb.%s", base, n+1, thumbExt)
 		for _, img := range []struct{ key, file string }{
-			{photoKey(s.userID, s.id), p.File},
-			{photoThumbKey(s.userID, s.id), p.Thumb},
+			{s.imageKey, p.File},
+			{photoThumbKey(s.imageKey), p.Thumb},
 		} {
 			if err := copyDemoObject(ctx, store, img.key, filepath.Join(dir, img.file)); err != nil {
 				return nil, fmt.Errorf("photo %s: %w", s.id, err)
