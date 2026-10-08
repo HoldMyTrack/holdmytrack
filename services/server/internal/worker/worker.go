@@ -76,7 +76,9 @@ const exportSweepInterval = time.Hour
 //
 // Long jobs have a lane of their own, a second loop beside this one: building an export or
 // unpacking a large archive takes minutes, and nobody's single upload or phone sync should
-// wait behind it. n tells an export's owner when it's ready (export_job.go).
+// wait behind it. n tells an export's owner when it's ready (export_job.go). The periodic
+// sweeps (runSweeps) have a third goroutine, so a busy queue never holds them back. A deleted
+// account's jobs are never claimed: its purge drops them within accountPurgeInterval.
 func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, n *Notifier) error {
 	notifier = n
 	var lanes sync.WaitGroup
@@ -98,8 +100,38 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 		}
 	}()
 
+	lanes.Add(1)
+	go func() {
+		defer lanes.Done()
+		runSweeps(ctx, pool, store, log)
+	}()
+
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			for {
+				processed, err := claimAndRunOne(ctx, pool, store, log)
+				if err != nil {
+					log.Error("job processing error", "err", err)
+					break
+				}
+				if !processed {
+					break // queue empty; wait for the next tick
+				}
+			}
+		}
+	}
+}
+
+// runSweeps runs the periodic sweeps until ctx is cancelled. It has a goroutine of its own
+// rather than a case in Run's job loop: that loop drains the whole queue before it selects
+// again, so a queue that never empties (a big import) would hold back a deleted account's
+// purge, the demo purge and the daily sweeps for as long as it lasts.
+func runSweeps(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger) {
 	demoTicker := time.NewTicker(demoPurgeInterval)
 	defer demoTicker.Stop()
 	accountTicker := time.NewTicker(accountPurgeInterval)
@@ -127,18 +159,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
-		case <-ticker.C:
-			for {
-				processed, err := claimAndRunOne(ctx, pool, store, log)
-				if err != nil {
-					log.Error("job processing error", "err", err)
-					break
-				}
-				if !processed {
-					break // queue empty; wait for the next tick
-				}
-			}
+			return
 		case <-demoTicker.C:
 			if err := purgeExpiredDemoUsers(ctx, pool, store, log); err != nil {
 				log.Error("demo purge error", "err", err)
@@ -214,6 +235,7 @@ func claimAndRun(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, 
 		WHERE state = 'pending' AND run_after <= NOW()
 		  AND (locked_at IS NULL OR locked_at < NOW() - make_interval(secs => $1))
 		  AND (kind IN ('export', 'unpack')) = $2
+		  AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = jobs.user_id AND u.deleted_at IS NOT NULL)
 		ORDER BY run_after, id
 		FOR UPDATE SKIP LOCKED
 		LIMIT 1

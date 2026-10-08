@@ -119,6 +119,31 @@ func TestClaimSkipsAJobStillRunningAndFailsOneThatKeptCrashing(t *testing.T) {
 	}
 }
 
+// A deleted account's jobs are never claimed, even before the purge (account_purge.go) has
+// dropped them: the claim passes over them to the next account's job.
+func TestClaimSkipsADeletedAccountsJobs(t *testing.T) {
+	pool, deletedID := testPool(t)
+	_, liveID := testPool(t)
+	log := slog.New(slog.DiscardHandler)
+	ctx := context.Background()
+
+	if _, err := pool.Exec(ctx, `UPDATE users SET deleted_at = NOW() WHERE id = $1`, deletedID); err != nil {
+		t.Fatalf("mark deleted: %v", err)
+	}
+	skipped := insertJob(t, pool, deletedID, "2000-01-01T00:00:00Z", 0, nil)
+	next := insertJob(t, pool, liveID, "2000-01-02T00:00:00Z", 0, nil)
+
+	if processed, err := claimAndRunOne(ctx, pool, nil, log); err != nil || !processed {
+		t.Fatalf("claim: processed=%v err=%v", processed, err)
+	}
+	if r := readJob(t, pool, skipped); r.state != "pending" || r.attempts != 0 {
+		t.Errorf("deleted account's job = %+v, want never claimed", r)
+	}
+	if r := readJob(t, pool, next); r.state != "failed" || r.attempts != 1 {
+		t.Errorf("live account's job = %+v, want claimed (and failed as an unknown kind)", r)
+	}
+}
+
 // A job that panics fails on its own instead of taking the worker down with it. An ingest
 // job over a nil object store panics on its first fetch — the same kind of nil dereference or
 // index out of range a malformed file used to cause inside a parser.
