@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Accepted. Its private-only rule is superseded by ADR-0036 for Stories shared with family members; the rest stands.
 
 ## Context
 
