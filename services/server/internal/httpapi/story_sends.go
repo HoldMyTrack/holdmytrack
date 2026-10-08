@@ -9,13 +9,13 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storycopy"
 )
 
 // Sending a copy of a Story (IMPLEMENTATION.md §4.23, ADR-0036). A Story's owner sends a copy
 // to an email address; the recipient finds it in their inbox and accepts or declines it, and
 // accepting enqueues the `story_copy` job that copies the Story as it is then into their
-// account (ingest.ProcessStoryCopy). Stored in story_sends until accepted or declined.
+// account (storycopy.Process). Stored in story_sends until accepted or declined.
 
 // storySendLimiter bounds how many copies one account sends an hour: each is an email to
 // someone else's inbox.
@@ -84,17 +84,27 @@ type storySendJSON struct {
 	ActivityCount int64     `json:"activity_count"`
 }
 
+// storyCopyingJSON is a copy the account accepted that hasn't finished arriving: its Story
+// appears once the `story_copy` job has run.
+type storyCopyingJSON struct {
+	StoryName string `json:"story_name"`
+	From      string `json:"from"`
+}
+
 type storySendsResponse struct {
-	Sends []storySendJSON `json:"sends"`
+	Sends   []storySendJSON    `json:"sends"`
+	Copying []storyCopyingJSON `json:"copying"`
 }
 
 // senderNameSQL is how a sender is named to the people they send to.
 const senderNameSQL = `COALESCE(NULLIF(u.display_name, ''), u.email)`
 
 // handleListStorySends serves `GET /v1/story-sends`: the copies waiting for the caller, newest
-// first. A send from an account being deleted is left out, as it can no longer be copied.
+// first, and the ones they accepted that are still being copied. A send from an account being
+// deleted is left out, as it can no longer be copied.
 func (s *Server) handleListStorySends(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	userID := userIDFromContext(ctx)
 	rows, err := s.pool.Query(ctx, `
 		SELECT ss.id, st.name, `+senderNameSQL+`, ss.sent_at,
 		       (SELECT count(*) FROM story_activities sa JOIN activities a ON a.id = sa.activity_id
@@ -104,7 +114,7 @@ func (s *Server) handleListStorySends(w http.ResponseWriter, r *http.Request) {
 		JOIN users u ON u.id = st.user_id
 		WHERE ss.recipient_id = $1 AND u.deleted_at IS NULL
 		ORDER BY ss.sent_at DESC, ss.id DESC
-	`, userIDFromContext(ctx))
+	`, userID)
 	if err != nil {
 		s.log.Error("story sends list failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -123,7 +133,33 @@ func (s *Server) handleListStorySends(w http.ResponseWriter, r *http.Request) {
 	if sends == nil {
 		sends = []storySendJSON{}
 	}
-	writeJSON(w, http.StatusOK, storySendsResponse{Sends: sends})
+	rows, err = s.pool.Query(ctx, `
+		SELECT st.name, `+senderNameSQL+`
+		FROM jobs j
+		JOIN stories st ON st.id = (j.payload->>'story_id')::uuid
+		JOIN users u ON u.id = st.user_id
+		WHERE j.user_id = $1 AND j.kind = 'story_copy' AND j.state = 'pending'
+		ORDER BY j.id
+	`, userID)
+	if err != nil {
+		s.log.Error("story copies list failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	copying, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (storyCopyingJSON, error) {
+		var v storyCopyingJSON
+		err := row.Scan(&v.StoryName, &v.From)
+		return v, err
+	})
+	if err != nil {
+		s.log.Error("story copies list failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if copying == nil {
+		copying = []storyCopyingJSON{}
+	}
+	writeJSON(w, http.StatusOK, storySendsResponse{Sends: sends, Copying: copying})
 }
 
 var errStorySendNotFound = errors.New("story send not found")
@@ -145,7 +181,7 @@ func takeStorySend(ctx context.Context, tx pgx.Tx, userID, sendID string) (strin
 // job has run.
 func (s *Server) handleAcceptStorySend(w http.ResponseWriter, r *http.Request) {
 	s.answerStorySend(w, r, func(ctx context.Context, tx pgx.Tx, userID, storyID string) error {
-		return ingest.EnqueueStoryCopy(ctx, tx, ingest.StoryCopyJob{StoryID: storyID, RecipientID: userID})
+		return storycopy.Enqueue(ctx, tx, storycopy.Job{StoryID: storyID, RecipientID: userID}, 0)
 	}, http.StatusAccepted)
 }
 

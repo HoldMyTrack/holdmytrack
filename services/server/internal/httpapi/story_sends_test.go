@@ -71,6 +71,11 @@ func TestSendAStoryCopy(t *testing.T) {
 	if jobs != 1 || len(d.inbox(you)) != 0 {
 		t.Errorf("after accept: %d copy jobs, inbox %+v", jobs, d.inbox(you))
 	}
+	var res storySendsResponse
+	d.decode(d.do(you, "GET", "/v1/story-sends", nil), http.StatusOK, &res)
+	if len(res.Copying) != 1 || res.Copying[0].StoryName != "Alps" || res.Copying[0].From != "Dad" {
+		t.Errorf("still copying: %+v, want Alps from Dad", res.Copying)
+	}
 	if rec := d.do(you, "POST", "/v1/story-sends/"+got[0].ID+"/accept", nil); rec.Code != http.StatusNotFound {
 		t.Errorf("accepted twice: %d, want 404", rec.Code)
 	}

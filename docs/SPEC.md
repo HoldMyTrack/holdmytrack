@@ -1246,7 +1246,7 @@ A Story is a hand-picked, private set of the account's activities — a hike, a 
 
 **Description**: What every Story endpoint but `DELETE /v1/stories/{id}` answers with — the list as `{stories: [...]}`.
 
-**Outputs**: `id`, `name`, `description` (`null` when none), `created_at`, `updated_at`, `activity_ids` (every member, earliest activity first) and `stats`: `count`, `distance_meters`, `moving_seconds` and `elapsed_seconds` over the Story's activities, with no date bound, and the same four per activity type in `by_type`, the most frequent type first. Like every other total (FR-3.7), `stats` leaves out a duplicate superseded by another copy, though it stays in `activity_ids`. An activity with no moving time of its own counts its elapsed time as moving, as in Trends (FR-9.1).
+**Outputs**: `id`, `name`, `description` (`null` when none), `created_at`, `updated_at`, `from` (for a Story that came from a copy someone sent, FR-14.8, their name or email address while the Story it was copied from still exists; otherwise `null`), `activity_ids` (every member, earliest activity first) and `stats`: `count`, `distance_meters`, `moving_seconds` and `elapsed_seconds` over the Story's activities, with no date bound, and the same four per activity type in `by_type`, the most frequent type first. Like every other total (FR-3.7), `stats` leaves out a duplicate superseded by another copy, though it stays in `activity_ids`. An activity with no moving time of its own counts its elapsed time as moving, as in Trends (FR-9.1).
 
 ### FR-14.2 Create, rename and delete
 
@@ -1322,9 +1322,9 @@ A Story is a hand-picked, private set of the account's activities — a hike, a 
 **Behavior**:
 1. `POST /v1/stories/{id}/send` with `{email}` answers `204` whether or not the address belongs to an account. Only a verified, real account other than the sender's own, and not being deleted (FR-1.11), receives the copy; for any other address nothing is stored. The address is trimmed and compared without case.
 2. Any Story the account owns can be sent, a Story it received as a copy included.
-3. A copy waits in the recipient's inbox, `GET /v1/story-sends`, as `{sends: [...]}`, newest first, each with `id`, `story_name`, `from` (the sender's name, or their email address when they've set none), `sent_at` and `activity_count` (the Story's activities, counted as FR-14.1 counts them).
+3. A copy waits in the recipient's inbox, `GET /v1/story-sends`, as `{sends: [...], copying: [...]}`. `sends` are the copies waiting to be answered, newest first, each with `id`, `story_name`, `from` (the sender's name, or their email address when they've set none), `sent_at` and `activity_count` (the Story's activities, counted as FR-14.1 counts them).
 4. Sending the same Story to the same person again while a copy still waits refreshes its `sent_at` rather than adding a second.
-5. `POST /v1/story-sends/{id}/accept` takes the copy out of the inbox and answers `202`; the Story arrives in the account once it has been copied (FR-14.8). `DELETE /v1/story-sends/{id}` declines it: it leaves the inbox, nothing is copied, and the sender isn't told.
+5. `POST /v1/story-sends/{id}/accept` takes the copy out of the inbox and answers `202`; the Story arrives in the account once it has been copied (FR-14.8), and until then `copying` lists it with `story_name` and `from`. `DELETE /v1/story-sends/{id}` declines it: it leaves the inbox, nothing is copied, and the sender isn't told.
 6. Deleting the Story withdraws its copies still waiting. A copy from an account being deleted leaves the inbox.
 7. A demo session's inbox is empty; sending, accepting and declining are refused with `403` `demo_read_only` (FR-2.1).
 
@@ -1333,6 +1333,20 @@ A Story is a hand-picked, private set of the account's activities — a hike, a 
 - An `email` that isn't a bare address → `400` with a message in the request's language (FR-13.1).
 - More than 30 sends in an hour from one account → `429` with a message in the request's language.
 - Accepting or declining a copy that isn't waiting for the account → `404`.
+
+### FR-14.8 The copy
+
+**Description**: What accepting a copy (FR-14.7) puts in the recipient's account: a Story and activities of their own, independent of the sender's from then on (ADR-0036).
+
+**Behavior**:
+1. The Story is copied as it is when the copy is made, not when it was sent.
+2. The first accepted copy of a Story makes a new Story in the recipient's account with its name and description. A later accepted copy of the same Story adds to that Story; if the recipient has deleted it, a new one is made with only what they haven't received before.
+3. Each of the Story's activities becomes an activity of the recipient's, made from its track as the sender sees it — the sender's Private locations (FR-8.1) and track edits (FR-5.14) already applied — and then treated as an upload of the recipient's: their own Private locations apply on top, it counts in their Fog of War, Heatmap, totals, countries and regions and Trends, and it's checked against their own recordings for duplicates (FR-3.7). Its type, name and description come with it, and its photos (FR-16) as photos of the recipient's.
+4. An account receives each original activity once, ever: an activity the recipient has already received from anyone, recorded themselves, or holds a copy of is left out — so a copy the recipient deleted doesn't come back, and a copy sent back to the person who recorded it adds nothing. With nothing to add, no Story is made, unless the Story being copied has no activities at all.
+5. An activity whose track the sender's Private locations hide entirely, or that has no track, isn't copied.
+6. An activity whose owner has a track edit or Private location change still being applied is copied once that finishes.
+7. A copy is the recipient's: they can edit, delete, add to and send it on like their own. The sender's later changes, deletions and account deletion don't reach it, and nothing the recipient does reaches the sender.
+8. A copy of a Story deleted before the copy is made, or whose owner is being deleted, adds nothing.
 
 ## 17. FR-15 — Spots
 
