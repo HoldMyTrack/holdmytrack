@@ -1237,6 +1237,10 @@ A Story is a hand-picked, private set of the account's activities — a hike, a 
 | `DELETE /v1/stories/{id}` | Delete it |
 | `POST /v1/stories/{id}/activities` | Add activities, `{activity_ids}` |
 | `DELETE /v1/stories/{id}/activities` | Remove activities, `{activity_ids}` |
+| `POST /v1/stories/{id}/send` | Send a copy of it to an email address, `{email}` (FR-14.7) |
+| `GET /v1/story-sends` | The copies others sent the account, waiting to be accepted |
+| `POST /v1/story-sends/{id}/accept` | Accept one: the Story is copied into the account (FR-14.8) |
+| `DELETE /v1/story-sends/{id}` | Decline one |
 
 ### FR-14.1 A Story
 
@@ -1310,6 +1314,25 @@ A Story is a hand-picked, private set of the account's activities — a hike, a 
 **Error cases**:
 - A `?story=` for a Story that doesn't exist or isn't the account's shows "This story doesn't exist, or isn't yours." at the top of the tab, with no Story open and no activities; clicking a Story opens it.
 - A rename or delete that fails keeps its dialog open with the server's message.
+
+### FR-14.7 Send a copy
+
+**Description**: A Story's owner sends a copy of it to someone else's account by email address; the recipient accepts or declines it (ADR-0036). Accepting copies the Story into their account (FR-14.8).
+
+**Behavior**:
+1. `POST /v1/stories/{id}/send` with `{email}` answers `204` whether or not the address belongs to an account. Only a verified, real account other than the sender's own, and not being deleted (FR-1.11), receives the copy; for any other address nothing is stored. The address is trimmed and compared without case.
+2. Any Story the account owns can be sent, a Story it received as a copy included.
+3. A copy waits in the recipient's inbox, `GET /v1/story-sends`, as `{sends: [...]}`, newest first, each with `id`, `story_name`, `from` (the sender's name, or their email address when they've set none), `sent_at` and `activity_count` (the Story's activities, counted as FR-14.1 counts them).
+4. Sending the same Story to the same person again while a copy still waits refreshes its `sent_at` rather than adding a second.
+5. `POST /v1/story-sends/{id}/accept` takes the copy out of the inbox and answers `202`; the Story arrives in the account once it has been copied (FR-14.8). `DELETE /v1/story-sends/{id}` declines it: it leaves the inbox, nothing is copied, and the sender isn't told.
+6. Deleting the Story withdraws its copies still waiting. A copy from an account being deleted leaves the inbox.
+7. A demo session's inbox is empty; sending, accepting and declining are refused with `403` `demo_read_only` (FR-2.1).
+
+**Error cases**:
+- A Story that doesn't exist or isn't the account's → `404`.
+- An `email` that isn't a bare address → `400` with a message in the request's language (FR-13.1).
+- More than 30 sends in an hour from one account → `429` with a message in the request's language.
+- Accepting or declining a copy that isn't waiting for the account → `404`.
 
 ## 17. FR-15 — Spots
 

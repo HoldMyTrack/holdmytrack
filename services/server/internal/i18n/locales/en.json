@@ -301,6 +301,7 @@
   "error.photo_too_large": "Photo too large or malformed multipart body.",
   "error.photo_type": "Unsupported image type {type} (want JPEG or WebP).",
   "error.photo_dimensions": "Photo is larger than {max} px on a side; it should be resized before upload.",
+  "error.story_send_limit": "Too many copies sent in the last hour. Try again later.",
   "error.photo_limit": "This account already holds {max} photos, the most it can.",
   "error.photo_caption_too_long": "Caption must be {max} characters or fewer.",
   "error.photo_needs_place": "Couldn't tell where on the track this photo was taken. Choose its place.",

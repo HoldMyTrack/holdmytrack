@@ -159,6 +159,11 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(route("DELETE", "/stories/{id}"), s.requireNotDemo(s.handleDeleteStory))
 	s.mux.HandleFunc(route("POST", "/stories/{id}/activities"), s.requireNotDemo(s.handleAddStoryActivities))
 	s.mux.HandleFunc(route("DELETE", "/stories/{id}/activities"), s.requireNotDemo(s.handleRemoveStoryActivities))
+	// Sending a copy of a Story (story_sends.go).
+	s.mux.HandleFunc(route("POST", "/stories/{id}/send"), s.requireNotDemo(s.handleSendStory))
+	s.mux.HandleFunc(route("GET", "/story-sends"), s.requireVerified(s.handleListStorySends))
+	s.mux.HandleFunc(route("POST", "/story-sends/{id}/accept"), s.requireNotDemo(s.handleAcceptStorySend))
+	s.mux.HandleFunc(route("DELETE", "/story-sends/{id}"), s.requireNotDemo(s.handleDeclineStorySend))
 	// Activity photos (photos.go) — under /photos rather than /activities/{id}/photos, which
 	// would collide with /activities/track-points/{id} and the other fixed segments above.
 	s.mux.HandleFunc(route("GET", "/photos"), s.requireVerified(s.handleListPhotos))

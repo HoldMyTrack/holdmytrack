@@ -535,6 +535,35 @@ CREATE TABLE tz_boundaries_source (
 );
 ```
 
+### 3.25 `story_sends` / `story_copies` / `received_origins`
+
+Sending a copy of a Story (§4.23, FR-14.7, ADR-0036) — `migrations/0026_story_copies.sql`. `story_sends` is the recipient's inbox: a copy offered and not yet answered, one row per Story and recipient however often it's sent, gone with the Story or either account. `story_copies` records, per sent Story and recipient, the Story the copy made, so the next accepted send of the same Story adds to it; it goes with either Story. `activities.origin_id` is the original activity a copy descends from, however many copies removed, with no foreign key since the original may be deleted while its copies stay; `NULL` on an original. `received_origins` is every original an account has received a copy of, kept after the copy is deleted.
+
+```sql
+CREATE TABLE story_sends (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    story_id      UUID NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+    recipient_id  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    sent_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (story_id, recipient_id)
+);
+
+CREATE TABLE story_copies (
+    source_story_id  UUID NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+    recipient_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    copy_story_id    UUID NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+    PRIMARY KEY (source_story_id, recipient_id)
+);
+
+ALTER TABLE activities ADD COLUMN origin_id UUID;
+
+CREATE TABLE received_origins (
+    user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    origin_id  UUID NOT NULL,
+    PRIMARY KEY (user_id, origin_id)
+);
+```
+
 ---
 
 ## 4. Core Technical Workflows
@@ -1471,6 +1500,8 @@ The app then posts `{code, verifier}` to `POST /v1/auth/handoff` (`handleAuthHan
 - `StoriesTab` draws each Story as a folder: `aria-expanded`, a lucide `Play` that `.stories-tab__story--open` rotates 90°, and the name. The open one holds its description and the list MapView already fetched, as `ActivityRow`s without a checkbox (`ActivityRow.tsx`, shared with the Activities tab along with `useScrollFocusedRow`), with the same hover and focus handlers as the Activities tab, and each with `ActivityRow`'s optional `remove` — an × (`.activities-panel__row-remove`, `opacity: 0` until the row is hovered or has focus, always visible under the phone breakpoint). The × calls `removeStoryActivities` (`DELETE /v1/stories/{id}/activities` with the one id), one at a time, and hands the returned Story to MapView's `handleStoryActivityRemoved`: `handleStoryEdited` puts it in both hooks (the footer's statistics follow), a focus or hover on the removed row clears, the list reloads without it, and `watchCoverage` fetches the tile version the removal moved to and then refreshes the tracks layer, so the removed track leaves the map instead of being redrawn from a tile cached at the old version. A failure shows the server's message above the rows. No confirmation: nothing is lost, and Add to story puts it back. A folder's pencil opens `StoryDialog` in edit mode (`PATCH`, then `handleStoryEdited` replaces the Story in both hooks); its bin opens `ConfirmDialog`, then `deleteStory` (`DELETE /v1/stories/{id}`), after which `handleStoryDeleted` drops it from the list in hand (`useStories`' `remove` — a refetch would leave the old list, deleted Story included, ready for a render, and the open-the-newest effect would pick it again) and, if that was the open Story, opens the next newest with `replace`, or closes it when it was the last. The pencil and bin are `opacity: 0` until the folder is hovered or has focus, and always visible under the phone breakpoint.
 
 `enterStory` and `exitStory` both reset the checked group, focus, hidden set and filters, as `changeSelectedRange` does. Opening a Story from the tab sets `flyToNextRangeRef`, so the camera fits the Story once its list lands, through the same fly-once-per-query effect a picked range uses (§4.7); `exitStory` clears it, so the camera stays. A page opened on a Story fits it on the first list instead of flying to the most recent activity, unless the URL has a camera. A Story with nothing to draw leaves that first fly for the date range leaving the tab returns to.
+
+**Sending a copy** (FR-14.7, ADR-0036) is `internal/httpapi/story_sends.go`, over §3.25's tables. `POST /v1/stories/{id}/send` checks the Story is the caller's (`ownsStory`), normalizes the address as sign-up does (`normalizeEmail`), and inserts the inbox row with an `INSERT … SELECT` from `users` that matches only a verified, non-demo account other than the caller's own with no `deleted_at` — so an address with no such account inserts nothing, and the answer, `204`, is the same either way; `ON CONFLICT (story_id, recipient_id)` refreshes `sent_at`. `storySendLimiter` (30 an hour per account, the `fixedWindowLimiter` sign-in uses) answers `429` past it, counted only once the Story is known to be the caller's. The inbox (`GET /v1/story-sends`, `requireVerified` so a demo session reads an empty one) names the sender as `display_name`, or the email address without one (`senderNameSQL`), and leaves out a sender with `deleted_at` set. Accept and decline both take the row out (`takeStorySend`, `DELETE … RETURNING story_id`, scoped to the recipient); accept enqueues the `story_copy` job (`ingest.EnqueueStoryCopy`) in the same transaction and answers `202`.
 
 **The Story badge** (FR-5.1): every row of `GET /v1/activities` — and `PATCH /v1/activities/{id}`'s answer, which shares `scanActivityRow` — carries `stories`, the Stories it's in as `[{id, name}]`, newest first. `activityStoriesColumn` is one `json_agg` subquery per row over `idx_story_activities_activity`, `'[]'` for none, scanned straight into `[]storyRef`. `ActivityRow` badges a row whose `stories` hold any but the open Story's own (`openStoryId`, set on the Stories tab only), in `.activities-panel__story-badge` beside Pending and Hidden. The badge is `ActivityRow.tsx`'s `StoryBadge`, a button that calls `onOpenStory` — `StoriesPanel`'s `onOpen`, i.e. MapView's `enterStory`, from both the Activities tab and an open Story's rows — with its one Story, or opens a menu of its Stories' names (`.story-menu__panel`'s look, right-aligned under the badge) for more than one. The Activities tab's also collapses the phone sheet first, as opening a Story from the Stories tab does. Every change to a Story's activities already reloads the list, so the badge follows it.
 
