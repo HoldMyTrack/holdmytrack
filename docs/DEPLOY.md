@@ -171,6 +171,42 @@ GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-f
 ./scripts/maintenance.sh off
 ```
 
+The three paths side by side, with what visitors get at each step:
+
+```mermaid
+sequenceDiagram
+    participant Op as Operator
+    participant Caddy as web (Caddy)
+    participant Old as old api + worker
+    participant DB as db
+    participant New as new api + worker
+    Note over Caddy,Old: visitors served by the old release
+    opt any new migration
+        Op->>DB: backup.sh
+    end
+    Op->>Op: git pull, compose build (minutes)
+    Note over Caddy,Old: still served by the old release
+    alt no new migrations
+        Op->>New: up -d
+        New--xOld: replaces
+        Note over Caddy,New: a few seconds of 502s during the swap
+    else migrations without the marker
+        Op->>DB: run --rm migrate
+        Note over Caddy,Old: old release keeps serving on the new schema
+        Op->>New: up -d (nothing left to migrate)
+        New--xOld: replaces
+        Note over Caddy,New: a few seconds of 502s during the swap
+    else a migration marked "Deploy: maintenance"
+        Op->>Caddy: maintenance.sh on
+        Note over Caddy: maintenance page (503), /healthz exempt
+        Op->>DB: up -d runs migrate
+        Op->>New: up -d starts new api + worker
+        New--xOld: replaces
+        Op->>Caddy: maintenance.sh off, once /healthz is 200
+    end
+    Note over Caddy,New: visitors served by the new release
+```
+
 Running `backup.sh` (§11) first means a migration that goes wrong can be undone from a dump taken minutes earlier, not last night's. `maintenance.sh on`/`off` flip `MAINTENANCE_MODE` in `.env.prod` and recreate only the `web` (Caddy) container — a couple of seconds, no rebuild. `/healthz` is deliberately exempt from maintenance mode (see `apps/web/docker/Caddyfile`), so `curl https://<your-domain>/healthz` still reflects `api`/`db`'s real status; wait for it to return `200` before running `maintenance.sh off`. `./scripts/maintenance.sh status` prints the current value.
 
 ## 8. Verify
