@@ -12,7 +12,7 @@ Every compose call on the server is `docker compose -f compose.prod.yml --env-fi
 
 ## Who runs the SSH commands
 
-Auto mode usually blocks Claude's SSH to production. Try once; if it's denied, don't work around it — hand each step to the user as a `! ssh holdmytrack '…'` line (the `!` runs it in the session so its output lands in the conversation), one step per message, and read the output before giving the next. The build outlasts the 120 s foreground timeout, so if Claude runs it, use `run_in_background`.
+Auto mode usually blocks Claude's SSH to production. Try once; if it's denied, don't work around it — hand each step to the user as a `! ssh holdmytrack '…'` line (the `!` runs it in the session so its output lands in the conversation), one step per message, and read the output before giving the next.
 
 ## 1. Plan locally (no SSH)
 
@@ -50,18 +50,25 @@ No bump: go on with the target as it is.
 
 ## 2. Deploy
 
-**Without new migrations** — one step:
+Build first in every case: `git pull` and `build` leave the running containers alone (none of them mounts the source), so the old version keeps serving through the slow part. The build outlasts the foreground timeout, so if Claude runs it, use `run_in_background`.
 
 ```
-! ssh holdmytrack 'cd /srv/holdmytrack && git pull --ff-only && GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod up -d --build'
+! ssh holdmytrack 'cd /srv/holdmytrack && git pull --ff-only && GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod build'
 ```
 
-**With new migrations** — DEPLOY.md §7, in order:
+**Without new migrations** — then swap the containers:
+
+```
+! ssh holdmytrack 'cd /srv/holdmytrack && GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod up -d'
+```
+
+**With new migrations** — DEPLOY.md §7. Backup before the build above, then maintenance only around the swap:
 
 1. Backup (also copies to the backup R2 bucket): `! ssh holdmytrack 'cd /srv/holdmytrack && ./scripts/backup.sh'` — it must finish without error before anything else.
-2. Maintenance on, pull, rebuild: `! ssh holdmytrack 'cd /srv/holdmytrack && ./scripts/maintenance.sh on && git pull --ff-only && GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod up -d --build'`
-3. Check (step 3 below) — `migrate` must be `Exited (0)` and `/healthz` 200 before going on.
-4. Maintenance off: `! ssh holdmytrack 'cd /srv/holdmytrack && ./scripts/maintenance.sh off'`
+2. Pull and build, as above — the site stays up.
+3. Maintenance on, swap: `! ssh holdmytrack 'cd /srv/holdmytrack && ./scripts/maintenance.sh on && GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod up -d'`
+4. Check (step 3 below) — `migrate` must be `Exited (0)` and `/healthz` 200 before going on.
+5. Maintenance off: `! ssh holdmytrack 'cd /srv/holdmytrack && ./scripts/maintenance.sh off'`
 
 If `git pull --ff-only` refuses, the server checkout has drifted: stop and show the user `git status`, don't reset it. If `migrate` exited non-zero, leave maintenance on, show its logs (`… logs migrate`), and stop — the backup from step 1 is the way back (DEPLOY.md §11).
 
