@@ -11,15 +11,16 @@ import dev.holdmytrack.android.net.Session
  * and their tile URLs never change by themselves, so the map would otherwise go on showing
  * coverage from before the change.
  *
- * [watch] polls `GET /v1/coverage/status` every 2 seconds and calls [onRefetch] once the
- * account has no coverage-changing job left — and also mid-job, whenever the status's
- * `version` moves, since a reprocess renders once with its Pending activities left out and
- * again once they're back. Each call restarts the watch rather than joining a running one: a
- * second delete can enqueue its job just after a read came back "done". Gives up waiting
- * after about three minutes and refetches anyway — a failed render leaves no job behind, so
- * that only bounds one stuck in the queue.
+ * [watch] polls `GET /v1/coverage/status` and calls [onRefetch] once the account has no
+ * coverage-changing job left — and also mid-job, whenever the status's `version` moves, since a
+ * reprocess renders once with its Pending activities left out and again once they're back. Each
+ * call restarts the watch rather than joining a running one: a second delete can enqueue its job
+ * just after a read came back "done". Reads go every 2 seconds for about three minutes, then
+ * every 10, a failed read included, until one finds nothing left: a big import can keep the
+ * server's worker busy far longer than three minutes, and only that last read refetches.
+ * [onRendering] gets every read's `rendering`, for the map's "still being updated" notice.
  */
-class CoverageWatch(private val onRefetch: () -> Unit) {
+class CoverageWatch(private val onRendering: (Boolean) -> Unit, private val onRefetch: () -> Unit) {
 
     private val handler = Handler(Looper.getMainLooper())
     private var generation = 0
@@ -49,10 +50,14 @@ class CoverageWatch(private val onRefetch: () -> Unit) {
     private fun check(watching: Int) {
         HoldMyTrackApi.coverageStatus { result ->
             if (watching != generation) return@coverageStatus
-            // A failed read ends the watch quietly; the next change starts another.
-            val status = result.getOrNull() ?: return@coverageStatus
             polls += 1
-            if (status.rendering && polls < MAX_POLLS) {
+            val status = result.getOrNull()
+            if (status == null) {
+                handler.postDelayed({ check(watching) }, delay())
+                return@coverageStatus
+            }
+            onRendering(status.rendering)
+            if (status.rendering) {
                 val shown = shownVersion
                 if (shown == null) {
                     shownVersion = status.version
@@ -61,7 +66,7 @@ class CoverageWatch(private val onRefetch: () -> Unit) {
                     Session.tileVersion = status.tileVersion
                     onRefetch()
                 }
-                handler.postDelayed({ check(watching) }, POLL_MS)
+                handler.postDelayed({ check(watching) }, delay())
                 return@coverageStatus
             }
             shownVersion = status.version
@@ -73,8 +78,12 @@ class CoverageWatch(private val onRefetch: () -> Unit) {
         }
     }
 
+    /** The web's `coveragePoll.ts`: every 2 seconds for the first [FAST_POLLS] reads, then every 10. */
+    private fun delay() = if (polls < FAST_POLLS) FAST_POLL_MS else SLOW_POLL_MS
+
     private companion object {
-        const val POLL_MS = 2_000L
-        const val MAX_POLLS = 90
+        const val FAST_POLL_MS = 2_000L
+        const val FAST_POLLS = 90
+        const val SLOW_POLL_MS = 10_000L
     }
 }

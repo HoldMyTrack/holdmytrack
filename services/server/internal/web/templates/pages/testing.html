@@ -192,6 +192,10 @@
     <h3 id="MA-9">MA-9 · No connection</h3>
     <p>Turn on airplane mode, close the app completely, and open it again. Then turn airplane mode off and tap Try again.</p>
     <p class="testing__expect"><strong>Expected:</strong> "Couldn't reach HoldMyTrack, so your tracks aren't on the map yet." with Try again. You stay signed in, and Try again brings everything back.</p>
+
+    <h3 id="MA-10">MA-10 · Map still being updated</h3>
+    <p>Switch to <strong>Fog</strong>. On the web, upload any file you haven't uploaded before (or delete an activity in the app), then come straight back to the map.</p>
+    <p class="testing__expect"><strong>Expected:</strong> under the toggle, "Your map is still being updated, so Fog and Heatmap may be incomplete for now. They'll refresh on their own." It goes by itself once the server is done (seconds for one file, longer for a big import) and the fog updates without reopening the app. Normal never shows it.</p>
   </section>
 
   <section class="page-section" id="dates">

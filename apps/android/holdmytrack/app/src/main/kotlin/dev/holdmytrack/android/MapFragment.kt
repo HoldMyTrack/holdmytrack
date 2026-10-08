@@ -197,10 +197,18 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /** Fog and Heatmap fetched again once the server has re-rendered them after a delete or a
-     *  reprocess (`map/CoverageWatch`). */
-    private val coverageWatch = CoverageWatch {
-        style?.takeIf { overlaysAttached }?.let(MapOverlays::refreshCoverage)
-    }
+     *  reprocess (`map/CoverageWatch`), and the notice that they're still being updated. */
+    private val coverageWatch = CoverageWatch(
+        onRendering = { rendering ->
+            coverageRendering = rendering
+            renderCoverageNotice()
+        },
+        onRefetch = { style?.takeIf { overlaysAttached }?.let(MapOverlays::refreshCoverage) },
+    )
+
+    /** What the coverage watch last read: the account's Fog/Heatmap are still being worked on. */
+    private var coverageRendering = false
+    private lateinit var coverageNotice: View
 
     /** The selected activity's `GET /v1/activities/track-metrics`, its pace bands
      *  (`renderTrackMetrics`); null with nothing selected, and while a new selection's is on
@@ -505,6 +513,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
         dateFooter = findViewById(R.id.date_footer)
         zoomLevelNotice = ZoomLevelNotice(findViewById(R.id.zoom_level_notice))
+        coverageNotice = findViewById(R.id.coverage_notice)
         sheet = findViewById(R.id.activities_sheet)
         selectionBar = findViewById(R.id.selection_bar)
         panel = ActivitiesPanel(
@@ -988,6 +997,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun checkTileVersion() {
         HoldMyTrackApi.coverageStatus { result ->
             val status = result.getOrNull() ?: return@coverageStatus
+            // Still being worked on (an import on the web, a sync): watched until it's done, which
+            // shows the notice and refetches at the end.
+            if (status.rendering) coverageWatch.watch()
             if (status.tileVersion.isEmpty() || status.tileVersion == Session.tileVersion) return@coverageStatus
             Session.tileVersion = status.tileVersion
             style?.takeIf { overlaysAttached }?.let {
@@ -1303,6 +1315,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         modeBar.visibility = if (isRecording() || editWindow.isOpen || selectionShown()) View.GONE else View.VISIBLE
         layersPanel.visibility = View.VISIBLE
         renderZoomLevelNotice()
+        renderCoverageNotice()
         renderModeChip()
     }
 
@@ -1322,6 +1335,14 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  recording, which draws neither. */
     private fun renderZoomLevelNotice() {
         zoomLevelNotice.render(mode, active = modeBarReady && !isRecording())
+    }
+
+    /** "Your map is still being updated…" (`docs/SPEC.md` FR-4.2 behavior 6): in Fog and Heatmap,
+     *  while the coverage watch's last read found the account's coverage still being worked on. */
+    private fun renderCoverageNotice() {
+        if (!::coverageNotice.isInitialized) return
+        val shown = coverageRendering && mode != MapMode.NORMAL && modeBarReady && !isRecording()
+        coverageNotice.visibility = if (shown) View.VISIBLE else View.GONE
     }
 
     /** Layers and Find my location, on the rail at the top row's end: away while the Edit window
@@ -1957,6 +1978,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
         style?.takeIf { overlaysAttached }?.let { MapOverlays.setMode(it, next) }
         renderZoomLevelNotice()
+        renderCoverageNotice()
         renderModeChip()
         renderDateFooter()
         refreshPhotos(force = false)
@@ -2120,7 +2142,12 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         mapView.onResume()
         daysStale = true
         syncSession()
-        if (overlaysAttached) loadSpotCaptures()
+        if (overlaysAttached) {
+            loadSpotCaptures()
+            // Back from elsewhere (the web, Sync): new tiles if the version moved, and the notice
+            // if the account's coverage is still being worked on.
+            checkTileVersion()
+        }
         captureMode.resume()
         // An empty map is asked again on every return — typically from Sync — so the notice
         // goes, and the camera frames the new history, as soon as something has arrived.
