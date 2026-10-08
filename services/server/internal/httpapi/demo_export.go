@@ -215,7 +215,7 @@ func exportDemoPhotos(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 	}
 	type stored struct {
 		id, imageKey, contentType, thumbContentType string
-		photo                                     demoManifestPhoto
+		photo                                       demoManifestPhoto
 	}
 	var all []stored
 	for rows.Next() {

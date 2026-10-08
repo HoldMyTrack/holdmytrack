@@ -94,7 +94,6 @@ func TestPurgeLeavesALiveAccountAlone(t *testing.T) {
 	}
 }
 
-
 func TestPurgeKeepsPhotoFilesAnotherAccountUses(t *testing.T) {
 	pool, userID := testPool(t)
 	_, otherID := testPool(t)
