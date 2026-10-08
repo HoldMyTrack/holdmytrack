@@ -130,6 +130,7 @@ export const en = {
   'slider.shift_later': 'Move the range later',
   'slider.start': 'Start date',
   'map.drop_files': 'Drop to upload: .gpx, .fit, .tcx or a .zip',
+  'map.coverage_updating': 'Your map is still being updated, so Fog and Heatmap may be incomplete for now. They\'ll refresh on their own.',
   'map.level.fog.city': 'City view — cleared exactly where you\'ve been',
   'map.level.fog.country': 'Country view — a whole country clears once you\'ve been anywhere in it',
   'map.level.fog.region': 'Region view — a whole state or province clears once you\'ve been anywhere in it',

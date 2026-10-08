@@ -956,8 +956,9 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
 
   // Fog/Heatmap are re-rendered by a queued job after an upload or delete, so they can't be
   // refetched right away like the tracks layer — this waits for the account's coverage jobs
-  // to drain, then refetches both (useCoverageRefresh.ts).
-  const watchCoverage = useCoverageRefresh(map);
+  // to drain, then refetches both (useCoverageRefresh.ts). It also watches once on load, and
+  // `coverageRendering` drives the notice that Fog/Heatmap may still be incomplete.
+  const { watch: watchCoverage, rendering: coverageRendering } = useCoverageRefresh(map);
 
   // A finished import is a new track on the map and a new row in every §4.7 response, so all of
   // them refresh together — the header's Upload menu says when (hmt:imports-changed, below).
@@ -1648,7 +1649,12 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
               {satelliteAvailable && (
                 <BasemapToggle satellite={overlays.satellite} onChange={(on) => changeOverlays({ ...overlays, satellite: on })} />
               )}
-              {/* On a line of its own under the toggles, however many rows they wrap to. */}
+              {/* On lines of their own under the toggles, however many rows they wrap to. */}
+              {mapMode !== 'normal' && coverageRendering && (
+                <div className="coverage-notice" role="status" data-testid="coverage-notice">
+                  <span className="coverage-notice__pill">{t('map.coverage_updating')}</span>
+                </div>
+              )}
               {map && <ZoomLevelNotice map={map} mode={mapMode} />}
             </div>
           )}
