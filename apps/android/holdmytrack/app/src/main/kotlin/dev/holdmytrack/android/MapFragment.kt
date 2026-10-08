@@ -533,6 +533,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
                 refreshPhotos(force = true)
             },
             onRemovedFromStory = ::onRemovedFromStory,
+            onStoryCopyArrived = ::onStoryCopyArrived,
             onSheetChanged = ::onSheetChanged,
         )
         privateEditor = PrivateLocationEditor(
@@ -1273,6 +1274,17 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     /** The toolbar's Delete finished: the tracks, the list and the days read again, and Fog
      *  and Heatmap watched until their re-render lands — the web's `handleActivitiesDeleted`.
      *  Deleted ids drop out of the selection with the reload. */
+    /** A copy of a Story someone sent has arrived (`docs/SPEC.md` FR-14.8): new activities on
+     *  the map and in the list, and the Fog and Heatmap the copy queued, as after an upload. The
+     *  map has history now, so its "nothing on your map yet" notice goes. */
+    private fun onStoryCopyArrived() {
+        hideNotice(Notice.EMPTY)
+        style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
+        reloadList()
+        activityDays.reload()
+        coverageWatch.watch()
+    }
+
     private fun onActivitiesDeleted(ids: List<String>) {
         if (ids.isEmpty()) return
         style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }

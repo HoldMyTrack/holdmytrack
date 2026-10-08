@@ -103,11 +103,9 @@ The map screen and its menus carry the web's phone layout over, which on a phone
 
 ## Phase 8: Web features to carry over
 
-Features the web has that the app doesn't yet. The server side of each is built, except Send a copy of a Story, which waits for root `docs/ROADMAP.md`'s Phase 1 steps; only the app's own part is listed.
+Features the web has that the app doesn't yet. The server side of each is built; only the app's own part is listed.
 
 - [x] **Split an activity** (`docs/SPEC.md` FR-5.17, `docs/IMPLEMENTATION.md` §4.7.8)
   - A Split tool in the Track tab, its two-color preview, and the confirm for a part left inside a Private location (`apps/android/docs/SPEC.md` FR-2.7 item 12). Merge waits for the web's (`docs/ROADMAP.md`). Checked on the emulator against a local stack, in English and Russian: a walk ending inside a Private location split at a point inside it, the confirm, Split anyway, and two rows, one of them Private.
 - [x] **The Private badge** (`docs/SPEC.md` FR-5.1)
   - A lock-and-"Private" badge in place of distance and duration, and its explanation on the selected activity's card in place of its stats (`apps/android/docs/SPEC.md` FR-2.7 item 2). Checked in the same run.
-- [ ] **Send a copy of a Story** (`docs/adr/0036-send-a-copy-of-a-story.md`, root `docs/ROADMAP.md` Phase 1)
-  - In the Stories tab: Send a copy on a Story, the inbox of copies others sent with Accept and Decline, and "From" and "Copying…" on a received Story.

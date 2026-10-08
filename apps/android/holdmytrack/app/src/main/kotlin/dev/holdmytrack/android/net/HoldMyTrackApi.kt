@@ -214,6 +214,16 @@ data class Activity(
  *  FR-5.1). */
 data class StoryRef(val id: String, val name: String)
 
+/** A copy of a Story someone sent the account, waiting to be accepted or declined
+ *  (`docs/SPEC.md` FR-14.7). [from] is the sender's name, or their email address. */
+data class StorySend(val id: String, val storyName: String, val from: String, val activityCount: Int)
+
+/** A copy the account accepted that hasn't finished arriving. */
+data class StoryCopying(val storyName: String, val from: String)
+
+/** `GET /v1/story-sends`: the copies waiting, newest first, and the accepted ones arriving. */
+data class StoryInbox(val sends: List<StorySend>, val copying: List<StoryCopying>)
+
 /**
  * A Story's numbers, or one activity type's share of them (`docs/SPEC.md` FR-14.1): [count]
  * activities, their distance and moving time. [activityType] is empty for the whole Story.
@@ -227,14 +237,16 @@ data class StoryTotals(
 
 /**
  * A Story — a hand-picked set of the account's activities (`docs/SPEC.md` FR-14.1), the web's
- * `Story`. [description] is empty when none is set; [activityIds] is every member, earliest
- * activity first; [stats] covers the whole Story, whatever the date range, and [byType] the
- * same per activity type, the most frequent first.
+ * `Story`. [description] is empty when none is set; [from] names who sent the copy it came from
+ * (FR-14.8), null for the account's own; [activityIds] is every member, earliest activity
+ * first; [stats] covers the whole Story, whatever the date range, and [byType] the same per
+ * activity type, the most frequent first.
  */
 data class Story(
     val id: String,
     val name: String,
     val description: String,
+    val from: String? = null,
     val activityIds: List<String>,
     val stats: StoryTotals,
     val byType: List<StoryTotals>,
@@ -1442,6 +1454,45 @@ object HoldMyTrackApi {
         call(request, { text -> parseStory(JSONObject(text)) }, onResult)
     }
 
+    /** `POST /v1/stories/{id}/send` — a copy of the Story to [email] (FR-14.7). Succeeds
+     *  whether or not the address has an account: the server never says. */
+    fun sendStory(id: String, email: String, onResult: (Result<Unit>) -> Unit) {
+        val request = Request.Builder()
+            .url(BuildConfig.API_BASE_URL + API_V1 + "/stories/" + id + "/send")
+            .post(JSONObject().put("email", email).toString().toRequestBody(JSON))
+            .build()
+        call(request, { }, onResult)
+    }
+
+    /** `GET /v1/story-sends` — the Stories tab's inbox. */
+    fun storySends(onResult: (Result<StoryInbox>) -> Unit) {
+        val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/story-sends").build()
+        call(request, { text ->
+            val json = JSONObject(text)
+            val sends = json.optJSONArray("sends") ?: JSONArray()
+            val copying = json.optJSONArray("copying") ?: JSONArray()
+            StoryInbox(
+                sends = List(sends.length()) { i ->
+                    sends.getJSONObject(i).let {
+                        StorySend(it.getString("id"), it.optString("story_name"), it.optString("from"), it.optInt("activity_count"))
+                    }
+                },
+                copying = List(copying.length()) { i ->
+                    copying.getJSONObject(i).let { StoryCopying(it.optString("story_name"), it.optString("from")) }
+                },
+            )
+        }, onResult)
+    }
+
+    /** `POST /v1/story-sends/{id}/accept` ([accept]) or `DELETE /v1/story-sends/{id}` (decline). */
+    fun answerStorySend(id: String, accept: Boolean, onResult: (Result<Unit>) -> Unit) {
+        val url = BuildConfig.API_BASE_URL + API_V1 + "/story-sends/" + id + if (accept) "/accept" else ""
+        val request = Request.Builder().url(url)
+            .apply { if (accept) post(EMPTY_BODY) else delete() }
+            .build()
+        call(request, { }, onResult)
+    }
+
     private fun parseStory(json: JSONObject): Story {
         fun totals(t: JSONObject) = StoryTotals(
             activityType = t.optString("activity_type"),
@@ -1456,6 +1507,7 @@ object HoldMyTrackApi {
             id = json.getString("id"),
             name = json.optString("name"),
             description = json.optNullableString("description").orEmpty(),
+            from = json.optNullableString("from"),
             activityIds = List(ids.length()) { ids.getString(it) },
             stats = totals(stats),
             byType = List(byType.length()) { totals(byType.getJSONObject(it)) },

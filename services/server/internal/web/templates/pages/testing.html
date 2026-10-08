@@ -328,6 +328,16 @@
       <li>Delete it with the bin.</li>
     </ol>
     <p class="testing__expect"><strong>Expected:</strong> in the Story menu, a story already holding all the checked activities shows as "Already in this story". Deleting asks "Delete “…”? Its activities stay.", and the activities are still on the map afterwards.</p>
+
+    <h3 id="ST-4">ST-4 · Send a copy</h3>
+    <p>You need a second HoldMyTrack account for this: one of your own with another email address, or another tester's.</p>
+    <ol class="page-list">
+      <li>On "Rome", tap the paper plane, enter the other account's email address and tap Send.</li>
+      <li>Sign in as the other account (or ask the other tester) and open the Stories tab.</li>
+      <li>Tap Accept.</li>
+      <li>Back on the first account, add another Italy day to "Rome" and send it again. Accept it on the other account.</li>
+    </ol>
+    <p class="testing__expect"><strong>Expected:</strong> the dialog says "Sent to …. If that address has a HoldMyTrack account, they'll find the copy in their Stories tab." The other account gets an email, and its Stories tab shows "… sent you a copy of “Rome” · 8 activities" with Accept and Decline. After Accept it reads "Copying “Rome” from …" for a moment, then "Rome" appears with "From …" under its name, and its tracks are on that account's map, Fog and Heatmap. The second send adds only the new day to the same "Rome".</p>
   </section>
 
   <section class="page-section" id="photos">
