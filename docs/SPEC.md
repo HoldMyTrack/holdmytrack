@@ -1324,9 +1324,10 @@ A Story is a hand-picked, private set of the account's activities — a hike, a 
 2. Any Story the account owns can be sent, a Story it received as a copy included.
 3. A copy waits in the recipient's inbox, `GET /v1/story-sends`, as `{sends: [...], copying: [...]}`. `sends` are the copies waiting to be answered, newest first, each with `id`, `story_name`, `from` (the sender's name, or their email address when they've set none), `sent_at` and `activity_count` (the Story's activities, counted as FR-14.1 counts them).
 4. Sending the same Story to the same person again while a copy still waits refreshes its `sent_at` rather than adding a second.
-5. `POST /v1/story-sends/{id}/accept` takes the copy out of the inbox and answers `202`; the Story arrives in the account once it has been copied (FR-14.8), and until then `copying` lists it with `story_name` and `from`. `DELETE /v1/story-sends/{id}` declines it: it leaves the inbox, nothing is copied, and the sender isn't told.
-6. Deleting the Story withdraws its copies still waiting. A copy from an account being deleted leaves the inbox.
-7. A demo session's inbox is empty; sending, accepting and declining are refused with `403` `demo_read_only` (FR-2.1).
+5. Each send that reaches an account emails it, in its own language (FR-13.1), English when it has chosen none: "<from> sent you a copy of “<story>”", with how many activities the Story has, that accepting makes the Story and its activities theirs, and a link to the Stories tab (`/?tab=stories`) to accept or decline it. An address that receives nothing gets no email.
+6. `POST /v1/story-sends/{id}/accept` takes the copy out of the inbox and answers `202`; the Story arrives in the account once it has been copied (FR-14.8), and until then `copying` lists it with `story_name` and `from`. `DELETE /v1/story-sends/{id}` declines it: it leaves the inbox, nothing is copied, and the sender isn't told.
+7. Deleting the Story withdraws its copies still waiting. A copy from an account being deleted leaves the inbox.
+8. A demo session's inbox is empty; sending, accepting and declining are refused with `403` `demo_read_only` (FR-2.1).
 
 **Error cases**:
 - A Story that doesn't exist or isn't the account's → `404`.

@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storycopy"
 )
 
@@ -28,8 +29,8 @@ type storySendRequest struct {
 // handleSendStory serves `POST /v1/stories/{id}/send` with `{email}`. The answer is `204`
 // whether or not the address belongs to an account that can receive it — anything else would
 // tell the sender who has an account. Only a verified real account other than the sender's
-// own gets the copy; a repeat send while the last one still waits refreshes it rather than
-// adding another.
+// own gets the copy, and an email saying so (sendStoryCopyEmail); a repeat send while the last
+// one still waits refreshes it rather than adding another, and emails again.
 func (s *Server) handleSendStory(w http.ResponseWriter, r *http.Request) {
 	storyID, ok := storyIDFromPath(w, r)
 	if !ok {
@@ -61,17 +62,51 @@ func (s *Server) handleSendStory(w http.ResponseWriter, r *http.Request) {
 		httpErrorT(w, r, http.StatusTooManyRequests, "error.story_send_limit")
 		return
 	}
-	if _, err := s.pool.Exec(ctx, `
+	var lang string
+	err = s.pool.QueryRow(ctx, `
 		INSERT INTO story_sends (story_id, recipient_id)
 		SELECT $1, id FROM users
 		WHERE email = $2 AND id <> $3 AND email_verified AND demo_expires_at IS NULL AND deleted_at IS NULL
 		ON CONFLICT (story_id, recipient_id) DO UPDATE SET sent_at = NOW()
-	`, storyID, email, userID); err != nil {
+		RETURNING (SELECT COALESCE(locale, '') FROM users WHERE id = recipient_id)
+	`, storyID, email, userID).Scan(&lang)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		s.log.Error("story send failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	if err == nil {
+		// A failed email is logged, not answered: the copy waits in the inbox either way, and
+		// a different answer would say the address has an account.
+		if err := s.sendStoryCopyEmail(ctx, userID, storyID, email, lang); err != nil {
+			s.log.Error("story copy email failed", "err", err)
+		}
+	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// sendStoryCopyEmail tells the recipient at email, in their own language (lang, or English
+// when they've chosen none), that the sender sent them a copy of the Story, with a link to
+// the Stories tab where they answer it.
+func (s *Server) sendStoryCopyEmail(ctx context.Context, senderID, storyID, email, lang string) error {
+	var from, story string
+	var activities int64
+	if err := s.pool.QueryRow(ctx, `
+		SELECT `+senderNameSQL+`, st.name,
+		       (SELECT count(*) FROM story_activities sa JOIN activities a ON a.id = sa.activity_id
+		        WHERE sa.story_id = st.id AND a.superseded_by IS NULL)
+		FROM stories st JOIN users u ON u.id = st.user_id
+		WHERE st.id = $1 AND u.id = $2`, storyID, senderID).Scan(&from, &story, &activities); err != nil {
+		return err
+	}
+	if lang == "" {
+		lang = "en"
+	}
+	l := i18n.Get(lang)
+	return s.mailer.Send(ctx, email,
+		l.T("email.story_copy.subject", "from", from, "story", story),
+		l.T("email.story_copy.body", "from", from, "story", story,
+			"activities", l.N("count.activities", activities), "link", s.appBaseURL+"/?tab=stories"))
 }
 
 // storySendJSON is one copy waiting in the recipient's inbox. From is the sender's name, or

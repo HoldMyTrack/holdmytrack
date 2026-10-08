@@ -15,14 +15,16 @@ import (
 
 // sentMail records what a test's server would have mailed.
 type sentMail struct {
-	mu sync.Mutex
-	to []string
+	mu                   sync.Mutex
+	to, subjects, bodies []string
 }
 
-func (m *sentMail) Send(_ context.Context, to, _, _ string) error {
+func (m *sentMail) Send(_ context.Context, to, subject, body string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.to = append(m.to, to)
+	m.subjects = append(m.subjects, subject)
+	m.bodies = append(m.bodies, body)
 	return nil
 }
 

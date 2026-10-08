@@ -46,6 +46,11 @@ func TestSendAStoryCopy(t *testing.T) {
 	if len(got) != 1 || got[0].StoryName != "Alps" || got[0].From != "Dad" || got[0].ActivityCount != 1 {
 		t.Fatalf("inbox %+v, want one copy of Alps from Dad", got)
 	}
+	mails := d.srv.mailer.(*sentMail)
+	if len(mails.to) != 2 || mails.to[0] != d.address(you) || mails.subjects[0] != "Dad sent you a copy of “Alps”" ||
+		!strings.Contains(mails.bodies[0], "(1 activity)") || !strings.Contains(mails.bodies[0], "https://app.example/?tab=stories") {
+		t.Errorf("emails %q / %q / %q, want one per send to the recipient", mails.to, mails.subjects, mails.bodies)
+	}
 	if mine := d.inbox(me); len(mine) != 0 {
 		t.Errorf("the sender's own inbox: %+v", mine)
 	}
@@ -107,6 +112,9 @@ func TestSendAStoryCopyRevealsNoAccount(t *testing.T) {
 	d.pool.QueryRow(ctx, `SELECT count(*) FROM story_sends WHERE story_id = $1`, trip).Scan(&sends)
 	if sends != 0 {
 		t.Errorf("%d copies stored for accounts that can't receive one", sends)
+	}
+	if mails := d.srv.mailer.(*sentMail); len(mails.to) != 0 {
+		t.Errorf("emailed %q, who can't receive a copy", mails.to)
 	}
 
 	other := d.newAccount(false)
