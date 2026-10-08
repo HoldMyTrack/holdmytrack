@@ -99,6 +99,15 @@ Go tests that need Postgres+PostGIS — so far `internal/httpapi`'s Story tests 
 
 This verification pass is what caught two of the gotchas below (the PostGIS M-ordinate bug and the `styledata`/`isStyleLoaded` timing bug) — see "Gotchas worth not rediscovering."
 
+## Writing a migration
+
+A deploy runs the new migrations while the previous release's `api` and `worker` are still serving (`DEPLOY.md` §7), so a migration has to work with the code that's already deployed as well as with the code it ships with. Most do without trying:
+
+- **Fine:** a new table, a new column that's nullable or has a default, a new index, a short `UPDATE`, queueing jobs (`0024_antimeridian_reprocess.sql`). The old code never reads what it doesn't know about.
+- **Not fine:** dropping or renaming a table or column the old code reads or writes, `NOT NULL` without a default on a column the old code inserts into, changing a column's type, a new constraint the old code can break, or anything that holds a table lock for more than a moment (rewriting a large table, a long backfill).
+
+Removing or renaming something takes two releases: the first stops using it, the next drops it. When a migration can't be made compatible, its first line says so, `-- Deploy: maintenance — <why>`, and the deploy puts the site into maintenance mode for it (`DEPLOY.md` §7). Without that line, a deploy runs it with the site up.
+
 ## Gotchas worth not rediscovering
 
 All verified directly against the repo, the registries, or a real `docker compose` run — not guessed.

@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: Deploy HoldMyTrack's current origin/main to production (holdmytrack.com) — backup and maintenance mode when there are migrations, rebuild, verify, and republish the Android APK when the app changed. Use only when the user asks to deploy.
+description: Deploy HoldMyTrack's current origin/main to production (holdmytrack.com) — build with the site up, backup when there are migrations and maintenance mode only for one that needs it, verify, and republish the Android APK when the app changed. Use only when the user asks to deploy.
 disable-model-invocation: true
 ---
 
@@ -21,12 +21,13 @@ git fetch -q origin
 DEPLOYED=$(curl -s https://holdmytrack.com/healthz | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
 git log --oneline $DEPLOYED..origin/main
 git diff --stat $DEPLOYED origin/main -- services/server/migrations apps/android
+git diff $DEPLOYED origin/main -- services/server/migrations | grep -E '^\+\+\+ |^\+-- Deploy: maintenance'
 git diff $DEPLOYED origin/main -- services/server/internal/geo | grep -E '^[-+].*(BoundariesKey|TimezonesKey) *='
 git diff --stat $DEPLOYED origin/main -- services/server/internal/fog services/server/internal/tilemath services/server/internal/httpapi/demo_data
 git diff $DEPLOYED origin/main -- docs/DEPLOY.md
 ```
 
-Tell the user: what's deployed, the target `origin/main` short SHA, the commits in between, and whether there are **new migrations** (files under `services/server/migrations/`), **Android changes** (anything under `apps/android/` outside `docs/`) and **one-time server steps** (step 3's last part). Read the `DEPLOY.md` diff whole: a feature that needs an operator step (a file to load, a command to run once) adds it there, and nothing else in this plan would show it. Only `origin/main` deploys — unmerged branches never do. If `/healthz` doesn't answer, say so and ask before going on. Confirm with the user before starting; a deploy changes the live site.
+Tell the user: what's deployed, the target `origin/main` short SHA, the commits in between, and whether there are **new migrations** (files under `services/server/migrations/`) and whether any **needs maintenance mode** (its first line is `-- Deploy: maintenance — <why>`, `docs/DEVELOPMENT.md`'s "Writing a migration"), **Android changes** (anything under `apps/android/` outside `docs/`) and **one-time server steps** (step 3's last part). Read every new migration without that line too, and if one looks unsafe to run beside the old code (a drop, a rename, a new `NOT NULL`, a long rewrite or backfill), say why and ask whether to deploy it with maintenance mode instead. Read the `DEPLOY.md` diff whole: a feature that needs an operator step (a file to load, a command to run once) adds it there, and nothing else in this plan would show it. Only `origin/main` deploys — unmerged branches never do. If `/healthz` doesn't answer, say so and ask before going on. Confirm with the user before starting; a deploy changes the live site.
 
 ### Android version bump (only if the app changed)
 
@@ -50,7 +51,7 @@ No bump: go on with the target as it is.
 
 ## 2. Deploy
 
-Build first in every case: `git pull` and `build` leave the running containers alone (none of them mounts the source), so the old version keeps serving through the slow part. The build outlasts the foreground timeout, so if Claude runs it, use `run_in_background`.
+Build first in every case (after the backup, when there are migrations): `git pull` and `build` leave the running containers alone (none of them mounts the source), so the old version keeps serving through the slow part. The build outlasts the foreground timeout, so if Claude runs it, use `run_in_background`.
 
 ```
 ! ssh holdmytrack 'cd /srv/holdmytrack && git pull --ff-only && GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod build'
@@ -62,15 +63,22 @@ Build first in every case: `git pull` and `build` leave the running containers a
 ! ssh holdmytrack 'cd /srv/holdmytrack && GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod up -d'
 ```
 
-**With new migrations** — DEPLOY.md §7. Backup before the build above, then maintenance only around the swap:
+**With new migrations, none needing maintenance** — DEPLOY.md §7, the site stays up throughout:
 
-1. Backup (also copies to the backup R2 bucket): `! ssh holdmytrack 'cd /srv/holdmytrack && ./scripts/backup.sh'` — it must finish without error before anything else.
+1. Backup (also copies to the backup R2 bucket): `! ssh holdmytrack 'cd /srv/holdmytrack && ./scripts/backup.sh'` — before the build, and it must finish without error before anything else.
+2. Pull and build, as above.
+3. Migrate beside the running release: `! ssh holdmytrack 'cd /srv/holdmytrack && docker compose -f compose.prod.yml --env-file .env.prod run --rm migrate'` — never fold this into `up -d`, which takes `api` down for as long as `migrate` runs.
+4. Swap, as in the case without migrations.
+
+**With a migration that needs maintenance mode** — DEPLOY.md §7, maintenance only around the swap:
+
+1. Backup, as above.
 2. Pull and build, as above — the site stays up.
 3. Maintenance on, swap: `! ssh holdmytrack 'cd /srv/holdmytrack && ./scripts/maintenance.sh on && GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod up -d'`
 4. Check (step 3 below) — `migrate` must be `Exited (0)` and `/healthz` 200 before going on.
 5. Maintenance off: `! ssh holdmytrack 'cd /srv/holdmytrack && ./scripts/maintenance.sh off'`
 
-If `git pull --ff-only` refuses, the server checkout has drifted: stop and show the user `git status`, don't reset it. If `migrate` exited non-zero, leave maintenance on, show its logs (`… logs migrate`), and stop — the backup from step 1 is the way back (DEPLOY.md §11).
+If `git pull --ff-only` refuses, the server checkout has drifted: stop and show the user `git status`, don't reset it. If `run --rm migrate` fails, nothing has been swapped: show its output and stop, leaving the old release running. If `migrate` exited non-zero under maintenance, leave maintenance on, show its logs (`… logs migrate`), and stop — the backup from step 1 is the way back (DEPLOY.md §11).
 
 ## 3. Verify
 
@@ -101,4 +109,4 @@ Check `curl -sI https://holdmytrack.com/download/holdmytrack.apk` — singular `
 
 ## 5. Report and record
 
-Tell the user the deployed SHA, whether migrations ran (and the backup's name), which one-time steps ran or were skipped and why, whether the APK was republished and at which `versionName`, and what was verified. If you keep notes on the deployment's state between sessions, record the deployed SHA there.
+Tell the user the deployed SHA, whether migrations ran (and the backup's name, and whether the site went into maintenance mode), which one-time steps ran or were skipped and why, whether the APK was republished and at which `versionName`, and what was verified. If you keep notes on the deployment's state between sessions, record the deployed SHA there.

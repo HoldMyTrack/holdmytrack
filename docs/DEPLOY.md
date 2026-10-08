@@ -150,7 +150,18 @@ It upserts every place by its OSM id, so a re-run with a newer extract updates t
 
 ## 7. Maintenance mode
 
-DigitalOcean (and most VPS providers) have no Droplet-level maintenance toggle, so this lives in the app stack instead. Before a deploy that touches migrations or involves manual DB work, put the site into maintenance mode so visitors see a friendly page instead of Caddy's raw `502`s while `api` is mid-restart — but only once the new images are built:
+A deploy pulls and builds first, with the old containers still serving: building is the slow part, minutes on this VPS, and it leaves the running containers alone, since none of them mounts the source. What comes after the build depends on the new migrations, if any. Most work with the release already running (`DEVELOPMENT.md`'s "Writing a migration"), so they run with the site up:
+
+```
+./scripts/backup.sh
+GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod build
+docker compose -f compose.prod.yml --env-file .env.prod run --rm migrate
+GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod up -d
+```
+
+`run --rm migrate` applies them beside the running `api` and `worker`, and exits non-zero if one fails, with nothing swapped yet. It has to come first: a plain `up -d` takes `api` and `worker` down as soon as it starts `migrate` and brings the new ones up only once it exits, so a slow migration would mean `502`s for as long as it runs. `up -d` then finds nothing left to migrate and swaps the containers. Without new migrations, skip the backup and the `run`.
+
+A migration whose first line is `-- Deploy: maintenance — <why>` can't run beside the old code, and a deploy that brings one, or involves manual DB work, puts the site into maintenance mode so visitors see a friendly page instead of errors. DigitalOcean (and most VPS providers) have no Droplet-level maintenance toggle, so this lives in the app stack instead, and it goes on only once the build is done:
 
 ```
 ./scripts/backup.sh
@@ -160,7 +171,7 @@ GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-f
 ./scripts/maintenance.sh off
 ```
 
-Building is the slow part of a deploy, minutes on this VPS, and it leaves the running containers alone: none of them mounts the source, so the old version keeps serving while it builds. `up -d` without `--build` then only runs `migrate` and recreates the containers whose image changed, so the maintenance page is up for seconds rather than for the whole build. Running `backup.sh` (§11) first means a migration that goes wrong can be undone from a dump taken minutes earlier, not last night's. `maintenance.sh on`/`off` flip `MAINTENANCE_MODE` in `.env.prod` and recreate only the `web` (Caddy) container — a couple of seconds, no rebuild. `/healthz` is deliberately exempt from maintenance mode (see `apps/web/docker/Caddyfile`), so `curl https://<your-domain>/healthz` still reflects `api`/`db`'s real status; wait for it to return `200` before running `maintenance.sh off`. `./scripts/maintenance.sh status` prints the current value.
+Running `backup.sh` (§11) first means a migration that goes wrong can be undone from a dump taken minutes earlier, not last night's. `maintenance.sh on`/`off` flip `MAINTENANCE_MODE` in `.env.prod` and recreate only the `web` (Caddy) container — a couple of seconds, no rebuild. `/healthz` is deliberately exempt from maintenance mode (see `apps/web/docker/Caddyfile`), so `curl https://<your-domain>/healthz` still reflects `api`/`db`'s real status; wait for it to return `200` before running `maintenance.sh off`. `./scripts/maintenance.sh status` prints the current value.
 
 ## 8. Verify
 
