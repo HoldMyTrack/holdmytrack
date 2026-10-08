@@ -1,6 +1,6 @@
 # Deploying HoldMyTrack — minimal single-VPS setup
 
-The smallest deployment that's actually production-shaped: one small VPS running `compose.prod.yml` (Postgres+PostGIS, `api`, `worker`, and Caddy in front of the built frontend), plus Cloudflare R2 for object storage. See `docs/VISION.md` §4.3 for the cost model this is built around; spend caps and the compliance work (DPIA, EU-region hosting) are `docs/ROADMAP.md`'s Phases 5 and 6. This document only covers getting a working deployment live, not everything a real public launch needs. Redeploying holdmytrack.com afterwards is routine: in Claude Code, `/deploy` (`.claude/skills/deploy/SKILL.md`) walks §6–§8 and §10 for the commits since the running version.
+The smallest deployment that's actually production-shaped: one small VPS running `compose.prod.yml` (Postgres+PostGIS, `api`, `worker`, and Caddy in front of the built frontend), plus Cloudflare R2 for object storage. See `docs/VISION.md` §4.3 for the cost model this is built around; spend caps and the compliance work (DPIA, EU-region hosting) are `docs/ROADMAP.md`'s Phases 5 and 6. This document only covers getting a working deployment live, not everything a real public launch needs. Redeploying holdmytrack.com afterwards is routine: in Claude Code, `/deploy` (`.claude/skills/deploy/SKILL.md`) walks §6–§8 for the commits since the running version.
 
 ## 1. Provision the VPS
 
@@ -266,20 +266,6 @@ WHERE u.timezone = r.old;
 ```
 
 That's the rename table in `services/server/internal/web/timezones_data.go` (`timezoneRenames`, tzdata 2026d) at the time of writing. If the table has been regenerated since, rebuild the list from it. Then check that nothing is left that the new image won't know: run `SELECT DISTINCT timezone FROM users` and look each result up in the new image's `pg_timezone_names`.
-
-## 10. Publishing the Android APK
-
-`https://<your-domain>/download/*` serves whatever is in `/srv/holdmytrack/downloads/` on the host, bind-mounted read-only into the `web` container (`compose.prod.yml`, `apps/web/docker/Caddyfile`), so publishing a new build is a copy with no rebuild or restart. Build against the deployment's own origin, then copy it up:
-
-```
-cd apps/android/holdmytrack
-./gradlew :app:assembleDebug -Pholdmytrack.apiBaseUrl=https://<your-domain>
-scp app/build/outputs/apk/debug/app-debug.apk <vps>:/srv/holdmytrack/downloads/holdmytrack.apk
-```
-
-The APK carries its own version — `versionName` (the release number) and the commit's short SHA, shown at the foot of the app's You tab — and a `versionCode` that is the commit count, so a newer build always installs over an older one (`apps/android/docs/IMPLEMENTATION.md` §8). Build from the commit you deployed and the app's SHA matches `/healthz`'s `version`.
-
-It's served with `Cache-Control: no-cache`, so a replaced file is never masked by a cached copy. This is a debug-signed APK: installable by sideloading, and it keeps Donate, which the Play build leaves out. The Play build is the release-signed bundle (`apps/android/holdmytrack/README.md`, Release build), and the two can't install over each other without uninstalling first. Google sign-in works in it only if that debug key's SHA-1 has an Android OAuth client (step 4).
 
 ## 11. Backups and the restore drill
 

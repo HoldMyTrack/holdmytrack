@@ -1,12 +1,12 @@
 ---
 name: deploy
-description: Deploy HoldMyTrack's current origin/main to production (holdmytrack.com) — build with the site up, backup when there are migrations and maintenance mode only for one that needs it, verify, and republish the Android APK when the app changed. Use only when the user asks to deploy.
+description: Deploy HoldMyTrack's current origin/main to production (holdmytrack.com) — build with the site up, backup when there are migrations and maintenance mode only for one that needs it and verify. Use only when the user asks to deploy.
 disable-model-invocation: true
 ---
 
 # Deploy HoldMyTrack to production
 
-Production is holdmytrack.com: one droplet, reached as `ssh holdmytrack` (root), repo checked out at `/srv/holdmytrack` tracking `main`, Compose project `holdmytrack`, config in `.env.prod`. `holdmytrack` is an alias in the operator's own `~/.ssh/config`, so the server's address isn't written here. `docs/DEPLOY.md` is the authority (§6 bring it up, §7 maintenance mode, §8 verify, §10 APK); this skill is the routine path through it.
+Production is holdmytrack.com: one droplet, reached as `ssh holdmytrack` (root), repo checked out at `/srv/holdmytrack` tracking `main`, Compose project `holdmytrack`, config in `.env.prod`. `holdmytrack` is an alias in the operator's own `~/.ssh/config`, so the server's address isn't written here. `docs/DEPLOY.md` is the authority (§6 bring it up, §7 maintenance mode, §8 verify); this skill is the routine path through it.
 
 Every compose call on the server is `docker compose -f compose.prod.yml --env-file .env.prod …` — never drop `--env-file`. `.env.prod` can't be shell-sourced (unquoted multi-word values), so read DB credentials inside the `db` container.
 
@@ -41,7 +41,7 @@ git log --oneline --no-merges $BUMPED..origin/main -- apps/android ':!apps/andro
 
 Give the current `versionName`, the commit that last set it, and the app's commits since — summarised as features, not a raw list — and ask whether this release deserves a bump, suggesting the next number (0.4 → 0.5) and a one-word theme when the features have one. Ask together with the deploy confirmation, so it's one question.
 
-The APK reads `versionName` from the commit it's built from, so a bump has to be on `origin/main` before the deploy. If the user wants one, before step 2:
+The app goes out through Google Play, built separately from the deploy (`apps/android/holdmytrack/README.md`, Release build), but a build reads `versionName` from the commit it's built from, so a bump goes on `origin/main` with the deploy rather than after it. If the user wants one, before step 2:
 
 1. Branch off `origin/main` (`android-version-0.5`) and change the number everywhere it's written: `versionName` in `apps/android/holdmytrack/app/build.gradle.kts`, and the examples of it in `apps/android/docs/IMPLEMENTATION.md` §8 ("The version comes from git"), `apps/android/docs/SPEC.md` FR-2.9 ("Version 0.4 (62da50b)") and the KDoc of `appVersion` and `UserAgentInterceptor` in `net/HoldMyTrackApi.kt`. `git grep -n '0\.4' apps/android` finds them; leave the unrelated matches (distances like "10.4 km", opacities).
 2. One commit, `Android: version 0.5 — <theme>`, with a body naming what the release brings; push it and give the user the compare URL to open the PR (`gh` may not be installed).
@@ -95,18 +95,6 @@ Then the one-time steps the plan found, each from DEPLOY.md §6, after maintenan
 - **Changed `demo_data/`**: `run --rm api seed-demo-customer --reset`.
 - **Changed `internal/fog` or `internal/tilemath`**: `run --rm api rerender-coverage`, with `--masks` when the stroke or which tiles a track reaches changed (§6). Say which commits touched it and what they change, so the user can decide whether existing tiles look different.
 
-## 4. Android APK (only if the app changed)
+## 4. Report and record
 
-From the deployed commit, so the APK's SHA matches `/healthz`:
-
-```
-cd apps/android/holdmytrack    # not apps/android
-./gradlew :app:assembleDebug -Pholdmytrack.apiBaseUrl=https://holdmytrack.com
-! scp app/build/outputs/apk/debug/app-debug.apk holdmytrack:/srv/holdmytrack/downloads/holdmytrack.apk
-```
-
-Check `curl -sI https://holdmytrack.com/download/holdmytrack.apk` — singular `/download/`; the server directory is plural `downloads/`, and `/downloads/…` is a misleading 404.
-
-## 5. Report and record
-
-Tell the user the deployed SHA, whether migrations ran (and the backup's name, and whether the site went into maintenance mode), which one-time steps ran or were skipped and why, whether the APK was republished and at which `versionName`, and what was verified. If you keep notes on the deployment's state between sessions, record the deployed SHA there.
+Tell the user the deployed SHA, whether migrations ran (and the backup's name, and whether the site went into maintenance mode), which one-time steps ran or were skipped and why, whether `versionName` was bumped, and what was verified. If you keep notes on the deployment's state between sessions, record the deployed SHA there.
