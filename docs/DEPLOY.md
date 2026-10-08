@@ -1,6 +1,6 @@
 # Deploying HoldMyTrack — minimal single-VPS setup
 
-The smallest deployment that's actually production-shaped: one small VPS running `compose.prod.yml` (Postgres+PostGIS, `api`, `worker`, and Caddy in front of the built frontend), plus Cloudflare R2 for object storage. See `docs/VISION.md` §4.3 for the cost model this is built around; spend caps and the compliance work (DPIA, EU-region hosting) are `docs/ROADMAP.md`'s Phases 5 and 6. This document only covers getting a working deployment live, not everything a real public launch needs. Redeploying holdmytrack.com afterwards is routine: in Claude Code, `/deploy` (`.claude/skills/deploy/SKILL.md`) walks §6–§8 and §10 for the commits since the running version.
+The smallest deployment that's actually production-shaped: one small VPS running `compose.prod.yml` (Postgres+PostGIS, `api`, `worker`, and Caddy in front of the built frontend), plus Cloudflare R2 for object storage. See `docs/VISION.md` §4.3 for the cost model this is built around; spend caps and the compliance work (DPIA, EU-region hosting) are `docs/ROADMAP.md`'s Phases 5 and 6. This document only covers getting a working deployment live, not everything a real public launch needs. Redeploying holdmytrack.com afterwards is routine: in Claude Code, `/deploy` (`.claude/skills/deploy/SKILL.md`) walks §6–§8 for the commits since the running version.
 
 ## 1. Provision the VPS
 
@@ -150,13 +150,61 @@ It upserts every place by its OSM id, so a re-run with a newer extract updates t
 
 ## 7. Maintenance mode
 
-DigitalOcean (and most VPS providers) have no Droplet-level maintenance toggle, so this lives in the app stack instead. Before a deploy that touches migrations or involves manual DB work — i.e. before step 6's `up -d --build` — put the site into maintenance mode so visitors see a friendly page instead of Caddy's raw `502`s while `api` is mid-restart:
+A deploy pulls and builds first, with the old containers still serving: building is the slow part, minutes on this VPS, and it leaves the running containers alone, since none of them mounts the source. What comes after the build depends on the new migrations, if any. Most work with the release already running (`DEVELOPMENT.md`'s "Writing a migration"), so they run with the site up:
 
 ```
 ./scripts/backup.sh
+GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod build
+docker compose -f compose.prod.yml --env-file .env.prod run --rm migrate
+GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod up -d
+```
+
+`run --rm migrate` applies them beside the running `api` and `worker`, and exits non-zero if one fails, with nothing swapped yet. It has to come first: a plain `up -d` takes `api` and `worker` down as soon as it starts `migrate` and brings the new ones up only once it exits, so a slow migration would mean `502`s for as long as it runs. `up -d` then finds nothing left to migrate and swaps the containers. Without new migrations, skip the backup and the `run`.
+
+A migration whose first line is `-- Deploy: maintenance — <why>` can't run beside the old code, and a deploy that brings one, or involves manual DB work, puts the site into maintenance mode so visitors see a friendly page instead of errors. DigitalOcean (and most VPS providers) have no Droplet-level maintenance toggle, so this lives in the app stack instead, and it goes on only once the build is done:
+
+```
+./scripts/backup.sh
+GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod build
 ./scripts/maintenance.sh on
-GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod up -d --build
+GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod up -d
 ./scripts/maintenance.sh off
+```
+
+The three paths side by side, with what visitors get at each step:
+
+```mermaid
+sequenceDiagram
+    participant Op as Operator
+    participant Caddy as web (Caddy)
+    participant Old as old api + worker
+    participant DB as db
+    participant New as new api + worker
+    Note over Caddy,Old: visitors served by the old release
+    opt any new migration
+        Op->>DB: backup.sh
+    end
+    Op->>Op: git pull, compose build (minutes)
+    Note over Caddy,Old: still served by the old release
+    alt no new migrations
+        Op->>New: up -d
+        New--xOld: replaces
+        Note over Caddy,New: a few seconds of 502s during the swap
+    else migrations without the marker
+        Op->>DB: run --rm migrate
+        Note over Caddy,Old: old release keeps serving on the new schema
+        Op->>New: up -d (nothing left to migrate)
+        New--xOld: replaces
+        Note over Caddy,New: a few seconds of 502s during the swap
+    else a migration marked "Deploy: maintenance"
+        Op->>Caddy: maintenance.sh on
+        Note over Caddy: maintenance page (503), /healthz exempt
+        Op->>DB: up -d runs migrate
+        Op->>New: up -d starts new api + worker
+        New--xOld: replaces
+        Op->>Caddy: maintenance.sh off, once /healthz is 200
+    end
+    Note over Caddy,New: visitors served by the new release
 ```
 
 Running `backup.sh` (§11) first means a migration that goes wrong can be undone from a dump taken minutes earlier, not last night's. `maintenance.sh on`/`off` flip `MAINTENANCE_MODE` in `.env.prod` and recreate only the `web` (Caddy) container — a couple of seconds, no rebuild. `/healthz` is deliberately exempt from maintenance mode (see `apps/web/docker/Caddyfile`), so `curl https://<your-domain>/healthz` still reflects `api`/`db`'s real status; wait for it to return `200` before running `maintenance.sh off`. `./scripts/maintenance.sh status` prints the current value.
@@ -218,20 +266,6 @@ WHERE u.timezone = r.old;
 ```
 
 That's the rename table in `services/server/internal/web/timezones_data.go` (`timezoneRenames`, tzdata 2026d) at the time of writing. If the table has been regenerated since, rebuild the list from it. Then check that nothing is left that the new image won't know: run `SELECT DISTINCT timezone FROM users` and look each result up in the new image's `pg_timezone_names`.
-
-## 10. Publishing the Android APK
-
-`https://<your-domain>/download/*` serves whatever is in `/srv/holdmytrack/downloads/` on the host, bind-mounted read-only into the `web` container (`compose.prod.yml`, `apps/web/docker/Caddyfile`), so publishing a new build is a copy with no rebuild or restart. Build against the deployment's own origin, then copy it up:
-
-```
-cd apps/android/holdmytrack
-./gradlew :app:assembleDebug -Pholdmytrack.apiBaseUrl=https://<your-domain>
-scp app/build/outputs/apk/debug/app-debug.apk <vps>:/srv/holdmytrack/downloads/holdmytrack.apk
-```
-
-The APK carries its own version — `versionName` (the release number) and the commit's short SHA, shown at the foot of the app's You tab — and a `versionCode` that is the commit count, so a newer build always installs over an older one (`apps/android/docs/IMPLEMENTATION.md` §8). Build from the commit you deployed and the app's SHA matches `/healthz`'s `version`.
-
-It's served with `Cache-Control: no-cache`, so a replaced file is never masked by a cached copy. This is a debug-signed APK: installable by sideloading, and it keeps Donate, which the Play build leaves out. The Play build is the release-signed bundle (`apps/android/holdmytrack/README.md`, Release build), and the two can't install over each other without uninstalling first. Google sign-in works in it only if that debug key's SHA-1 has an Android OAuth client (step 4).
 
 ## 11. Backups and the restore drill
 

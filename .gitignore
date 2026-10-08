@@ -45,6 +45,3 @@ Thumbs.db
 *.swp
 .idea/
 .vscode/
-
-# The deploy host's published Android APK (docs/DEPLOY.md §10) — built, not source.
-/downloads/
