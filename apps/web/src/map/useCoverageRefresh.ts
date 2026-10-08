@@ -1,15 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { getCoverageStatus } from '../api';
-import { setTileVersion } from './coverageVersion';
+import { coveragePollDelay } from './coveragePoll';
+import { getTileVersion, setTileVersion } from './coverageVersion';
 import { refreshFogLayers } from './fog';
 import { refreshHeatmapLayers } from './heatmap';
-
-/** How often the coverage status is re-read while a re-render is outstanding. */
-const POLL_MS = 2000;
-/** Give up waiting after this many reads (~3 minutes) and refetch anyway — a render that
- *  failed leaves no pending job, so this only bounds a job stuck in the queue. */
-const MAX_POLLS = 90;
 
 /**
  * Keeps the Fog/Heatmap layers current after an upload or delete (IMPLEMENTATION.md §4.2.3).
@@ -27,19 +22,35 @@ const MAX_POLLS = 90;
  * again once they're back (IMPLEMENTATION.md §4.7.7), and the first of those is only shown if
  * picked up mid-job. The first read of a page only sets the baseline.
  *
+ * It also watches once on its own as soon as the map exists, so a page opened while the
+ * account's coverage is still being worked on gets its final refetch too; that first watch
+ * refetches nothing if it finds the page's own tile version already current. Reads go every
+ * 2 s and then every 10 s (coveragePoll.ts) until nothing is left, a failed read included.
+ * `rendering` is what the latest read said, for the map's "still being updated" notice.
+ *
  * `onDone`, when given, runs after that refetch — for a caller whose change also moves things
  * the coverage rasters don't cover (a Private location change reprocesses whole activities),
  * and which can't otherwise tell when the server has finished.
  */
-export function useCoverageRefresh(map: MapLibreMap | null): (onDone?: () => void) => void {
+export interface CoverageRefresh {
+  /** Starts (or restarts) the watch — see useCoverageRefresh. */
+  watch: (onDone?: () => void) => void;
+  /** Whether the latest status read found coverage still being worked on. */
+  rendering: boolean;
+}
+
+export function useCoverageRefresh(map: MapLibreMap | null): CoverageRefresh {
   const [generation, setGeneration] = useState(0);
+  const [rendering, setRendering] = useState(false);
   const onDoneRef = useRef<(() => void) | undefined>(undefined);
   // The status version the layers were last refetched at (or first seen at) — shared across
   // watches, since a restarted watch is still showing the same tiles.
   const shownVersionRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (generation === 0 || !map) return;
+    if (!map) return;
+    // The watch the map's own load starts, before any change has asked for one.
+    const initial = generation === 0;
     const controller = new AbortController();
     let timer: number | undefined;
     let polls = 0;
@@ -51,12 +62,18 @@ export function useCoverageRefresh(map: MapLibreMap | null): (onDone?: () => voi
     };
     const check = () => {
       getCoverageStatus(controller.signal)
-        .then(({ rendering, version, tile_version: tileVersion }) => {
+        .then(({ rendering: busy, version, tile_version: tileVersion }) => {
           polls += 1;
-          if (rendering && polls < MAX_POLLS) {
+          setRendering(busy);
+          if (busy) {
             if (shownVersionRef.current === null) shownVersionRef.current = version;
             else if (version !== shownVersionRef.current) refetch(version, tileVersion);
-            timer = window.setTimeout(check, POLL_MS);
+            timer = window.setTimeout(check, coveragePollDelay(polls));
+            return;
+          }
+          if (initial && polls === 1 && tileVersion === getTileVersion()) {
+            // A page loaded with nothing in flight already shows current tiles.
+            shownVersionRef.current = version;
             return;
           }
           refetch(version, tileVersion);
@@ -65,7 +82,9 @@ export function useCoverageRefresh(map: MapLibreMap | null): (onDone?: () => voi
           onDone?.();
         })
         .catch(() => {
-          // A failed read just ends this watch; the next upload or delete starts another.
+          if (controller.signal.aborted) return;
+          polls += 1;
+          timer = window.setTimeout(check, coveragePollDelay(polls));
         });
     };
     check();
@@ -77,8 +96,9 @@ export function useCoverageRefresh(map: MapLibreMap | null): (onDone?: () => voi
 
   // A restart without its own `onDone` keeps the one still waiting (a Private location change's
   // list refresh shouldn't be dropped because a row then went Pending); it runs once, then clears.
-  return useCallback((onDone?: () => void) => {
+  const watch = useCallback((onDone?: () => void) => {
     if (onDone) onDoneRef.current = onDone;
     setGeneration((g) => g + 1);
   }, []);
+  return { watch, rendering };
 }
