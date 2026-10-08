@@ -66,7 +66,7 @@ func newDBTestWithS3(t *testing.T, s3Handler http.Handler) *dbTest {
 	if err != nil {
 		t.Fatalf("templates: %v", err)
 	}
-	srv := New(pool, store, slog.New(slog.DiscardHandler), nil, "https://app.example", "", mapstyle.Satellite{}, "test", false, GoogleOAuthConfig{}, FacebookOAuthConfig{}, pages)
+	srv := New(pool, store, slog.New(slog.DiscardHandler), &sentMail{}, "https://app.example", "", mapstyle.Satellite{}, "test", false, GoogleOAuthConfig{}, FacebookOAuthConfig{}, pages)
 	return &dbTest{t: t, pool: pool, srv: srv}
 }
 

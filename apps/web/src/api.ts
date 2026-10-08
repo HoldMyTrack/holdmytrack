@@ -561,6 +561,9 @@ export interface Story {
   id: string;
   name: string;
   description: string;
+  /** Who sent the copy this Story came from (FR-14.8) — their name or email address — while the
+   *  Story it was copied from still exists; null for the account's own. */
+  from: string | null;
   /** Every member, earliest activity first. */
   activityIds: string[];
   stats: StoryTotals & { byType: (StoryTotals & { activityType: string })[] };
@@ -577,6 +580,7 @@ interface StoryBody {
   id: string;
   name: string;
   description: string | null;
+  from: string | null;
   activity_ids: string[];
   stats: StoryTotalsBody & { by_type: (StoryTotalsBody & { activity_type: string })[] };
 }
@@ -595,6 +599,7 @@ function toStory(body: StoryBody): Story {
     id: body.id,
     name: body.name,
     description: body.description ?? '',
+    from: body.from,
     activityIds: body.activity_ids,
     stats: {
       ...toStoryTotals(body.stats),
@@ -688,6 +693,71 @@ export async function removeStoryActivities(id: string, activityIds: string[]): 
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
   return toStory((await res.json()) as StoryBody);
+}
+
+/** `POST /v1/stories/{id}/send` — a copy of the Story to `email` (FR-14.7). Succeeds whether or
+ *  not the address has an account: the server never says. */
+export async function sendStory(id: string, email: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/stories/${encodeURIComponent(id)}/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
+  }
+}
+
+/** A copy of a Story someone sent the account, waiting to be accepted or declined (FR-14.7). */
+export interface StorySend {
+  id: string;
+  storyName: string;
+  /** The sender's name, or their email address when they've set none. */
+  from: string;
+  activityCount: number;
+}
+
+/** A copy the account accepted that hasn't finished arriving. */
+export interface StoryCopying {
+  storyName: string;
+  from: string;
+}
+
+export interface StoryInbox {
+  sends: StorySend[];
+  copying: StoryCopying[];
+}
+
+/** `GET /v1/story-sends` — the copies waiting for the account, newest first, and the accepted
+ *  ones still being copied. */
+export async function listStorySends(signal?: AbortSignal): Promise<StoryInbox> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/story-sends`, {
+    ...(signal ? { signal } : {}),
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
+  }
+  const body = (await res.json()) as {
+    sends: { id: string; story_name: string; from: string; activity_count: number }[];
+    copying: { story_name: string; from: string }[];
+  };
+  return {
+    sends: body.sends.map((s) => ({ id: s.id, storyName: s.story_name, from: s.from, activityCount: s.activity_count })),
+    copying: body.copying.map((c) => ({ storyName: c.story_name, from: c.from })),
+  };
+}
+
+/** `POST /v1/story-sends/{id}/accept` (accept) or `DELETE /v1/story-sends/{id}` (decline). */
+export async function answerStorySend(id: string, accept: boolean): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}${API_V1}/story-sends/${encodeURIComponent(id)}${accept ? '/accept' : ''}`, {
+    method: accept ? 'POST' : 'DELETE',
+    credentials: 'include',
+  });
+  if (!res.ok && res.status !== 404) {
+    throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
+  }
 }
 
 /** `POST /v1/stories` — a new Story holding `activityIds` from the start, in one request. */

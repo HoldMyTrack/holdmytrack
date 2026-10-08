@@ -403,15 +403,15 @@ func loadAccount(ctx context.Context, pool *pgxpool.Pool, userID string) (*docum
 	}
 
 	rows, err = pool.Query(ctx, `
-		SELECT id, activity_id, COALESCE(caption, ''), taken_at, route_at, content_type
+		SELECT id, activity_id, COALESCE(caption, ''), taken_at, route_at, content_type, image_key
 		FROM activity_photos WHERE user_id = $1 ORDER BY activity_id, route_at, created_at`, userID)
 	if err != nil {
 		return nil, fmt.Errorf("photos: %w", err)
 	}
 	for rows.Next() {
-		var id, activityID, contentType string
+		var id, activityID, contentType, imageKey string
 		var p photo
-		if err := rows.Scan(&id, &activityID, &p.Caption, &p.TakenAt, &p.RouteAt, &contentType); err != nil {
+		if err := rows.Scan(&id, &activityID, &p.Caption, &p.TakenAt, &p.RouteAt, &contentType, &imageKey); err != nil {
 			rows.Close()
 			return nil, fmt.Errorf("photos: %w", err)
 		}
@@ -419,8 +419,7 @@ func loadAccount(ctx context.Context, pool *pgxpool.Pool, userID string) (*docum
 		if !ok {
 			continue
 		}
-		// httpapi's photoKey.
-		p.key, p.ext = "photos/"+userID+"/"+id, photoExt[contentType]
+		p.key, p.ext = imageKey, photoExt[contentType]
 		if p.ext == "" {
 			p.ext = "jpg"
 		}

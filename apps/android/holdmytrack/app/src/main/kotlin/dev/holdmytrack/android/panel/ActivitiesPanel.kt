@@ -80,6 +80,8 @@ class ActivitiesPanel(
     private val onStoriesChanged: () -> Unit,
     /** An activity was taken out of the open Story on the Stories tab. */
     private val onRemovedFromStory: (activityId: String) -> Unit,
+    /** A copy of a Story someone sent has arrived in the account (`StoriesTab`). */
+    private val onStoryCopyArrived: () -> Unit,
     /** The sheet came to rest at another height, or its peek changed. */
     private val onSheetChanged: () -> Unit,
 ) {
@@ -168,6 +170,7 @@ class ActivitiesPanel(
         onClearFocus = ::clearFocus,
         onBadgesChanged = { onStoriesChanged() },
         onActivityRemoved = { id -> onRemovedFromStory(id) },
+        onCopyArrived = { onStoryCopyArrived() },
     )
 
     private var loading = false

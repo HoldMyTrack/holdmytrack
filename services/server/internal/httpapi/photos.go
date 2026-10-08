@@ -20,6 +20,7 @@ import (
 	_ "golang.org/x/image/webp" // image.DecodeConfig for an uploaded WebP
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 )
 
 // Activity photos (IMPLEMENTATION.md §4.27, ADR-0024) — the user's own pictures on an
@@ -67,8 +68,13 @@ var (
 // the client asks the user where on the track it was taken and sends it again with route_at.
 const photoNeedsPlaceCode = "photo_needs_place"
 
-func photoKey(userID, photoID string) string      { return "photos/" + userID + "/" + photoID }
-func photoThumbKey(userID, photoID string) string { return photoKey(userID, photoID) + "-thumb" }
+// photoKey is where a newly uploaded photo's image goes, and the image_key its row records. A
+// copy of the photo in a copied Story (§4.23) keeps the original's key, so the key, not the
+// row's owner and id, names the files from then on.
+func photoKey(userID, photoID string) string { return "photos/" + userID + "/" + photoID }
+
+// photoThumbKey is the thumbnail stored beside the image at imageKey.
+func photoThumbKey(imageKey string) string { return imageKey + "-thumb" }
 
 // photoJSON is one photo as every photo endpoint returns it. Lon/Lat are null only for an
 // activity with no track left at all.
@@ -331,30 +337,32 @@ func (s *Server) handleUploadPhoto(w http.ResponseWriter, r *http.Request) {
 		httpErrorT(w, r, http.StatusConflict, "error.photo_limit", "max", maxPhotosPerAccount)
 		return
 	}
-	var photoID string
+	var photoID, imageKey string
 	if err := tx.QueryRow(ctx, `
-		INSERT INTO activity_photos (user_id, activity_id, taken_at, route_at, caption, content_type, thumb_content_type, width, height, bytes)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id
+		WITH n AS (SELECT gen_random_uuid() AS id)
+		INSERT INTO activity_photos (id, user_id, activity_id, taken_at, route_at, caption, content_type, thumb_content_type, width, height, bytes, image_key)
+		SELECT n.id, $1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'photos/' || $1::uuid::text || '/' || n.id FROM n
+		RETURNING id, image_key
 	`, userID, activityID, takenAt, routeAt, caption, photo.contentType, thumb.contentType, photo.width, photo.height,
-		len(photo.data)+len(thumb.data)).Scan(&photoID); err != nil {
+		len(photo.data)+len(thumb.data)).Scan(&photoID, &imageKey); err != nil {
 		s.log.Error("photo upload: insert failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	if err := s.store.Put(ctx, photoKey(userID, photoID), bytes.NewReader(photo.data), int64(len(photo.data))); err != nil {
+	if err := s.store.Put(ctx, imageKey, bytes.NewReader(photo.data), int64(len(photo.data))); err != nil {
 		s.log.Error("photo upload: store failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	if err := s.store.Put(ctx, photoThumbKey(userID, photoID), bytes.NewReader(thumb.data), int64(len(thumb.data))); err != nil {
+	if err := s.store.Put(ctx, photoThumbKey(imageKey), bytes.NewReader(thumb.data), int64(len(thumb.data))); err != nil {
 		s.log.Error("photo upload: thumbnail store failed", "err", err)
-		s.removePhotoObjects(ctx, userID, photoID)
+		s.removePhotoFiles(ctx, imageKey)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if err := tx.Commit(ctx); err != nil {
 		s.log.Error("photo upload: commit failed", "err", err)
-		s.removePhotoObjects(ctx, userID, photoID)
+		s.removePhotoFiles(ctx, imageKey)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -650,10 +658,10 @@ func (s *Server) servePhotoImage(w http.ResponseWriter, r *http.Request, thumb b
 		http.Error(w, "photo not found", http.StatusNotFound)
 		return
 	}
-	var contentType, thumbContentType string
+	var contentType, thumbContentType, key string
 	err := s.pool.QueryRow(ctx,
-		`SELECT content_type, thumb_content_type FROM activity_photos WHERE id = $1 AND user_id = $2`, photoID, userID,
-	).Scan(&contentType, &thumbContentType)
+		`SELECT content_type, thumb_content_type, image_key FROM activity_photos WHERE id = $1 AND user_id = $2`, photoID, userID,
+	).Scan(&contentType, &thumbContentType, &key)
 	if errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "photo not found", http.StatusNotFound)
 		return
@@ -663,9 +671,8 @@ func (s *Server) servePhotoImage(w http.ResponseWriter, r *http.Request, thumb b
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	key := photoKey(userID, photoID)
 	if thumb {
-		key, contentType = photoThumbKey(userID, photoID), thumbContentType
+		key, contentType = photoThumbKey(key), thumbContentType
 	}
 	obj, err := s.store.Get(ctx, key)
 	if err != nil {
@@ -772,8 +779,9 @@ func (s *Server) handleUpdatePhoto(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, p)
 }
 
-// handleDeletePhoto serves `DELETE /v1/photos/{id}`: the row, then both images, best-effort —
-// an orphaned blob is a cleanup nuisance, never a reason to keep a photo the user removed.
+// handleDeletePhoto serves `DELETE /v1/photos/{id}`: the row, then both images unless another
+// row still uses them (a copied Story's photo, §4.23), best-effort — an orphaned blob is a
+// cleanup nuisance, never a reason to keep a photo the user removed.
 func (s *Server) handleDeletePhoto(w http.ResponseWriter, r *http.Request) {
 	userID := userIDFromContext(r.Context())
 	ctx := r.Context()
@@ -782,24 +790,26 @@ func (s *Server) handleDeletePhoto(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "photo not found", http.StatusNotFound)
 		return
 	}
-	tag, err := s.pool.Exec(ctx, `DELETE FROM activity_photos WHERE id = $1 AND user_id = $2`, photoID, userID)
+	var imageKey string
+	err := s.pool.QueryRow(ctx, `DELETE FROM activity_photos WHERE id = $1 AND user_id = $2 RETURNING image_key`,
+		photoID, userID).Scan(&imageKey)
+	if errors.Is(err, pgx.ErrNoRows) {
+		http.Error(w, "photo not found", http.StatusNotFound)
+		return
+	}
 	if err != nil {
 		s.log.Error("photo delete failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	if tag.RowsAffected() == 0 {
-		http.Error(w, "photo not found", http.StatusNotFound)
-		return
-	}
-	s.removePhotoObjects(ctx, userID, photoID)
+	s.removeUnreferencedPhotoFiles(ctx, []string{imageKey})
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// activityPhotoIDs lists an activity's photos, for removing their images before the activity's
-// own delete cascades their rows away.
-func (s *Server) activityPhotoIDs(ctx context.Context, activityID string) ([]string, error) {
-	rows, err := s.pool.Query(ctx, `SELECT id::text FROM activity_photos WHERE activity_id = $1`, activityID)
+// activityPhotoKeys lists an activity's photos' image keys, read before the activity's own delete
+// cascades their rows away, so their images can be removed after it.
+func (s *Server) activityPhotoKeys(ctx context.Context, activityID string) ([]string, error) {
+	rows, err := s.pool.Query(ctx, `SELECT image_key FROM activity_photos WHERE activity_id = $1`, activityID)
 	if err != nil {
 		return nil, err
 	}
@@ -813,11 +823,20 @@ func deref(s *string) string {
 	return *s
 }
 
-// removePhotoObjects removes a photo's two images, logging rather than failing.
-func (s *Server) removePhotoObjects(ctx context.Context, userID, photoID string) {
-	for _, key := range []string{photoKey(userID, photoID), photoThumbKey(userID, photoID)} {
+// removePhotoFiles removes a photo's two images, logging rather than failing — for an upload
+// that failed before any other row could refer to them.
+func (s *Server) removePhotoFiles(ctx context.Context, imageKey string) {
+	for _, key := range []string{imageKey, photoThumbKey(imageKey)} {
 		if err := s.store.Remove(ctx, key); err != nil {
 			s.log.Error("photo object removal failed", "key", key, "err", err)
 		}
+	}
+}
+
+// removeUnreferencedPhotoFiles removes the images at keys that no row uses any more, logging
+// rather than failing (ingest.RemoveUnreferencedPhotoFiles).
+func (s *Server) removeUnreferencedPhotoFiles(ctx context.Context, keys []string) {
+	if err := ingest.RemoveUnreferencedPhotoFiles(ctx, s.pool, s.store, keys); err != nil {
+		s.log.Error("photo object removal failed", "err", err)
 	}
 }

@@ -1,12 +1,15 @@
 package dev.holdmytrack.android.panel
 
 import android.annotation.SuppressLint
+import android.os.Handler
+import android.os.Looper
 import android.util.TypedValue
 import android.view.GestureDetector
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TableLayout
@@ -24,6 +27,8 @@ import dev.holdmytrack.android.net.ApiException
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.net.Story
+import dev.holdmytrack.android.net.StoryCopying
+import dev.holdmytrack.android.net.StorySend
 import dev.holdmytrack.android.net.StoryTotals
 import dev.holdmytrack.android.recording.RecordingTypes
 
@@ -34,11 +39,13 @@ import dev.holdmytrack.android.recording.RecordingTypes
  * one is viewing it: `MapFragment` shows the tracks and the list of all its activities,
  * whatever the date range ([onOpen]), and this tab lists those rows inside the folder — tap to
  * select, × to take one out of the Story — with the whole Story's statistics in the footer. A
- * folder's pencil and bin rename and delete it.
+ * folder's pencil and bin rename and delete it, and its send button sends someone a copy
+ * ([SendCopyDialog], FR-14.7).
  *
  * The list is read each time the tab opens ([start]), so a Story made or changed since —
  * Add to story's included — is there; the open Story is read on its own ([setOpen]) for the
- * footer's numbers.
+ * footer's numbers. Above the Stories, the copies others sent wait to be accepted or declined,
+ * read with the list and every few seconds while an accepted one is arriving.
  */
 class StoriesTab(
     private val content: View,
@@ -53,6 +60,8 @@ class StoriesTab(
     private val onBadgesChanged: () -> Unit,
     /** [activityId] was taken out of the open Story: the list and the tracks are out of date. */
     private val onActivityRemoved: (activityId: String) -> Unit,
+    /** A copy of a Story someone sent has arrived: new activities, and Fog and Heatmap coming. */
+    private val onCopyArrived: () -> Unit,
 ) {
     private val context = content.context
     private val res = context.resources
@@ -84,6 +93,14 @@ class StoriesTab(
      *  one, or another Story opening. */
     private var removeError: String? = null
 
+    /** The inbox (FR-14.7): copies waiting, and accepted ones arriving. */
+    private var sends: List<StorySend> = emptyList()
+    private var copying: List<StoryCopying> = emptyList()
+    private var answering = false
+    private var answerError: String? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private val pollInbox = Runnable { loadInbox() }
+
     init {
         list.layoutManager = LinearLayoutManager(context)
         list.adapter = adapter
@@ -97,6 +114,11 @@ class StoriesTab(
         ready = false
         error = null
         render()
+        loadStories()
+        loadInbox()
+    }
+
+    private fun loadStories() {
         HoldMyTrackApi.stories { result ->
             if (!showing) return@stories
             result.onSuccess { next ->
@@ -111,6 +133,42 @@ class StoriesTab(
     /** The tab closed — `MapFragment` has closed its Story. */
     fun stop() {
         showing = false
+        handler.removeCallbacks(pollInbox)
+    }
+
+    /** The inbox read again; while a copy is arriving, again a few seconds later. A copy that
+     *  has arrived since the last read brings the list and the map up to date. */
+    private fun loadInbox() {
+        handler.removeCallbacks(pollInbox)
+        HoldMyTrackApi.storySends { result ->
+            if (!showing) return@storySends
+            // The inbox is an extra on the tab: a failed read leaves the last one shown.
+            val inbox = result.getOrNull() ?: return@storySends
+            val arrived = inbox.copying.size < copying.size
+            sends = inbox.sends
+            copying = inbox.copying
+            if (arrived) {
+                loadStories()
+                onCopyArrived()
+            }
+            if (copying.isNotEmpty()) handler.postDelayed(pollInbox, COPYING_POLL_MS)
+            render()
+        }
+    }
+
+    private fun answer(send: StorySend, accept: Boolean) {
+        if (answering) return
+        answering = true
+        answerError = null
+        render()
+        HoldMyTrackApi.answerStorySend(send.id, accept) { result ->
+            answering = false
+            result.onFailure { failure ->
+                answerError = failure.message?.takeIf { it.isNotBlank() } ?: res.getString(R.string.story_save_failed)
+            }
+            render()
+            loadInbox()
+        }
     }
 
     /** [id] is the open Story now (or none): its own copy is read for the footer. */
@@ -174,6 +232,9 @@ class StoriesTab(
 
     private fun render() {
         val items = ArrayList<Item>()
+        sends.forEach { items += Item.Inbox(it, answering) }
+        copying.forEachIndexed { i, copy -> items += Item.Copying(copy, i) }
+        answerError?.let { items += Item.Note(it, failed = true) }
         val openListed = stories.any { it.id == openId }
         if (openError != null && !openListed) items += Item.Note(openError!!, failed = true)
         for (listed in stories) {
@@ -182,6 +243,7 @@ class StoriesTab(
             val story = if (open && openStory?.id == listed.id) openStory!! else listed
             items += Item.Folder(story, open)
             if (!open) continue
+            story.from?.let { items += Item.From(story.id, res.getString(R.string.story_from, it)) }
             if (story.description.isNotEmpty()) items += Item.Description(story.id, story.description)
             removeError?.let { items += Item.Note(it, failed = true) }
             rows.forEach { items += Item.Row(it, story.id) }
@@ -330,6 +392,9 @@ class StoriesTab(
     private sealed class Item(val key: String) {
         data class Folder(val story: Story, val open: Boolean) : Item("folder:" + story.id)
         data class Description(val storyId: String, val text: String) : Item("description:$storyId")
+        data class From(val storyId: String, val text: String) : Item("from:$storyId")
+        data class Inbox(val send: StorySend, val answering: Boolean) : Item("inbox:" + send.id)
+        data class Copying(val copy: StoryCopying, val index: Int) : Item("copying:$index")
         data class Row(val row: ActivityRowItem, val storyId: String) : Item("row:" + row.activity.id)
         data class Note(val text: String, val failed: Boolean) : Item("note:$text")
     }
@@ -342,7 +407,8 @@ class StoriesTab(
     ) {
         override fun getItemViewType(position: Int) = when (getItem(position)) {
             is Item.Folder -> TYPE_FOLDER
-            is Item.Description -> TYPE_DESCRIPTION
+            is Item.Description, is Item.From -> TYPE_DESCRIPTION
+            is Item.Inbox, is Item.Copying -> TYPE_INBOX
             is Item.Row -> TYPE_ROW
             is Item.Note -> TYPE_NOTE
         }
@@ -352,6 +418,7 @@ class StoriesTab(
             return when (viewType) {
                 TYPE_FOLDER -> FolderHolder(inflater.inflate(R.layout.item_story_folder, parent, false))
                 TYPE_DESCRIPTION -> object : RecyclerView.ViewHolder(inflater.inflate(R.layout.item_story_description, parent, false)) {}
+                TYPE_INBOX -> InboxHolder(inflater.inflate(R.layout.item_story_inbox, parent, false))
                 TYPE_ROW -> {
                     val view = inflater.inflate(R.layout.item_activity_row, parent, false)
                     // Set in under the folder's name, which is what makes them its contents.
@@ -366,7 +433,17 @@ class StoriesTab(
         override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
             when (val item = getItem(position)) {
                 is Item.Folder -> (holder as FolderHolder).bind(item)
-                is Item.Description -> (holder.itemView as TextView).text = item.text
+                is Item.Description -> (holder.itemView as TextView).apply {
+                    text = item.text
+                    setTextSize(TypedValue.COMPLEX_UNIT_PX, res.getDimension(R.dimen.hmt_text_md))
+                }
+                // Who sent the copy, smaller, over the description (.stories-tab__from).
+                is Item.From -> (holder.itemView as TextView).apply {
+                    text = item.text
+                    setTextSize(TypedValue.COMPLEX_UNIT_PX, res.getDimension(R.dimen.hmt_text_sm))
+                }
+                is Item.Inbox -> (holder as InboxHolder).bind(item)
+                is Item.Copying -> (holder as InboxHolder).bind(item)
                 // Badged only for the row's other Stories: every row here is in this one.
                 is Item.Row -> (holder as ActivityRowHolder).bind(
                     item.row,
@@ -385,11 +462,41 @@ class StoriesTab(
         }
     }
 
+    private inner class InboxHolder(view: View) : RecyclerView.ViewHolder(view) {
+        private val text: TextView = view.findViewById(R.id.story_inbox_text)
+        private val actions: View = view.findViewById(R.id.story_inbox_actions)
+        private val accept: Button = view.findViewById(R.id.story_inbox_accept)
+        private val decline: Button = view.findViewById(R.id.story_inbox_decline)
+
+        fun bind(item: Item.Inbox) {
+            val send = item.send
+            text.text = res.getString(
+                R.string.story_inbox_sent,
+                send.from,
+                send.storyName,
+                res.getQuantityString(R.plurals.story_activity_count, send.activityCount, send.activityCount),
+            )
+            text.setTextColor(context.getColor(R.color.hmt_ink))
+            actions.visibility = View.VISIBLE
+            accept.isEnabled = !item.answering
+            decline.isEnabled = !item.answering
+            accept.setOnClickListener { answer(send, true) }
+            decline.setOnClickListener { answer(send, false) }
+        }
+
+        fun bind(item: Item.Copying) {
+            text.text = res.getString(R.string.story_inbox_copying, item.copy.storyName, item.copy.from)
+            text.setTextColor(context.getColor(R.color.hmt_ink_secondary))
+            actions.visibility = View.GONE
+        }
+    }
+
     private inner class FolderHolder(view: View) : RecyclerView.ViewHolder(view) {
         private val toggle: View = view.findViewById(R.id.story_toggle)
         private val chevron: ImageView = view.findViewById(R.id.story_chevron)
         private val name: TextView = view.findViewById(R.id.story_name)
         private val edit: ImageButton = view.findViewById(R.id.story_edit)
+        private val send: ImageButton = view.findViewById(R.id.story_send)
         private val delete: ImageButton = view.findViewById(R.id.story_delete)
 
         fun bind(item: Item.Folder) {
@@ -409,13 +516,18 @@ class StoriesTab(
             val demo = Session.isDemo
             val editLabel = res.getString(if (demo) R.string.story_demo_edit else R.string.story_edit)
             val deleteLabel = res.getString(if (demo) R.string.story_demo_delete else R.string.story_delete)
+            val sendLabel = res.getString(if (demo) R.string.story_demo_send else R.string.story_send)
             edit.isEnabled = !demo
+            send.isEnabled = !demo
             delete.isEnabled = !demo
             edit.contentDescription = "$editLabel: ${story.name}"
+            send.contentDescription = "$sendLabel: ${story.name}"
             delete.contentDescription = "$deleteLabel: ${story.name}"
             TooltipCompat.setTooltipText(edit, editLabel)
+            TooltipCompat.setTooltipText(send, sendLabel)
             TooltipCompat.setTooltipText(delete, deleteLabel)
             edit.setOnClickListener { StoryDialog.edit(context, story, ::edited) }
+            send.setOnClickListener { SendCopyDialog.show(context, story) }
             delete.setOnClickListener { confirmDelete(story) }
         }
     }
@@ -425,6 +537,10 @@ class StoriesTab(
         const val TYPE_DESCRIPTION = 1
         const val TYPE_ROW = 2
         const val TYPE_NOTE = 3
+        const val TYPE_INBOX = 4
+
+        /** How often the inbox is read again while an accepted copy is arriving. */
+        const val COPYING_POLL_MS = 3000L
 
         /** The web's 36px `.stories-tab__rows` indent. */
         const val ROW_INDENT_DP = 36

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- One Story on the Stories tab, after the web's .stories-tab__folder: the triangle and the
-     name, which is the folder's own tap target (open it), then the pencil and the bin — always
+     name, which is the folder's own tap target (open it), then the pencil, send and the bin — always
      shown, as the web shows them at phone width. A hairline over it. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -53,6 +53,12 @@
         style="@style/Widget.HoldMyTrack.PanelChip"
         android:contentDescription="@string/story_edit"
         android:src="@drawable/ic_pencil" />
+
+    <ImageButton
+        android:id="@+id/story_send"
+        style="@style/Widget.HoldMyTrack.PanelChip"
+        android:contentDescription="@string/story_send"
+        android:src="@drawable/ic_send" />
 
     <ImageButton
         android:id="@+id/story_delete"

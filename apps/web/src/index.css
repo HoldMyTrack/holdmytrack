@@ -256,7 +256,7 @@ body {
   font-weight: var(--fm-weight-semibold);
 }
 
-/* A folder's pencil and trash show on hover (and for keyboard focus) at desktop width; the
+/* A folder's pencil, send and trash show on hover (and for keyboard focus) at desktop width; the
    phone query below keeps them visible, since a finger has no hover. */
 .stories-tab__action {
   opacity: 0;
@@ -265,6 +265,63 @@ body {
 .stories-tab__folder:hover .stories-tab__action,
 .stories-tab__folder:focus-within .stories-tab__action {
   opacity: 1;
+}
+
+/* A copy someone sent, waiting at the top of the tab to be accepted or declined (FR-14.7), and
+   one accepted and still arriving. */
+.stories-tab__inbox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fm-space-8);
+  padding: var(--fm-space-10) var(--fm-space-16);
+  border-bottom: 1px solid rgb(var(--fm-ink-rgb) / 8%);
+  background: rgb(var(--fm-accent-rgb) / 8%);
+}
+
+.stories-tab__inbox-text {
+  flex: 1 1 12rem;
+  margin: 0;
+  font-size: var(--fm-text-md);
+  overflow-wrap: anywhere;
+}
+
+.stories-tab__inbox-count {
+  color: var(--fm-ink-secondary);
+}
+
+.stories-tab__inbox-actions {
+  display: flex;
+  gap: var(--fm-space-6);
+}
+
+.stories-tab__inbox-actions button {
+  padding: var(--fm-space-6) var(--fm-space-12);
+  font-size: var(--fm-text-md);
+}
+
+.stories-tab__inbox--copying .stories-tab__inbox-text {
+  color: var(--fm-ink-secondary);
+}
+
+/* Who sent the copy a Story came from (FR-14.8). */
+.stories-tab__from {
+  margin: 0;
+  padding: 0 var(--fm-space-16) var(--fm-space-4) 36px;
+  font-size: var(--fm-text-sm);
+  color: var(--fm-ink-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* "Sent" in the Send a copy dialog: the same words whether or not the address has an account. */
+.settings-page__success {
+  margin: var(--fm-space-4) 0 0;
+  padding: var(--fm-space-8) var(--fm-space-10);
+  border-radius: var(--fm-radius-sm);
+  background: rgb(var(--fm-accent-rgb) / 10%);
+  color: var(--fm-ink);
+  font-size: var(--fm-text-md);
+  overflow-wrap: anywhere;
 }
 
 .stories-tab__body {

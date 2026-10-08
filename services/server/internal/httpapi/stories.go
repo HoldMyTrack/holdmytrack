@@ -63,6 +63,9 @@ type story struct {
 	Description *string   `json:"description"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+	// From names who sent the copy this Story came from (§4.23, ADR-0036), while the Story it
+	// was copied from still exists; null for a Story of the account's own.
+	From *string `json:"from"`
 	// Every member, oldest activity first — what the Edit window's Stories tab checks its
 	// boxes from without a request per Story.
 	ActivityIDs []string   `json:"activity_ids"`
@@ -408,7 +411,12 @@ func (s *Server) loadStory(ctx context.Context, q querier, userID, storyID strin
 }
 
 const listStoriesQuery = `
-SELECT id, name, description, created_at, updated_at
+SELECT id, name, description, created_at, updated_at,
+       (SELECT ` + senderNameSQL + ` FROM story_copies sc
+        JOIN stories src ON src.id = sc.source_story_id
+        JOIN users u ON u.id = src.user_id
+        WHERE sc.copy_story_id = stories.id
+        ORDER BY sc.source_story_id LIMIT 1)
 FROM stories
 WHERE user_id = $1 AND ($2::uuid IS NULL OR id = $2)
 ORDER BY created_at DESC, id DESC`
@@ -445,7 +453,7 @@ func (s *Server) loadStories(ctx context.Context, q querier, userID string, stor
 	}
 	stories, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (story, error) {
 		st := story{ActivityIDs: []string{}, Stats: storyStats{ByType: []storyTypeStats{}}}
-		err := row.Scan(&st.ID, &st.Name, &st.Description, &st.CreatedAt, &st.UpdatedAt)
+		err := row.Scan(&st.ID, &st.Name, &st.Description, &st.CreatedAt, &st.UpdatedAt, &st.From)
 		return st, err
 	})
 	if err != nil {

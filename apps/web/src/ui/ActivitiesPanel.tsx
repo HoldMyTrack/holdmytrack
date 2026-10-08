@@ -9,6 +9,7 @@ import { DateRangeSlider, type DateRangeSliderProps } from './DateRangeSlider';
 import { DistanceFilter } from './DistanceFilter';
 import { PrivateLocationsPanel } from './PrivateLocationsPanel';
 import { StoriesTab } from './StoriesTab';
+import type { StoryInboxState } from './useStoryInbox';
 import type { DistanceRange, TypeFacet } from './activityFacets';
 import { formatActivityType, formatTotalDistance } from './format';
 import { useUnitSystem } from './units';
@@ -158,6 +159,7 @@ export interface StoriesPanel {
   stories: Story[];
   ready: boolean;
   error: string | null;
+  inbox: StoryInboxState;
   openId: string | null;
   openStory: Story | null;
   openError: string | null;
@@ -469,6 +471,7 @@ export function ActivitiesPanel({
           stories={stories.stories}
           storiesReady={stories.ready}
           storiesError={stories.error}
+          inbox={stories.inbox}
           openId={stories.openId}
           openStory={stories.openStory}
           openError={stories.openError}

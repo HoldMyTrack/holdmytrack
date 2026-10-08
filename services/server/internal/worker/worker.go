@@ -20,6 +20,7 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/metrics"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storycopy"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/unpack"
 )
 
@@ -377,6 +378,12 @@ func runJob(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *
 			return fmt.Errorf("unmarshal reprivacy job: %w", err)
 		}
 		return ingest.ProcessReprivacy(ctx, pool, store, j.id, rj)
+	case "story_copy":
+		var sj storycopy.Job
+		if err := json.Unmarshal(j.payload, &sj); err != nil {
+			return fmt.Errorf("unmarshal story_copy job: %w", err)
+		}
+		return storycopy.Process(ctx, pool, store, sj)
 	case "export":
 		return runExport(ctx, pool, store, log, j.id, j.payload)
 	case "unpack":

@@ -49,6 +49,7 @@ import { useActivityDays } from '../ui/useActivityDays';
 import { useActivityList } from '../ui/useActivityList';
 import { usePhotos, type PhotoScope } from '../ui/usePhotos';
 import { useStories } from '../ui/useStories';
+import { useStoryInbox } from '../ui/useStoryInbox';
 import { useStory } from '../ui/useStory';
 import { currentTheme, useTheme } from '../ui/useTheme';
 import { t } from '../i18n';
@@ -61,6 +62,12 @@ const EDIT_PENDING_POLL_MS = 2000;
  *  unlike `?private-locations`, so a refresh or a shared link comes back to it. */
 function storyParam(): string | null {
   return new URLSearchParams(window.location.search).get('story') || null;
+}
+
+/** `/?tab=stories` opens on the Stories tab with no Story picked — where the email about a copy
+ *  of a Story someone sent links to, since its inbox is at the top of that tab (FR-14.7). */
+function storiesTabParam(): boolean {
+  return new URLSearchParams(window.location.search).get('tab') === 'stories';
 }
 
 /** The current URL with `?story=` set to id, or taken off for null — the hash (the camera)
@@ -266,7 +273,13 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // onto Privacy (FR-8.1) and `/?story=` onto Stories (FR-14.6), and so the tab outlives the
   // panel unmounting for Fog/Heatmap.
   const [panelTab, setPanelTab] = useState<PanelTab>(
-    initialActivity !== null ? 'activities' : storyParam() !== null ? 'stories' : initialPrivateLocationsOpen ? 'private' : 'activities',
+    initialActivity !== null
+      ? 'activities'
+      : storyParam() !== null || storiesTabParam()
+        ? 'stories'
+        : initialPrivateLocationsOpen
+          ? 'private'
+          : 'activities',
   );
 
   // The list/summary filter — the Activities tab's date slider (DateRangeSlider.tsx). The
@@ -957,6 +970,15 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     watchCoverage();
   }, [map, activityQuery, reloadActivities, reloadDays, storyState.reload, watchCoverage]);
 
+  // The Stories tab's inbox (FR-14.7). A copy that has arrived is a new Story and new activities,
+  // whose Fog and Heatmap the copy job has queued — refreshed as an import is.
+  const storiesReload = storiesList.reload;
+  const handleCopyArrived = useCallback(() => {
+    storiesReload();
+    handleUploaded();
+  }, [storiesReload, handleUploaded]);
+  const storyInbox = useStoryInbox(panelTab === 'stories', handleCopyArrived);
+
   // The header's Upload menu (static/upload.js, served with the page's header) says when an
   // import it's following has finished, or a file's upload has landed — the same refresh.
   useEffect(() => {
@@ -1150,6 +1172,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
       stories: storiesList.stories,
       ready: storiesList.ready,
       error: storiesList.error,
+      inbox: storyInbox,
       openId: storyId,
       openStory: storyState.story,
       openError: storyState.error,
@@ -1162,6 +1185,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
       storiesList.stories,
       storiesList.ready,
       storiesList.error,
+      storyInbox,
       storyId,
       storyState.story,
       storyState.error,

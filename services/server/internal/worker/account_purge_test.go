@@ -93,3 +93,55 @@ func TestPurgeLeavesALiveAccountAlone(t *testing.T) {
 		t.Fatal("a live account was purged")
 	}
 }
+
+func TestPurgeKeepsPhotoFilesAnotherAccountUses(t *testing.T) {
+	pool, userID := testPool(t)
+	_, otherID := testPool(t)
+	ctx := context.Background()
+	s3 := storagetest.New()
+	srv := httptest.NewServer(s3)
+	t.Cleanup(srv.Close)
+	store, err := storage.New(srv.URL, "test", "test", "test")
+	if err != nil {
+		t.Fatalf("store: %v", err)
+	}
+	activity := func(owner string) string {
+		var id string
+		if err := pool.QueryRow(ctx, `
+			INSERT INTO activities (user_id, source, activity_type, started_at, timezone) VALUES ($1, 'upload', 'run', NOW(), 'UTC') RETURNING id
+		`, owner).Scan(&id); err != nil {
+			t.Fatalf("create activity: %v", err)
+		}
+		return id
+	}
+	photo := func(owner, activityID, key string) {
+		if _, err := pool.Exec(ctx, `
+			INSERT INTO activity_photos (user_id, activity_id, route_at, content_type, thumb_content_type, width, height, bytes, image_key)
+			VALUES ($1, $2, NOW(), 'image/jpeg', 'image/jpeg', 1, 1, 1, $3)`, owner, activityID, key); err != nil {
+			t.Fatalf("photo: %v", err)
+		}
+		s3.Put(key, []byte("x"))
+		s3.Put(key+"-thumb", []byte("x"))
+	}
+	mine, theirs := activity(userID), activity(otherID)
+	sharedKey, ownKey := "photos/"+userID+"/shared", "photos/"+userID+"/own"
+	receivedKey, receivedAlone := "photos/"+otherID+"/sent", "photos/someone-gone/sent"
+	photo(userID, mine, sharedKey)
+	photo(otherID, theirs, sharedKey) // the other account's copy of it
+	photo(userID, mine, ownKey)
+	photo(otherID, theirs, receivedKey)
+	photo(userID, mine, receivedKey) // a copy the account received
+	photo(userID, mine, receivedAlone)
+
+	if _, err := pool.Exec(ctx, `UPDATE users SET deleted_at = NOW() WHERE id = $1`, userID); err != nil {
+		t.Fatalf("mark deleted: %v", err)
+	}
+	if err := purgeAccount(ctx, pool, store, slog.New(slog.DiscardHandler), userID); err != nil {
+		t.Fatalf("purge: %v", err)
+	}
+	for key, want := range map[string]bool{sharedKey: true, ownKey: false, receivedKey: true, receivedAlone: false} {
+		if s3.Has(key) != want || s3.Has(key+"-thumb") != want {
+			t.Errorf("%s stored %v, want %v", key, s3.Has(key), want)
+		}
+	}
+}

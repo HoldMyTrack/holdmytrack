@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Send a copy (panel/SendCopyDialog.kt), after the web's SendCopyDialog.tsx: what the person
+     gets, their email address, and then "Sent to …" — the same whether or not the address has
+     an account — or the server's reason when the request fails. The dialog's own buttons are
+     Cancel (Close once sent) and Send. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="@dimen/hmt_space_24"
+    android:paddingTop="@dimen/hmt_space_4"
+    android:paddingEnd="@dimen/hmt_space_24">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/hmt_space_8"
+        android:text="@string/story_send_body"
+        android:textColor="@color/hmt_ink_secondary"
+        android:textSize="@dimen/hmt_text_md" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/story_send_email">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/send_copy_email"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:autofillHints="emailAddress"
+            android:imeOptions="actionSend"
+            android:inputType="textEmailAddress" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <TextView
+        android:id="@+id/send_copy_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/hmt_space_10"
+        android:accessibilityLiveRegion="polite"
+        android:textSize="@dimen/hmt_text_md"
+        android:visibility="gone" />
+</LinearLayout>

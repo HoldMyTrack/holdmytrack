@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Accepted. ADR-0036 adds sending a copy of a Story to another account; the Story itself stays private.
 
 ## Context
 

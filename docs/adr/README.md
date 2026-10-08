@@ -44,6 +44,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0033](0033-android-bottom-navigation-single-activity.md) | Android's main screens are tabs of one Activity, each a Fragment, under a bottom navigation bar |
 | [0034](0034-country-region-outlines-from-overture.md) | Country and region outlines come from Overture Maps' divisions, land-clipped, loaded from our own copy at deploy time |
 | [0035](0035-activity-local-timezone.md) | An activity's times show, and its days group, in the timezone it was recorded in |
+| [0036](0036-send-a-copy-of-a-story.md) | A Story can be sent as a copy to another account, which accepts it into a Story and activities of its own; nothing syncs afterwards |
 
 ## Writing a new one
 

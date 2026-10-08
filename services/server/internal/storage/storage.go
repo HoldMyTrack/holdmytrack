@@ -106,11 +106,18 @@ func (s *Store) Open(ctx context.Context, key string) (io.ReadSeekCloser, error)
 // individual key written for that user. Best-effort: logged and swallowed by the caller,
 // not surfaced as a reason to skip deleting the DB rows those objects belong to.
 func (s *Store) RemoveByPrefix(ctx context.Context, prefix string) error {
+	return s.RemoveByPrefixExcept(ctx, prefix, nil)
+}
+
+// RemoveByPrefixExcept is RemoveByPrefix sparing every object whose key keep reports true for —
+// the account purge's photos, whose files a copied Story's rows in another account still use.
+// A nil keep spares nothing.
+func (s *Store) RemoveByPrefixExcept(ctx context.Context, prefix string, keep func(key string) bool) error {
 	objectsCh := make(chan minio.ObjectInfo)
 	go func() {
 		defer close(objectsCh)
 		for obj := range s.client.ListObjects(ctx, s.bucket, minio.ListObjectsOptions{Prefix: prefix, Recursive: true}) {
-			if obj.Err != nil {
+			if obj.Err != nil || (keep != nil && keep(obj.Key)) {
 				continue
 			}
 			objectsCh <- obj

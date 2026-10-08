@@ -12,6 +12,9 @@ export interface StoriesState {
   /** Drops a deleted Story from the list in hand, rather than refetching: a refetch leaves the
    *  old list, deleted Story included, ready until it lands. */
   remove: (id: string) => void;
+  /** Reads the list again, keeping the one in hand until it lands — a copy someone sent has
+   *  arrived (useStoryInbox). */
+  reload: () => void;
 }
 
 /** Reader for `GET /v1/stories`, the Stories tab's list (`SPEC.md` FR-14.6). Fetched each time
@@ -21,9 +24,12 @@ export function useStories(enabled: boolean): StoriesState {
   const [stories, setStories] = useState<Story[]>([]);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Bumped by reload: a read that keeps `ready`, unlike the tab opening.
+  const [reloads, setReloads] = useState(0);
+
+  useEffect(() => setReady(false), [enabled]);
 
   useEffect(() => {
-    setReady(false);
     if (!enabled) return;
     const controller = new AbortController();
     listStories(controller.signal)
@@ -37,12 +43,13 @@ export function useStories(enabled: boolean): StoriesState {
         setError(err instanceof Error ? err.message : String(err));
       });
     return () => controller.abort();
-  }, [enabled]);
+  }, [enabled, reloads]);
 
   const replace = useCallback(
     (story: Story) => setStories((current) => current.map((s) => (s.id === story.id ? story : s))),
     [],
   );
   const remove = useCallback((id: string) => setStories((current) => current.filter((s) => s.id !== id)), []);
-  return { stories, ready, error, replace, remove };
+  const reload = useCallback(() => setReloads((n) => n + 1), []);
+  return { stories, ready, error, replace, remove, reload };
 }
