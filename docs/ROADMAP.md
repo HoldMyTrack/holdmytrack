@@ -40,19 +40,6 @@ Splitting an activity is built on the web (`SPEC.md` FR-5.17), and so is merging
 - [ ] Decide where Merge lives — a toolbar action over checked neighboring parts, or a "Merge with the next part" in the Edit window — and build it on the web, from the list rows' `split` field.
 - [ ] Carry it to the Android app, next to its Split tool (`apps/android/docs/SPEC.md` FR-2.7 item 12).
 
-### Send a copy of a Story — decided, not built
-
-A Story's owner sends a copy of it to an email address; the recipient accepts it into a Story and activities of their own, and nothing syncs afterwards (ADR-0036, `VISION.md` §4.2). Builds on Stories (`IMPLEMENTATION.md` §4.23) and photos (§4.27). Write the matching `SPEC.md` FR-14 and FR-16 requirements and `IMPLEMENTATION.md` sections as each step lands, and check the tester page (`SPEC.md` FR-10.7) for anything the Android app now shows differently.
-
-- [ ] Schema: pending sends, where each sent Story's copy lives per recipient, an activity's origin, the origins each account has received, and a photo's image key.
-- [ ] Photo files shared by image key: every read and delete goes through the key, and a file is removed with the last row that refers to it — photo delete, activity delete, the account and demo purges.
-- [ ] Send, inbox, accept and decline endpoints: the same answer for an address with or without an account, nothing for a demo or unverified account, repeat sends waiting as one, rate-limited.
-- [ ] The copy job: the sender's displayed points written as GPX and ingested as the recipient's, name, description and photos carried over, later sends adding only new activities to the earlier copy, each original received once.
-- [ ] The notification email, in English and Russian.
-- [ ] Web: Send a copy on a Story, the inbox in the Stories tab, "From" and "Copying…" on a received Story.
-- [ ] Help and `/privacy` (`SPEC.md` FR-10.6): what accepting a copy stores in your account.
-- [ ] The Android part (`apps/android/docs/ROADMAP.md` Phase 8).
-
 ### Sign in with Facebook — built, not live
 
 Sign in with Facebook is built (`SPEC.md` FR-1.10) and the Meta app exists, but Meta won't publish an app until its business portfolio passes Business Verification (`docs/DEPLOY.md` §4). Until then `holdmytrack.com` runs with `FACEBOOK_APP_ID` empty, so it shows no Facebook button. This isn't a launch gate: Google and email sign-in cover everyone.

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted, not built (`ROADMAP.md` Phase 1, Send a copy of a Story). ADR-0020 stands: a Story stays private to its account, and what is sent is a copy, not a view of it.
+Accepted. Built on the server, the web and in the Android app (`SPEC.md` FR-14.7, FR-14.8; `IMPLEMENTATION.md` §3.25, §4.23). ADR-0020 stands: a Story stays private to its account, and what is sent is a copy, not a view of it.
 
 ## Context
 
