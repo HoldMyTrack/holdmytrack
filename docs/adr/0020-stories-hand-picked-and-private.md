@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Its private-only rule is superseded by ADR-0036 for Stories shared with family members; the rest stands.
+Accepted. ADR-0036 adds sending a copy of a Story to another account; the Story itself stays private.
 
 ## Context
 
