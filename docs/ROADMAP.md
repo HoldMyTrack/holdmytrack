@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-10-06.
+Last updated: 2026-10-07.
 
 ## How to read this document
 
@@ -39,6 +39,23 @@ Splitting an activity is built on the web (`SPEC.md` FR-5.17), and so is merging
 
 - [ ] Decide where Merge lives — a toolbar action over checked neighboring parts, or a "Merge with the next part" in the Edit window — and build it on the web, from the list rows' `split` field.
 - [ ] Carry it to the Android app, next to its Split tool (`apps/android/docs/SPEC.md` FR-2.7 item 12).
+
+### Family Stories — decided, not built
+
+A Story shared with family members who have accounts, its activities held by every member as their own, so no member can take another's away (ADR-0036, `VISION.md` §4.2). Builds on Stories (`IMPLEMENTATION.md` §4.23). Write the matching `SPEC.md` FR-14 and `IMPLEMENTATION.md` requirements as each step lands, and check the tester page (`SPEC.md` FR-10.7) for anything the Android app now shows differently.
+
+- [ ] Schema: a Story's members, its pending invites, and an activity's holders; the creator becomes the first member of every existing Story and the recorder the first holder of every existing activity.
+- [ ] Invite, accept, decline and leave endpoints. Any member invites by email, and the answer is the same whether the address has an account or not; a Story is deleted when its last member leaves.
+- [ ] One "activities this account holds" helper behind every user-facing read: the list, the summary, the histogram, Trends, the activity graph, the tracks tiles, the countries and regions, photos — the way they already skip superseded duplicates (`IMPLEMENTATION.md` §4.6).
+- [ ] Fog of War and Heatmap composites over held activities' masks, with joining, leaving, adding, forking and releasing marking tiles dirty and bumping `map_version` for every affected holder (`IMPLEMENTATION.md` §4.2, §4.2.6).
+- [ ] Release instead of delete: deleting a held activity, leaving a Story and the account purge (`IMPLEMENTATION.md` §4.28) drop only that account's hold, and the activity, its streams, photos and masks go when the last holder lets go. A departed recorder shows as "a former member".
+- [ ] Copy-on-write: every edit (Chop, Split, Crop, reprocess, type or name) to an activity with more than one holder gives the editor their own copy.
+- [ ] "Own recording wins": a held activity that duplicates one of the member's own recordings is hidden from that member's reads.
+- [ ] The 24-hour undo: the member who added an activity can take it back out of the Story within 24 hours.
+- [ ] Web: the Story panel's members and invites, pending invites for the signed-in account, a "recorded by" mark on held activities, the first-share consent confirmation and the Leave confirmation.
+- [ ] Admin panel: remove an account's activities from everyone else's holdings on a safety request (ADR-0013).
+- [ ] `/privacy` (`SPEC.md` FR-10.6): what stays with a Story's members after account deletion, and on what basis.
+- [ ] The Android part (`apps/android/docs/ROADMAP.md` Phase 8).
 
 ### Sign in with Facebook — built, not live
 
@@ -117,7 +134,7 @@ An engineering requirement, can land alongside any of the above (`IMPLEMENTATION
 
 Gates any public launch: a precise location history is sensitive personal data under GDPR (`VISION.md` §7).
 
-- [ ] DPIA before any public launch. As part of it, re-check that the cookies and browser storage `apps/web` and the server's pages set still match `/privacy`'s Cookies list (`SPEC.md` FR-10.6), all strictly necessary or a preference set at the user's request, so the site still needs no cookie banner; anything non-essential (analytics, an ad pixel, marketing tracking) would flip that.
+- [ ] DPIA before any public launch, covering family Stories' activities that stay with other members after an account is deleted (ADR-0036). As part of it, re-check that the cookies and browser storage `apps/web` and the server's pages set still match `/privacy`'s Cookies list (`SPEC.md` FR-10.6), all strictly necessary or a preference set at the user's request, so the site still needs no cookie banner; anything non-essential (analytics, an ad pixel, marketing tracking) would flip that.
 - [ ] EU-region hosting for EU users.
 - [x] A privacy policy page — `/privacy` (`SPEC.md` FR-10.6). It names the email delivery provider only generically; name it there once settled, and update the policy when EU-region hosting moves the data.
 - [x] Account deletion and data export — Settings' Delete account and Download your data, on the web and in the Android app (`SPEC.md` FR-1.11, FR-1.12). Named "Download your data" so it doesn't collide with the map's Export control (FR-4.10).
