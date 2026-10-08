@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react';
-import { Pencil, Play, Trash2 } from 'lucide-react';
+import { Pencil, Play, Send, Trash2 } from 'lucide-react';
 import { deleteStory, removeStoryActivities, type Activity, type Story, type StoryTotals } from '../api';
 import { ActivityRow, useScrollFocusedRow } from './ActivityRow';
 import { ConfirmDialog } from './ConfirmDialog';
+import { SendCopyDialog } from './SendCopyDialog';
 import { StoryDialog } from './StoryDialog';
+import type { StoryInboxState } from './useStoryInbox';
 import { formatActivityType, formatDuration, formatTotalDistance } from './format';
 import { useUnitSystem, type UnitSystem } from './units';
 import { t, tn } from '../i18n';
@@ -24,6 +26,8 @@ export interface StoriesTabProps {
   stories: Story[];
   storiesReady: boolean;
   storiesError: string | null;
+  /** Copies of Stories others sent the account, and the accepted ones still arriving — useStoryInbox. */
+  inbox: StoryInboxState;
   /** The open Story's id — MapView's storyId. At most one is open, and once the list has
    *  loaded, one always is (MapView opens the newest). */
   openId: string | null;
@@ -52,7 +56,8 @@ export interface StoriesTabProps {
 }
 
 /**
- * The Activities panel's Stories tab (`SPEC.md` FR-14.6): every Story as a folder, newest first,
+ * The Activities panel's Stories tab (`SPEC.md` FR-14.6): the copies others sent, to accept or
+ * decline (FR-14.7), then every Story as a folder, newest first,
  * exactly one of them open. Opening one is viewing it — MapView narrows the drawn tracks and the
  * list to it, whatever date range the Activities tab has, and this tab shows that list inside the folder and the whole
  * Story's statistics in the footer. A row previews on hover and focuses on click, like the
@@ -66,6 +71,7 @@ export function StoriesTab({
   stories,
   storiesReady,
   storiesError,
+  inbox,
   openId,
   openStory,
   openError,
@@ -85,6 +91,23 @@ export function StoriesTab({
   const system = useUnitSystem();
   const [editing, setEditing] = useState<Story | null>(null);
   const [deleting, setDeleting] = useState<Story | null>(null);
+  const [sending, setSending] = useState<Story | null>(null);
+  // The waiting copy being answered, and why the last answer failed.
+  const [answering, setAnswering] = useState<string | null>(null);
+  const [answerError, setAnswerError] = useState<string | null>(null);
+
+  async function answer(id: string, accept: boolean) {
+    if (answering !== null) return;
+    setAnswering(id);
+    setAnswerError(null);
+    try {
+      await inbox.answer(id, accept);
+    } catch (err) {
+      setAnswerError(err instanceof Error ? err.message : t('common.something_wrong'));
+    } finally {
+      setAnswering(null);
+    }
+  }
   // The row being taken out of the open Story, and why the last one couldn't be.
   const [removing, setRemoving] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
@@ -106,12 +129,45 @@ export function StoriesTab({
 
   const editTitle = readOnly ? t('stories.demo_edit') : t('stories.edit');
   const deleteTitle = readOnly ? t('stories.demo_delete') : t('stories.delete');
+  const sendTitle = readOnly ? t('stories.demo_send') : t('stories.send');
   const removeTitle = readOnly ? t('stories.demo_remove') : t('stories.remove');
   const openListed = openId !== null && stories.some((s) => s.id === openId);
 
   return (
     <>
       <ul className="stories-tab" data-testid="stories-list" ref={listRef}>
+        {inbox.sends.map((send) => (
+          <li key={send.id} className="stories-tab__inbox" data-testid="stories-inbox">
+            <p className="stories-tab__inbox-text">
+              {t('stories.inbox_sent', { from: send.from, name: send.storyName })}
+              <span className="stories-tab__inbox-count"> · {tn('activities.count', send.activityCount)}</span>
+            </p>
+            <div className="stories-tab__inbox-actions">
+              <button
+                type="button"
+                className="settings-page__submit"
+                disabled={answering !== null}
+                onClick={() => void answer(send.id, true)}
+              >
+                {t('stories.inbox_accept')}
+              </button>
+              <button
+                type="button"
+                className="settings-page__button"
+                disabled={answering !== null}
+                onClick={() => void answer(send.id, false)}
+              >
+                {t('stories.inbox_decline')}
+              </button>
+            </div>
+          </li>
+        ))}
+        {inbox.copying.map((copy, i) => (
+          <li key={i} className="stories-tab__inbox stories-tab__inbox--copying" data-testid="stories-copying">
+            <p className="stories-tab__inbox-text">{t('stories.inbox_copying', { from: copy.from, name: copy.storyName })}</p>
+          </li>
+        ))}
+        {answerError && <li className="activities-panel__note activities-panel__note--error">{answerError}</li>}
         {openError && !openListed && <li className="activities-panel__note activities-panel__note--error">{openError}</li>}
         {stories.map((listed) => {
           const open = listed.id === openId;
@@ -146,6 +202,16 @@ export function StoriesTab({
                 </button>
                 <button
                   type="button"
+                  className="activities-panel__edit stories-tab__action"
+                  disabled={readOnly}
+                  onClick={() => setSending(story)}
+                  aria-label={`${sendTitle}: ${story.name}`}
+                  title={sendTitle}
+                >
+                  <Send size={14} />
+                </button>
+                <button
+                  type="button"
                   className="activities-panel__delete stories-tab__action"
                   disabled={readOnly}
                   onClick={() => setDeleting(story)}
@@ -164,6 +230,7 @@ export function StoriesTab({
                     if (e.target === e.currentTarget) onClearFocus();
                   }}
                 >
+                  {story.from !== null && <p className="stories-tab__from">{t('stories.from', { from: story.from })}</p>}
                   {story.description !== '' && <p className="stories-tab__description">{story.description}</p>}
                   {removeError && <p className="activities-panel__note activities-panel__note--error">{removeError}</p>}
                   <ul className="stories-tab__rows">
@@ -235,6 +302,8 @@ export function StoriesTab({
       {editing && (
         <StoryDialog mode="edit" story={editing} onSaved={onEdited} onClose={() => setEditing(null)} />
       )}
+
+      {sending && <SendCopyDialog story={sending} onClose={() => setSending(null)} />}
 
       {deleting && (
         <ConfirmDialog

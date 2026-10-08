@@ -1309,7 +1309,11 @@ A Story is a hand-picked, private set of the account's activities — a hike, a 
 9. The URL carries the open Story, `/?story=<id>`: a refresh or a shared link opens the Stories tab with that Story open, and Back and Forward move between Stories and to and from the tab. A new Story from Add to story (FR-5.16) opens the same way.
 10. Normal mode only: Fog of War and Heatmap stay all-time (FR-4.2, FR-4.3), and returning to Normal shows the open Story again.
 11. With no Stories, the tab says how to make one: select or check activities on the Activities tab, then choose Add to story. The map stays as on the Activities tab.
-12. A demo session sees the Demo Customer's Stories the same way, with the pencil, the bin and the rows' × disabled.
+12. A demo session sees the Demo Customer's Stories the same way, with the pencil, the send button, the bin and the rows' × disabled.
+13. Copies of Stories others sent (FR-14.7) wait at the top of the tab, above the Stories, each as "<from> sent you a copy of “<story>” · <n> activities" with Accept and Decline. Accepting turns it into "Copying “<story>” from <from>…" until the copy has arrived (FR-14.8); then the new Story is in the list, and the account's activities, Fog of War and Heatmap are refreshed. The tab reads its inbox each time it opens, and every few seconds while a copy is arriving. An answer that fails shows the server's message there.
+14. Each folder row has a send button between the pencil and the bin, shown the same way. It opens Send a copy: the Story's name, a note that the person gets their own copy once they accept it, that later changes don't reach it and that sending again adds only what they don't have, and their email address. Send keeps the dialog open with "Sent to <address>. If that address has a HoldMyTrack account, they'll find the copy in their Stories tab." — the same whether or not it has one — and the field cleared for another address.
+15. An open Story that came from a copy says "From <from>" above its description.
+16. `/?tab=stories` opens the map on the Stories tab, as the copy email's link does.
 
 **Error cases**:
 - A `?story=` for a Story that doesn't exist or isn't the account's shows "This story doesn't exist, or isn't yours." at the top of the tab, with no Story open and no activities; clicking a Story opens it.
