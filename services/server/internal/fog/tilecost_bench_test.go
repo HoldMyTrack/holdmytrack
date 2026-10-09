@@ -12,8 +12,8 @@ import (
 func BenchmarkFogTile(b *testing.B) {
 	m := image.NewGray(image.Rect(0, 0, TileSize, TileSize))
 	for i := 0; i < TileSize; i++ {
-		for w := -6; w <= 6; w++ {
-			if y := i/2 + 100 + w; y >= 0 && y < TileSize {
+		for w := -1; w <= 1; w++ { // a stroke ~3 px wide, as strokeRadiusPx draws one
+			if y := i/2 + TileSize/5 + w; y >= 0 && y < TileSize {
 				m.Pix[y*m.Stride+i] = 255
 			}
 		}
@@ -33,8 +33,8 @@ func BenchmarkFogTile(b *testing.B) {
 func benchStroke() *image.Gray {
 	m := image.NewGray(image.Rect(0, 0, TileSize, TileSize))
 	for i := 0; i < TileSize; i++ {
-		for w := -6; w <= 6; w++ {
-			if y := i/2 + 100 + w; y >= 0 && y < TileSize {
+		for w := -1; w <= 1; w++ { // a stroke ~3 px wide, as strokeRadiusPx draws one
+			if y := i/2 + TileSize/5 + w; y >= 0 && y < TileSize {
 				m.Pix[y*m.Stride+i] = 255
 			}
 		}
