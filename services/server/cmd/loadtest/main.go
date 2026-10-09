@@ -15,7 +15,9 @@
 //	gen K N         write K archives of N tracks each to -dir, demo tracks moved apart and back in
 //	                time so every file is new; -long keeps the three tracks of 200+ z14 tiles
 //	import K        upload archive-1..K.zip, one per account, all at once
-//	browse VUS DUR  VUS map users panning and zooming for DUR; latency per tile layer every 30 s
+//	browse VUS DUR  VUS people at the map for DUR, each in Normal, Fog or Heatmap mode, panning
+//	                and zooming and requesting the tiles the web client would; each keeps a
+//	                browser-like tile cache unless -cold. Latency per tile layer every 30 s
 //	probe           upload one new track from the last account and time it until it's processed
 //	cleanup         delete every account in tokens.json
 //
@@ -352,19 +354,96 @@ func tileXY(lat, lon float64, z int) (int, int) {
 	return x, y
 }
 
-// layers returns what the web map requests at zoom z (an approximation of apps/web's tiers).
-func layers(z int) []string {
-	switch {
-	case z <= 5:
-		return []string{"country-fog:mvt", "tracks:mvt"}
-	case z <= 8:
-		return []string{"region-fog:mvt", "tracks:mvt"}
-	case z <= 11:
-		return []string{"fog:png", "tracks:mvt"}
+// The web client's tiers (apps/web/src/map/zoomTiers.ts and the layers' own zoom ranges): Fog
+// and Heatmap draw whole countries below z3 and whole regions below z7, their rasters from z7;
+// Normal draws tracks from z4. Every tile source stops at z14 and is stretched past it.
+const (
+	countryMaxZoom = 3
+	regionMaxZoom  = 7
+	tracksMinZoom  = 4
+	spotsMinZoom   = 13
+	sourceMaxZoom  = 14
+	viewW, viewH   = 1280, 800 // a laptop browser window, CSS pixels; the clients draw tiles 512 px
+)
+
+// layers returns the tile layers the web client requests at whole zoom z in mode, each as
+// "name:ext", and the zoom it requests them at.
+func layers(mode string, spots bool, z int) ([]string, int) {
+	tz := min(z, sourceMaxZoom)
+	var out []string
+	switch mode {
+	case "normal":
+		if z >= tracksMinZoom {
+			out = append(out, "tracks:mvt")
+		}
+	default: // fog, heatmap
+		switch {
+		case z < countryMaxZoom:
+			out = append(out, "country-"+mode+":mvt")
+		case z < regionMaxZoom:
+			out = append(out, "region-"+mode+":mvt")
+		default:
+			out = append(out, mode+":png")
+		}
+	}
+	if spots && z >= spotsMinZoom {
+		out = append(out, "spots:mvt")
+	}
+	return out, tz
+}
+
+// visitor is one simulated person at the map: one account, one mode at a time, and — unless
+// -cold — a tile cache like a browser's, which keeps every tile it has fetched for good (they
+// carry the account's tile version and are served immutable, IMPLEMENTATION.md §4.2.6).
+type visitor struct {
+	r     *mrand.Rand
+	tok   string
+	mode  string
+	spots bool
+	c     pt
+	z     int
+	cache map[string]bool
+}
+
+func pickMode(r *mrand.Rand) string {
+	switch n := r.Intn(100); {
+	case n < 50:
+		return "normal"
+	case n < 85:
+		return "fog"
 	default:
-		return []string{"fog:png", "tracks:mvt", "spots:mvt"}
+		return "heatmap"
 	}
 }
+
+// step moves the visitor the way people use the map: mostly panning about half a screen,
+// sometimes zooming in or out a level, now and then pulling right out to see a country and
+// coming back, and rarely switching mode.
+func (v *visitor) step() {
+	switch n := v.r.Intn(100); {
+	case n < 55:
+		// Half a screen in a random direction, in degrees at this zoom.
+		span := 360 / math.Exp2(float64(v.z)) * (float64(viewW) / 512)
+		v.c.lon += (v.r.Float64() - 0.5) * span
+		v.c.lat += (v.r.Float64() - 0.5) * span * float64(viewH) / float64(viewW) * math.Cos(v.c.lat*math.Pi/180)
+	case n < 80:
+		if v.r.Intn(2) == 0 {
+			v.z = max(v.z-1, 2)
+		} else {
+			v.z = min(v.z+1, 17)
+		}
+	case n < 92:
+		v.z = 2 + v.r.Intn(4) // out to a country or region
+	case n < 97:
+		v.z = 11 + v.r.Intn(4) // back into a city
+	default:
+		v.mode = pickMode(v.r)
+	}
+}
+
+// -cold drops the tile cache: every view fetches all its tiles again, the worst case the
+// 2026-10-08 and 2026-10-09 runs measured.
+var cold = flag.Bool("cold", false, "browse: no tile cache, every view fetches every tile")
 
 func browse(vus int, dur time.Duration) {
 	accts := loadAccts()
@@ -376,32 +455,23 @@ func browse(vus int, dur time.Duration) {
 	ctx, cancel := context.WithTimeout(context.Background(), dur)
 	defer cancel()
 	var wg sync.WaitGroup
-	var views atomic.Int64
-	for v := 0; v < vus; v++ {
+	var views, hits atomic.Int64
+	for i := 0; i < vus; i++ {
 		wg.Add(1)
-		go func(v int) {
+		go func(i int) {
 			defer wg.Done()
-			r := mrand.New(mrand.NewSource(int64(v) + time.Now().UnixNano()))
-			a := accts[v%len(accts)]
-			time.Sleep(time.Duration(r.Intn(2000)) * time.Millisecond)
+			r := mrand.New(mrand.NewSource(int64(i) + time.Now().UnixNano()))
+			// Opening the map frames the account's latest activity, at city zoom (SPEC.md FR-4.5).
+			v := &visitor{r: r, tok: accts[i%len(accts)].Token, mode: pickMode(r), spots: r.Intn(5) == 0,
+				c: cs[r.Intn(len(cs))], z: 12 + r.Intn(3), cache: map[string]bool{}}
+			time.Sleep(time.Duration(r.Intn(3000)) * time.Millisecond)
 			for ctx.Err() == nil {
-				c := cs[r.Intn(len(cs))]
-				// zoom in from z3 to z14, pan a few steps at z13, zoom back out
-				path := []int{3, 5, 7, 9, 11, 12, 13, 13, 13, 13, 14, 12, 10, 8}
-				for i, z := range path {
-					if ctx.Err() != nil {
-						return
-					}
-					if z == 13 && i > 6 {
-						c.lat += (r.Float64() - 0.5) * 0.04
-						c.lon += (r.Float64() - 0.5) * 0.06
-					}
-					view(ctx, st, a.Token, c, z)
-					views.Add(1)
-					time.Sleep(time.Duration(1000+r.Intn(1000)) * time.Millisecond)
-				}
+				hits.Add(int64(view(ctx, st, v)))
+				views.Add(1)
+				time.Sleep(time.Duration(1500+r.Intn(2500)) * time.Millisecond)
+				v.step()
 			}
-		}(v)
+		}(i)
 	}
 	tick := time.NewTicker(30 * time.Second)
 	done := make(chan struct{})
@@ -411,33 +481,58 @@ loop:
 	for {
 		select {
 		case <-tick.C:
-			fmt.Printf("--- %s  vus=%d views=%d\n", time.Since(t0).Round(time.Second), vus, views.Load())
+			fmt.Printf("--- %s  vus=%d views=%d cached tiles=%d\n", time.Since(t0).Round(time.Second), vus, views.Load(), hits.Load())
 			st.printInterval()
 		case <-done:
 			break loop
 		}
 	}
-	fmt.Printf("=== FINAL vus=%d dur=%s views=%d (%.1f views/s)\n", vus, dur, views.Load(), float64(views.Load())/time.Since(t0).Seconds())
+	secs := time.Since(t0).Seconds()
+	reqs := st.total()
+	fmt.Printf("=== FINAL vus=%d dur=%s cold=%v views=%d (%.1f views/s) requests=%d (%.1f/s, %.1f a view) cached tiles=%d\n",
+		vus, dur, *cold, views.Load(), float64(views.Load())/secs, reqs, float64(reqs)/secs, float64(reqs)/math.Max(1, float64(views.Load())), hits.Load())
 	st.print()
 }
 
-// view requests a 4x3 viewport of every layer at z, six at a time like a browser.
-func view(ctx context.Context, st *stats, tok string, c pt, z int) {
-	cx, cy := tileXY(c.lat, c.lon, z)
+// view requests the tiles the visitor's window shows at its zoom, in its mode, six at a time
+// like a browser, skipping those its cache already holds. It returns how many it skipped.
+func view(ctx context.Context, st *stats, v *visitor) int {
+	ls, tz := layers(v.mode, v.spots, v.z)
+	// The window in tiles of zoom tz: viewW/512 tiles across at zoom z, twice as many per zoom
+	// level the tiles are deeper than that.
+	scale := math.Exp2(float64(tz - v.z))
+	hw, hh := float64(viewW)/512/2*scale, float64(viewH)/512/2*scale
+	n := math.Exp2(float64(tz))
+	fx := (v.c.lon + 180) / 360 * n
+	lr := v.c.lat * math.Pi / 180
+	fy := (1 - math.Log(math.Tan(lr)+1/math.Cos(lr))/math.Pi) / 2 * n
 	sem := make(chan struct{}, 6)
 	var wg sync.WaitGroup
-	for _, l := range layers(z) {
+	skipped := 0
+	for _, l := range ls {
 		parts := strings.SplitN(l, ":", 2)
-		for dx := -2; dx <= 1; dx++ {
-			for dy := -1; dy <= 1; dy++ {
-				url := fmt.Sprintf("%s/tiles/v1/%s/%d/%d/%d.%s", *base, parts[0], z, cx+dx, cy+dy, parts[1])
+		for x := int(math.Floor(fx - hw)); x <= int(math.Floor(fx+hw)); x++ {
+			for y := int(math.Floor(fy - hh)); y <= int(math.Floor(fy+hh)); y++ {
+				if y < 0 || y >= int(n) {
+					continue
+				}
+				wx := ((x % int(n)) + int(n)) % int(n)
+				key := fmt.Sprintf("%s/%d/%d/%d", parts[0], tz, wx, y)
+				if !*cold {
+					if v.cache[key] {
+						skipped++
+						continue
+					}
+					v.cache[key] = true
+				}
+				url := fmt.Sprintf("%s/tiles/v1/%s.%s", *base, key, parts[1])
 				wg.Add(1)
 				sem <- struct{}{}
 				go func(name, url string) {
 					defer wg.Done()
 					defer func() { <-sem }()
 					req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-					req.Header.Set("Authorization", "Bearer "+tok)
+					req.Header.Set("Authorization", "Bearer "+v.tok)
 					t := time.Now()
 					resp, err := client.Do(req)
 					if err == nil {
@@ -457,6 +552,7 @@ func view(ctx context.Context, st *stats, tok string, c pt, z int) {
 		}
 	}
 	wg.Wait()
+	return skipped
 }
 
 // ---- stats
@@ -522,6 +618,19 @@ func (s *stats) printInterval() {
 	dump(s.ilat, s.icodes)
 	s.ilat = map[string][]time.Duration{}
 	s.icodes = map[string]map[int]int{}
+}
+
+// total is every request made, failed ones included.
+func (s *stats) total() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := 0
+	for _, codes := range s.codes {
+		for _, c := range codes {
+			n += c
+		}
+	}
+	return n
 }
 
 func (s *stats) print() {
