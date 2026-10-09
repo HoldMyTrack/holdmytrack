@@ -35,6 +35,7 @@ holdmytrack/
 ├── scripts/maintenance.sh       # flips the deployment's maintenance page (docs/DEPLOY.md §7)
 ├── scripts/restore-drill.sh     # restores the newest backup into a throwaway container and checks it (docs/DEPLOY.md §11)
 ├── scripts/spots-extract.sh     # downloads OSM data and filters it into the Spots places file, off the server (docs/DEPLOY.md §6)
+├── scripts/loadtest-sampler.sh  # samples a deployment's CPU, memory and job queue during a load test (docs/PERFORMANCE.md)
 ├── .env.example                 # Compose interpolation only — never VITE_*
 ├── .env.prod.example            # compose.prod.yml's own env template
 ├── .editorconfig
@@ -48,7 +49,9 @@ holdmytrack/
 │   ├── BRAINSTORM.md            # ideas raised but not yet decided
 │   ├── adr/                     # Architecture Decision Records — why, not just what
 │   ├── DEVELOPMENT.md           # running it locally, verification, gotchas, commands
-│   └── DEPLOY.md                # the production deployment runbook
+│   ├── DEPLOY.md                # the production deployment runbook
+│   ├── PERFORMANCE.md           # measured performance, one entry per load test or benchmark session
+│   └── performance/             # images those entries show
 ├── AGENTS.md                    # orientation for coding agents
 ├── brand/                       # logo.svg, the mark's master; make_icons.py renders every logo and icon from it, the README's included
 ├── apps/
@@ -67,6 +70,8 @@ holdmytrack/
         ├── README.md            # the serve/work/migrate contract and the open decisions
         ├── Dockerfile
         ├── cmd/holdmytrack/     # main.go: serve / work / migrate
+        ├── cmd/loadtest/        # the load-test driver docs/PERFORMANCE.md's sessions run
+        ├── cmd/delayproxy/      # adds object-storage latency to the dev stack, for render measurements
         ├── internal/            # config, db, fog, geo, httpapi, i18n, ingest, mail, mapstyle, parse, spots, storage, takeout, tilemath, web, worker
         └── migrations/          # embedded *.sql, applied in order by `cmd/holdmytrack migrate`
 ```
@@ -87,6 +92,7 @@ This tree is the canonical one; do not let a second tree exist anywhere else to 
 | [`docs/adr/`](docs/adr/) | Architecture Decision Records — why each consequential, hard-to-reverse decision was made, and what was rejected. |
 | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Running it locally, the verification checklist, gotchas worth not rediscovering, and the command reference. |
 | [`docs/DEPLOY.md`](docs/DEPLOY.md) | You're standing up an actual deployment. |
+| [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | Measured performance: each load test or benchmark session, how it ran and what it found. |
 | [`AGENTS.md`](AGENTS.md) | You are a coding agent opening the repo cold — this same routing table, self-contained, plus the documentation and Markdown conventions these docs follow. |
 
 ## License

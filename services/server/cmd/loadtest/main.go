@@ -1,0 +1,539 @@
+// cmd/loadtest drives the load-test sessions docs/PERFORMANCE.md logs: it creates test accounts,
+// uploads activities, browses the map the way the web client does and reports latency, and
+// deletes the accounts again. Run it from services/server against a deployment you may load:
+//
+//	go run ./cmd/loadtest -base https://example.com -dir /tmp/lt signup 21
+//	go run ./cmd/loadtest -base https://example.com -dir /tmp/lt seed
+//	go run ./cmd/loadtest -base https://example.com -dir /tmp/lt browse 25 3m
+//	go run ./cmd/loadtest -base https://example.com -dir /tmp/lt cleanup
+//
+// Subcommands:
+//
+//	signup N        create N accounts (the deployment must skip email verification meanwhile,
+//	                docs/PERFORMANCE.md "Test accounts"); their sessions go to -dir/tokens.json
+//	seed            upload every demo track (internal/httpapi/demo_data) to every account
+//	gen K N         write K archives of N tracks each to -dir, demo tracks moved apart and back in
+//	                time so every file is new; -long keeps the three tracks of 200+ z14 tiles
+//	import K        upload archive-1..K.zip, one per account, all at once
+//	browse VUS DUR  VUS map users panning and zooming for DUR; latency per tile layer every 30 s
+//	probe           upload one new track from the last account and time it until it's processed
+//	cleanup         delete every account in tokens.json
+//
+// Nothing it writes goes in the repo: tokens and archives live in -dir.
+package main
+
+import (
+	"archive/zip"
+	"bytes"
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"io"
+	"math"
+	mrand "math/rand"
+	"mime/multipart"
+	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+)
+
+var (
+	base     = flag.String("base", "", "the deployment's origin, e.g. https://example.com (required)")
+	dir      = flag.String("dir", "", "working directory for tokens.json and archives (required)")
+	demoDir  = flag.String("demo", "internal/httpapi/demo_data", "the demo tracks, relative to services/server")
+	emailFmt = flag.String("email", "loadtest+%02d@holdmytrack.com", "test account address, numbered from 1")
+	long     = flag.Bool("long", false, "gen: keep the long demo tracks (200+ z14 tiles each)")
+	client   = &http.Client{Timeout: 60 * time.Second, Transport: &http.Transport{MaxIdleConnsPerHost: 512}}
+	upload   = &http.Client{Timeout: 30 * time.Minute}
+)
+
+type acct struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	Token    string `json:"token"`
+}
+
+func inDir(name string) string { return filepath.Join(*dir, name) }
+
+func loadAccts() []acct {
+	b, err := os.ReadFile(inDir("tokens.json"))
+	must(err)
+	var a []acct
+	must(json.Unmarshal(b, &a))
+	return a
+}
+
+func must(err error) {
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "fatal:", err)
+		os.Exit(1)
+	}
+}
+
+func main() {
+	flag.Parse()
+	args := flag.Args()
+	if len(args) < 1 || *dir == "" || (*base == "" && args[0] != "gen") {
+		fmt.Fprintln(os.Stderr, "usage: loadtest -base URL -dir DIR signup N | seed | gen K N | import K | browse VUS DUR | probe | cleanup")
+		os.Exit(2)
+	}
+	must(os.MkdirAll(*dir, 0o700))
+	os.Args = append([]string{os.Args[0]}, args...)
+	switch os.Args[1] {
+	case "signup":
+		n, _ := strconv.Atoi(os.Args[2])
+		signup(n)
+	case "seed":
+		seed()
+	case "gen":
+		k, _ := strconv.Atoi(os.Args[2])
+		n, _ := strconv.Atoi(os.Args[3])
+		gen(k, n)
+	case "browse":
+		v, _ := strconv.Atoi(os.Args[2])
+		d, _ := time.ParseDuration(os.Args[3])
+		browse(v, d)
+	case "import":
+		k, _ := strconv.Atoi(os.Args[2])
+		importArchives(k)
+	case "probe":
+		probe()
+	case "cleanup":
+		cleanup()
+	}
+}
+
+// ---- accounts
+
+func signup(n int) {
+	var out []acct
+	secret := make([]byte, 12)
+	_, err := rand.Read(secret)
+	must(err)
+	password := "lt-" + hex.EncodeToString(secret) // one per run, kept in tokens.json
+	for i := 1; i <= n; i++ {
+		email := fmt.Sprintf(*emailFmt, i)
+		body, _ := json.Marshal(map[string]string{"email": email, "password": password, "timezone": "UTC"})
+		resp, err := client.Post(*base+"/v1/auth/signup", "application/json", bytes.NewReader(body))
+		must(err)
+		rb, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		var r struct {
+			SessionToken  string `json:"session_token"`
+			EmailVerified bool   `json:"email_verified"`
+		}
+		json.Unmarshal(rb, &r)
+		fmt.Printf("%s %d verified=%v %s\n", email, resp.StatusCode, r.EmailVerified, trunc(string(rb), 200))
+		if r.SessionToken != "" {
+			out = append(out, acct{email, password, r.SessionToken})
+		}
+	}
+	b, _ := json.MarshalIndent(out, "", " ")
+	must(os.WriteFile(inDir("tokens.json"), b, 0o600))
+}
+
+func cleanup() {
+	for _, a := range loadAccts() {
+		body, _ := json.Marshal(map[string]string{"email": a.Email})
+		req, _ := http.NewRequest("DELETE", *base+"/v1/account", bytes.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+a.Token)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Println(a.Email, err)
+			continue
+		}
+		rb, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		fmt.Println(a.Email, resp.StatusCode, trunc(string(rb), 200))
+	}
+}
+
+// ---- uploads
+
+func uploadFile(c *http.Client, tok, name string, data []byte) (int, []byte, time.Duration, error) {
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	fw, _ := mw.CreateFormFile("file", name)
+	fw.Write(data)
+	mw.Close()
+	req, _ := http.NewRequest("POST", *base+"/v1/activities/upload", &buf)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	t := time.Now()
+	resp, err := c.Do(req)
+	if err != nil {
+		return 0, nil, time.Since(t), err
+	}
+	defer resp.Body.Close()
+	rb, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, rb, time.Since(t), nil
+}
+
+func demoFiles() []string {
+	f, _ := filepath.Glob(filepath.Join(*demoDir, "*.gpx"))
+	sort.Strings(f)
+	return f
+}
+
+func seed() {
+	accts := loadAccts()
+	files := demoFiles()
+	st := newStats()
+	var wg sync.WaitGroup
+	t0 := time.Now()
+	for _, a := range accts {
+		wg.Add(1)
+		go func(a acct) {
+			defer wg.Done()
+			for _, f := range files {
+				data, _ := os.ReadFile(f)
+				code, rb, d, err := uploadFile(upload, a.Token, filepath.Base(f), data)
+				st.add("upload", code, d, err)
+				if code != 202 && code != 200 {
+					fmt.Println(a.Email, filepath.Base(f), code, err, trunc(string(rb), 200))
+				}
+			}
+		}(a)
+	}
+	wg.Wait()
+	fmt.Printf("seed uploads done in %s\n", time.Since(t0).Round(time.Second))
+	st.print()
+}
+
+var latRe = regexp.MustCompile(`lat="(-?[0-9.]+)"`)
+var lonRe = regexp.MustCompile(`lon="(-?[0-9.]+)"`)
+var timeRe = regexp.MustCompile(`<time>([^<]+)</time>`)
+
+// shift moves a GPX by (dlat, dlon) degrees and by days, so every copy has a distinct hash,
+// a distinct place on the fog map and a distinct date.
+func shift(gpx []byte, dlat, dlon float64, days int) []byte {
+	sh := func(re *regexp.Regexp, key string, d float64) func([]byte) []byte {
+		return func(m []byte) []byte {
+			v, _ := strconv.ParseFloat(string(re.FindSubmatch(m)[1]), 64)
+			return []byte(fmt.Sprintf(`%s="%.6f"`, key, v+d))
+		}
+	}
+	gpx = latRe.ReplaceAllFunc(gpx, sh(latRe, "lat", dlat))
+	gpx = lonRe.ReplaceAllFunc(gpx, sh(lonRe, "lon", dlon))
+	gpx = timeRe.ReplaceAllFunc(gpx, func(m []byte) []byte {
+		t, err := time.Parse(time.RFC3339, string(timeRe.FindSubmatch(m)[1]))
+		if err != nil {
+			return m
+		}
+		return []byte("<time>" + t.AddDate(0, 0, -days).Format(time.RFC3339) + "</time>")
+	})
+	return gpx
+}
+
+func gen(k, n int) {
+	var files []string
+	for _, f := range demoFiles() {
+		// The three demo tracks of 200+ z14 tiles each (the 1,478 km "2026-01-22 Vietnam" drive and
+		// two Niagara trips) are left out by default: an import made of copies of them measures
+		// those tracks, not an import.
+		if *long || !strings.Contains(f, "01-22 Vietnam") && !strings.Contains(f, "07-13 Niagara") && !strings.Contains(f, "07-17 Niagara") {
+			files = append(files, f)
+		}
+	}
+	src := make([][]byte, len(files))
+	for i, f := range files {
+		src[i], _ = os.ReadFile(f)
+	}
+	for a := 1; a <= k; a++ {
+		f, err := os.Create(inDir(fmt.Sprintf("archive-%d.zip", a)))
+		must(err)
+		zw := zip.NewWriter(f)
+		for i := 0; i < n; i++ {
+			// a spiral of offsets, ~0.05° (5 km) apart, so copies spread outward around each origin
+			ang := float64(i) * 2.399963
+			r := 0.05 * math.Sqrt(float64(i+1)) * float64(a)
+			g := shift(src[i%len(src)], r*math.Sin(ang), r*math.Cos(ang), i+a*1000)
+			w, _ := zw.Create(fmt.Sprintf("a%d/track-%04d.gpx", a, i))
+			w.Write(g)
+		}
+		zw.Close()
+		fi, _ := f.Stat()
+		f.Close()
+		fmt.Printf("archive-%d.zip %d files %.1f MB\n", a, n, float64(fi.Size())/1e6)
+	}
+}
+
+func importArchives(k int) {
+	accts := loadAccts()
+	var wg sync.WaitGroup
+	for a := 1; a <= k; a++ {
+		wg.Add(1)
+		go func(a int, ac acct) {
+			defer wg.Done()
+			data, err := os.ReadFile(inDir(fmt.Sprintf("archive-%d.zip", a)))
+			must(err)
+			code, rb, d, err := uploadFile(upload, ac.Token, fmt.Sprintf("archive-%d.zip", a), data)
+			fmt.Printf("%s archive-%d: %d in %s err=%v %s\n", time.Now().Format("15:04:05"), a, code, d.Round(time.Millisecond), err, trunc(string(rb), 300))
+		}(a, accts[a-1])
+	}
+	wg.Wait()
+}
+
+func probe() {
+	accts := loadAccts()
+	a := accts[len(accts)-1]
+	files := demoFiles()
+	g := shift(mustRead(files[mrand.Intn(len(files))]), mrand.Float64()*0.2, mrand.Float64()*0.2, mrand.Intn(3000)+5000)
+	code, rb, d, err := uploadFile(client, a.Token, "probe.gpx", g)
+	fmt.Printf("probe upload %d in %s err=%v %s\n", code, d.Round(time.Millisecond), err, trunc(string(rb), 200))
+	var r struct {
+		ExternalID string `json:"external_id"`
+	}
+	json.Unmarshal(rb, &r)
+	if r.ExternalID == "" {
+		return
+	}
+	t0 := time.Now()
+	for {
+		req, _ := http.NewRequest("GET", *base+"/v1/activities/status/"+r.ExternalID, nil)
+		req.Header.Set("Authorization", "Bearer "+a.Token)
+		resp, err := client.Do(req)
+		if err == nil {
+			sb, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			var s struct{ Status string }
+			json.Unmarshal(sb, &s)
+			if s.Status == "done" || s.Status == "failed" {
+				fmt.Printf("probe %s after %s\n", s.Status, time.Since(t0).Round(time.Second))
+				return
+			}
+		}
+		time.Sleep(5 * time.Second)
+	}
+}
+
+func mustRead(f string) []byte {
+	b, err := os.ReadFile(f)
+	must(err)
+	return b
+}
+
+// ---- browse
+
+type pt struct{ lat, lon float64 }
+
+func centres() []pt {
+	var out []pt
+	for _, f := range demoFiles() {
+		b := mustRead(f)
+		la := latRe.FindSubmatch(b)
+		lo := lonRe.FindSubmatch(b)
+		if la == nil || lo == nil {
+			continue
+		}
+		x, _ := strconv.ParseFloat(string(la[1]), 64)
+		y, _ := strconv.ParseFloat(string(lo[1]), 64)
+		out = append(out, pt{x, y})
+	}
+	return out
+}
+
+func tileXY(lat, lon float64, z int) (int, int) {
+	n := math.Exp2(float64(z))
+	x := int((lon + 180) / 360 * n)
+	lr := lat * math.Pi / 180
+	y := int((1 - math.Log(math.Tan(lr)+1/math.Cos(lr))/math.Pi) / 2 * n)
+	return x, y
+}
+
+// layers returns what the web map requests at zoom z (an approximation of apps/web's tiers).
+func layers(z int) []string {
+	switch {
+	case z <= 5:
+		return []string{"country-fog:mvt", "tracks:mvt"}
+	case z <= 8:
+		return []string{"region-fog:mvt", "tracks:mvt"}
+	case z <= 11:
+		return []string{"fog:png", "tracks:mvt"}
+	default:
+		return []string{"fog:png", "tracks:mvt", "spots:mvt"}
+	}
+}
+
+func browse(vus int, dur time.Duration) {
+	accts := loadAccts()
+	if len(accts) > 20 {
+		accts = accts[:20] // the last account is the probe's
+	}
+	cs := centres()
+	st := newStats()
+	ctx, cancel := context.WithTimeout(context.Background(), dur)
+	defer cancel()
+	var wg sync.WaitGroup
+	var views atomic.Int64
+	for v := 0; v < vus; v++ {
+		wg.Add(1)
+		go func(v int) {
+			defer wg.Done()
+			r := mrand.New(mrand.NewSource(int64(v) + time.Now().UnixNano()))
+			a := accts[v%len(accts)]
+			time.Sleep(time.Duration(r.Intn(2000)) * time.Millisecond)
+			for ctx.Err() == nil {
+				c := cs[r.Intn(len(cs))]
+				// zoom in from z3 to z14, pan a few steps at z13, zoom back out
+				path := []int{3, 5, 7, 9, 11, 12, 13, 13, 13, 13, 14, 12, 10, 8}
+				for i, z := range path {
+					if ctx.Err() != nil {
+						return
+					}
+					if z == 13 && i > 6 {
+						c.lat += (r.Float64() - 0.5) * 0.04
+						c.lon += (r.Float64() - 0.5) * 0.06
+					}
+					view(ctx, st, a.Token, c, z)
+					views.Add(1)
+					time.Sleep(time.Duration(1000+r.Intn(1000)) * time.Millisecond)
+				}
+			}
+		}(v)
+	}
+	tick := time.NewTicker(30 * time.Second)
+	done := make(chan struct{})
+	go func() { wg.Wait(); close(done) }()
+	t0 := time.Now()
+loop:
+	for {
+		select {
+		case <-tick.C:
+			fmt.Printf("--- %s  vus=%d views=%d\n", time.Since(t0).Round(time.Second), vus, views.Load())
+			st.printInterval()
+		case <-done:
+			break loop
+		}
+	}
+	fmt.Printf("=== FINAL vus=%d dur=%s views=%d (%.1f views/s)\n", vus, dur, views.Load(), float64(views.Load())/time.Since(t0).Seconds())
+	st.print()
+}
+
+// view requests a 4x3 viewport of every layer at z, six at a time like a browser.
+func view(ctx context.Context, st *stats, tok string, c pt, z int) {
+	cx, cy := tileXY(c.lat, c.lon, z)
+	sem := make(chan struct{}, 6)
+	var wg sync.WaitGroup
+	for _, l := range layers(z) {
+		parts := strings.SplitN(l, ":", 2)
+		for dx := -2; dx <= 1; dx++ {
+			for dy := -1; dy <= 1; dy++ {
+				url := fmt.Sprintf("%s/tiles/v1/%s/%d/%d/%d.%s", *base, parts[0], z, cx+dx, cy+dy, parts[1])
+				wg.Add(1)
+				sem <- struct{}{}
+				go func(name, url string) {
+					defer wg.Done()
+					defer func() { <-sem }()
+					req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+					req.Header.Set("Authorization", "Bearer "+tok)
+					t := time.Now()
+					resp, err := client.Do(req)
+					if err == nil {
+						io.Copy(io.Discard, resp.Body)
+						resp.Body.Close()
+					}
+					if ctx.Err() != nil {
+						return
+					}
+					code := 0
+					if resp != nil {
+						code = resp.StatusCode
+					}
+					st.add(name, code, time.Since(t), err)
+				}(parts[0], url)
+			}
+		}
+	}
+	wg.Wait()
+}
+
+// ---- stats
+
+type stats struct {
+	mu     sync.Mutex
+	lat    map[string][]time.Duration
+	codes  map[string]map[int]int
+	errs   map[string]int
+	ilat   map[string][]time.Duration
+	icodes map[string]map[int]int
+}
+
+func newStats() *stats {
+	return &stats{lat: map[string][]time.Duration{}, codes: map[string]map[int]int{}, errs: map[string]int{}, ilat: map[string][]time.Duration{}, icodes: map[string]map[int]int{}}
+}
+
+func (s *stats) add(name string, code int, d time.Duration, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.codes[name] == nil {
+		s.codes[name] = map[int]int{}
+	}
+	if s.icodes[name] == nil {
+		s.icodes[name] = map[int]int{}
+	}
+	if err != nil {
+		s.errs[name]++
+		s.codes[name][0]++
+		s.icodes[name][0]++
+		return
+	}
+	s.lat[name] = append(s.lat[name], d)
+	s.ilat[name] = append(s.ilat[name], d)
+	s.codes[name][code]++
+	s.icodes[name][code]++
+}
+
+func pct(d []time.Duration, p float64) time.Duration {
+	if len(d) == 0 {
+		return 0
+	}
+	sort.Slice(d, func(i, j int) bool { return d[i] < d[j] })
+	return d[int(math.Min(float64(len(d)-1), p*float64(len(d))))]
+}
+
+func dump(lat map[string][]time.Duration, codes map[string]map[int]int) {
+	names := make([]string, 0, len(codes))
+	for n := range codes {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		d := lat[n]
+		fmt.Printf("  %-14s n=%-6d p50=%-8s p95=%-8s p99=%-8s max=%-8s codes=%v\n", n, len(d),
+			pct(d, .5).Round(time.Millisecond), pct(d, .95).Round(time.Millisecond), pct(d, .99).Round(time.Millisecond), pct(d, 1).Round(time.Millisecond), codes[n])
+	}
+}
+
+func (s *stats) printInterval() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	dump(s.ilat, s.icodes)
+	s.ilat = map[string][]time.Duration{}
+	s.icodes = map[string]map[int]int{}
+}
+
+func (s *stats) print() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	dump(s.lat, s.codes)
+}
+
+func trunc(s string, n int) string {
+	s = strings.ReplaceAll(s, "\n", " ")
+	if len(s) > n {
+		return s[:n] + "…"
+	}
+	return s
+}

@@ -20,6 +20,7 @@ HoldMyTrack is a free, community-funded platform that brings together the outdoo
 | `docs/adr/` | You need *why* one specific consequential decision was made the way it was — the alternatives considered and rejected, not just today's state. `ARCHITECTURE.md` says what's true now; an ADR is frozen at the decision it documents. |
 | `docs/DEVELOPMENT.md` | You need to run the stack, verify a change, or you're about to rediscover a gotcha someone already hit. |
 | `docs/DEPLOY.md` | You're standing up an actual deployment, not just reading about the deployment scaffolding's design (`IMPLEMENTATION.md` §5.8 covers that). |
+| `docs/PERFORMANCE.md` | You need what HoldMyTrack's performance has been measured to be — each load test or benchmark session's date, target, method and results — or you're about to run one. A session you run gets its entry there; how the measured piece works stays in `IMPLEMENTATION.md`. |
 
 For repository layout, the root `README.md` is now the authority — it absorbed a former third planning document once that document's structure had actually been applied and its checklist finished. `services/server/README.md` covers the backend scaffold's open decisions specifically.
 
