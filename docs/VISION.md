@@ -2,11 +2,11 @@
 
 ## 1. Executive Summary
 
-HoldMyTrack is a **free, community-funded platform for tracking outdoor activities and seeing the accumulated shape of where you have been** — how much ground you've covered, how well you've explored the places you live and travel through, and where you go most. It aggregates the activity history you already have — from watches, from cloud services, from files — and turns it into maps and exploration stats worth looking at.
+HoldMyTrack is a **free, community-funded platform for tracking outdoor activities and seeing the accumulated shape of where you have been** — how much ground you've covered, how well you've explored the places you live and travel through, and where you go most. It keeps the journeys you choose — from a watch, the phone, a cloud service or a file — and turns them into maps and exploration stats worth looking at.
 
-**What it is for.** A watch or tracking app shows one activity at a time, and years of history end up split across whichever devices and apps someone has used. HoldMyTrack puts all of it on one map, so "where have I been?" is answered by a picture rather than a list — and the same picture shows, just as clearly, the streets, parks and trails nearby that are still unexplored. A trip that spans several activities — a multi-day hike, a holiday — can be kept as one Story with its own map and totals (§4.2), instead of dissolving into the rest of the history. It doesn't tell anyone where to go (Spots, §1.1, is the one place it suggests somewhere); it shows what's left and leaves the choice to them.
+**What it is for.** A watch or tracking app shows one activity at a time, and years of history end up split across whichever devices and apps someone has used. HoldMyTrack puts the journeys worth keeping on one map — the user picks them from each source, and the commute and the grocery run stay out unless they tick them (ADR-0039) — so "where have I been?" is answered by a picture rather than a list — and the same picture shows, just as clearly, the streets, parks and trails nearby that are still unexplored. Stories are the main feature: a trip that spans several activities — a multi-day hike, a holiday — is kept as one Story with its own map and totals (§4.2), instead of dissolving into the rest of the history. It doesn't tell anyone where to go (Spots, §1.1, is the one place it suggests somewhere); it shows what's left and leaves the choice to them.
 
-It targets people who already track workouts or travel and want a better way to *see* the result: all their history on one map, and each trip kept as a Story with its photos, without adopting another real-time GPS tracker.
+It targets people who already track workouts or travel and want a better way to *see* the result: the journeys they chose to keep on one map, and each trip kept as a Story with its photos, without adopting another real-time GPS tracker.
 
 HoldMyTrack's wedge is:
 
@@ -23,7 +23,7 @@ Worth stating early, because a map of your activities is easy to mistake for a b
 * **HoldMyTrack has no social network yet.** No feed, no follows, no kudos, no segments, no leaderboards. A social graph is the third milestone (§5), built only if the second milestone's numbers say it can be paid for — and not building it is an acceptable outcome. See §5.8 for why that ordering is not just caution. Sending a copy of a Story to someone who was on the trip (§4.2) is not a step towards it: the copy becomes theirs, and nothing is shown to anyone.
 * **HoldMyTrack is not a health or fitness advisor, and keeps no health data.** We don't keep your health profile — only the geographical data you trust us with, and the photos you choose to add to it. No HR zones, no training load, no recovery or readiness scores, no sleep tracking — and no heart rate at all: it is never read from a file or from Health Connect, never stored and never shown. An activity is where you went, when, and at what elevation; pace is derived from that and shown only as the color of a selected route. An outdoor GPS tracker is what this is, not a health platform wearing a map as a skin (ADR-0017).
 
-What is left is an aggregator and a map for exploring where you've been — not an analytics platform and not a coach. That is a deliberately small product, and a more defensible one for it: it is built around seeing where you've been, not around recording, analysis or a network.
+What is left is a place to keep the journeys you chose and a map for exploring where they went — not an analytics platform and not a coach. That is a deliberately small product, and a more defensible one for it: it is built around seeing where you've been, not around recording, analysis or a network.
 
 **One place it suggests where to go: Spots.** The fog shows what's left and leaves the choice to the user; Spots (§4.2) goes one step further and names places — a playground, a dog park, a viewpoint — and that is deliberately as far as discovery goes: outdoor places from OpenStreetMap only, not a "things to do" app, with no venues, reviews or ratings. The one live step is capture: standing in a place for half a minute with the Android app open marks it captured, a private mark of having gone out to find it, not a check-in anyone else sees (ADR-0023). It is the only mark a place carries (ADR-0028).
 
@@ -38,9 +38,9 @@ To let athletes, runners, cyclists, travellers and explorers see and keep the sh
 
 ### 2.2 Value Proposition
 * **No tracking friction** — fits existing workflows; HoldMyTrack never asks to record a workout.
-* **Bring everything** — one place for data scattered across a watch, a cloud service and a folder of old exports.
+* **Keep what matters** — pick the journeys worth keeping from a watch, the phone, a cloud service or a file, and leave the routine out.
 * **Exploration insight** — how much ground you've covered this year versus last, how well a neighborhood is explored, and where you go most.
-* **Gamified exploration** — "Fog of War" turns routine training into map discovery.
+* **Gamified exploration** — "Fog of War" clears the places your kept journeys reached and shows what's left.
 * **Find somewhere to go** — playgrounds, dog parks, monuments, viewpoints and historic sites on the map, and which of them your history already covers.
 * **Remember the trip** — group the activities of a hike, a holiday or an event into a Story with its own map and totals.
 * **Beautiful by default** — render quality is the differentiator, not feature count.
@@ -59,7 +59,7 @@ To let athletes, runners, cyclists, travellers and explorers see and keep the sh
 * **Travellers** — people who want a holiday, a road trip or a multi-day trek kept as one journey on a map, with its photos. Served by Stories, photos and in-app recording (§4.2, §4.1); held back by having no route history to bring unless they recorded one, since most travellers' trace sits in Google Maps Timeline, which HoldMyTrack imports from an Android phone's export but not yet from an iPhone's (§5.5).
 
 ### 3.2 Market Opportunity
-Digital fitness tracking continues to grow, and the major platforms remain focused on real-time logging, social feeds and health metrics rather than spatial artifacts and cross-source aggregation. The opportunity is a **quality and openness** opportunity, not a whitespace opportunity.
+Digital fitness tracking continues to grow, and the major platforms remain focused on real-time logging, social feeds and health metrics rather than spatial artifacts and the journeys worth keeping. The opportunity is a **quality and openness** opportunity, not a whitespace opportunity.
 
 ### 3.3 Competitive Landscape
 
@@ -125,7 +125,7 @@ So Android on-device sync is foreground-only, and Samsung Galaxy Watch is unsupp
 
 #### Path 3 — Direct manual file upload
 
-`.GPX`, `.FIT`, `.TCX`, plus bulk-export archives from Strava and others. Unglamorous, and the most robust thing in this document: no API terms, no licence, no permission model, no vendor who can revoke it, and it works for every service that offers an export — which is all of them, because GDPR requires it.
+`.GPX`, `.FIT` and `.TCX` files, up to 20 at a time — the files inside any service's export, Strava's included, picked by the user. Not the archive whole: a `.zip` or a Google Takeout export brings in thousands of activities at once, the opposite of a gate (ADR-0039). Unglamorous, and the most robust thing in this document: no API terms, no licence, no permission model, no vendor who can revoke it, and it works for every service that offers an export — which is all of them, because GDPR requires it.
 
 **It is also what the no-signup demo is built from** — the demo account's history went in through this same pipeline. See §8.2.
 
@@ -135,7 +135,7 @@ Paths 1 and 2 depend on things HoldMyTrack doesn't control: Garmin's licence ter
 
 #### Casual in-app GPS recording — mobile-only, and not a fourth path
 
-Distinct from the three paths above, which each bring in a user's *existing* history from somewhere else: the mobile app can also originate an activity itself, for someone who has no watch running and does not want to install a separate tracker for a one-off walk or drive. Start, optionally pause, and stop a GPS-only recording directly in HoldMyTrack; on stop, the recorded track submits through the same ingest pipeline every other source already uses (`ARCHITECTURE.md` §1.1, `IMPLEMENTATION.md` §4.1) — no new server-side path, no separate privacy story, no dedupe case beyond what already exists for two overlapping recordings of the same activity.
+Distinct from the three paths above, which each bring in a user's *existing* history from somewhere else: the mobile app can also originate an activity itself, for someone who has no watch running and does not want to install a separate tracker for a one-off walk or drive. Start, optionally pause, and stop a GPS-only recording directly in HoldMyTrack; on stop, the recorded track submits through the same ingest pipeline every other source already uses (`ARCHITECTURE.md` §1.1, `IMPLEMENTATION.md` §4.1) — no new server-side path and no separate privacy story.
 
 This isn't a resilience decision the way Paths 1–3 are — §4.1's provider-independence argument doesn't apply, since it depends on no external provider at all. It's a convenience feature: one fewer tool to install for someone who just wants a casual walk or drive on the map, with no export and no import in the way. **Scope stays deliberately narrow — GPS only.** No heart rate, cadence, power, or any other sensor; no training-load or coaching output; not a replacement for a dedicated fitness tracker (§1.1).
 
@@ -143,7 +143,7 @@ This isn't a resilience decision the way Paths 1–3 are — §4.1's provider-in
 
 | Category | Description | Key functionality |
 | :--- | :--- | :--- |
-| **Multi-source ingest** | The structural differentiator | Cloud connectors, on-device sync, file upload; cross-source deduplication |
+| **Multi-source ingest** | The structural differentiator | Cloud connectors, on-device sync, file upload; each source shows what it would bring in, and only what the user ticks comes in |
 | **In-app GPS recording** (mobile) | Convenience capture, not a fitness-tracker replacement | Start/pause/stop a GPS-only track directly in the app; feeds the same ingest pipeline as any other source |
 | **Visual Map Engine** | Interactive renderer with custom styles | Fog of War, heatmap and track/normal modes (`IMPLEMENTATION.md` §4.2, §4.2.2); curated themes; smooth (non-hexagonal) fog edges |
 | **Per-activity detail** | Pace as route context, not a coaching product | The selected activity's route colored by pace (`IMPLEMENTATION.md` §4.3.1) |
@@ -159,6 +159,8 @@ This isn't a resilience decision the way Paths 1–3 are — §4.1's provider-in
 **We don't keep your health profile — only the geographical data you trust us with, and the photos you choose to add to it.** An activity is a route: positions, times and elevation. Pace is derived from those and shown as the color of a selected track — a supporting detail on the route, not a pillar and not a training product; the pillars are the map and the exploration stats. Heart rate, cadence, power, calories and every other body signal are never read, stored or shown, whichever source an activity came from. The one place such data can still sit is inside an original upload, which is kept as-is so a track edit or a Private location change can rebuild the activity, is only ever read for its route, and is deleted with the activity. The schema carries per-point streams (`IMPLEMENTATION.md` §3.3) for the route, and no more. See ADR-0017.
 
 **Photos are the one thing kept that isn't geography, and only because the user adds them.** A trip is remembered by what was seen on it as much as by where it went, so an activity can carry the user's own photos, each pinned to the point of the route where it was taken — worked out from the photo's capture time, or its position when the time is unusable, or chosen by the user when neither says, and movable along the route by hand. Every photo has a place on its route; there are no loose ones. They're kept as a resized copy with every EXIF field stripped, never as the original: HoldMyTrack is a map of trips, not a photo backup, and the original stays wherever the user keeps it. They're private like everything else, and always sit on the route as it's drawn, so a Private location that hides a track's end hides the place a photo there was taken too. See ADR-0024.
+
+**Only what the user keeps comes in, and nothing is guessed for them.** Every source is a gate: it shows what it would bring in, nothing is ticked to start with, and what isn't ticked never reaches the server. Fog of War clears the places your kept journeys reached, and only those: there are no fog-only contributions from history left out, and deleting an activity takes its fog with it. When a candidate overlaps an activity already kept, it's marked as overlapping rather than merged or hidden automatically, and the user decides; tracks are fixed with the edit tools, not by rules applied on import. Bulk archives (`.zip`, Google Takeout) aren't imported: bulk history comes through cloud connectors with the same picker. See ADR-0039.
 
 **The activity graph is deliberately private, not a profile page.** It's the same genre of thing as Fog of War above — motivation through your own history, no comparison required — not a step toward the social features §1.1 and §5.7 explicitly hold off on. It has no follows, no feed, and nothing another user can view; it's a personal dashboard, available once accounts exist (§5.2), not a public artifact. If a shareable version is ever worth building, that's a §5.7 social-phase decision to make deliberately, not a side effect of how this one ships.
 
@@ -223,13 +225,13 @@ Settle what the plan rests on before building on it: whether Garmin's licence ap
 The product on the web, on the one ingest path that needs nobody's permission: file upload (Path 3, §4.1), the map in all its modes, the no-signup demo (§8.2), accounts, the activity graph, export, Stories and Spots (§4.2). Path 3 comes first so that the first usable version waits on no one's approval.
 
 ### 5.3 Phase 2: Mobile
-Native apps for the on-device path (Path 2, §4.1) and for in-app GPS recording. Android goes first although it is the more constrained platform — foreground-only route reads, and no Samsung routes at all, which the app states plainly rather than quietly degrading — so the sync contract is designed against the harder case; iOS, on HealthKit and Apple Watch, the stronger of the two routes, inherits it. Cross-source deduplication belongs here too: it is needed the moment a second source exists.
+Native apps for the on-device path (Path 2, §4.1) and for in-app GPS recording. Android goes first although it is the more constrained platform — foreground-only route reads, and no Samsung routes at all, which the app states plainly rather than quietly degrading — so the sync contract is designed against the harder case; iOS, on HealthKit and Apple Watch, the stronger of the two routes, inherits it. Picking what to sync belongs here too: the phone holds every walk, and only the ones the user ticks come in (ADR-0039).
 
 ### 5.4 Phase 3: Finalized design + mobile browser support
 One visual language across desktop and phone browsers, then frozen: the `--fm-*` tokens, Inter and Fraunces (Source Serif 4 for Russian headings), and Lucide icons. The mobile apps inherit the freeze rather than inventing a second visual language: two clients that each chose their own would not read as one product.
 
 ### 5.5 Phase 4: More sources
-* Google Maps Timeline import — a one-time upload of the JSON file the phone's Google Maps exports, for the travellers (§3.1) whose only route history is Timeline. Google moved Timeline onto the phone and closed its web version, so years of history have no map of their own any more; "see it all on one map again, with Fog of War" is a strong reason to arrive. Import only — see §1.1 on why HoldMyTrack doesn't pick up continuous location tracking.
+* Google Maps Timeline import — a one-time upload of the JSON file the phone's Google Maps exports, for the travellers (§3.1) whose only route history is Timeline. Google moved Timeline onto the phone and closed its web version, so years of history have no map of their own any more; "pick the trips worth keeping and see them on one map again, with Fog of War" is a strong reason to arrive. Import only — see §1.1 on why HoldMyTrack doesn't pick up continuous location tracking.
 * Path 1 connectors (§4.1), in whatever order their approvals land — last among the sources because they are the ones that depend on other companies' permission.
 
 ### 5.6 Phases 5–6: Cost control and compliance

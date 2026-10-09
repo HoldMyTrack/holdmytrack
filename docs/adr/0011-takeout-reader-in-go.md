@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Reverses the "shell out to pathify" choice recorded in `IMPLEMENTATION.md` §4.0.2 when Takeout import was first built; that choice had no ADR of its own.
+Superseded by [ADR-0039](0039-the-app-is-the-gate.md), which removes Takeout import. Reverses the "shell out to pathify" choice recorded in `IMPLEMENTATION.md` §4.0.2 when Takeout import was first built; that choice had no ADR of its own.
 
 ## Context
 

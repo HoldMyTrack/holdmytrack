@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Built: inline raw payloads (`internal/ingest/enqueue.go`, `IMPLEMENTATION.md` §4.1 step 1) and the worker's `unpack` job (`internal/unpack`, §4.0.1), with the web's Upload menu and the Android app's Upload screen showing an archive's notes once it's unpacked.
+Accepted. Built: inline raw payloads (`internal/ingest/enqueue.go`, `IMPLEMENTATION.md` §4.1 step 1) and the worker's `unpack` job (`internal/unpack`, §4.0.1), with the web's Upload menu and the Android app's Upload screen showing an archive's notes once it's unpacked. Its archive unpacking is superseded by [ADR-0039](0039-the-app-is-the-gate.md), which removes `.zip` and Takeout import.
 
 ## Context
 

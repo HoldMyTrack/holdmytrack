@@ -13,7 +13,6 @@ Read `docs/ROADMAP.md` (Phase 2 — Mobile) first; this document expands one ite
 - **The toolchain is on the host, not in a container** (`apps/android/README.md`), and it is installed: the Android SDK at `/opt/homebrew/share/android-commandlinetools` with platform 37, build-tools 37 and `adb` under `platform-tools/`, alongside JDK 21, which the Android Gradle Plugin supports. `ANDROID_HOME` is not exported by default, so export it (or write `sdk.dir` into `local.properties`) before invoking `./gradlew`. There is no Android Studio, but an AVD now exists (`holdmytrack`, a Pixel 7 image on Android 16/API 36, under `emulator/`) — used to verify in-app recording (`apps/android/docs/SPEC.md` §9); FR-1 through FR-4's own verification record still names a physical device specifically, and that distinction is worth preserving rather than blurring the two.
 - **Android ships first of the two mobile apps** (`VISION.md` §5.3): it defines the payload shape `POST /v1/sync/activities` accepts and the pick-what-to-send model over `POST /v1/sync/known` (root `docs/SPEC.md` FR-3.6), and iOS inherits them.
 - **The design is frozen, product-wide** (`VISION.md` §5.4). The app's look is the web's tokens — palette, Inter and Fraunces, and the spacing, radius and type scales — and its Lucide icons, carried into Material 3 (`apps/android/docs/IMPLEMENTATION.md` §1.3, [ADR-0026](../../../docs/adr/0026-material-3-on-views.md)).
-- **Cross-source deduplication is part of this phase** (`VISION.md` §5.3); built, `docs/IMPLEMENTATION.md` §4.6.
 
 ---
 
