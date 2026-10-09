@@ -5,7 +5,7 @@ import androidx.appcompat.app.AppCompatActivity
 import dev.holdmytrack.android.sync.ImportHistory
 
 /**
- * The whole sync history, from the Sync tab's See all: every import a page at a time
+ * The whole sync history, from the Sync tab and the Upload screen: every import a page at a time
  * ([ImportHistory]) — the web's `/sync` list. Read while it shows, and kept
  * current while anything is still processing.
  */
@@ -16,7 +16,7 @@ class SyncHistoryActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_sync_history)
-        history = ImportHistory(findViewById(R.id.sync_history_root), preview = false, onViewOnMap = { activityId, day ->
+        history = ImportHistory(findViewById(R.id.sync_history_root), onViewOnMap = { activityId, day ->
             MainActivity.viewOnMap(this, activityId, day)
             finish()
         })

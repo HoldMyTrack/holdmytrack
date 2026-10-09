@@ -916,7 +916,7 @@
         <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.LabelLarge</item>
     </style>
 
-    <!-- A tile (Sync's Bring in files): a card standing alone, its icon in an accent tile over a
+    <!-- A tile (Sync's Upload files and Sync history): a card, its icon in an accent tile over a
          title and a line under it. -->
     <style name="Widget.HoldMyTrack.Tile" parent="">
         <item name="android:background">@drawable/bg_section_card</item>

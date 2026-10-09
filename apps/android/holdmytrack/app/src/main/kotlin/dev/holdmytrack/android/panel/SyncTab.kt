@@ -19,7 +19,6 @@ import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
-import dev.holdmytrack.android.MainActivity
 import dev.holdmytrack.android.R
 import dev.holdmytrack.android.SyncHistoryActivity
 import dev.holdmytrack.android.UploadActivity
@@ -35,10 +34,10 @@ import dev.holdmytrack.android.sync.Candidate
 import dev.holdmytrack.android.sync.HealthConnectCard
 import dev.holdmytrack.android.sync.HealthConnectCard.Companion.isReadable
 import dev.holdmytrack.android.sync.HiddenCandidates
-import dev.holdmytrack.android.sync.ImportHistory
 import dev.holdmytrack.android.sync.SyncCandidates
 import dev.holdmytrack.android.sync.SyncReport
 import dev.holdmytrack.android.sync.SyncRunner
+import dev.holdmytrack.android.ui.LargeText
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -54,8 +53,8 @@ import kotlinx.coroutines.launch
  * newest first ([SyncCandidates]), each drawn dashed on the map while the tab shows
  * ([onCandidates]). **Nothing is ticked**: only what the user ticks is sent ([SyncRunner]), and
  * an unticked row never reaches the server. A row swiped aside is hidden ([HiddenCandidates]) —
- * Show hidden brings it back. Under the list, Health Connect's setup ([HealthConnectCard]), the
- * ways to bring in files and the latest of the sync history ([ImportHistory]).
+ * Show hidden brings it back. Under the list, Health Connect's setup ([HealthConnectCard]), then
+ * Upload files and Sync history, each a screen of its own.
  *
  * There's no cursor: each time the tab opens the list is worked out afresh from the phone and the
  * server (`POST /v1/sync/known`), so a reinstall or a second phone agrees, and an activity
@@ -103,14 +102,8 @@ class SyncTab(
     private val foot: View = LayoutInflater.from(activity).inflate(R.layout.include_sync_foot, list, false)
     private val listNote: TextView = foot.findViewById(R.id.sync_list_note)
     private val showHiddenButton: Button = foot.findViewById(R.id.sync_show_hidden)
-    private val filesSection: View = foot.findViewById(R.id.sync_files_section)
+    private val upload: View = foot.findViewById(R.id.sync_upload)
     private val card = HealthConnectCard(foot.findViewById(R.id.sync_health_connect_section), requestPermissions)
-    private val history = ImportHistory(
-        foot,
-        preview = true,
-        onViewOnMap = { id, day -> MainActivity.viewOnMap(activity, id, day) },
-        onSeeAll = { activity.startActivity(Intent(activity, SyncHistoryActivity::class.java)) },
-    )
 
     private val rows = RowAdapter()
 
@@ -151,9 +144,11 @@ class SyncTab(
             showHidden = !showHidden
             render()
         }
-        foot.findViewById<View>(R.id.sync_upload).setOnClickListener {
-            activity.startActivity(Intent(activity, UploadActivity::class.java))
+        upload.setOnClickListener { activity.startActivity(Intent(activity, UploadActivity::class.java)) }
+        foot.findViewById<View>(R.id.sync_history).setOnClickListener {
+            activity.startActivity(Intent(activity, SyncHistoryActivity::class.java))
         }
+        LargeText.stack(foot.findViewById(R.id.sync_tiles))
     }
 
     /** The tab showed: everything read again, nothing ticked. */
@@ -165,7 +160,6 @@ class SyncTab(
         highlight = null
         results.visibility = View.GONE
         problems.visibility = View.GONE
-        history.start()
         refresh()
     }
 
@@ -173,7 +167,6 @@ class SyncTab(
     fun stop() {
         showing = false
         pause()
-        history.stop()
         onCandidates(emptyList(), null)
     }
 
@@ -181,7 +174,6 @@ class SyncTab(
      *  read again, keeping what's ticked. */
     fun resume() {
         if (!showing) return
-        history.start()
         refresh()
     }
 
@@ -191,7 +183,6 @@ class SyncTab(
         loadJob = null
         runJob?.cancel()
         runJob = null
-        history.stop()
         loading = false
     }
 
@@ -302,7 +293,7 @@ class SyncTab(
         accountNotice.visibility = if (demo) View.VISIBLE else View.GONE
         card.visible = !demo
         readiness?.let { if (!demo) card.render(it) }
-        filesSection.visibility = if (demo) View.GONE else View.VISIBLE
+        upload.visibility = if (demo) View.GONE else View.VISIBLE
 
         val everything = all()
         val shown = shown()

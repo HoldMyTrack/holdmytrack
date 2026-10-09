@@ -252,7 +252,7 @@ class MainActivity : AppCompatActivity() {
         internal const val EXTRA_VIEW_DAY = "dev.holdmytrack.android.VIEW_DAY"
         private const val EXTRA_PRIVATE_LOCATION = "dev.holdmytrack.android.PRIVATE_LOCATION"
 
-        /** Opens the main window on [tab] — Upload's "See Sync". Clears whatever is over an
+        /** Opens the main window on [tab] — `SyncActivity`'s Choose what to sync. Clears whatever is over an
          *  existing one. */
         fun openTab(context: Context, tab: Tab) {
             context.startActivity(
