@@ -35,6 +35,7 @@ holdmytrack/
 ├── scripts/maintenance.sh       # flips the deployment's maintenance page (docs/DEPLOY.md §7)
 ├── scripts/restore-drill.sh     # restores the newest backup into a throwaway container and checks it (docs/DEPLOY.md §11)
 ├── scripts/spots-extract.sh     # downloads OSM data and filters it into the Spots places file, off the server (docs/DEPLOY.md §6)
+├── scripts/loadtest-sampler.sh  # samples a deployment's CPU, memory and job queue during a load test (docs/PERFORMANCE.md)
 ├── .env.example                 # Compose interpolation only — never VITE_*
 ├── .env.prod.example            # compose.prod.yml's own env template
 ├── .editorconfig
@@ -67,6 +68,8 @@ holdmytrack/
         ├── README.md            # the serve/work/migrate contract and the open decisions
         ├── Dockerfile
         ├── cmd/holdmytrack/     # main.go: serve / work / migrate
+        ├── cmd/loadtest/        # the load-test driver docs/PERFORMANCE.md's sessions run
+        ├── cmd/delayproxy/      # adds object-storage latency to the dev stack, for render measurements
         ├── internal/            # config, db, fog, geo, httpapi, i18n, ingest, mail, mapstyle, parse, spots, storage, takeout, tilemath, web, worker
         └── migrations/          # embedded *.sql, applied in order by `cmd/holdmytrack migrate`
 ```
