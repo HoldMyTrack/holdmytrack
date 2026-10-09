@@ -19,15 +19,19 @@ import org.maplibre.geojson.Point
 /**
  * The Sync tab's candidates on the map (`docs/SPEC.md` FR-3.6): every activity listed there,
  * drawn dashed from the phone's own data — none of it is on the server yet — and the one picked
- * on the list or the map solid and wider, over the rest. One GeoJSON source, two layers filtered
- * on a `role` property, under the basemap's labels, as [TrackEditOverlay] is. The lines are the
- * candidates' simplified ones ([Candidate.line]).
+ * on the list or the map as the Map tab draws a selected activity: solid and wider over a dark
+ * halo, coloured by pace ([Candidate.metrics], [MapOverlays.bandFeatures]). One GeoJSON source
+ * whose layers filter on a `role` property, and one for the bands, all under the basemap's
+ * labels, as [TrackEditOverlay] is. The lines are the candidates' simplified ones ([Candidate.line]).
  */
 object SyncCandidatesOverlay {
 
     private const val SOURCE_ID = "sync-candidates"
+    private const val BAND_SOURCE_ID = "sync-candidates-bands"
+    private const val HALO_LAYER_ID = "sync-candidates-halo"
     private const val LINE_LAYER_ID = "sync-candidates-line"
     private const val HIGHLIGHT_LAYER_ID = "sync-candidates-highlight"
+    private const val BAND_LAYER_ID = "sync-candidates-bands"
 
     private const val COLOR = MapOverlays.TRACK_COLOR
 
@@ -36,12 +40,23 @@ object SyncCandidatesOverlay {
 
     fun ensure(style: Style) {
         if (style.getSource(SOURCE_ID) == null) style.addSource(GeoJsonSource(SOURCE_ID))
+        if (style.getSource(BAND_SOURCE_ID) == null) style.addSource(GeoJsonSource(BAND_SOURCE_ID))
         val beforeId = style.layers.firstOrNull { it is SymbolLayer }?.id
         fun add(layer: LineLayer) {
             if (style.getLayer(layer.id) != null) return
             if (beforeId != null) style.addLayerBelow(layer, beforeId) else style.addLayer(layer)
         }
         fun role(name: String) = Expression.eq(Expression.get("role"), name)
+        // Halo first, then the dashed lines, then the picked line and its bands over them.
+        add(
+            LineLayer(HALO_LAYER_ID, SOURCE_ID).withFilter(role("highlight")).withProperties(
+                PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+                PropertyFactory.lineColor(MapOverlays.CASING_COLOR),
+                PropertyFactory.lineWidth(MapOverlays.CASING_WIDTH),
+                PropertyFactory.lineOpacity(MapOverlays.CASING_OPACITY),
+            ),
+        )
         add(
             LineLayer(LINE_LAYER_ID, SOURCE_ID).withFilter(role("line")).withProperties(
                 PropertyFactory.lineCap(Property.LINE_CAP_BUTT),
@@ -57,13 +72,22 @@ object SyncCandidatesOverlay {
                 PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                 PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
                 PropertyFactory.lineColor(COLOR),
-                PropertyFactory.lineWidth(5f),
+                PropertyFactory.lineWidth(MapOverlays.SELECTED_WIDTH),
                 PropertyFactory.lineOpacity(1f),
+            ),
+        )
+        add(
+            LineLayer(BAND_LAYER_ID, BAND_SOURCE_ID).withProperties(
+                PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+                PropertyFactory.lineColor(Expression.get("color")),
+                PropertyFactory.lineWidth(MapOverlays.BAND_WIDTH),
+                PropertyFactory.lineOpacity(MapOverlays.BAND_OPACITY),
             ),
         )
     }
 
-    /** Draws [candidates], [highlight] (a [Candidate.key]) picked out over the rest. */
+    /** Draws [candidates], [highlight] (a [Candidate.key]) picked out over the rest, in its pace bands. */
     fun set(style: Style, candidates: List<Candidate>, highlight: String?) {
         ensure(style)
         val source = style.getSourceAs<GeoJsonSource>(SOURCE_ID) ?: return
@@ -76,10 +100,13 @@ object SyncCandidatesOverlay {
             }
         }
         source.setGeoJson(FeatureCollection.fromFeatures(features))
+        val bands = candidates.firstOrNull { it.key == highlight }?.let { MapOverlays.bandFeatures(it.metrics) }.orEmpty()
+        style.getSourceAs<GeoJsonSource>(BAND_SOURCE_ID)?.setGeoJson(FeatureCollection.fromFeatures(bands))
     }
 
     fun clear(style: Style) {
         style.getSourceAs<GeoJsonSource>(SOURCE_ID)?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+        style.getSourceAs<GeoJsonSource>(BAND_SOURCE_ID)?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
     }
 
     /** The key of the candidate drawn under [screen], if any. */

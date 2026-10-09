@@ -139,18 +139,19 @@ object MapOverlays {
     private const val TRACK_WIDTH = 2.5f
     private const val TRACK_OPACITY = 0.9f
 
-    /** The web's `EMPHASIS_WIDTH` and `CASING_WIDTH` (1.5 of halo showing each side). */
-    private const val SELECTED_WIDTH = 4.5f
-    private const val CASING_WIDTH = SELECTED_WIDTH + 3f
-    private const val CASING_COLOR = "#202b25"
-    private const val CASING_OPACITY = 0.95f
+    /** The web's `EMPHASIS_WIDTH` and `CASING_WIDTH` (1.5 of halo showing each side) — the
+     *  Sync tab's picked candidate is drawn the same ([SyncCandidatesOverlay]). */
+    const val SELECTED_WIDTH = 4.5f
+    const val CASING_WIDTH = SELECTED_WIDTH + 3f
+    const val CASING_COLOR = "#202b25"
+    const val CASING_OPACITY = 0.95f
 
     /** The selected activity's pace bands (`TrackBands`), the web's `track-bands`:
      *  one coloured line per run, over its track, under the labels. */
     private const val BAND_SOURCE_ID = "track-bands"
     private const val BAND_LAYER_ID = "track-bands-line"
-    private const val BAND_WIDTH = 6f
-    private const val BAND_OPACITY = 0.95f
+    const val BAND_WIDTH = 6f
+    const val BAND_OPACITY = 0.95f
 
     /** The track layers' ids, in paint order — what mode and recording show and hide together. */
     private val TRACK_LAYER_IDS = listOf(TRACKS_CASING_LAYER_ID, TRACKS_LAYER_ID, TRACKS_SELECTED_LAYER_ID)
@@ -283,16 +284,16 @@ object MapOverlays {
      */
     fun setTrackBands(style: Style, points: List<TrackMetricPoint>) {
         val source = style.getSourceAs<GeoJsonSource>(BAND_SOURCE_ID) ?: return
-        if (points.size < 2) {
-            source.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
-            return
-        }
-        val runs = TrackBands.runs(points, TrackBands.scale(points))
-        val features = runs.map { run ->
+        source.setGeoJson(FeatureCollection.fromFeatures(bandFeatures(points)))
+    }
+
+    /** [points]' band runs as lines, each with its `color` — none under two points. */
+    fun bandFeatures(points: List<TrackMetricPoint>): List<Feature> {
+        if (points.size < 2) return emptyList()
+        return TrackBands.runs(points, TrackBands.scale(points)).map { run ->
             val line = LineString.fromLngLats(points.subList(run.startIndex, run.endIndex + 1).map { Point.fromLngLat(it.lon, it.lat) })
             Feature.fromGeometry(line).apply { addStringProperty("color", TrackBands.COLORS[run.band]) }
         }
-        source.setGeoJson(FeatureCollection.fromFeatures(features))
     }
 
     fun clearTrackBands(style: Style) = setTrackBands(style, emptyList())

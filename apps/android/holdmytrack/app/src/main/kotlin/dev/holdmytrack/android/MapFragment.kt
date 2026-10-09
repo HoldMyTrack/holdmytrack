@@ -1483,13 +1483,15 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     /**
      * The selected activity's pace bands on the map while it's also drawn there — not hidden,
      * filtered out or Pending, whose metrics describe the points from before its reprocess
-     * (the web's `focusedPending`).
+     * (the web's `focusedPending`). Not on the Sync tab, whose picked candidate has bands of its
+     * own (`map/SyncCandidatesOverlay`).
      */
     private fun renderTrackMetrics() {
         val metrics = trackMetrics
         val loaded = style?.takeIf { overlaysAttached } ?: return
         val focused = panelState.focused
-        if (metrics != null && focused == metrics.activityId && focused !in panelState.mapHidden) {
+        val onSync = ::panel.isInitialized && panel.tab == PanelTab.SYNC
+        if (metrics != null && focused == metrics.activityId && focused !in panelState.mapHidden && !onSync) {
             MapOverlays.setTrackBands(loaded, metrics.points)
             panel.setBandsShown(true)
         } else {
