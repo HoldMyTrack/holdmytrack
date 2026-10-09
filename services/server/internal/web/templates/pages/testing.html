@@ -5,7 +5,7 @@
     <p class="page-lede">Thank you for testing! This page walks through everything the Android app does, one test at a time, with the files to use. Start with Setup: it fills your account with activities from four countries, which most of the other tests need. After that, the sections can be done in any order.</p>
     <nav class="help__toc" aria-label="On this page">
       <a href="#setup">0. Setup</a>
-      <a href="#upload">1. Uploads and imports</a>
+      <a href="#upload">1. Uploads</a>
       <a href="#map">2. The map</a>
       <a href="#dates">3. Date slider</a>
       <a href="#activities">4. Activities panel</a>
@@ -72,7 +72,7 @@
   </section>
 
   <section class="page-section" id="upload">
-    <h2>1. Uploads and imports</h2>
+    <h2>1. Uploads</h2>
     <p>All of these start from <strong>Sync → Upload files → Choose files…</strong>. After each, check Sync history.</p>
 
     <h3 id="UP-1">UP-1 · A GPX file</h3>
@@ -114,6 +114,10 @@
     <h3 id="UP-9">UP-9 · Several files at once</h3>
     <p>Pick <strong>evening-loop.tcx</strong>, <strong>mill-creek-falls.fit</strong> and <strong>track.kml</strong> together.</p>
     <p class="testing__expect"><strong>Expected:</strong> one row per file. The two activities say they were already uploaded (from UP-2 and UP-3), and track.kml is named as not sent.</p>
+
+    <h3 id="UP-14">UP-14 · More than 20 files</h3>
+    <p>Pick the 20 files from Setup's holdmytrack-sample folder and <strong>west-side.gpx</strong> together, 21 in all.</p>
+    <p class="testing__expect"><strong>Expected:</strong> nothing is sent, with "Too many files selected (21): choose up to 20 at a time."</p>
 
     <h3 id="UP-13">UP-13 · Sync history</h3>
     <ol class="page-list">
@@ -515,7 +519,7 @@
 
     <h3 id="DM-1">DM-1 · Look around without an account</h3>
     <p>Signed out, tap Try the demo.</p>
-    <p class="testing__expect"><strong>Expected:</strong> a ready-made account with activities in Cleveland, Niagara Falls, Rome, Tallinn and Vietnam, Stories and photos. Everything can be looked at, but nothing can be changed. Editing says "Not available for demo accounts — create an account to edit activities", Upload says the same for uploading, and Sync now isn't there.</p>
+    <p class="testing__expect"><strong>Expected:</strong> a ready-made account with activities in Cleveland, Niagara Falls, Rome, Tallinn and Vietnam, Stories and photos. Everything can be looked at, but nothing can be changed. Editing says "Not available for demo accounts — create an account to edit activities", and Upload says the same for uploading. The Sync tab says "The demo account is read-only — it can't add, edit, or delete activities. Create an account to sync your own data.", with nothing to tick and no Sync now.</p>
   </section>
 
   <section class="page-section" id="report">
