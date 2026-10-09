@@ -104,6 +104,10 @@ object MapOverlays {
     private const val REGION_MAX_ZOOM = 7f
     private const val CITY_MIN_ZOOM = 7f
 
+    /** Fog and Heatmap show as square pixels below this zoom and smoothed from it up — the zoom
+     *  their finest tiles are stored at, the web's `PIXELS_MAX_ZOOM` (ADR-0038). */
+    private const val PIXELS_MAX_ZOOM = 14f
+
     /** Which [ZoomTier] Fog and Heatmap draw at [zoom] — the same bands the layers switch on (a
      *  layer shows at minZoom <= zoom < maxZoom), the web's `zoomTier`, for what has to name the
      *  level in view (`ZoomLevelNotice`). */
@@ -526,7 +530,20 @@ object MapOverlays {
             style.addSource(RasterSource(sourceId, tileSet(url), RASTER_TILE_SIZE))
         }
         if (style.getLayer(layerId) == null) {
-            val layer = RasterLayer(layerId, sourceId).apply { setMinZoom(minZoom) }
+            val layer = RasterLayer(layerId, sourceId).apply {
+                setMinZoom(minZoom)
+                // Square pixels from afar, smoothed close up, where the z14 tile is only stretched
+                // further with every zoom.
+                setProperties(
+                    PropertyFactory.rasterResampling(
+                        Expression.step(
+                            Expression.zoom(),
+                            Expression.literal("nearest"),
+                            Expression.stop(PIXELS_MAX_ZOOM, "linear"),
+                        ),
+                    ),
+                )
+            }
             insert(style, layer, beforeId)
         }
     }
