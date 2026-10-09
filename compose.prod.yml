@@ -131,7 +131,11 @@ services:
     restart: unless-stopped
     logging: *logging
     command: ["work"]
-    environment: *server-env
+    environment:
+      <<: *server-env
+      # How many jobs run at once, never two of one account's (internal/worker's claimQuery,
+      # docs/DEPLOY.md §4). Mostly waiting on R2, so bounded by memory rather than CPUs.
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
     depends_on:
       db: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -86,12 +87,15 @@ func readJob(t *testing.T, pool *pgxpool.Pool, id int64) jobRow {
 
 func TestClaimSkipsAJobStillRunningAndFailsOneThatKeptCrashing(t *testing.T) {
 	pool, userID := testPool(t)
+	// The running job is another account's: an account with a job running has its others
+	// held back anyway (TestClaimRunsOneJobPerAccountAtATime).
+	_, otherID := testPool(t)
 	log := slog.New(slog.DiscardHandler)
 	ctx := context.Background()
 
 	fresh := time.Now()
 	stale := time.Now().Add(-2 * claimLease)
-	running := insertJob(t, pool, userID, "2000-01-01T00:00:00Z", 1, &fresh)
+	running := insertJob(t, pool, otherID, "2000-01-01T00:00:00Z", 1, &fresh)
 	crashed := insertJob(t, pool, userID, "2000-01-02T00:00:00Z", maxAttempts, &stale)
 	next := insertJob(t, pool, userID, "2000-01-03T00:00:00Z", 0, nil)
 
@@ -116,6 +120,128 @@ func TestClaimSkipsAJobStillRunningAndFailsOneThatKeptCrashing(t *testing.T) {
 	}
 	if r := readJob(t, pool, running); r.state != "pending" {
 		t.Errorf("running job = %+v, want still pending", r)
+	}
+}
+
+// While one of an account's jobs runs, its next one waits even if it's first in line, and
+// another account's job is claimed instead.
+func TestClaimRunsOneJobPerAccountAtATime(t *testing.T) {
+	pool, busyID := testPool(t)
+	_, otherID := testPool(t)
+	log := slog.New(slog.DiscardHandler)
+	ctx := context.Background()
+
+	fresh := time.Now()
+	insertJob(t, pool, busyID, "2000-01-01T00:00:00Z", 1, &fresh)
+	held := insertJob(t, pool, busyID, "2000-01-02T00:00:00Z", 0, nil)
+	other := insertJob(t, pool, otherID, "2000-01-03T00:00:00Z", 0, nil)
+
+	if processed, err := claimAndRunOne(ctx, pool, nil, log); err != nil || !processed {
+		t.Fatalf("claim 1: processed=%v err=%v", processed, err)
+	}
+	if r := readJob(t, pool, held); r.state != "pending" || r.attempts != 0 {
+		t.Errorf("busy account's next job = %+v, want held back", r)
+	}
+	if r := readJob(t, pool, other); r.attempts != 1 {
+		t.Errorf("other account's job = %+v, want claimed", r)
+	}
+	// With the busy account's job still running, nothing else is claimable.
+	if processed, err := claimAndRunOne(ctx, pool, nil, log); err != nil || processed {
+		t.Fatalf("claim 2: processed=%v err=%v, want nothing claimable", processed, err)
+	}
+}
+
+// Accounts take turns: one with a long queue doesn't keep a newer account waiting behind all
+// of it, and two accounts with queues alternate.
+func TestClaimTakesAccountsInTurn(t *testing.T) {
+	pool, bigID := testPool(t)
+	_, smallID := testPool(t)
+	log := slog.New(slog.DiscardHandler)
+	ctx := context.Background()
+
+	var big []int64
+	for i := range 4 {
+		big = append(big, insertJob(t, pool, bigID, fmt.Sprintf("2000-01-0%dT00:00:00Z", i+1), 0, nil))
+	}
+	// Queued after all of the big account's, as a new user's upload arriving mid-import.
+	small := []int64{
+		insertJob(t, pool, smallID, "2000-02-01T00:00:00Z", 0, nil),
+		insertJob(t, pool, smallID, "2000-02-02T00:00:00Z", 0, nil),
+	}
+
+	order := func() []int64 {
+		var ids []int64
+		rows, err := pool.Query(ctx, `
+			SELECT id FROM jobs WHERE user_id IN ($1, $2) AND state <> 'pending'
+			ORDER BY locked_at, id`, bigID, smallID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var id int64
+			if err := rows.Scan(&id); err != nil {
+				t.Fatal(err)
+			}
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	for i := range 6 {
+		if processed, err := claimAndRunOne(ctx, pool, nil, log); err != nil || !processed {
+			t.Fatalf("claim %d: processed=%v err=%v", i+1, processed, err)
+		}
+	}
+	// Both never served: the earlier run_after goes first. Then they alternate, the
+	// least recently served first, until the small account has nothing left.
+	want := []int64{big[0], small[0], big[1], small[1], big[2], big[3]}
+	if got := order(); fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("claim order = %v, want %v", got, want)
+	}
+}
+
+// Several loops claiming at once (Run's concurrency) never take the same job twice.
+func TestConcurrentClaimsTakeEachJobOnce(t *testing.T) {
+	pool, firstID := testPool(t)
+	accounts := []string{firstID}
+	for range 2 {
+		_, id := testPool(t)
+		accounts = append(accounts, id)
+	}
+	log := slog.New(slog.DiscardHandler)
+	ctx := context.Background()
+
+	var ids []int64
+	for i := range 10 {
+		for _, acct := range accounts {
+			ids = append(ids, insertJob(t, pool, acct, fmt.Sprintf("2000-01-%02dT00:00:00Z", i+1), 0, nil))
+		}
+	}
+	var wg sync.WaitGroup
+	for range 4 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for idle := 0; idle < 20; {
+				processed, err := claimAndRunOne(ctx, pool, nil, log)
+				if err != nil {
+					t.Errorf("claim: %v", err)
+					return
+				}
+				if processed {
+					idle = 0
+				} else {
+					idle++ // another loop holds the only claimable account's job for now
+					time.Sleep(5 * time.Millisecond)
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	for _, id := range ids {
+		if r := readJob(t, pool, id); r.state == "pending" || r.attempts != 1 {
+			t.Errorf("job %d = %+v, want claimed exactly once", id, r)
+		}
 	}
 }
 
