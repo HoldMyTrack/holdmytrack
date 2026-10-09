@@ -76,10 +76,11 @@ const exportSweepInterval = time.Hour
 //
 // Long jobs have a lane of their own, a second loop beside this one: building an export or
 // unpacking a large archive takes minutes, and nobody's single upload or phone sync should
-// wait behind it. n tells an export's owner when it's ready (export_job.go). The periodic
+// wait behind it. The main lane itself runs as `concurrency` loops side by side, fair across
+// accounts (claimQuery). n tells an export's owner when it's ready (export_job.go). The periodic
 // sweeps (runSweeps) have a third goroutine, so a busy queue never holds them back. A deleted
 // account's jobs are never claimed: its purge drops them within accountPurgeInterval.
-func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, n *Notifier) error {
+func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, n *Notifier, concurrency int) error {
 	notifier = n
 	var lanes sync.WaitGroup
 	defer lanes.Wait() // a long job cut off by shutdown is released before Run returns
@@ -106,12 +107,27 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 		runSweeps(ctx, pool, store, log)
 	}()
 
+	for range concurrency {
+		lanes.Add(1)
+		go func() {
+			defer lanes.Done()
+			runMainLane(ctx, pool, store, log)
+		}()
+	}
+	<-ctx.Done()
+	return nil
+}
+
+// runMainLane is one of Run's `concurrency` main-lane loops: claim and run jobs until the
+// queue has nothing this loop may take (claimQuery: one job per account at a time), then wait
+// for the next tick.
+func runMainLane(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger) {
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return
 		case <-ticker.C:
 			for {
 				processed, err := claimAndRunOne(ctx, pool, store, log)
@@ -120,7 +136,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 					break
 				}
 				if !processed {
-					break // queue empty; wait for the next tick
+					break // nothing claimable; wait for the next tick
 				}
 			}
 		}
@@ -221,6 +237,53 @@ func claimAndRunOne(ctx context.Context, pool *pgxpool.Pool, store *storage.Stor
 	return claimAndRun(ctx, pool, store, log, laneMain)
 }
 
+// claimQuery picks the lane's next job, fairly across accounts:
+//
+//   - One job per account at a time. An account with a job of this lane already claimed
+//     (busy) waits, which keeps its own jobs in order (an edit, then its render) and stops
+//     one account's import from taking every worker.
+//   - Of each other account, only its next job (runnable, by run_after then id) is a
+//     candidate, and the candidates go in order of when their account was last served (its
+//     latest claim on this lane, idx_jobs_user_locked), never-served first. A new user's single
+//     upload therefore goes ahead of the thousandth file of someone else's import, instead of
+//     after it.
+//   - A deleted account's jobs are never claimed: its purge drops them (account_purge.go).
+//
+// The outer query repeats the claimability checks on jobs itself, not only in the CTE: under
+// READ COMMITTED, FOR UPDATE re-checks just those conditions against a row another worker
+// claimed and committed after this statement's snapshot, so they are what keeps two workers
+// off the same job. SKIP LOCKED then moves on to the next candidate, another account's.
+const claimQuery = `
+	WITH busy AS (
+		SELECT DISTINCT user_id FROM jobs
+		WHERE state = 'pending' AND user_id IS NOT NULL
+		  AND locked_at >= NOW() - make_interval(secs => $1)
+		  AND (kind IN ('export', 'unpack')) = $2
+	),
+	heads AS (
+		SELECT DISTINCT ON (j.user_id) j.id, j.user_id, j.run_after
+		FROM jobs j
+		WHERE j.state = 'pending' AND j.run_after <= NOW()
+		  AND (j.locked_at IS NULL OR j.locked_at < NOW() - make_interval(secs => $1))
+		  AND (j.kind IN ('export', 'unpack')) = $2
+		  AND (j.user_id IS NULL OR j.user_id NOT IN (SELECT user_id FROM busy))
+		  AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = j.user_id AND u.deleted_at IS NOT NULL)
+		ORDER BY j.user_id, j.run_after, j.id
+	),
+	ranked AS (
+		SELECT h.id, h.run_after,
+			(SELECT max(s.locked_at) FROM jobs s
+			 WHERE s.user_id = h.user_id AND (s.kind IN ('export', 'unpack')) = $2) AS served
+		FROM heads h
+	)
+	SELECT j.id, j.kind, j.payload, j.attempts
+	FROM jobs j JOIN ranked r ON r.id = j.id
+	WHERE j.state = 'pending'
+	  AND (j.locked_at IS NULL OR j.locked_at < NOW() - make_interval(secs => $1))
+	ORDER BY r.served NULLS FIRST, r.run_after, r.id
+	FOR UPDATE OF j SKIP LOCKED
+	LIMIT 1`
+
 func claimAndRun(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, long bool) (bool, error) {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
@@ -230,16 +293,7 @@ func claimAndRun(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, 
 
 	var j job
 	var attempts int
-	err = tx.QueryRow(ctx, `
-		SELECT id, kind, payload, attempts FROM jobs
-		WHERE state = 'pending' AND run_after <= NOW()
-		  AND (locked_at IS NULL OR locked_at < NOW() - make_interval(secs => $1))
-		  AND (kind IN ('export', 'unpack')) = $2
-		  AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = jobs.user_id AND u.deleted_at IS NOT NULL)
-		ORDER BY run_after, id
-		FOR UPDATE SKIP LOCKED
-		LIMIT 1
-	`, claimLease.Seconds(), long).Scan(&j.id, &j.kind, &j.payload, &attempts)
+	err = tx.QueryRow(ctx, claimQuery, claimLease.Seconds(), long).Scan(&j.id, &j.kind, &j.payload, &attempts)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}

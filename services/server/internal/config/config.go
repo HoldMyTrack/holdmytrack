@@ -79,6 +79,10 @@ type Config struct {
 	// of the copies embedded in the binary — so editing a page in dev needs no image rebuild
 	// (compose.yaml bind-mounts it). Empty everywhere else.
 	WebDevDir string
+	// WorkerConcurrency is how many main-lane jobs `work` runs at once (internal/worker's Run),
+	// never more than one per account. The jobs are mostly waiting on object storage, so this
+	// is bounded by memory, not CPU count (IMPLEMENTATION.md §5.2). Only read by `work`.
+	WorkerConcurrency int
 }
 
 func Load() (Config, error) {
@@ -112,6 +116,9 @@ func Load() (Config, error) {
 		return c, err
 	}
 	if c.SatelliteMaxZoom, err = positiveInt("SATELLITE_MAXZOOM", 18); err != nil {
+		return c, err
+	}
+	if c.WorkerConcurrency, err = positiveInt("WORKER_CONCURRENCY", 4); err != nil {
 		return c, err
 	}
 	c.WebDevDir = env("WEB_DEV_DIR", "")

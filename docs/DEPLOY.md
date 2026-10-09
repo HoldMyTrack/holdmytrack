@@ -24,6 +24,8 @@ cp .env.prod.example .env.prod
 
 Fill in every value — see that file's own comments for what each one means and why it has no default (unlike dev's `.env.example`, nothing here is safe to leave as a placeholder). `APP_BASE_URL` and `DOMAIN` both need the real domain from step 3; get `APP_BASE_URL`'s `https://` scheme right — `auth.go`'s session cookie derives its `Secure` flag from it, and password-reset emails link back into it.
 
+**Worker concurrency.** `WORKER_CONCURRENCY` (default 4) is how many jobs the worker runs at once — imports, renders, edits — taking accounts in turn and never two of one account's at the same time (`IMPLEMENTATION.md` §3.8). A job mostly waits on R2, so the bound is memory, not CPUs: 4 is comfortable on 2 vCPU / 4 GB. The worker's database pool is 4 connections per unit of it. A change needs only `up -d` for `worker`.
+
 **Sign in with Google (optional).** Leave `GOOGLE_CLIENT_ID` empty to run without it; the sign-in screen then shows only email and password. To turn it on:
 
 1. In the Google Cloud console, create a project (or reuse one) and set up the OAuth consent screen: user type External, app name HoldMyTrack, the domain from step 3 as an authorized domain, and only the `openid`, `email` and `profile` scopes — none of them needs Google's app verification. Publish it ("In production"); in "Testing" only listed test users can sign in.

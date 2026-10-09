@@ -63,9 +63,15 @@ func main() {
 	// db and the object store are separate compose services with their own startup time; retrying
 	// here means api/worker/migrate don't need a fragile healthcheck-based `depends_on`
 	// condition on the object store specifically (see compose.yaml's comment on that).
+	// `work` runs several jobs at once, each rendering up to 16 tiles side by side
+	// (internal/fog's renderParallelism), so it gets a bigger pool than pgx's default.
+	var maxConns int32
+	if os.Args[1] == "work" {
+		maxConns = int32(4 * cfg.WorkerConcurrency)
+	}
 	var pool *pgxpool.Pool
 	err = retry(ctx, log, "db connect", func() (err error) {
-		pool, err = db.Open(ctx, cfg.DatabaseURL)
+		pool, err = db.OpenSized(ctx, cfg.DatabaseURL, maxConns)
 		return err
 	})
 	if err != nil {
@@ -141,9 +147,9 @@ func main() {
 			os.Exit(1)
 		}
 		metrics.Serve(ctx, cfg.MetricsAddr, log)
-		log.Info("work: polling")
+		log.Info("work: polling", "concurrency", cfg.WorkerConcurrency)
 		notifier := &worker.Notifier{Mailer: newMailer(cfg, log, "work"), BaseURL: cfg.AppBaseURL}
-		if err := worker.Run(ctx, pool, store, log, notifier); err != nil {
+		if err := worker.Run(ctx, pool, store, log, notifier, cfg.WorkerConcurrency); err != nil {
 			log.Error("work", "err", err)
 			os.Exit(1)
 		}
