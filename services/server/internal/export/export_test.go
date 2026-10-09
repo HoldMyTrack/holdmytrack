@@ -65,11 +65,11 @@ func TestBuildWritesEverythingAcrossParts(t *testing.T) {
 		VALUES ($1, 'upload', 'walk.gpx', 'walking', 'Lake / Loop', $2, $3, 260, 'Europe/Berlin') RETURNING id`, userID, started, rawKey).Scan(&walk); err != nil {
 		t.Fatal(err)
 	}
-	// A second activity on the same raw file (a cross-source duplicate): the original is
+	// A second activity on the same raw file (the same file through two paths): the original is
 	// written once, and both point at it.
 	if err := pool.QueryRow(ctx, `
-		INSERT INTO activities (user_id, source, source_detail, activity_type, name, started_at, raw_payload_key, superseded_by, timezone)
-		VALUES ($1, 'takeout', 'walk.gpx', 'walking', 'Lake / Loop', $2, $3, $4, 'Europe/Berlin') RETURNING id`, userID, started.Add(time.Minute), rawKey, walk).Scan(&copyOf); err != nil {
+		INSERT INTO activities (user_id, source, source_detail, activity_type, name, started_at, raw_payload_key, timezone)
+		VALUES ($1, 'takeout', 'walk.gpx', 'walking', 'Lake / Loop', $2, $3, 'Europe/Berlin') RETURNING id`, userID, started.Add(time.Minute), rawKey).Scan(&copyOf); err != nil {
 		t.Fatal(err)
 	}
 	var photoID string
@@ -145,7 +145,6 @@ func TestBuildWritesEverythingAcrossParts(t *testing.T) {
 		}
 		Activities []struct {
 			ID, Original, Track string
-			DuplicateOf         string `json:"duplicate_of"`
 			Photos              []struct{ File, Caption string }
 		}
 		Stories []struct {
@@ -169,7 +168,7 @@ func TestBuildWritesEverythingAcrossParts(t *testing.T) {
 			t.Errorf("activity %s: original %q", a.ID, a.Original)
 		}
 	}
-	if doc.Activities[0].ID != walk || doc.Activities[1].DuplicateOf != walk || len(doc.Activities[0].Photos) != 1 || doc.Activities[0].Photos[0].Caption != "The bridge" {
+	if doc.Activities[0].ID != walk || doc.Activities[1].ID != copyOf || len(doc.Activities[0].Photos) != 1 || doc.Activities[0].Photos[0].Caption != "The bridge" {
 		t.Errorf("activities: %+v", doc.Activities)
 	}
 	if !strings.Contains(string(files["README.txt"]), "originals/") {

@@ -38,7 +38,6 @@
           <td>{{.Countries}}</td>
           <td>{{.Regions}}</td>
           <td>
-            {{with .SupersededBy}}<span class="admin__badge">{{th "admin.duplicate_of" "id" .}}</span>{{end}}
             {{if .Hidden}}<span class="admin__badge">{{t "admin.badge_hidden"}}</span>{{end}}
             {{if .Edited}}<span class="admin__badge">{{t "admin.badge_edited"}}</span>{{end}}
           </td>

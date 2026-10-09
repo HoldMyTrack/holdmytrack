@@ -9,8 +9,8 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 )
 
-// A span is answered with the live activity it overlaps by 80% of the longer of the two; a
-// walk inside it, a hidden duplicate and an empty span are not.
+// A span is answered with the activity it overlaps by 80% of the longer of the two; a walk
+// inside it and an empty span are not.
 func TestActivityOverlaps(t *testing.T) {
 	d := newDBTest(t)
 	me := d.newAccount(false)
@@ -20,8 +20,6 @@ func TestActivityOverlaps(t *testing.T) {
 	if _, err := d.pool.Exec(ctx, `UPDATE activities SET name = 'Morning walk' WHERE id = $1`, walk); err != nil {
 		t.Fatal(err)
 	}
-	other := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 3600, startedAt: at.Add(2 * time.Hour)})
-	d.newActivity(me, testActivity{activityType: "walking", durationSecs: 3600, startedAt: at.Add(4 * time.Hour), supersededBy: other})
 	// Someone else's activity at the same time is never an answer.
 	d.newActivity(d.newAccount(false), testActivity{activityType: "walking", durationSecs: 3600, startedAt: at})
 
@@ -32,7 +30,6 @@ func TestActivityOverlaps(t *testing.T) {
 	d.decode(d.do(me, http.MethodPost, "/v1/activities/overlaps", map[string]any{"spans": []map[string]any{
 		span("copy", 2*time.Minute, 61*time.Minute),
 		span("inside", 0, 10*time.Minute),
-		span("hidden", 4*time.Hour, 5*time.Hour),
 		span("empty", 0, 0),
 	}}), http.StatusOK, &resp)
 	if len(resp.Overlaps) != 1 {
@@ -73,37 +70,10 @@ func TestOverlappingSyncsStayLive(t *testing.T) {
 	a := send("healthconnect", "hc-1", 0)
 	b := send("recorded", "rec-1", time.Minute)
 	var live int
-	if err := d.pool.QueryRow(ctx, `SELECT count(*) FROM activities WHERE id = ANY($1::uuid[]) AND superseded_by IS NULL`, []string{a, b}).Scan(&live); err != nil {
+	if err := d.pool.QueryRow(ctx, `SELECT count(*) FROM activities WHERE id = ANY($1::uuid[])`, []string{a, b}).Scan(&live); err != nil {
 		t.Fatal(err)
 	}
 	if live != 2 {
 		t.Errorf("%d live, want both", live)
-	}
-}
-
-// Deleting an activity that hid duplicates before ingest stopped matching promotes the richest
-// of them and keeps the rest hidden behind it.
-func TestDeletePromotesOneReleasedCopy(t *testing.T) {
-	d := newDBTestWithS3(t, newMemS3())
-	me := d.newAccount(false)
-	ctx := context.Background()
-	kept := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, at: &[2]float64{10, 50}})
-	routeless := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, supersededBy: kept})
-	routed := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, at: &[2]float64{10, 50}, supersededBy: kept})
-
-	d.decode(d.do(me, http.MethodDelete, "/v1/activities/"+kept, nil), http.StatusNoContent, nil)
-
-	superseded := func(id string) *string {
-		var by *string
-		if err := d.pool.QueryRow(ctx, `SELECT superseded_by::text FROM activities WHERE id = $1`, id).Scan(&by); err != nil {
-			t.Fatal(err)
-		}
-		return by
-	}
-	if by := superseded(routed); by != nil {
-		t.Errorf("the copy with a route is still hidden behind %s", *by)
-	}
-	if by := superseded(routeless); by == nil || *by != routed {
-		t.Errorf("the routeless copy is hidden behind %v, want %s", by, routed)
 	}
 }

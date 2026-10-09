@@ -22,8 +22,8 @@ import java.util.Locale
  * The sync history — the web's `/sync` page (`apps/android/docs/SPEC.md` FR-4): every ingest job
  * the account has produced, from any path, as `GET /v1/uploads` lists them — a Health Connect
  * session, a GPS recording and a file uploaded on the web are the same kind of job, so they
- * share one history. Each row says how it ended — Ready, Duplicate (its activity set aside for a
- * fuller copy from elsewhere), Failed — or that it's still processing, and when it finished.
+ * share one history. Each row says how it ended — Ready or Failed — or that it's still
+ * processing, and when it finished.
  * Re-read every 1.5 seconds while anything is still processing (the web shows those in its
  * Upload menu; this app has no other place for them), and a Ready row has View on map.
  *
@@ -145,8 +145,8 @@ class ImportHistory(
     /**
      * One row, as the web's `/sync` draws it: a file's own name, or for anything synced the
      * source it came from — a synced row's `filename` is a raw external id, never meant to be
-     * read — with "9 Sep · 34.7 km" under it once finished, and for a duplicate which copy was
-     * kept. At the other end the status, when it finished, and a Ready row's View on map.
+     * read — with "9 Sep · 34.7 km" under it once finished. At the other end the status, when
+     * it finished, and a Ready row's View on map.
      */
     private fun addRow(entry: SyncHistoryEntry) {
         val title = when (entry.source) {
@@ -157,14 +157,7 @@ class ImportHistory(
         view.findViewById<TextView>(R.id.row_name).text = title
         val status = view.findViewById<TextView>(R.id.row_status)
         val detail = view.findViewById<TextView>(R.id.row_detail)
-        val duplicate = entry.status == "done" && entry.keptSource != null
         when {
-            duplicate -> {
-                status.setText(R.string.status_row_duplicate)
-                status.setTextColor(context.getColor(R.color.hmt_accent_strong))
-                val kept = res.getString(R.string.status_row_kept, sourceName(entry.keptSource.orEmpty()))
-                showDetail(detail, meta(entry)?.let { "$it · $kept" } ?: kept)
-            }
             entry.status == "done" -> {
                 status.setText(R.string.status_row_ready)
                 status.setTextColor(context.getColor(R.color.hmt_success))
@@ -190,8 +183,7 @@ class ImportHistory(
         val day = entry.startedAt?.let { startedAt ->
             runCatching { Instant.parse(startedAt).atZone(PanelFormat.zone(entry.timezone)).toLocalDate().toString() }.getOrNull()
         }
-        // A duplicate's activity is on no map, so it has nowhere to go.
-        if (entry.status == "done" && !duplicate && activityId != null && day != null) {
+        if (entry.status == "done" && activityId != null && day != null) {
             view.findViewById<TextView>(R.id.row_action).apply {
                 visibility = View.VISIBLE
                 setOnClickListener { onViewOnMap(activityId, day) }
@@ -233,17 +225,6 @@ class ImportHistory(
         "takeout" -> res.getString(R.string.source_title_takeout)
         "recorded" -> res.getString(R.string.source_title_recorded)
         "timeline" -> res.getString(R.string.source_title_timeline)
-        else -> source
-    }
-
-    /** The `source` values, said in a sentence (the web's `formatIngestSource`). */
-    private fun sourceName(source: String): String = when (source) {
-        "healthconnect" -> res.getString(R.string.source_health_connect)
-        "healthkit" -> res.getString(R.string.source_health_kit)
-        "upload" -> res.getString(R.string.source_upload)
-        "takeout" -> res.getString(R.string.source_takeout)
-        "recorded" -> res.getString(R.string.source_recorded)
-        "timeline" -> res.getString(R.string.source_timeline)
         else -> source
     }
 

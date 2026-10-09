@@ -55,18 +55,17 @@ type adminUserView struct {
 }
 
 type adminActivityRow struct {
-	ID           string
-	Started      string
-	Type         string
-	Name         string
-	Distance     string
-	Duration     string
-	Source       string
-	Countries    string
-	Regions      string
-	SupersededBy string
-	Hidden       bool
-	Edited       bool
+	ID        string
+	Started   string
+	Type      string
+	Name      string
+	Distance  string
+	Duration  string
+	Source    string
+	Countries string
+	Regions   string
+	Hidden    bool
+	Edited    bool
 }
 
 // adminAccount is the page's account when it may see the admin panel, or nil after answering
@@ -139,7 +138,7 @@ func (s *Server) handleAdminUserPage(w http.ResponseWriter, r *http.Request) {
 }
 
 // adminUsers lists every account, newest first, or just userID's when it's set. Counts and
-// distance are over live activities only — a superseded duplicate isn't one the account shows.
+// distance are over every activity.
 func (s *Server) adminUsers(ctx context.Context, l *i18n.Localizer, userID string, imperial bool) ([]adminUserRow, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT u.id, u.email, COALESCE(u.display_name, ''), u.created_at, COALESCE(u.country, ''),
@@ -147,7 +146,7 @@ func (s *Server) adminUsers(ctx context.Context, l *i18n.Localizer, userID strin
 		       count(a.id), min((a.started_at AT TIME ZONE a.timezone)::date), max((a.started_at AT TIME ZONE a.timezone)::date),
 		       COALESCE(sum(a.distance_meters), 0)::float8
 		FROM users u
-		LEFT JOIN activities a ON a.user_id = u.id AND a.superseded_by IS NULL
+		LEFT JOIN activities a ON a.user_id = u.id
 		WHERE u.deleted_at IS NULL AND ($1 = '' OR u.id::text = $1)
 		GROUP BY u.id
 		ORDER BY u.created_at DESC
@@ -181,8 +180,8 @@ func (s *Server) adminUsers(ctx context.Context, l *i18n.Localizer, userID strin
 	return users, rows.Err()
 }
 
-// adminUserActivities is one page of u's activities, newest first — superseded and hidden ones
-// included, marked as such, since the panel is for seeing what's actually stored.
+// adminUserActivities is one page of u's activities, newest first — hidden ones included,
+// marked as such, since the panel is for seeing what's actually stored.
 func (s *Server) adminUserActivities(ctx context.Context, l *i18n.Localizer, u adminUserRow, page int, imperial bool) (adminUserView, error) {
 	view := adminUserView{User: u}
 	var total int
@@ -204,7 +203,7 @@ func (s *Server) adminUserActivities(ctx context.Context, l *i18n.Localizer, u a
 		SELECT a.id, to_char(a.started_at AT TIME ZONE a.timezone, 'YYYY-MM-DD HH24:MI') || ' ' || a.timezone,
 		       a.activity_type, COALESCE(a.name, ''),
 		       COALESCE(a.distance_meters, 0)::float8, COALESCE(a.duration_seconds, 0), a.source,
-		       COALESCE(a.superseded_by::text, ''), a.trajectory IS NULL, a.track_edit IS NOT NULL,
+		       a.trajectory IS NULL, a.track_edit IS NOT NULL,
 		       COALESCE((SELECT string_agg(c.name, ', ' ORDER BY c.name)
 		                 FROM activity_country ac JOIN admin_countries c ON c.id = ac.country_id
 		                 WHERE ac.activity_id = a.id), ''),
@@ -225,7 +224,7 @@ func (s *Server) adminUserActivities(ctx context.Context, l *i18n.Localizer, u a
 		var meters float64
 		var seconds int64
 		if err := rows.Scan(&a.ID, &a.Started, &a.Type, &a.Name, &meters, &seconds, &a.Source,
-			&a.SupersededBy, &a.Hidden, &a.Edited, &a.Countries, &a.Regions); err != nil {
+			&a.Hidden, &a.Edited, &a.Countries, &a.Regions); err != nil {
 			return view, fmt.Errorf("admin: scan activity: %w", err)
 		}
 		a.Distance = web.FormatDistance(l, meters, imperial)

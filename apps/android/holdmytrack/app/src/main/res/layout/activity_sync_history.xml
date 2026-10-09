@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- SyncHistoryActivity: the whole sync history and the duplicates (include_sync_history). -->
+<!-- SyncHistoryActivity: the whole sync history (include_sync_history). -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"

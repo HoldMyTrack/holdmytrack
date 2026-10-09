@@ -325,7 +325,6 @@ type activity struct {
 	ElapsedSeconds   *int64    `json:"elapsed_s,omitempty"`
 	MovingSeconds    *int64    `json:"moving_s,omitempty"`
 	ElevationGainM   *float64  `json:"elevation_gain_m,omitempty"`
-	DuplicateOf      string    `json:"duplicate_of,omitempty"`
 	Original         string    `json:"original,omitempty"`
 	Track            string    `json:"track,omitempty"`
 	TrackUnavailable bool      `json:"track_unavailable,omitempty"`
@@ -380,7 +379,7 @@ func loadAccount(ctx context.Context, pool *pgxpool.Pool, userID string) (*docum
 	rows, err := pool.Query(ctx, `
 		SELECT id, COALESCE(name, ''), activity_type, source, COALESCE(description, ''), started_at, timezone,
 		       distance_meters::float8, duration_seconds, moving_seconds, elevation_gain_m::float8,
-		       COALESCE(superseded_by::text, ''), COALESCE(raw_payload_key, '')
+		       COALESCE(raw_payload_key, '')
 		FROM activities WHERE user_id = $1 ORDER BY started_at, id`, userID)
 	if err != nil {
 		return nil, fmt.Errorf("activities: %w", err)
@@ -389,7 +388,7 @@ func loadAccount(ctx context.Context, pool *pgxpool.Pool, userID string) (*docum
 	for rows.Next() {
 		var v activity
 		if err := rows.Scan(&v.ID, &v.Name, &v.Type, &v.Source, &v.Description, &v.StartedAt, &v.Timezone,
-			&v.DistanceMeters, &v.ElapsedSeconds, &v.MovingSeconds, &v.ElevationGainM, &v.DuplicateOf, &v.rawKey); err != nil {
+			&v.DistanceMeters, &v.ElapsedSeconds, &v.MovingSeconds, &v.ElevationGainM, &v.rawKey); err != nil {
 			rows.Close()
 			return nil, fmt.Errorf("activities: %w", err)
 		}

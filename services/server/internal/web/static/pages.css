@@ -1154,7 +1154,7 @@ code {
   font-size: var(--fm-text-md);
 }
 
-/* The Sync page (templates/pages/sync.html): the finished imports, then the duplicates. */
+/* The Sync page (templates/pages/sync.html): the finished imports. */
 .sync {
   max-width: 760px;
 }
@@ -1215,9 +1215,6 @@ code {
   color: rgb(var(--fm-ink-rgb) / 55%);
 }
 
-.sync__row--duplicate .sync__status {
-  color: var(--fm-accent);
-}
 
 .sync__status {
   flex: none;

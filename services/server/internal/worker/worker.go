@@ -465,6 +465,8 @@ func runJob(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *
 	case "unpack":
 		defer keepClaimed(ctx, pool, log, j.id)()
 		return unpack.Run(ctx, pool, store, j.id, j.payload)
+	case "remove_activity_objects":
+		return runRemoveActivityObjects(ctx, store, j.payload)
 	default:
 		return fmt.Errorf("unhandled job kind %q (export / provider_sync / retention are out of scope for this task)", j.kind)
 	}

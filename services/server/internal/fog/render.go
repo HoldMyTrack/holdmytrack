@@ -135,7 +135,7 @@ func dirtyTiles(ctx context.Context, pool *pgxpool.Pool, userID string, zoom int
 // simplified trajectory's bounding box.
 //
 // Fog and Heatmap draw from the same query but not the same *rows*: Fog is a true all-time
-// aggregate (every non-superseded activity's mask), while Heatmap only composites masks whose
+// aggregate (every activity's mask), while Heatmap only composites masks whose
 // activity is currently flagged `in_heatmap_window` — a plain column read, not a comparison
 // against "now" here. Keeping that flag current as activities age past HeatmapWindowDays is
 // internal/worker's job (heatmap_aging.go's daily sweep), not this function's — by the time an
@@ -154,7 +154,7 @@ func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.
 		SELECT m.mask_object_key, a.in_heatmap_window
 		FROM activity_tile_masks m
 		JOIN activities a ON a.id = m.activity_id
-		WHERE a.user_id = $1 AND a.superseded_by IS NULL AND NOT a.edit_pending
+		WHERE a.user_id = $1 AND NOT a.edit_pending
 		  AND m.zoom = $2 AND m.tile_x = $3 AND m.tile_y = $4
 	`, userID, zoom, x, y)
 	if err != nil {

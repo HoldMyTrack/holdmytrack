@@ -30,10 +30,6 @@ const zoneMarginM = 25
 // circle's radius (plus zoneMarginM) of its center: every activity a location placed, or
 // previously placed, there could clip. Run inside the caller's transaction, alongside the
 // privacy_zones change itself.
-//
-// Duplicate copies hidden behind a better one (superseded_by set) are included. Dedupe can
-// make one live again without reprocessing it — when the copy displacing it is deleted, or a
-// later copy re-ranks the group — so it has to be clipped with the current locations already.
 func AffectedActivities(ctx context.Context, tx pgx.Tx, userID string, lat, lon float64, radiusM int) ([]string, error) {
 	rows, err := tx.Query(ctx, `
 		SELECT id FROM activities

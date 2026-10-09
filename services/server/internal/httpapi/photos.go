@@ -164,7 +164,7 @@ func (s *Server) handleListPhotos(w http.ResponseWriter, r *http.Request) {
 		where = "p.activity_id = $2"
 	case q.Get("story") != "":
 		id, owns = q.Get("story"), s.ownsStory
-		where = `a.superseded_by IS NULL AND p.activity_id IN (SELECT activity_id FROM story_activities WHERE story_id = $2)`
+		where = `p.activity_id IN (SELECT activity_id FROM story_activities WHERE story_id = $2)`
 	default:
 		http.Error(w, `missing "activity" or "story"`, http.StatusBadRequest)
 		return

@@ -30,7 +30,7 @@ func ageOutHeatmapWindow(ctx context.Context, pool *pgxpool.Pool, log *slog.Logg
 	cutoff := time.Now().AddDate(0, 0, -fog.HeatmapWindowDays)
 	rows, err := pool.Query(ctx, `
 		SELECT id, user_id FROM activities
-		WHERE in_heatmap_window AND superseded_by IS NULL AND started_at < $1
+		WHERE in_heatmap_window AND started_at < $1
 	`, cutoff)
 	if err != nil {
 		return fmt.Errorf("heatmap aging: query aged activities: %w", err)

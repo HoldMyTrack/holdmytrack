@@ -25,7 +25,7 @@ import (
 // user from tomorrow's candidate set.
 func recomputeHeatmapCaps(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger) error {
 	rows, err := pool.Query(ctx, `
-		SELECT DISTINCT user_id FROM activities WHERE in_heatmap_window AND superseded_by IS NULL
+		SELECT DISTINCT user_id FROM activities WHERE in_heatmap_window
 	`)
 	if err != nil {
 		return fmt.Errorf("heatmap cap: query candidate users: %w", err)

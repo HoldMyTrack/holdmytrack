@@ -250,11 +250,11 @@ func MergeEdits(pieces []piece) TrackEdit {
 // MergePieces joins adjacent pieces of one split back into one activity (§4.7.8): the earliest
 // survives — the row first split, when it's among them, since a split always leaves a row the
 // earlier part and inserts the later one, so it keeps its own external_id — takes the joined range,
-// the merged track edit (MergeEdits), the others' photos and Stories and any duplicate they
-// displaced (§4.6), and goes Pending with an `edit_track` job to rebuild it. The others are
-// deleted. Returns the survivor and the deleted ids — whose masks in object storage the caller
-// removes, since the cascade only reaches their rows. ErrSplitConflict when ids aren't two or
-// more adjacent, live, idle pieces of one split owned by userID.
+// the merged track edit (MergeEdits) and the others' photos and Stories, and goes Pending with
+// an `edit_track` job to rebuild it. The others are deleted. Returns the survivor and the
+// deleted ids — whose masks in object storage the caller removes, since the cascade only
+// reaches their rows. ErrSplitConflict when ids aren't two or more adjacent, idle pieces of
+// one split owned by userID.
 func MergePieces(ctx context.Context, pool *pgxpool.Pool, userID string, ids []string) (string, []string, error) {
 	ids = slices.Compact(slices.Sorted(slices.Values(ids)))
 	if len(ids) < 2 {
@@ -267,7 +267,7 @@ func MergePieces(ctx context.Context, pool *pgxpool.Pool, userID string, ids []s
 	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
 
 	rows, err := tx.Query(ctx, `
-		SELECT id, split_group, split_from, split_to, track_edit, edit_pending, superseded_by IS NOT NULL
+		SELECT id, split_group, split_from, split_to, track_edit, edit_pending
 		FROM activities WHERE user_id = $1 AND id = ANY($2::uuid[])
 		FOR UPDATE
 	`, userID, ids)
@@ -280,12 +280,12 @@ func MergePieces(ctx context.Context, pool *pgxpool.Pool, userID string, ids []s
 		var p piece
 		var g *string
 		var editJSON []byte
-		var pending, superseded bool
-		if err := rows.Scan(&p.ID, &g, &p.Range.From, &p.Range.To, &editJSON, &pending, &superseded); err != nil {
+		var pending bool
+		if err := rows.Scan(&p.ID, &g, &p.Range.From, &p.Range.To, &editJSON, &pending); err != nil {
 			rows.Close()
 			return "", nil, err
 		}
-		if g == nil || pending || superseded || (group != nil && *g != *group) {
+		if g == nil || pending || (group != nil && *g != *group) {
 			rows.Close()
 			return "", nil, ErrSplitConflict
 		}
@@ -342,7 +342,6 @@ func MergePieces(ctx context.Context, pool *pgxpool.Pool, userID string, ids []s
 		`INSERT INTO story_activities (story_id, activity_id)
 		 SELECT DISTINCT story_id, $1::uuid FROM story_activities WHERE activity_id = ANY($2::uuid[])
 		 ON CONFLICT DO NOTHING`,
-		`UPDATE activities SET superseded_by = $1 WHERE superseded_by = ANY($2::uuid[])`,
 	} {
 		if _, err := tx.Exec(ctx, q, survivor, removed); err != nil {
 			return "", nil, err

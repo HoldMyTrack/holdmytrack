@@ -5,8 +5,8 @@ import androidx.appcompat.app.AppCompatActivity
 import dev.holdmytrack.android.sync.ImportHistory
 
 /**
- * The whole sync history, from the Sync tab's See all: every import a page at a time, and the
- * duplicates under it ([ImportHistory]) — the web's `/sync` list. Read while it shows, and kept
+ * The whole sync history, from the Sync tab's See all: every import a page at a time
+ * ([ImportHistory]) — the web's `/sync` list. Read while it shows, and kept
  * current while anything is still processing.
  */
 class SyncHistoryActivity : AppCompatActivity() {

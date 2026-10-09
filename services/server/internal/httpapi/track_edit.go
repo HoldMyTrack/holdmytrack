@@ -168,8 +168,8 @@ func (s *Server) handleActivityTrackEdit(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if !ok {
-		// Not this user's, a superseded duplicate, or already mid-edit — one 409 covers all
-		// three without saying which, same as a 404 elsewhere never says whose activity it was.
+		// Not this user's, or already mid-edit — one 409 covers both without saying which, same
+		// as a 404 elsewhere never says whose activity it was.
 		httpErrorT(w, r, http.StatusConflict, "error.track_busy")
 		return
 	}

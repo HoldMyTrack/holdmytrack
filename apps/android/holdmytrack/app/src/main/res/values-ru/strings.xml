@@ -410,17 +410,11 @@
     <string name="status_row_ready">Готово</string>
     <string name="status_row_failed">Ошибка</string>
     <string name="status_row_failed_with">Ошибка: %1$s</string>
-    <string name="status_row_duplicate">Дубликат</string>
-    <string name="status_row_kept">Оставлена копия из %1$s</string>
     <string name="status_view_on_map">Показать на карте</string>
     <string name="status_range">%1$d–%2$d из %3$d</string>
     <string name="status_range_one">%1$d из %2$d</string>
     <string name="status_newer">← Новее</string>
     <string name="status_older">Старше →</string>
-    <string name="source_upload">загруженного файла</string>
-    <string name="source_takeout">импорта Google Takeout</string>
-    <string name="source_recorded">GPS-записи</string>
-    <string name="source_timeline">Хронологии Google Карт</string>
     <string name="source_title_upload">Загруженный файл</string>
     <string name="source_title_recorded">GPS-запись</string>
     <string name="source_title_timeline">Хронология Google Карт</string>

@@ -155,9 +155,7 @@ data class UnpackedArchive(val batch: String, val already: Int, val skipped: Int
  * an uploaded file or a Takeout entry, a raw external id for everything else. [startedAt],
  * [distanceMeters] and [activityId] are null while the job is still processing, or forever if
  * it failed: there is no activity behind it to describe. [finishedAt] is when the import finished
- * — when it was synced — and [keptSource], for an activity cross-source deduplication set aside
- * as a duplicate (`docs/IMPLEMENTATION.md` §4.6), is the source of the copy kept in its place;
- * such a row's [status] is still "done", the import itself having succeeded.
+ * — when it was synced.
  */
 data class SyncHistoryEntry(
     val filename: String,
@@ -168,7 +166,6 @@ data class SyncHistoryEntry(
     val startedAt: String?,
     val distanceMeters: Double?,
     val activityId: String?,
-    val keptSource: String?,
     /** The zone [startedAt]'s activity was recorded in (`docs/IMPLEMENTATION.md` §4.30). */
     val timezone: String? = null,
 )
@@ -752,7 +749,6 @@ object HoldMyTrackApi {
                         startedAt = row.optString("started_at").ifBlank { null },
                         distanceMeters = if (row.isNull("distance_meters")) null else row.optDouble("distance_meters"),
                         activityId = row.optString("activity_id").ifBlank { null },
-                        keptSource = row.optJSONObject("superseded_by")?.optString("source")?.ifBlank { null },
                         timezone = row.optString("timezone").ifBlank { null },
                     )
                 },

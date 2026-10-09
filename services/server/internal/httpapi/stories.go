@@ -46,9 +46,8 @@ type storyTypeStats struct {
 	ElapsedSeconds int64   `json:"elapsed_seconds"`
 }
 
-// storyStats is a Story's joint statistics over its live activities (a superseded duplicate,
-// §4.6, is a member but isn't counted), with no date bound, plus the same per activity type,
-// most frequent first.
+// storyStats is a Story's joint statistics over its activities, with no date bound, plus the
+// same per activity type, most frequent first.
 type storyStats struct {
 	Count          int64            `json:"count"`
 	DistanceMeters float64          `json:"distance_meters"`
@@ -440,7 +439,6 @@ FROM story_activities sa
 JOIN stories s ON s.id = sa.story_id
 JOIN activities a ON a.id = sa.activity_id
 WHERE s.user_id = $1 AND ($2::uuid IS NULL OR s.id = $2)
-  AND a.superseded_by IS NULL
 GROUP BY sa.story_id, a.activity_type
 ORDER BY COUNT(*) DESC, a.activity_type`
 

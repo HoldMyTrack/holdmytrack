@@ -146,7 +146,7 @@ func EnqueueRaw(ctx context.Context, db Querier, userID string, items []RawItem)
 // KnownExternalIDs returns which of ids the account already has from source: an activity row
 // in any state, or an ingest job still waiting to run. It answers a phone's "is this synced
 // yet?" (IMPLEMENTATION.md §4.0.3's `POST /v1/sync/known`), so it counts everything a repeat
-// sync would answer `already_processed` for — a superseded duplicate included — plus what's
+// sync would answer `already_processed` for, plus what's
 // queued, so a session sent a moment ago doesn't come back while the worker catches up. A
 // deleted activity's row is gone and its job finished, so its id isn't known any more.
 func KnownExternalIDs(ctx context.Context, db Querier, userID, source string, ids []string) ([]string, error) {

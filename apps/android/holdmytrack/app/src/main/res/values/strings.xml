@@ -392,8 +392,6 @@
     <string name="status_row_ready">Ready</string>
     <string name="status_row_failed">Failed</string>
     <string name="status_row_failed_with">Failed: %1$s</string>
-    <string name="status_row_duplicate">Duplicate</string>
-    <string name="status_row_kept">Kept the copy from %1$s</string>
     <string name="status_view_on_map">View on map</string>
     <string name="status_range">%1$d–%2$d of %3$d</string>
     <string name="status_range_one">%1$d of %2$d</string>
@@ -401,10 +399,6 @@
     <string name="status_older">Older →</string>
     <string name="source_health_connect" translatable="false">Health Connect</string>
     <string name="source_health_kit" translatable="false">HealthKit</string>
-    <string name="source_upload">an uploaded file</string>
-    <string name="source_takeout">a Google Takeout import</string>
-    <string name="source_recorded">a GPS recording</string>
-    <string name="source_timeline">a Google Maps Timeline import</string>
     <string name="source_title_upload">Uploaded file</string>
     <string name="source_title_takeout" translatable="false">Google Takeout</string>
     <string name="source_title_recorded">GPS Logger</string>

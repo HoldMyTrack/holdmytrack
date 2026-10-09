@@ -445,10 +445,9 @@ func MarkFogTilesDirty(ctx context.Context, pool *pgxpool.Pool, userID string, t
 
 // ActivityTiles reads back the z14 tiles one activity's own crisp masks cover —
 // activity_tile_masks' primary key leads with activity_id, so this is an index-only lookup.
-// Shared by handleDeleteActivity's own tile lookup (which additionally merges in any
-// activity this one supersedes — see its own activityFogTiles) and heatmap_aging.go's daily
-// sweep, which has no supersede case to worry about: an activity aging out of the window is
-// still live, just no longer eligible, so only its own tiles ever need re-rendering.
+// Shared by handleDeleteActivity's own tile lookup and heatmap_aging.go's daily sweep: an
+// activity aging out of the window is still live, just no longer eligible, so only its own
+// tiles need re-rendering.
 func ActivityTiles(ctx context.Context, pool *pgxpool.Pool, activityID string) ([][2]int, error) {
 	rows, err := pool.Query(ctx,
 		`SELECT DISTINCT tile_x, tile_y FROM activity_tile_masks WHERE activity_id = $1 AND zoom = $2`,

@@ -19,11 +19,6 @@ import (
 // ones the tiles draw. Every polygon touched gets a row, however
 // briefly — matching the product requirement that a visit's size or duration doesn't matter,
 // only whether it happened.
-//
-// Not filtered by superseded_by: activity_tile_masks keeps rows for a superseded duplicate
-// too (so a later-deleted winner makes the loser's own coverage live again for free), and
-// this mirrors that. The country/region "unlocked" tile queries do their own superseded_by
-// filtering at read time instead.
 func MatchActivity(ctx context.Context, pool *pgxpool.Pool, activityID string) error {
 	_, err := pool.Exec(ctx, `
 		INSERT INTO activity_country (activity_id, country_id)
