@@ -62,6 +62,8 @@ class StoriesTab(
     private val onActivityRemoved: (activityId: String) -> Unit,
     /** A copy of a Story someone sent has arrived: new activities, and Fog and Heatmap coming. */
     private val onCopyArrived: () -> Unit,
+    /** The inbox read: [waiting] copies others sent wait to be answered — the bar's badge. */
+    private val onInboxRead: (waiting: Int) -> Unit,
 ) {
     private val context = content.context
     private val res = context.resources
@@ -147,6 +149,7 @@ class StoriesTab(
             val arrived = inbox.copying.size < copying.size
             sends = inbox.sends
             copying = inbox.copying
+            onInboxRead(sends.size)
             if (arrived) {
                 loadStories()
                 onCopyArrived()

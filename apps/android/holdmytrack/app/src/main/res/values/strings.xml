@@ -346,6 +346,10 @@
     <string name="sync_open_list">Choose what to sync</string>
     <string name="sync_history_hint">Health Connect only shares the past 30 days unless you allow access to past data. HoldMyTrack is built around the whole shape of where you have been, so 30 days is not much of a map.</string>
     <string name="sync_allow_history">Allow access to past data</string>
+    <plurals name="stories_waiting">
+        <item quantity="one">%1$d copy of a story waiting</item>
+        <item quantity="other">%1$d copies of stories waiting</item>
+    </plurals>
     <plurals name="sync_waiting">
         <item quantity="one">%1$d recording waiting</item>
         <item quantity="other">%1$d recordings waiting</item>

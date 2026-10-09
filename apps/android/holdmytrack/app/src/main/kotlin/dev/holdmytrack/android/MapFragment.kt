@@ -586,6 +586,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             },
             onRemovedFromStory = ::onRemovedFromStory,
             onStoryCopyArrived = ::onStoryCopyArrived,
+            onStoriesWaiting = { host?.setStoriesWaiting(it) },
             onSheetChanged = ::onSheetChanged,
             syncTab = syncTab,
         )
