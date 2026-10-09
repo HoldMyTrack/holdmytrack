@@ -350,10 +350,6 @@
         <item quantity="one">%1$d copy of a story waiting</item>
         <item quantity="other">%1$d copies of stories waiting</item>
     </plurals>
-    <plurals name="sync_waiting">
-        <item quantity="one">%1$d recording waiting</item>
-        <item quantity="other">%1$d recordings waiting</item>
-    </plurals>
     <string name="sync_hc_ready">Ready to read</string>
     <string name="sync_hc_ready_30_days">Ready, the last 30 days only</string>
     <string name="sync_hc_setup">One more step</string>

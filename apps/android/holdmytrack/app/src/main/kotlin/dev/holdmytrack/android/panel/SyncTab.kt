@@ -281,7 +281,6 @@ class SyncTab(
                 emptyMap()
             }
         }
-        (activity as? MainActivity)?.setSyncWaiting(recordings.size)
     }
 
     private fun hiddenStore() = HiddenCandidates(activity, Session.email)
@@ -420,7 +419,6 @@ class SyncTab(
                     hidden = hiddenStore().all()
                     recordings = recordings.filterNot { it.key == candidate.key }
                     ticked -= candidate.key
-                    (activity as? MainActivity)?.setSyncWaiting(recordings.size)
                     render()
                 }
             }
@@ -464,7 +462,6 @@ class SyncTab(
         recordings = recordings.filterNot { it.key in report.landed }
         ticked -= report.landed
         if (highlight in report.landed) highlight = null
-        (activity as? MainActivity)?.setSyncWaiting(recordings.size)
     }
 
     /**

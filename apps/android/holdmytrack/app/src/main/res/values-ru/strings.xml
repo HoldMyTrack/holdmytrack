@@ -366,12 +366,6 @@
         <item quantity="many">%1$d копий историй ждут</item>
         <item quantity="other">%1$d копии историй ждут</item>
     </plurals>
-    <plurals name="sync_waiting">
-        <item quantity="one">%1$d запись ждёт</item>
-        <item quantity="few">%1$d записи ждут</item>
-        <item quantity="many">%1$d записей ждут</item>
-        <item quantity="other">%1$d записи ждут</item>
-    </plurals>
     <string name="sync_hc_ready">Готово к чтению</string>
     <string name="sync_hc_ready_30_days">Готово, но только последние 30 дней</string>
     <string name="sync_hc_setup">Остался один шаг</string>
