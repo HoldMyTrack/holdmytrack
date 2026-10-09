@@ -174,21 +174,7 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 		return Result{}, fmt.Errorf("ingest: render activity masks: %w", err)
 	}
 
-	// §4.6's cross-source deduplication, after the streams and masks above and not before:
-	// richness is ranked off those rows, so a record judged ahead of its own streams would
-	// lose every collision it entered. Masks are rendered for the loser too — they cost
-	// nothing to keep, every read already excludes a superseded activity, and if the winner
-	// is ever deleted the loser becomes live again with its coverage already on file.
-	//
-	// The tiles it reports back are added to the dirty set rather than replacing it: a
-	// collision can change which activities a tile the *new* one never touched is composited
-	// from, and rebuilding only the new one's tiles would leave the rest showing coverage
-	// from a copy that no longer counts.
-	dedupeTiles, err := ResolveDuplicates(ctx, pool, job.UserID, points[0].Time, m.durationS)
-	if err != nil {
-		return Result{}, err
-	}
-	if err := MarkFogTilesDirty(ctx, pool, job.UserID, mergeTiles(tiles, dedupeTiles)); err != nil {
+	if err := MarkFogTilesDirty(ctx, pool, job.UserID, tiles); err != nil {
 		return Result{}, fmt.Errorf("ingest: mark fog tiles dirty: %w", err)
 	}
 

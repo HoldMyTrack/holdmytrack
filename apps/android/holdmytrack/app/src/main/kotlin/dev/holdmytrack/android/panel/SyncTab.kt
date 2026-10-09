@@ -24,7 +24,9 @@ import dev.holdmytrack.android.R
 import dev.holdmytrack.android.SyncHistoryActivity
 import dev.holdmytrack.android.UploadActivity
 import dev.holdmytrack.android.health.HealthConnect
+import dev.holdmytrack.android.net.ActivityOverlap
 import dev.holdmytrack.android.net.HoldMyTrackApi
+import dev.holdmytrack.android.net.OverlapSpan
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.recording.RecordingActivity
 import dev.holdmytrack.android.recording.RecordingTypes
@@ -121,6 +123,8 @@ class SyncTab(
     private var known: Set<String> = emptySet()
     private var recordings: List<Candidate> = emptyList()
     private var hidden: Set<String> = emptySet()
+    /** The account's activity each candidate overlaps, by key — the hint, nothing more. */
+    private var overlaps: Map<String, ActivityOverlap> = emptyMap()
     private var showHidden = false
 
     /** What Health Connect couldn't give, said over the list. */
@@ -265,6 +269,18 @@ class SyncTab(
         hiddenStore.retainOnly(recordings.map { it.key }.toSet() + keptSessions)
         hidden = hiddenStore.all()
         ticked.retainAll(all().map { it.key }.toSet())
+        // A hint only: when the server can't say, the rows go without it.
+        overlaps = if (Session.isDemo) {
+            emptyMap()
+        } else {
+            try {
+                HoldMyTrackApi.activityOverlaps(all().map { OverlapSpan(it.key, it.startedAt, it.endedAt) })
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                emptyMap()
+            }
+        }
         (activity as? MainActivity)?.setSyncWaiting(recordings.size)
     }
 
@@ -486,10 +502,14 @@ class SyncTab(
             RecordingTypes.format(res, candidate.activityType),
             res.getString(if (candidate.isRecording) R.string.sync_origin_recorded else R.string.sync_origin_health_connect),
         ).joinToString(" · ")
+        val overlap = overlaps[candidate.key]?.let { o ->
+            res.getString(R.string.sync_row_overlaps, o.name.trim().ifEmpty { PanelFormat.startedAt(res, o.startedAt, o.timezone) })
+        }
         return Row(
             key = candidate.key,
             title = if (named) candidate.name else date,
             meta = meta,
+            overlap = overlap,
             type = candidate.activityType,
             recording = candidate.isRecording,
             ticked = candidate.key in ticked,
@@ -505,6 +525,8 @@ class SyncTab(
         val key: String,
         val title: String,
         val meta: String,
+        /** "Overlaps Morning walk", when it does (`docs/SPEC.md` FR-3.7). */
+        val overlap: String?,
         val type: String,
         val recording: Boolean,
         val ticked: Boolean,
@@ -532,6 +554,7 @@ class SyncTab(
         private val text: View = view.findViewById(R.id.candidate_text)
         private val title: TextView = view.findViewById(R.id.candidate_title)
         private val meta: TextView = view.findViewById(R.id.candidate_meta)
+        private val overlap: TextView = view.findViewById(R.id.candidate_overlap)
         private val hiddenBadge: View = view.findViewById(R.id.candidate_hidden)
         private val edit: View = view.findViewById(R.id.candidate_edit)
         private val delete: View = view.findViewById(R.id.candidate_delete)
@@ -544,9 +567,12 @@ class SyncTab(
             itemView.isSelected = row.highlighted
             title.text = row.title
             meta.text = row.meta
+            overlap.text = row.overlap
+            overlap.visibility = if (row.overlap != null) View.VISIBLE else View.GONE
             val alpha = if (row.hidden) HIDDEN_ALPHA else 1f
             title.alpha = alpha
             meta.alpha = alpha
+            overlap.alpha = alpha
             hiddenBadge.visibility = if (row.hidden) View.VISIBLE else View.GONE
 
             val context = itemView.context
@@ -559,7 +585,7 @@ class SyncTab(
             tick.contentDescription = res.getString(if (row.ticked) R.string.sync_row_untick else R.string.sync_row_tick, row.title)
             tick.setOnClickListener { toggle(row.key) }
 
-            text.contentDescription = listOf(res.getString(R.string.sync_row_show, row.title), row.meta).joinToString(". ")
+            text.contentDescription = listOfNotNull(res.getString(R.string.sync_row_show, row.title), row.meta, row.overlap).joinToString(". ")
             text.setOnClickListener { candidate(row.key)?.let(::pick) }
             text.setOnLongClickListener {
                 if (tickable) toggle(row.key)

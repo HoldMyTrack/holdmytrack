@@ -14,12 +14,11 @@ This file stays lean and current-only. Once an entry is fixed, its root-cause/fi
 - [ ] Join across the parts of one split export: hold the parts of one Takeout export (they share a name stem, `takeout-<timestamp>-NNN.zip`) until all have arrived, or index each part's exercise logs and GPS files and join across them.
 - [ ] Check both against a real multi-part export, then drop the limit from the guide.
 
-### A split activity's ride arriving again from another source shows up beside its parts
+### The overlap hint misses a whole copy of a split activity
 
-Cross-source duplicate detection (`SPEC.md` FR-3.7, `IMPLEMENTATION.md` §4.6) calls two activities the same one when their time ranges overlap by at least 80% of the longer one. After a split (FR-5.17, §4.7.8), a whole-activity copy of the same recording from a second source, say a Garmin export after a Health Connect sync, overlaps each part by far less than that, so it goes live next to them: the time is counted twice in totals, and the route is drawn twice into the Heatmap. A later copy of just one part is caught, since that part and the copy overlap almost entirely.
+The overlap hint (`SPEC.md` FR-3.7, `IMPLEMENTATION.md` §4.6) marks a candidate whose time range overlaps one of the account's activities by at least 80% of the longer one. After a split (FR-5.17, §4.7.8), a whole copy of the same recording from a second source, say a Health Connect session of a ride uploaded earlier from the watch's file and then split, overlaps each part by far less than that, so its row in the Android app's Sync tab isn't marked. Ticked, it lands next to the parts: the time is counted twice in totals, and the route is drawn twice into the Heatmap. A copy of just one part is marked, since that part and the copy overlap almost entirely.
 
-- [ ] In `ResolveDuplicates`, compare a new activity against a split group as one span (the group's earliest start to its latest end) as well as against each part. When it matches, mark it superseded by the group's first part.
-- [ ] Decide which copy wins when the new one is richer: keep the parts, since they hold the user's own split, and say so in FR-3.7.
+- [ ] In `ingest.Overlaps`, compare a span against a split group as one span (the group's earliest start to its latest end) as well as against each part, and answer with the group's first part.
 
 ### Trends leaves out empty weeks and months, so its bars don't show the 12 months `SPEC.md` FR-9 describes
 

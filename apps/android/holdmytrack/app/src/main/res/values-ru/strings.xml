@@ -356,6 +356,7 @@
     <string name="sync_row_tick">Отметить: %1$s</string>
     <string name="sync_row_untick">Снять отметку: %1$s</string>
     <string name="sync_row_show">Показать на карте: %1$s</string>
+    <string name="sync_row_overlaps">Пересекается с «%1$s»</string>
     <string name="sync_open_list">Выбрать, что синхронизировать</string>
     <string name="sync_history_hint">Health Connect отдаёт только последние 30 дней, если не разрешить доступ к прошлым данным. HoldMyTrack показывает всё, где вы побывали, так что 30 дней — это совсем маленькая карта.</string>
     <string name="sync_allow_history">Разрешить доступ к прошлым данным</string>

@@ -342,6 +342,7 @@
     <string name="sync_row_tick">Tick %1$s</string>
     <string name="sync_row_untick">Untick %1$s</string>
     <string name="sync_row_show">Show %1$s on the map</string>
+    <string name="sync_row_overlaps">Overlaps %1$s</string>
     <string name="sync_open_list">Choose what to sync</string>
     <string name="sync_history_hint">Health Connect only shares the past 30 days unless you allow access to past data. HoldMyTrack is built around the whole shape of where you have been, so 30 days is not much of a map.</string>
     <string name="sync_allow_history">Allow access to past data</string>

@@ -474,18 +474,14 @@ func (s *Server) handleDeleteActivity(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// A representative of the copies this delete is about to release (§4.6). Each one overlapped
-	// the deleted winner, so re-ranking around any one of them re-ranks its copies too — and
-	// without that they would every one become live at once, leaving the same ride counted two
-	// or three times in the totals and the fog.
-	var releasedStart *time.Time
-	var releasedDuration *int
-	if err := s.pool.QueryRow(ctx,
-		`SELECT started_at, duration_seconds FROM activities
-		 WHERE superseded_by = $1 ORDER BY created_at LIMIT 1`, activityID,
-	).Scan(&releasedStart, &releasedDuration); err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		s.log.Error("activity delete: superseded lookup failed", "activity_id", activityID, "err", err)
+	// The copies this activity hid as duplicates (§4.6) would all become live as it goes; one
+	// is promoted and the rest stay hidden behind it. Before the delete, while they still point
+	// at it.
+	released, err := ingest.RankReleased(ctx, s.pool, activityID)
+	if err != nil {
+		s.log.Error("activity delete: ranking released copies failed", "activity_id", activityID, "err", err)
 	}
+	tiles = append(tiles, released...)
 
 	tag, err := s.pool.Exec(ctx, `DELETE FROM activities WHERE id = $1 AND user_id = $2`, activityID, userID)
 	if err != nil {
@@ -509,16 +505,6 @@ func (s *Server) handleDeleteActivity(w http.ResponseWriter, r *http.Request) {
 	// whatever activity_tile_masks rows currently exist, so simply re-triggering it against
 	// the now-smaller set (this activity's rows already gone via the cascade above) produces a
 	// correct result with no new compositing logic needed.
-	// Re-rank before re-rendering, so the render below composites the set that actually wins.
-	if releasedStart != nil && releasedDuration != nil {
-		extra, err := ingest.ResolveDuplicates(ctx, s.pool, userID, *releasedStart, *releasedDuration)
-		if err != nil {
-			s.log.Error("activity delete: re-resolving duplicates failed", "activity_id", activityID, "err", err)
-		} else {
-			tiles = append(tiles, extra...)
-		}
-	}
-
 	if len(tiles) > 0 {
 		if err := ingest.MarkFogTilesDirty(ctx, s.pool, userID, tiles); err != nil {
 			s.log.Error("activity delete: mark fog tiles dirty failed", "activity_id", activityID, "err", err)

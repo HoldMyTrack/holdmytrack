@@ -619,6 +619,39 @@ object HoldMyTrackApi {
             known
         }
 
+    /**
+     * `POST /v1/activities/overlaps` (root `docs/IMPLEMENTATION.md` §4.6): for each of [spans],
+     * keyed by the caller, the live activity it overlaps, if any — the Sync tab's "Overlaps
+     * Morning walk" hint (`docs/SPEC.md` FR-3.7). Keys with no overlap aren't in the map.
+     */
+    suspend fun activityOverlaps(spans: List<OverlapSpan>): Map<String, ActivityOverlap> =
+        withContext(Dispatchers.IO) {
+            val found = mutableMapOf<String, ActivityOverlap>()
+            for (chunk in spans.chunked(MAX_KNOWN_IDS)) {
+                val array = JSONArray()
+                for (span in chunk) {
+                    array.put(JSONObject().put("key", span.key).put("start", span.start.toString()).put("end", span.end.toString()))
+                }
+                val request = Request.Builder()
+                    .url(BuildConfig.API_BASE_URL + API_V1 + "/activities/overlaps")
+                    .post(JSONObject().put("spans", array).toString().toRequestBody(JSON))
+                    .build()
+                val response = client.newCall(request).execute()
+                val text = response.use { it.body?.string().orEmpty() }
+                if (!response.isSuccessful) throw ApiException.from(response.code, text)
+                val rows = JSONObject(text).getJSONArray("overlaps")
+                for (i in 0 until rows.length()) {
+                    val row = rows.getJSONObject(i)
+                    found[row.getString("key")] = ActivityOverlap(
+                        name = row.optString("name"),
+                        startedAt = row.getString("started_at"),
+                        timezone = if (row.isNull("timezone")) null else row.optString("timezone"),
+                    )
+                }
+            }
+            found
+        }
+
     /** The server's `maxKnownIDs`: one `POST /v1/sync/known` asks about at most this many. */
     private const val MAX_KNOWN_IDS = 5000
 
@@ -1690,3 +1723,10 @@ object HoldMyTrackApi {
         })
     }
 }
+
+/** One time span asked about in [HoldMyTrackApi.activityOverlaps], under the caller's [key]. */
+data class OverlapSpan(val key: String, val start: Instant, val end: Instant)
+
+/** The live activity a span overlaps: its [name] (empty when it has none), and its start in the
+ *  zone it was recorded in, which titles it when it has no name. */
+data class ActivityOverlap(val name: String, val startedAt: String, val timezone: String?)

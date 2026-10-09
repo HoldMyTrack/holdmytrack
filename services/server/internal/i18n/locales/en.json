@@ -322,7 +322,7 @@
   "meta.sync_title": "Sync — HoldMyTrack",
   "sync.title": "Sync history",
   "sync.failed_unseen": "Failed imports: {n}",
-  "sync.subtext": "Everything you've imported, once it's finished: files you uploaded and activities synced from your phone, newest first. An activity recorded twice — by your watch and your phone, say — is a Duplicate: only the fuller copy is kept on the map. What's still being processed is in the Upload menu.",
+  "sync.subtext": "Everything you've imported, once it's finished: files you uploaded and activities synced from your phone, newest first. A Duplicate is an activity set aside earlier because a fuller copy of it, recorded by another device, was kept: only that copy is on the map. What's still being processed is in the Upload menu.",
   "sync.demo": "The demo account's imports. Create an account to import your own.",
   "sync.empty": "Nothing imported yet. Upload files from the header, or sync from the Android app.",
   "sync.ready": "Ready",

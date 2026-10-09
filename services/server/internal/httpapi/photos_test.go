@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage/storagetest"
 )
 
@@ -280,31 +279,16 @@ func TestPhotoUploadRefusals(t *testing.T) {
 	}
 }
 
-func TestPhotosFollowTheirActivity(t *testing.T) {
+func TestPhotosGoWithTheirActivity(t *testing.T) {
 	s3 := newMemS3()
 	d := newDBTestWithS3(t, s3)
 	me := d.newAccount(false)
-	ctx := context.Background()
 	file, thumb := testJPEG(t, 40, 30), testJPEG(t, 8, 6)
 
-	// Two recordings of the same walk, a second apart. Equally rich, so the one stored first wins.
 	tracked := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, startedAt: photoTrackStart, at: &[2]float64{10, 50}})
-	copied := d.newActivity(me, testActivity{activityType: "walking", durationSecs: 60, startedAt: photoTrackStart.Add(time.Second), at: &[2]float64{10.0001, 50}})
 	var p photoJSON
-	d.decode(d.uploadPhoto(me, file, thumb, map[string]string{"activity_id": copied, "taken_at": "2026-05-01T10:00:30Z"}), http.StatusCreated, &p)
-	if _, err := ingest.ResolveDuplicates(ctx, d.pool, me.id, photoTrackStart, 60); err != nil {
-		t.Fatal(err)
-	}
+	d.decode(d.uploadPhoto(me, file, thumb, map[string]string{"activity_id": tracked, "taken_at": "2026-05-01T10:00:30Z"}), http.StatusCreated, &p)
 	d.decode(d.do(me, "GET", p.URL, nil), http.StatusOK, nil)
-	var list photosResponse
-	d.decode(d.do(me, "GET", "/v1/photos?activity="+tracked, nil), http.StatusOK, &list)
-	if len(list.Photos) != 1 || list.Photos[0].ID != p.ID {
-		t.Fatalf("the winner's photos: %+v, want the hidden copy's", list.Photos)
-	}
-	// Its moment, now on the winner's track.
-	if !near(list.Photos[0].Lon, 10.0005) {
-		t.Errorf("moved photo at %v, want the track's midpoint", list.Photos[0].Lon)
-	}
 
 	// Deleting the activity deletes its photos, images and all.
 	d.decode(d.do(me, "DELETE", "/v1/activities/"+tracked, nil), http.StatusNoContent, nil)

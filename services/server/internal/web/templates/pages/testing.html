@@ -96,7 +96,7 @@
 
     <h3 id="UP-6">UP-6 · The same activity from another source</h3>
     <p>File: <a class="testing__file" href="{{asset "testing/duplicate.tcx"}}" download="duplicate.tcx">duplicate.tcx</a>, the Clague Park walk from the sample zip again, as a different file without elevation.</p>
-    <p class="testing__expect"><strong>Expected:</strong> Sync history shows it as Duplicate, "Kept the copy from an uploaded file". There is still only one Clague Park walk on 27 September, and it still has its elevation.</p>
+    <p class="testing__expect"><strong>Expected:</strong> Sync history shows it as Ready. There are now two Clague Park walks on 27 September: HoldMyTrack doesn't merge copies for you. Delete the one without elevation.</p>
 
     <h3 id="UP-7">UP-7 · Files that can't be imported</h3>
     <p>Upload each of these, one at a time:</p>
@@ -469,6 +469,10 @@
     <h3 id="RC-6">RC-6 · Edit, download, delete before syncing</h3>
     <p>Record another short walk and save it. On the Sync tab, Edit it (change the type), use Download GPX, then Delete it.</p>
     <p class="testing__expect"><strong>Expected:</strong> Download GPX says "Track saved." Delete warns "It hasn't been synced, so this is the only copy. This can't be undone."</p>
+
+    <h3 id="RC-7">RC-7 · A walk you already have <em>(needs a watch or another app that writes to Health Connect)</em></h3>
+    <p>Record a walk with the app while your watch, or another app, records the same walk into Health Connect. Sync the app's recording first (RC-2), then open the Sync tab again.</p>
+    <p class="testing__expect"><strong>Expected:</strong> the Health Connect session of that walk is listed, unticked, with a third line "Overlaps" and the recording's date and time. Ticked and synced anyway, it becomes a second walk on the map.</p>
   </section>
 
   <section class="page-section" id="you">

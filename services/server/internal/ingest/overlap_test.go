@@ -40,7 +40,7 @@ func TestOverlapMatches(t *testing.T) {
 	}
 }
 
-// Every pair overlapMatches accepts must start within dedupeStartSlack of the incoming
+// Every pair overlapMatches accepts must start within overlapStartSlack of the incoming
 // activity's duration, or the SQL prefilter would drop a real match before the exact test.
 func TestStartSlackCoversEveryMatch(t *testing.T) {
 	t0 := time.Date(2026, 9, 1, 8, 0, 0, 0, time.UTC)
@@ -50,8 +50,8 @@ func TestStartSlackCoversEveryMatch(t *testing.T) {
 			if !overlapMatches(t0, d, t0.Add(off), other) {
 				continue
 			}
-			if abs := off.Abs(); float64(abs) > float64(d)*dedupeStartSlack {
-				t.Fatalf("match at start offset %v (other %v) is outside the slack of %v", off, other, time.Duration(float64(d)*dedupeStartSlack))
+			if abs := off.Abs(); float64(abs) > float64(d)*overlapStartSlack {
+				t.Fatalf("match at start offset %v (other %v) is outside the slack of %v", off, other, time.Duration(float64(d)*overlapStartSlack))
 			}
 		}
 	}
