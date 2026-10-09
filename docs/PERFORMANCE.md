@@ -24,7 +24,7 @@ Afterwards `loadtest cleanup` deletes them all; the purge (`IMPLEMENTATION.md` �
 ### Scenarios
 
 - **Seed**: `seed` uploads every demo track (`internal/httpapi/demo_data`, 45 files) to every account, about 945 jobs, then the queue is timed to empty. It includes the three long tracks (200+ z14 tiles each; the 1,478 km "2026-01-22 Vietnam" drive crosses 756), so it doubles as a worst case for them.
-- **Browse ramp**: `browse` with 10, 25, 50, 100 and 200 users for 3 minutes each, the worker idle. Each user opens a 4×3-tile view of every layer the zoom shows (Country fog, Region fog, Fog, Tracks, Spots) every 1–2 s through a zoom-in, pan and zoom-out path, six requests at a time, with no tile cache: a cold-cache worst case, since real browsers keep each tile for good per tile version (`IMPLEMENTATION.md` §4.2.6).
+- **Browse ramp**: `browse` with 10, 25, 50, 100 and 200 users for 3 minutes each, the worker idle. Each simulated person is in one mode at a time (Normal half the time, Fog about a third, Heatmap the rest), starts at city zoom over one of the account's places, and every 1.5–4 s pans about half a screen, zooms a level, pulls out to a country or region and back, or now and then switches mode. Each view requests what the web client would for a 1280×800 window: Tracks from z4 in Normal; Country tiles below z3, Region tiles below z7 and the Fog or Heatmap raster from z7 in those modes; Spots from z13 for the fifth of people who turn them on; never deeper than z14, which every source stops at. Six requests at a time, and a tile already fetched isn't fetched again, as a browser keeps each for good per tile version (`IMPLEMENTATION.md` §4.2.6). `-cold` drops that cache for a worst case.
 - **Import**: `gen 5 1000` then `import 5`: five accounts upload a 1,000-track archive each at once. Two minutes in, and again deep into the backlog, `probe` uploads one new track from a separate account and times it to processed — the fairness check. A 12-user `browse` runs meanwhile.
 - **Stop** a step on more than 2% errors, a p95 over 5 s on two consecutive steps, under 10% memory available, or an out-of-memory kill.
 
@@ -32,7 +32,7 @@ Afterwards `loadtest cleanup` deletes them all; the purge (`IMPLEMENTATION.md` �
 
 ### 2026-10-08 — production, `d07834c`, the baseline
 
-The production VPS (2 vCPU, 4 GB) with one sequential worker. 21 test accounts; the bypass was on for about 30 s.
+The production VPS (2 vCPU, 4 GB) with one sequential worker. 21 test accounts; the bypass was on for about 30 s. The browse of the time didn't follow the client: every view asked for a 4×3 block of Fog and Tracks together at every zoom, Country tiles at z3 and z5 and Region tiles at z7–8, with no cache — about 30 requests a view, several times what a person makes (see the realistic-browse session below).
 
 | Users | Map views/s | Fog p95 | Tracks p95 | Country p95 | Errors |
 | :-- | :-- | :-- | :-- | :-- | :-- |
@@ -63,7 +63,7 @@ With the parallel render, the fair worker (4 loops) and palette tiles deployed. 
 
 ### 2026-10-09 — production, `c040021`
 
-The same VPS with everything above plus the faster blur. 21 test accounts; the bypass was on for 8 s.
+The same VPS with everything above plus the faster blur. 21 test accounts; the bypass was on for 8 s. The browse was still the one the baseline used, about 30 requests a view.
 
 | Users | Map views/s | Fog p95 | Tracks p95 | Country p95 | Errors |
 | :-- | :-- | :-- | :-- | :-- | :-- |
@@ -149,3 +149,16 @@ Two dev accounts imported the same kind of 1,000-track archive. A worker built f
 
 - Both purges removed every object and row of their account: no `fog/`, `heatmap/`, `raw/` or `imports/` object and no mask row left. The dev store's 29 orphaned mask folders all predate the test (2026-09-26 to 2026-10-07).
 - No activity was skipped in either redraw.
+
+### 2026-10-09 — dev stack, a browse that follows the client
+
+`loadtest browse` rewritten to request what the web client requests (the "Browse ramp" scenario above), run with 20 people for a minute against the dev stack, and once with `-cold`.
+
+| 20 people, 1 minute | Views | Requests | A view |
+| :-- | :-- | :-- | :-- |
+| Browse before, no cache (from an earlier 50-person dev run) | — | — | about 30 |
+| Realistic, with a tile cache | 434 | 1,683 (2,139 more served from cache) | 3.9 |
+| Realistic, `-cold` | 440 | 3,290 | 7.5 |
+
+- A person's view costs the server about an eighth of what the earlier browse charged it, so both production runs' map numbers were a worst case well past real traffic.
+- The heaviest layer is now Region tiles at z3–6 (p95 78–91 ms on the laptop), then Country tiles at z0–2; Tracks, Fog and Heatmap stay a few milliseconds.
