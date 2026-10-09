@@ -26,9 +26,24 @@ data class ActivityRowItem(
     val selecting: Boolean = false,
 )
 
-/** The icon for an activity's kind, on its row's tile and its card. */
+/** The icon for an activity's type, on its row's tile and its card: a solowheel's or an
+ *  e-scooter's own, matched case-insensitively within the type ("Solowheel", "e_scooter_commute"),
+ *  else its kind's. */
 @DrawableRes
-fun kindIcon(kind: ActivityKind): Int = when (kind) {
+fun typeIcon(type: String): Int {
+    val t = type.lowercase()
+    return when {
+        MONOWHEEL_WORDS.any { it in t } -> R.drawable.ic_monowheel
+        E_SCOOTER_WORDS.any { it in t } -> R.drawable.ic_electric_scooter
+        else -> kindIcon(ActivityKind.of(type))
+    }
+}
+
+private val MONOWHEEL_WORDS = listOf("solowheel", "monowheel")
+private val E_SCOOTER_WORDS = listOf("e_scooter", "escooter")
+
+@DrawableRes
+private fun kindIcon(kind: ActivityKind): Int = when (kind) {
     ActivityKind.FOOT -> R.drawable.ic_footprints
     ActivityKind.WHEELS -> R.drawable.ic_bike
     ActivityKind.MOTOR -> R.drawable.ic_car
@@ -155,7 +170,7 @@ class ActivityRowHolder(view: View) : RecyclerView.ViewHolder(view) {
 
         val context = itemView.context
         val ticked = isChecked && onCheck != null
-        kindTile.setImageResource(if (ticked) R.drawable.ic_check else kindIcon(ActivityKind.of(activity.activityType)))
+        kindTile.setImageResource(if (ticked) R.drawable.ic_check else typeIcon(activity.activityType))
         kindTile.backgroundTintList = if (ticked) ColorStateList.valueOf(context.getColor(R.color.hmt_accent)) else null
         kindTile.imageTintList = ColorStateList.valueOf(context.getColor(if (ticked) R.color.hmt_on_accent else R.color.hmt_ink_secondary))
         val checkLabel = res.getString(if (isChecked) R.string.panel_row_uncheck else R.string.panel_row_check, label)

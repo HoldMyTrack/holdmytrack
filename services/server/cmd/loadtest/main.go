@@ -433,6 +433,10 @@ func (v *visitor) step() {
 		span := 360 / math.Exp2(float64(v.z)) * (float64(viewW) / 512)
 		v.c.lon += (v.r.Float64() - 0.5) * span
 		v.c.lat += (v.r.Float64() - 0.5) * span * float64(viewH) / float64(viewW) * math.Cos(v.c.lat*math.Pi/180)
+		// The map stops at Web Mercator's edge and wraps east-west, as the web client's does; a
+		// centre past a pole sends view's tile rows to infinity.
+		v.c.lat = math.Max(-85, math.Min(85, v.c.lat))
+		v.c.lon = math.Mod(math.Mod(v.c.lon+180, 360)+360, 360) - 180
 	case n < 80:
 		if v.r.Intn(2) == 0 {
 			v.z = max(v.z-1, 2)

@@ -162,3 +162,22 @@ Two dev accounts imported the same kind of 1,000-track archive. A worker built f
 
 - A person's view costs the server about an eighth of what the earlier browse charged it, so both production runs' map numbers were a worst case well past real traffic.
 - The heaviest layer is now Region tiles at z3–6 (p95 78–91 ms on the laptop), then Country tiles at z0–2; Tracks, Fog and Heatmap stay a few milliseconds.
+
+### 2026-10-09 — production, `f3f28d2`, the client's browse
+
+The same VPS with 64 px tiles (ADR-0037), the parallel purge and the per-file import (ADR-0039), and the first production run of the browse that follows the client. 21 test accounts; the bypass was on for 6 s. Region and Country are the Fog-mode requests, the heavier of the two modes' for both.
+
+| Users | Map views/s | Requests/s | Fog p95 | Heatmap p95 | Tracks p95 | Region p95 | Country p95 | Errors |
+| :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- |
+| 10 | 3.5 | 8.1 | 0.18 s | 0.14 s | 0.08 s | 0.39 s | 0.22 s | 0 |
+| 25 | 8.8 | 26.4 | 0.15 s | 0.15 s | 0.09 s | 0.38 s | 0.25 s | 0 |
+| 50 | 17.3 | 43.6 | 0.20 s | 0.22 s | 0.21 s | 0.41 s | 0.39 s | 0 |
+| 100 | 34.7 | 86.0 | 0.34 s | 0.31 s | 0.31 s | 0.54 s | 0.43 s | 0 |
+| 200 | 62.4 | 169.2 | 1.76 s | 1.80 s | 1.94 s | 2.31 s | 2.04 s | 0 |
+
+- Views rose in step with people all the way to 200; nothing saturated. A view cost 2.3–3.0 requests, the rest coming from the tile cache. Postgres averaged 51% CPU at 100 people and 117% at 200 (peaks of 195%), serving the live Tracks, Region and Country tiles; the API stayed under 35% and Caddy under 35%. At least 2.6 GB of memory stayed available.
+- The seed's 945 uploads were accepted in 30 s (p95 2.36 s) and the queue drained in 19 minutes, with the worker peaking at 193% CPU.
+- The import's 5,000 files, sent one at a time by five accounts at once, were accepted in about 2.5 minutes without a failure, and the queue drained in 38 minutes. Ingests ran at about 75 a minute for the first three minutes, the worker at about 45% CPU and the host two-thirds idle while autovacuum analysed `activities` and `activity_streams`, then at 260–375 a minute.
+- A single upload from another account was processed in 5 s with 4,254 jobs queued ahead of it, but took 7 minutes 35 s when sent at 23:04: by then the renders of the four accounts that had finished ingesting held all four worker loops (`IMPLEMENTATION.md` §3.8), and the upload waited until the first of them ended at 23:12. Those four renders ended between 23:12 and 23:15 with the worker averaging 81% CPU of its 200%, waiting more than computing.
+- 12 people browsing during the import: every 30 s window's Fog p95 under 155 ms (median 59 ms), Tracks under 245 ms (63 ms), Region under 940 ms (118 ms), with no errors.
+- The purge removed the 21 accounts and their 5,947 activities in about 10 minutes, leaving no row with their `user_id` in any table and no job pending. The database grew from 2,452 to 2,582 MB during the test and stood at 2,564 MB after the purge.
