@@ -394,16 +394,21 @@ body {
   background: none;
   font: inherit;
   cursor: pointer;
-  opacity: 0.45;
+  --tab-opacity: 0.45;
 }
 
 .activities-panel__tab:hover {
-  opacity: 0.75;
+  --tab-opacity: 0.75;
 }
 
 .activities-panel__tab[aria-selected='true'] {
   border-bottom-color: var(--fm-accent);
-  opacity: 1;
+  --tab-opacity: 1;
+}
+
+/* On the tab's contents, not the tab, so a waiting badge can stay at full strength. */
+.activities-panel__tab > * {
+  opacity: var(--tab-opacity);
 }
 
 .activities-panel__heading-text {
@@ -422,6 +427,13 @@ body {
   padding: 1px var(--fm-space-8);
   font-size: var(--fm-text-sm);
   font-weight: var(--fm-weight-bold);
+}
+
+/* Copies of Stories waiting to be answered (FR-14.7): filled, and never dimmed with its tab. */
+.activities-panel__tab > .activities-panel__badge--waiting {
+  opacity: 1;
+  background: var(--fm-accent);
+  color: var(--fm-on-accent);
 }
 
 .activities-panel__subtext {

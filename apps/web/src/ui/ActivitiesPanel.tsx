@@ -424,6 +424,17 @@ export function ActivitiesPanel({
             onClick={() => selectTab('stories')}
           >
             <span className="activities-panel__heading-text">{t('stories.tab')}</span>
+            {/* Copies others sent, waiting to be accepted or declined (FR-14.7). */}
+            {stories.inbox.sends.length > 0 && (
+              <span
+                className="activities-panel__badge activities-panel__badge--waiting"
+                title={tn('stories.inbox_waiting', stories.inbox.sends.length)}
+                aria-label={tn('stories.inbox_waiting', stories.inbox.sends.length)}
+                data-testid="activities-panel-stories-waiting"
+              >
+                {stories.inbox.sends.length.toLocaleString(lang)}
+              </span>
+            )}
           </button>
           <button
             type="button"

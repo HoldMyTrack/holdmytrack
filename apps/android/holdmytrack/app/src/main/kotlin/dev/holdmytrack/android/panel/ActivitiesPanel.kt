@@ -83,6 +83,8 @@ class ActivitiesPanel(
     private val onRemovedFromStory: (activityId: String) -> Unit,
     /** A copy of a Story someone sent has arrived in the account (`StoriesTab`). */
     private val onStoryCopyArrived: () -> Unit,
+    /** The Stories tab read its inbox: how many copies wait to be answered. */
+    private val onStoriesWaiting: (waiting: Int) -> Unit,
     /** The sheet came to rest at another height, or its peek changed. */
     private val onSheetChanged: () -> Unit,
     /** The Sync tab, `MapFragment`'s to build: it draws on the map and reads the phone. */
@@ -175,6 +177,7 @@ class ActivitiesPanel(
         onBadgesChanged = { onStoriesChanged() },
         onActivityRemoved = { id -> onRemovedFromStory(id) },
         onCopyArrived = { onStoryCopyArrived() },
+        onInboxRead = { onStoriesWaiting(it) },
     )
 
     private var loading = false

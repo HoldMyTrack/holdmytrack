@@ -12,6 +12,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.panel.PanelTab
 import dev.holdmytrack.android.recording.RecordingService
@@ -107,7 +108,10 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         // Back from a recording's Save screen, or anywhere a recording was added or sent.
-        if (::nav.isInitialized) refreshSyncBadge()
+        if (::nav.isInitialized) {
+            refreshSyncBadge()
+            refreshStoriesBadge()
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -177,6 +181,28 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshSyncBadge() {
         lifecycleScope.launch { setSyncWaiting(RecordedActivityStore(this@MainActivity).count()) }
+    }
+
+    /** The Stories tab's badge: the copies of Stories others sent, waiting to be accepted or
+     *  declined (`docs/SPEC.md` FR-14.7) — in the accent, an invitation rather than a chore. */
+    fun setStoriesWaiting(count: Int) {
+        if (count <= 0 || Session.isDemo) {
+            nav.removeBadge(R.id.nav_stories)
+            return
+        }
+        nav.getOrCreateBadge(R.id.nav_stories).apply {
+            backgroundColor = getColor(R.color.hmt_accent)
+            badgeTextColor = getColor(R.color.hmt_surface)
+            number = count
+            setContentDescriptionQuantityStringsResource(R.plurals.stories_waiting)
+        }
+    }
+
+    /** The inbox read on launch and on every return to the app; the Stories tab reads it again
+     *  as it opens and after every answer. A failed read leaves the badge as it was. */
+    private fun refreshStoriesBadge() {
+        if (Session.isDemo) return
+        HoldMyTrackApi.storySends { result -> result.onSuccess { setStoriesWaiting(it.sends.size) } }
     }
 
     /** The bottom bar, and the record button over it — gone while the map's Edit window or
