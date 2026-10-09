@@ -270,7 +270,7 @@ func compositeHeatmapMask(masks []*image.Gray, cap float64) *image.Gray {
 //   - Colours that stand off the basemap: deep red, through orange, to bright yellow at the
 //     cap. The old rust-to-yellow ramp sat too close to the cream land and yellow roads.
 //
-// Applied when a tile is served (RenderHeatmapPNG), so a change here needs no re-render —
+// Applied when a tile is served (HeatmapTile's palette), so a change here needs no re-render —
 // only the tile-version bump rerender-coverage gives every account, so browsers refetch.
 type rampStop struct {
 	t          float64
@@ -284,7 +284,9 @@ var heatmapRamp = []rampStop{
 	{t: 1.00, r: 255, g: 216, b: 74, a: 255},
 }
 
-func heatmapColor(intensity uint8) color.RGBA {
+// heatmapNRGBA is intensity's colour along heatmapRamp, not premultiplied: one entry of the
+// served tile's palette (tint.go).
+func heatmapNRGBA(intensity uint8) color.NRGBA {
 	t := float64(intensity) / 255.0
 	i := 1
 	for i < len(heatmapRamp)-1 && heatmapRamp[i].t < t {
@@ -297,27 +299,7 @@ func heatmapColor(intensity uint8) color.RGBA {
 		f = (t - lo.t) / span
 	}
 	lerp := func(a, b uint8) uint8 { return uint8(float64(a) + f*(float64(b)-float64(a))) }
-	rgb := color.RGBA{R: lerp(lo.r, hi.r), G: lerp(lo.g, hi.g), B: lerp(lo.b, hi.b), A: lerp(lo.a, hi.a)}
-	// Premultiply: image.RGBA expects RGB already scaled by alpha, same convention
-	// RenderFogPNG uses.
-	a := float64(rgb.A) / 255
-	return color.RGBA{
-		R: uint8(float64(rgb.R) * a), G: uint8(float64(rgb.G) * a), B: uint8(float64(rgb.B) * a), A: rgb.A,
-	}
-}
-
-// RenderHeatmapPNG converts a stored additive-intensity mask into the ready-to-draw RGBA
-// PNG §4.2.2 specifies, via heatmapRamp. A blank mask (no fog_tiles row, or a row with no
-// heatmap_object_key yet) is *fully transparent* here, not fully opaque the way fog's blank
-// tile is — "no heat" should be invisible, unlike fog's "no coverage" veil.
-func RenderHeatmapPNG(mask *image.Gray) *image.RGBA {
-	out := image.NewRGBA(mask.Bounds())
-	for y := mask.Bounds().Min.Y; y < mask.Bounds().Max.Y; y++ {
-		for x := mask.Bounds().Min.X; x < mask.Bounds().Max.X; x++ {
-			out.SetRGBA(x, y, heatmapColor(mask.GrayAt(x, y).Y))
-		}
-	}
-	return out
+	return color.NRGBA{R: lerp(lo.r, hi.r), G: lerp(lo.g, hi.g), B: lerp(lo.b, hi.b), A: lerp(lo.a, hi.a)}
 }
 
 // Veil is one theme's fog treatment: the colour unexplored territory is painted in, and how
@@ -345,23 +327,4 @@ func VeilForTheme(theme string) Veil {
 		return DarkVeil
 	}
 	return LightVeil
-}
-
-// RenderFogPNG converts a stored single-channel coverage mask into the ready-to-draw fog-veil
-// RGBA PNG: the veil's colour in RGB, alpha = veil opacity × (255 - coverage).
-func RenderFogPNG(mask *image.Gray, veil Veil) *image.RGBA {
-	out := image.NewRGBA(mask.Bounds())
-	for y := mask.Bounds().Min.Y; y < mask.Bounds().Max.Y; y++ {
-		for x := mask.Bounds().Min.X; x < mask.Bounds().Max.X; x++ {
-			coverage := mask.GrayAt(x, y).Y
-			alpha := uint8(veil.Opacity * float64(255-coverage))
-			// Premultiplied, matching image.RGBA's convention (see RenderHeatmapPNG's own
-			// comment on the same point): scale each channel by the same alpha fraction.
-			a := float64(alpha) / 255
-			out.SetRGBA(x, y, color.RGBA{
-				R: uint8(float64(veil.R) * a), G: uint8(float64(veil.G) * a), B: uint8(float64(veil.B) * a), A: alpha,
-			})
-		}
-	}
-	return out
 }

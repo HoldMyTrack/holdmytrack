@@ -390,7 +390,7 @@ func renderPyramidLevel(ctx context.Context, pool *pgxpool.Pool, store *storage.
 // loadTileImage fetches a tile's currently-stored mask (fog or heatmap, per column) or a
 // blank one if the tile has no fog_tiles row yet or hasn't been rendered on that side — the
 // correct stand-in for "nothing here", not an error, since a user's history need not touch
-// every sibling tile. A blank mask is all-zero either way; RenderFogPNG and RenderHeatmapPNG
+// every sibling tile. A blank mask is all-zero either way; FogTile and HeatmapTile
 // each interpret zero correctly for their own mode (fully fogged vs. fully transparent).
 //
 // column is a Go identifier, not user input — always one of the two literal call sites

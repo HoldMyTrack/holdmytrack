@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"errors"
-	"image/png"
 	"net/http"
 
 	"github.com/jackc/pgx/v5"
@@ -10,7 +9,8 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
 )
 
-// handleHeatmapTile serves §4.2.2's additive-intensity mask as a ready-to-draw RGBA PNG.
+// handleHeatmapTile serves §4.2.2's additive-intensity mask as a ready-to-draw palette PNG,
+// coloured along the heat ramp (fog.HeatmapTile).
 //
 // Unlike Fog of War, which shows true all-time coverage (a place once cleared stays cleared),
 // Heatmap answers "where do I go *now*" — an old, no-longer-visited route should be able to
@@ -51,7 +51,7 @@ func (s *Server) handleHeatmapTile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	mask, err := loadMaskOrBlank(ctx, s.store, objectKey)
+	mask, err := loadMaskPNG(ctx, s.store, objectKey)
 	if err != nil {
 		if clientGone(w, r) {
 			return
@@ -61,9 +61,13 @@ func (s *Server) handleHeatmapTile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rgba := fog.RenderHeatmapPNG(mask)
+	tile, err := fog.HeatmapTile(mask)
+	if err != nil {
+		s.log.Error("heatmap tile tint failed", "err", err, "z", z, "x", x, "y", y)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "image/png")
 	setTileCacheControl(w, r)
-	// Encoding an in-memory image fails only on the write, which is the client having gone.
-	_ = png.Encode(w, rgba)
+	_, _ = w.Write(tile) // fails only when the client has gone
 }
