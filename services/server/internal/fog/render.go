@@ -13,10 +13,19 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parallel"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/tilemath"
 )
+
+// renderParallelism bounds how many tiles (or masks) a render works on at once. The work is
+// mostly waiting on object storage — a tile is one or more GETs and two PUTs, each a round
+// trip to R2 — so running them one after another left a render at about 1.3 tiles a second
+// on the production droplet (the 2026-10-08 load test), almost none of it CPU. Bounded rather
+// than unbounded so memory stays predictable (IMPLEMENTATION.md §5.2): each in-flight tile
+// holds a few decoded masks.
+const renderParallelism = 16
 
 // RenderUser is the `render_fog` job body: re-render every tile currently marked dirty for
 // this user, z14 first and then each pyramid level up to z0. Idempotent and complete per
@@ -59,7 +68,7 @@ func RenderUser(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, u
 		}
 		// A level's tiles are independent of each other, so they render side by side; the
 		// next level up waits for all of them, since its tiles are built from these.
-		err = forEach(ctx, len(dirty), renderParallelism, func(ctx context.Context, i int) error {
+		err = parallel.ForEach(ctx, len(dirty), renderParallelism, func(ctx context.Context, i int) error {
 			t := dirty[i]
 			var err error
 			if z == Zoom {
@@ -171,7 +180,7 @@ func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.
 
 	// Fetched side by side: a tile many activities cross (a daily commute) has as many masks.
 	loaded := make([]*image.Gray, len(rowsOut))
-	if err := forEach(ctx, len(rowsOut), renderParallelism, func(ctx context.Context, i int) error {
+	if err := parallel.ForEach(ctx, len(rowsOut), renderParallelism, func(ctx context.Context, i int) error {
 		mask, err := loadCrispMask(ctx, store, rowsOut[i].key)
 		if err != nil {
 			// One missing/corrupt mask should not fail the whole tile — every other
@@ -256,7 +265,7 @@ func RenderActivityMasks(ctx context.Context, pool *pgxpool.Pool, store *storage
 	keys := make([]string, len(tiles))
 	// Rendered and stored side by side: a long track crosses hundreds of tiles, and storing
 	// their masks one after another cost a 1,500 km drive over three minutes of the worker.
-	if err := forEach(ctx, len(tiles), renderParallelism, func(ctx context.Context, i int) error {
+	if err := parallel.ForEach(ctx, len(tiles), renderParallelism, func(ctx context.Context, i int) error {
 		x, y := tiles[i][0], tiles[i][1]
 		mask := renderActivityMask(projectToTile(points, x, y, Zoom)...)
 		key := activityMaskObjectKey(activityID, Zoom, x, y)
@@ -300,7 +309,7 @@ func RemoveActivityMasks(ctx context.Context, pool *pgxpool.Pool, store *storage
 	`, activityID, Zoom, xs, ys); err != nil {
 		return err
 	}
-	return forEach(ctx, len(tiles), renderParallelism, func(ctx context.Context, i int) error {
+	return parallel.ForEach(ctx, len(tiles), renderParallelism, func(ctx context.Context, i int) error {
 		t := tiles[i]
 		if err := store.Remove(ctx, activityMaskObjectKey(activityID, Zoom, t[0], t[1])); err != nil {
 			return fmt.Errorf("remove activity mask z%d/%d/%d: %w", Zoom, t[0], t[1], err)

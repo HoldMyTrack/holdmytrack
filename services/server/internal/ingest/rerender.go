@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parallel"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 )
 
@@ -63,6 +64,11 @@ func RerenderCoverage(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 	return nil
 }
 
+// rerenderParallelism is how many of an account's activities rerenderUserMasks redraws at
+// once. Each already stores its masks side by side (fog.RenderActivityMasks), so a few is
+// plenty.
+const rerenderParallelism = 8
+
 // rerenderUserMasks redraws every activity of one account whose masks can be redrawn. One that
 // can't — Pending (its own reprocess will), or with no upload stored — is logged and left as it
 // is rather than failing the whole run.
@@ -84,10 +90,18 @@ func rerenderUserMasks(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	for _, id := range ids {
-		if err := RerenderActivityMasks(ctx, pool, store, userID, id); err != nil {
-			log.Warn("rerender-coverage: masks skipped", "activity", id, "err", err)
+	// Side by side: an activity's redraw is mostly object-storage round trips, and one after
+	// another it took about 0.4 s each on production (docs/PERFORMANCE.md, 2026-10-09).
+	// MarkFogTilesDirty takes its rows in tile order, so two activities sharing tiles can't
+	// deadlock each other.
+	err = parallel.ForEach(ctx, len(ids), rerenderParallelism, func(ctx context.Context, i int) error {
+		if err := RerenderActivityMasks(ctx, pool, store, userID, ids[i]); err != nil {
+			log.Warn("rerender-coverage: masks skipped", "activity", ids[i], "err", err)
 		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 	log.Info("rerender-coverage: masks redrawn", "user", userID, "activities", len(ids))
 	return nil

@@ -451,6 +451,7 @@ func MarkFogTilesDirty(ctx context.Context, pool *pgxpool.Pool, userID string, t
 		INSERT INTO fog_tiles (user_id, zoom, tile_x, tile_y, dirty)
 		SELECT $1, $2, x, y, true
 		FROM unnest($3::int[], $4::int[]) AS t(x, y)
+		ORDER BY x, y
 		ON CONFLICT (user_id, zoom, tile_x, tile_y) DO UPDATE SET dirty = true, dirty_gen = fog_tiles.dirty_gen + 1
 	`, userID, FogZoom, xs, ys)
 	return err

@@ -1,4 +1,4 @@
-package fog
+package parallel
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 func TestForEachRunsEveryIndexWithinTheLimit(t *testing.T) {
 	var running, peak atomic.Int32
 	seen := make([]atomic.Bool, 50)
-	err := forEach(context.Background(), len(seen), 4, func(ctx context.Context, i int) error {
+	err := ForEach(context.Background(), len(seen), 4, func(ctx context.Context, i int) error {
 		n := running.Add(1)
 		for {
 			p := peak.Load()
@@ -40,7 +40,7 @@ func TestForEachRunsEveryIndexWithinTheLimit(t *testing.T) {
 func TestForEachStopsAtTheFirstError(t *testing.T) {
 	boom := errors.New("boom")
 	var started atomic.Int32
-	err := forEach(context.Background(), 1000, 2, func(ctx context.Context, i int) error {
+	err := ForEach(context.Background(), 1000, 2, func(ctx context.Context, i int) error {
 		started.Add(1)
 		if i == 3 {
 			return boom
@@ -62,7 +62,7 @@ func TestForEachStopsAtTheFirstError(t *testing.T) {
 func TestForEachReportsACancelledParent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if err := forEach(ctx, 5, 2, func(context.Context, int) error { return nil }); !errors.Is(err, context.Canceled) {
+	if err := ForEach(ctx, 5, 2, func(context.Context, int) error { return nil }); !errors.Is(err, context.Canceled) {
 		t.Fatalf("err = %v, want context.Canceled", err)
 	}
 }
