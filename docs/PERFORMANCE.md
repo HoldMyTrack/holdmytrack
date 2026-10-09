@@ -137,3 +137,15 @@ Deploying ADR-0037 ran `rerender-coverage --masks` once over production's four a
 
 - Redrawing the 835 activities' masks took 6 minutes, about 0.4 s each and one at a time, nearly all of it R2 round trips. The four accounts' renders then took 16–108 s each.
 - Fog and Heatmap on the demo account looked as the dev true render did; the walk the half-pixel fix rescued is there.
+
+### 2026-10-09 — dev stack, purging and redrawing in parallel
+
+Two dev accounts imported the same kind of 1,000-track archive. A worker built from `main` and one from the parallel purge branch then each redrew one account's masks (`rerender-coverage --masks --user`) and purged it, with 80 ms added to every object-store round trip by `delayproxy`.
+
+| 1,000-activity account | One after another | In parallel |
+| :-- | :-- | :-- |
+| Redraw its masks | 311 s | 37 s |
+| Purge it, from the sweep's first tick | 225 s | 36 s |
+
+- Both purges removed every object and row of their account: no `fog/`, `heatmap/`, `raw/` or `imports/` object and no mask row left. The dev store's 29 orphaned mask folders all predate the test (2026-09-26 to 2026-10-07).
+- No activity was skipped in either redraw.
