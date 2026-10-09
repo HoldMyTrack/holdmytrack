@@ -46,13 +46,6 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/upload_guide_google_health" />
-
-            <Button
-                android:id="@+id/upload_guide_timeline"
-                style="@style/Widget.HoldMyTrack.Button.Link"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/upload_guide_timeline" />
         </LinearLayout>
 
         <Button

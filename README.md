@@ -10,7 +10,7 @@ Live at [holdmytrack.com](https://holdmytrack.com), with a no-signup demo accoun
 
 Each feature links to the part of [`docs/SPEC.md`](docs/SPEC.md) that defines its behavior.
 
-- **Bring your whole history.** GPX, FIT and TCX files, `.zip` archives, Google Takeout exports and Google Maps Timeline exports, plus Health Connect sync and plain GPS recording from the Android app — all through one ingest pipeline, with cross-source deduplication ([FR-3](docs/SPEC.md#5-fr-3--activity-upload--ingestion)).
+- **Bring your whole history.** GPX, FIT and TCX files, `.zip` archives and Google Takeout exports, plus Health Connect sync and plain GPS recording from the Android app — all through one ingest pipeline, with cross-source deduplication ([FR-3](docs/SPEC.md#5-fr-3--activity-upload--ingestion)).
 - **One map, three views.** Every track drawn together; Fog of War, which clears wherever you have ever been; and a heatmap of the last year. Pick a track and it is colored by pace ([FR-4](docs/SPEC.md#6-fr-4--map-visualization)).
 - **Somewhere new, close to home.** The fog shows exactly which streets, parks and trails nearby you haven't been to yet.
 - **Points of interest.** Playgrounds, dog parks, monuments, viewpoints and historic sites from OpenStreetMap, with what OSM knows about each; the Android app captures one when you stand in it for 30 seconds ([FR-15](docs/SPEC.md#17-fr-15--spots)).

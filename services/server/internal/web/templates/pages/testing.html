@@ -106,7 +106,7 @@
       <li><a class="testing__file" href="{{asset "testing/indoor.gpx"}}" download="indoor.gpx">indoor.gpx</a>, a treadmill run. <strong>Expected:</strong> Failed: "The file has no GPS points. It may be from an indoor workout."</li>
       <li><a class="testing__file" href="{{asset "testing/one-point.gpx"}}" download="one-point.gpx">one-point.gpx</a>. <strong>Expected:</strong> Failed: "The file has fewer than two GPS points, so there's no track to draw."</li>
       <li><a class="testing__file" href="{{asset "testing/empty.gpx"}}" download="empty.gpx">empty.gpx</a>, 0 bytes. <strong>Expected:</strong> refused straight away, "empty.gpx: Empty file."</li>
-      <li><a class="testing__file" href="{{asset "testing/track.kml"}}" download="track.kml">track.kml</a>, a format HoldMyTrack doesn't read. <strong>Expected:</strong> not sent at all, "track.kml isn't a .gpx, .fit, .tcx, .zip or Timeline .json file, so it wasn't sent."</li>
+      <li><a class="testing__file" href="{{asset "testing/track.kml"}}" download="track.kml">track.kml</a>, a format HoldMyTrack doesn't read. <strong>Expected:</strong> not sent at all, "track.kml isn't a .gpx, .fit, .tcx or .zip file, so it wasn't sent."</li>
     </ul>
     <p class="testing__expect">None of them adds anything to the map.</p>
 
@@ -121,18 +121,6 @@
     <h3 id="UP-10">UP-10 · A Google Health (Takeout) export</h3>
     <p>File: <a class="testing__file" href="{{asset "testing/takeout-sample.zip"}}" download="takeout-sample.zip">takeout-sample.zip</a>, a tiny made-up Google Health export: walks and rides in July 2026.</p>
     <p class="testing__expect"><strong>Expected:</strong> recognised as a Google Health export without being asked, and its outdoor activities appear in Sync history as Ready, from a Google Takeout import. A workout with no GPS is left out.</p>
-
-    <h3 id="UP-11">UP-11 · A Google Maps Timeline export</h3>
-    <p>File: <a class="testing__file" href="{{asset "testing/Timeline.json"}}" download="Timeline.json">Timeline.json</a>, a made-up export with a drive and a walk on 26 September 2026, a flight from Cleveland to Rome, and a trip that never left one place.</p>
-    <ol class="page-list">
-      <li>Sync → Maps Timeline → Choose Timeline.json, and pick the file.</li>
-      <li>Look at the dates and the list of modes, then tap Import.</li>
-    </ol>
-    <p class="testing__expect"><strong>Expected:</strong> From and To span 1 August to 26 September 2026. The modes listed are Driving, Walking and Flying, with Flying left unticked. The screen says "1 trip that never left one place is left out." Import shows "Sending …", then "Sent 2: 2 new, 0 imported before, 0 refused. They appear on the map as they are processed."</p>
-
-    <h3 id="UP-12">UP-12 · The same Timeline again</h3>
-    <p>Once UP-11's drive and walk are on the map, import <strong>Timeline.json</strong> again, the same way.</p>
-    <p class="testing__expect"><strong>Expected:</strong> "Sent 2: 0 new, 2 imported before, 0 refused." Nothing new on the map.</p>
 
     <h3 id="UP-13">UP-13 · Sync history</h3>
     <ol class="page-list">

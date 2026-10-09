@@ -215,7 +215,6 @@ func (s *Server) registerPages() {
 	s.mux.HandleFunc("GET /contacts", s.staticPage("contacts", "meta.contacts_title", "meta.contacts_description", ""))
 	s.mux.HandleFunc("GET /privacy", s.staticPage("privacy", "meta.privacy_title", "meta.privacy_description", ""))
 	// Step-by-step export guides, linked from the Upload menu and from Help.
-	s.mux.HandleFunc("GET /help/timeline-export", s.staticPage("guide-timeline", "meta.guide_timeline_title", "meta.guide_timeline_description", ""))
 	s.mux.HandleFunc("GET /help/google-health-export", s.staticPage("guide-google-health", "meta.guide_google_health_title", "meta.guide_google_health_description", ""))
 	// The Android test suite for Play's closed testers, its sample files under /static/testing/.
 	s.mux.HandleFunc("GET /testing", s.unlistedPage("testing", "meta.testing_title", "meta.testing_description"))

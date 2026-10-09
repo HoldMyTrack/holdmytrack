@@ -189,7 +189,7 @@ type Enqueuer struct {
 	seq     int
 }
 
-// Chunk bounds for Enqueuer: about a Timeline sync request's worth of items, and half the
+// Chunk bounds for Enqueuer: a full sync request's worth of items, and half the
 // sync endpoint's own body cap in bytes.
 const (
 	enqueueChunkItems = 100

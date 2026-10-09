@@ -450,13 +450,10 @@ object HoldMyTrackApi {
 
     /** The `source` values this app posts to `POST /v1/sync/activities` — Health Connect
      *  sync (`sync/SyncRunner.kt`), in-app GPS recording (`recording/RecordingActivity.kt`,
-     *  `docs/adr/0007-in-app-gps-recording-submits-directly.md`) and a Google Maps Timeline
-     *  export read on the phone (`timeline/TimelineImport.kt`, root `docs/IMPLEMENTATION.md`
-     *  §4.0.5). iOS's own is `"healthkit"`; an uploaded file has its own endpoint
-     *  ([uploadActivityFile]). */
+     *  `docs/adr/0007-in-app-gps-recording-submits-directly.md`). iOS's own is `"healthkit"`; an
+     *  uploaded file has its own endpoint ([uploadActivityFile]). */
     const val SOURCE_HEALTH_CONNECT = "healthconnect"
     const val SOURCE_RECORDED = "recorded"
-    const val SOURCE_TIMELINE = "timeline"
     private val JSON = "application/json; charset=utf-8".toMediaType()
     private val main = Handler(Looper.getMainLooper())
 
@@ -572,22 +569,12 @@ object HoldMyTrackApi {
      * not all-or-nothing there, and the caller needs to know which ones landed before it takes
      * them off its list. A non-2xx status is the whole request failing and throws instead;
      * nothing in the batch was decided.
-     *
-     * [batch] and [batchTitle] name one import the caller splits over several requests (a
-     * Timeline export, a hundred activities to a request), so the history counts it as one.
      */
-    suspend fun syncActivities(
-        activities: List<JSONObject>,
-        source: String,
-        batch: String? = null,
-        batchTitle: String? = null,
-    ): List<SyncResult> =
+    suspend fun syncActivities(activities: List<JSONObject>, source: String): List<SyncResult> =
         withContext(Dispatchers.IO) {
             val body = JSONObject()
                 .put("source", source)
                 .put("activities", JSONArray(activities))
-            if (batch != null) body.put("batch", batch)
-            if (batchTitle != null) body.put("batch_title", batchTitle)
             val request = Request.Builder()
                 .url(BuildConfig.API_BASE_URL + API_V1 + "/sync/activities")
                 .post(body.toString().toRequestBody(JSON))

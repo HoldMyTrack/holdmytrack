@@ -16,8 +16,8 @@ import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
 
 /**
- * Upload: files made somewhere else — a watch's or an app's export, a Google Takeout archive, a
- * Google Maps Timeline export — brought into the account (`apps/android/docs/SPEC.md` FR-3.6).
+ * Upload: files made somewhere else — a watch's or an app's export, a Google Takeout archive —
+ * brought into the account (`apps/android/docs/SPEC.md` FR-3.6).
  * The web's Upload menu as a screen, from the You tab, kept apart from the Sync tab as Upload
  * sits apart from Sync in the web's header: Sync is for what lives on the phone and keeps coming, this is for a file,
  * usually once. The uploads themselves are [FileImports]'s, so they carry on when this screen
@@ -57,7 +57,6 @@ class UploadActivity : AppCompatActivity() {
 
         choose.setOnClickListener { picker.launch(arrayOf("*/*")) }
         findViewById<Button>(R.id.upload_guide_google_health).setOnClickListener { openPage(GOOGLE_HEALTH_GUIDE_PATH) }
-        findViewById<Button>(R.id.upload_guide_timeline).setOnClickListener { openPage(TimelineImportActivity.GUIDE_PATH) }
         seeSync.setOnClickListener {
             MainActivity.openTab(this, MainActivity.Tab.SYNC)
             finish()
@@ -98,9 +97,9 @@ class UploadActivity : AppCompatActivity() {
         if (uris.isNotEmpty() && canUpload()) importFiles(uris)
     }
 
-    /** Picked or shared files to [FileImports]; a Timeline export among them opens its own screen. */
+    /** Picked or shared files to [FileImports]. */
     private fun importFiles(uris: List<Uri>) {
-        FileImports.enqueue(this, uris)?.let { TimelineImportActivity.open(this, it) }
+        FileImports.enqueue(this, uris)
     }
 
     private fun openPage(path: String) {

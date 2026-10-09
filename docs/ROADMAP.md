@@ -39,10 +39,10 @@ Splitting an activity is built on the web (`SPEC.md` FR-5.17), and so is merging
 
 Every source brings in only what the user ticks, nothing starts ticked, and nothing is guessed on their behalf (ADR-0039). In this order.
 
-- [ ] Google Maps Timeline: keep each trip's start and end places as Timeline gives them (drop `ANCHOR_MAX_M`'s 200 km/h rule), and start the window with no mode ticked, on the web and in the Android app (`SPEC.md` FR-3.10, `IMPLEMENTATION.md` §4.0.5).
+- [x] Remove Google Maps Timeline import: its window picked by date range and mode, not trip by trip, so three months brought in hundreds of drives and walks at once. The web window and reader, the Android screen, the `/help/timeline-export` guide and the `timeline` sync source go; activities already imported stay.
 - [ ] Remove `.zip` and Google Takeout import: `POST /v1/activities/upload` refuses a `.zip` with `415`; `internal/unpack` and `internal/takeout` go, with the archive rows and statuses in the import history; the web's Upload menu and map drop target stop taking `.zip`, and the 20-file limit's message stops suggesting one; the help and guide pages lose the archive and Takeout instructions (`SPEC.md` FR-3.1–FR-3.4, `IMPLEMENTATION.md` §4.0.2).
 - [x] Android: pick what to sync from Health Connect and the phone, over `POST /v1/sync/known`, with no sync cursor (`SPEC.md` FR-3.6, FR-3.8).
-- [ ] An overlap hint in place of automatic duplicate handling: `POST /v1/activities/overlaps` answers which live activities a set of time ranges overlaps (the 80% rule of `internal/geo/match.go`); the web's Timeline window and the Android picker mark such a candidate "overlaps *Morning walk*", still unticked; ingest stops matching and superseding (`SPEC.md` FR-3.7, FR-3.9; `IMPLEMENTATION.md` §4.6).
+- [ ] An overlap hint in place of automatic duplicate handling: `POST /v1/activities/overlaps` answers which live activities a set of time ranges overlaps (the 80% rule of `internal/geo/match.go`); the Android picker marks such a candidate "overlaps *Morning walk*", still unticked; ingest stops matching and superseding (`SPEC.md` FR-3.7, FR-3.9; `IMPLEMENTATION.md` §4.6).
 - [ ] Remove `superseded_by`: a migration deletes the superseded activities and drops the column, its index and the promotion on delete; every read loses its filter, and `GET /v1/activities/duplicates` goes with the Android app's use of it (`SPEC.md` FR-3.4, FR-3.9). Maintenance mode if `docs/DEPLOY.md` §7 calls for it.
 
 ### Pre-launch validation — gates any public launch (Milestone 2), regardless of which paths are live
@@ -81,19 +81,9 @@ Path 2 on-device sync and in-app GPS recording (`VISION.md` §5.3). Android and 
 
 ## Phase 4 — More sources
 
-Connecting the app to third-party services, and reading the exports of ones it can't connect to.
+Connecting the app to third-party services.
 
-### Path 3 — Google Maps Timeline import
-
-For travellers whose only route history is Timeline (`VISION.md` §3.1, §5.5). Import only: no continuous location logging (`VISION.md` §1.1).
-
-- [x] Try the render on a real Timeline export before building anything, and decide how Timeline data is drawn: as given, every trip an activity and visits left out, flights unticked until chosen (`IMPLEMENTATION.md` §4.0.5).
-- [x] Read the Android phone's on-device export, in the browser, sending only the trips (`IMPLEMENTATION.md` §4.0.5).
-- [ ] Read the iPhone's Timeline export and the older account-side `Semantic Location History` from past Takeouts. Both differ from the Android export and neither is documented, so each waits for a real file to build against. Until then the import recognizes and refuses them by name.
-- [x] Import with a date range, a choice of modes and a preview on the map, not a whole-history dump (`SPEC.md` FR-3.10). Private locations apply as for every other source.
-- [ ] Bound the storage a Timeline adds per account. The gate is the bound (ADR-0039): only the trips the user ticks come in, and the window starts with none ticked ("The app is the gate" in Phase 1). Three months of daily driving imported whole measured about 60 MB, most of it per-activity masks (`IMPLEMENTATION.md` §4.0.5), against `VISION.md` §4.3's assumption of about 27 MB per user in all; re-measure a real import made under the gate once it's built.
-
-### Prerequisites — gate the specific connectors below, not this phase's other work
+### Prerequisites — gate the specific connectors below
 
 - [ ] Get Garmin's Connect Developer Program licence position in writing for a free, donation-funded service (`VISION.md` §4.1, §4.3, §8.3).
 - [ ] File the Wahoo partner-API application (lead time, not cost, is the risk).

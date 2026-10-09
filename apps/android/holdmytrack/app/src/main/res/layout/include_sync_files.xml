@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Bring in files, under the Sync tab's list: Upload (UploadActivity) and Google Maps Timeline
-     (TimelineImportActivity), files that come once rather than keep coming. Gone for an account
-     that can't upload (panel/SyncTab). -->
+<!-- Bring in files, under the Sync tab's list: Upload (UploadActivity), files that come once
+     rather than keep coming. Gone for an account that can't upload (panel/SyncTab). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/sync_files_section"
@@ -17,70 +16,31 @@
         android:text="@string/sync_section_files" />
 
     <LinearLayout
+        android:id="@+id/sync_upload"
+        style="@style/Widget.HoldMyTrack.Tile"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:baselineAligned="false"
-        android:orientation="horizontal">
+        android:layout_height="wrap_content">
 
-        <LinearLayout
-            android:id="@+id/sync_upload"
-            style="@style/Widget.HoldMyTrack.Tile"
-            android:layout_width="0dp"
+        <ImageView
+            style="@style/Widget.HoldMyTrack.IconTile"
+            android:contentDescription="@null"
+            android:backgroundTint="@color/hmt_accent_container"
+            android:src="@drawable/ic_upload"
+            app:tint="@color/hmt_accent_strong" />
+
+        <TextView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="@dimen/hmt_space_10"
-            android:layout_weight="1">
+            android:layout_marginTop="@dimen/hmt_space_10"
+            android:text="@string/sync_upload_title"
+            android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleSmall" />
 
-            <ImageView
-                style="@style/Widget.HoldMyTrack.IconTile"
-                android:contentDescription="@null"
-                android:backgroundTint="@color/hmt_accent_container"
-                android:src="@drawable/ic_upload"
-                app:tint="@color/hmt_accent_strong" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/hmt_space_10"
-                android:text="@string/sync_upload_title"
-                android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleSmall" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/hmt_space_2"
-                android:text="@string/sync_upload_sub"
-                android:textAppearance="@style/TextAppearance.HoldMyTrack.BodySmall"
-                android:textColor="@color/hmt_ink_secondary" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/sync_timeline"
-            style="@style/Widget.HoldMyTrack.Tile"
-            android:layout_width="0dp"
+        <TextView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1">
-
-            <ImageView
-                style="@style/Widget.HoldMyTrack.IconTile"
-                android:contentDescription="@null"
-                android:backgroundTint="@color/hmt_accent_container"
-                android:src="@drawable/ic_map_pin"
-                app:tint="@color/hmt_accent_strong" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/hmt_space_10"
-                android:text="@string/sync_timeline_title"
-                android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleSmall" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/hmt_space_2"
-                android:text="@string/sync_timeline_sub"
-                android:textAppearance="@style/TextAppearance.HoldMyTrack.BodySmall"
-                android:textColor="@color/hmt_ink_secondary" />
-        </LinearLayout>
+            android:layout_marginTop="@dimen/hmt_space_2"
+            android:text="@string/sync_upload_sub"
+            android:textAppearance="@style/TextAppearance.HoldMyTrack.BodySmall"
+            android:textColor="@color/hmt_ink_secondary" />
     </LinearLayout>
 </LinearLayout>

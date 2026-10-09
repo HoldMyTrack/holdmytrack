@@ -3,7 +3,6 @@ package main
 import (
 	"archive/zip"
 	"bytes"
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -129,14 +128,4 @@ func TestFilesDoWhatThePageSays(t *testing.T) {
 		r.Close()
 	}
 
-	var export struct {
-		SemanticSegments []map[string]any `json:"semanticSegments"`
-	}
-	data, err := os.ReadFile(filepath.Join(committed, "Timeline.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := json.Unmarshal(data, &export); err != nil || len(export.SemanticSegments) == 0 {
-		t.Errorf("Timeline.json: %v, %d segments", err, len(export.SemanticSegments))
-	}
 }

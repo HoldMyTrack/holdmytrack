@@ -29,12 +29,12 @@
     <details class="header-menu upload-menu" data-upload-menu>
       <summary class="upload-menu__trigger" aria-label="{{t "upload.label"}}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" x2="12" y1="3" y2="15" /></svg><span class="upload-menu__label">{{t "upload.label"}}</span><span class="upload-menu__badge" hidden></span><span class="upload-menu__alert" hidden></span></summary>
       <div class="header-menu__dropdown upload-menu__dropdown" aria-label="{{t "upload.menu_label"}}">
-        <label class="upload-menu__choose">{{t "upload.choose"}}<input class="upload-menu__input" type="file" multiple accept=".gpx,.fit,.tcx,.zip,.json" hidden /></label>
+        <label class="upload-menu__choose">{{t "upload.choose"}}<input class="upload-menu__input" type="file" multiple accept=".gpx,.fit,.tcx,.zip" hidden /></label>
         <p class="upload-menu__hint">{{th "upload.hint"}}</p>
         <ul class="upload-menu__list" aria-live="polite"></ul>
         <p class="upload-menu__idle">{{t "upload.idle"}}</p>
         <ul class="upload-menu__notes" aria-live="polite"></ul>
-        <script type="application/json" class="upload-menu__strings">{"queued": {{t "upload.queued"}}, "uploading": {{t "upload.uploading"}}, "processing": {{t "upload.processing"}}, "processing_count": {{t "upload.processing_count"}}, "unpacking": {{t "upload.unpacking"}}, "failed_unseen": {{t "sync.failed_unseen"}}, "dismiss": {{t "upload.dismiss"}}, "too_many": {{t "upload.too_many"}}, "already": {{t "upload.already"}}, "already_in": {{t "upload.already_in"}}, "skipped": {{t "upload.skipped"}}, "truncated": {{t "upload.truncated"}}, "failed_transfer": {{t "upload.failed_transfer"}}, "network_error": {{t "upload.network_error"}}, "request_failed": {{t "upload.request_failed"}}, "timeline_one": {{t "upload.timeline_one"}}, "timeline_alone": {{t "upload.timeline_alone"}}}</script>
+        <script type="application/json" class="upload-menu__strings">{"queued": {{t "upload.queued"}}, "uploading": {{t "upload.uploading"}}, "processing": {{t "upload.processing"}}, "processing_count": {{t "upload.processing_count"}}, "unpacking": {{t "upload.unpacking"}}, "failed_unseen": {{t "sync.failed_unseen"}}, "dismiss": {{t "upload.dismiss"}}, "too_many": {{t "upload.too_many"}}, "already": {{t "upload.already"}}, "already_in": {{t "upload.already_in"}}, "skipped": {{t "upload.skipped"}}, "truncated": {{t "upload.truncated"}}, "failed_transfer": {{t "upload.failed_transfer"}}, "network_error": {{t "upload.network_error"}}, "request_failed": {{t "upload.request_failed"}}}</script>
       </div>
     </details>
     {{end}}

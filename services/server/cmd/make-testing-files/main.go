@@ -145,7 +145,6 @@ func generate() {
 			return nil
 		}))
 	})
-	write("Timeline.json", timeline())
 	writePhotos()
 }
 
@@ -359,83 +358,6 @@ func untimed(gpx []byte) []byte {
 		out.WriteString(s[:i])
 		s = s[i+j+len("</time>"):]
 	}
-}
-
-// timeline writes a Google Maps Timeline export as an Android phone saves it
-// (apps/android/.../timeline/TimelineFile.kt): semanticSegments holding a visit, activities
-// with a start, an end and a mode, and timelinePath buckets of the points kept, one a
-// minute. The activities are the Brecksville drive and walk, a flight, which the import
-// leaves unticked, and a trip that never left one place, which it skips and counts.
-func timeline() []byte {
-	cleveland, err := time.LoadLocation("America/New_York")
-	must(err)
-	stamp := func(t time.Time) string { return t.In(cleveland).Format("2006-01-02T15:04:05.000-07:00") }
-	latLng := func(lat, lon float64) string { return fmt.Sprintf("%.7f°, %.7f°", lat, lon) }
-
-	type point struct {
-		Point string `json:"point"`
-		Time  string `json:"time"`
-	}
-	var segments []map[string]any
-	activity := func(start, end time.Time, fromLat, fromLon, toLat, toLon float64, mode string, meters float64) {
-		segments = append(segments, map[string]any{
-			"startTime": stamp(start),
-			"endTime":   stamp(end),
-			"activity": map[string]any{
-				"start":          map[string]any{"latLng": latLng(fromLat, fromLon)},
-				"end":            map[string]any{"latLng": latLng(toLat, toLon)},
-				"distanceMeters": math.Round(meters),
-				"topCandidate":   map[string]any{"type": mode, "probability": 0.9},
-			},
-		})
-	}
-	trip := func(a parse.Activity, mode string) {
-		first, last := a.Points[0], a.Points[len(a.Points)-1]
-		activity(first.Time, last.Time, first.Lat, first.Lon, last.Lat, last.Lon, mode, length(a.Points))
-		var path []point
-		var next time.Time
-		for _, p := range a.Points {
-			if p.Time.Before(next) {
-				continue
-			}
-			path = append(path, point{latLng(p.Lat, p.Lon), stamp(p.Time)})
-			next = p.Time.Add(time.Minute)
-		}
-		segments = append(segments, map[string]any{
-			"startTime":    stamp(first.Time.Truncate(2 * time.Hour)),
-			"endTime":      stamp(first.Time.Truncate(2 * time.Hour).Add(2 * time.Hour)),
-			"timelinePath": path,
-		})
-	}
-
-	drive, walk := load(brecksDrive), load(brecksWalk)
-	trip(drive, "IN_PASSENGER_VEHICLE")
-	arrive, leave := drive.Points[len(drive.Points)-1], walk.Points[0]
-	segments = append(segments, map[string]any{
-		"startTime": stamp(arrive.Time),
-		"endTime":   stamp(leave.Time),
-		"visit": map[string]any{
-			"hierarchyLevel": 0,
-			"probability":    0.8,
-			"topCandidate": map[string]any{
-				"placeId":       "ChIJ0000000000000000000000",
-				"semanticType":  "UNKNOWN",
-				"probability":   0.7,
-				"placeLocation": map[string]any{"latLng": latLng(leave.Lat, leave.Lon)},
-			},
-		},
-	})
-	trip(walk, "WALKING")
-	// Cleveland to Rome, the day before the Italy trip starts.
-	flightStart := time.Date(2026, 8, 1, 18, 30, 0, 0, cleveland)
-	activity(flightStart, flightStart.Add(9*time.Hour+40*time.Minute), 41.4117, -81.8498, 41.7999, 12.2462, "FLYING", 7_380_000)
-	// A walk Timeline guessed but that starts and ends at one spot.
-	idle := time.Date(2026, 9, 26, 19, 0, 0, 0, cleveland)
-	activity(idle, idle.Add(25*time.Minute), 41.3191, -81.6268, 41.3191, -81.6268, "WALKING", 0)
-
-	out, err := json.MarshalIndent(map[string]any{"semanticSegments": segments}, "", "  ")
-	must(err)
-	return append(out, '\n')
 }
 
 // length is a track's length in meters, as the crow flies between points.

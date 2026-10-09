@@ -49,7 +49,6 @@ object FileImports {
 
     private val ACCEPTED = Regex("""\.(gpx|fit|tcx|zip)$""", RegexOption.IGNORE_CASE)
     private val ZIP = Regex("""\.zip$""", RegexOption.IGNORE_CASE)
-    private val TIMELINE = Regex("""\.json$""", RegexOption.IGNORE_CASE)
 
     private class Pending(val uri: Uri, val transfer: Transfer)
 
@@ -89,25 +88,14 @@ object FileImports {
     private fun changed() = listeners.toList().forEach { it() }
 
     /**
-     * Queues [uris] the way the web's `enqueue` does, and returns the Google Maps Timeline export
-     * among them, if there is one, for the Timeline screen to open (`timeline/TimelineImport.kt`):
-     * a `.json` is never uploaded as it is. It imports on its own, as on the web, so nothing else
-     * is queued alongside it. More than [MAX_PLAIN_FILES] files picked one by one are refused in
-     * favour of a `.zip`; a file of any other kind, or past the server's size limit, is named in
-     * a note rather than sent.
+     * Queues [uris] the way the web's `enqueue` does. More than [MAX_PLAIN_FILES] files picked
+     * one by one are refused in favour of a `.zip`; a file of any other kind, or past the
+     * server's size limit, is named in a note rather than sent.
      */
-    fun enqueue(context: Context, uris: List<Uri>): Uri? {
+    fun enqueue(context: Context, uris: List<Uri>) {
         val res = context.resources
         _notes.clear()
         val picked = uris.map { uri -> Picked(uri, nameOf(context, uri), sizeOf(context, uri)) }
-
-        val timeline = picked.filter { TIMELINE.containsMatchIn(it.name) }
-        if (timeline.isNotEmpty()) {
-            if (timeline.size > 1) _notes += Note(res.getString(R.string.upload_timeline_one), error = true)
-            if (picked.size > timeline.size) _notes += Note(res.getString(R.string.upload_timeline_alone), error = true)
-            changed()
-            return timeline.first().uri
-        }
 
         for (other in picked.filterNot { ACCEPTED.containsMatchIn(it.name) }) {
             _notes += Note(res.getString(R.string.upload_wrong_type, other.name), error = true)
@@ -130,7 +118,6 @@ object FileImports {
         }
         changed()
         if (!running) sendNext(context.applicationContext)
-        return null
     }
 
     private class Picked(val uri: Uri, val name: String, val size: Long)

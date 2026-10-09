@@ -500,9 +500,8 @@ func TestIngestDropsImpossiblePoints(t *testing.T) {
 	}
 }
 
-// A Timeline import arrives through the sync endpoint as its own source, and the same
-// segment sent again — a later export that still holds it — is already processed.
-func TestSyncAcceptsTimelineSegments(t *testing.T) {
+// Google Maps Timeline import is gone (ADR-0039): the sync endpoint refuses its source.
+func TestSyncRefusesTimelineSource(t *testing.T) {
 	d := newDBTestWithS3(t, newMemS3())
 	me := d.newAccount(false)
 	body := map[string]any{"source": "timeline", "activities": []map[string]any{{
@@ -511,29 +510,10 @@ func TestSyncAcceptsTimelineSegments(t *testing.T) {
 		"points": []map[string]any{
 			{"lat": 50.0, "lon": 10.0, "time": "2026-05-01T10:00:00Z"},
 			{"lat": 50.01, "lon": 10.01, "time": "2026-05-01T10:05:00Z"},
-			{"lat": 50.02, "lon": 10.02, "time": "2026-05-01T10:10:00Z"},
 		},
 	}}}
-	var resp syncActivitiesResponse
-	d.decode(d.do(me, http.MethodPost, "/v1/sync/activities", body), http.StatusOK, &resp)
-	if got := resp.Results[0].Status; got != "enqueued" {
-		t.Fatalf("first send: %s (%s), want enqueued", got, resp.Results[0].Error)
-	}
-	res, err := ingest.Process(context.Background(), d.pool, d.srv.store, d.latestIngestJob(me))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var source, typ string
-	if err := d.pool.QueryRow(context.Background(),
-		`SELECT source, activity_type FROM activities WHERE id = $1`, res.ActivityID).Scan(&source, &typ); err != nil {
-		t.Fatal(err)
-	}
-	if source != "timeline" || typ != "driving" {
-		t.Errorf("stored as %s/%s, want timeline/driving", source, typ)
-	}
-	d.decode(d.do(me, http.MethodPost, "/v1/sync/activities", body), http.StatusOK, &resp)
-	if got := resp.Results[0].Status; got != "already_processed" {
-		t.Errorf("second send: %s, want already_processed", got)
+	if code := d.do(me, http.MethodPost, "/v1/sync/activities", body).Code; code != http.StatusBadRequest {
+		t.Errorf("status %d, want 400", code)
 	}
 }
 

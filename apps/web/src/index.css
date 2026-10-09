@@ -2203,59 +2203,6 @@ button.activities-panel__story-badge:hover {
   color: var(--fm-danger);
 }
 
-/* TimelineImportWindow.tsx — the Google Maps Timeline import, the same .edit-track card in the
-   same corner. The file picker is a label styled as a button around a hidden input. */
-.timeline-import__choose {
-  align-self: flex-start;
-}
-
-.timeline-import__fields {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fm-space-10);
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.timeline-import__date {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: var(--fm-space-2);
-  min-width: 0;
-  font-size: var(--fm-text-sm);
-  color: rgb(var(--fm-ink-rgb) / 60%);
-}
-
-.timeline-import__modes {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fm-space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.timeline-import__mode {
-  display: flex;
-  align-items: center;
-  gap: var(--fm-space-6);
-  font-size: var(--fm-text-md);
-  cursor: pointer;
-}
-
-.timeline-import__mode-name {
-  flex: 1;
-}
-
-.timeline-import__mode-count {
-  font-size: var(--fm-text-sm);
-  color: rgb(var(--fm-ink-rgb) / 60%);
-  font-variant-numeric: tabular-nums;
-}
-
 /* EditActivityWindow.tsx — the Edit window is the .edit-track card above with two tabs, the
    Activities panel's own tab look at a smaller size. Its Activity form reuses the
    .settings-page__* field classes. */

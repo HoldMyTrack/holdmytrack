@@ -22,7 +22,6 @@ import com.google.android.material.snackbar.Snackbar
 import dev.holdmytrack.android.MainActivity
 import dev.holdmytrack.android.R
 import dev.holdmytrack.android.SyncHistoryActivity
-import dev.holdmytrack.android.TimelineImportActivity
 import dev.holdmytrack.android.UploadActivity
 import dev.holdmytrack.android.health.HealthConnect
 import dev.holdmytrack.android.net.HoldMyTrackApi
@@ -150,9 +149,6 @@ class SyncTab(
         }
         foot.findViewById<View>(R.id.sync_upload).setOnClickListener {
             activity.startActivity(Intent(activity, UploadActivity::class.java))
-        }
-        foot.findViewById<View>(R.id.sync_timeline).setOnClickListener {
-            activity.startActivity(Intent(activity, TimelineImportActivity::class.java))
         }
     }
 
