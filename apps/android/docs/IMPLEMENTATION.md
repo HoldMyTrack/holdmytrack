@@ -157,7 +157,7 @@ The Privacy screen (`apps/android/docs/SPEC.md` FR-1.7), from the You tab, in th
 
 ### 3.1 `map/MapOverlays`
 
-Owns exactly three layers — `tracks` (a `VectorSource` MVT layer), `fog`, and `heatmap` (both `RasterSource` layers, 512px tiles matching the server's own raster tile size, not the MapLibre default of 256) — and the logic to add, remove, and toggle them.
+Owns exactly three layers — `tracks` (a `VectorSource` MVT layer), `fog`, and `heatmap` (both `RasterSource` layers declared at 512px tiles, not the MapLibre default of 256; the server's images are 64 px and MapLibre stretches them smoothly to that, the look ADR-0037 chose) — and the logic to add, remove, and toggle them.
 
 - **`attach` is idempotent and re-runnable**, checked with `style.getSource(id) == null` / `getLayer(id) == null` before adding anything. This matters because a style *reload* (switching from `light` to `dark` when the app's night mode changes) discards any custom layers a previous `attach` call added — this is not a one-shot setup path.
 - **Insertion point is computed, not hardcoded**: `labelInsertionPoint` finds the basemap's first `SymbolLayer` and every custom layer is added *below* it (`addLayerBelow`), so place labels always render on top. Within that, both rasters are added before the tracks vector layer, so tracks paint above whichever raster is currently visible — the same ordering rationale `docs/IMPLEMENTATION.md` §4.2's client-compositing section gives for the web client, reproduced here layer-by-layer rather than shared code, since there is no shared layer-ordering module between the two clients.
