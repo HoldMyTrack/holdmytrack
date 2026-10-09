@@ -1,22 +1,17 @@
-package fog
+// Package parallel runs a bounded number of calls at once — for work that mostly waits on
+// object storage (internal/fog's renders, internal/worker's account purge), where doing one
+// call after another leaves the time almost all in round trips.
+package parallel
 
 import (
 	"context"
 	"sync"
 )
 
-// renderParallelism bounds how many tiles (or masks) a render works on at once. The work is
-// mostly waiting on object storage — a tile is one or more GETs and two PUTs, each a round
-// trip to R2 — so running them one after another left a render at about 1.3 tiles a second
-// on the production droplet (the 2026-10-08 load test), almost none of it CPU. Bounded rather
-// than unbounded so memory stays predictable (IMPLEMENTATION.md §5.2): each in-flight tile
-// holds a few decoded masks.
-const renderParallelism = 16
-
-// forEach runs fn(ctx, i) for every i in [0, n), at most limit at a time, and returns the
+// ForEach runs fn(ctx, i) for every i in [0, n), at most limit at a time, and returns the
 // first error. After an error no further calls start, and the ctx the running ones were given
 // is cancelled; it waits for those to return before it does.
-func forEach(ctx context.Context, n, limit int, fn func(ctx context.Context, i int) error) error {
+func ForEach(ctx context.Context, n, limit int, fn func(ctx context.Context, i int) error) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	var (

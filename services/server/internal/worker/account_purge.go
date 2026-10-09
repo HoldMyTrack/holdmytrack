@@ -9,8 +9,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parallel"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 )
+
+// purgeParallelism is how many of an account's storage prefixes purgeAccount removes at once.
+const purgeParallelism = 16
 
 // accountPurgeBatchSize bounds one sweep, as demoPurgeBatchSize does; the next tick takes the rest.
 const accountPurgeBatchSize = 20
@@ -96,10 +100,19 @@ func purgeAccount(ctx context.Context, pool *pgxpool.Pool, store *storage.Store,
 	}
 	prefixes = append(prefixes,
 		"raw/"+userID+"/", "fog/"+userID+"/", "heatmap/"+userID+"/", "exports/"+userID+"/", "imports/"+userID+"/")
-	for _, prefix := range prefixes {
-		if err := store.RemoveByPrefix(ctx, prefix); err != nil {
-			log.Error("account purge: storage cleanup failed, deleting the account anyway", "user_id", userID, "prefix", prefix, "err", err)
+	// Side by side: each prefix is a listing and a bulk delete, round trips to object storage,
+	// and an account has one per activity — one after another, a 1,000-activity account took
+	// about 5.5 minutes on production (docs/PERFORMANCE.md, 2026-10-09).
+	// A failed prefix is logged and the rest go on; ForEach itself fails only when the worker
+	// is shutting down, and then the account is left for the next sweep rather than its row
+	// deleted with objects still listed.
+	if err := parallel.ForEach(ctx, len(prefixes), purgeParallelism, func(ctx context.Context, i int) error {
+		if err := store.RemoveByPrefix(ctx, prefixes[i]); err != nil {
+			log.Error("account purge: storage cleanup failed, deleting the account anyway", "user_id", userID, "prefix", prefixes[i], "err", err)
 		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("storage cleanup: %w", err)
 	}
 	photoPrefix := "photos/" + userID + "/"
 	rows, err := pool.Query(ctx, `

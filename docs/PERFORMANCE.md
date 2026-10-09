@@ -123,3 +123,29 @@ The 64 px code (ADR-0037) on the dev stack, the demo account re-rendered with `r
 - Screenshots of the true render at zoom 10, 13 and 16, light and dark, matched the resolution session's shrunk 64 px images closely; the user signed off on them.
 - The first true render had lost a whole walk: at 64 px, GPS jitter while standing still makes segments so short that `gg`'s stroker drew nothing for the track. Skipping points within half a pixel of the last one drawn fixed it (`IMPLEMENTATION.md` §4.2 "Rendering a tile"); 300 random jittery walks then all drew.
 - 7 of the 1,666 masks are empty, all legitimately: the touched-tile check pads by the stroke radius, and those tracks pass 1.3–1.8 px outside the tile.
+
+### 2026-10-09 — production, `7d013f0`, the 64 px re-render
+
+Deploying ADR-0037 ran `rerender-coverage --masks` once over production's four accounts with coverage, 835 activities. Bucket sizes from `rclone size` before and after:
+
+| R2 prefix | 512 px | 64 px |
+| :-- | :-- | :-- |
+| `fog/` | 18.06 MiB, 3,276 objects | 1.07 MiB (6%), 3,276 |
+| `heatmap/` | 15.28 MiB, 3,276 objects | 1.16 MiB (8%), 3,276 |
+| `activity-masks/` | 15.36 MiB, 6,154 objects | 1.57 MiB (10%), 5,997 |
+| All three | 48.7 MiB | 3.8 MiB (8%) |
+
+- Redrawing the 835 activities' masks took 6 minutes, about 0.4 s each and one at a time, nearly all of it R2 round trips. The four accounts' renders then took 16–108 s each.
+- Fog and Heatmap on the demo account looked as the dev true render did; the walk the half-pixel fix rescued is there.
+
+### 2026-10-09 — dev stack, purging and redrawing in parallel
+
+Two dev accounts imported the same kind of 1,000-track archive. A worker built from `main` and one from the parallel purge branch then each redrew one account's masks (`rerender-coverage --masks --user`) and purged it, with 80 ms added to every object-store round trip by `delayproxy`.
+
+| 1,000-activity account | One after another | In parallel |
+| :-- | :-- | :-- |
+| Redraw its masks | 311 s | 37 s |
+| Purge it, from the sweep's first tick | 225 s | 36 s |
+
+- Both purges removed every object and row of their account: no `fog/`, `heatmap/`, `raw/` or `imports/` object and no mask row left. The dev store's 29 orphaned mask folders all predate the test (2026-09-26 to 2026-10-07).
+- No activity was skipped in either redraw.
