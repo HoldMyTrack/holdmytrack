@@ -45,6 +45,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0034](0034-country-region-outlines-from-overture.md) | Country and region outlines come from Overture Maps' divisions, land-clipped, loaded from our own copy at deploy time |
 | [0035](0035-activity-local-timezone.md) | An activity's times show, and its days group, in the timezone it was recorded in |
 | [0036](0036-send-a-copy-of-a-story.md) | A Story can be sent as a copy to another account, which accepts it into a Story and activities of its own; nothing syncs afterwards |
+| [0037](0037-fog-heatmap-64px-tiles.md) | Fog and Heatmap tiles are 64 px, stretched smoothly by the clients |
 
 ## Writing a new one
 

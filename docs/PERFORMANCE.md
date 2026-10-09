@@ -98,4 +98,28 @@ Storage was measured by re-encoding the demo account's 2,529 Fog and 2,529 Heatm
 | 128 | 19 | 2.05 MB | 2.02 MB | 17–20% |
 | 64 | 38 | 0.92 MB | 0.94 MB | 8–9% |
 
-256 px looks the same as 512; 128 px is softer up close; 64 px smears thin tracks at zoom 13 and pales the Heatmap; the pixel-art versions are crisp and deliberately blocky. 64 px with smooth stretching was chosen for both layers.
+256 px looks the same as 512; 128 px is softer up close; 64 px smears thin tracks at zoom 13 and pales the Heatmap; the pixel-art versions are crisp and deliberately blocky. 64 px with smooth stretching was chosen for both layers (ADR-0037).
+
+### 2026-10-09 — dev stack, the true 64 px render
+
+The 64 px code (ADR-0037) on the dev stack, the demo account re-rendered with `rerender-coverage --masks --user`, and its stored bytes summed from the dev object store before and after. The dev store adds a few hundred bytes of metadata per object, which at 64 px outweighs many of the images themselves, so production's R2 saving sits nearer the PNG ratios of the resolution session above.
+
+| Stored for the demo account | 512 px | 64 px |
+| :-- | :-- | :-- |
+| Fog tiles (2,529) | 14.62 MB | 2.26 MB |
+| Heatmap tiles (2,529) | 13.18 MB | 2.37 MB |
+| Activity masks (45 activities) | 6.19 MB, 1,691 | 1.51 MB, 1,666 |
+
+| Per tile, laptop | 512 px | 64 px |
+| :-- | :-- | :-- |
+| Composite, Fog | 1.1 ms | 6.9 µs |
+| Composite, Heatmap | 3.3 ms | 13 µs |
+| Pyramid step | 1.2 ms | 7.9 µs |
+| Decode a mask | 0.58 ms | 16 µs |
+| Encode a mask | 1.6 ms | 0.13 ms |
+| Serve a tile | 0.66 µs | 0.39 µs |
+
+- Redrawing the account's 45 activities' masks took about a second, and rendering all its tiles 3.6 s.
+- Screenshots of the true render at zoom 10, 13 and 16, light and dark, matched the resolution session's shrunk 64 px images closely; the user signed off on them.
+- The first true render had lost a whole walk: at 64 px, GPS jitter while standing still makes segments so short that `gg`'s stroker drew nothing for the track. Skipping points within half a pixel of the last one drawn fixed it (`IMPLEMENTATION.md` §4.2 "Rendering a tile"); 300 random jittery walks then all drew.
+- 7 of the 1,666 masks are empty, all legitimately: the touched-tile check pads by the stroke radius, and those tracks pass 1.3–1.8 px outside the tile.
