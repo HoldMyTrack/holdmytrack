@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Built on the server (`IMPLEMENTATION.md` §4.2); the web and Android clients are unchanged. It replaces the tile size ADR-0003 named, 512 px; the rest of ADR-0003 stands.
+Accepted. Built on the server (`IMPLEMENTATION.md` §4.2); the web and Android clients are unchanged. It replaces the tile size ADR-0003 named, 512 px; the rest of ADR-0003 stands. Since ADR-0038 the clients smooth the tiles only from zoom 14 in, and draw square pixels below.
 
 ## Context
 
