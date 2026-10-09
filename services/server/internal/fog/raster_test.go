@@ -1,8 +1,10 @@
 package fog
 
 import (
+	"bytes"
 	"image"
 	"image/color"
+	"math/rand/v2"
 	"testing"
 )
 
@@ -88,5 +90,99 @@ func TestHeatmapRampVisibleWhereVisited(t *testing.T) {
 			t.Fatalf("alpha drops from %d to %d at intensity %d", prev, a, i)
 		}
 		prev = a
+	}
+}
+
+// boxBlurReference is the direct per-pixel box blur boxBlur replaced: every pixel the
+// integer mean of the in-bounds pixels of the square around it.
+func boxBlurReference(src *image.Gray, radius int) *image.Gray {
+	w, h := src.Bounds().Dx(), src.Bounds().Dy()
+	out := image.NewGray(src.Bounds())
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			var sum, n int
+			for sy := max(y-radius, 0); sy <= min(y+radius, h-1); sy++ {
+				for sx := max(x-radius, 0); sx <= min(x+radius, w-1); sx++ {
+					sum += int(src.Pix[sy*src.Stride+sx])
+					n++
+				}
+			}
+			out.Pix[y*out.Stride+x] = uint8(sum / n)
+		}
+	}
+	return out
+}
+
+// The two-pass blur is byte for byte the direct one, edges included, for any radius — even
+// one wider than the image.
+func TestBoxBlurMatchesTheDirectMean(t *testing.T) {
+	rng := rand.New(rand.NewPCG(1, 2))
+	for _, size := range []image.Point{{TileSize, TileSize}, {7, 5}, {1, 1}, {3, 9}} {
+		src := image.NewGray(image.Rect(0, 0, size.X, size.Y))
+		for i := range src.Pix {
+			if rng.IntN(4) == 0 { // mostly empty, like a mask, with full-strength strokes
+				src.Pix[i] = uint8(rng.IntN(256))
+			}
+		}
+		for _, r := range []int{1, 2, featherPx, 5, 12} {
+			got, want := boxBlur(src, r), boxBlurReference(src, r)
+			if !bytes.Equal(got.Pix, want.Pix) {
+				t.Fatalf("%v radius %d: differs from the direct mean", size, r)
+			}
+		}
+	}
+}
+
+// downsampleReference is the pyramid step downsampleQuadrants replaced: the four children
+// copied into one double-size image, each 2x2 block's brightest pixel, then a 3x3 max filter
+// pixel by pixel.
+func downsampleReference(children [4]*image.Gray) *image.Gray {
+	big := image.NewGray(image.Rect(0, 0, TileSize*2, TileSize*2))
+	for q, c := range children {
+		ox, oy := (q%2)*TileSize, (q/2)*TileSize
+		for y := 0; y < TileSize; y++ {
+			copy(big.Pix[(oy+y)*2*TileSize+ox:], c.Pix[y*TileSize:(y+1)*TileSize])
+		}
+	}
+	pooled := image.NewGray(image.Rect(0, 0, TileSize, TileSize))
+	for y := 0; y < TileSize; y++ {
+		for x := 0; x < TileSize; x++ {
+			x2, y2 := x*2, y*2
+			pooled.Pix[y*TileSize+x] = max(big.Pix[y2*2*TileSize+x2], big.Pix[y2*2*TileSize+x2+1],
+				big.Pix[(y2+1)*2*TileSize+x2], big.Pix[(y2+1)*2*TileSize+x2+1])
+		}
+	}
+	out := image.NewGray(pooled.Bounds())
+	for y := 0; y < TileSize; y++ {
+		for x := 0; x < TileSize; x++ {
+			var v uint8
+			for sy := max(y-1, 0); sy <= min(y+1, TileSize-1); sy++ {
+				for sx := max(x-1, 0); sx <= min(x+1, TileSize-1); sx++ {
+					v = max(v, pooled.Pix[sy*TileSize+sx])
+				}
+			}
+			out.Pix[y*TileSize+x] = v
+		}
+	}
+	return out
+}
+
+// The pyramid step is byte for byte the copy-pool-dilate it replaced, children of every kind.
+func TestDownsampleMatchesTheReference(t *testing.T) {
+	rng := rand.New(rand.NewPCG(3, 4))
+	var children [4]*image.Gray
+	for i := range children {
+		children[i] = blankTile()
+		if i == 2 {
+			continue // a blank sibling, as at the edge of anyone's history
+		}
+		for j := range children[i].Pix {
+			if rng.IntN(50) == 0 {
+				children[i].Pix[j] = uint8(rng.IntN(256))
+			}
+		}
+	}
+	if got, want := downsampleQuadrants(children), downsampleReference(children); !bytes.Equal(got.Pix, want.Pix) {
+		t.Fatal("differs from the reference pyramid step")
 	}
 }
