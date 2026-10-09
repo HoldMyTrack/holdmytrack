@@ -1,7 +1,7 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { API_BASE_URL, TILES_V1 } from '../api';
 import { versionedTileURL } from './coverageVersion';
-import { BOUNDARIES_ATTRIBUTION, CITY_MIN_ZOOM, COUNTRY_MAX_ZOOM, REGION_MAX_ZOOM, REGION_MIN_ZOOM } from './zoomTiers';
+import { BOUNDARIES_ATTRIBUTION, CITY_MIN_ZOOM, COUNTRY_MAX_ZOOM, PIXELS_MAX_ZOOM, REGION_MAX_ZOOM, REGION_MIN_ZOOM } from './zoomTiers';
 
 /**
  * The Heatmap raster layer (IMPLEMENTATION.md §4.2.2) — mirrors fog.ts in every way that's
@@ -85,6 +85,10 @@ export function ensureHeatmapLayer(map: MapLibreMap, beforeId: string | undefine
         source: HEATMAP_SOURCE_ID,
         minzoom: CITY_MIN_ZOOM,
         layout: { visibility: 'none' }, // starts hidden — Normal is the default mode
+        // Square pixels below z14, where each tile pixel shows 8 screen pixels wide however far out
+        // the map is; smoothed from z14, where there's no finer tile and the z14 one is stretched
+        // further with every zoom (ADR-0038).
+        paint: { 'raster-resampling': ['step', ['zoom'], 'nearest', PIXELS_MAX_ZOOM, 'linear'] },
       },
       beforeId,
     );

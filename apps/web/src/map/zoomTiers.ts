@@ -13,6 +13,9 @@ export const COUNTRY_MAX_ZOOM = 3;
 export const REGION_MIN_ZOOM = 3;
 export const REGION_MAX_ZOOM = 7;
 export const CITY_MIN_ZOOM = 7;
+/** Fog and Heatmap tiles show as square pixels below this zoom and are smoothed from it up: the
+ *  zoom their finest tiles are stored at (ADR-0038). */
+export const PIXELS_MAX_ZOOM = 14;
 
 /** Which of the three tiers Fog and Heatmap draw at `zoom` — the same bands the layers above
  *  switch on (a layer shows at minzoom <= zoom < maxzoom), for anything that has to name the
