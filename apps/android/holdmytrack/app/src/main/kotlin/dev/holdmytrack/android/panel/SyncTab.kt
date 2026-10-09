@@ -564,7 +564,7 @@ class SyncTab(
             hiddenBadge.visibility = if (row.hidden) View.VISIBLE else View.GONE
 
             val context = itemView.context
-            icon.setImageResource(if (row.ticked) R.drawable.ic_check else kindIcon(ActivityKind.of(row.type)))
+            icon.setImageResource(if (row.ticked) R.drawable.ic_check else typeIcon(row.type))
             icon.backgroundTintList = if (row.ticked) ColorStateList.valueOf(context.getColor(R.color.hmt_accent)) else null
             icon.imageTintList = ColorStateList.valueOf(context.getColor(if (row.ticked) R.color.hmt_on_accent else R.color.hmt_ink_secondary))
             val tickable = !row.hidden && !Session.isDemo

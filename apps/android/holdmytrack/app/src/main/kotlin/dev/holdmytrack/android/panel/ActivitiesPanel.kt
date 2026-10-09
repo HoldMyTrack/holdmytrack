@@ -789,7 +789,7 @@ class ActivitiesPanel(
         card.visibility = if (shown) View.VISIBLE else View.GONE
         if (!shown || activity == null) return
         val kind = ActivityKind.of(activity.activityType)
-        cardIcon.setImageResource(kindIcon(kind))
+        cardIcon.setImageResource(typeIcon(activity.activityType))
         cardTitle.text = PanelFormat.rowLabel(res, activity)
         // The start moves under the title once a name has taken it, as on a row.
         val named = activity.name?.trim()?.isNotEmpty() == true
