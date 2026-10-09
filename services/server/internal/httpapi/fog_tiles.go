@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"errors"
-	"image/png"
 	"net/http"
 
 	"github.com/jackc/pgx/v5"
@@ -10,8 +9,8 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
 )
 
-// handleFogTile serves §4.2's coverage mask as a ready-to-draw fog-veil RGBA PNG: the veil's
-// colour in RGB, alpha = veil opacity × (255 - coverage).
+// handleFogTile serves §4.2's coverage mask as a ready-to-draw fog-veil palette PNG
+// (fog.FogTile): the veil's colour in RGB, alpha = veil opacity × (255 - coverage).
 //
 // Always reads the precomputed fog_tiles aggregate — Fog of War shows true all-time coverage,
 // unconditionally: it isn't scoped by date range, TYPE/DISTANCE, or hidden-track state (a
@@ -43,7 +42,7 @@ func (s *Server) handleFogTile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	mask, err := loadMaskOrBlank(ctx, s.store, objectKey)
+	mask, err := loadMaskPNG(ctx, s.store, objectKey)
 	if err != nil {
 		if clientGone(w, r) {
 			return
@@ -53,9 +52,13 @@ func (s *Server) handleFogTile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rgba := fog.RenderFogPNG(mask, fog.VeilForTheme(r.URL.Query().Get("theme")))
+	tile, err := fog.FogTile(mask, fog.VeilForTheme(r.URL.Query().Get("theme")))
+	if err != nil {
+		s.log.Error("fog tile tint failed", "err", err, "z", z, "x", x, "y", y)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "image/png")
 	setTileCacheControl(w, r)
-	// Encoding an in-memory image fails only on the write, which is the client having gone.
-	_ = png.Encode(w, rgba)
+	_, _ = w.Write(tile) // fails only when the client has gone
 }
