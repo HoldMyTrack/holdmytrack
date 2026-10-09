@@ -107,11 +107,15 @@ func compositeFogMask(masks []*image.Gray) *image.Gray {
 	return boxBlur(out, featherPx)
 }
 
-// boxBlur is a plain (non-separable, not sliding-window) box blur — O(w·h·radius²), fine
-// at 512×512 with a radius of 3 (under 5M samples), and worth staying obviously correct
-// over being clever: this is the one piece of the rasterizer hand-rolled rather than
-// pulled from a library, specifically because it's simple enough not to need one, unlike
-// anti-aliased stroke rendering (see the package doc's reasoning for using gg at all).
+// boxBlur averages each pixel over the (2·radius+1)² square around it, clipped to the tile:
+// the sum of the square's in-bounds pixels, integer-divided by how many there are. It sums
+// the square in two passes — a sliding window along each row, then along each column of those
+// row sums — so a pixel costs a few additions however big the radius, rather than (2r+1)².
+// The square's sum and count are the same either way, so the result is byte for byte what
+// the direct per-pixel loop gives (boxBlurReference, raster_test.go). That loop ran on every
+// tile a render composited, once for Fog and once per activity for Heatmap, and was most of a
+// render's CPU once storage stopped being the wait: about 250 ms a z14 tile on the production
+// droplet in the 2026-10-09 load test.
 func boxBlur(src *image.Gray, radius int) *image.Gray {
 	if radius <= 0 {
 		return src
@@ -120,24 +124,40 @@ func boxBlur(src *image.Gray, radius int) *image.Gray {
 	w, h := bounds.Dx(), bounds.Dy()
 	out := image.NewGray(bounds)
 
+	// rows[y*w+x]: the sum of row y over [x-radius, x+radius], clipped.
+	rows := make([]int32, w*h)
 	for y := 0; y < h; y++ {
+		line := src.Pix[y*src.Stride : y*src.Stride+w]
+		var sum int32
+		for x := 0; x < min(radius, w); x++ {
+			sum += int32(line[x])
+		}
 		for x := 0; x < w; x++ {
-			var sum, n int
-			for dy := -radius; dy <= radius; dy++ {
-				sy := y + dy
-				if sy < 0 || sy >= h {
-					continue
-				}
-				for dx := -radius; dx <= radius; dx++ {
-					sx := x + dx
-					if sx < 0 || sx >= w {
-						continue
-					}
-					sum += int(src.GrayAt(sx, sy).Y)
-					n++
-				}
+			if in := x + radius; in < w {
+				sum += int32(line[in])
 			}
-			out.SetGray(x, y, color.Gray{Y: uint8(sum / n)})
+			if gone := x - radius - 1; gone >= 0 {
+				sum -= int32(line[gone])
+			}
+			rows[y*w+x] = sum
+		}
+	}
+
+	span := func(i, n int) int32 { return int32(min(i+radius, n-1) - max(i-radius, 0) + 1) }
+	for x := 0; x < w; x++ {
+		nx := span(x, w)
+		var sum int32
+		for y := 0; y < min(radius, h); y++ {
+			sum += rows[y*w+x]
+		}
+		for y := 0; y < h; y++ {
+			if in := y + radius; in < h {
+				sum += rows[in*w+x]
+			}
+			if gone := y - radius - 1; gone >= 0 {
+				sum -= rows[gone*w+x]
+			}
+			out.Pix[y*out.Stride+x] = uint8(sum / (nx * span(y, h)))
 		}
 	}
 	return out
@@ -154,44 +174,53 @@ func boxBlur(src *image.Gray, radius int) *image.Gray {
 // a line at least ~4 px wide at every level (each level halves it, then adds 2), the way the
 // Normal-mode tracks keep 2.5 px however far out; wide areas are barely affected.
 func downsampleQuadrants(children [4]*image.Gray) *image.Gray {
-	big := image.NewGray(image.Rect(0, 0, TileSize*2, TileSize*2))
-	draw.Draw(big, image.Rect(0, 0, TileSize, TileSize), children[0], image.Point{}, draw.Src)
-	draw.Draw(big, image.Rect(TileSize, 0, TileSize*2, TileSize), children[1], image.Point{}, draw.Src)
-	draw.Draw(big, image.Rect(0, TileSize, TileSize, TileSize*2), children[2], image.Point{}, draw.Src)
-	draw.Draw(big, image.Rect(TileSize, TileSize, TileSize*2, TileSize*2), children[3], image.Point{}, draw.Src)
-
 	pooled := image.NewGray(image.Rect(0, 0, TileSize, TileSize))
-	for y := 0; y < TileSize; y++ {
-		for x := 0; x < TileSize; x++ {
-			x2, y2 := x*2, y*2
-			pooled.Pix[y*TileSize+x] = max(big.Pix[y2*2*TileSize+x2], big.Pix[y2*2*TileSize+x2+1],
-				big.Pix[(y2+1)*2*TileSize+x2], big.Pix[(y2+1)*2*TileSize+x2+1])
+	const half = TileSize / 2
+	for q, child := range children {
+		// The quarter of the parent this child pools into.
+		ox, oy := (q%2)*half, (q/2)*half
+		for y := 0; y < half; y++ {
+			r0 := child.Pix[(2*y)*child.Stride:]
+			r1 := child.Pix[(2*y+1)*child.Stride:]
+			dst := pooled.Pix[(oy+y)*pooled.Stride+ox:]
+			for x := 0; x < half; x++ {
+				dst[x] = max(r0[2*x], r0[2*x+1], r1[2*x], r1[2*x+1])
+			}
 		}
 	}
 	return dilate(pooled)
 }
 
 // dilate is a 3x3 max filter: every pixel takes the brightest of itself and its eight
-// neighbours, widening every mark by one pixel on each side.
+// neighbours, widening every mark by one pixel on each side. The square's max is the max of
+// its rows' maxes, so it runs as a pass along each row and then one down each column.
 func dilate(src *image.Gray) *image.Gray {
-	out := image.NewGray(src.Bounds())
-	for y := 0; y < TileSize; y++ {
-		for x := 0; x < TileSize; x++ {
-			var v uint8
-			for dy := -1; dy <= 1; dy++ {
-				sy := y + dy
-				if sy < 0 || sy >= TileSize {
-					continue
-				}
-				for dx := -1; dx <= 1; dx++ {
-					sx := x + dx
-					if sx < 0 || sx >= TileSize {
-						continue
-					}
-					v = max(v, src.Pix[sy*TileSize+sx])
-				}
+	w, h := src.Bounds().Dx(), src.Bounds().Dy()
+	rows := make([]uint8, w*h)
+	for y := 0; y < h; y++ {
+		line := src.Pix[y*src.Stride : y*src.Stride+w]
+		for x := 0; x < w; x++ {
+			v := line[x]
+			if x > 0 {
+				v = max(v, line[x-1])
 			}
-			out.Pix[y*TileSize+x] = v
+			if x+1 < w {
+				v = max(v, line[x+1])
+			}
+			rows[y*w+x] = v
+		}
+	}
+	out := image.NewGray(src.Bounds())
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			v := rows[y*w+x]
+			if y > 0 {
+				v = max(v, rows[(y-1)*w+x])
+			}
+			if y+1 < h {
+				v = max(v, rows[(y+1)*w+x])
+			}
+			out.Pix[y*out.Stride+x] = v
 		}
 	}
 	return out
