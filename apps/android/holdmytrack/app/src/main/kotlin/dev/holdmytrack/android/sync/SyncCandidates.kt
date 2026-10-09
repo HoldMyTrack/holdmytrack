@@ -10,6 +10,7 @@ import dev.holdmytrack.android.health.ExerciseTypes
 import dev.holdmytrack.android.map.Geo
 import dev.holdmytrack.android.map.Simplify
 import dev.holdmytrack.android.net.HoldMyTrackApi
+import dev.holdmytrack.android.net.TrackMetricPoint
 import dev.holdmytrack.android.recording.db.RecordedActivityRecord
 import java.time.Duration
 import java.time.Instant
@@ -28,8 +29,9 @@ class Recording(val record: RecordedActivityRecord) : CandidateOrigin
 /**
  * One thing the Sync tab offers (`docs/SPEC.md` FR-3.6): an activity on this phone that isn't in
  * the account yet. [key] is unique across both origins and is what the hidden set stores;
- * [line] is the route simplified for drawing ([Simplify]), as `[lon, lat]` pairs, and [bbox]
- * its `[west, south, east, north]`.
+ * [line] is the route simplified for drawing ([Simplify]), as `[lon, lat]` pairs, [metrics] the
+ * same vertices with their speed — what its pace bands are drawn from when it's picked
+ * ([SyncCandidates.metrics]) — and [bbox] its `[west, south, east, north]`.
  */
 data class Candidate(
     val key: String,
@@ -43,6 +45,7 @@ data class Candidate(
     /** A recording's name, when it was given one; Health Connect's titles aren't read. */
     val name: String,
     val line: List<DoubleArray>,
+    val metrics: List<TrackMetricPoint>,
     val bbox: List<Double>,
     val pointCount: Int,
     val origin: CandidateOrigin?,
@@ -119,6 +122,7 @@ object SyncCandidates {
                 name = "",
                 lats = lats,
                 lons = lons,
+                times = LongArray(route.size) { route[it].time.toEpochMilli() },
                 distanceM = Geo.lengthM(lats, lons),
                 origin = HealthConnectSession(record, route),
             )
@@ -134,6 +138,7 @@ object SyncCandidates {
             name = record.name,
             lats = DoubleArray(record.points.size) { record.points[it].lat },
             lons = DoubleArray(record.points.size) { record.points[it].lon },
+            times = LongArray(record.points.size) { record.points[it].time.toEpochMilli() },
             distanceM = record.distanceMeters,
             origin = Recording(record),
         )
@@ -149,10 +154,12 @@ object SyncCandidates {
         name: String,
         lats: DoubleArray,
         lons: DoubleArray,
+        times: LongArray,
         distanceM: Double,
         origin: CandidateOrigin?,
     ): Candidate {
-        val line = Simplify.indexes(lats, lons).map { doubleArrayOf(lons[it], lats[it]) }
+        val kept = Simplify.indexes(lats, lons)
+        val line = kept.map { doubleArrayOf(lons[it], lats[it]) }
         val bbox = if (lats.isEmpty()) emptyList() else listOf(lons.min(), lats.min(), lons.max(), lats.max())
         return Candidate(
             key = key(source, externalId),
@@ -164,10 +171,32 @@ object SyncCandidates {
             distanceM = distanceM,
             name = name,
             line = line,
+            metrics = metrics(lats, lons, times, kept),
             bbox = bbox,
             pointCount = lats.size,
             origin = origin,
         )
+    }
+
+    /**
+     * The [kept] vertices of a route with their speed, by the server's own rule for a synced
+     * activity's (`GET /v1/activities/track-metrics`): the distance from the vertex before over
+     * the whole seconds between them ([times] are Unix ms), 0 where no second passed, and the
+     * first vertex taking the second's. The phone simplifies more coarsely than the server does
+     * ([Simplify] at 15 m, the server about 3 m), so the speeds are a little smoother than the
+     * same activity's once it's synced; the bands are relative to the activity's own range either way.
+     */
+    fun metrics(lats: DoubleArray, lons: DoubleArray, times: LongArray, kept: IntArray): List<TrackMetricPoint> {
+        val n = kept.size
+        val speed = DoubleArray(n)
+        for (i in 1 until n) {
+            val a = kept[i - 1]
+            val b = kept[i]
+            val dt = (times[b] / 1000 - times[a] / 1000).toDouble()
+            if (dt > 0) speed[i] = Geo.haversineM(lats[a], lons[a], lats[b], lons[b]) / dt
+        }
+        if (n > 1) speed[0] = speed[1]
+        return List(n) { TrackMetricPoint(lon = lons[kept[it]], lat = lats[kept[it]], speedMps = speed[it], timeS = times[kept[it]] / 1000) }
     }
 
     /**
