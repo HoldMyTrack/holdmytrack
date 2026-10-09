@@ -12,22 +12,25 @@ export interface StoryInboxState extends StoryInbox {
 
 /**
  * Reader for `GET /v1/story-sends`, the Stories tab's inbox (`SPEC.md` FR-14.7): the copies of
- * Stories others sent, and the accepted ones still being copied. Read each time the tab opens
- * (`enabled`), and every few seconds while a copy is arriving; `onArrived` runs whenever one
- * has, so the caller can read its Stories and activities again.
+ * Stories others sent, and the accepted ones still being copied. Read once on mount, for the
+ * tab's count of waiting copies, then each time the tab opens (`enabled`) and every few seconds
+ * while a copy is arriving; `onArrived` runs whenever one has, so the caller can read its
+ * Stories and activities again.
  */
 export function useStoryInbox(enabled: boolean, onArrived: () => void): StoryInboxState {
   const [inbox, setInbox] = useState<StoryInbox>({ sends: [], copying: [] });
   const [nonce, setNonce] = useState(0);
   const copyingRef = useRef(0);
+  const readRef = useRef(false);
   const onArrivedRef = useRef(onArrived);
   onArrivedRef.current = onArrived;
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled && readRef.current) return;
     const controller = new AbortController();
     listStorySends(controller.signal)
       .then((result) => {
+        readRef.current = true;
         if (result.copying.length < copyingRef.current) onArrivedRef.current();
         copyingRef.current = result.copying.length;
         setInbox(result);

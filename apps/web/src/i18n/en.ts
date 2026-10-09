@@ -271,6 +271,8 @@ export const en = {
   'stories.send_confirm': 'Send',
   'stories.sending': 'Sending…',
   'stories.send_done': "Sent to {email}. If that address has a HoldMyTrack account, they'll find the copy in their Stories tab.",
+  'stories.inbox_waiting.one': '{n} copy of a story waiting for you',
+  'stories.inbox_waiting.other': '{n} copies of stories waiting for you',
   'stories.inbox_sent': '{from} sent you a copy of “{name}”',
   'stories.inbox_accept': 'Accept',
   'stories.inbox_decline': 'Decline',
