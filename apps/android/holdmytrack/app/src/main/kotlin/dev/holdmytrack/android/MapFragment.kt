@@ -24,10 +24,13 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.health.connect.client.PermissionController
+import androidx.lifecycle.lifecycleScope
 import androidx.core.view.AccessibilityDelegateCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -40,8 +43,10 @@ import com.google.android.material.progressindicator.LinearProgressIndicator
 import dev.holdmytrack.android.map.ActivityDays
 import dev.holdmytrack.android.map.BoxUnion
 import dev.holdmytrack.android.map.CaptureMode
+import dev.holdmytrack.android.map.Geo
 import dev.holdmytrack.android.map.CoverageWatch
 import dev.holdmytrack.android.map.EditPreview
+import dev.holdmytrack.android.map.SyncCandidatesOverlay
 import dev.holdmytrack.android.map.TrackEditOverlay
 import dev.holdmytrack.android.map.DateRange
 import dev.holdmytrack.android.map.DateRangeSlider
@@ -75,6 +80,8 @@ import dev.holdmytrack.android.panel.PanelFormat
 import dev.holdmytrack.android.panel.PanelTab
 import dev.holdmytrack.android.panel.PrivateLocationEditor
 import dev.holdmytrack.android.panel.PanelState
+import dev.holdmytrack.android.panel.SyncTab
+import dev.holdmytrack.android.sync.Candidate
 import dev.holdmytrack.android.recording.RecordButton
 import dev.holdmytrack.android.recording.RecordingFormat
 import dev.holdmytrack.android.recording.RecordingService
@@ -385,6 +392,21 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
     }
 
+    /** The Sync tab's Health Connect permissions (`sync/HealthConnectCard`). */
+    private val healthPermissionLauncher = registerForActivityResult(
+        @Suppress("UNCHECKED_CAST")
+        PermissionController.createRequestPermissionResultContract()
+            as ActivityResultContract<Set<String>, Set<String>>,
+    ) { if (::panel.isInitialized) panel.syncTab.permissionsAnswered() }
+
+    /** What the Sync tab has the map draw (`map/SyncCandidatesOverlay`), kept for a style
+     *  reload, which drops the layers. */
+    private var syncCandidates: List<Candidate> = emptyList()
+    private var syncHighlight: String? = null
+
+    /** The bottom bar's Sync came before the panel was built: it opens on Sync once it is. */
+    private var pendingSync = false
+
     /** The Photos tab's Add photos: Android's photo picker, any number of images, with no
      *  storage permission. What's picked goes to the tab to prepare and place. */
     private val photoPickLauncher = registerForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
@@ -414,6 +436,16 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     /** The bottom bar's Stories: the panel's Stories tab. */
     fun showStories() {
         if (::panel.isInitialized) panel.showStories()
+    }
+
+    /** The bottom bar's Sync: the panel's Sync tab, in Normal mode, where the sheet is. */
+    fun showSync() {
+        if (!::panel.isInitialized) {
+            pendingSync = true
+            return
+        }
+        if (modeBarReady && mode != MapMode.NORMAL) setMode(MapMode.NORMAL)
+        panel.showSync()
     }
 
     /**
@@ -516,6 +548,15 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         coverageNotice = findViewById(R.id.coverage_notice)
         sheet = findViewById(R.id.activities_sheet)
         selectionBar = findViewById(R.id.selection_bar)
+        val syncTab = SyncTab(
+            findViewById(R.id.panel_sync_content),
+            requireActivity() as AppCompatActivity,
+            scope = { viewLifecycleOwner.lifecycleScope },
+            requestPermissions = healthPermissionLauncher::launch,
+            onCandidates = ::drawSyncCandidates,
+            onFrame = { candidates -> BoxUnion.of(candidates.map { it.bbox }.filter { it.isNotEmpty() })?.let { flyTo(it) } },
+            onSynced = ::onSyncedFromPhone,
+        )
         panel = ActivitiesPanel(
             sheet,
             selectionBar,
@@ -529,6 +570,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
                 if (tab != PanelTab.STORIES && storyId != null) exitStory()
                 // The footer is the Activities tab's; renderDateFooter renders Privacy too.
                 renderDateFooter()
+                // The empty map's notice points to Sync, so it steps aside there.
+                updateNoticeVisibility()
                 // The bottom bar's Stories is this tab, so the bar follows it.
                 host?.onPanelTabChanged(tab)
             },
@@ -544,7 +587,12 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             onRemovedFromStory = ::onRemovedFromStory,
             onStoryCopyArrived = ::onStoryCopyArrived,
             onSheetChanged = ::onSheetChanged,
+            syncTab = syncTab,
         )
+        if (pendingSync) {
+            pendingSync = false
+            view.post { showSync() }
+        }
         privateEditor = PrivateLocationEditor(
             findViewById(R.id.private_editor),
             map = { map },
@@ -972,6 +1020,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             renderTrackMetrics()
             // A new style has none of the circles; draw them again if the editor has the map.
             privateEditor.onStyleReady()
+            // Nor the Sync tab's lines.
+            drawSyncCandidates(syncCandidates, syncHighlight)
             if (isRecording()) MapOverlays.setRecording(loaded, true, mode)
             frameActivities()
             checkTileVersion()
@@ -1297,6 +1347,26 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         coverageWatch.watch()
     }
 
+    /** The Sync tab's lines, drawn over the map — or none, as it leaves. */
+    private fun drawSyncCandidates(candidates: List<Candidate>, highlight: String?) {
+        syncCandidates = candidates
+        syncHighlight = highlight
+        val loaded = style?.takeIf { overlaysAttached } ?: return
+        if (candidates.isEmpty()) SyncCandidatesOverlay.clear(loaded) else SyncCandidatesOverlay.set(loaded, candidates, highlight)
+    }
+
+    /** The Sync tab sent activities: the range's list, its days and the tiles catch up, as on a
+     *  return to the map. */
+    private fun onSyncedFromPhone() {
+        activityDays.reload()
+        reloadList()
+        checkTileVersion()
+        if (shownNotice == Notice.EMPTY) {
+            framed = false
+            frameActivities()
+        }
+    }
+
     private fun onActivitiesDeleted(ids: List<String>) {
         if (ids.isEmpty()) return
         style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
@@ -1507,7 +1577,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun openPhotoMarker(ids: List<String>) {
         val instance = map ?: return
         val located = ids.mapNotNull { id -> photos.firstOrNull { it.id == id }?.takeIf { it.lat != null && it.lon != null } }
-        val spread = located.maxOfOrNull { a -> located.maxOf { b -> haversineM(a.lat!!, a.lon!!, b.lat!!, b.lon!!) } } ?: 0.0
+        val spread = located.maxOfOrNull { a -> located.maxOf { b -> Geo.haversineM(a.lat!!, a.lon!!, b.lat!!, b.lon!!) } } ?: 0.0
         if (located.size > 1 && spread > PHOTO_GROUP_SPREAD_M) {
             flyTo(
                 doubleArrayOf(located.minOf { it.lon!! }, located.minOf { it.lat!! }, located.maxOf { it.lon!! }, located.maxOf { it.lat!! }),
@@ -1518,14 +1588,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         if (located.isEmpty()) return
         spotPopup.close()
         photoPopup.show(instance, located)
-    }
-
-    private fun haversineM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val rad = Math.PI / 180
-        val dLat = (lat2 - lat1) * rad
-        val dLon = (lon2 - lon1) * rad
-        val h = Math.sin(dLat / 2).let { it * it } + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2).let { it * it }
-        return 2 * 6_371_008.8 * Math.asin(minOf(1.0, Math.sqrt(h)))
     }
 
     /** Frames every one of [activities] that has a track — nothing, for none. */
@@ -1549,6 +1611,12 @@ class MapFragment : Fragment(R.layout.fragment_map) {
                 return true
             }
             spotPopup.close()
+        }
+        // The Sync tab's lines: one tapped is picked out on its list.
+        if (::panel.isInitialized && panel.tab == PanelTab.SYNC && sheet.isVisible) {
+            SyncCandidatesOverlay.keyAt(instance, instance.projection.toScreenLocation(point), resources.displayMetrics.density)
+                ?.let(panel.syncTab::focus)
+            return true
         }
         if (!normalMode()) return false
         // The Private location editor has the map to itself while it's open.
@@ -1591,9 +1659,11 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         // The selected activity's card takes the range's place at the head.
         val footer = normal && panel.tab == PanelTab.ACTIVITIES && !panel.showsCard && activityDays.ready && activityDays.earliest != null
         dateFooter.visibility = if (footer) View.VISIBLE else View.GONE
-        // An editor over the map has the screen, the sheet stepping aside for it.
+        // An editor over the map has the screen, the sheet stepping aside for it. The Sync tab
+        // stays while recording: what's on the phone can be sent with a new walk under way.
         val editing = editWindow.isOpen || privacyEditing()
-        sheet.visibility = if (normal && !editing) View.VISIBLE else View.GONE
+        val syncing = modeBarReady && mode == MapMode.NORMAL && panel.tab == PanelTab.SYNC
+        sheet.visibility = if ((normal || syncing) && !editing) View.VISIBLE else View.GONE
         if (!normal) panel.dismissPopups()
         onSheetChanged()
         renderSelectionBar()
@@ -1945,13 +2015,15 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         updateNoticeVisibility()
     }
 
-    /** "Nothing on your map yet" has nothing to say while a recording has the map, so it
-     *  steps aside then and comes back after; the failures stay up regardless. */
+    /** "Nothing on your map yet" has nothing to say while a recording has the map, or on the
+     *  Sync tab it points to, so it steps aside then and comes back after; the failures stay up
+     *  regardless. */
     private fun updateNoticeVisibility() {
         val kind = shownNotice
+        val onSync = ::panel.isInitialized && panel.tab == PanelTab.SYNC
         notice.visibility = when {
             kind == null -> View.GONE
-            kind == Notice.EMPTY && isRecording() -> View.GONE
+            kind == Notice.EMPTY && (isRecording() || onSync) -> View.GONE
             else -> View.VISIBLE
         }
     }
@@ -2155,6 +2227,15 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             framed = false
             frameActivities()
         }
+        // Back from Health Connect's settings or a recording's Edit: the Sync tab reads again.
+        if (::panel.isInitialized && !isHidden) panel.syncTab.resume()
+    }
+
+    /** The You tab over the map, or the map back: the Sync tab stops reading, or reads again. */
+    override fun onHiddenChanged(hidden: Boolean) {
+        super.onHiddenChanged(hidden)
+        if (!::panel.isInitialized) return
+        if (hidden) panel.syncTab.pause() else panel.syncTab.resume()
     }
 
     override fun onPause() {
@@ -2164,6 +2245,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     override fun onStop() {
+        // Health Connect's routes can't be read in the background (`docs/IMPLEMENTATION.md` §4.0).
+        if (::panel.isInitialized) panel.syncTab.pause()
         if (::mapView.isInitialized) mapView.removeCallbacks(pendingPoll)
         if (recorderBound) {
             recorder?.onChange = null

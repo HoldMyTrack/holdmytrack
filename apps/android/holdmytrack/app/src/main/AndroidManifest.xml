@@ -138,7 +138,7 @@
              their exercise data, and without that filter the permission dialog can refuse to
              appear at all (found on a device). This screen is the rationale — it says
              what is read and what it is used for before asking for anything. The app's own Sync
-             is MainActivity's Sync tab, the same SyncFragment. -->
+             is MainActivity's Sync tab, on the map (panel/SyncTab). -->
         <activity
             android:name=".SyncActivity"
             android:exported="true"

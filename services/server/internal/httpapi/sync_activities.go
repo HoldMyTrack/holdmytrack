@@ -175,6 +175,57 @@ func (s *Server) handleSyncActivities(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, syncActivitiesResponse{Results: results})
 }
 
+// maxKnownIDs bounds one `POST /v1/sync/known` request: three months of a phone's sessions,
+// which is what the Sync screen asks about, is a few hundred at most.
+const maxKnownIDs = 5000
+
+type syncKnownRequest struct {
+	Source      string   `json:"source"`
+	ExternalIDs []string `json:"external_ids"`
+}
+
+type syncKnownResponse struct {
+	Known []string `json:"known"`
+}
+
+// handleSyncKnown serves IMPLEMENTATION.md §4.0.3's `POST /v1/sync/known`: which of a phone's
+// candidates the account already has (ingest.KnownExternalIDs). The phone keeps no cursor —
+// its Sync screen lists what's on the device minus what this answers — so a reinstall or a
+// second phone agrees with the server, and an activity deleted here is offered again.
+func (s *Server) handleSyncKnown(w http.ResponseWriter, r *http.Request) {
+	var req syncKnownRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if !syncSources[req.Source] {
+		http.Error(w, `invalid "source", want "healthconnect", "healthkit", "recorded" or "timeline"`, http.StatusBadRequest)
+		return
+	}
+	if len(req.ExternalIDs) > maxKnownIDs {
+		http.Error(w, fmt.Sprintf("too many external_ids (%d), want %d or fewer", len(req.ExternalIDs), maxKnownIDs), http.StatusBadRequest)
+		return
+	}
+	for _, id := range req.ExternalIDs {
+		if !syncExternalIDPattern.MatchString(id) {
+			http.Error(w, i18n.Get(requestLang(r)).T("error.sync_external_id_invalid"), http.StatusBadRequest)
+			return
+		}
+	}
+	ctx := r.Context()
+	known, err := ingest.KnownExternalIDs(ctx, s.pool, userIDFromContext(ctx), req.Source, req.ExternalIDs)
+	if err != nil {
+		s.log.Error("sync known failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if known == nil {
+		known = []string{}
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, syncKnownResponse{Known: known})
+}
+
 // syncItem validates one batch entry and turns it into the item EnqueueRaw takes, or returns
 // why it was rejected — one bad entry is that entry's result, never the whole batch's.
 func (s *Server) syncItem(l *i18n.Localizer, source, batch, batchTitle string, act syncActivityRequest) (ingest.RawItem, string) {

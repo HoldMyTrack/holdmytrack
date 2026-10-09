@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The top of the Sync tab's list (panel/SyncTab): why this account can't sync, if it can't;
+     what the last run did and what it couldn't (selectable, since a rejection's reason is what
+     someone would paste into a bug report); what Health Connect wouldn't give; then the type
+     filters and Select all over the rows. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="@dimen/hmt_space_8">
+
+    <TextView
+        android:id="@+id/sync_account_notice"
+        style="@style/Widget.HoldMyTrack.Notice"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/hmt_space_16"
+        android:layout_marginEnd="@dimen/hmt_space_16"
+        android:layout_marginBottom="@dimen/hmt_space_8"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/sync_results"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/hmt_space_16"
+        android:layout_marginEnd="@dimen/hmt_space_16"
+        android:layout_marginBottom="@dimen/hmt_space_8"
+        android:accessibilityLiveRegion="polite"
+        android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowSub"
+        android:textIsSelectable="true"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/sync_problems"
+        style="@style/Widget.HoldMyTrack.Notice.Error"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/hmt_space_16"
+        android:layout_marginEnd="@dimen/hmt_space_16"
+        android:layout_marginBottom="@dimen/hmt_space_8"
+        android:textIsSelectable="true"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/sync_source_note"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/hmt_space_16"
+        android:layout_marginEnd="@dimen/hmt_space_16"
+        android:layout_marginBottom="@dimen/hmt_space_8"
+        android:textColor="@color/hmt_ink_meta"
+        android:textSize="@dimen/hmt_text_sm"
+        android:visibility="gone"
+        tools:text="Health Connect sessions from the last 3 months. Older ones stay in Health Connect." />
+
+    <LinearLayout
+        android:id="@+id/sync_filters"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingEnd="@dimen/hmt_space_8">
+
+        <HorizontalScrollView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:scrollbars="none">
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/sync_types"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/sync_types"
+                android:paddingStart="@dimen/hmt_space_16"
+                android:paddingEnd="@dimen/hmt_space_8"
+                app:singleLine="true" />
+        </HorizontalScrollView>
+
+        <Button
+            android:id="@+id/sync_select_all"
+            style="@style/Widget.HoldMyTrack.Button.Link"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="@string/sync_select_all"
+            android:textFontWeight="600" />
+    </LinearLayout>
+</LinearLayout>

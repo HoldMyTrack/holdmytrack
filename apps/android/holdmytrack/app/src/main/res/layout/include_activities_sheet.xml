@@ -3,7 +3,7 @@
      collapsed — its head alone — half the map and nearly all of it (BottomSheetBehavior; the
      expanded top stops under the map's top row). Its head is the date range on the Activities
      tab — the range as a heading, ‹ › to move it, and the day scrubber under them — or the
-     title of the Stories content showing instead. Everything under the
+     title of the Stories or Sync content showing instead. Everything under the
      head stays laid out while collapsed, just covered, so the list keeps its scroll position.
      Clickable, so a touch on it never reaches the map underneath. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -127,7 +127,7 @@
         <!-- The selected activity, in the range's place while one is selected. -->
         <include layout="@layout/include_activity_card" />
 
-        <!-- The Stories head: the content's title. -->
+        <!-- The Stories and Sync head: the content's title. -->
         <LinearLayout
             android:id="@+id/panel_title_head"
             android:layout_width="match_parent"
@@ -149,7 +149,7 @@
                 tools:text="Stories" />
         </LinearLayout>
 
-        <!-- What the Stories content is (.activities-panel__subtext);
+        <!-- What the Stories or Sync content is (.activities-panel__subtext);
              the Activities tab has none, its range and filters saying what's listed. -->
         <TextView
             android:id="@+id/panel_subtext"
@@ -346,5 +346,8 @@
                     android:shrinkColumns="1" />
             </LinearLayout>
         </LinearLayout>
+
+        <!-- The Sync tab: what's on this phone, waiting, to tick and send (panel/SyncTab). -->
+        <include layout="@layout/include_sync_content" />
     </FrameLayout>
 </LinearLayout>

@@ -11,7 +11,7 @@ import dev.holdmytrack.android.SignInActivity
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.recording.db.RecordedActivityStore
-import dev.holdmytrack.android.sync.SyncCursor
+import dev.holdmytrack.android.sync.HiddenCandidates
 import kotlinx.coroutines.launch
 
 /**
@@ -52,8 +52,8 @@ object AccountDeletion {
     }
 
     /**
-     * What this device keeps for the deleted account goes too: its unsynced recordings and its
-     * Health Connect watermark — both keyed by the email, which a new account can take again —
+     * What this device keeps for the deleted account goes too: its unsynced recordings and the
+     * rows it hid on the Sync tab — both keyed by the email, which a new account can take again —
      * then the session, and on to the sign-in screen, which says the account was deleted.
      */
     private fun forget(activity: AppCompatActivity) {
@@ -61,7 +61,7 @@ object AccountDeletion {
         val context = activity.applicationContext
         activity.lifecycleScope.launch {
             RecordedActivityStore(context).deleteAll()
-            SyncCursor(context, email).reset()
+            HiddenCandidates(context, email).clear()
             Session.clear()
             SignInActivity.open(activity, R.string.account_deleted)
         }

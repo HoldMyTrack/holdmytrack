@@ -77,14 +77,16 @@ Everything is under `app/src/main/kotlin/dev/holdmytrack/android/`:
 - `net/HoldMyTrackApi.kt` — the whole HTTP surface: the shared `OkHttpClient`, the interceptor that attaches the token to HoldMyTrack's own origin and nowhere else, and the five calls the app makes.
 - `map/MapOverlays.kt` — the tracks, fog and heatmap layers, their ordering beneath the basemap's labels, and the three-way mode toggle.
 - `map/MapModeButton.kt` — a Normal, Fog or Heatmap button, read by TalkBack as one choice of three.
-- `SyncFragment.kt` — the Sync screen, the Sync tab: Health Connect onboarding, the recordings, the sync run, and the way to Upload and the Timeline import.
-- `SyncActivity.kt` — the Sync screen on its own, registered for `ACTION_SHOW_PERMISSIONS_RATIONALE`, so Health Connect opens it as the app's own explanation of what it reads.
+- `map/SyncCandidatesOverlay.kt` — the Sync tab's candidates on the map, dashed, the picked one solid.
+- `SyncActivity.kt` — Health Connect's setup on its own, registered for `ACTION_SHOW_PERMISSIONS_RATIONALE`, so Health Connect opens it as the app's own explanation of what it reads.
 - `health/HealthConnect.kt` — availability, the three permissions, and the readiness states the onboarding walks through.
 - `health/ExerciseTypes.kt` — Health Connect's exercise type to HoldMyTrack's `activity_type`, normalised onto the vocabulary the other ingest paths already produce.
-- `sync/SyncCursor.kt` — the watermark. Read its comment before changing anything about it.
-- `sync/SyncRunner.kt` — one foreground sync run: read, classify, batch, post, advance.
-- `sync/ImportHistory.kt` — the history of every import, duplicates among them, the web's `/sync` page: its latest rows on the Sync screen, and all of it on `SyncHistoryActivity.kt`, See all's screen.
-- `panel/` — the map's Activities panel, the web's phone sheet: `ActivitiesPanel.kt` (the sheet and its Activities tab), `PanelState.kt` and `ActivityFacets.kt` (its rules, unit-tested), `EditActivityWindow.kt` (Edit), `TrackEditor.kt` and `EditTrackOps.kt` (its Track tab, the rules unit-tested), `StoriesTab.kt` (Stories), `PrivateLocationEditor.kt` (a Private location, edited on the map).
+- `sync/SyncCandidates.kt` — what's waiting: Health Connect's sessions from the last three months the server doesn't have, and the recordings on the phone.
+- `sync/SyncRunner.kt` — sends what's ticked, in batches, and reports what happened to each.
+- `sync/HiddenCandidates.kt` — the rows swiped aside, per account.
+- `sync/HealthConnectCard.kt` — Health Connect's setup card, on the Sync tab and in `SyncActivity`.
+- `sync/ImportHistory.kt` — the history of every import, duplicates among them, the web's `/sync` page: its latest rows on the Sync tab, and all of it on `SyncHistoryActivity.kt`, See all's screen.
+- `panel/` — the map's Activities panel, the web's phone sheet: `ActivitiesPanel.kt` (the sheet and its Activities tab), `PanelState.kt` and `ActivityFacets.kt` (its rules, unit-tested), `EditActivityWindow.kt` (Edit), `TrackEditor.kt` and `EditTrackOps.kt` (its Track tab, the rules unit-tested), `StoriesTab.kt` (Stories), `SyncTab.kt` (Sync: what's on the phone, ticked and sent), `PrivateLocationEditor.kt` (a Private location, edited on the map).
 - `privacy/` — the Privacy screen, from the You tab: `PrivacyActivity.kt` (the Private locations and what's kept), `CirclePreviewView.kt` (a location drawn small) and `DataExportActivity.kt` (Download your data).
 - `ui/LargeText.kt` — rows that stack instead of breaking words at a large font size.
 
@@ -94,9 +96,9 @@ Alongside:
 
 ## Syncing from Health Connect
 
-Three permissions, one data type. `READ_EXERCISE` and `READ_HEALTH_DATA_HISTORY` are ordinary requests; **`READ_EXERCISE_ROUTES` cannot be requested at all** and has to be granted in Health Connect → HoldMyTrack → *Additional access* → *Access exercise routes* → *Always allow*. The sync screen says so, because that screen is two levels down and nothing links to it. Without the history permission Health Connect serves only the last 30 days — measured, not assumed.
+Three permissions, one data type. `READ_EXERCISE` and `READ_HEALTH_DATA_HISTORY` are ordinary requests; **`READ_EXERCISE_ROUTES` cannot be requested at all** and has to be granted in Health Connect → HoldMyTrack → *Additional access* → *Access exercise routes* → *Always allow*. The Sync tab says so, because that screen is two levels down and nothing links to it. Without the history permission Health Connect serves only the last 30 days — measured, not assumed.
 
-The run is foreground-only and stops when the screen does, which is a platform constraint rather than a choice: routes written by other apps read back as `ConsentRequired` in the background whatever is granted. That is safe rather than lossy because the watermark only moves over activities the server has already confirmed, so an interrupted run is simply repeated. **If you change one thing in `sync/`, read `SyncCursor`'s comment first** — advancing it past a record whose route was not read produces a history that is complete except for the map, which is worse than no sync at all.
+Reading and sending are foreground-only and stop when the Sync tab leaves the screen, which is a platform constraint rather than a choice: routes written by other apps read back as `ConsentRequired` in the background whatever is granted. That is safe rather than lossy because the phone keeps no cursor: each time the tab opens, it lists what's on the phone minus what the server says it already has (`POST /v1/sync/known`), so an interrupted run leaves its unsent rows listed. Nothing is ticked by default, and only what the user ticks is sent.
 
 ## Signing in against a dev stack
 

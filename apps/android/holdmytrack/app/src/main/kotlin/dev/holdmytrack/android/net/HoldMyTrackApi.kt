@@ -566,12 +566,12 @@ object HoldMyTrackApi {
      * is the sync run, which is a coroutine from end to end (Health Connect's read API leaves
      * no choice). The blocking `execute()` is confined to `Dispatchers.IO` here rather than
      * wrapped in `enqueue`, since the caller genuinely wants to wait: the next batch must not
-     * be sent, and the watermark must not move, until this one is answered.
+     * be sent until this one is answered.
      *
      * Returns the server's per-activity verdicts rather than a single pass/fail — a batch is
-     * not all-or-nothing there, and the caller needs to know which ones landed before it can
-     * decide how far the watermark may move. A non-2xx status is the whole request failing and
-     * throws instead; nothing in the batch was decided.
+     * not all-or-nothing there, and the caller needs to know which ones landed before it takes
+     * them off its list. A non-2xx status is the whole request failing and throws instead;
+     * nothing in the batch was decided.
      *
      * [batch] and [batchTitle] name one import the caller splits over several requests (a
      * Timeline export, a hundred activities to a request), so the history counts it as one.
@@ -605,6 +605,35 @@ object HoldMyTrackApi {
                 )
             }
         }
+
+    /**
+     * `POST /v1/sync/known` (`docs/IMPLEMENTATION.md` §4.0.3): which of [externalIds] the
+     * account already has from [source] — the Sync tab's list is what's on the phone minus these,
+     * so a reinstall or a second phone agrees with the server. Suspending, like [syncActivities],
+     * for the same caller; a failure throws.
+     */
+    suspend fun syncKnown(source: String, externalIds: List<String>): Set<String> =
+        withContext(Dispatchers.IO) {
+            val known = mutableSetOf<String>()
+            for (chunk in externalIds.chunked(MAX_KNOWN_IDS)) {
+                val body = JSONObject()
+                    .put("source", source)
+                    .put("external_ids", JSONArray(chunk))
+                val request = Request.Builder()
+                    .url(BuildConfig.API_BASE_URL + API_V1 + "/sync/known")
+                    .post(body.toString().toRequestBody(JSON))
+                    .build()
+                val response = client.newCall(request).execute()
+                val text = response.use { it.body?.string().orEmpty() }
+                if (!response.isSuccessful) throw ApiException.from(response.code, text)
+                val ids = JSONObject(text).getJSONArray("known")
+                for (i in 0 until ids.length()) known += ids.getString(i)
+            }
+            known
+        }
+
+    /** The server's `maxKnownIDs`: one `POST /v1/sync/known` asks about at most this many. */
+    private const val MAX_KNOWN_IDS = 5000
 
     /**
      * Uploads take as long as sending the file does, up to 512 MiB, and the server answers once it

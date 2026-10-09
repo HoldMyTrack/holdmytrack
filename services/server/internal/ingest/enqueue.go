@@ -143,6 +143,34 @@ func EnqueueRaw(ctx context.Context, db Querier, userID string, items []RawItem)
 	return out, nil
 }
 
+// KnownExternalIDs returns which of ids the account already has from source: an activity row
+// in any state, or an ingest job still waiting to run. It answers a phone's "is this synced
+// yet?" (IMPLEMENTATION.md §4.0.3's `POST /v1/sync/known`), so it counts everything a repeat
+// sync would answer `already_processed` for — a superseded duplicate included — plus what's
+// queued, so a session sent a moment ago doesn't come back while the worker catches up. A
+// deleted activity's row is gone and its job finished, so its id isn't known any more.
+func KnownExternalIDs(ctx context.Context, db Querier, userID, source string, ids []string) ([]string, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	rows, err := db.Query(ctx, `
+		SELECT external_id FROM activities
+		WHERE user_id = $1 AND source = $2 AND external_id = ANY($3::text[])
+		UNION
+		SELECT payload->>'external_id' FROM jobs
+		WHERE user_id = $1 AND kind = 'ingest' AND state = 'pending'
+		  AND payload->>'source' = $2 AND payload->>'external_id' = ANY($3::text[])`,
+		userID, source, ids)
+	if err != nil {
+		return nil, fmt.Errorf("ingest: known ids: %w", err)
+	}
+	known, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return nil, fmt.Errorf("ingest: known ids: %w", err)
+	}
+	return known, nil
+}
+
 // Enqueuer feeds EnqueueRaw a long run of items — an archive's files — a chunk at a time, so
 // neither the bytes held in memory nor one INSERT grows with the archive. Each chunk is its
 // own transaction.

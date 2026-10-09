@@ -51,7 +51,7 @@ Sign in with Facebook is built (`SPEC.md` FR-1.10) and the Meta app exists, but 
 
 ## Phase 2 — Mobile
 
-Path 2 on-device sync and in-app GPS recording (`VISION.md` §5.3). Android and iOS are tracked separately below; iOS reuses the sync contract (payload shape, sync-cursor semantics) Android settled.
+Path 2 on-device sync and in-app GPS recording (`VISION.md` §5.3). Android and iOS are tracked separately below; iOS reuses the sync contract Android settled: the payload shape, and the list of what's on the phone that the user ticks from, with the server answering what the account already has (`SPEC.md` FR-3.6).
 
 ### Android
 
@@ -64,7 +64,7 @@ Path 2 on-device sync and in-app GPS recording (`VISION.md` §5.3). Android and 
 ### iOS
 
 - [ ] Confirm `HKWorkoutRoute` access with a throwaway iOS app (`VISION.md` §4.1) — due diligence before committing engineering effort to the full iOS build, not resolving a real unknown: Apple's docs already say this works.
-- [ ] iOS app: HealthKit sync, `HKWorkoutRoute` for full GPS geometry, on the payload and sync-cursor design Android settled.
+- [ ] iOS app: HealthKit sync, `HKWorkoutRoute` for full GPS geometry, on the payload and the pick-what-to-send design Android settled.
 - [ ] In-app GPS recording, iOS half — inherits the Android build's wire shape and `source` convention once the iOS app itself exists (see the iOS Path 2 item above, which this depends on).
 
 ---

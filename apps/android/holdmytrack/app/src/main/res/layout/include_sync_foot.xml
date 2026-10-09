@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The bottom of the Sync tab's list (panel/SyncTab): a note when there's nothing to list,
+     Show hidden, then Health Connect's setup (include_health_connect_card), the ways to bring in
+     files (include_sync_files) and the latest of the sync history (include_sync_history, the
+     whole of it in SyncHistoryActivity). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:divider="@drawable/gap_20"
+    android:orientation="vertical"
+    android:paddingStart="@dimen/hmt_space_16"
+    android:paddingTop="@dimen/hmt_space_8"
+    android:paddingEnd="@dimen/hmt_space_16"
+    android:paddingBottom="@dimen/hmt_space_16"
+    android:showDividers="middle">
+
+    <TextView
+        android:id="@+id/sync_list_note"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowSub"
+        android:visibility="gone" />
+
+    <Button
+        android:id="@+id/sync_show_hidden"
+        style="@style/Widget.HoldMyTrack.Button.Link"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:minHeight="48dp"
+        android:textFontWeight="600"
+        android:visibility="gone" />
+
+    <include layout="@layout/include_health_connect_card" />
+
+    <include layout="@layout/include_sync_files" />
+
+    <LinearLayout
+        android:id="@+id/sync_history_section"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <include layout="@layout/include_sync_history" />
+    </LinearLayout>
+</LinearLayout>

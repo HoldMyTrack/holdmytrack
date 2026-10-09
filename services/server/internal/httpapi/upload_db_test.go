@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -591,6 +592,69 @@ func TestSyncEnqueuesRawPayloadsInline(t *testing.T) {
 		if got[i].Status != want {
 			t.Errorf("repeat result %d: %s, want %s", i, got[i].Status, want)
 		}
+	}
+}
+
+// `POST /v1/sync/known` answers which of a phone's sessions the account has: ingested or still
+// queued, and no longer once the activity is deleted. Only the asker's own, only that source.
+func TestSyncKnownAnswersWhatTheAccountHas(t *testing.T) {
+	d := newDBTestWithS3(t, newMemS3())
+	me := d.newAccount(false)
+	other := d.newAccount(false)
+	ctx := context.Background()
+	points := []map[string]any{
+		{"lat": 50.0, "lon": 10.0, "time": "2026-05-01T10:00:00Z"},
+		{"lat": 50.001, "lon": 10.001, "time": "2026-05-01T10:01:00Z"},
+	}
+	sync := func(as account, source string, ids ...string) {
+		var acts []map[string]any
+		for _, id := range ids {
+			acts = append(acts, map[string]any{"external_id": id, "activity_type": "walk", "points": points})
+		}
+		d.decode(d.do(as, http.MethodPost, "/v1/sync/activities", map[string]any{"source": source, "activities": acts}), http.StatusOK, nil)
+	}
+	known := func(ids ...string) []string {
+		var resp syncKnownResponse
+		d.decode(d.do(me, http.MethodPost, "/v1/sync/known", map[string]any{"source": "healthconnect", "external_ids": ids}), http.StatusOK, &resp)
+		slices.Sort(resp.Known)
+		return resp.Known
+	}
+
+	sync(me, "healthconnect", "ingested")
+	job := d.latestIngestJob(me)
+	res, err := ingest.Process(ctx, d.pool, d.srv.store, job)
+	if err != nil || !res.Persisted {
+		t.Fatalf("ingest: %+v, %v", res, err)
+	}
+	if _, err := d.pool.Exec(ctx, `UPDATE jobs SET state = 'done' WHERE user_id = $1`, me.id); err != nil {
+		t.Fatal(err)
+	}
+	sync(me, "healthconnect", "queued")
+	sync(me, "recorded", "other-source")
+	sync(other, "healthconnect", "someone-elses")
+
+	if got, want := known("ingested", "queued", "other-source", "someone-elses", "never-sent"), []string{"ingested", "queued"}; !slices.Equal(got, want) {
+		t.Fatalf("known: %v, want %v", got, want)
+	}
+
+	if rec := d.do(me, http.MethodDelete, "/v1/activities/"+res.ActivityID, nil); rec.Code != http.StatusNoContent && rec.Code != http.StatusOK {
+		t.Fatalf("delete: %d %s", rec.Code, rec.Body.String())
+	}
+	if got, want := known("ingested", "queued"), []string{"queued"}; !slices.Equal(got, want) {
+		t.Errorf("after delete: %v, want %v", got, want)
+	}
+
+	for _, body := range []map[string]any{
+		{"source": "strava", "external_ids": []string{"x"}},
+		{"source": "healthconnect", "external_ids": []string{"../x"}},
+	} {
+		if rec := d.do(me, http.MethodPost, "/v1/sync/known", body); rec.Code != http.StatusBadRequest {
+			t.Errorf("%v: %d, want 400", body, rec.Code)
+		}
+	}
+	demo := d.newAccount(true)
+	if rec := d.do(demo, http.MethodPost, "/v1/sync/known", map[string]any{"source": "healthconnect", "external_ids": []string{"x"}}); rec.Code != http.StatusForbidden {
+		t.Errorf("demo: %d, want 403", rec.Code)
 	}
 }
 

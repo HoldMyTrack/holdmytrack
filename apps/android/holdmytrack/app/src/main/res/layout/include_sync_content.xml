@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Sync tab (panel/SyncTab): the bar with what's ticked and the Sync button, which stays
+     put, then what's on this phone and not on the map yet, one row each — the list's head
+     (include_sync_head) above them and its foot (include_sync_foot) under them, all one
+     scrolling list. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/panel_sync_content"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:visibility="gone">
+
+    <!-- What's ticked, and Sync — at the top, so the half-open sheet shows it; progress under
+         it while a read or a run goes. -->
+    <LinearLayout
+        android:id="@+id/sync_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="@dimen/hmt_space_16"
+            android:paddingTop="@dimen/hmt_space_8"
+            android:paddingEnd="@dimen/hmt_space_16"
+            android:paddingBottom="@dimen/hmt_space_8">
+
+            <TextView
+                android:id="@+id/sync_ticked"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="@dimen/hmt_space_12"
+                android:layout_weight="1"
+                android:accessibilityLiveRegion="polite"
+                android:textColor="@color/hmt_ink"
+                android:textSize="@dimen/hmt_text_md"
+                tools:text="2 of 14 ticked · 18.4 km" />
+
+            <Button
+                android:id="@+id/sync_now"
+                style="@style/Widget.HoldMyTrack.Button.Hero"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/sync_now"
+                app:icon="@drawable/ic_refresh_cw" />
+        </LinearLayout>
+
+        <com.google.android.material.progressindicator.LinearProgressIndicator
+            android:id="@+id/sync_progress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:indeterminate="true"
+            android:visibility="gone"
+            app:indicatorColor="@color/hmt_accent"
+            app:trackColor="@color/hmt_surface_tint_strong"
+            app:trackThickness="3dp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/hmt_hairline" />
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/sync_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:overScrollMode="never"
+        android:scrollbars="vertical" />
+</LinearLayout>

@@ -37,8 +37,8 @@ import dev.holdmytrack.android.recording.RecordingTypes
 import dev.holdmytrack.android.ui.LargeText
 import kotlin.math.abs
 
-/** The panel's three tabs, the web's `PanelTab`. */
-enum class PanelTab { ACTIVITIES, STORIES }
+/** The panel's tabs: the web's `PanelTab`, and the bottom bar's Sync. */
+enum class PanelTab { ACTIVITIES, STORIES, SYNC }
 
 /**
  * The map's Activities sheet (`apps/web/src/ui/ActivitiesPanel.tsx`, redrawn for a phone): a
@@ -48,7 +48,8 @@ enum class PanelTab { ACTIVITIES, STORIES }
  * listed activities' totals ([render]), and under it the Type dropdown and the DISTANCE slider,
  * a toolbar over the toolbar's target, the rows and the target's summary. The Stories tab — the
  * bottom bar's Stories — has the account's Stories with one open on the map ([StoriesTab]),
- * headed by its title instead of the range.
+ * headed by its title instead of the range; the Sync tab — the bottom bar's Sync — what's on
+ * this phone waiting to be added ([SyncTab]), headed the same way.
  *
  * The rules live in [PanelState]; this draws it and turns taps into state changes.
  * `MapFragment` owns the map and the fetch: it hands over each list ([setActivities]) and
@@ -84,6 +85,8 @@ class ActivitiesPanel(
     private val onStoryCopyArrived: () -> Unit,
     /** The sheet came to rest at another height, or its peek changed. */
     private val onSheetChanged: () -> Unit,
+    /** The Sync tab, `MapFragment`'s to build: it draws on the map and reads the phone. */
+    val syncTab: SyncTab,
 ) {
     private val context = sheet.context
     private val res = context.resources
@@ -94,6 +97,7 @@ class ActivitiesPanel(
     private val titleHead: View = sheet.findViewById(R.id.panel_title_head)
     private val title: TextView = sheet.findViewById(R.id.panel_title)
     private val storiesContent: View = sheet.findViewById(R.id.panel_stories_content)
+    private val syncContent: View = sheet.findViewById(R.id.panel_sync_content)
     private val activitiesContent: View = sheet.findViewById(R.id.panel_activities_content)
     private val head: View = sheet.findViewById(R.id.panel_head)
     private val subtext: TextView = sheet.findViewById(R.id.panel_subtext)
@@ -294,6 +298,7 @@ class ActivitiesPanel(
         tab = next
         dismissPopups()
         if (next == PanelTab.STORIES) storiesTab.start() else storiesTab.stop()
+        if (next == PanelTab.SYNC) syncTab.start() else syncTab.stop()
         render()
         onTabChanged(next)
     }
@@ -305,7 +310,14 @@ class ActivitiesPanel(
         setExpanded(true)
     }
 
-    /** The Activities tab, collapsed — the Sync screen's View on map, which is about the map. */
+    /** Onto the Sync tab, the sheet halfway up so its list shows over the lines it draws — the
+     *  bottom bar's Sync. */
+    fun showSync() {
+        showTab(PanelTab.SYNC)
+        setExpanded(true)
+    }
+
+    /** The Activities tab, collapsed — the bottom bar's Map, or a View on map. */
     fun showActivities() {
         showTab(PanelTab.ACTIVITIES)
         setExpanded(false)
@@ -460,10 +472,10 @@ class ActivitiesPanel(
         val listed = state.listed
         // The Activities tab's own totals: an open Story's rows are the list meanwhile, and
         // aren't what the range's heading counts, as on the web.
-        if (tab != PanelTab.STORIES) summary.text = summaryOf(listed)
+        if (tab == PanelTab.ACTIVITIES) summary.text = summaryOf(listed)
         renderTabs()
         subtext.visibility = if (tab == PanelTab.ACTIVITIES) View.GONE else View.VISIBLE
-        subtext.setText(R.string.story_subtext)
+        subtext.setText(if (tab == PanelTab.SYNC) R.string.sync_subtext else R.string.story_subtext)
         // Held down under an edit, the sheet is collapsed whatever it was.
         val open = expanded && !held
         handle.contentDescription = res.getString(if (open) R.string.panel_collapse else R.string.panel_expand)
@@ -501,13 +513,14 @@ class ActivitiesPanel(
         PanelFormat.duration(res, listed.sumOf { it.durationSeconds ?: 0L }),
     ).joinToString(" · ")
 
-    /** The tab's head — the range is `MapFragment`'s to show; Stories has its title — and its
-     *  content in the sheet. */
+    /** The tab's head — the range is `MapFragment`'s to show; Stories and Sync have their
+     *  titles — and its content in the sheet. */
     private fun renderTabs() {
         titleHead.visibility = if (tab == PanelTab.ACTIVITIES) View.GONE else View.VISIBLE
-        title.setText(R.string.panel_tab_stories)
+        title.setText(if (tab == PanelTab.SYNC) R.string.sync_title else R.string.panel_tab_stories)
         activitiesContent.visibility = if (tab == PanelTab.ACTIVITIES) View.VISIBLE else View.GONE
         storiesContent.visibility = if (tab == PanelTab.STORIES) View.VISIBLE else View.GONE
+        syncContent.visibility = if (tab == PanelTab.SYNC) View.VISIBLE else View.GONE
     }
 
     /** DISTANCE, the web's `DistanceFilter`: gone while the list has no spread of distances. */

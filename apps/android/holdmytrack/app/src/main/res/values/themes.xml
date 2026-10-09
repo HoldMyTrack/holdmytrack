@@ -834,7 +834,7 @@
         <item name="android:insetBottom">0dp</item>
     </style>
 
-    <!-- The Sync, You and Privacy screens (fragment_sync, fragment_you, activity_privacy): a
+    <!-- The You and Privacy screens (fragment_you, activity_privacy): a
          serif title over cream, uppercase section headings, and white cards of rows. -->
     <style name="TextAppearance.HoldMyTrack.ScreenTitle" parent="TextAppearance.HoldMyTrack.TitleLarge">
         <item name="android:textSize">30sp</item>
