@@ -454,10 +454,10 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // who's simply browsing) is what lets this safely reconsider on new data without also
   // firing on every Earlier/Later click.
   //
-  // Held still while the Edit window is open: a big zip lands newer activity-days on every
+  // Held still while the Edit window is open: a big import lands newer activity-days on every
   // poll tick, sliding the default forward past the activity being edited — which drops it
   // from the list, and the window can't outlive its activities (below), so it kept closing
-  // itself until the whole zip had finished. `editOpen` is a dependency so the default
+  // itself until the whole import had finished. `editOpen` is a dependency so the default
   // catches up on whatever landed meanwhile the moment the window closes.
   useEffect(() => {
     if (userChangedRangeRef.current || !daysReady || editOpen) return;
@@ -629,8 +629,8 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
 
   // The /sync page's "View on map" (`/?activity=&day=`, below), reusing focusActivity above
   // rather than inventing a second fly-to mechanism. The one thing a row click doesn't already
-  // handle: the target activity may not be in the currently selected date range (an old Takeout
-  // import, a Health Connect backfill), in which case focusActivity would silently find nothing
+  // handle: the target activity may not be in the currently selected date range (an old upload,
+  // a Health Connect backfill), in which case focusActivity would silently find nothing
   // in `activities` and no-op. When that happens, this narrows the range to just that activity's
   // own day — in the account's timezone, as the link carries it (changeSelectedRange, the same
   // mechanism the slider commits through) — and defers the actual focus to the effect below,

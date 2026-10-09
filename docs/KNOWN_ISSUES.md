@@ -6,14 +6,6 @@ This file stays lean and current-only. Once an entry is fixed, its root-cause/fi
 
 ---
 
-### A Google Health Takeout export over 512 MB, or split into several files, can't be imported
-
-`handleUpload` refuses a `.zip` over `maxZipUploadBytes` (512 MiB, `services/server/internal/httpapi/server.go`), but Takeout's smallest part size is 1 GB and its default is 2 GB. The real sample the Takeout reader was built against (`IMPLEMENTATION.md` §4.0.2) was 1.9 GB, so it would be refused through the upload. Takeout also splits an export bigger than the chosen part size into several `.zip` files. `handleTakeoutUpload` reads one archive at a time, and the join needs an activity's exercise log (`exercise-N.json`) and its day's GPS file (`gps_location_*.csv`) in the same archive. Split across parts, an activity whose two halves land apart comes out with no route, or is skipped. The export guide (`SPEC.md` FR-10.5) states both limits rather than promising otherwise.
-
-- [ ] Accept a Takeout archive above 512 MB. It's already read from a temp file rather than memory (`multipartMemoryBytes`), so the cap is about request size, not RAM. A separate, larger cap for an archive `isTakeoutArchive` recognizes would do, or a resumable upload.
-- [ ] Join across the parts of one split export: hold the parts of one Takeout export (they share a name stem, `takeout-<timestamp>-NNN.zip`) until all have arrived, or index each part's exercise logs and GPS files and join across them.
-- [ ] Check both against a real multi-part export, then drop the limit from the guide.
-
 ### The overlap hint misses a whole copy of a split activity
 
 The overlap hint (`SPEC.md` FR-3.7, `IMPLEMENTATION.md` §4.6) marks a candidate whose time range overlaps one of the account's activities by at least 80% of the longer one. After a split (FR-5.17, §4.7.8), a whole copy of the same recording from a second source, say a Health Connect session of a ride uploaded earlier from the watch's file and then split, overlaps each part by far less than that, so its row in the Android app's Sync tab isn't marked. Ticked, it lands next to the parts: the time is counted twice in totals, and the route is drawn twice into the Heatmap. A copy of just one part is marked, since that part and the copy overlap almost entirely.

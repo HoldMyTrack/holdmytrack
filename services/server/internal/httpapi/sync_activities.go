@@ -63,8 +63,7 @@ type syncActivitiesRequest struct {
 }
 
 // syncActivityResult reports what happened to one activity in the batch — a batch is never
-// all-or-nothing, the same "one bad entry doesn't abort the rest" treatment handleZipUpload
-// already gives a mixed-quality zip archive.
+// all-or-nothing: one bad entry doesn't abort the rest.
 type syncActivityResult struct {
 	ExternalID string `json:"external_id"`
 	Status     string `json:"status"` // "enqueued" | "already_processed" | "rejected"

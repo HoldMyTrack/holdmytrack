@@ -1,18 +1,13 @@
 package httpapi
 
 import (
-	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/json"
 	"io"
-	"io/fs"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -20,7 +15,6 @@ import (
 	"testing"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/unpack"
 )
 
 const resumeGPX = `<?xml version="1.0"?>
@@ -79,30 +73,6 @@ func (d *dbTest) latestIngestJob(as account) ingest.Job {
 	return j
 }
 
-// runUnpack runs the account's newest unpack job as the worker would, and returns the state it
-// finished with.
-func (d *dbTest) runUnpack(as account) unpack.State {
-	d.t.Helper()
-	ctx := context.Background()
-	var id int64
-	var payload []byte
-	if err := d.pool.QueryRow(ctx,
-		`SELECT id, payload FROM jobs WHERE user_id = $1 AND kind = 'unpack' ORDER BY id DESC LIMIT 1`, as.id).Scan(&id, &payload); err != nil {
-		d.t.Fatal(err)
-	}
-	if err := unpack.Run(ctx, d.pool, d.srv.store, id, payload); err != nil {
-		d.t.Fatal(err)
-	}
-	var j unpack.Job
-	if err := d.pool.QueryRow(ctx, `SELECT payload FROM jobs WHERE id = $1`, id).Scan(&payload); err != nil {
-		d.t.Fatal(err)
-	}
-	if err := json.Unmarshal(payload, &j); err != nil {
-		d.t.Fatal(err)
-	}
-	return j.State
-}
-
 // An ingest cut off after its activity row commits isn't "already processed": uploading the
 // file again enqueues it, and the job finishes what the first one didn't.
 func TestInterruptedIngestResumes(t *testing.T) {
@@ -150,143 +120,6 @@ func TestInterruptedIngestResumes(t *testing.T) {
 	}
 	if !complete || streams != 1 || masks == 0 {
 		t.Fatalf("after resume: complete %v, streams %d, masks %d", complete, streams, masks)
-	}
-}
-
-// A zip larger than the in-memory multipart threshold is stored from the temp file it spilled
-// to, not copied into memory. Measured as what the request allocates, which stays a fixed
-// multiple of the threshold (the multipart reader's own buffer, grown to it before spilling)
-// however large the archive; keeping the part in memory and copying it whole grew with the
-// archive, here to about 500 MiB. The store discards what it's sent: an in-memory one would
-// count its own copy of the archive against the request.
-func TestLargeZipUploadIsReadInPlace(t *testing.T) {
-	s3 := &discardS3{}
-	d := newDBTestWithS3(t, s3)
-	me := d.newAccount(false)
-
-	var archive bytes.Buffer
-	zw := zip.NewWriter(&archive)
-	w, _ := zw.CreateHeader(&zip.FileHeader{Name: "ride.gpx", Method: zip.Store})
-	w.Write([]byte(resumeGPX))
-	pad, _ := zw.CreateHeader(&zip.FileHeader{Name: "padding.bin", Method: zip.Store})
-	pad.Write(make([]byte, 3*multipartMemoryBytes))
-	zw.Close()
-
-	var body bytes.Buffer
-	mw := multipart.NewWriter(&body)
-	part, _ := mw.CreateFormFile("file", "export.zip")
-	part.Write(archive.Bytes())
-	mw.Close()
-	req := httptest.NewRequest(http.MethodPost, "/v1/activities/upload", &body)
-	req.Header.Set("Content-Type", mw.FormDataContentType())
-	req.Header.Set("Authorization", bearerPrefix+me.session)
-	rec := httptest.NewRecorder()
-	var before, after runtime.MemStats
-	runtime.GC()
-	runtime.ReadMemStats(&before)
-	d.srv.ServeHTTP(rec, req)
-	runtime.ReadMemStats(&after)
-
-	var resp archiveUploadResponse
-	d.decode(rec, http.StatusAccepted, &resp)
-	if allocated := after.TotalAlloc - before.TotalAlloc; allocated > 6*multipartMemoryBytes {
-		t.Errorf("the request allocated %d MiB for a %d MiB archive", allocated>>20, archive.Len()>>20)
-	}
-	if got := s3.received.Load(); got < int64(archive.Len()) {
-		t.Errorf("the store received %d bytes of a %d-byte archive", got, archive.Len())
-	}
-}
-
-// An archive upload is answered once the archive is stored, with one `unpack` job; the job
-// enqueues its activity files as ingest jobs under the archive's batch, counts what it
-// skipped or already had, and removes the archive.
-func TestZipUploadIsUnpackedByTheWorker(t *testing.T) {
-	s3 := newMemS3()
-	d := newDBTestWithS3(t, s3)
-	me := d.newAccount(false)
-	ctx := context.Background()
-
-	upload := func(files map[string]string) archiveUploadResponse {
-		var archive bytes.Buffer
-		zw := zip.NewWriter(&archive)
-		for name, content := range files {
-			w, _ := zw.Create(name)
-			w.Write([]byte(content))
-		}
-		zw.Close()
-		var resp archiveUploadResponse
-		d.decode(d.uploadRaw(me, "export.zip", archive.Bytes()), http.StatusAccepted, &resp)
-		if resp.Status != "zip_accepted" || resp.Batch == "" {
-			t.Fatalf("response = %+v", resp)
-		}
-		if !s3.Has(unpack.Key(me.id, resp.Batch)) {
-			t.Fatal("the archive wasn't stored")
-		}
-		var ingests int
-		if err := d.pool.QueryRow(ctx, `SELECT count(*) FROM jobs WHERE user_id = $1 AND kind = 'ingest' AND payload->>'batch' = $2`, me.id, resp.Batch).Scan(&ingests); err != nil || ingests != 0 {
-			t.Fatalf("ingest jobs before unpacking: %d, %v", ingests, err)
-		}
-		return resp
-	}
-
-	resp := upload(map[string]string{"rides/ride.gpx": resumeGPX, "notes.txt": "hello"})
-	if st := d.runUnpack(me); st.Skipped != 1 || st.Already != 0 || st.Truncated {
-		t.Fatalf("state = %+v, want notes.txt skipped", st)
-	}
-	if s3.Has(unpack.Key(me.id, resp.Batch)) {
-		t.Fatal("the archive is still stored after unpacking")
-	}
-	j := d.latestIngestJob(me)
-	if j.SourceDetail != "ride.gpx" || j.Source != "upload" || j.Batch != resp.Batch || j.BatchTitle != "export.zip" {
-		t.Fatalf("ingest job = %+v", j)
-	}
-	if res, err := ingest.Process(ctx, d.pool, d.srv.store, j); err != nil || !res.Persisted {
-		t.Fatalf("ingest: %+v, %v", res, err)
-	}
-
-	upload(map[string]string{"ride.gpx": resumeGPX})
-	if st := d.runUnpack(me); st.Already != 1 || st.Skipped != 0 {
-		t.Fatalf("state = %+v, want ride.gpx already imported", st)
-	}
-}
-
-// An unpack cut off partway — a deploy — resumes from its saved cursor: the files it had
-// already enqueued aren't enqueued a second time.
-func TestUnpackResumesFromItsCursor(t *testing.T) {
-	d := newDBTestWithS3(t, newMemS3())
-	me := d.newAccount(false)
-	ctx := context.Background()
-
-	var archive bytes.Buffer
-	zw := zip.NewWriter(&archive)
-	for _, name := range []string{"a.gpx", "b.txt", "c.gpx"} {
-		w, _ := zw.Create(name)
-		w.Write([]byte(strings.Replace(resumeGPX, "<trk>", "<trk><name>"+name+"</name>", 1)))
-	}
-	zw.Close()
-	var resp archiveUploadResponse
-	d.decode(d.uploadRaw(me, "export.zip", archive.Bytes()), http.StatusAccepted, &resp)
-
-	// The state an earlier run left when it was cut off after its first chunk: a.gpx
-	// enqueued, one unit walked.
-	if _, err := d.pool.Exec(ctx, `UPDATE jobs SET payload = jsonb_set(payload, '{state}', '{"cursor": 1}') WHERE user_id = $1 AND kind = 'unpack'`, me.id); err != nil {
-		t.Fatal(err)
-	}
-	if st := d.runUnpack(me); st.Cursor != 3 || st.Skipped != 1 {
-		t.Fatalf("state = %+v, want cursor 3 and b.txt skipped", st)
-	}
-	var names []string
-	rows, err := d.pool.Query(ctx, `SELECT payload->>'source_detail' FROM jobs WHERE user_id = $1 AND kind = 'ingest' ORDER BY id`, me.id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for rows.Next() {
-		var n string
-		rows.Scan(&n)
-		names = append(names, n)
-	}
-	if strings.Join(names, ",") != "c.gpx" {
-		t.Fatalf("ingest jobs = %v, want only c.gpx", names)
 	}
 }
 
@@ -444,6 +277,20 @@ func TestPrivateLocationLimitHoldsUnderConcurrency(t *testing.T) {
 	}
 	if n != maxPrivateLocations {
 		t.Fatalf("%d locations, want %d", n, maxPrivateLocations)
+	}
+}
+
+// A .zip is refused with a message of its own: archives aren't imported (ADR-0039).
+func TestZipUploadIsRefused(t *testing.T) {
+	d := newDBTestWithS3(t, newMemS3())
+	me := d.newAccount(false)
+	rec := d.uploadRaw(me, "export.zip", []byte("PK\x03\x04"))
+	if rec.Code != http.StatusUnsupportedMediaType || !strings.Contains(rec.Body.String(), "can't be imported") {
+		t.Errorf("status %d, %q; want 415 with the archive message", rec.Code, rec.Body.String())
+	}
+	var jobs int
+	if err := d.pool.QueryRow(context.Background(), `SELECT count(*) FROM jobs WHERE user_id = $1`, me.id).Scan(&jobs); err != nil || jobs != 0 {
+		t.Errorf("%d jobs (%v), want none", jobs, err)
 	}
 }
 
@@ -605,69 +452,5 @@ func TestSyncKnownAnswersWhatTheAccountHas(t *testing.T) {
 	demo := d.newAccount(true)
 	if rec := d.do(demo, http.MethodPost, "/v1/sync/known", map[string]any{"source": "healthconnect", "external_ids": []string{"x"}}); rec.Code != http.StatusForbidden {
 		t.Errorf("demo: %d, want 403", rec.Code)
-	}
-}
-
-// A Google Takeout export goes the same way as a plain zip: recognised in the request, unpacked
-// by the worker into one ingest job per activity with GPS, each typed and named as
-// internal/takeout writes it.
-func TestTakeoutUploadIsUnpackedByTheWorker(t *testing.T) {
-	d := newDBTestWithS3(t, newMemS3())
-	me := d.newAccount(false)
-	ctx := context.Background()
-
-	var archive bytes.Buffer
-	zw := zip.NewWriter(&archive)
-	root := "../takeout/testdata/sample"
-	err := filepath.WalkDir(root, func(path string, e fs.DirEntry, err error) error {
-		if err != nil || e.IsDir() {
-			return err
-		}
-		rel, _ := filepath.Rel(root, path)
-		w, err := zw.Create(filepath.ToSlash(rel))
-		if err != nil {
-			return err
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		_, err = w.Write(data)
-		return err
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	zw.Close()
-
-	var resp archiveUploadResponse
-	d.decode(d.uploadRaw(me, "takeout-20260101.zip", archive.Bytes()), http.StatusAccepted, &resp)
-	var format string
-	if err := d.pool.QueryRow(ctx, `SELECT payload->>'format' FROM jobs WHERE user_id = $1 AND kind = 'unpack'`, me.id).Scan(&format); err != nil || format != unpack.FormatTakeout {
-		t.Fatalf("unpack job format = %q, %v", format, err)
-	}
-	d.runUnpack(me)
-
-	rows, err := d.pool.Query(ctx, `
-		SELECT payload->>'source', payload->>'activity_type', payload->>'source_detail', payload->>'batch_title'
-		FROM jobs WHERE user_id = $1 AND kind = 'ingest' ORDER BY id`, me.id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer rows.Close()
-	types := map[string]int{}
-	for rows.Next() {
-		var source, typ, name, title string
-		if err := rows.Scan(&source, &typ, &name, &title); err != nil {
-			t.Fatal(err)
-		}
-		if source != "takeout" || !strings.HasSuffix(name, ".gpx") || title != "takeout-20260101.zip" {
-			t.Errorf("job: %s %s %s %s", source, typ, name, title)
-		}
-		types[typ]++
-	}
-	// The sample's two activities with GPS, as testdata/pathify-out has them.
-	if len(types) != 2 || types["Walk"] != 1 || types["Outdoor Bike"] != 1 {
-		t.Fatalf("ingest jobs by type: %v, want one Walk and one Outdoor Bike", types)
 	}
 }

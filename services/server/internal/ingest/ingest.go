@@ -42,20 +42,13 @@ type Job struct {
 	ExternalID    string `json:"external_id"`
 	RawPayloadKey string `json:"raw_payload_key"`
 	// ActivityType overrides whatever the parser itself reports, when set. Empty means "use
-	// the parsed value" (the zero value already does the right thing for every existing
-	// caller). This exists for the Google Takeout import path
-	// (services/server/internal/httpapi/takeout_upload.go): activities are extracted one type
-	// at a time, so the caller already knows each one's real type — a per-activity Takeout GPX
-	// carries no `<type>` element of its own to parse back out, and reconstructing one from its
-	// display name would just be re-deriving something the caller already has for free.
+	// the parsed value". A copy of a Story (storycopy) and the demo seed set it: their GPX
+	// carries no type of its own, and they already know the activity's.
 	ActivityType string `json:"activity_type,omitempty"`
-	// Batch groups the jobs one request enqueued together — a .zip's or a Takeout export's
-	// files, a phone sync's activities — so the header's Upload menu can show them as one row
-	// ("Takeout.zip · 120 of 340") however the page was reloaded meanwhile. Empty for a single
-	// uploaded file, which is its own row. BatchTitle is that row's name: the archive's file
-	// name; empty for a phone sync, whose row is named after its source.
-	Batch      string `json:"batch,omitempty"`
-	BatchTitle string `json:"batch_title,omitempty"`
+	// Batch groups the jobs one request enqueued together — a phone sync's activities — so the
+	// header's Upload menu can show them as one row however the page was reloaded meanwhile.
+	// Empty for a single uploaded file, which is its own row.
+	Batch string `json:"batch,omitempty"`
 }
 
 // Result reports what happened, distinguishing "persisted a new activity" from "this was
@@ -485,7 +478,7 @@ type RenderFogJob struct {
 // The coalescing is this INSERT's: it adds no job while the user already has a render_fog
 // waiting unclaimed, since that one reads the dirty flags only once claimed, after every
 // caller has committed its marks (they all mark before enqueueing). A claimed one may have
-// read them already, so it doesn't count. Without this, a 584-activity archive queued 584
+// read them already, so it doesn't count. Without this, a 584-activity import queued 584
 // renders of ~40 s each, every one after the first redrawing nothing new.
 func EnqueueRenderFog(ctx context.Context, pool *pgxpool.Pool, userID string) error {
 	payload, err := json.Marshal(RenderFogJob{UserID: userID})

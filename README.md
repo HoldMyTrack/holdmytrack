@@ -10,7 +10,7 @@ Live at [holdmytrack.com](https://holdmytrack.com), with a no-signup demo accoun
 
 Each feature links to the part of [`docs/SPEC.md`](docs/SPEC.md) that defines its behavior.
 
-- **Bring in what you choose.** GPX, FIT and TCX files, `.zip` archives and Google Takeout exports, plus Health Connect sync and plain GPS recording from the Android app — all through one ingest pipeline, nothing coming in that you didn't pick, and a hint when it would be a second copy ([FR-3](docs/SPEC.md#5-fr-3--activity-upload--ingestion)).
+- **Bring in what you choose.** GPX, FIT and TCX files, plus Health Connect sync and plain GPS recording from the Android app — all through one ingest pipeline, nothing coming in that you didn't pick, and a hint when it would be a second copy ([FR-3](docs/SPEC.md#5-fr-3--activity-upload--ingestion)).
 - **One map, three views.** Every track drawn together; Fog of War, which clears wherever you have ever been; and a heatmap of the last year. Pick a track and it is colored by pace ([FR-4](docs/SPEC.md#6-fr-4--map-visualization)).
 - **Somewhere new, close to home.** The fog shows exactly which streets, parks and trails nearby you haven't been to yet.
 - **Points of interest.** Playgrounds, dog parks, monuments, viewpoints and historic sites from OpenStreetMap, with what OSM knows about each; the Android app captures one when you stand in it for 30 seconds ([FR-15](docs/SPEC.md#17-fr-15--spots)).
@@ -72,7 +72,7 @@ holdmytrack/
         ├── cmd/holdmytrack/     # main.go: serve / work / migrate
         ├── cmd/loadtest/        # the load-test driver docs/PERFORMANCE.md's sessions run
         ├── cmd/delayproxy/      # adds object-storage latency to the dev stack, for render measurements
-        ├── internal/            # config, db, fog, geo, httpapi, i18n, ingest, mail, mapstyle, parse, spots, storage, takeout, tilemath, web, worker
+        ├── internal/            # config, db, fog, geo, httpapi, i18n, ingest, mail, mapstyle, parse, spots, storage, tilemath, web, worker
         └── migrations/          # embedded *.sql, applied in order by `cmd/holdmytrack migrate`
 ```
 

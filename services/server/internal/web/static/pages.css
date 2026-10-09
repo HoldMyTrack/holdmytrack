@@ -985,60 +985,6 @@ code {
   overflow-wrap: anywhere;
 }
 
-/* The export guides (templates/pages/guide-*.html): numbered steps, each its words beside a
-   phone screenshot, stacked on a narrow screen. */
-.guide__back {
-  margin: 0 0 12px;
-  font-size: 15px;
-}
-
-.guide__steps {
-  display: flex;
-  flex-direction: column;
-  gap: 32px;
-  margin: 16px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.guide__step {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 270px;
-  gap: 24px;
-  align-items: start;
-}
-
-.guide__step h3 {
-  margin: 4px 0 8px;
-  font-family: var(--fm-font-serif);
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.guide__shot {
-  margin: 0;
-}
-
-.guide__shot img {
-  display: block;
-  width: 100%;
-  height: auto;
-  border: 1px solid rgb(var(--fm-ink-rgb) / 12%);
-  border-radius: 18px;
-  box-shadow: var(--fm-shadow-md);
-}
-
-@media (max-width: 768px) {
-  .guide__step {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
-  }
-
-  .guide__shot {
-    max-width: 270px;
-  }
-}
-
 @media (max-width: 768px) {
   /* iOS Safari zooms the page in on focusing a text field under 16px and doesn't zoom back
      out; the sign-in and settings fields are 14px. The map app's own inputs get the same

@@ -35,16 +35,6 @@ Splitting an activity is built on the web (`SPEC.md` FR-5.17), and so is merging
 - [ ] Decide where Merge lives — a toolbar action over checked neighboring parts, or a "Merge with the next part" in the Edit window — and build it on the web, from the list rows' `split` field.
 - [ ] Carry it to the Android app, next to its Split tool (`apps/android/docs/SPEC.md` FR-2.7 item 12).
 
-### The app is the gate
-
-Every source brings in only what the user ticks, nothing starts ticked, and nothing is guessed on their behalf (ADR-0039). In this order.
-
-- [x] Remove Google Maps Timeline import: its window picked by date range and mode, not trip by trip, so three months brought in hundreds of drives and walks at once. The web window and reader, the Android screen, the `/help/timeline-export` guide and the `timeline` sync source go; activities already imported stay.
-- [ ] Remove `.zip` and Google Takeout import: `POST /v1/activities/upload` refuses a `.zip` with `415`; `internal/unpack` and `internal/takeout` go, with the archive rows and statuses in the import history; the web's Upload menu and map drop target stop taking `.zip`, and the 20-file limit's message stops suggesting one; the help and guide pages lose the archive and Takeout instructions (`SPEC.md` FR-3.1–FR-3.4, `IMPLEMENTATION.md` §4.0.2).
-- [x] Android: pick what to sync from Health Connect and the phone, over `POST /v1/sync/known`, with no sync cursor (`SPEC.md` FR-3.6, FR-3.8).
-- [x] An overlap hint in place of automatic duplicate handling: `POST /v1/activities/overlaps` answers which live activity each of a set of time ranges overlaps (80% of the longer, `internal/ingest/overlap.go`); the Android Sync tab marks such a row "Overlaps *Morning walk*", still unticked; ingest stops matching and superseding (`SPEC.md` FR-3.7, `IMPLEMENTATION.md` §4.6).
-- [x] Remove `superseded_by`: migration `0028_drop_superseded.sql` (maintenance) moves the hidden copies' photos and Story memberships to the kept copy, deletes them, queues a `remove_activity_objects` job per account for their stored objects, and drops the column and `idx_activities_live`; every read loses its filter, and `GET /v1/activities/duplicates` and the Duplicate rows of both histories go.
-
 ### Pre-launch validation — gates any public launch (Milestone 2), regardless of which paths are live
 
 - [ ] Stand up the funding page (Open Collective, public ledger — `VISION.md` §6.1) before any public launch, not retrofitted after. The app side is built (`IMPLEMENTATION.md` §4.16), and the `holdmytrack` collective applied to Open Source Collective as fiscal host on 2026-09-24; what's left: once approved, set the slug — `services/server/internal/web/web.go`'s `OpenCollectiveSlug` — and replace the About page template's "donations are not open yet" line with a link to it.
@@ -91,7 +81,7 @@ Connecting the app to third-party services.
 
 ### Path 1 — cloud connectors (gated on the prerequisites above)
 
-- [ ] Generic OAuth connection scaffolding — `connections` table already exists (`migrations/0002_activities.sql`, `IMPLEMENTATION.md` §3.2); build the authorize/callback/token-refresh flow once, provider-agnostic, before any specific provider, with a picker: a connector lists what it would bring in and imports only what the user ticks (ADR-0039). That is how bulk history arrives now that archives aren't imported.
+- [ ] Generic OAuth connection scaffolding — `connections` table already exists (`migrations/0002_activities.sql`, `IMPLEMENTATION.md` §3.2); build the authorize/callback/token-refresh flow once, provider-agnostic, before any specific provider, with a picker: a connector lists what it would bring in and imports only what the user ticks (ADR-0039). That is how bulk history arrives, since archives aren't imported.
 - [ ] Garmin connector (after the licence prerequisite is settled).
 - [ ] Wahoo connector (after partner approval).
 - [ ] COROS connector (after partner approval).

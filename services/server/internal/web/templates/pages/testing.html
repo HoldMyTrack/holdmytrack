@@ -60,13 +60,14 @@
     <p class="testing__expect"><strong>Expected:</strong> there is no way past the screen without a country. After saving, the map opens with "Nothing on your map yet. Sync from Health Connect, or record a walk with the button below."</p>
 
     <h3 id="SU-4">SU-4 · Import the sample activities</h3>
-    <p>Download <a class="testing__file" href="{{asset "testing/holdmytrack-sample.zip"}}" download="holdmytrack-sample.zip">holdmytrack-sample.zip</a> (385 KB). It holds 20 activities: 5 days in Vietnam (January 2026), 3 in Estonia (May), 8 in Italy (August) and 4 walks around Cleveland, Ohio (September).</p>
+    <p>Download <a class="testing__file" href="{{asset "testing/holdmytrack-sample.zip"}}" download="holdmytrack-sample.zip">holdmytrack-sample.zip</a> (385 KB). It holds 20 activity files: 5 days in Vietnam (January 2026), 3 in Estonia (May), 8 in Italy (August) and 4 walks around Cleveland, Ohio (September).</p>
     <ol class="page-list">
+      <li>In the Files app, open Downloads, tap holdmytrack-sample.zip and choose Extract. HoldMyTrack doesn't import a .zip itself.</li>
       <li>Open the <strong>Sync</strong> tab and tap Upload files.</li>
-      <li>Tap Choose files…, open Downloads and pick holdmytrack-sample.zip.</li>
-      <li>Watch the file's row, then tap Follow them in Sync.</li>
+      <li>Tap Choose files…, open the extracted holdmytrack-sample folder, and select all 20 files (touch and hold one, then tap the others, or use Select all).</li>
+      <li>Watch the rows, then tap Follow them in Sync.</li>
     </ol>
-    <p class="testing__expect"><strong>Expected:</strong> the row shows "Uploading …%", then the archive is unpacked and processed. Sync history fills up with rows marked Ready, one per activity. Back on the Map tab, the map flies to the newest activity, a walk in Clague Park, Cleveland, and the date slider shows the 5 most recent days with activities.</p>
+    <p class="testing__expect"><strong>Expected:</strong> each file's row shows "Queued", then "Uploading …%". Sync history fills up with rows marked Ready, one per activity. Back on the Map tab, the map flies to the newest activity, a walk in Clague Park, Cleveland, and the date slider shows the 5 most recent days with activities.</p>
     <p>Everything below assumes Setup is done.</p>
   </section>
 
@@ -90,13 +91,13 @@
     <p>Once UP-1's row is Ready, upload <strong>west-side.gpx</strong> again.</p>
     <p class="testing__expect"><strong>Expected:</strong> "west-side.gpx was already uploaded before." No second copy appears on the map or in the list.</p>
 
-    <h3 id="UP-5">UP-5 · The same zip twice</h3>
-    <p>Upload <strong>holdmytrack-sample.zip</strong> again.</p>
-    <p class="testing__expect"><strong>Expected:</strong> "Already uploaded before, in holdmytrack-sample.zip: 20". Nothing new on the map.</p>
+    <h3 id="UP-5">UP-5 · A .zip</h3>
+    <p>Pick <strong>holdmytrack-sample.zip</strong> itself on the Upload screen.</p>
+    <p class="testing__expect"><strong>Expected:</strong> not sent, with "holdmytrack-sample.zip is a .zip archive, which can't be imported. Upload the GPX, FIT or TCX files inside it instead." Nothing new on the map.</p>
 
     <h3 id="UP-6">UP-6 · The same activity from another source</h3>
     <p>File: <a class="testing__file" href="{{asset "testing/duplicate.tcx"}}" download="duplicate.tcx">duplicate.tcx</a>, the Clague Park walk from the sample zip again, as a different file without elevation.</p>
-    <p class="testing__expect"><strong>Expected:</strong> Sync history shows it as Ready. There are now two Clague Park walks on 27 September: HoldMyTrack doesn't merge copies for you. Delete the one without elevation.</p>
+    <p class="testing__expect"><strong>Expected:</strong> Sync history shows it as Ready. There are now two Clague Park walks on 27 September: HoldMyTrack doesn't merge copies for you.</p>
 
     <h3 id="UP-7">UP-7 · Files that can't be imported</h3>
     <p>Upload each of these, one at a time:</p>
@@ -106,21 +107,13 @@
       <li><a class="testing__file" href="{{asset "testing/indoor.gpx"}}" download="indoor.gpx">indoor.gpx</a>, a treadmill run. <strong>Expected:</strong> Failed: "The file has no GPS points. It may be from an indoor workout."</li>
       <li><a class="testing__file" href="{{asset "testing/one-point.gpx"}}" download="one-point.gpx">one-point.gpx</a>. <strong>Expected:</strong> Failed: "The file has fewer than two GPS points, so there's no track to draw."</li>
       <li><a class="testing__file" href="{{asset "testing/empty.gpx"}}" download="empty.gpx">empty.gpx</a>, 0 bytes. <strong>Expected:</strong> refused straight away, "empty.gpx: Empty file."</li>
-      <li><a class="testing__file" href="{{asset "testing/track.kml"}}" download="track.kml">track.kml</a>, a format HoldMyTrack doesn't read. <strong>Expected:</strong> not sent at all, "track.kml isn't a .gpx, .fit, .tcx or .zip file, so it wasn't sent."</li>
+      <li><a class="testing__file" href="{{asset "testing/track.kml"}}" download="track.kml">track.kml</a>, a format HoldMyTrack doesn't read. <strong>Expected:</strong> not sent at all, "track.kml isn't a .gpx, .fit or .tcx file, so it wasn't sent."</li>
     </ul>
     <p class="testing__expect">None of them adds anything to the map.</p>
-
-    <h3 id="UP-8">UP-8 · A zip with some bad files in it</h3>
-    <p>File: <a class="testing__file" href="{{asset "testing/mixed.zip"}}" download="mixed.zip">mixed.zip</a>: two drives on 3 October 2026, the broken GPX from UP-7, and a text file.</p>
-    <p class="testing__expect"><strong>Expected:</strong> "Skipped in mixed.zip: 1" (the text file). The two drives are added, and broken.gpx gets a Failed row.</p>
 
     <h3 id="UP-9">UP-9 · Several files at once</h3>
     <p>Pick <strong>evening-loop.tcx</strong>, <strong>mill-creek-falls.fit</strong> and <strong>track.kml</strong> together.</p>
     <p class="testing__expect"><strong>Expected:</strong> one row per file. The two activities say they were already uploaded (from UP-2 and UP-3), and track.kml is named as not sent.</p>
-
-    <h3 id="UP-10">UP-10 · A Google Health (Takeout) export</h3>
-    <p>File: <a class="testing__file" href="{{asset "testing/takeout-sample.zip"}}" download="takeout-sample.zip">takeout-sample.zip</a>, a tiny made-up Google Health export: walks and rides in July 2026.</p>
-    <p class="testing__expect"><strong>Expected:</strong> recognised as a Google Health export without being asked, and its outdoor activities appear in Sync history as Ready, from a Google Takeout import. A workout with no GPS is left out.</p>
 
     <h3 id="UP-13">UP-13 · Sync history</h3>
     <ol class="page-list">
@@ -266,7 +259,7 @@
     <p class="testing__expect"><strong>Expected:</strong> the part after the knob is drawn in blue, with "Saving splits this activity in two at …". After saving there are two activities with the same type and name, both Pending for a moment.</p>
 
     <h3 id="ED-6">ED-6 · Delete</h3>
-    <p>Select one of the 3 October drives (from UP-8) and tap Delete. Then check both drives and delete them together.</p>
+    <p>Select the Clague Park walk without elevation (from UP-6) and tap Delete. Then check the other Clague Park walk (27 September) and the Mill Creek Falls ride (from UP-3) and delete them together.</p>
     <p class="testing__expect"><strong>Expected:</strong> "Delete this activity?" (or "Delete this group?") naming what goes, with its distance. After deleting, it's gone from the list, the map, and, a little later, Fog and Heatmap.</p>
   </section>
 

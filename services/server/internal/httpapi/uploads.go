@@ -24,8 +24,8 @@ const maxUploadsLimit = 50
 type uploadRow struct {
 	Filename   string `json:"filename"`
 	ExternalID string `json:"external_id"`
-	// The `jobs.payload->>'source'` value — "upload", "takeout", "healthconnect",
-	// "healthkit", "recorded", or "timeline" on jobs from before Timeline import was removed
+	// The `jobs.payload->>'source'` value — "upload", "healthconnect", "healthkit",
+	// "recorded", or "takeout" and "timeline" on jobs from before those imports were removed
 	// (§3.3). ROADMAP.md's Files/Sync split reads this to decide
 	// which tab a row belongs in; nothing server-side needed it as a response field until now.
 	Source      string    `json:"source"`
@@ -59,8 +59,7 @@ type uploadsResponse struct {
 }
 
 // uploadsCountQuery and uploadsListQuery read the `jobs` table directly rather than a
-// dedicated uploads table — every upload already is an `ingest` job (handleUpload,
-// handleZipUpload), and `jobs` already carries everything a history row needs (filename via
+// dedicated uploads table — every upload already is an `ingest` job (handleUpload), and `jobs` already carries everything a history row needs (filename via
 // `payload->>'source_detail'`, external_id, state, last_error, created_at). LIMIT/OFFSET,
 // not the keyset pagination §4.7's histogram uses, because this is the one place in the
 // upload flow §4.0.1 says pagination is actually justified — unlike the activity list, an
@@ -77,12 +76,9 @@ WHERE kind = 'ingest' AND user_id = $1
 const uploadsProcessingCountQuery = `SELECT COUNT(*) FROM jobs WHERE kind = 'ingest' AND user_id = $1 AND state = 'pending'`
 
 // The LEFT JOIN is what turns a "done" job into a "9 Sep · 34.7 km" row instead of just a
-// bare status. Joined on `a.source = j.payload->>'source'`, not a literal 'upload' — a plain
-// upload and a Google Takeout import (handleTakeoutUpload, source = 'takeout') are both
-// `kind = 'ingest'` jobs this query already selects, and each one's own persisted activity
-// carries the matching source, not always 'upload'. A hardcoded literal here quietly left
-// every Takeout-imported row showing "Ready" with no date or distance, since the join never
-// matched — caught live by opening the panel after a real Takeout import, not a unit test.
+// bare status. Joined on `a.source = j.payload->>'source'`, not a literal 'upload': every
+// source's jobs are `kind = 'ingest'` jobs this query selects, and each one's own persisted
+// activity carries the matching source, not always 'upload'.
 const uploadsListQuery = `
 SELECT j.payload->>'source_detail' AS filename,
        j.payload->>'external_id' AS external_id,

@@ -25,12 +25,12 @@ func TestSyncPage(t *testing.T) {
 		t.Fatal(err)
 	}
 	externalID := "walk-1"
-	d.insertImportJob(me, "done", source, "morning-walk.gpx", "", "")
+	d.insertImportJob(me, "done", source, "morning-walk.gpx", "")
 	if _, err := d.pool.Exec(ctx, `UPDATE jobs SET payload = payload || jsonb_build_object('external_id', $2::text) WHERE user_id = $1 AND payload->>'source_detail' = 'morning-walk.gpx'`, me.id, externalID); err != nil {
 		t.Fatal(err)
 	}
-	d.insertImportJob(me, "failed", "upload", "broken.gpx", "", "")
-	d.insertImportJob(me, "pending", "upload", "still-going.gpx", "", "")
+	d.insertImportJob(me, "failed", "upload", "broken.gpx", "")
+	d.insertImportJob(me, "pending", "upload", "still-going.gpx", "")
 
 	rec := d.do(me, "GET", "/sync", nil)
 	if rec.Code != http.StatusOK {

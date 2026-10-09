@@ -156,7 +156,7 @@
             android:exported="true"
             android:label="@string/upload_title"
             android:theme="@style/Theme.HoldMyTrack">
-            <!-- An activity file or archive another app opens or shares with HoldMyTrack —
+            <!-- An activity file another app opens or shares with HoldMyTrack —
                  uploaded as if picked here (imports/FileImports). A .fit has no type of its own
                  most apps agree on, and most hand a .gpx over as a generic binary, which isn't
                  claimed, so those are picked in the screen. -->
@@ -165,8 +165,6 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/gpx+xml" />
                 <data android:mimeType="application/vnd.garmin.tcx+xml" />
-                <data android:mimeType="application/zip" />
-                <data android:mimeType="application/x-zip-compressed" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
@@ -174,8 +172,6 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/gpx+xml" />
                 <data android:mimeType="application/vnd.garmin.tcx+xml" />
-                <data android:mimeType="application/zip" />
-                <data android:mimeType="application/x-zip-compressed" />
             </intent-filter>
         </activity>
 

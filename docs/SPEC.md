@@ -15,7 +15,7 @@ This document specifies HoldMyTrack's functional behavior as currently implement
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web and in the Android app, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, `.zip` bulk import, Google Takeout import, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), the overlap hint (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, pace-colored segments, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), splitting an activity in two (FR-5.17), Private locations (FR-8.1), the date slider, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help, Contacts and Privacy policy pages and the Android test suite page (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), the interface language — English or Russian (FR-13), Stories on the web and in the Android app (FR-14), Spots' places on the web and in the Android app (FR-15), and photos on an activity, on the web (FR-16).
+**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web and in the Android app, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), the overlap hint (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, pace-colored segments, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), splitting an activity in two (FR-5.17), Private locations (FR-8.1), the date slider, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help, Contacts and Privacy policy pages and the Android test suite page (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), the interface language — English or Russian (FR-13), Stories on the web and in the Android app (FR-14), Spots' places on the web and in the Android app (FR-15), and photos on an activity, on the web (FR-16).
 
 **Out of scope**: anything not yet built (`docs/ROADMAP.md` tracks it), and what `VISION.md` §1.1 rules out — performance analysis and any health data (ADR-0017); §20 lists the deliberate limits. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
 
@@ -379,7 +379,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Preconditions**: Active session.
 
-**Inputs**: One or more files, each a `.gpx`, `.fit`, or `.tcx` file no larger than 64 MiB. Up to 20 individually-selected files per batch (a larger selection is rejected client-side in full, before any upload begins, with a message directing the user to a `.zip` archive instead — FR-3.2).
+**Inputs**: One or more files, each a `.gpx`, `.fit`, or `.tcx` file no larger than 64 MiB. Up to 20 files per batch (a larger selection is rejected client-side in full, before any upload begins, with a message saying to choose up to 20 at a time). A `.zip` archive isn't imported (ADR-0039): the clients don't send one, and say so naming it.
 
 **Behavior**:
 1. User chooses files from the header's **Upload** menu (FR-3.4), on any page, or drops them on the map. The Android app sends them from its Upload screen (`apps/android/docs/SPEC.md` FR-3.6).
@@ -391,64 +391,28 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Outputs**: One new `Activity` per successfully ingested file, each with a parsed trajectory, distance, duration, and (where the source file provides it) elevation data. Heart rate and any other health data in the file are ignored — never read out of it (`VISION.md` §1.1).
 
 **Error cases**:
-- Unsupported file extension → `415 Unsupported Media Type`.
+- Unsupported file extension → `415 Unsupported Media Type`; a `.zip` with a message of its own, to upload the files inside it instead.
 - File too large, or malformed request → `413 Request Entity Too Large`.
 - Empty file → `400 Bad Request`.
 - Unparseable/corrupt file content → the background job fails; the Sync page (FR-3.9) shows it "Failed" with a reason, the header's Sync item carries a red dot until that page has been opened (FR-3.9), and no `Activity` is created.
 - A file whose points carry no timestamps at all (a planned route rather than a recorded activity) → the background job fails the same way, with a reason saying the file has no timestamps. Points without a timestamp inside an otherwise timed track are dropped, not failed on.
 
-### FR-3.2 Bulk upload via `.zip` archive
-
-**Description**: A signed-in user uploads many activity files at once as a single `.zip` archive, bypassing FR-3.1's 20-file batch limit.
-
-**Preconditions**: Active session.
-
-**Inputs**: One `.zip` archive, at most 512 MiB compressed, containing at most 5,000 entries, each contained file at most 64 MiB.
-
-**Behavior**:
-1. User uploads a `.zip` file the same way as FR-3.1 (the Upload menu, or dropped on the map). The server answers as soon as the archive has arrived (`202`, `"zip_accepted"`, with the archive's batch id), whatever its size. From then on it is one row in the Upload menu, "Unpacking…" and then counting its files (FR-3.4).
-2. In the background, the server extracts the archive and processes each contained `.gpx`/`.fit`/`.tcx` file exactly as FR-3.1 does — one background parsing job per file.
-3. A file inside the archive with an unsupported extension, or that is oversized, unreadable or empty, is skipped; the rest of the batch proceeds regardless. Files past the 5,000th aren't read, and the archive is reported as truncated.
-4. Once the archive is unpacked, the Upload menu that sent it notes how many of its files were already uploaded before, how many were skipped, and whether it was truncated (FR-3.4).
-
-**Outputs**: One new `Activity` per successfully ingested contained file.
-
-**Error cases**:
-- Archive itself exceeds the size bound, or is not a valid `.zip` → `413 Request Entity Too Large` / `400 Bad Request`, before anything is stored.
-- An archive that can't be unpacked after all (a Takeout export missing its data files) → the Upload menu notes the failure (FR-3.4).
-- An individual bad entry does not fail the request — see step 3.
-
-### FR-3.3 Google Takeout import
-
-**Description**: A user imports their exported Google Health / Fitbit activity history.
-
-**Preconditions**: Active session.
-
-**Inputs**: A Google Takeout export `.zip` archive (detected automatically by its internal folder structure — no separate upload flow to choose).
-
-**Behavior**:
-1. User uploads the Takeout export `.zip` the same way as FR-3.1/FR-3.2.
-2. Server recognizes the archive's shape as a Takeout export (rather than a plain `.zip`) and extracts one activity file per recorded activity that has GPS data (activity types with no GPS in the export — e.g. a logged swim with no route — are skipped, not treated as errors).
-3. Each extracted activity is ingested exactly as FR-3.1 describes, attributed to the Takeout source.
-
-**Outputs**: One new `Activity` per activity in the export that had GPS data.
-
 ### FR-3.4 Import status
 
-**Description**: What's being imported right now is the header's **Upload** menu, on every page; what an import came to once it has finished is the **Sync** page, `/sync` (FR-3.9), the header's next item. Imports from every source show in both: uploaded files and archives alongside activities synced from the Android app (Health Connect and in-app GPS recording — FR-3.6, FR-3.8). The web can't start a phone sync — that sync is phone-triggered, and nothing in the web app can request it; the Android app shows its own history of the same imports on its Sync screen (`apps/android/docs/SPEC.md` FR-4.1).
+**Description**: What's being imported right now is the header's **Upload** menu, on every page; what an import came to once it has finished is the **Sync** page, `/sync` (FR-3.9), the header's next item. Imports from every source show in both: uploaded files alongside activities synced from the Android app (Health Connect and in-app GPS recording — FR-3.6, FR-3.8). The web can't start a phone sync — that sync is phone-triggered, and nothing in the web app can request it; the Android app shows its own history of the same imports on its Sync screen (`apps/android/docs/SPEC.md` FR-4.1).
 
 **Preconditions**: Active session.
 
 **Behavior** — an **Upload** button in the header of every page opens a menu of what is being imported right now:
-1. **Choose files…** opens the file picker (`.gpx`, `.fit`, `.tcx`, `.zip` — FR-3.1–FR-3.3); files dropped anywhere on the map, which shows a dashed "Drop to upload" cover while they're dragged over it, go to the same place. Choosing or dropping opens the menu. Under the button, the list of what it takes links "Google Health export" to its export guide (FR-10.5), in a new tab.
-2. The menu lists every import in progress: files waiting their turn ("Queued"), a file being sent ("Uploading 45%"), then each one the server is processing ("Processing…"), including activities synced from the phone, named after their source. A `.zip` or a Takeout export is one row counting its files or activities — "Processing 120 of 340"; an archive reads "Unpacking…" until the server has found all its files. The button shows how many rows there are.
+1. **Choose files…** opens the file picker (`.gpx`, `.fit`, `.tcx` — FR-3.1); files dropped anywhere on the map, which shows a dashed "Drop to upload" cover while they're dragged over it, go to the same place. Choosing or dropping opens the menu. Under the button, a line says what it takes. A `.zip` chosen or dropped isn't sent: a message names it and says to upload the files inside it instead.
+2. The menu lists every import in progress: files waiting their turn ("Queued"), a file being sent ("Uploading 45%"), then each one the server is processing ("Processing…"), including activities synced from the phone, named after their source. A phone sync of several activities is one row counting them — "Processing 12 of 34". The button shows how many rows there are.
 3. An import leaves the menu as soon as it has finished, whether it succeeded or failed; what it came to is the Sync page's (FR-3.9). The map refreshes itself as each finishes.
-4. Messages about this browser tab's own uploads — a file already uploaded before, how many of a `.zip`'s or Takeout export's files were already uploaded before ("Already uploaded before, in Trips.zip: 12"), the files an archive skipped, an archive that couldn't be unpacked (with the reason), too many files chosen, a file the server refused outright (with the reason) — show in the menu until dismissed, one by one. An archive's come once it has been unpacked, on whichever page the tab is on by then.
+4. Messages about this browser tab's own uploads — a file already uploaded before, a `.zip` not sent, too many files chosen, a file the server refused outright (with the reason) — show in the menu until dismissed, one by one.
 5. The menu closes on a click outside it or Escape. It has nothing about finished imports: those are the header's Sync item's (FR-3.9).
 6. What's in progress is read from the server every 2 seconds while anything is, every 20 otherwise.
 7. A demo session sees the button disabled, its tooltip saying why.
 
-**Outputs**: `GET /v1/uploads/active` returns the imports still in progress — each with a title, its source, how many of its jobs have finished and how many there are, whether it's an archive still being unpacked, and when it was submitted — the archives unpacked in the last hour with their batch id, how many of their files were already imported or skipped, whether they were truncated, and for one that failed, why — and how many failed imports the account hasn't seen yet on the Sync page. `GET /v1/uploads?limit=&offset=&source=` (the Android app's Sync screen) returns one page of every import, the total count (scoped to `source` when given), and how many are still processing; each row carries `source`, when it was submitted and — once finished — when it finished, and, once the job has produced one, the resulting activity's own `id`, start time and `timezone` (FR-3.11).
+**Outputs**: `GET /v1/uploads/active` returns the imports still in progress — each with a title, its source, how many of its jobs have finished and how many there are, and when it was submitted — and how many failed imports the account hasn't seen yet on the Sync page. `GET /v1/uploads?limit=&offset=&source=` (the Android app's Sync screen) returns one page of every import, the total count (scoped to `source` when given), and how many are still processing; each row carries `source`, when it was submitted and — once finished — when it finished, and, once the job has produced one, the resulting activity's own `id`, start time and `timezone` (FR-3.11).
 
 ### FR-3.5 Duplicate detection
 
@@ -523,7 +487,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 ### FR-3.9 The Sync page
 
-**Description**: **Sync**, an item of its own in the header of every page for a signed-in account (after Upload), opens `/sync`, which lists every import that has finished — uploaded files, the files inside an archive and activities synced from the phone alike.
+**Description**: **Sync**, an item of its own in the header of every page for a signed-in account (after Upload), opens `/sync`, which lists every import that has finished — uploaded files and activities synced from the phone alike.
 
 **Preconditions**: Signed in; signed out, the page sends you to sign in.
 
@@ -1043,12 +1007,12 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 2. It has sections for: what HoldMyTrack is and what it is for, how it works (three numbered steps: bring what you already recorded, see it on one map, go somewhere new), why someone might want it, what it isn't, how it is funded (section id `funding`), and a pointer to Contacts (FR-10.3).
 3. "Try the demo — no signup" links to `/signin`, where the demo starts from its own button (FR-2.1). The page never starts a demo session itself.
 4. About, Help, Contacts and the privacy policy are reachable from every page's header and footer (FR-10.4) — the map and the sign-in pages included.
-5. `/robots.txt` allows crawling except for `/v1/` and `/tiles/`, and points to `/sitemap.xml`, which lists `/`, `/help`, the export guides (FR-10.5), `/contacts` and `/privacy` (`/about` is the same page as `/`).
+5. `/robots.txt` allows crawling except for `/v1/` and `/tiles/`, and points to `/sitemap.xml`, which lists `/`, `/help`, `/contacts` and `/privacy` (`/about` is the same page as `/`).
 6. The front page carries structured data (a schema.org `WebApplication`, as JSON-LD) naming the site, its URL, description and share image, and that it's free.
 
 ### FR-10.2 Help page
 
-**Description**: A public page at `/help` that explains how HoldMyTrack works, in ten sections reachable from jump links under its title: the map (the opening view, the Normal / Fog of War / Heatmap modes, how Fog and Heatmap switch to whole states or regions, then whole countries, as the map zooms out, and the Layers menu's base map and paths — FR-4, FR-4.13, FR-4.14), the date slider (what its slots are, moving a knob, and paging back through history with a knob pulled along — FR-6), editing and deleting activities (anchor `#edit`: the Edit window's Activity and Track tabs, Hide, Delete, and splitting an activity in two — FR-5.10–FR-5.14, FR-5.17), Stories (making one, adding and removing activities, the Stories tab, renaming and deleting, sending a copy and accepting one, the badge — FR-14, FR-5.16), photos (anchor `#photos`: adding them in the Edit window, how each is placed on the route, moving and captioning one, looking at them, and the resized copy kept and the 2,000-photo limit — FR-16), points of interest (anchor `#places`: turning categories on in Layers, where badges and areas show and Show in this area, the popup, capturing a place in the Android app, and that the places come from OpenStreetMap — FR-15), getting activities in (files, `.zip` archives, Google Takeout with a link to Google's own download guide and to the Google Health export guide (FR-10.5), the Android app with a link to download it and that it uploads files too, and what happens on a repeated import or the same activity from two sources — FR-3), exporting a map image (FR-4.10), the Profile page (anchor `#profile`: the activity grid, its totals, and Trends — FR-7, FR-9), and settings and privacy (Country, Timezone, Language, Theme, Private locations — FR-1.7, FR-4.12, FR-13, FR-8.1 — what HoldMyTrack stores and doesn't: no health data, only the route, and the original upload kept only to rebuild it (`VISION.md` §1.1; anchor `#what-we-store`), with a link to the privacy policy (FR-10.6) — how to download a copy of everything (anchor `#download-data`: requesting it in Settings, the email, the 7 days, the 2 GB archives and what each folder holds — FR-1.12), and how to delete an account — in Settings on the web or in the Android app (FR-1.11), or by email to the Contacts address for someone who can no longer sign in — and how to revoke Google's or Facebook's access on their side; its `#delete-account` anchor is the deployment's data-deletion instructions URL for Facebook, FR-1.10).
+**Description**: A public page at `/help` that explains how HoldMyTrack works, in ten sections reachable from jump links under its title: the map (the opening view, the Normal / Fog of War / Heatmap modes, how Fog and Heatmap switch to whole states or regions, then whole countries, as the map zooms out, and the Layers menu's base map and paths — FR-4, FR-4.13, FR-4.14), the date slider (what its slots are, moving a knob, and paging back through history with a knob pulled along — FR-6), editing and deleting activities (anchor `#edit`: the Edit window's Activity and Track tabs, Hide, Delete, and splitting an activity in two — FR-5.10–FR-5.14, FR-5.17), Stories (making one, adding and removing activities, the Stories tab, renaming and deleting, sending a copy and accepting one, the badge — FR-14, FR-5.16), photos (anchor `#photos`: adding them in the Edit window, how each is placed on the route, moving and captioning one, looking at them, and the resized copy kept and the 2,000-photo limit — FR-16), points of interest (anchor `#places`: turning categories on in Layers, where badges and areas show and Show in this area, the popup, capturing a place in the Android app, and that the places come from OpenStreetMap — FR-15), getting activities in (files, up to 20 at a time, and that a `.zip` isn't imported, the Android app with a link to download it and that it uploads files too, and what happens on a repeated import or the same activity from two sources — FR-3), exporting a map image (FR-4.10), the Profile page (anchor `#profile`: the activity grid, its totals, and Trends — FR-7, FR-9), and settings and privacy (Country, Timezone, Language, Theme, Private locations — FR-1.7, FR-4.12, FR-13, FR-8.1 — what HoldMyTrack stores and doesn't: no health data, only the route, and the original upload kept only to rebuild it (`VISION.md` §1.1; anchor `#what-we-store`), with a link to the privacy policy (FR-10.6) — how to download a copy of everything (anchor `#download-data`: requesting it in Settings, the email, the 7 days, the 2 GB archives and what each folder holds — FR-1.12), and how to delete an account — in Settings on the web or in the Android app (FR-1.11), or by email to the Contacts address for someone who can no longer sign in — and how to revoke Google's or Facebook's access on their side; its `#delete-account` anchor is the deployment's data-deletion instructions URL for Facebook, FR-1.10).
 
 **Preconditions**: None.
 
@@ -1080,18 +1044,6 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 8. An address no page answers gets a "Page not found" page (`404`) with the same header; under `/v1/` and `/tiles/` it's a plain `404`, not a page.
 9. Every indexable page carries link-preview tags (Open Graph and a large-image Twitter card), with a 1200×630 share image: a Fog of War map with the HoldMyTrack logo, tagline and a one-line pitch.
 
-### FR-10.5 Export guide
-
-**Description**: A public page that walks through getting a file to import, step by step, each step beside a screenshot of the phone with what to tap outlined: `/help/google-health-export`, exporting Google Health (formerly Fitbit) data through Google Takeout from the Google Health app and importing the `.zip` (FR-3.3).
-
-**Preconditions**: None.
-
-**Behavior**:
-1. `GET /help/google-health-export` returns the page, in English or Russian like Help. It's indexable and listed in `/sitemap.xml`. It opens with a link back to Help's "Getting your activities in".
-2. The screenshots are an English Pixel's, so the Russian page gives each menu or button in Russian with its English name beside it. They show no account's name, email, photo or files.
-3. It says how to start the export in the app (or on takeout.google.com), which Takeout options to keep, that Google emails a download link valid for a week, to upload the `.zip` without unpacking it (or pick it on the Android app's Upload screen), and that only workouts with a route are read. It also states the 512 MB archive limit and that an export Takeout splits into several files can't be imported yet.
-4. It's linked from the header's Upload menu (FR-3.4), opening in a new tab, from the matching section of Help (FR-10.2), and from the Android app's Upload screen (`apps/android/docs/SPEC.md` FR-3.6).
-
 ### FR-10.6 Privacy policy
 
 **Description**: A public page at `/privacy`, the privacy policy: what HoldMyTrack keeps and why, the Android app's Health Connect and location use, the processors, cookies, retention and the user's rights. It is the policy the Play Store listing and the Android app's Health Connect rationale (`apps/android/docs/SPEC.md` FR-3.1) point to.
@@ -1117,9 +1069,9 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 
 **Behavior**:
 1. `GET /testing` returns the page. It is marked `noindex`, carries no canonical link, isn't in `/sitemap.xml`, and nothing on the site or in the app links to it; testers get its URL with their invitation.
-2. Setup comes first: install the app, create an account, set it up (FR-1.7), and import `holdmytrack-sample.zip` — 20 of the Demo Customer's activities, in Vietnam, Estonia, Italy and Cleveland (FR-2.1). The tests after it assume that account: uploads and imports (FR-3, including each failure reason, a file uploaded twice and the same activity from another source), the map's modes and layers (FR-4), the date slider, the Activities panel, editing and splitting (FR-5), Private locations (FR-8.1), Stories (FR-14), photos (FR-16), points of interest (FR-15), and the Android-only Health Connect sync, recording, You tab and Settings, account and demo screens (`apps/android/docs/SPEC.md`). It ends with how to report a problem, by email to the Contacts address (FR-10.3).
+2. Setup comes first: install the app, create an account, set it up (FR-1.7), and upload the 20 files in `holdmytrack-sample.zip`, extracted on the phone — 20 of the Demo Customer's activities, in Vietnam, Estonia, Italy and Cleveland (FR-2.1). The tests after it assume that account: uploads (FR-3, including each failure reason, a file uploaded twice, a `.zip` refused and the same activity from another source), the map's modes and layers (FR-4), the date slider, the Activities panel, editing and splitting (FR-5), Private locations (FR-8.1), Stories (FR-14), photos (FR-16), points of interest (FR-15), and the Android-only Health Connect sync, recording, You tab and Settings, account and demo screens (`apps/android/docs/SPEC.md`). It ends with how to report a problem, by email to the Contacts address (FR-10.3).
 3. Its expected results quote the app's own text, so a change to what the Android app shows or says, or to a server message it shows, is a change to this page too.
-4. Each sample file is a link under `/static/testing/` that downloads under its own name: single GPX, TCX and FIT activities, a TCX duplicating one of the zip's activities, a file for each import failure (unreadable, no timestamps, no GPS points, one point, empty, an unsupported type), a zip with a bad entry and a non-activity file, a Google Health Takeout export, and photos whose capture time places them on one of the activities, or on none.
+4. Each sample file is a link under `/static/testing/` that downloads under its own name: the zip of Setup's 20 files, single GPX, TCX and FIT activities, a TCX duplicating one of Setup's activities, a file for each import failure (unreadable, no timestamps, no GPS points, one point, empty, an unsupported type), and photos whose capture time places them on one of the activities, or on none.
 
 ## 13. FR-11 — Donations
 
@@ -1167,7 +1119,7 @@ A read-only view of every account and every account's activities, for the people
 **Behavior**:
 1. The header repeats FR-12.2's row, plus the account id.
 2. Activities are listed newest first, 100 per page, with "← Newer" and "Older →" links (`?page=`) and a "1–100 of 250" count.
-3. Each row shows the full activity id (selected whole with one click), the start date and time where it was recorded, followed by that timezone's name (FR-3.11), type, name, distance, duration (hours:minutes), source (`upload`, `takeout`, `healthconnect`, `recorded`, …), and the countries and regions it passes through (FR-4.2's boundary tiers).
+3. Each row shows the full activity id (selected whole with one click), the start date and time where it was recorded, followed by that timezone's name (FR-3.11), type, name, distance, duration (hours:minutes), source (`upload`, `healthconnect`, `recorded`, `takeout` and `timeline` on older activities, …), and the countries and regions it passes through (FR-4.2's boundary tiers).
 4. Unlike every other list in the product, activities entirely inside a Private location are included, badged "hidden"; an activity with a track edit (FR-5.14) is badged "edited".
 5. An id that isn't a UUID, or no account's, is `404`. A page past the last shows no rows and a link back to the first.
 6. The pages only read. Nothing on them changes an account or an activity.
@@ -1188,7 +1140,7 @@ A read-only view of every account and every account's activities, for the people
 7. A language chosen in the header's menu (FR-13.2) takes effect from that choice's own reload onward; other open pages change on their next load. Saved from the Android app, it applies to the web from each page's next load.
 8. The Android app follows its own per-app language (Android's Settings → Apps → HoldMyTrack → Language), else the phone's. Its Language, on Settings or the You tab, sets that per-app language and the account's setting together, and signing in applies the account's language when it is English or Русский (`apps/android/docs/SPEC.md` FR-1.5). It sends its language as `Accept-Language`, so the server's messages match it.
 
-**Not translated**: activity names and descriptions people type, place names on the map, activity types outside the common set (shown as recorded), and the reason a `.zip` entry was skipped.
+**Not translated**: activity names and descriptions people type, place names on the map, and activity types outside the common set (shown as recorded).
 
 ### FR-13.2 The language menu
 

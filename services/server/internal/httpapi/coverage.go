@@ -12,8 +12,7 @@ import (
 // running jobs too. `ingest`, `edit_track`, `reprivacy` and `story_copy` are included, not just
 // `render_fog`: an upload the client has already seen accepted may not have been parsed yet, and
 // until it has, the `render_fog` job it will enqueue doesn't exist to be waited on; an accepted
-// copy of a Story is the same, one activity at a time. `unpack` is there for the same reason one
-// step earlier: an accepted .zip has no ingest jobs until its archive has been unpacked.
+// copy of a Story is the same, one activity at a time.
 //
 // The second column is the version: the account's map_version, bumped at the end of every
 // render pass and by every request-time change to what a tile returns (fog.BumpMapVersion). A
@@ -24,7 +23,7 @@ import (
 const coverageRenderingQuery = `
 SELECT EXISTS (
     SELECT 1 FROM jobs
-    WHERE user_id = $1 AND state = 'pending' AND kind IN ('unpack', 'ingest', 'edit_track', 'reprivacy', 'render_fog', 'story_copy')
+    WHERE user_id = $1 AND state = 'pending' AND kind IN ('ingest', 'edit_track', 'reprivacy', 'render_fog', 'story_copy')
 ),
 (SELECT map_version FROM users WHERE id = $1)`
 

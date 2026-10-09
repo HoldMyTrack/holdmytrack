@@ -54,7 +54,7 @@ Most privacy laws outside the EU (Brazil's LGPD, Australia's Privacy Act APP 8, 
 
 * The design already suits it: no feature reads another account's data (true today, apart from the copy job behind sending a copy of a Story, ADR-0036, which reads the sender's activities once while copying and would have to work across regions or be refused across them; a Milestone 3 social graph, `VISION.md` §5.7, would have to work across regions or rule this out), user IDs are UUIDs so they stay unique across regions, and the basemap is public and stays global on one CDN.
 * Still to build: a small global directory mapping an email or sign-in identity to its home region (or per-region subdomains the user picks at sign-in), a home region chosen at signup and defaulted from Country, deploys that roll out to N stacks, and the Demo Customer and admin boundaries seeded in each.
-* The takeout export (`internal/takeout`) plus a matching import would move an account between regions.
+* Download your data (`internal/export`) plus a matching import would move an account between regions.
 * Each region is a fixed monthly cost against the project's funding (`VISION.md` §6), so the alternative for a localization country with few users is declining signups there rather than running a stack for them.
 * Until then, the only cost is not closing the door: keep each deployment fully configured by env, and ask whether any new cross-account query would still work split by region.
 

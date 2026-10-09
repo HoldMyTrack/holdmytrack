@@ -26,7 +26,7 @@ Before implementing any UI or sync routines, we must design around two hard plat
 2. **Samsung Health Route-Geometry Limitation**
    - **Constraint**: Samsung Health writes summary data but does not expose GPS route geometry (`EXERCISE_ROUTE`) to other apps via Health Connect, so Galaxy Watch sessions never carry a route (`docs/VISION.md` §4.1, `docs/IMPLEMENTATION.md` §4.0).
    - **Decision**: HoldMyTrack only ingests activities that have a route — this is a deliberate product boundary (`docs/VISION.md` §1.1), not just a platform limitation to work around. A session with no geometry is rejected at sync time with a clear reason (`POST /v1/sync/activities` already does this — see the server-side prerequisites below), not persisted and not silently dropped. In practice this means **Samsung Galaxy Watch sync is unsupported**: every Samsung-sourced session arrives with no geometry and is therefore always rejected.
-   - **Route-less activities are ordinary, and indoor exercise is why.** A gym session, a swim or a rowing machine has no trajectory by its nature — `docs/IMPLEMENTATION.md` §4.0.2 already meets the same case from the Takeout side and skips it there too. Measured on a real store (`docs/IMPLEMENTATION.md` §4.0), half the sessions had no geometry on exactly these grounds, and all of Samsung's do, regardless of activity type. These are skipped by design (`VISION.md` §1.1).
+   - **Route-less activities are ordinary, and indoor exercise is why.** A gym session, a swim or a rowing machine has no trajectory by its nature — Measured on a real store (`docs/IMPLEMENTATION.md` §4.0), half the sessions had no geometry on exactly these grounds, and all of Samsung's do, regardless of activity type. These are skipped by design (`VISION.md` §1.1).
 
 ---
 

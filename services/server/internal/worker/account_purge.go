@@ -99,7 +99,9 @@ func purgeAccount(ctx context.Context, pool *pgxpool.Pool, store *storage.Store,
 		return fmt.Errorf("activities: rows: %w", err)
 	}
 	prefixes = append(prefixes,
-		"raw/"+userID+"/", "fog/"+userID+"/", "heatmap/"+userID+"/", "exports/"+userID+"/", "imports/"+userID+"/")
+		"raw/"+userID+"/", "fog/"+userID+"/", "heatmap/"+userID+"/", "exports/"+userID+"/",
+		// imports/: archives uploaded before .zip import was removed (ADR-0039).
+		"imports/"+userID+"/")
 	// Side by side: each prefix is a listing and a bulk delete, round trips to object storage,
 	// and an account has one per activity — one after another, a 1,000-activity account took
 	// about 5.5 minutes on production (docs/PERFORMANCE.md, 2026-10-09).

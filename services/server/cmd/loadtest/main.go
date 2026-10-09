@@ -12,20 +12,21 @@
 //	signup N        create N accounts (the deployment must skip email verification meanwhile,
 //	                docs/PERFORMANCE.md "Test accounts"); their sessions go to -dir/tokens.json
 //	seed            upload every demo track (internal/httpapi/demo_data) to every account
-//	gen K N         write K archives of N tracks each to -dir, demo tracks moved apart and back in
-//	                time so every file is new; -long keeps the three tracks of 200+ z14 tiles
-//	import K        upload archive-1..K.zip, one per account, all at once
+//	gen K N         write K sets of N tracks each to -dir/set-1..K, demo tracks moved apart and
+//	                back in time so every file is new; -long keeps the three tracks of 200+ z14
+//	                tiles
+//	import K        upload set-1..K, one per account, all accounts at once, each set's files one
+//	                at a time as the web's Upload menu sends them
 //	browse VUS DUR  VUS people at the map for DUR, each in Normal, Fog or Heatmap mode, panning
 //	                and zooming and requesting the tiles the web client would; each keeps a
 //	                browser-like tile cache unless -cold. Latency per tile layer every 30 s
 //	probe           upload one new track from the last account and time it until it's processed
 //	cleanup         delete every account in tokens.json
 //
-// Nothing it writes goes in the repo: tokens and archives live in -dir.
+// Nothing it writes goes in the repo: tokens and track sets live in -dir.
 package main
 
 import (
-	"archive/zip"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -51,7 +52,7 @@ import (
 
 var (
 	base     = flag.String("base", "", "the deployment's origin, e.g. https://example.com (required)")
-	dir      = flag.String("dir", "", "working directory for tokens.json and archives (required)")
+	dir      = flag.String("dir", "", "working directory for tokens.json and track sets (required)")
 	demoDir  = flag.String("demo", "internal/httpapi/demo_data", "the demo tracks, relative to services/server")
 	emailFmt = flag.String("email", "loadtest+%02d@holdmytrack.com", "test account address, numbered from 1")
 	long     = flag.Bool("long", false, "gen: keep the long demo tracks (200+ z14 tiles each)")
@@ -107,7 +108,7 @@ func main() {
 		browse(v, d)
 	case "import":
 		k, _ := strconv.Atoi(os.Args[2])
-		importArchives(k)
+		importSets(k)
 	case "probe":
 		probe()
 	case "cleanup":
@@ -253,35 +254,41 @@ func gen(k, n int) {
 		src[i], _ = os.ReadFile(f)
 	}
 	for a := 1; a <= k; a++ {
-		f, err := os.Create(inDir(fmt.Sprintf("archive-%d.zip", a)))
-		must(err)
-		zw := zip.NewWriter(f)
+		set := inDir(fmt.Sprintf("set-%d", a))
+		must(os.MkdirAll(set, 0o755))
+		var size int
 		for i := 0; i < n; i++ {
 			// a spiral of offsets, ~0.05° (5 km) apart, so copies spread outward around each origin
 			ang := float64(i) * 2.399963
 			r := 0.05 * math.Sqrt(float64(i+1)) * float64(a)
 			g := shift(src[i%len(src)], r*math.Sin(ang), r*math.Cos(ang), i+a*1000)
-			w, _ := zw.Create(fmt.Sprintf("a%d/track-%04d.gpx", a, i))
-			w.Write(g)
+			must(os.WriteFile(filepath.Join(set, fmt.Sprintf("a%d-track-%04d.gpx", a, i)), g, 0o644))
+			size += len(g)
 		}
-		zw.Close()
-		fi, _ := f.Stat()
-		f.Close()
-		fmt.Printf("archive-%d.zip %d files %.1f MB\n", a, n, float64(fi.Size())/1e6)
+		fmt.Printf("set-%d %d files %.1f MB\n", a, n, float64(size)/1e6)
 	}
 }
 
-func importArchives(k int) {
+func importSets(k int) {
 	accts := loadAccts()
 	var wg sync.WaitGroup
 	for a := 1; a <= k; a++ {
 		wg.Add(1)
 		go func(a int, ac acct) {
 			defer wg.Done()
-			data, err := os.ReadFile(inDir(fmt.Sprintf("archive-%d.zip", a)))
+			files, err := filepath.Glob(filepath.Join(inDir(fmt.Sprintf("set-%d", a)), "*.gpx"))
 			must(err)
-			code, rb, d, err := uploadFile(upload, ac.Token, fmt.Sprintf("archive-%d.zip", a), data)
-			fmt.Printf("%s archive-%d: %d in %s err=%v %s\n", time.Now().Format("15:04:05"), a, code, d.Round(time.Millisecond), err, trunc(string(rb), 300))
+			sort.Strings(files)
+			t0 := time.Now()
+			failed := 0
+			for _, f := range files {
+				code, rb, _, err := uploadFile(upload, ac.Token, filepath.Base(f), mustRead(f))
+				if err != nil || code >= 300 {
+					failed++
+					fmt.Printf("%s set-%d %s: %d err=%v %s\n", time.Now().Format("15:04:05"), a, filepath.Base(f), code, err, trunc(string(rb), 200))
+				}
+			}
+			fmt.Printf("%s set-%d: %d files sent in %s, %d failed\n", time.Now().Format("15:04:05"), a, len(files), time.Since(t0).Round(time.Millisecond), failed)
 		}(a, accts[a-1])
 	}
 	wg.Wait()

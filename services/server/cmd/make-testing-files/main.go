@@ -1,8 +1,7 @@
 // cmd/make-testing-files writes the sample files the Android test suite page offers testers
 // (`/testing`, docs/SPEC.md FR-10.7, IMPLEMENTATION.md §4.14) into
 // internal/web/static/testing/, from the Demo Customer's own tracks and photos
-// (internal/httpapi/demo_data) and the Takeout test sample (internal/takeout/testdata).
-// Run it from services/server after changing either, or this file:
+// (internal/httpapi/demo_data). Run it from services/server after changing them, or this file:
 //
 //	go run ./cmd/make-testing-files
 //
@@ -17,7 +16,6 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
-	"io/fs"
 	"log"
 	"math"
 	"os"
@@ -33,12 +31,12 @@ import (
 
 const (
 	demoDir     = "internal/httpapi/demo_data"
-	takeoutDir  = "internal/takeout/testdata/sample"
 	photoWidth  = 1600
 	jpegQuality = 82
 )
 
-// sampleZip is what Setup imports: the Demo Customer's trips abroad, each a country Fog
+// sampleZip is what Setup imports, unzipped and uploaded as its 20 files (the most one pick
+// takes): the Demo Customer's trips abroad, each a country Fog
 // clears at country level, and a few Cleveland walks for a slider that spans months.
 var sampleZip = []string{
 	"2026-01-20 Vietnam.gpx", "2026-01-21 Vietnam.gpx", "2026-01-22 Vietnam.gpx", "2026-01-23 Vietnam.gpx", "2026-01-24 Vietnam.gpx",
@@ -57,8 +55,6 @@ const (
 	clague      = "2026-09-27 Clague Park-2.gpx"         // duplicate.tcx: in sampleZip
 	playArea    = "2026-09-07 Andrew s Nature Play Area.gpx"
 	solon       = "2026-09-13 Solon Community Park.gpx"
-	driving1    = "2026-10-03 driving.gpx"
-	driving2    = "2026-10-03 driving-2.gpx"
 	brecksDrive = "2026-09-26 Brecksville Reservation trip.gpx"
 	brecksWalk  = "2026-09-26 Brecksville Reservation trip-2.gpx"
 )
@@ -118,33 +114,6 @@ func generate() {
   </Placemark>
 </kml>
 `))
-	writeZip("mixed.zip", func(add func(name string, data []byte)) {
-		add(driving1, demoFile(driving1))
-		add(driving2, demoFile(driving2))
-		add("broken.gpx", broken)
-		add("notes.txt", []byte("Not an activity file: the import skips it.\n"))
-	})
-	writeZip("takeout-sample.zip", func(add func(name string, data []byte)) {
-		must(filepath.WalkDir(takeoutDir, func(path string, d fs.DirEntry, err error) error {
-			if err != nil || d.IsDir() {
-				return err
-			}
-			// The fixture's health-data decoy, there for the reader's tests, isn't for testers.
-			if strings.Contains(path, "Menstrual Health") {
-				return nil
-			}
-			rel, err := filepath.Rel(takeoutDir, path)
-			if err != nil {
-				return err
-			}
-			data, err := os.ReadFile(path)
-			if err != nil {
-				return err
-			}
-			add(filepath.ToSlash(rel), data)
-			return nil
-		}))
-	})
 	writePhotos()
 }
 

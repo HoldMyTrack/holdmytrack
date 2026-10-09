@@ -21,7 +21,6 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/metrics"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storycopy"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/unpack"
 )
 
 const pollInterval = 500 * time.Millisecond
@@ -74,9 +73,8 @@ const exportSweepInterval = time.Hour
 // The fresh locked_at, not the row lock, is what keeps a second worker process off a job
 // that is still running (claimLease).
 //
-// Long jobs have a lane of their own, a second loop beside this one: building an export or
-// unpacking a large archive takes minutes, and nobody's single upload or phone sync should
-// wait behind it. The main lane itself runs as `concurrency` loops side by side, fair across
+// Long jobs have a lane of their own, a second loop beside this one: building an export takes
+// minutes, and nobody's single upload or phone sync should wait behind it. The main lane itself runs as `concurrency` loops side by side, fair across
 // accounts (claimQuery). n tells an export's owner when it's ready (export_job.go). The periodic
 // sweeps (runSweeps) have a third goroutine, so a busy queue never holds them back. A deleted
 // account's jobs are never claimed: its purge drops them within accountPurgeInterval.
@@ -200,8 +198,7 @@ func runSweeps(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, lo
 	}
 }
 
-// The two lanes Run claims from: the long-running kinds (an export, unpacking an archive) and
-// everything else.
+// The two lanes Run claims from: the long-running kind (an export) and everything else.
 const (
 	laneMain = false
 	laneLong = true
@@ -258,14 +255,14 @@ const claimQuery = `
 		SELECT DISTINCT user_id FROM jobs
 		WHERE state = 'pending' AND user_id IS NOT NULL
 		  AND locked_at >= NOW() - make_interval(secs => $1)
-		  AND (kind IN ('export', 'unpack')) = $2
+		  AND (kind IN ('export')) = $2
 	),
 	heads AS (
 		SELECT DISTINCT ON (j.user_id) j.id, j.user_id, j.run_after
 		FROM jobs j
 		WHERE j.state = 'pending' AND j.run_after <= NOW()
 		  AND (j.locked_at IS NULL OR j.locked_at < NOW() - make_interval(secs => $1))
-		  AND (j.kind IN ('export', 'unpack')) = $2
+		  AND (j.kind IN ('export')) = $2
 		  AND (j.user_id IS NULL OR j.user_id NOT IN (SELECT user_id FROM busy))
 		  AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = j.user_id AND u.deleted_at IS NOT NULL)
 		ORDER BY j.user_id, j.run_after, j.id
@@ -273,7 +270,7 @@ const claimQuery = `
 	ranked AS (
 		SELECT h.id, h.run_after,
 			(SELECT max(s.locked_at) FROM jobs s
-			 WHERE s.user_id = h.user_id AND (s.kind IN ('export', 'unpack')) = $2) AS served
+			 WHERE s.user_id = h.user_id AND (s.kind IN ('export')) = $2) AS served
 		FROM heads h
 	)
 	SELECT j.id, j.kind, j.payload, j.attempts
@@ -369,7 +366,7 @@ func claimAndRun(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, 
 }
 
 // finished counts a job in metrics.JobsFinished. A failure with no jobs.error_code (any kind
-// but ingest and unpack) counts as "internal": only their codes can name the user's file.
+// but ingest) counts as "internal": only its codes can name the user's file.
 func finished(kind, outcome string, code *string) {
 	c := ""
 	if outcome == "failed" {
@@ -381,17 +378,13 @@ func finished(kind, outcome string, code *string) {
 	metrics.JobsFinished.WithLabelValues(kind, outcome, c).Inc()
 }
 
-// failureCode is the error_code a failed job is stored with. Only an ingest's or an unpack's
-// failure reaches a person (the upload history, the Upload menu), so only they get a code to
-// be translated from; the other kinds' failures are for the logs. A nil err is a failure that isn't the file's own
-// (the abandoned-job path), so FailInternal.
+// failureCode is the error_code a failed job is stored with. Only an ingest's failure reaches a
+// person (the upload history), so only it gets a code to be translated from; the other kinds'
+// failures are for the logs. A nil err is a failure that isn't the file's own (the
+// abandoned-job path), so FailInternal.
 func failureCode(kind string, err error) *string {
 	var c string
 	switch {
-	case kind == "unpack" && err != nil:
-		c = unpack.FailureCode(err)
-	case kind == "unpack":
-		c = unpack.FailInternal
 	case kind != "ingest":
 		return nil
 	case err != nil:
@@ -462,9 +455,6 @@ func runJob(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *
 		return storycopy.Process(ctx, pool, store, sj)
 	case "export":
 		return runExport(ctx, pool, store, log, j.id, j.payload)
-	case "unpack":
-		defer keepClaimed(ctx, pool, log, j.id)()
-		return unpack.Run(ctx, pool, store, j.id, j.payload)
 	case "remove_activity_objects":
 		return runRemoveActivityObjects(ctx, store, j.payload)
 	default:

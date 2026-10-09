@@ -109,7 +109,7 @@ func (s *Server) buildSync(ctx context.Context, l *i18n.Localizer, acct *pageAcc
 		if err := rows.Scan(&filename, &source, &state, &lastError, &errorCode, &finishedAt, &startedOn, &distance, &activityID); err != nil {
 			return view, err
 		}
-		row := syncRow{Title: importTitle(l, source, "", filename), Failed: state == "failed"}
+		row := syncRow{Title: importTitle(l, source, filename), Failed: state == "failed"}
 		if finishedAt != nil {
 			row.SyncedAt = web.LocalTime(l, *finishedAt, acct.info.timezone)
 		}

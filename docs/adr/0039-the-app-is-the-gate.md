@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Built so far: the Android app's list of what's on the phone to tick and send (`SPEC.md` FR-3.6, FR-3.8), Google Maps Timeline import removed, the overlap hint in place of duplicate handling on ingest (FR-3.7), and `superseded_by` gone with the copies it hid. The rest is in `ROADMAP.md`'s "The app is the gate". Supersedes ADR-0011, since Takeout import goes, and the archive parts of ADR-0001 and ADR-0032.
+Accepted. Built: the Android app's list of what's on the phone to tick and send (`SPEC.md` FR-3.6, FR-3.8), Google Maps Timeline import and `.zip` and Takeout import removed, the overlap hint in place of duplicate handling on ingest (FR-3.7), and `superseded_by` gone with the copies it hid. Supersedes ADR-0011, since Takeout import goes, and the archive parts of ADR-0001 and ADR-0032.
 
 ## Context
 

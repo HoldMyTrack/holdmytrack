@@ -6,7 +6,7 @@ What HoldMyTrack's performance has been measured to be, session by session: when
 
 ### Tools
 
-- `services/server/cmd/loadtest`: the driver. Creates test accounts, uploads activities, browses the map the way the web client does and reports latency per tile layer, times a single upload, and deletes the accounts. Its package comment lists the subcommands. The target is always the `-base` flag; tokens and archives go in `-dir`, outside the repo.
+- `services/server/cmd/loadtest`: the driver. Creates test accounts, uploads activities, browses the map the way the web client does and reports latency per tile layer, times a single upload, and deletes the accounts. Its package comment lists the subcommands. The target is always the `-base` flag; tokens and track sets go in `-dir`, outside the repo.
 - `scripts/loadtest-sampler.sh`: run on the server during a test, every 5 s: host load and memory, each container's CPU and memory, the job queue by kind and state, database size and connections.
 - `services/server/cmd/delayproxy`: puts object-storage latency in front of the dev stack's local store, so a render measured on a laptop pays per object what production pays to R2.
 - `go test -bench` in `services/server/internal/fog`: per-tile costs (`tilecost_bench_test.go`).
@@ -25,7 +25,7 @@ Afterwards `loadtest cleanup` deletes them all; the purge (`IMPLEMENTATION.md` �
 
 - **Seed**: `seed` uploads every demo track (`internal/httpapi/demo_data`, 45 files) to every account, about 945 jobs, then the queue is timed to empty. It includes the three long tracks (200+ z14 tiles each; the 1,478 km "2026-01-22 Vietnam" drive crosses 756), so it doubles as a worst case for them.
 - **Browse ramp**: `browse` with 10, 25, 50, 100 and 200 users for 3 minutes each, the worker idle. Each simulated person is in one mode at a time (Normal half the time, Fog about a third, Heatmap the rest), starts at city zoom over one of the account's places, and every 1.5–4 s pans about half a screen, zooms a level, pulls out to a country or region and back, or now and then switches mode. Each view requests what the web client would for a 1280×800 window: Tracks from z4 in Normal; Country tiles below z3, Region tiles below z7 and the Fog or Heatmap raster from z7 in those modes; Spots from z13 for the fifth of people who turn them on; never deeper than z14, which every source stops at. Six requests at a time, and a tile already fetched isn't fetched again, as a browser keeps each for good per tile version (`IMPLEMENTATION.md` §4.2.6). `-cold` drops that cache for a worst case.
-- **Import**: `gen 5 1000` then `import 5`: five accounts upload a 1,000-track archive each at once. Two minutes in, and again deep into the backlog, `probe` uploads one new track from a separate account and times it to processed — the fairness check. A 12-user `browse` runs meanwhile.
+- **Import**: `gen 5 1000` then `import 5`: five accounts upload a 1,000-track set each at once, one file at a time, as the web's Upload menu does (archives were uploaded whole until ADR-0039, which the sessions below measured). Two minutes in, and again deep into the backlog, `probe` uploads one new track from a separate account and times it to processed — the fairness check. A 12-user `browse` runs meanwhile.
 - **Stop** a step on more than 2% errors, a p95 over 5 s on two consecutive steps, under 10% memory available, or an out-of-memory kill.
 
 ## Sessions
