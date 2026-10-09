@@ -42,11 +42,11 @@ func TestAdminPagesRender(t *testing.T) {
 		NextHref: "/admin/users/u-1?page=2",
 		Activities: []adminActivityRow{
 			{ID: "a-1", Started: "2026-09-20 08:15", Type: "walk", Countries: "Italy", Regions: "Emilia-Romagna", Edited: true},
-			{ID: "a-2", Started: "2026-09-19 18:00", Type: "walk", SupersededBy: "a-1", Hidden: true},
+			{ID: "a-2", Started: "2026-09-19 18:00", Type: "walk", Hidden: true},
 		},
 	}})
 	body = rec.Body.String()
-	for _, want := range []string{`<code class="admin__id">a-1</code>`, "Emilia-Romagna", `href="#a-1"`, ">hidden<", ">edited<", "1–2 of 2", `href="/admin/users/u-1?page=2"`} {
+	for _, want := range []string{`<code class="admin__id">a-1</code>`, "Emilia-Romagna", ">hidden<", ">edited<", "1–2 of 2", `href="/admin/users/u-1?page=2"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("admin user page: missing %q", want)
 		}

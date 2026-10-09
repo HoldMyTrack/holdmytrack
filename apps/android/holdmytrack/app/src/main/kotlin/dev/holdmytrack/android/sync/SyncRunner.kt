@@ -2,15 +2,11 @@ package dev.holdmytrack.android.sync
 
 import android.content.res.Resources
 import android.util.Log
-import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.records.ExerciseRoute
-import androidx.health.connect.client.records.ExerciseRouteResult
-import androidx.health.connect.client.records.ExerciseSessionRecord
-import androidx.health.connect.client.request.ReadRecordsRequest
-import androidx.health.connect.client.time.TimeRangeFilter
 import dev.holdmytrack.android.R
-import dev.holdmytrack.android.health.ExerciseTypes
 import dev.holdmytrack.android.net.HoldMyTrackApi
+import dev.holdmytrack.android.recording.db.RecordedActivityStore
+import dev.holdmytrack.android.recording.db.toSyncJson
 import java.io.IOException
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
@@ -18,233 +14,148 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** One activity the server rejected, or that could never be accepted, with the reason why. */
-data class Rejection(val startedAt: Instant, val activityType: String, val reason: String)
+/** One ticked activity the server refused, or that it could never accept, with the reason why. */
+data class Rejection(val key: String, val startedAt: Instant, val activityType: String, val reason: String)
 
 /** What a finished (or curtailed) run did. */
 data class SyncReport(
-    val scanned: Int,
+    /** The keys the account has now — sent, or already there: off the list. */
+    val landed: Set<String>,
     val synced: Int,
     val alreadyPresent: Int,
-    val skippedNoRoute: Int,
     val rejected: List<Rejection>,
-    /** Null when the run reached the end of the store; otherwise why it stopped short. */
+    /** Null when everything ticked was sent; otherwise why the run stopped short. */
     val stoppedBecause: String?,
 )
 
-/** Live counts while a run is in progress, for the screen to show. */
-data class SyncProgress(val scanned: Int, val synced: Int)
-
 /**
- * One foreground sync run: read exercise sessions and their routes out of Health Connect,
- * send them to `POST /v1/sync/activities`, and move the watermark only over records that are
- * genuinely finished with.
+ * Sends what the user ticked on the Sync tab (`docs/SPEC.md` FR-3.6, FR-3.8) to
+ * `POST /v1/sync/activities`, and nothing else: an unticked candidate never reaches the server.
+ * Health Connect sessions go in batches under `healthconnect`; each recording in a request of its
+ * own under `recorded`, and is deleted from the phone once the server has it — it lives in the
+ * account from then on.
  *
- * **Foreground-only is a platform constraint, not a design preference** (`docs/IMPLEMENTATION.md`
- * §4.0). Routes written by other apps read back as `ConsentRequired` in the background even
- * with "Always allow" granted — measured on a device, the same 46 sessions returned 23 routes in
- * the foreground and none in the background. Nothing here schedules itself: the caller runs it
- * from a foreground screen and cancels it when that screen stops, and because the watermark
- * only moves on confirmed records, a run cut off mid-way simply resumes next time.
+ * Interrupting a run is safe: the server is idempotent on `(user_id, source, external_id)`, so
+ * whatever was sent before the cut is simply known next time the list is read (`POST
+ * /v1/sync/known`), and sending one again answers `already_processed`.
  *
- * **Every record gets one of two verdicts, and the watermark hangs on the difference:**
- *  - *Terminal* — the server took it, already had it, permanently refused it, or it has no
- *    route and never will. The watermark may pass it.
- *  - *Blocking* — a route exists but could not be read (`ConsentRequired`), or the request
- *    failed. The watermark stops, and the run stops with it, because everything after this
- *    point would otherwise be read and confirmed while this one is quietly left behind — the
- *    exact "complete in every respect except the map" failure §4.0 warns about.
- *
- * **A session with no route is terminal, not a failure.** Half the sessions measured on a
- * device had none, and the reason is ordinary: a gym session, a swim or a rowing machine has no
- * trajectory by its nature. HoldMyTrack's scope is outdoor GPS tracking (`docs/VISION.md` §1.1), so
- * these are skipped by design rather than retried forever or represented as gaps.
+ * **Foreground only** (`docs/IMPLEMENTATION.md` §4.0): routes written by other apps read back as
+ * `ConsentRequired` in the background, so the routes sent here are the ones the Sync tab read
+ * while it was on screen, and the tab cancels a run when it leaves.
  */
 class SyncRunner(
-    private val client: HealthConnectClient,
-    private val cursor: SyncCursor,
+    private val store: RecordedActivityStore,
     /** For the reasons a run reports — the refusals and why it stopped — in the app's language. */
     private val res: Resources,
 ) {
-
-    /** Records read since the watermark last moved, in order. Cleared each time it moves. */
-    private val segment = mutableListOf<ExerciseSessionRecord>()
-
-    /** Activities prepared but not yet sent. */
-    private val batch = mutableListOf<JSONObject>()
-    private val batchRecords = mutableListOf<ExerciseSessionRecord>()
-    private var batchPoints = 0
-
-    private var scanned = 0
+    private val landed = mutableSetOf<String>()
     private var synced = 0
     private var alreadyPresent = 0
-    private var skippedNoRoute = 0
     private val rejected = mutableListOf<Rejection>()
 
-    suspend fun run(onProgress: (SyncProgress) -> Unit): SyncReport {
-        val startFrom = cursor.at
-        val alreadyHandled = cursor.handledAtCursor
-        var pageToken: String? = null
-        var stoppedBecause: String? = null
-
-        paging@ while (true) {
-            val page = client.readRecords(
-                ReadRecordsRequest(
-                    ExerciseSessionRecord::class,
-                    // `after` is inclusive, so the record the watermark stands on comes back
-                    // every run; SyncCursor.handledAtCursor is what filters it out again
-                    // without also losing a session that shares its start instant.
-                    timeRangeFilter = TimeRangeFilter.after(startFrom ?: Instant.EPOCH),
-                    ascendingOrder = true,
-                    pageSize = PAGE_SIZE,
-                    pageToken = pageToken,
-                ),
-            )
-
-            for (record in page.records) {
-                if (record.startTime == startFrom && record.metadata.id in alreadyHandled) continue
-                scanned++
-                onProgress(SyncProgress(scanned, synced))
-
-                when (val result = record.exerciseRouteResult) {
-                    is ExerciseRouteResult.Data -> take(record, result.exerciseRoute)
-                    is ExerciseRouteResult.NoData -> {
-                        skippedNoRoute++
-                        segment += record
-                    }
-                    else -> {
-                        // ConsentRequired. Blocking, always: the route is there and we were
-                        // refused it, so passing over this record would lose it for good.
-                        stoppedBecause = res.getString(R.string.sync_consent_required)
-                        break@paging
-                    }
-                }
-
-                if (batch.size >= MAX_BATCH_ACTIVITIES || batchPoints >= MAX_BATCH_POINTS) {
-                    stoppedBecause = flush()
-                    if (stoppedBecause != null) break@paging
-                }
-            }
-
-            pageToken = page.pageToken ?: break
-        }
-
-        // Whatever is buffered still has to be sent and confirmed before the watermark can
-        // cover it — including when the loop above stopped at a blocking record, since
-        // everything before that record is still legitimately finished with.
-        val flushFailure = flush()
-        return SyncReport(
-            scanned = scanned,
-            synced = synced,
-            alreadyPresent = alreadyPresent,
-            skippedNoRoute = skippedNoRoute,
-            rejected = rejected.toList(),
-            stoppedBecause = stoppedBecause ?: flushFailure,
-        )
+    suspend fun send(ticked: List<Candidate>, onProgress: (sent: Int) -> Unit): SyncReport {
+        val stopped = sendSessions(ticked.filter { it.origin is HealthConnectSession }, onProgress)
+            ?: sendRecordings(ticked.filter { it.origin is Recording }, onProgress)
+        return SyncReport(landed.toSet(), synced, alreadyPresent, rejected.toList(), stopped)
     }
 
-    /** Prepares one session with geometry, or records why it can never be accepted. */
-    private suspend fun take(record: ExerciseSessionRecord, route: ExerciseRoute) {
-        val points = route.route
-        val activityType = ExerciseTypes.name(record.exerciseType)
-        val refusal = when {
-            points.size < MIN_POINTS -> res.getString(R.string.sync_refusal_too_few_points)
-            points.size > MAX_POINTS_PER_ACTIVITY -> res.getString(R.string.sync_refusal_too_many_points, points.size)
-            else -> null
-        }
-        if (refusal != null) {
-            // Terminal, like a server rejection: nothing about this record will change, so the
-            // watermark must pass it rather than stall on it forever.
-            rejected += Rejection(record.startTime, activityType, refusal)
-            segment += record
-            return
-        }
-        batch += prepare(record, activityType, points)
-        batchRecords += record
-        batchPoints += points.size
-        segment += record
-    }
-
-    /**
-     * Sends the buffered batch and moves the watermark over everything it covers.
-     *
-     * Returns null when the run may continue, or a reason to stop. A failed request stops the
-     * run *without* moving the watermark: nothing in that batch was decided, and guessing
-     * either way is how records get skipped.
-     */
-    private suspend fun flush(): String? {
-        if (batch.isEmpty()) {
-            advanceOverSegment()
-            return null
-        }
-        val results = try {
-            HoldMyTrackApi.syncActivities(batch, HoldMyTrackApi.SOURCE_HEALTH_CONNECT)
-        } catch (e: IOException) {
-            Log.w(TAG, "sync batch failed", e)
-            batch.clear()
-            batchRecords.clear()
-            batchPoints = 0
-            segment.clear()
-            return e.message ?: res.getString(R.string.sync_request_failed)
-        }
-
-        val byId = results.associateBy { it.externalId }
-        for (record in batchRecords) {
-            when (val result = byId[record.metadata.id]?.status) {
-                "enqueued" -> synced++
-                "already_processed" -> alreadyPresent++
-                else -> rejected += Rejection(
-                    record.startTime,
-                    ExerciseTypes.name(record.exerciseType),
-                    byId[record.metadata.id]?.error?.ifBlank { null }
-                        ?: res.getString(R.string.sync_no_report, result ?: "missing"),
-                )
+    /** Health Connect's ticked sessions, a batch at a time. Returns why it stopped, if it did. */
+    private suspend fun sendSessions(sessions: List<Candidate>, onProgress: (Int) -> Unit): String? {
+        val batch = mutableListOf<Candidate>()
+        var points = 0
+        for (candidate in sessions) {
+            if (candidate.pointCount > MAX_POINTS_PER_ACTIVITY) {
+                val refusal = res.getString(R.string.sync_refusal_too_many_points, candidate.pointCount)
+                rejected += Rejection(candidate.key, candidate.startedAt, candidate.activityType, refusal)
+                continue
+            }
+            batch += candidate
+            points += candidate.pointCount
+            if (batch.size >= MAX_BATCH_ACTIVITIES || points >= MAX_BATCH_POINTS) {
+                flush(batch, HoldMyTrackApi.SOURCE_HEALTH_CONNECT)?.let { return it }
+                onProgress(landed.size)
+                batch.clear()
+                points = 0
             }
         }
+        val stopped = flush(batch, HoldMyTrackApi.SOURCE_HEALTH_CONNECT)
+        onProgress(landed.size)
+        return stopped
+    }
 
-        batch.clear()
-        batchRecords.clear()
-        batchPoints = 0
-        advanceOverSegment()
+    /** Each ticked recording on its own; one that lands is deleted from the phone. */
+    private suspend fun sendRecordings(recordings: List<Candidate>, onProgress: (Int) -> Unit): String? {
+        for (candidate in recordings) {
+            flush(listOf(candidate), HoldMyTrackApi.SOURCE_RECORDED)?.let { return it }
+            if (candidate.key in landed) store.delete(candidate.externalId)
+            onProgress(landed.size)
+        }
         return null
     }
 
     /**
-     * Moves the watermark to the last record of the current segment. Safe by construction:
-     * the run stops at the first blocking record, so a segment only ever contains records that
-     * are finished with.
+     * Sends [batch] and sorts the server's verdicts. Returns null when the run may go on, or the
+     * reason to stop: a failed request decided nothing, so the batch stays ticked on the list.
      */
-    private fun advanceOverSegment() {
-        val last = segment.lastOrNull() ?: return
-        val idsAtInstant = segment.filter { it.startTime == last.startTime }
-            .map { it.metadata.id }
-            .toSet()
-        cursor.advanceTo(last.startTime, idsAtInstant)
-        segment.clear()
+    private suspend fun flush(batch: List<Candidate>, source: String): String? {
+        if (batch.isEmpty()) return null
+        val results = try {
+            HoldMyTrackApi.syncActivities(batch.map { prepare(it) }, source)
+        } catch (e: IOException) {
+            Log.w(TAG, "sync batch failed", e)
+            return e.message ?: res.getString(R.string.sync_request_failed)
+        }
+        val byId = results.associateBy { it.externalId }
+        for (candidate in batch) {
+            val result = byId[candidate.externalId]
+            when (result?.status) {
+                "enqueued" -> {
+                    synced++
+                    landed += candidate.key
+                }
+                "already_processed" -> {
+                    alreadyPresent++
+                    landed += candidate.key
+                }
+                else -> rejected += Rejection(
+                    candidate.key,
+                    candidate.startedAt,
+                    candidate.activityType,
+                    result?.error?.ifBlank { null } ?: res.getString(R.string.sync_no_report, result?.status ?: "missing"),
+                )
+            }
+        }
+        return null
     }
 
     /**
-     * The wire shape `POST /v1/sync/activities` accepts (`docs/IMPLEMENTATION.md` §4.0.3).
+     * The wire shape `POST /v1/sync/activities` accepts (`docs/IMPLEMENTATION.md` §4.0.3), built
+     * from the route as read — never the simplified line the map draws.
      *
-     * `external_id` is Health Connect's own record id, not a hash of the payload — the endpoint
-     * keys idempotency on `(user_id, source, external_id)` precisely so a re-sent record is
-     * recognised as the same activity rather than minted as a new one, which is what makes an
-     * interrupted run safe to simply repeat.
+     * `external_id` is Health Connect's own record id, or the recording's UUID: the endpoint keys
+     * idempotency on `(user_id, source, external_id)`, which is what makes a re-sent activity the
+     * same activity rather than a new one.
      *
-     * Elevation is sent when the location carries it and omitted otherwise, rather than
-     * defaulted to zero — an unknown altitude is not sea level. Heart rate is never read or sent:
-     * HoldMyTrack keeps no health data, only the geography (`docs/VISION.md` §1.1).
+     * Elevation is sent when the location carries it and omitted otherwise, rather than defaulted
+     * to zero — an unknown altitude is not sea level. Heart rate is never read or sent: HoldMyTrack
+     * keeps no health data, only the geography (`docs/VISION.md` §1.1).
      *
-     * Built off the main thread: a long ride is tens of thousands of points, and serialising
-     * that is real work.
+     * Built off the main thread: a long ride is tens of thousands of points.
      */
-    private suspend fun prepare(
-        record: ExerciseSessionRecord,
-        activityType: String,
-        points: List<ExerciseRoute.Location>,
-    ): JSONObject = withContext(Dispatchers.Default) {
+    private suspend fun prepare(candidate: Candidate): JSONObject = withContext(Dispatchers.Default) {
+        when (val origin = candidate.origin) {
+            is Recording -> origin.record.toSyncJson()
+            is HealthConnectSession -> JSONObject()
+                .put("external_id", candidate.externalId)
+                .put("activity_type", candidate.activityType)
+                .put("points", points(origin.route))
+            null -> error("candidate ${candidate.key} has nothing to send")
+        }
+    }
+
+    private fun points(route: List<ExerciseRoute.Location>): JSONArray {
         val array = JSONArray()
-        for (point in points) {
+        for (point in route) {
             val json = JSONObject()
                 .put("lat", point.latitude)
                 .put("lon", point.longitude)
@@ -252,26 +163,19 @@ class SyncRunner(
             point.altitude?.let { json.put("elevation_m", it.inMeters) }
             array.put(json)
         }
-        JSONObject()
-            .put("external_id", record.metadata.id)
-            .put("activity_type", activityType)
-            .put("points", array)
+        return array
     }
 
     private companion object {
         const val TAG = "HoldMyTrackSync"
 
-        /** How many sessions one Health Connect read asks for. */
-        const val PAGE_SIZE = 50
-
         /** The endpoint accepts 100 per request; a smaller batch keeps one request modest on
-         *  mobile data, and makes the watermark move more often on a long first backfill. */
+         *  mobile data. */
         const val MAX_BATCH_ACTIVITIES = 25
         const val MAX_BATCH_POINTS = 20_000
 
-        /** The server's own floor and ceiling, checked here so a record that could never be
-         *  accepted is reported as such instead of being sent to be refused. */
-        const val MIN_POINTS = 2
+        /** The server's ceiling, checked here so a route it could never accept is reported as
+         *  such instead of being sent to be refused. */
         const val MAX_POINTS_PER_ACTIVITY = 50_000
     }
 }

@@ -5,7 +5,7 @@
     <p class="page-lede">Thank you for testing! This page walks through everything the Android app does, one test at a time, with the files to use. Start with Setup: it fills your account with activities from four countries, which most of the other tests need. After that, the sections can be done in any order.</p>
     <nav class="help__toc" aria-label="On this page">
       <a href="#setup">0. Setup</a>
-      <a href="#upload">1. Uploads and imports</a>
+      <a href="#upload">1. Uploads</a>
       <a href="#map">2. The map</a>
       <a href="#dates">3. Date slider</a>
       <a href="#activities">4. Activities panel</a>
@@ -60,18 +60,19 @@
     <p class="testing__expect"><strong>Expected:</strong> there is no way past the screen without a country. After saving, the map opens with "Nothing on your map yet. Sync from Health Connect, or record a walk with the button below."</p>
 
     <h3 id="SU-4">SU-4 · Import the sample activities</h3>
-    <p>Download <a class="testing__file" href="{{asset "testing/holdmytrack-sample.zip"}}" download="holdmytrack-sample.zip">holdmytrack-sample.zip</a> (385 KB). It holds 20 activities: 5 days in Vietnam (January 2026), 3 in Estonia (May), 8 in Italy (August) and 4 walks around Cleveland, Ohio (September).</p>
+    <p>Download <a class="testing__file" href="{{asset "testing/holdmytrack-sample.zip"}}" download="holdmytrack-sample.zip">holdmytrack-sample.zip</a> (385 KB). It holds 20 activity files: 5 days in Vietnam (January 2026), 3 in Estonia (May), 8 in Italy (August) and 4 walks around Cleveland, Ohio (September).</p>
     <ol class="page-list">
+      <li>In the Files app, open Downloads, tap holdmytrack-sample.zip and choose Extract. HoldMyTrack doesn't import a .zip itself.</li>
       <li>Open the <strong>Sync</strong> tab and tap Upload files.</li>
-      <li>Tap Choose files…, open Downloads and pick holdmytrack-sample.zip.</li>
-      <li>Watch the file's row, then tap Follow them in Sync.</li>
+      <li>Tap Choose files…, open the extracted holdmytrack-sample folder, and select all 20 files (touch and hold one, then tap the others, or use Select all).</li>
+      <li>Watch the rows, then tap Follow them in Sync.</li>
     </ol>
-    <p class="testing__expect"><strong>Expected:</strong> the row shows "Uploading …%", then the archive is unpacked and processed. Sync history fills up with rows marked Ready, one per activity. Back on the Map tab, the map flies to the newest activity, a walk in Clague Park, Cleveland, and the date slider shows the 5 most recent days with activities.</p>
+    <p class="testing__expect"><strong>Expected:</strong> each file's row shows "Queued", then "Uploading …%". Sync history fills up with rows marked Ready, one per activity. Back on the Map tab, the map flies to the newest activity, a walk in Clague Park, Cleveland, and the date slider shows the 5 most recent days with activities.</p>
     <p>Everything below assumes Setup is done.</p>
   </section>
 
   <section class="page-section" id="upload">
-    <h2>1. Uploads and imports</h2>
+    <h2>1. Uploads</h2>
     <p>All of these start from <strong>Sync → Upload files → Choose files…</strong>. After each, check Sync history.</p>
 
     <h3 id="UP-1">UP-1 · A GPX file</h3>
@@ -90,13 +91,13 @@
     <p>Once UP-1's row is Ready, upload <strong>west-side.gpx</strong> again.</p>
     <p class="testing__expect"><strong>Expected:</strong> "west-side.gpx was already uploaded before." No second copy appears on the map or in the list.</p>
 
-    <h3 id="UP-5">UP-5 · The same zip twice</h3>
-    <p>Upload <strong>holdmytrack-sample.zip</strong> again.</p>
-    <p class="testing__expect"><strong>Expected:</strong> "Already uploaded before, in holdmytrack-sample.zip: 20". Nothing new on the map.</p>
+    <h3 id="UP-5">UP-5 · A .zip</h3>
+    <p>Pick <strong>holdmytrack-sample.zip</strong> itself on the Upload screen.</p>
+    <p class="testing__expect"><strong>Expected:</strong> not sent, with "holdmytrack-sample.zip is a .zip archive, which can't be imported. Upload the GPX, FIT or TCX files inside it instead." Nothing new on the map.</p>
 
     <h3 id="UP-6">UP-6 · The same activity from another source</h3>
     <p>File: <a class="testing__file" href="{{asset "testing/duplicate.tcx"}}" download="duplicate.tcx">duplicate.tcx</a>, the Clague Park walk from the sample zip again, as a different file without elevation.</p>
-    <p class="testing__expect"><strong>Expected:</strong> Sync history shows it as Duplicate, "Kept the copy from an uploaded file". There is still only one Clague Park walk on 27 September, and it still has its elevation.</p>
+    <p class="testing__expect"><strong>Expected:</strong> Sync history shows it as Ready. There are now two Clague Park walks on 27 September: HoldMyTrack doesn't merge copies for you.</p>
 
     <h3 id="UP-7">UP-7 · Files that can't be imported</h3>
     <p>Upload each of these, one at a time:</p>
@@ -106,33 +107,17 @@
       <li><a class="testing__file" href="{{asset "testing/indoor.gpx"}}" download="indoor.gpx">indoor.gpx</a>, a treadmill run. <strong>Expected:</strong> Failed: "The file has no GPS points. It may be from an indoor workout."</li>
       <li><a class="testing__file" href="{{asset "testing/one-point.gpx"}}" download="one-point.gpx">one-point.gpx</a>. <strong>Expected:</strong> Failed: "The file has fewer than two GPS points, so there's no track to draw."</li>
       <li><a class="testing__file" href="{{asset "testing/empty.gpx"}}" download="empty.gpx">empty.gpx</a>, 0 bytes. <strong>Expected:</strong> refused straight away, "empty.gpx: Empty file."</li>
-      <li><a class="testing__file" href="{{asset "testing/track.kml"}}" download="track.kml">track.kml</a>, a format HoldMyTrack doesn't read. <strong>Expected:</strong> not sent at all, "track.kml isn't a .gpx, .fit, .tcx, .zip or Timeline .json file, so it wasn't sent."</li>
+      <li><a class="testing__file" href="{{asset "testing/track.kml"}}" download="track.kml">track.kml</a>, a format HoldMyTrack doesn't read. <strong>Expected:</strong> not sent at all, "track.kml isn't a .gpx, .fit or .tcx file, so it wasn't sent."</li>
     </ul>
     <p class="testing__expect">None of them adds anything to the map.</p>
-
-    <h3 id="UP-8">UP-8 · A zip with some bad files in it</h3>
-    <p>File: <a class="testing__file" href="{{asset "testing/mixed.zip"}}" download="mixed.zip">mixed.zip</a>: two drives on 3 October 2026, the broken GPX from UP-7, and a text file.</p>
-    <p class="testing__expect"><strong>Expected:</strong> "Skipped in mixed.zip: 1" (the text file). The two drives are added, and broken.gpx gets a Failed row.</p>
 
     <h3 id="UP-9">UP-9 · Several files at once</h3>
     <p>Pick <strong>evening-loop.tcx</strong>, <strong>mill-creek-falls.fit</strong> and <strong>track.kml</strong> together.</p>
     <p class="testing__expect"><strong>Expected:</strong> one row per file. The two activities say they were already uploaded (from UP-2 and UP-3), and track.kml is named as not sent.</p>
 
-    <h3 id="UP-10">UP-10 · A Google Health (Takeout) export</h3>
-    <p>File: <a class="testing__file" href="{{asset "testing/takeout-sample.zip"}}" download="takeout-sample.zip">takeout-sample.zip</a>, a tiny made-up Google Health export: walks and rides in July 2026.</p>
-    <p class="testing__expect"><strong>Expected:</strong> recognised as a Google Health export without being asked, and its outdoor activities appear in Sync history as Ready, from a Google Takeout import. A workout with no GPS is left out.</p>
-
-    <h3 id="UP-11">UP-11 · A Google Maps Timeline export</h3>
-    <p>File: <a class="testing__file" href="{{asset "testing/Timeline.json"}}" download="Timeline.json">Timeline.json</a>, a made-up export with a drive and a walk on 26 September 2026, a flight from Cleveland to Rome, and a trip that never left one place.</p>
-    <ol class="page-list">
-      <li>Sync → Maps Timeline → Choose Timeline.json, and pick the file.</li>
-      <li>Look at the dates and the list of modes, then tap Import.</li>
-    </ol>
-    <p class="testing__expect"><strong>Expected:</strong> From and To span 1 August to 26 September 2026. The modes listed are Driving, Walking and Flying, with Flying left unticked. The screen says "1 trip that never left one place is left out." Import shows "Sending …", then "Sent 2: 2 new, 0 imported before, 0 refused. They appear on the map as they are processed."</p>
-
-    <h3 id="UP-12">UP-12 · The same Timeline again</h3>
-    <p>Once UP-11's drive and walk are on the map, import <strong>Timeline.json</strong> again, the same way.</p>
-    <p class="testing__expect"><strong>Expected:</strong> "Sent 2: 0 new, 2 imported before, 0 refused." Nothing new on the map.</p>
+    <h3 id="UP-14">UP-14 · More than 20 files</h3>
+    <p>Pick the 20 files from Setup's holdmytrack-sample folder and <strong>west-side.gpx</strong> together, 21 in all.</p>
+    <p class="testing__expect"><strong>Expected:</strong> nothing is sent, with "Too many files selected (21): choose up to 20 at a time."</p>
 
     <h3 id="UP-13">UP-13 · Sync history</h3>
     <ol class="page-list">
@@ -278,7 +263,7 @@
     <p class="testing__expect"><strong>Expected:</strong> the part after the knob is drawn in blue, with "Saving splits this activity in two at …". After saving there are two activities with the same type and name, both Pending for a moment.</p>
 
     <h3 id="ED-6">ED-6 · Delete</h3>
-    <p>Select one of the 3 October drives (from UP-8) and tap Delete. Then check both drives and delete them together.</p>
+    <p>Select the Clague Park walk without elevation (from UP-6) and tap Delete. Then check the other Clague Park walk (27 September) and the Mill Creek Falls ride (from UP-3) and delete them together.</p>
     <p class="testing__expect"><strong>Expected:</strong> "Delete this activity?" (or "Delete this group?") naming what goes, with its distance. After deleting, it's gone from the list, the map, and, a little later, Fog and Heatmap.</p>
   </section>
 
@@ -430,13 +415,21 @@
     </ol>
     <p class="testing__expect"><strong>Expected:</strong> after each step the screen moves on: "One more step" until routes are allowed, then "Ready, the last 30 days only" until past data is allowed, then "Ready to read". The info explains that only exercise sessions and their routes are read, never heart rate or other health data.</p>
 
-    <h3 id="HC-2">HC-2 · Sync</h3>
-    <p>Tap Sync now.</p>
-    <p class="testing__expect"><strong>Expected:</strong> "Reading Health Connect…", then "Read … sessions, synced …", then a summary such as "Synced 3 new, 0 already in HoldMyTrack, out of 12 sessions read." Indoor sessions are counted as skipped. The new activities appear on the map.</p>
+    <h3 id="HC-2">HC-2 · What's waiting</h3>
+    <p>Open the Sync tab.</p>
+    <p class="testing__expect"><strong>Expected:</strong> the Sync sheet opens over the map, listing your Health Connect sessions with a route from the last 3 months, newest first, each with its day, distance, type and "Health Connect". <strong>Nothing is ticked.</strong> Each one is drawn on the map as a dashed line. Indoor sessions and anything older than 3 months aren't listed. Tapping a row picks out its line and moves the map to it; tapping a line picks out its row.</p>
 
-    <h3 id="HC-3">HC-3 · Interrupted and run again</h3>
-    <p>Start Sync now and switch to another app straight away. Come back and sync again.</p>
-    <p class="testing__expect"><strong>Expected:</strong> the first run stops early and says so. The second picks up where it stopped. No activity appears twice.</p>
+    <h3 id="HC-3">HC-3 · Sync what you tick</h3>
+    <p>Tick two rows (tap their icons), then tap Sync 2.</p>
+    <p class="testing__expect"><strong>Expected:</strong> "2 of … ticked" while ticking. After Sync, those two leave the list and "Added 2 activities to your map." shows; they appear on the map and in Activities. Nothing you didn't tick was added.</p>
+
+    <h3 id="HC-4">HC-4 · Hide a row</h3>
+    <p>Swipe a row sideways. Then tap Show hidden, and swipe the hidden row again.</p>
+    <p class="testing__expect"><strong>Expected:</strong> the row goes, with "Hidden — it won't be offered again" and Undo. Show hidden lists it again, faded and marked Hidden, and it can't be ticked. Swiping it brings it back to the list. Hidden rows stay hidden after closing and reopening the app.</p>
+
+    <h3 id="HC-5">HC-5 · Synced stays synced</h3>
+    <p>Uninstall and reinstall the app, sign in and open Sync. Then delete one of the activities from HC-3 on the website, and open Sync again.</p>
+    <p class="testing__expect"><strong>Expected:</strong> after reinstalling, the activities synced in HC-3 aren't listed. After deleting one on the website, its session is listed again, unticked.</p>
   </section>
 
   <section class="page-section" id="recording">
@@ -454,9 +447,9 @@
     <h3 id="RC-2">RC-2 · Save and sync it</h3>
     <ol class="page-list">
       <li>Choose a type and Save.</li>
-      <li>On the Sync tab, look under "Recorded on this phone", then tap Sync now.</li>
+      <li>Open the Sync tab, tick the walk ("Recorded on this phone") and tap Sync 1.</li>
     </ol>
-    <p class="testing__expect"><strong>Expected:</strong> "Recording saved. It will appear on the map after you sync." The Sync tab shows a badge and "1 recording waiting" with a route preview. After syncing, the row goes and the walk is on the map.</p>
+    <p class="testing__expect"><strong>Expected:</strong> "Recording saved. It will appear on the map after you sync." The Sync tab shows a badge with 1, and the walk is listed unticked and drawn dashed on the map. After syncing, the row goes and the walk is on the map.</p>
 
     <h3 id="RC-3">RC-3 · The notification</h3>
     <p>Start a recording, then lock the phone and use the notification's Pause, Resume and Stop.</p>
@@ -471,8 +464,12 @@
     <p class="testing__expect"><strong>Expected:</strong> "Unfinished recording" with Resume, Save and Discard.</p>
 
     <h3 id="RC-6">RC-6 · Edit, download, delete before syncing</h3>
-    <p>Record another short walk and save it. Under "Recorded on this phone", Edit it (change the type), use Download GPX, then Delete it.</p>
+    <p>Record another short walk and save it. On the Sync tab, Edit it (change the type), use Download GPX, then Delete it.</p>
     <p class="testing__expect"><strong>Expected:</strong> Download GPX says "Track saved." Delete warns "It hasn't been synced, so this is the only copy. This can't be undone."</p>
+
+    <h3 id="RC-7">RC-7 · A walk you already have <em>(needs a watch or another app that writes to Health Connect)</em></h3>
+    <p>Record a walk with the app while your watch, or another app, records the same walk into Health Connect. Sync the app's recording first (RC-2), then open the Sync tab again.</p>
+    <p class="testing__expect"><strong>Expected:</strong> the Health Connect session of that walk is listed, unticked, with a third line "Overlaps" and the recording's date and time. Ticked and synced anyway, it becomes a second walk on the map.</p>
   </section>
 
   <section class="page-section" id="you">
@@ -522,7 +519,7 @@
 
     <h3 id="DM-1">DM-1 · Look around without an account</h3>
     <p>Signed out, tap Try the demo.</p>
-    <p class="testing__expect"><strong>Expected:</strong> a ready-made account with activities in Cleveland, Niagara Falls, Rome, Tallinn and Vietnam, Stories and photos. Everything can be looked at, but nothing can be changed. Editing says "Not available for demo accounts — create an account to edit activities", Upload says the same for uploading, and Sync now isn't there.</p>
+    <p class="testing__expect"><strong>Expected:</strong> a ready-made account with activities in Cleveland, Niagara Falls, Rome, Tallinn and Vietnam, Stories and photos. Everything can be looked at, but nothing can be changed. Editing says "Not available for demo accounts — create an account to edit activities", and Upload says the same for uploading. The Sync tab says "The demo account is read-only — it can't add, edit, or delete activities. Create an account to sync your own data.", with nothing to tick and no Sync now.</p>
   </section>
 
   <section class="page-section" id="report">

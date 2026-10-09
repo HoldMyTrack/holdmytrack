@@ -7,7 +7,6 @@
 package httpapi
 
 import (
-	"archive/zip"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -25,7 +24,6 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mapstyle"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/metrics"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/unpack"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 )
 
@@ -36,16 +34,13 @@ import (
 // buffers. A single activity file is realistically well under this.
 const maxUploadBytes = 64 << 20 // 64 MiB
 
-// maxZipUploadBytes bounds a `.zip` archive's own compressed size — IMPLEMENTATION.md
-// §4.0.1's bulk-historical-import case (a Strava export can be thousands of files),
-// so this is deliberately much larger than a single activity file ever needs to be.
-const maxZipUploadBytes = 512 << 20 // 512 MiB
-
 // multipartMemoryBytes is how much of an upload's multipart body ParseMultipartForm keeps in
-// memory; a larger file part goes to a temp file. Passing maxZipUploadBytes here instead kept
-// a whole archive in RAM, and the zip branch then copied it again — about 1 GiB per upload,
-// so two or three large exports at once could get the API killed for out-of-memory.
+// memory; a larger file part goes to a temp file.
 const multipartMemoryBytes = 32 << 20
+
+// uploadExts is the activity file types an upload may be. A `.zip` is refused with a message
+// of its own: archives aren't imported (ADR-0039).
+var uploadExts = map[string]bool{".gpx": true, ".fit": true, ".tcx": true}
 
 // corsAllowedOrigins lists the origins a credentialed cross-origin request may come from —
 // needed now that sessions are cookies (see serve's own doc comment for why "*" no
@@ -138,7 +133,7 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(route("GET", "/activities"), s.requireVerified(s.handleListActivities))
 	s.mux.HandleFunc(route("PATCH", "/activities/{id}"), s.requireNotDemo(s.handleUpdateActivity))
 	s.mux.HandleFunc(route("DELETE", "/activities/{id}"), s.requireNotDemo(s.handleDeleteActivity))
-	s.mux.HandleFunc(route("GET", "/activities/duplicates"), s.requireVerified(s.handleListDuplicates))
+	s.mux.HandleFunc(route("POST", "/activities/overlaps"), s.requireVerified(s.handleActivityOverlaps))
 	s.mux.HandleFunc(route("GET", "/activities/summary"), s.requireVerified(s.handleActivitySummary))
 	s.mux.HandleFunc(route("GET", "/activities/histogram"), s.requireVerified(s.handleActivityHistogram))
 	s.mux.HandleFunc(route("GET", "/activities/graph-stats"), s.requireVerified(s.handleActivityGraphStats))
@@ -177,6 +172,7 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(route("GET", "/uploads/active"), s.requireVerified(s.handleActiveUploads))
 	s.mux.HandleFunc(route("GET", "/coverage/status"), s.requireVerified(s.handleCoverageStatus))
 	s.mux.HandleFunc(route("POST", "/sync/activities"), s.requireNotDemo(s.handleSyncActivities))
+	s.mux.HandleFunc(route("POST", "/sync/known"), s.requireNotDemo(s.handleSyncKnown))
 	s.mux.HandleFunc(tileRoute("GET", "/tracks/{z}/{x}/{y}"), s.requireVerified(s.handleTracksTile))
 	s.mux.HandleFunc(tileRoute("GET", "/fog/{z}/{x}/{y}"), s.requireVerified(s.handleFogTile))
 	s.mux.HandleFunc(tileRoute("GET", "/heatmap/{z}/{x}/{y}"), s.requireVerified(s.handleHeatmapTile))
@@ -214,8 +210,6 @@ func (s *Server) registerPages() {
 	s.mux.HandleFunc("GET /contacts", s.staticPage("contacts", "meta.contacts_title", "meta.contacts_description", ""))
 	s.mux.HandleFunc("GET /privacy", s.staticPage("privacy", "meta.privacy_title", "meta.privacy_description", ""))
 	// Step-by-step export guides, linked from the Upload menu and from Help.
-	s.mux.HandleFunc("GET /help/timeline-export", s.staticPage("guide-timeline", "meta.guide_timeline_title", "meta.guide_timeline_description", ""))
-	s.mux.HandleFunc("GET /help/google-health-export", s.staticPage("guide-google-health", "meta.guide_google_health_title", "meta.guide_google_health_description", ""))
 	// The Android test suite for Play's closed testers, its sample files under /static/testing/.
 	s.mux.HandleFunc("GET /testing", s.unlistedPage("testing", "meta.testing_title", "meta.testing_description"))
 	s.mux.Handle("GET /static/", s.pages.StaticHandler())
@@ -422,18 +416,8 @@ type uploadResponse struct {
 // handleUpload is §4.1 step 1 only: validate, then enqueue an `ingest` job carrying the raw
 // payload (ingest.EnqueueRaw), return. No parsing happens here — see internal/ingest,
 // run by cmd/holdmytrack work.
-//
-// A `.zip` archive takes a different path entirely (handleZipUpload,
-// IMPLEMENTATION.md §4.0.1's bulk-import case) — bypassing §4.0.1's 20-file client-side
-// cap rather than being one more file subject to it, and turning into many jobs, by way of
-// the worker's `unpack`, instead of one. The body-size ceiling below has to accommodate whichever path a
-// given request turns out to need before the multipart form (and therefore the filename) has
-// even been parsed, which is why it's sized for a zip archive regardless of what's actually
-// uploaded — a single non-zip file is still bounded to maxUploadBytes once read (below), so
-// this only changes how much of a too-large *non-zip* body the server bothers reading before
-// rejecting it, not what it ultimately accepts.
 func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, maxZipUploadBytes+1<<20) // +1MiB of multipart overhead
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadBytes+1<<20) // +1MiB of multipart overhead
 	if err := r.ParseMultipartForm(multipartMemoryBytes); err != nil {
 		httpErrorT(w, r, http.StatusRequestEntityTooLarge, "error.upload_too_large")
 		return
@@ -448,26 +432,10 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	if ext == ".zip" {
-		// zip.NewReader reads the part where ParseMultipartForm left it — in memory when
-		// small, a temp file otherwise — rather than a second copy of the whole archive.
-		if header.Size == 0 {
-			httpErrorT(w, r, http.StatusBadRequest, "error.upload_empty")
-			return
-		}
-		ra, ok := file.(io.ReaderAt)
-		if !ok {
-			httpErrorT(w, r, http.StatusBadRequest, "error.avatar_read")
-			return
-		}
-		zr, err := zip.NewReader(ra, header.Size)
-		if err != nil {
-			httpErrorT(w, r, http.StatusBadRequest, "error.upload_bad_zip")
-			return
-		}
-		s.handleZipUpload(w, r, zr, ra, header.Size, header.Filename)
+		httpErrorT(w, r, http.StatusUnsupportedMediaType, "error.upload_zip")
 		return
 	}
-	if !unpack.AllowedExt[ext] {
+	if !uploadExts[ext] {
 		httpErrorT(w, r, http.StatusUnsupportedMediaType, "error.upload_type", "type", strconv.Quote(ext))
 		return
 	}

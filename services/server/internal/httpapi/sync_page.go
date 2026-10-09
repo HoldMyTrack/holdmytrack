@@ -13,24 +13,21 @@ import (
 
 // The Sync page (IMPLEMENTATION.md §4.0.1, docs/SPEC.md FR-3.4): every finished import, newest
 // first — uploaded files, archives' files and phone syncs alike, each Ready with its date and
-// distance and a link to it on the map, or Failed with why — then the duplicates cross-source
-// dedup took out of circulation (FR-3.7). What's still being processed is the header's Upload
+// distance and a link to it on the map, or Failed with why. What's still being processed is the header's Upload
 // menu's, not this page's, so the page never changes while it's open and needs no script.
 // Opening it counts every failure so far as seen (users.imports_seen_at).
 
 const syncPageSize = 20
 
 // syncHistoryQuery is uploadsListQuery's finished rows only, most recently finished first:
-// each with when it finished, its activity's local date where it was recorded (§4.30) and, for
-// an activity set aside as a duplicate, the source of the copy kept in its place.
+// each with when it finished and its activity's local date where it was recorded (§4.30).
 const syncHistoryQuery = `
 SELECT j.payload->>'source_detail', j.payload->>'source',
        j.state, j.last_error, j.error_code, j.finished_at,
-       to_char(a.started_at AT TIME ZONE a.timezone, 'YYYY-MM-DD'), a.distance_meters, a.id, w.source
+       to_char(a.started_at AT TIME ZONE a.timezone, 'YYYY-MM-DD'), a.distance_meters, a.id
 FROM jobs j
 LEFT JOIN activities a
   ON a.user_id = j.user_id AND a.source = j.payload->>'source' AND a.external_id = j.payload->>'external_id'
-LEFT JOIN activities w ON w.id = a.superseded_by
 WHERE j.kind = 'ingest' AND j.user_id = $1 AND j.state IN ('done', 'failed')
 ORDER BY j.finished_at DESC NULLS LAST, j.id DESC
 LIMIT $2 OFFSET $3`
@@ -48,16 +45,13 @@ type syncView struct {
 }
 
 type syncRow struct {
-	Title     string
-	Failed    bool
-	Duplicate bool
-	// Detail is a Ready row's "Sep 26 · 4.1 mi", a Duplicate's "Sep 26 · 4.1 mi · Kept the copy
-	// from Health Connect", or a Failed row's reason.
+	Title  string
+	Failed bool
+	// Detail is a Ready row's "Sep 26 · 4.1 mi", or a Failed row's reason.
 	Detail string
 	// SyncedAt is when the import finished, "Oct 6, 14:31" in the account's timezone.
 	SyncedAt string
-	// MapHref opens the map on the activity (`/?activity=…&day=…`), "" when there is none — a
-	// duplicate's included, its activity being on no map.
+	// MapHref opens the map on the activity (`/?activity=…&day=…`), "" when there is none.
 	MapHref string
 }
 
@@ -109,13 +103,13 @@ func (s *Server) buildSync(ctx context.Context, l *i18n.Localizer, acct *pageAcc
 	defer rows.Close()
 	for rows.Next() {
 		var filename, source, state string
-		var lastError, errorCode, startedOn, activityID, keptSource *string
+		var lastError, errorCode, startedOn, activityID *string
 		var finishedAt *time.Time
 		var distance *float64
-		if err := rows.Scan(&filename, &source, &state, &lastError, &errorCode, &finishedAt, &startedOn, &distance, &activityID, &keptSource); err != nil {
+		if err := rows.Scan(&filename, &source, &state, &lastError, &errorCode, &finishedAt, &startedOn, &distance, &activityID); err != nil {
 			return view, err
 		}
-		row := syncRow{Title: importTitle(l, source, "", filename), Failed: state == "failed", Duplicate: keptSource != nil}
+		row := syncRow{Title: importTitle(l, source, filename), Failed: state == "failed"}
 		if finishedAt != nil {
 			row.SyncedAt = web.LocalTime(l, *finishedAt, acct.info.timezone)
 		}
@@ -128,9 +122,7 @@ func (s *Server) buildSync(ctx context.Context, l *i18n.Localizer, acct *pageAcc
 			if distance != nil {
 				row.Detail += " · " + web.FormatDistance(l, *distance, imperial)
 			}
-			if row.Duplicate {
-				row.Detail += " · " + l.T("sync.duplicate_kept", "kept", sourcePhrase(l, *keptSource))
-			} else if activityID != nil {
+			if activityID != nil {
 				row.MapHref = "/?" + url.Values{"activity": {*activityID}, "day": {day}}.Encode()
 			}
 		}
@@ -159,15 +151,4 @@ func (s *Server) buildSync(ctx context.Context, l *i18n.Localizer, acct *pageAcc
 	}
 
 	return view, nil
-}
-
-// sourcePhrase is a source said in a sentence — "an uploaded file", "Health Connect" — the web
-// app's formatIngestSource and the Android app's sourceName().
-func sourcePhrase(l *i18n.Localizer, source string) string {
-	switch source {
-	case "upload", "takeout", "healthconnect", "healthkit", "recorded", "timeline":
-		return l.T("imports.source_phrase." + source)
-	default:
-		return source
-	}
 }

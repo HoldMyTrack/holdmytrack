@@ -27,7 +27,7 @@ import (
 // Remove range spanning the points strictly between its two ends (so the ends themselves
 // survive and are joined), and Delete point adds to Drop. A surviving point whose timestamp is
 // in Move takes that entry's [lon, lat] in place of its recorded position — a Move point drag,
-// for the outliers a sparse source like Google Maps Timeline is full of; its elevation and time
+// for the outliers a sparse track (a point every few minutes) is full of; its elevation and time
 // stay as recorded. Points sharing one timestamp are kept, removed or moved together — see
 // EditableTimestamps for the one ordering the spec relies on.
 type TrackEdit struct {
@@ -449,8 +449,8 @@ func tilesNotIn(a, b [][2]int) [][2]int {
 
 // EnqueueTrackEdit marks the activity pending (and its tiles dirty — markPendingTilesDirty)
 // and enqueues its `edit_track` job in one transaction, so an activity is never shown Pending without a job on its way, nor gets a job
-// while already pending. Returns false when the activity isn't this user's, is a superseded
-// duplicate, or already has an edit pending.
+// while already pending. Returns false when the activity isn't this user's or already has an
+// edit pending.
 //
 // splitAt, when set, also splits the activity at that point timestamp (§4.7.8) in the same
 // transaction — insertSplitPiece — and the job reprocesses both pieces with job.Edit.
@@ -464,7 +464,7 @@ func EnqueueTrackEdit(ctx context.Context, pool *pgxpool.Pool, job EditJob, spli
 
 	tag, err := tx.Exec(ctx, `
 		UPDATE activities SET edit_pending = true
-		WHERE id = $1 AND user_id = $2 AND superseded_by IS NULL AND NOT edit_pending
+		WHERE id = $1 AND user_id = $2 AND NOT edit_pending
 	`, job.ActivityID, job.UserID)
 	if err != nil {
 		return false, err

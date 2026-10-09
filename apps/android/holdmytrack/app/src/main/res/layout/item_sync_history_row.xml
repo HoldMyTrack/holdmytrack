@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- One sync history row, a card's row (include_sync_history): on the left the name,
-     one line, and under it a finished row's date and distance, a duplicate's kept copy too
-     (.sync__detail); on the right the status, when it finished (.sync__when), and View on map
+     one line, and under it a finished row's date and distance (.sync__detail); on the right the status, when it finished (.sync__when), and View on map
      (.sync__map) for a Ready row. Filled by sync/ImportHistory. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"

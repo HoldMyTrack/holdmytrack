@@ -31,15 +31,15 @@ Every new account now picks a Country before it reaches the map (`SPEC.md` FR-1.
 
 ### Cap Normal mode at the 500 most recent activities
 
-Normal mode fetches every activity in the selected date range in one response (`GET /v1/activities` has no limit) and the Activities panel renders every row; track tiles grow with the number of tracks. Fine today — measured with the Demo Customer's 611 activities, the all-time list is 189 KB and the home-area track tile 44 KB — but unbounded: ten years of daily walks is ~5,000 rows, ~1.5 MB and 5,000 rows in the page. Proposed: the app handles 500 activities at once; if a range holds more, it shows the 500 most recent and declines the rest, with a notice. Fog and Heatmap are how you see everything — precomputed rasters whose cost doesn't grow with history — so a cap on Normal mode isn't a paywall on the whole picture.
+Normal mode fetches every activity in the selected date range in one response (`GET /v1/activities` has no limit) and the Activities panel renders every row; track tiles grow with the number of tracks. Fine today — measured with a 611-activity account, the all-time list was 189 KB and its home-area track tile 44 KB — but unbounded: ten years of daily walks is ~5,000 rows, ~1.5 MB and 5,000 rows in the page. Proposed: the app handles 500 activities at once; if a range holds more, it shows the 500 most recent and declines the rest, with a notice. Fog and Heatmap are how you see everything — precomputed rasters whose cost doesn't grow with history — so a cap on Normal mode isn't a paywall on the whole picture.
 
 * Decided so far: the 500 *most recent* in the range; the selected range itself is left as the user picked it; Android gets the cap and the notice too.
-* Mechanism: a start-time cut-off, not a `LIMIT`. The server finds the start of the 500th most recent activity in the range (one query on `idx_activities_live`, `OFFSET 499 LIMIT 1` with `COUNT(*) OVER ()` for the total) and narrows the filter's `from` to it — applied in the list, the summary totals and every track tile. Tiles are queried independently, so only a shared cut-off keeps the list, the totals and the map agreeing on the same 500; per-request top-500s wouldn't. Ties at the exact cut-off second may admit a 501st; acceptable.
-* The list response gains `total` (activities in the range before the cap) and `limit` (500), so no client hard-codes the number. Deliberately uncapped: the histogram (the backdrop showing where activity exists), duplicates, the profile page's graph stats and trends, per-activity endpoints.
+* Mechanism: a start-time cut-off, not a `LIMIT`. The server finds the start of the 500th most recent activity in the range (one query on `idx_activities_user_time`, `OFFSET 499 LIMIT 1` with `COUNT(*) OVER ()` for the total) and narrows the filter's `from` to it — applied in the list, the summary totals and every track tile. Tiles are queried independently, so only a shared cut-off keeps the list, the totals and the map agreeing on the same 500; per-request top-500s wouldn't. Ties at the exact cut-off second may admit a 501st; acceptable.
+* The list response gains `total` (activities in the range before the cap) and `limit` (500), so no client hard-codes the number. Deliberately uncapped: the histogram (the backdrop showing where activity exists), the profile page's graph stats and trends, per-activity endpoints.
 * Web: a note at the top of the Activities list — "Showing the 500 most recent of 1,234 activities in this range. Narrow the range to see older ones, or switch to Fog or Heatmap to see everything." Type facets, Select all, Invert selection and the edit dialog's type picker already derive from the loaded list, so they follow the cap unchanged.
-* Android has no date range: it requests all-time tiles and reads the unfiltered list for its opening view (`activityBounds`) and the recording Type picker's counts (`activityTypeCounts`). With the cap its map shows the 500 most recent tracks; `activityBounds` would read `total`/`limit` from the same response and show a long Toast (the map screen's existing notice style). The Type picker would count only the 500 most recent — acceptable, since it also takes free text.
+* Android has no date range: it requests all-time tiles and reads the unfiltered list for its opening view (`latestActivityBounds`) and the recording Type picker's counts (`activityTypeCounts`). With the cap its map shows the 500 most recent tracks; `latestActivityBounds` would read `total`/`limit` from the same response and show a long Toast (the map screen's existing notice style). The Type picker would count only the 500 most recent — acceptable, since it also takes free text.
 * Would make the per-user quota item in `ROADMAP.md` Phase 5 purely about storage and ingest, since viewing is bounded.
-* Verify with the demo account: all-time list returns 500 rows with `total: 611`; summary `count: 500`; an all-time z4 tile holds only those 500 ids; a two-week range is unchanged. The existing suites use an account under 500, so they should pass unchanged.
+* Verify with an account of more than 500 activities (the demo has 46, so a load-test account, `docs/PERFORMANCE.md`): all-time list returns 500 rows with `total` the full count; summary `count: 500`; an all-time z4 tile holds only those 500 ids; a two-week range is unchanged. The existing suites use an account under 500, so they should pass unchanged.
 
 ### Elevation map layer
 
@@ -54,7 +54,7 @@ Most privacy laws outside the EU (Brazil's LGPD, Australia's Privacy Act APP 8, 
 
 * The design already suits it: no feature reads another account's data (true today, apart from the copy job behind sending a copy of a Story, ADR-0036, which reads the sender's activities once while copying and would have to work across regions or be refused across them; a Milestone 3 social graph, `VISION.md` §5.7, would have to work across regions or rule this out), user IDs are UUIDs so they stay unique across regions, and the basemap is public and stays global on one CDN.
 * Still to build: a small global directory mapping an email or sign-in identity to its home region (or per-region subdomains the user picks at sign-in), a home region chosen at signup and defaulted from Country, deploys that roll out to N stacks, and the Demo Customer and admin boundaries seeded in each.
-* The takeout export (`internal/takeout`) plus a matching import would move an account between regions.
+* Download your data (`internal/export`) plus a matching import would move an account between regions.
 * Each region is a fixed monthly cost against the project's funding (`VISION.md` §6), so the alternative for a localization country with few users is declining signups there rather than running a stack for them.
 * Until then, the only cost is not closing the door: keep each deployment fully configured by env, and ask whether any new cross-account query would still work split by region.
 
@@ -66,14 +66,13 @@ ADR-0024 keeps a resized copy of each photo on our own storage. If photos ever b
 * Google Photos can't serve as one: its API hands out image URLs that expire within the hour.
 * Decide only once cost-per-user is measured (`ROADMAP.md` Phase 5) and photos show up in it.
 
-### Preview and select before importing an archive
+### The Activity graph under the gate
 
-A Google Maps Timeline export is narrowed to a date range and a set of modes, and drawn on the map, before anything is sent (`SPEC.md` FR-3.10). A `.zip` or a Google Takeout export goes straight in, every activity in it, so a 5,000-file Strava archive or a multi-year Takeout can't be cut down to the trip someone actually wanted. The same window could serve both. Timeline can be previewed in the browser because it's plain JSON. Archives are parsed on the server: FIT is binary, and the Takeout join (`IMPLEMENTATION.md` §4.0.2) is Go. Reading them in the browser as well would mean two parsers that drift apart. So this would be a two-step import on the server.
+The Activity graph (`SPEC.md` FR-7) is a GitHub-style grid of every day with an activity, with totals and a longest streak, built for a history that held every walk. Under ADR-0039 an account holds only what its owner chose to keep, mostly trips and journeys rather than the daily routine, so the grid fills sparsely and a streak counts kept days, not days out.
 
-* Upload, then the server parses the archive and returns a preview: each activity's day, type, distance and a simplified route, without ingesting anything. The person picks a range and types and confirms, and only that is ingested.
-* The upload has to be held between the two steps, in object storage with an expiry, and abandoned previews cleaned up. A Takeout export can be close to 2 GB.
-* The preview of a large archive is itself big: thousands of simplified routes may need a coarser simplification, or a tile layer rather than GeoJSON.
-* The need is weaker than for Timeline. An archive's activities are ones the person already chose to record, while Timeline is the one source they didn't.
+* Keep it as it is: it shows the kept journeys over the years, and someone who keeps their daily walks still gets a full grid.
+* Reshape it around what's kept: Stories and longer trips on the year's grid rather than single days, or the streak dropped.
+* Remove it, along with the weekly/monthly Trends below it (FR-9), if neither fits the product any more. It's one of `VISION.md` §4.2's core features, so that would be a change of position, not just of the page.
 
 ### Deploy on merge
 

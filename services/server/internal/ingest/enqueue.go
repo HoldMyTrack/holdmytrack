@@ -19,22 +19,19 @@ import (
 // RawItem is one file or synced activity a request hands to the worker: its bytes as they
 // arrived, and what the `ingest` job needs to know about them.
 type RawItem struct {
-	// "upload" (a plain or zip-contained file), "takeout", or a phone sync's source — the
+	// "upload" (an uploaded file) or a phone sync's source — the
 	// `activities.source` column's own provenance value, not just a label.
 	Source   string
 	Filename string
 	Ext      string
-	// Overrides whatever the parser itself detects, when non-empty — see Job.ActivityType.
-	ActivityType string
-	Data         []byte
+	Data     []byte
 	// ExternalID, when set, is the idempotency key as given instead of a content hash of
 	// Data. Only a phone sync sets it: its activities carry the platform's own stable record
 	// id, and hashing the synced JSON instead would mint a new activity on every retry that
 	// reserialized a field differently. A file has no such id, so it's hashed.
 	ExternalID string
-	// Batch and BatchTitle are Job's — set when one request enqueues many items.
-	Batch      string
-	BatchTitle string
+	// Batch is Job's — set when one request enqueues many items.
+	Batch string
 }
 
 // Enqueued is what EnqueueRaw did with one item.
@@ -121,9 +118,7 @@ func EnqueueRaw(ctx context.Context, db Querier, userID string, items []RawItem)
 			SourceDetail:  it.Filename,
 			ExternalID:    ids[i],
 			RawPayloadKey: keys[i],
-			ActivityType:  it.ActivityType,
 			Batch:         it.Batch,
-			BatchTitle:    it.BatchTitle,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("ingest: job marshal: %w", err)
@@ -143,70 +138,32 @@ func EnqueueRaw(ctx context.Context, db Querier, userID string, items []RawItem)
 	return out, nil
 }
 
-// Enqueuer feeds EnqueueRaw a long run of items — an archive's files — a chunk at a time, so
-// neither the bytes held in memory nor one INSERT grows with the archive. Each chunk is its
-// own transaction.
-type Enqueuer struct {
-	Pool   *pgxpool.Pool
-	UserID string
-	// Done is called once per added item, in the order added, with the item's sequence
-	// number (0 for the first Add) and its result, inside its chunk's transaction.
-	Done func(seq int, res Enqueued)
-	// Commit, when set, runs last in each chunk's transaction, so a caller can record how far
-	// it has got in the same commit as the jobs that got it there.
-	Commit func(ctx context.Context, tx pgx.Tx) error
-
-	pending []RawItem
-	bytes   int
-	seq     int
-}
-
-// Chunk bounds for Enqueuer: about a Timeline sync request's worth of items, and half the
-// sync endpoint's own body cap in bytes.
-const (
-	enqueueChunkItems = 100
-	enqueueChunkBytes = 32 << 20
-)
-
-// Add queues an item, enqueuing the chunk once it's full.
-func (e *Enqueuer) Add(ctx context.Context, it RawItem) error {
-	e.pending = append(e.pending, it)
-	e.bytes += len(it.Data)
-	if len(e.pending) >= enqueueChunkItems || e.bytes >= enqueueChunkBytes {
-		return e.Flush(ctx)
+// KnownExternalIDs returns which of ids the account already has from source: an activity row
+// in any state, or an ingest job still waiting to run. It answers a phone's "is this synced
+// yet?" (IMPLEMENTATION.md §4.0.3's `POST /v1/sync/known`), so it counts everything a repeat
+// sync would answer `already_processed` for, plus what's
+// queued, so a session sent a moment ago doesn't come back while the worker catches up. A
+// deleted activity's row is gone and its job finished, so its id isn't known any more.
+func KnownExternalIDs(ctx context.Context, db Querier, userID, source string, ids []string) ([]string, error) {
+	if len(ids) == 0 {
+		return nil, nil
 	}
-	return nil
-}
-
-// Flush enqueues whatever is queued. An error leaves the chunk unenqueued, and the Enqueuer
-// isn't to be used further.
-func (e *Enqueuer) Flush(ctx context.Context) error {
-	if len(e.pending) == 0 {
-		return nil
-	}
-	tx, err := e.Pool.Begin(ctx)
+	rows, err := db.Query(ctx, `
+		SELECT external_id FROM activities
+		WHERE user_id = $1 AND source = $2 AND external_id = ANY($3::text[])
+		UNION
+		SELECT payload->>'external_id' FROM jobs
+		WHERE user_id = $1 AND kind = 'ingest' AND state = 'pending'
+		  AND payload->>'source' = $2 AND payload->>'external_id' = ANY($3::text[])`,
+		userID, source, ids)
 	if err != nil {
-		return fmt.Errorf("ingest: begin enqueue: %w", err)
+		return nil, fmt.Errorf("ingest: known ids: %w", err)
 	}
-	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
-	res, err := EnqueueRaw(ctx, tx, e.UserID, e.pending)
+	known, err := pgx.CollectRows(rows, pgx.RowTo[string])
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("ingest: known ids: %w", err)
 	}
-	for i := range res {
-		e.Done(e.seq+i, res[i])
-	}
-	if e.Commit != nil {
-		if err := e.Commit(ctx, tx); err != nil {
-			return err
-		}
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("ingest: commit enqueue: %w", err)
-	}
-	e.seq += len(e.pending)
-	e.pending, e.bytes = nil, 0
-	return nil
+	return known, nil
 }
 
 // PromoteRaw writes a job's inline raw payload (EnqueueRaw) to its raw key and clears it from

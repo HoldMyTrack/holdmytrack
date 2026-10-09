@@ -32,7 +32,7 @@ const (
 // the cap be" query, not a side-effecting sweep.
 //
 // The statistic: the single most-touched z14 tile's count — how many currently-in-window,
-// non-superseded activities cross it. A percentile was tried first and rejected: live against
+// activities cross it. A percentile was tried first and rejected: live against
 // the Demo Customer account (1,140 distinct touched tiles, 1,100 of them touched exactly
 // once), any percentile at or below ~99.7th still lands inside that single-touch mass, since
 // the genuinely hot tiles (591 and 498 touches) are under 0.2% of the touched-tile population
@@ -61,7 +61,7 @@ func RecomputeHeatmapCap(ctx context.Context, pool *pgxpool.Pool, userID string)
 		SELECT COUNT(DISTINCT m.activity_id)
 		FROM activity_tile_masks m
 		JOIN activities a ON a.id = m.activity_id
-		WHERE a.user_id = $1 AND a.superseded_by IS NULL AND NOT a.edit_pending
+		WHERE a.user_id = $1 AND NOT a.edit_pending
 		  AND a.in_heatmap_window AND m.zoom = $2
 		GROUP BY m.tile_x, m.tile_y
 	`, userID, Zoom)

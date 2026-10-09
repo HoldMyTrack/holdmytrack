@@ -94,7 +94,7 @@ func (s *Server) sendStoryCopyEmail(ctx context.Context, senderID, storyID, emai
 	if err := s.pool.QueryRow(ctx, `
 		SELECT `+senderNameSQL+`, st.name,
 		       (SELECT count(*) FROM story_activities sa JOIN activities a ON a.id = sa.activity_id
-		        WHERE sa.story_id = st.id AND a.superseded_by IS NULL)
+		        WHERE sa.story_id = st.id)
 		FROM stories st JOIN users u ON u.id = st.user_id
 		WHERE st.id = $1 AND u.id = $2`, storyID, senderID).Scan(&from, &story, &activities); err != nil {
 		return err
@@ -143,7 +143,7 @@ func (s *Server) handleListStorySends(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT ss.id, st.name, `+senderNameSQL+`, ss.sent_at,
 		       (SELECT count(*) FROM story_activities sa JOIN activities a ON a.id = sa.activity_id
-		        WHERE sa.story_id = st.id AND a.superseded_by IS NULL)
+		        WHERE sa.story_id = st.id)
 		FROM story_sends ss
 		JOIN stories st ON st.id = ss.story_id
 		JOIN users u ON u.id = st.user_id

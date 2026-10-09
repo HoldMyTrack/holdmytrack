@@ -143,7 +143,7 @@ func sourcesToCopy(ctx context.Context, pool *pgxpool.Pool, job Job) ([]source, 
 		SELECT a.id, COALESCE(a.origin_id, a.id), a.activity_type, a.name, a.description, a.edit_pending
 		FROM story_activities sa
 		JOIN activities a ON a.id = sa.activity_id
-		WHERE sa.story_id = $1 AND a.superseded_by IS NULL AND a.trajectory IS NOT NULL AND a.raw_payload_key IS NOT NULL
+		WHERE sa.story_id = $1 AND a.trajectory IS NOT NULL AND a.raw_payload_key IS NOT NULL
 		  AND NOT EXISTS (SELECT 1 FROM received_origins r WHERE r.user_id = $2 AND r.origin_id = COALESCE(a.origin_id, a.id))
 		  AND NOT EXISTS (SELECT 1 FROM activities mine
 		                  WHERE mine.user_id = $2 AND (mine.id = COALESCE(a.origin_id, a.id) OR mine.origin_id = COALESCE(a.origin_id, a.id)))

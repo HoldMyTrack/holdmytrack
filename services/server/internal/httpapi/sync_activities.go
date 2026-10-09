@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"unicode/utf8"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
@@ -15,12 +14,10 @@ import (
 // syncSources is the `source` allowlist this endpoint accepts — IMPLEMENTATION.md §4.0 names
 // the two on-device platforms for Path 2 (iOS/HealthKit, Android/Health Connect), and §4.0.4
 // adds "recorded" for in-app GPS recording (ADR-0007) — authored by HoldMyTrack itself rather than
-// read from a platform health store, but the same batched wire shape either way. §4.0.5 adds
-// "timeline": a Google Maps Timeline export, read in the browser, whose movement segments
-// arrive here already split into activities. Path 1 (webhooks) and Path 3's file upload have
-// their own endpoints and their own `source` values, so this list doesn't need to anticipate
-// those.
-var syncSources = map[string]bool{"healthconnect": true, "healthkit": true, "recorded": true, "timeline": true}
+// read from a platform health store, but the same batched wire shape either way. Path 1
+// (webhooks) and Path 3's file upload have their own endpoints and their own `source` values,
+// so this list doesn't need to anticipate those.
+var syncSources = map[string]bool{"healthconnect": true, "healthkit": true, "recorded": true}
 
 // syncExternalIDPattern is what a synced activity's external_id may be: a Health Connect or
 // HealthKit record UUID, or the UUID GPS-Logger mints, fits easily. The id goes into the raw
@@ -63,27 +60,10 @@ type syncActivityRequest struct {
 type syncActivitiesRequest struct {
 	Source     string                `json:"source"`
 	Activities []syncActivityRequest `json:"activities"`
-	// Batch and BatchTitle are optional: an import the client splits over several requests (a
-	// Timeline export of thousands of activities, §4.0.5) names one batch for all of them, so
-	// the Upload menu shows it as one row, "Timeline.json · 120 of 584", as it does a .zip.
-	// Without one, each request is its own batch.
-	Batch      string `json:"batch"`
-	BatchTitle string `json:"batch_title"`
 }
 
-// syncBatchPattern is what a client-chosen batch id may be. It's stored with clientBatchPrefix,
-// whose ":" neither newBatchID's tokens nor a lone upload's job id (activeImportsQuery groups
-// those by id::text) can contain, so a client can't fold its activities into another row.
-var syncBatchPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{8,64}$`)
-
-const clientBatchPrefix = "client:"
-
-// maxSyncBatchTitleRunes bounds a batch's title, a file name in practice.
-const maxSyncBatchTitleRunes = 200
-
 // syncActivityResult reports what happened to one activity in the batch — a batch is never
-// all-or-nothing, the same "one bad entry doesn't abort the rest" treatment handleZipUpload
-// already gives a mixed-quality zip archive.
+// all-or-nothing: one bad entry doesn't abort the rest.
 type syncActivityResult struct {
 	ExternalID string `json:"external_id"`
 	Status     string `json:"status"` // "enqueued" | "already_processed" | "rejected"
@@ -116,7 +96,7 @@ func (s *Server) handleSyncActivities(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !syncSources[req.Source] {
-		http.Error(w, `invalid "source", want "healthconnect", "healthkit", "recorded" or "timeline"`, http.StatusBadRequest)
+		http.Error(w, `invalid "source", want "healthconnect", "healthkit" or "recorded"`, http.StatusBadRequest)
 		return
 	}
 	if len(req.Activities) == 0 {
@@ -129,17 +109,6 @@ func (s *Server) handleSyncActivities(w http.ResponseWriter, r *http.Request) {
 	}
 
 	batch := newBatchID()
-	if req.Batch != "" {
-		if !syncBatchPattern.MatchString(req.Batch) {
-			http.Error(w, `invalid "batch", want 8 to 64 letters, digits, "-" or "_"`, http.StatusBadRequest)
-			return
-		}
-		batch = clientBatchPrefix + req.Batch
-	}
-	if utf8.RuneCountInString(req.BatchTitle) > maxSyncBatchTitleRunes {
-		http.Error(w, fmt.Sprintf(`"batch_title" too long, want %d characters or fewer`, maxSyncBatchTitleRunes), http.StatusBadRequest)
-		return
-	}
 
 	ctx := r.Context()
 	userID := userIDFromContext(ctx)
@@ -148,7 +117,7 @@ func (s *Server) handleSyncActivities(w http.ResponseWriter, r *http.Request) {
 	var items []ingest.RawItem
 	var slots []int // results index of each item
 	for i, act := range req.Activities {
-		item, rejection := s.syncItem(l, req.Source, batch, req.BatchTitle, act)
+		item, rejection := s.syncItem(l, req.Source, batch, act)
 		if rejection != "" {
 			results[i] = syncActivityResult{ExternalID: act.ExternalID, Status: "rejected", Error: rejection}
 			continue
@@ -175,9 +144,60 @@ func (s *Server) handleSyncActivities(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, syncActivitiesResponse{Results: results})
 }
 
+// maxKnownIDs bounds one `POST /v1/sync/known` request: three months of a phone's sessions,
+// which is what the Sync screen asks about, is a few hundred at most.
+const maxKnownIDs = 5000
+
+type syncKnownRequest struct {
+	Source      string   `json:"source"`
+	ExternalIDs []string `json:"external_ids"`
+}
+
+type syncKnownResponse struct {
+	Known []string `json:"known"`
+}
+
+// handleSyncKnown serves IMPLEMENTATION.md §4.0.3's `POST /v1/sync/known`: which of a phone's
+// candidates the account already has (ingest.KnownExternalIDs). The phone keeps no cursor —
+// its Sync screen lists what's on the device minus what this answers — so a reinstall or a
+// second phone agrees with the server, and an activity deleted here is offered again.
+func (s *Server) handleSyncKnown(w http.ResponseWriter, r *http.Request) {
+	var req syncKnownRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if !syncSources[req.Source] {
+		http.Error(w, `invalid "source", want "healthconnect", "healthkit" or "recorded"`, http.StatusBadRequest)
+		return
+	}
+	if len(req.ExternalIDs) > maxKnownIDs {
+		http.Error(w, fmt.Sprintf("too many external_ids (%d), want %d or fewer", len(req.ExternalIDs), maxKnownIDs), http.StatusBadRequest)
+		return
+	}
+	for _, id := range req.ExternalIDs {
+		if !syncExternalIDPattern.MatchString(id) {
+			http.Error(w, i18n.Get(requestLang(r)).T("error.sync_external_id_invalid"), http.StatusBadRequest)
+			return
+		}
+	}
+	ctx := r.Context()
+	known, err := ingest.KnownExternalIDs(ctx, s.pool, userIDFromContext(ctx), req.Source, req.ExternalIDs)
+	if err != nil {
+		s.log.Error("sync known failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if known == nil {
+		known = []string{}
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, syncKnownResponse{Known: known})
+}
+
 // syncItem validates one batch entry and turns it into the item EnqueueRaw takes, or returns
 // why it was rejected — one bad entry is that entry's result, never the whole batch's.
-func (s *Server) syncItem(l *i18n.Localizer, source, batch, batchTitle string, act syncActivityRequest) (ingest.RawItem, string) {
+func (s *Server) syncItem(l *i18n.Localizer, source, batch string, act syncActivityRequest) (ingest.RawItem, string) {
 	if act.ExternalID == "" {
 		return ingest.RawItem{}, l.T("error.sync_external_id_required")
 	}
@@ -226,6 +246,5 @@ func (s *Server) syncItem(l *i18n.Localizer, source, batch, batchTitle string, a
 		Data:       data,
 		ExternalID: act.ExternalID,
 		Batch:      batch,
-		BatchTitle: batchTitle,
 	}, ""
 }

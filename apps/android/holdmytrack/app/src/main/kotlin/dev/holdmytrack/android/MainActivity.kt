@@ -20,12 +20,12 @@ import kotlinx.coroutines.launch
 
 /**
  * The app's main window: the bottom bar — Map, Stories, Record, Sync, You — and the tab above it
- * ([ADR-0033](../../../docs/adr/0033-android-bottom-navigation-single-activity.md)). Map and
- * Stories are both the map ([MapFragment]): Stories is its panel's Stories tab. Sync is
- * [SyncFragment] and You is [YouFragment]. Tabs are shown and hidden rather than replaced, so the
- * map — its camera, its layers, a recording on it — is just as it was on coming back to it.
- * The record button over the bar's middle slot is the map's to drive (`MapFragment.onRecordTap`).
- * Sync carries a badge with the number of recordings waiting to be sent.
+ * ([ADR-0033](../../../docs/adr/0033-android-bottom-navigation-single-activity.md)). Map, Stories
+ * and Sync are all the map ([MapFragment]): Stories and Sync are its panel's Stories and Sync
+ * tabs, Sync's list drawn on the map it covers. You is [YouFragment]. Tabs are shown and hidden
+ * rather than replaced, so the map — its camera, its layers, a recording on it — is just as it
+ * was on coming back to it. The record button over the bar's middle slot is the map's to drive
+ * (`MapFragment.onRecordTap`). Sync carries a badge with the number of recordings waiting to be sent.
  *
  * Never shows the map without a session: a signed-out visitor is handed straight to
  * `SignInActivity`, mirroring web's `AuthGate` (`docs/IMPLEMENTATION.md` §4.13), before any layout
@@ -97,9 +97,10 @@ class MainActivity : AppCompatActivity() {
         } else {
             tab = savedInstanceState.getString(STATE_TAB)?.let(Tab::valueOf) ?: Tab.MAP
             markTab(tab)
-            // The map's panel comes back on its Activities tab; Stories puts it back on its own
-            // once the map's view is up.
+            // The map's panel comes back on its Activities tab; Stories and Sync put it back on
+            // their own once the map's view is up.
             if (tab == Tab.STORIES) nav.post { map()?.showStories() }
+            if (tab == Tab.SYNC) nav.post { map()?.showSync() }
         }
     }
 
@@ -125,9 +126,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Shows [next]'s fragment and hides the others, adding it the first time. Map and Stories are
-     * the same fragment: moving between them moves its panel between Activities and Stories, and
-     * Map takes it off Private locations too.
+     * Shows [next]'s fragment and hides the others, adding it the first time. Map, Stories and
+     * Sync are the same fragment: moving between them moves its panel between Activities, Stories
+     * and Sync, and Map takes it off Private locations too.
      */
     fun showTab(next: Tab) {
         val tag = tagOf(next)
@@ -146,6 +147,7 @@ class MainActivity : AppCompatActivity() {
         tab = next
         when (next) {
             Tab.STORIES -> map()?.showStories()
+            Tab.SYNC -> map()?.showSync()
             Tab.MAP -> if (map()?.panelTab.let { it != null && it != PanelTab.ACTIVITIES }) map()?.showActivities()
             else -> Unit
         }
@@ -190,10 +192,16 @@ class MainActivity : AppCompatActivity() {
         map()?.editPrivateLocation(id)
     }
 
-    /** The map's panel moved between its tabs: the bar marks Stories while it shows Stories. */
+    /** The map's panel moved between its tabs: the bar marks the one it shows. */
     fun onPanelTabChanged(panelTab: PanelTab) {
-        if (tab != Tab.MAP && tab != Tab.STORIES) return
-        markTab(if (panelTab == PanelTab.STORIES) Tab.STORIES else Tab.MAP)
+        if (tab == Tab.YOU) return
+        markTab(
+            when (panelTab) {
+                PanelTab.STORIES -> Tab.STORIES
+                PanelTab.SYNC -> Tab.SYNC
+                PanelTab.ACTIVITIES -> Tab.MAP
+            },
+        )
     }
 
     private fun markTab(shown: Tab) {
@@ -207,13 +215,11 @@ class MainActivity : AppCompatActivity() {
     private fun map() = supportFragmentManager.findFragmentByTag(TAG_MAP) as? MapFragment
 
     private fun tagOf(tab: Tab) = when (tab) {
-        Tab.MAP, Tab.STORIES -> TAG_MAP
-        Tab.SYNC -> TAG_SYNC
+        Tab.MAP, Tab.STORIES, Tab.SYNC -> TAG_MAP
         Tab.YOU -> TAG_YOU
     }
 
     private fun newFragment(tag: String): Fragment = when (tag) {
-        TAG_SYNC -> SyncFragment()
         TAG_YOU -> YouFragment()
         else -> MapFragment()
     }
@@ -237,9 +243,8 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG_MAP = "map"
-        private const val TAG_SYNC = "sync"
         private const val TAG_YOU = "you"
-        private val TAGS = listOf(TAG_MAP, TAG_SYNC, TAG_YOU)
+        private val TAGS = listOf(TAG_MAP, TAG_YOU)
         private const val STATE_TAB = "tab"
         private const val EXTRA_TAB = "dev.holdmytrack.android.TAB"
         internal const val EXTRA_VIEW_ACTIVITY = "dev.holdmytrack.android.VIEW_ACTIVITY"
@@ -267,7 +272,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         /** Opens the map on [activityId], on [day] (`YYYY-MM-DD`, its local date where it was
-         *  recorded) — the Sync screen's View on map. Clears whatever is over an existing map,
+         *  recorded) — the sync history's View on map. Clears whatever is over an existing map,
          *  which then selects it. */
         fun viewOnMap(context: Context, activityId: String, day: String) {
             context.startActivity(

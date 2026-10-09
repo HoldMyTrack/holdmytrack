@@ -7,9 +7,9 @@ import org.json.JSONObject
 
 /**
  * One GPS recording, persisted locally by `RecordingService` the moment it stops rather than
- * submitted immediately — submission is a separate, explicit step (the Sync screen's "Sync now",
- * which sends every row here), after which the row is deleted from the device. A failed submit
- * leaves the row as it is, so the next Sync now retries it.
+ * submitted immediately — submission is a separate, explicit step (ticked on the Sync tab and
+ * sent), after which the row is deleted from the device. A failed submit leaves the row as it
+ * is, still listed, to be sent again.
  *
  * [id] is the same client-generated UUID used as `external_id` on the wire
  * (`docs/IMPLEMENTATION.md` §4.0.4) — minted once at Start (it keys the recording's journal,

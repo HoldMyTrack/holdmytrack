@@ -1,8 +1,8 @@
 // The header's Upload menu (templates/header.html, docs/SPEC.md FR-3.4), on every page: files
 // chosen here — or dropped on the map, which sends them here as an `hmt:upload-files` event —
 // upload one at a time with their progress, then show as "Processing…" until the server has
-// finished them, a .zip or Takeout export as one row, "Unpacking…" while the worker finds its
-// files and then counting them. A finished import leaves the menu, whatever became of it: what
+// finished them. A .zip is refused here, with a note: archives aren't imported (ADR-0039). A
+// finished import leaves the menu, whatever became of it: what
 // it came to is the header's Sync item's, the /sync page, whose red dot this script also keeps
 // — a failure the account hasn't seen there.
 //
@@ -18,16 +18,10 @@
 
   var POLL_MS = 2000;
   var IDLE_MS = 20000;
-  // An individually chosen batch's cap; a .zip bypasses it (IMPLEMENTATION.md §4.0.1).
-  var MAX_PLAIN_FILES = 20;
-  var ACCEPT = /\.(gpx|fit|tcx|zip|json)$/i;
-  // A .json is a Google Maps Timeline export: never uploaded as it is, but read on the map
-  // (TimelineImportWindow.tsx), which also says so when it's some other .json.
-  var TIMELINE = /\.json$/i;
-  // apps/web/src/timeline/handoff.ts's names: how a file chosen off the map reaches it.
-  var HANDOFF_DB = 'hmt-handoff';
-  var HANDOFF_STORE = 'files';
-  var HANDOFF_KEY = 'timeline';
+  // How many files one pick or drop may bring (IMPLEMENTATION.md §4.0.1).
+  var MAX_FILES = 20;
+  var ACCEPT = /\.(gpx|fit|tcx)$/i;
+  var ZIP = /\.zip$/i;
 
   var menu = document.querySelector('[data-upload-menu]');
   if (!menu) return;
@@ -44,31 +38,11 @@
 
   var transfers = []; // { id, name, progress, sending } — files still to send, or being sent
   var active = []; // GET /v1/uploads/active's imports
-  // Archives this tab uploaded, by batch, until the server says what their files came to:
-  // kept for the session, so it survives going to another page while one unpacks.
-  var AWAITING_KEY = 'hmt-unpacking';
-  var awaiting = loadAwaiting(); // { batch: filename }
   var unseenFailures = 0;
   var noteList = []; // { id, text, error } — this page's own messages, dismissed one by one
   var uid = 0;
   var timer = null;
   var polling = false;
-
-  function loadAwaiting() {
-    try {
-      return JSON.parse(sessionStorage.getItem(AWAITING_KEY) || '{}') || {};
-    } catch (e) {
-      return {};
-    }
-  }
-
-  function saveAwaiting() {
-    try {
-      sessionStorage.setItem(AWAITING_KEY, JSON.stringify(awaiting));
-    } catch (e) {
-      // Without storage, the notes only reach this page.
-    }
-  }
 
   function fill(template, values) {
     return template.replace(/\{(\w+)\}/g, function (m, key) {
@@ -105,9 +79,7 @@
       list.appendChild(row(t.name, t.sending ? fill(strings.uploading, { percent: Math.round(t.progress * 100) }) : strings.queued));
     });
     active.forEach(function (a) {
-      var status = a.unpacking
-        ? strings.unpacking
-        : a.total > 1 ? fill(strings.processing_count, { done: a.done, total: a.total }) : strings.processing;
+      var status = a.total > 1 ? fill(strings.processing_count, { done: a.done, total: a.total }) : strings.processing;
       list.appendChild(row(a.title, status));
     });
     var busy = transfers.length + active.length;
@@ -164,28 +136,12 @@
         });
         active = body.imports;
         unseenFailures = body.unseen_failures;
-        (body.unpacked || []).forEach(unpacked);
         render();
         if (finishedSome) changed();
       })
       .catch(function () {
         // The next tick tries again.
       });
-  }
-
-  // An archive this tab uploaded has been unpacked: what its files came to beyond the jobs it
-  // made. Neither already-imported nor skipped files become jobs, so neither shows on the Sync
-  // page: these notes are the only place they're told — and for an archive with nothing new,
-  // the only sign it arrived.
-  function unpacked(a) {
-    var filename = awaiting[a.batch];
-    if (filename === undefined) return;
-    delete awaiting[a.batch];
-    saveAwaiting();
-    if (a.error) note(fill(strings.failed_transfer, { filename: filename, error: a.error }), true);
-    if (a.already > 0) note(fill(strings.already_in, { filename: filename, n: a.already }));
-    if (a.skipped > 0) note(fill(strings.skipped, { filename: filename, n: a.skipped }));
-    if (a.truncated) note(fill(strings.truncated, { filename: filename }));
   }
 
   function schedule() {
@@ -239,12 +195,6 @@
           // An upload the server took; nothing more to say about it.
         }
         if (body.status === 'already_processed') note(fill(strings.already, { filename: file.name }));
-        // An archive is unpacked by the worker; its notes come with the import list once
-        // that's done (unpacked).
-        if (body.status === 'zip_accepted' && body.batch) {
-          awaiting[body.batch] = file.name;
-          saveAwaiting();
-        }
         resolve();
       };
       xhr.onerror = function () {
@@ -257,48 +207,15 @@
     });
   }
 
-  // On the map, the map takes the file (it cancels the event to say so). Anywhere else the file
-  // is left in IndexedDB for the map to pick up at /?import=timeline; without IndexedDB the
-  // map's window just asks for it again.
-  function openTimeline(file) {
-    var taken = !window.dispatchEvent(new CustomEvent('hmt:open-timeline-import', { cancelable: true, detail: { file: file } }));
-    if (taken) {
-      menu.open = false;
-      return;
-    }
-    var go = function () { window.location.href = '/?import=timeline'; };
-    try {
-      var req = indexedDB.open(HANDOFF_DB, 1);
-      req.onupgradeneeded = function () { req.result.createObjectStore(HANDOFF_STORE); };
-      req.onerror = go;
-      req.onsuccess = function () {
-        var db = req.result;
-        var tx = db.transaction(HANDOFF_STORE, 'readwrite');
-        tx.objectStore(HANDOFF_STORE).put(file, HANDOFF_KEY);
-        tx.oncomplete = function () { db.close(); go(); };
-        tx.onerror = function () { db.close(); go(); };
-      };
-    } catch (e) {
-      go();
-    }
-  }
-
   function enqueue(fileList) {
-    var files = Array.prototype.filter.call(fileList, function (f) { return ACCEPT.test(f.name); });
-    var timeline = files.filter(function (f) { return TIMELINE.test(f.name); });
-    files = files.filter(function (f) { return !TIMELINE.test(f.name); });
-    if (timeline.length > 1) note(strings.timeline_one, true);
-    if (timeline.length > 0) {
-      // The Timeline window replaces this page's view of things, so nothing else is queued
-      // alongside it.
-      if (files.length > 0) note(strings.timeline_alone, true);
-      openTimeline(timeline[0]);
-      return;
-    }
-    var plain = files.filter(function (f) { return !/\.zip$/i.test(f.name); });
-    if (plain.length > MAX_PLAIN_FILES) {
-      note(fill(strings.too_many, { n: plain.length }), true);
-      files = files.filter(function (f) { return /\.zip$/i.test(f.name); });
+    var all = Array.prototype.slice.call(fileList);
+    all.filter(function (f) { return ZIP.test(f.name); }).forEach(function (f) {
+      note(fill(strings.zip_refused, { filename: f.name }), true);
+    });
+    var files = all.filter(function (f) { return ACCEPT.test(f.name); });
+    if (files.length > MAX_FILES) {
+      note(fill(strings.too_many, { n: files.length }), true);
+      files = [];
     }
     if (files.length === 0) return;
     menu.open = true;
@@ -330,12 +247,6 @@
 
   window.addEventListener('hmt:upload-files', function (event) {
     enqueue(event.detail);
-  });
-
-  // The Timeline window sends its activities itself, and says when a batch has gone so the list
-  // shows it now rather than at the next idle tick.
-  window.addEventListener('hmt:imports-sent', function () {
-    refresh().then(schedule);
   });
 
   // Opening the menu reads the latest at once rather than waiting for the next tick.

@@ -82,7 +82,7 @@ internal class RecordingDbHelper(context: Context) :
     // Version 3 changed no columns: a synced row is now deleted rather than kept with a
     // `synced` status, so upgrading clears the rows that status left behind — and keeps the
     // unsynced ones, which exist nowhere else. Version 4 added the journal's tables. Version 5
-    // dropped `sync_status`: Sync now sends every row, so there is nothing left to mark.
+    // dropped `sync_status`: a row is deleted once sent, so there is nothing left to mark.
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) {
             db.execSQL("DROP TABLE IF EXISTS $TABLE")
@@ -103,19 +103,17 @@ internal class RecordingDbHelper(context: Context) :
 
 /**
  * Every local GPS recording not yet on the server — inserted by `RecordingService` on Stop,
- * edited from the Sync screen's list (`RecordedActivityRows`), and drained by its "Sync now",
- * each row deleted once the server has it. One instance per
+ * listed, edited and sent from the Sync tab (`panel/SyncTab`, `sync/SyncRunner`), each row
+ * deleted once the server has it. One instance per
  * caller is fine; `SQLiteOpenHelper` itself keeps the single underlying connection.
  *
  * **Every read and write is scoped to the currently signed-in account.** Recording works
  * whether or not anyone is signed in, and the app supports switching accounts on one device
  * (sign out, sign into a different one, or the demo) — without this, one account's recordings
- * would show up in another's Recorded Activities list. Scoped by [Session.email], the same
- * per-account key `sync/SyncCursor.kt` already uses for exactly this reason: "signing into a
- * different account must not inherit a position through someone else's history." A demo
- * account shares the same empty-string key across every demo session on this device, matching
- * `SyncCursor`'s own "harmless — its data is deleted within the day either way" reasoning —
- * except a demo account can never sync (`SyncActivity`'s own demo gate), so nothing recorded
+ * would show up in another's Sync list. Scoped by [Session.email], the same per-account key
+ * `sync/HiddenCandidates.kt` uses. A demo account shares the same empty-string key across every
+ * demo session on this device, which is harmless — its data is deleted within the day either
+ * way, and a demo account can never sync (the Sync tab's own demo gate), so nothing recorded
  * under it ever reaches the server regardless of which demo session sees it locally.
  */
 class RecordedActivityStore(context: Context) {
@@ -165,9 +163,9 @@ class RecordedActivityStore(context: Context) {
         Unit
     }
 
-    /** Removes a row — the user's Delete in `RecordedActivityRows` (the only copy,
-     *  since nothing here has synced), or `SyncActivity.flushRecordedQueue` once the server
-     *  has accepted it and the activity lives there instead. */
+    /** Removes a row — the user's Delete on the Sync tab (the only copy, since nothing here has
+     *  synced), or `SyncRunner` once the server has accepted it and the activity lives there
+     *  instead. */
     suspend fun delete(id: String) = withContext(Dispatchers.IO) {
         helper.writableDatabase.delete(RecordingDbHelper.TABLE, "id = ? AND account = ?", arrayOf(id, account()))
         Unit

@@ -42,20 +42,13 @@ type Job struct {
 	ExternalID    string `json:"external_id"`
 	RawPayloadKey string `json:"raw_payload_key"`
 	// ActivityType overrides whatever the parser itself reports, when set. Empty means "use
-	// the parsed value" (the zero value already does the right thing for every existing
-	// caller). This exists for the Google Takeout import path
-	// (services/server/internal/httpapi/takeout_upload.go): activities are extracted one type
-	// at a time, so the caller already knows each one's real type — a per-activity Takeout GPX
-	// carries no `<type>` element of its own to parse back out, and reconstructing one from its
-	// display name would just be re-deriving something the caller already has for free.
+	// the parsed value". A copy of a Story (storycopy) and the demo seed set it: their GPX
+	// carries no type of its own, and they already know the activity's.
 	ActivityType string `json:"activity_type,omitempty"`
-	// Batch groups the jobs one request enqueued together — a .zip's or a Takeout export's
-	// files, a phone sync's activities — so the header's Upload menu can show them as one row
-	// ("Takeout.zip · 120 of 340") however the page was reloaded meanwhile. Empty for a single
-	// uploaded file, which is its own row. BatchTitle is that row's name: the archive's file
-	// name; empty for a phone sync, whose row is named after its source.
-	Batch      string `json:"batch,omitempty"`
-	BatchTitle string `json:"batch_title,omitempty"`
+	// Batch groups the jobs one request enqueued together — a phone sync's activities — so the
+	// header's Upload menu can show them as one row however the page was reloaded meanwhile.
+	// Empty for a single uploaded file, which is its own row.
+	Batch string `json:"batch,omitempty"`
 }
 
 // Result reports what happened, distinguishing "persisted a new activity" from "this was
@@ -174,21 +167,7 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 		return Result{}, fmt.Errorf("ingest: render activity masks: %w", err)
 	}
 
-	// §4.6's cross-source deduplication, after the streams and masks above and not before:
-	// richness is ranked off those rows, so a record judged ahead of its own streams would
-	// lose every collision it entered. Masks are rendered for the loser too — they cost
-	// nothing to keep, every read already excludes a superseded activity, and if the winner
-	// is ever deleted the loser becomes live again with its coverage already on file.
-	//
-	// The tiles it reports back are added to the dirty set rather than replacing it: a
-	// collision can change which activities a tile the *new* one never touched is composited
-	// from, and rebuilding only the new one's tiles would leave the rest showing coverage
-	// from a copy that no longer counts.
-	dedupeTiles, err := ResolveDuplicates(ctx, pool, job.UserID, points[0].Time, m.durationS)
-	if err != nil {
-		return Result{}, err
-	}
-	if err := MarkFogTilesDirty(ctx, pool, job.UserID, mergeTiles(tiles, dedupeTiles)); err != nil {
+	if err := MarkFogTilesDirty(ctx, pool, job.UserID, tiles); err != nil {
 		return Result{}, fmt.Errorf("ingest: mark fog tiles dirty: %w", err)
 	}
 
@@ -459,10 +438,9 @@ func MarkFogTilesDirty(ctx context.Context, pool *pgxpool.Pool, userID string, t
 
 // ActivityTiles reads back the z14 tiles one activity's own crisp masks cover —
 // activity_tile_masks' primary key leads with activity_id, so this is an index-only lookup.
-// Shared by handleDeleteActivity's own tile lookup (which additionally merges in any
-// activity this one supersedes — see its own activityFogTiles) and heatmap_aging.go's daily
-// sweep, which has no supersede case to worry about: an activity aging out of the window is
-// still live, just no longer eligible, so only its own tiles ever need re-rendering.
+// Shared by handleDeleteActivity's own tile lookup and heatmap_aging.go's daily sweep: an
+// activity aging out of the window is still live, just no longer eligible, so only its own
+// tiles need re-rendering.
 func ActivityTiles(ctx context.Context, pool *pgxpool.Pool, activityID string) ([][2]int, error) {
 	rows, err := pool.Query(ctx,
 		`SELECT DISTINCT tile_x, tile_y FROM activity_tile_masks WHERE activity_id = $1 AND zoom = $2`,
@@ -500,7 +478,7 @@ type RenderFogJob struct {
 // The coalescing is this INSERT's: it adds no job while the user already has a render_fog
 // waiting unclaimed, since that one reads the dirty flags only once claimed, after every
 // caller has committed its marks (they all mark before enqueueing). A claimed one may have
-// read them already, so it doesn't count. Without this, a 584-activity archive queued 584
+// read them already, so it doesn't count. Without this, a 584-activity import queued 584
 // renders of ~40 s each, every one after the first redrawing nothing new.
 func EnqueueRenderFog(ctx context.Context, pool *pgxpool.Pool, userID string) error {
 	payload, err := json.Marshal(RenderFogJob{UserID: userID})

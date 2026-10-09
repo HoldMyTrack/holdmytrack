@@ -2,7 +2,7 @@
 
 [![Go coverage](https://img.shields.io/codecov/c/github/HoldMyTrack/holdmytrack?flag=go&logo=go&logoColor=white&label=Go%20coverage)](https://app.codecov.io/gh/HoldMyTrack/holdmytrack?flags%5B0%5D=go) [![TypeScript coverage](https://img.shields.io/codecov/c/github/HoldMyTrack/holdmytrack?flag=typescript&logo=typescript&logoColor=white&label=TypeScript%20coverage)](https://app.codecov.io/gh/HoldMyTrack/holdmytrack?flags%5B0%5D=typescript) [![Kotlin coverage](https://img.shields.io/codecov/c/github/HoldMyTrack/holdmytrack?flag=kotlin&logo=kotlin&logoColor=white&label=Kotlin%20coverage)](https://app.codecov.io/gh/HoldMyTrack/holdmytrack?flags%5B0%5D=kotlin)
 
-A free, community-funded platform for tracking outdoor activities and seeing the accumulated shape of where you have been. It aggregates the activity history you already have — from watches, from cloud services, from files — and turns it into maps and exploration stats worth looking at. The point is to see, on one map, every place you have already been — and, just as clearly, the streets, parks and trails nearby that you haven't, so the next walk, run or ride can go somewhere new, and every trip can be kept as a Story with its photos. What it is, and what it deliberately isn't: [`docs/VISION.md` §1](docs/VISION.md#1-executive-summary).
+A free, community-funded platform for tracking outdoor activities and seeing the accumulated shape of where you have been. It keeps the journeys you choose — from a watch, the phone, a cloud service or a file — and turns them into maps and exploration stats worth looking at. The point is to see, on one map, every place your kept journeys reached — and, just as clearly, the streets, parks and trails nearby that you haven't, so the next walk, run or ride can go somewhere new, and every trip can be kept as a Story with its photos. What it is, and what it deliberately isn't: [`docs/VISION.md` §1](docs/VISION.md#1-executive-summary).
 
 Live at [holdmytrack.com](https://holdmytrack.com), with a no-signup demo account to explore.
 
@@ -10,7 +10,7 @@ Live at [holdmytrack.com](https://holdmytrack.com), with a no-signup demo accoun
 
 Each feature links to the part of [`docs/SPEC.md`](docs/SPEC.md) that defines its behavior.
 
-- **Bring your whole history.** GPX, FIT and TCX files, `.zip` archives, Google Takeout exports and Google Maps Timeline exports, plus Health Connect sync and plain GPS recording from the Android app — all through one ingest pipeline, with cross-source deduplication ([FR-3](docs/SPEC.md#5-fr-3--activity-upload--ingestion)).
+- **Bring in what you choose.** GPX, FIT and TCX files, plus Health Connect sync and plain GPS recording from the Android app — all through one ingest pipeline, nothing coming in that you didn't pick, and a hint when it would be a second copy ([FR-3](docs/SPEC.md#5-fr-3--activity-upload--ingestion)).
 - **One map, three views.** Every track drawn together; Fog of War, which clears wherever you have ever been; and a heatmap of the last year. Pick a track and it is colored by pace ([FR-4](docs/SPEC.md#6-fr-4--map-visualization)).
 - **Somewhere new, close to home.** The fog shows exactly which streets, parks and trails nearby you haven't been to yet.
 - **Points of interest.** Playgrounds, dog parks, monuments, viewpoints and historic sites from OpenStreetMap, with what OSM knows about each; the Android app captures one when you stand in it for 30 seconds ([FR-15](docs/SPEC.md#17-fr-15--spots)).
@@ -72,7 +72,7 @@ holdmytrack/
         ├── cmd/holdmytrack/     # main.go: serve / work / migrate
         ├── cmd/loadtest/        # the load-test driver docs/PERFORMANCE.md's sessions run
         ├── cmd/delayproxy/      # adds object-storage latency to the dev stack, for render measurements
-        ├── internal/            # config, db, fog, geo, httpapi, i18n, ingest, mail, mapstyle, parse, spots, storage, takeout, tilemath, web, worker
+        ├── internal/            # config, db, fog, geo, httpapi, i18n, ingest, mail, mapstyle, parse, spots, storage, tilemath, web, worker
         └── migrations/          # embedded *.sql, applied in order by `cmd/holdmytrack migrate`
 ```
 

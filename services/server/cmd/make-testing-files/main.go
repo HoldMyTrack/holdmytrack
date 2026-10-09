@@ -1,8 +1,7 @@
 // cmd/make-testing-files writes the sample files the Android test suite page offers testers
 // (`/testing`, docs/SPEC.md FR-10.7, IMPLEMENTATION.md §4.14) into
 // internal/web/static/testing/, from the Demo Customer's own tracks and photos
-// (internal/httpapi/demo_data) and the Takeout test sample (internal/takeout/testdata).
-// Run it from services/server after changing either, or this file:
+// (internal/httpapi/demo_data). Run it from services/server after changing them, or this file:
 //
 //	go run ./cmd/make-testing-files
 //
@@ -17,7 +16,6 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
-	"io/fs"
 	"log"
 	"math"
 	"os"
@@ -33,12 +31,12 @@ import (
 
 const (
 	demoDir     = "internal/httpapi/demo_data"
-	takeoutDir  = "internal/takeout/testdata/sample"
 	photoWidth  = 1600
 	jpegQuality = 82
 )
 
-// sampleZip is what Setup imports: the Demo Customer's trips abroad, each a country Fog
+// sampleZip is what Setup imports, unzipped and uploaded as its 20 files (the most one pick
+// takes): the Demo Customer's trips abroad, each a country Fog
 // clears at country level, and a few Cleveland walks for a slider that spans months.
 var sampleZip = []string{
 	"2026-01-20 Vietnam.gpx", "2026-01-21 Vietnam.gpx", "2026-01-22 Vietnam.gpx", "2026-01-23 Vietnam.gpx", "2026-01-24 Vietnam.gpx",
@@ -57,8 +55,6 @@ const (
 	clague      = "2026-09-27 Clague Park-2.gpx"         // duplicate.tcx: in sampleZip
 	playArea    = "2026-09-07 Andrew s Nature Play Area.gpx"
 	solon       = "2026-09-13 Solon Community Park.gpx"
-	driving1    = "2026-10-03 driving.gpx"
-	driving2    = "2026-10-03 driving-2.gpx"
 	brecksDrive = "2026-09-26 Brecksville Reservation trip.gpx"
 	brecksWalk  = "2026-09-26 Brecksville Reservation trip-2.gpx"
 )
@@ -89,8 +85,8 @@ func generate() {
 	write("west-side.gpx", demoFile(westSide))
 	write("evening-loop.tcx", tcx(load(eveningLoop), "Biking", true))
 	write("mill-creek-falls.fit", fit(load(millCreek)))
-	// The same outing as the zip's Clague Park walk, without elevation: the duplicate check
-	// keeps the GPX copy, which has it (SPEC.md FR-3.7).
+	// The same outing as the zip's Clague Park walk, without elevation: uploaded, it's a second
+	// activity beside the GPX copy, since nothing is merged on ingest (SPEC.md FR-3.7).
 	write("duplicate.tcx", tcx(load(clague), "Other", false))
 
 	broken := demoFile(playArea)
@@ -118,34 +114,6 @@ func generate() {
   </Placemark>
 </kml>
 `))
-	writeZip("mixed.zip", func(add func(name string, data []byte)) {
-		add(driving1, demoFile(driving1))
-		add(driving2, demoFile(driving2))
-		add("broken.gpx", broken)
-		add("notes.txt", []byte("Not an activity file: the import skips it.\n"))
-	})
-	writeZip("takeout-sample.zip", func(add func(name string, data []byte)) {
-		must(filepath.WalkDir(takeoutDir, func(path string, d fs.DirEntry, err error) error {
-			if err != nil || d.IsDir() {
-				return err
-			}
-			// The fixture's health-data decoy, there for the reader's tests, isn't for testers.
-			if strings.Contains(path, "Menstrual Health") {
-				return nil
-			}
-			rel, err := filepath.Rel(takeoutDir, path)
-			if err != nil {
-				return err
-			}
-			data, err := os.ReadFile(path)
-			if err != nil {
-				return err
-			}
-			add(filepath.ToSlash(rel), data)
-			return nil
-		}))
-	})
-	write("Timeline.json", timeline())
 	writePhotos()
 }
 
@@ -359,83 +327,6 @@ func untimed(gpx []byte) []byte {
 		out.WriteString(s[:i])
 		s = s[i+j+len("</time>"):]
 	}
-}
-
-// timeline writes a Google Maps Timeline export as an Android phone saves it
-// (apps/android/.../timeline/TimelineFile.kt): semanticSegments holding a visit, activities
-// with a start, an end and a mode, and timelinePath buckets of the points kept, one a
-// minute. The activities are the Brecksville drive and walk, a flight, which the import
-// leaves unticked, and a trip that never left one place, which it skips and counts.
-func timeline() []byte {
-	cleveland, err := time.LoadLocation("America/New_York")
-	must(err)
-	stamp := func(t time.Time) string { return t.In(cleveland).Format("2006-01-02T15:04:05.000-07:00") }
-	latLng := func(lat, lon float64) string { return fmt.Sprintf("%.7f°, %.7f°", lat, lon) }
-
-	type point struct {
-		Point string `json:"point"`
-		Time  string `json:"time"`
-	}
-	var segments []map[string]any
-	activity := func(start, end time.Time, fromLat, fromLon, toLat, toLon float64, mode string, meters float64) {
-		segments = append(segments, map[string]any{
-			"startTime": stamp(start),
-			"endTime":   stamp(end),
-			"activity": map[string]any{
-				"start":          map[string]any{"latLng": latLng(fromLat, fromLon)},
-				"end":            map[string]any{"latLng": latLng(toLat, toLon)},
-				"distanceMeters": math.Round(meters),
-				"topCandidate":   map[string]any{"type": mode, "probability": 0.9},
-			},
-		})
-	}
-	trip := func(a parse.Activity, mode string) {
-		first, last := a.Points[0], a.Points[len(a.Points)-1]
-		activity(first.Time, last.Time, first.Lat, first.Lon, last.Lat, last.Lon, mode, length(a.Points))
-		var path []point
-		var next time.Time
-		for _, p := range a.Points {
-			if p.Time.Before(next) {
-				continue
-			}
-			path = append(path, point{latLng(p.Lat, p.Lon), stamp(p.Time)})
-			next = p.Time.Add(time.Minute)
-		}
-		segments = append(segments, map[string]any{
-			"startTime":    stamp(first.Time.Truncate(2 * time.Hour)),
-			"endTime":      stamp(first.Time.Truncate(2 * time.Hour).Add(2 * time.Hour)),
-			"timelinePath": path,
-		})
-	}
-
-	drive, walk := load(brecksDrive), load(brecksWalk)
-	trip(drive, "IN_PASSENGER_VEHICLE")
-	arrive, leave := drive.Points[len(drive.Points)-1], walk.Points[0]
-	segments = append(segments, map[string]any{
-		"startTime": stamp(arrive.Time),
-		"endTime":   stamp(leave.Time),
-		"visit": map[string]any{
-			"hierarchyLevel": 0,
-			"probability":    0.8,
-			"topCandidate": map[string]any{
-				"placeId":       "ChIJ0000000000000000000000",
-				"semanticType":  "UNKNOWN",
-				"probability":   0.7,
-				"placeLocation": map[string]any{"latLng": latLng(leave.Lat, leave.Lon)},
-			},
-		},
-	})
-	trip(walk, "WALKING")
-	// Cleveland to Rome, the day before the Italy trip starts.
-	flightStart := time.Date(2026, 8, 1, 18, 30, 0, 0, cleveland)
-	activity(flightStart, flightStart.Add(9*time.Hour+40*time.Minute), 41.4117, -81.8498, 41.7999, 12.2462, "FLYING", 7_380_000)
-	// A walk Timeline guessed but that starts and ends at one spot.
-	idle := time.Date(2026, 9, 26, 19, 0, 0, 0, cleveland)
-	activity(idle, idle.Add(25*time.Minute), 41.3191, -81.6268, 41.3191, -81.6268, "WALKING", 0)
-
-	out, err := json.MarshalIndent(map[string]any{"semanticSegments": segments}, "", "  ")
-	must(err)
-	return append(out, '\n')
 }
 
 // length is a track's length in meters, as the crow flies between points.

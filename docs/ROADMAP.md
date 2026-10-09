@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-10-07.
+Last updated: 2026-10-09.
 
 ## How to read this document
 
@@ -28,17 +28,17 @@ The phases below sit inside three milestones (`VISION.md` §5, ADR-0031):
 
 **Shipped and deployable** — `SPEC.md` FR-1 through FR-16 describe it. What's left before the public launch:
 
-### Pre-launch validation — gates any public launch (Milestone 2), regardless of which paths are live
-
-- [ ] Stand up the funding page (Open Collective, public ledger — `VISION.md` §6.1) before any public launch, not retrofitted after. The app side is built (`IMPLEMENTATION.md` §4.16), and the `holdmytrack` collective applied to Open Source Collective as fiscal host on 2026-09-24; what's left: once approved, set the slug — `services/server/internal/web/web.go`'s `OpenCollectiveSlug` — and replace the About page template's "donations are not open yet" line with a link to it.
-- [ ] Post concept renders to r/running, r/cycling, r/Garmin, r/Strava, r/FogOfWorld (`VISION.md` §5.1, §8.1) — validate "free, funded by its users" as credible before the public launch.
-
 ### Merge a split activity back — server built, no control yet
 
 Splitting an activity is built on the web (`SPEC.md` FR-5.17), and so is merging its parts back on the server (`POST /v1/activities/track-merge`, `IMPLEMENTATION.md` §4.7.8). Neither client offers Merge yet, so a split can't be undone from the app.
 
 - [ ] Decide where Merge lives — a toolbar action over checked neighboring parts, or a "Merge with the next part" in the Edit window — and build it on the web, from the list rows' `split` field.
 - [ ] Carry it to the Android app, next to its Split tool (`apps/android/docs/SPEC.md` FR-2.7 item 12).
+
+### Pre-launch validation — gates any public launch (Milestone 2), regardless of which paths are live
+
+- [ ] Stand up the funding page (Open Collective, public ledger — `VISION.md` §6.1) before any public launch, not retrofitted after. The app side is built (`IMPLEMENTATION.md` §4.16), and the `holdmytrack` collective applied to Open Source Collective as fiscal host on 2026-09-24; what's left: once approved, set the slug — `services/server/internal/web/web.go`'s `OpenCollectiveSlug` — and replace the About page template's "donations are not open yet" line with a link to it.
+- [ ] Post concept renders to r/running, r/cycling, r/Garmin, r/Strava, r/FogOfWorld (`VISION.md` §5.1, §8.1) — validate "free, funded by its users" as credible before the public launch.
 
 ### Sign in with Facebook — built, not live
 
@@ -51,7 +51,7 @@ Sign in with Facebook is built (`SPEC.md` FR-1.10) and the Meta app exists, but 
 
 ## Phase 2 — Mobile
 
-Path 2 on-device sync and in-app GPS recording (`VISION.md` §5.3). Android and iOS are tracked separately below; iOS reuses the sync contract (payload shape, sync-cursor semantics) Android settled.
+Path 2 on-device sync and in-app GPS recording (`VISION.md` §5.3). Android and iOS are tracked separately below; iOS reuses the sync contract Android settled: the payload shape, and the list of what's on the phone that the user ticks from, with the server answering what the account already has (`SPEC.md` FR-3.6).
 
 ### Android
 
@@ -64,26 +64,16 @@ Path 2 on-device sync and in-app GPS recording (`VISION.md` §5.3). Android and 
 ### iOS
 
 - [ ] Confirm `HKWorkoutRoute` access with a throwaway iOS app (`VISION.md` §4.1) — due diligence before committing engineering effort to the full iOS build, not resolving a real unknown: Apple's docs already say this works.
-- [ ] iOS app: HealthKit sync, `HKWorkoutRoute` for full GPS geometry, on the payload and sync-cursor design Android settled.
+- [ ] iOS app: HealthKit sync, `HKWorkoutRoute` for full GPS geometry, on the payload and the pick-what-to-send design Android settled.
 - [ ] In-app GPS recording, iOS half — inherits the Android build's wire shape and `source` convention once the iOS app itself exists (see the iOS Path 2 item above, which this depends on).
 
 ---
 
 ## Phase 4 — More sources
 
-Connecting the app to third-party services, and reading the exports of ones it can't connect to.
+Connecting the app to third-party services.
 
-### Path 3 — Google Maps Timeline import
-
-For travellers whose only route history is Timeline (`VISION.md` §3.1, §5.5). Import only: no continuous location logging (`VISION.md` §1.1).
-
-- [x] Try the render on a real Timeline export before building anything, and decide how Timeline data is drawn: as given, every trip an activity and visits left out, flights unticked until chosen (`IMPLEMENTATION.md` §4.0.5).
-- [x] Read the Android phone's on-device export, in the browser, sending only the trips (`IMPLEMENTATION.md` §4.0.5).
-- [ ] Read the iPhone's Timeline export and the older account-side `Semantic Location History` from past Takeouts. Both differ from the Android export and neither is documented, so each waits for a real file to build against. Until then the import recognizes and refuses them by name.
-- [x] Import with a date range, a choice of modes and a preview on the map, not a whole-history dump (`SPEC.md` FR-3.10). Private locations apply as for every other source.
-- [ ] Bound the storage a Timeline adds per account. Three months of daily driving measured about 60 MB, most of it per-activity masks (`IMPLEMENTATION.md` §4.0.5), against `VISION.md` §4.3's assumption of about 27 MB per user in all. A multi-year export, which no one has measured yet, would be several times that.
-
-### Prerequisites — gate the specific connectors below, not this phase's other work
+### Prerequisites — gate the specific connectors below
 
 - [ ] Get Garmin's Connect Developer Program licence position in writing for a free, donation-funded service (`VISION.md` §4.1, §4.3, §8.3).
 - [ ] File the Wahoo partner-API application (lead time, not cost, is the risk).
@@ -91,7 +81,7 @@ For travellers whose only route history is Timeline (`VISION.md` §3.1, §5.5). 
 
 ### Path 1 — cloud connectors (gated on the prerequisites above)
 
-- [ ] Generic OAuth connection scaffolding — `connections` table already exists (`migrations/0002_activities.sql`, `IMPLEMENTATION.md` §3.2); build the authorize/callback/token-refresh flow once, provider-agnostic, before any specific provider.
+- [ ] Generic OAuth connection scaffolding — `connections` table already exists (`migrations/0002_activities.sql`, `IMPLEMENTATION.md` §3.2); build the authorize/callback/token-refresh flow once, provider-agnostic, before any specific provider, with a picker: a connector lists what it would bring in and imports only what the user ticks (ADR-0039). That is how bulk history arrives, since archives aren't imported.
 - [ ] Garmin connector (after the licence prerequisite is settled).
 - [ ] Wahoo connector (after partner approval).
 - [ ] COROS connector (after partner approval).

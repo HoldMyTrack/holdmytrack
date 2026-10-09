@@ -12,13 +12,13 @@
     {{if .Rows}}
     <ul class="sync__list">
       {{range .Rows}}
-      <li class="sync__row{{if .Failed}} sync__row--failed{{else if .Duplicate}} sync__row--duplicate{{end}}">
+      <li class="sync__row{{if .Failed}} sync__row--failed{{end}}">
         <div class="sync__main">
           <span class="sync__title">{{.Title}}</span>
           <span class="sync__detail">{{.Detail}}</span>
         </div>
         <div class="sync__side">
-          <span class="sync__status">{{if .Failed}}{{t "sync.failed"}}{{else if .Duplicate}}{{t "sync.duplicate"}}{{else}}{{t "sync.ready"}}{{end}}</span>
+          <span class="sync__status">{{if .Failed}}{{t "sync.failed"}}{{else}}{{t "sync.ready"}}{{end}}</span>
           {{with .SyncedAt}}<span class="sync__when">{{.}}</span>{{end}}
         </div>
         {{with .MapHref}}<a class="sync__map" href="{{.}}">{{t "sync.view_on_map"}}</a>{{end}}

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Accepted. Its archive import in Path 3 is superseded by [ADR-0039](0039-the-app-is-the-gate.md), which removes `.zip` and Takeout import; Path 3 is single-file upload.
 
 ## Context
 

@@ -10,20 +10,17 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.browser.customtabs.CustomTabsIntent
 import dev.holdmytrack.android.imports.FileImports
-import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
 
 /**
- * Upload: files made somewhere else — a watch's or an app's export, a Google Takeout archive, a
- * Google Maps Timeline export — brought into the account (`apps/android/docs/SPEC.md` FR-3.6).
+ * Upload: files made somewhere else — a watch's or an app's export — brought into the account (`apps/android/docs/SPEC.md` FR-3.6).
  * The web's Upload menu as a screen, from the You tab, kept apart from the Sync tab as Upload
  * sits apart from Sync in the web's header: Sync is for what lives on the phone and keeps coming, this is for a file,
  * usually once. The uploads themselves are [FileImports]'s, so they carry on when this screen
  * goes; once one has gone, its activities are followed in Sync's history.
  *
- * Another app's `.gpx`, `.tcx` or `.zip` handed to this app to open or share lands here, and is
+ * Another app's `.gpx` or `.tcx` handed to this app to open or share lands here, and is
  * uploaded as if picked.
  */
 class UploadActivity : AppCompatActivity() {
@@ -56,8 +53,6 @@ class UploadActivity : AppCompatActivity() {
         seeSync = findViewById(R.id.upload_see_sync)
 
         choose.setOnClickListener { picker.launch(arrayOf("*/*")) }
-        findViewById<Button>(R.id.upload_guide_google_health).setOnClickListener { openPage(GOOGLE_HEALTH_GUIDE_PATH) }
-        findViewById<Button>(R.id.upload_guide_timeline).setOnClickListener { openPage(TimelineImportActivity.GUIDE_PATH) }
         seeSync.setOnClickListener {
             MainActivity.openTab(this, MainActivity.Tab.SYNC)
             finish()
@@ -98,13 +93,9 @@ class UploadActivity : AppCompatActivity() {
         if (uris.isNotEmpty() && canUpload()) importFiles(uris)
     }
 
-    /** Picked or shared files to [FileImports]; a Timeline export among them opens its own screen. */
+    /** Picked or shared files to [FileImports]. */
     private fun importFiles(uris: List<Uri>) {
-        FileImports.enqueue(this, uris)?.let { TimelineImportActivity.open(this, it) }
-    }
-
-    private fun openPage(path: String) {
-        CustomTabsIntent.Builder().build().launchUrl(this, HoldMyTrackApi.webPageUri(path))
+        FileImports.enqueue(this, uris)
     }
 
     /** The account gate, then each file queued or uploading, the uploads' notes and errors, and
@@ -150,10 +141,5 @@ class UploadActivity : AppCompatActivity() {
         errors.text = bad.joinToString("\n") { it.text }
         errors.visibility = if (bad.isEmpty()) View.GONE else View.VISIBLE
         seeSync.visibility = if (FileImports.sentCount > 0) View.VISIBLE else View.GONE
-    }
-
-    private companion object {
-        /** The step-by-step Google Health (Takeout) export guide (root `docs/SPEC.md` FR-10.5). */
-        const val GOOGLE_HEALTH_GUIDE_PATH = "/help/google-health-export"
     }
 }

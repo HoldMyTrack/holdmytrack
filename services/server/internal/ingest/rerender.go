@@ -111,7 +111,7 @@ func rerenderUserMasks(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 // with (DisplayedPoints: the upload parsed, clipped to Private locations, its track edit applied)
 // at the current stroke, drops the masks of tiles it no longer reaches, and marks every tile
 // before or after dirty — reprocessActivity's mask step alone, since nothing else about the
-// activity changes. Superseded activities too, so one promoted later is drawn the same.
+// activity changes.
 func RerenderActivityMasks(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID, activityID string) error {
 	points, err := DisplayedPoints(ctx, pool, store, activityID)
 	if err != nil {

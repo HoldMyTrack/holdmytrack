@@ -26,7 +26,7 @@ import dev.holdmytrack.android.net.Session
  * screen asks `GET /v1/auth/me` again on every resume — coming back from the mail app is the
  * moment it's most likely to have changed — and on Continue. Resend and Sign out are the web
  * page's other two ways forward; changing a mistyped address stays on the web, since the
- * app's local recordings and sync watermark are keyed by the email and would be orphaned.
+ * app's local recordings and hidden Sync rows are keyed by the email and would be orphaned.
  *
  * The root of its own task like [SignInActivity]: Back leaves the app rather than revealing a
  * map this account can't load yet.

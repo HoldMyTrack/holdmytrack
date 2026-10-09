@@ -24,8 +24,9 @@ const maxUploadsLimit = 50
 type uploadRow struct {
 	Filename   string `json:"filename"`
 	ExternalID string `json:"external_id"`
-	// The `jobs.payload->>'source'` value — "upload", "takeout", "healthconnect",
-	// "healthkit", "recorded" or "timeline" (§3.3). ROADMAP.md's Files/Sync split reads this to decide
+	// The `jobs.payload->>'source'` value — "upload", "healthconnect", "healthkit",
+	// "recorded", or "takeout" and "timeline" on jobs from before those imports were removed
+	// (§3.3). ROADMAP.md's Files/Sync split reads this to decide
 	// which tab a row belongs in; nothing server-side needed it as a response field until now.
 	Source      string    `json:"source"`
 	Status      string    `json:"status"` // "processing" | "done" | "failed"
@@ -44,13 +45,6 @@ type uploadRow struct {
 	// Nullable for the same reason StartedAt/DistanceMeters are: a job with no matching
 	// activity yet (still processing, or failed) has nothing to link to.
 	ActivityID *string `json:"activity_id,omitempty"`
-	// The copy that replaced this import's activity, when cross-source detection set it aside
-	// as a duplicate (§4.6) — the same shape GET /v1/activities/duplicates names it in. The
-	// row's Status stays "done", since the import itself succeeded; a client that knows this
-	// field shows the row as a duplicate instead, and offers no View on map, the activity being
-	// out of every list. Read live, so a row turns into a duplicate when the fuller copy
-	// arrives later, and back when deleting the kept copy promotes this one again.
-	SupersededBy *supersedingActivity `json:"superseded_by,omitempty"`
 }
 
 type uploadsResponse struct {
@@ -65,8 +59,7 @@ type uploadsResponse struct {
 }
 
 // uploadsCountQuery and uploadsListQuery read the `jobs` table directly rather than a
-// dedicated uploads table — every upload already is an `ingest` job (handleUpload,
-// handleZipUpload), and `jobs` already carries everything a history row needs (filename via
+// dedicated uploads table — every upload already is an `ingest` job (handleUpload), and `jobs` already carries everything a history row needs (filename via
 // `payload->>'source_detail'`, external_id, state, last_error, created_at). LIMIT/OFFSET,
 // not the keyset pagination §4.7's histogram uses, because this is the one place in the
 // upload flow §4.0.1 says pagination is actually justified — unlike the activity list, an
@@ -83,23 +76,18 @@ WHERE kind = 'ingest' AND user_id = $1
 const uploadsProcessingCountQuery = `SELECT COUNT(*) FROM jobs WHERE kind = 'ingest' AND user_id = $1 AND state = 'pending'`
 
 // The LEFT JOIN is what turns a "done" job into a "9 Sep · 34.7 km" row instead of just a
-// bare status. Joined on `a.source = j.payload->>'source'`, not a literal 'upload' — a plain
-// upload and a Google Takeout import (handleTakeoutUpload, source = 'takeout') are both
-// `kind = 'ingest'` jobs this query already selects, and each one's own persisted activity
-// carries the matching source, not always 'upload'. A hardcoded literal here quietly left
-// every Takeout-imported row showing "Ready" with no date or distance, since the join never
-// matched — caught live by opening the panel after a real Takeout import, not a unit test.
+// bare status. Joined on `a.source = j.payload->>'source'`, not a literal 'upload': every
+// source's jobs are `kind = 'ingest'` jobs this query selects, and each one's own persisted
+// activity carries the matching source, not always 'upload'.
 const uploadsListQuery = `
 SELECT j.payload->>'source_detail' AS filename,
        j.payload->>'external_id' AS external_id,
        j.payload->>'source' AS source,
        j.state, j.last_error, j.error_code, j.created_at, j.finished_at,
-       a.started_at, a.timezone, a.distance_meters, a.id,
-       w.id, w.source, w.started_at, w.timezone
+       a.started_at, a.timezone, a.distance_meters, a.id
 FROM jobs j
 LEFT JOIN activities a
   ON a.user_id = j.user_id AND a.source = j.payload->>'source' AND a.external_id = j.payload->>'external_id'
-LEFT JOIN activities w ON w.id = a.superseded_by
 WHERE j.kind = 'ingest' AND j.user_id = $1
   AND ($4::text[] IS NULL OR j.payload->>'source' = ANY($4))
 ORDER BY j.id DESC
@@ -183,10 +171,8 @@ func (s *Server) handleListUploads(w http.ResponseWriter, r *http.Request) {
 		var u uploadRow
 		var state string
 		var lastError, errorCode *string
-		var keptID, keptSource, keptTimezone *string
-		var keptStartedAt *time.Time
 		if err := rows.Scan(&u.Filename, &u.ExternalID, &u.Source, &state, &lastError, &errorCode, &u.SubmittedAt, &u.FinishedAt,
-			&u.StartedAt, &u.Timezone, &u.DistanceMeters, &u.ActivityID, &keptID, &keptSource, &keptStartedAt, &keptTimezone); err != nil {
+			&u.StartedAt, &u.Timezone, &u.DistanceMeters, &u.ActivityID); err != nil {
 			s.log.Error("uploads scan failed", "err", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
@@ -204,9 +190,6 @@ func (s *Server) handleListUploads(w http.ResponseWriter, r *http.Request) {
 			u.Error = jobErrorMessage(l, errorCode, lastError)
 		default:
 			u.Status = state
-		}
-		if keptID != nil && keptSource != nil && keptStartedAt != nil {
-			u.SupersededBy = &supersedingActivity{ID: *keptID, Source: *keptSource, StartedAt: *keptStartedAt, Timezone: *keptTimezone}
 		}
 		uploads = append(uploads, u)
 	}

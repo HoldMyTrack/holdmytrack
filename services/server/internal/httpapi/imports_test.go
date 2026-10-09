@@ -9,11 +9,11 @@ import (
 
 // insertImportJob adds an ingest job the way ingest.EnqueueRaw would, in the given state; a
 // finished one gets a finished_at, as the worker sets it.
-func (d *dbTest) insertImportJob(acct account, state, source, filename, batch, batchTitle string) {
+func (d *dbTest) insertImportJob(acct account, state, source, filename, batch string) {
 	d.t.Helper()
 	payload, err := json.Marshal(map[string]string{
 		"user_id": acct.id, "source": source, "source_detail": filename, "external_id": filename,
-		"batch": batch, "batch_title": batchTitle,
+		"batch": batch,
 	})
 	if err != nil {
 		d.t.Fatal(err)
@@ -32,13 +32,12 @@ func (d *dbTest) insertImportJob(acct account, state, source, filename, batch, b
 func TestActiveImports(t *testing.T) {
 	d := newDBTest(t)
 	me := d.newAccount(false)
-	d.insertImportJob(me, "pending", "upload", "walk.gpx", "", "")
-	d.insertImportJob(me, "done", "upload", "old.gpx", "", "")
-	d.insertImportJob(me, "done", "upload", "a.gpx", "b1", "Trips.zip")
-	d.insertImportJob(me, "failed", "upload", "b.gpx", "b1", "Trips.zip")
-	d.insertImportJob(me, "pending", "upload", "c.gpx", "b1", "Trips.zip")
-	d.insertImportJob(me, "done", "upload", "d.gpx", "b2", "Finished.zip")
-	d.insertImportJob(me, "pending", "healthconnect", "3f0c9a.json", "b3", "")
+	d.insertImportJob(me, "pending", "upload", "walk.gpx", "")
+	d.insertImportJob(me, "done", "upload", "old.gpx", "")
+	d.insertImportJob(me, "done", "healthconnect", "a.json", "b1")
+	d.insertImportJob(me, "failed", "healthconnect", "b.json", "b1")
+	d.insertImportJob(me, "pending", "healthconnect", "c.json", "b1")
+	d.insertImportJob(me, "done", "recorded", "d.json", "b2")
 
 	var resp activeImportsResponse
 	d.decode(d.do(me, "GET", "/v1/uploads/active", nil), http.StatusOK, &resp)
@@ -46,7 +45,7 @@ func TestActiveImports(t *testing.T) {
 	for _, a := range resp.Imports {
 		got[a.Title] = [2]int64{a.Done, a.Total}
 	}
-	want := map[string][2]int64{"walk.gpx": {0, 1}, "Trips.zip": {2, 3}, "Health Connect": {0, 1}}
+	want := map[string][2]int64{"walk.gpx": {0, 1}, "Health Connect": {2, 3}}
 	if len(got) != len(want) {
 		t.Fatalf("imports: %v, want %v", got, want)
 	}
@@ -72,8 +71,8 @@ func TestUnseenImportFailures(t *testing.T) {
 	if _, err := d.pool.Exec(context.Background(), `UPDATE users SET imports_seen_at = NOW() - INTERVAL '1 hour' WHERE id = $1`, me.id); err != nil {
 		t.Fatal(err)
 	}
-	d.insertImportJob(me, "failed", "upload", "bad.gpx", "", "")
-	d.insertImportJob(me, "done", "upload", "good.gpx", "", "")
+	d.insertImportJob(me, "failed", "upload", "bad.gpx", "")
+	d.insertImportJob(me, "done", "upload", "good.gpx", "")
 
 	var resp activeImportsResponse
 	d.decode(d.do(me, "GET", "/v1/uploads/active", nil), http.StatusOK, &resp)
@@ -89,124 +88,27 @@ func TestUnseenImportFailures(t *testing.T) {
 	}
 }
 
-// An import sent over several sync requests under one client batch is one row, titled with the
-// batch's title; a malformed batch id is refused.
-func TestSyncRequestsShareAClientBatch(t *testing.T) {
-	d := newDBTestWithS3(t, newMemS3())
-	me := d.newAccount(false)
-	send := func(id, batch string) int {
-		body := map[string]any{"source": "timeline", "batch": batch, "batch_title": "Timeline.json", "activities": []map[string]any{{
-			"external_id": id, "activity_type": "walking",
-			"points": []map[string]any{
-				{"lat": 50.0, "lon": 10.0, "time": "2026-05-01T10:00:00Z"},
-				{"lat": 50.001, "lon": 10.001, "time": "2026-05-01T10:01:00Z"},
-			},
-		}}}
-		return d.do(me, http.MethodPost, "/v1/sync/activities", body).Code
-	}
-	for _, id := range []string{"seg-1", "seg-2", "seg-3"} {
-		if code := send(id, "k3Jd9xQa2LmP"); code != http.StatusOK {
-			t.Fatalf("send %s: status %d", id, code)
-		}
-	}
-	if code := send("seg-4", "../x"); code != http.StatusBadRequest {
-		t.Errorf("malformed batch: status %d, want 400", code)
-	}
-
-	var resp activeImportsResponse
-	d.decode(d.do(me, "GET", "/v1/uploads/active", nil), http.StatusOK, &resp)
-	if len(resp.Imports) != 1 || resp.Imports[0].Title != "Timeline.json" || resp.Imports[0].Total != 3 {
-		t.Errorf("imports: %+v, want one Timeline.json row of 3", resp.Imports)
-	}
-}
-
-// An archive is one row from its upload on: "unpacking" while its unpack job is pending, with
-// the ingest jobs it has made so far counted. Once that job has finished, its outcome is in
-// `unpacked`, a failure's in the reader's language.
-func TestActiveImportsUnpacking(t *testing.T) {
+// The history says when each import finished, and links a finished one to its activity.
+func TestUploadHistoryFinishedAt(t *testing.T) {
 	d := newDBTest(t)
 	me := d.newAccount(false)
-	ctx := context.Background()
-	unpackJob := func(state, batch, title, code string, st map[string]any) {
-		payload, _ := json.Marshal(map[string]any{
-			"user_id": me.id, "source": "upload", "format": "zip", "batch": batch, "batch_title": title, "state": st,
-		})
-		if _, err := d.pool.Exec(ctx, `
-			INSERT INTO jobs (kind, user_id, payload, state, error_code, finished_at)
-			VALUES ('unpack', $1, $2, $3::text, NULLIF($4, ''), CASE WHEN $3::text = 'pending' THEN NULL ELSE NOW() END)`,
-			me.id, payload, state, code); err != nil {
-			t.Fatal(err)
-		}
-	}
-	unpackJob("pending", "b1", "Trips.zip", "", map[string]any{"cursor": 0})
-	d.insertImportJob(me, "pending", "upload", "a.gpx", "b1", "Trips.zip")
-	unpackJob("done", "b2", "Old.zip", "", map[string]any{"cursor": 5, "already": 2, "skipped": 1, "truncated": true})
-	unpackJob("failed", "b3", "Broken.zip", "unreadable_archive", map[string]any{"cursor": 0})
-
-	var resp activeImportsResponse
-	d.decode(d.do(me, "GET", "/v1/uploads/active", nil), http.StatusOK, &resp)
-	if len(resp.Imports) != 1 || resp.Imports[0].Title != "Trips.zip" || !resp.Imports[0].Unpacking || resp.Imports[0].Total != 1 {
-		t.Fatalf("imports = %+v, want Trips.zip unpacking with 1 found", resp.Imports)
-	}
-	byBatch := map[string]unpackedArchive{}
-	for _, a := range resp.Unpacked {
-		byBatch[a.Batch] = a
-	}
-	if a := byBatch["b2"]; len(resp.Unpacked) != 2 || a.Already != 2 || a.Skipped != 1 || !a.Truncated || a.Error != "" {
-		t.Fatalf("unpacked = %+v", resp.Unpacked)
-	}
-	if a := byBatch["b3"]; a.Error != "The archive couldn't be read." {
-		t.Fatalf("failed archive's error = %q", a.Error)
-	}
-}
-
-// The history says when each import finished, and names the copy that replaced an import's
-// activity as a duplicate — live, so the row follows the activity when it's promoted back.
-func TestUploadHistoryDuplicates(t *testing.T) {
-	d := newDBTest(t)
-	me := d.newAccount(false)
-	d.insertImportJob(me, "done", "healthconnect", "hc-1", "", "")
-	d.insertImportJob(me, "done", "upload", "walk.gpx", "", "")
-	d.insertImportJob(me, "pending", "upload", "next.gpx", "", "")
-	kept := d.newActivity(me, testActivity{activityType: "walk", distanceMeters: 1000})
-	dup := d.newActivity(me, testActivity{activityType: "walk", distanceMeters: 1000, supersededBy: kept})
-	ctx := context.Background()
-	if _, err := d.pool.Exec(ctx, `UPDATE activities SET source = 'upload', external_id = 'walk.gpx' WHERE id = $1`, kept); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := d.pool.Exec(ctx, `UPDATE activities SET source = 'healthconnect', external_id = 'hc-1' WHERE id = $1`, dup); err != nil {
+	d.insertImportJob(me, "done", "upload", "walk.gpx", "")
+	d.insertImportJob(me, "pending", "upload", "next.gpx", "")
+	walk := d.newActivity(me, testActivity{activityType: "walk", distanceMeters: 1000})
+	if _, err := d.pool.Exec(context.Background(), `UPDATE activities SET source = 'upload', external_id = 'walk.gpx' WHERE id = $1`, walk); err != nil {
 		t.Fatal(err)
 	}
 
-	byName := func() map[string]uploadRow {
-		var resp uploadsResponse
-		d.decode(d.do(me, "GET", "/v1/uploads?limit=10", nil), http.StatusOK, &resp)
-		rows := map[string]uploadRow{}
-		for _, u := range resp.Uploads {
-			rows[u.Filename] = u
-		}
-		return rows
+	var resp uploadsResponse
+	d.decode(d.do(me, "GET", "/v1/uploads?limit=10", nil), http.StatusOK, &resp)
+	rows := map[string]uploadRow{}
+	for _, u := range resp.Uploads {
+		rows[u.Filename] = u
 	}
-	rows := byName()
-	hc := rows["hc-1"]
-	if hc.Status != "done" || hc.SupersededBy == nil || hc.SupersededBy.ID != kept || hc.SupersededBy.Source != "upload" {
-		t.Fatalf("duplicate row: status %q, superseded_by %+v; want done, replaced by %s from upload", hc.Status, hc.SupersededBy, kept)
-	}
-	if hc.FinishedAt == nil {
-		t.Error("a finished row has no finished_at")
-	}
-	if w := rows["walk.gpx"]; w.SupersededBy != nil || w.ActivityID == nil || *w.ActivityID != kept {
-		t.Errorf("kept row: superseded_by %+v, activity %v; want none, %s", w.SupersededBy, w.ActivityID, kept)
+	if w := rows["walk.gpx"]; w.Status != "done" || w.FinishedAt == nil || w.ActivityID == nil || *w.ActivityID != walk {
+		t.Errorf("finished row: status %q, finished_at %v, activity %v; want done, set, %s", w.Status, w.FinishedAt, w.ActivityID, walk)
 	}
 	if n := rows["next.gpx"]; n.Status != "processing" || n.FinishedAt != nil {
 		t.Errorf("pending row: status %q, finished_at %v; want processing with none", n.Status, n.FinishedAt)
-	}
-
-	// Deleting the kept copy promotes the duplicate, and its row stops being one.
-	if _, err := d.pool.Exec(ctx, `UPDATE activities SET superseded_by = NULL WHERE id = $1`, dup); err != nil {
-		t.Fatal(err)
-	}
-	if hc := byName()["hc-1"]; hc.SupersededBy != nil {
-		t.Errorf("promoted row still superseded by %+v", hc.SupersededBy)
 	}
 }

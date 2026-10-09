@@ -60,8 +60,8 @@ func tileYToLat(y, n float64) float64 {
 // SegmentTiles returns every tile at the given zoom a straight segment between two points
 // passes through, walking tile space rather than just the two endpoints' tiles —
 // consecutive GPS fixes are usually within one tile at 1 Hz, but a fast segment (a car
-// commute logged by mistake, a GPS glitch) or a sparse source (a Google Maps Timeline drive,
-// a point every few minutes) can span many, and a gap here would leave a strip of
+// commute logged by mistake, a GPS glitch) or a sparse track (a drive with a point every few
+// minutes) can span many, and a gap here would leave a strip of
 // genuinely-covered ground stuck fogged.
 func SegmentTiles(lon1, lat1, lon2, lat2 float64, zoom int) [][2]int {
 	return SegmentTilesBuffered(lon1, lat1, lon2, lat2, zoom, 0, 256)

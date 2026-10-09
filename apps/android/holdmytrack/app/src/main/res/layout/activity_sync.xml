@@ -1,7 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- SyncActivity: the Sync screen (fragment_sync.xml, SyncFragment) and nothing else. -->
-<androidx.fragment.app.FragmentContainerView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/sync_content"
-    android:name="dev.holdmytrack.android.SyncFragment"
+<!-- SyncActivity: Health Connect's rationale and setup (include_health_connect_card) on its own,
+     and the way to the Sync tab, where what's on the phone is chosen and sent. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent" />
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:divider="@drawable/gap_20"
+        android:orientation="vertical"
+        android:padding="@dimen/hmt_space_16"
+        android:showDividers="middle">
+
+        <!-- Why nothing here can sync: signed out, email unconfirmed, or the read-only demo
+             account (SyncActivity.render). -->
+        <TextView
+            android:id="@+id/sync_account_notice"
+            style="@style/Widget.HoldMyTrack.Notice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
+
+        <include layout="@layout/include_health_connect_card" />
+
+        <Button
+            android:id="@+id/sync_open_list"
+            style="@style/Widget.HoldMyTrack.Button.Hero"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/sync_open_list"
+            android:visibility="gone" />
+    </LinearLayout>
+</ScrollView>

@@ -132,22 +132,8 @@ data class Providers(val google: Boolean, val facebook: Boolean, val googleClien
  */
 data class SyncResult(val externalId: String, val status: String, val error: String)
 
-/**
- * What `POST /v1/activities/upload` said about one file: "enqueued" or "already_processed" for a
- * single `.gpx`/`.fit`/`.tcx`, "zip_accepted" for a `.zip` or a Google Takeout export, which the
- * server unpacks in the background; [batch] is the archive's, for finding its [UnpackedArchive]
- * once it has been.
- */
-data class UploadOutcome(val status: String, val batch: String)
-
-/**
- * An archive the server finished unpacking (`GET /v1/uploads/active`'s `unpacked`): how many of
- * its files were already imported before or skipped, and whether it had more files than one
- * upload reads ([truncated]); [error], when it couldn't be unpacked, is why, in the app's
- * language. Neither already-imported nor skipped files become jobs, so the sync history never
- * shows them: this is the only place they're counted.
- */
-data class UnpackedArchive(val batch: String, val already: Int, val skipped: Int, val truncated: Boolean, val error: String)
+/** What `POST /v1/activities/upload` said about one file: "enqueued" or "already_processed". */
+data class UploadOutcome(val status: String)
 
 /**
  * One row of the sync history — an `ingest` job and, once it has produced one, the activity it
@@ -155,9 +141,7 @@ data class UnpackedArchive(val batch: String, val already: Int, val skipped: Int
  * an uploaded file or a Takeout entry, a raw external id for everything else. [startedAt],
  * [distanceMeters] and [activityId] are null while the job is still processing, or forever if
  * it failed: there is no activity behind it to describe. [finishedAt] is when the import finished
- * — when it was synced — and [keptSource], for an activity cross-source deduplication set aside
- * as a duplicate (`docs/IMPLEMENTATION.md` §4.6), is the source of the copy kept in its place;
- * such a row's [status] is still "done", the import itself having succeeded.
+ * — when it was synced.
  */
 data class SyncHistoryEntry(
     val filename: String,
@@ -168,7 +152,6 @@ data class SyncHistoryEntry(
     val startedAt: String?,
     val distanceMeters: Double?,
     val activityId: String?,
-    val keptSource: String?,
     /** The zone [startedAt]'s activity was recorded in (`docs/IMPLEMENTATION.md` §4.30). */
     val timezone: String? = null,
 )
@@ -450,13 +433,10 @@ object HoldMyTrackApi {
 
     /** The `source` values this app posts to `POST /v1/sync/activities` — Health Connect
      *  sync (`sync/SyncRunner.kt`), in-app GPS recording (`recording/RecordingActivity.kt`,
-     *  `docs/adr/0007-in-app-gps-recording-submits-directly.md`) and a Google Maps Timeline
-     *  export read on the phone (`timeline/TimelineImport.kt`, root `docs/IMPLEMENTATION.md`
-     *  §4.0.5). iOS's own is `"healthkit"`; an uploaded file has its own endpoint
-     *  ([uploadActivityFile]). */
+     *  `docs/adr/0007-in-app-gps-recording-submits-directly.md`). iOS's own is `"healthkit"`; an
+     *  uploaded file has its own endpoint ([uploadActivityFile]). */
     const val SOURCE_HEALTH_CONNECT = "healthconnect"
     const val SOURCE_RECORDED = "recorded"
-    const val SOURCE_TIMELINE = "timeline"
     private val JSON = "application/json; charset=utf-8".toMediaType()
     private val main = Handler(Looper.getMainLooper())
 
@@ -566,28 +546,18 @@ object HoldMyTrackApi {
      * is the sync run, which is a coroutine from end to end (Health Connect's read API leaves
      * no choice). The blocking `execute()` is confined to `Dispatchers.IO` here rather than
      * wrapped in `enqueue`, since the caller genuinely wants to wait: the next batch must not
-     * be sent, and the watermark must not move, until this one is answered.
+     * be sent until this one is answered.
      *
      * Returns the server's per-activity verdicts rather than a single pass/fail — a batch is
-     * not all-or-nothing there, and the caller needs to know which ones landed before it can
-     * decide how far the watermark may move. A non-2xx status is the whole request failing and
-     * throws instead; nothing in the batch was decided.
-     *
-     * [batch] and [batchTitle] name one import the caller splits over several requests (a
-     * Timeline export, a hundred activities to a request), so the history counts it as one.
+     * not all-or-nothing there, and the caller needs to know which ones landed before it takes
+     * them off its list. A non-2xx status is the whole request failing and throws instead;
+     * nothing in the batch was decided.
      */
-    suspend fun syncActivities(
-        activities: List<JSONObject>,
-        source: String,
-        batch: String? = null,
-        batchTitle: String? = null,
-    ): List<SyncResult> =
+    suspend fun syncActivities(activities: List<JSONObject>, source: String): List<SyncResult> =
         withContext(Dispatchers.IO) {
             val body = JSONObject()
                 .put("source", source)
                 .put("activities", JSONArray(activities))
-            if (batch != null) body.put("batch", batch)
-            if (batchTitle != null) body.put("batch_title", batchTitle)
             val request = Request.Builder()
                 .url(BuildConfig.API_BASE_URL + API_V1 + "/sync/activities")
                 .post(body.toString().toRequestBody(JSON))
@@ -607,8 +577,70 @@ object HoldMyTrackApi {
         }
 
     /**
-     * Uploads take as long as sending the file does, up to 512 MiB, and the server answers once it
-     * has stored the file, which for a large archive takes longer than the default ten seconds.
+     * `POST /v1/sync/known` (`docs/IMPLEMENTATION.md` §4.0.3): which of [externalIds] the
+     * account already has from [source] — the Sync tab's list is what's on the phone minus these,
+     * so a reinstall or a second phone agrees with the server. Suspending, like [syncActivities],
+     * for the same caller; a failure throws.
+     */
+    suspend fun syncKnown(source: String, externalIds: List<String>): Set<String> =
+        withContext(Dispatchers.IO) {
+            val known = mutableSetOf<String>()
+            for (chunk in externalIds.chunked(MAX_KNOWN_IDS)) {
+                val body = JSONObject()
+                    .put("source", source)
+                    .put("external_ids", JSONArray(chunk))
+                val request = Request.Builder()
+                    .url(BuildConfig.API_BASE_URL + API_V1 + "/sync/known")
+                    .post(body.toString().toRequestBody(JSON))
+                    .build()
+                val response = client.newCall(request).execute()
+                val text = response.use { it.body?.string().orEmpty() }
+                if (!response.isSuccessful) throw ApiException.from(response.code, text)
+                val ids = JSONObject(text).getJSONArray("known")
+                for (i in 0 until ids.length()) known += ids.getString(i)
+            }
+            known
+        }
+
+    /**
+     * `POST /v1/activities/overlaps` (root `docs/IMPLEMENTATION.md` §4.6): for each of [spans],
+     * keyed by the caller, the live activity it overlaps, if any — the Sync tab's "Overlaps
+     * Morning walk" hint (`docs/SPEC.md` FR-3.7). Keys with no overlap aren't in the map.
+     */
+    suspend fun activityOverlaps(spans: List<OverlapSpan>): Map<String, ActivityOverlap> =
+        withContext(Dispatchers.IO) {
+            val found = mutableMapOf<String, ActivityOverlap>()
+            for (chunk in spans.chunked(MAX_KNOWN_IDS)) {
+                val array = JSONArray()
+                for (span in chunk) {
+                    array.put(JSONObject().put("key", span.key).put("start", span.start.toString()).put("end", span.end.toString()))
+                }
+                val request = Request.Builder()
+                    .url(BuildConfig.API_BASE_URL + API_V1 + "/activities/overlaps")
+                    .post(JSONObject().put("spans", array).toString().toRequestBody(JSON))
+                    .build()
+                val response = client.newCall(request).execute()
+                val text = response.use { it.body?.string().orEmpty() }
+                if (!response.isSuccessful) throw ApiException.from(response.code, text)
+                val rows = JSONObject(text).getJSONArray("overlaps")
+                for (i in 0 until rows.length()) {
+                    val row = rows.getJSONObject(i)
+                    found[row.getString("key")] = ActivityOverlap(
+                        name = row.optString("name"),
+                        startedAt = row.getString("started_at"),
+                        timezone = if (row.isNull("timezone")) null else row.optString("timezone"),
+                    )
+                }
+            }
+            found
+        }
+
+    /** The server's `maxKnownIDs`: one `POST /v1/sync/known` asks about at most this many. */
+    private const val MAX_KNOWN_IDS = 5000
+
+    /**
+     * Uploads take as long as sending the file does, up to 64 MiB, which over a slow connection
+     * takes longer than the default ten seconds.
      * The same client otherwise, so the same interceptors.
      */
     private val uploadClient: OkHttpClient by lazy {
@@ -620,9 +652,8 @@ object HoldMyTrackApi {
 
     /**
      * `POST /v1/activities/upload` — the web's Upload menu's request (root `docs/SPEC.md`
-     * FR-3.1–FR-3.3): one `.gpx`, `.fit`, `.tcx` or `.zip`, which the server tells apart from a
-     * Google Takeout export itself. The file is streamed from [uri] rather than read into memory
-     * first, since a `.zip` can be 512 MiB; [onProgress] gets the bytes sent so far, on the
+     * FR-3.1): one `.gpx`, `.fit` or `.tcx`. The file is streamed from [uri] rather than read into
+     * memory first, since it can be 64 MiB; [onProgress] gets the bytes sent so far, on the
      * I/O thread sending them. Suspending, like [syncActivities]: its caller (`imports/FileImports.kt`)
      * sends one file after another and waits for each.
      */
@@ -645,7 +676,7 @@ object HoldMyTrackApi {
         val text = response.use { it.body?.string().orEmpty() }
         if (!response.isSuccessful) throw ApiException.from(response.code, text)
         val json = runCatching { JSONObject(text) }.getOrDefault(JSONObject())
-        UploadOutcome(status = json.optString("status"), batch = json.optString("batch"))
+        UploadOutcome(status = json.optString("status"))
     }
 
     /** A picked file as a request body, read as it's sent. Opened afresh on every [writeTo], so
@@ -703,31 +734,10 @@ object HoldMyTrackApi {
                         startedAt = row.optString("started_at").ifBlank { null },
                         distanceMeters = if (row.isNull("distance_meters")) null else row.optDouble("distance_meters"),
                         activityId = row.optString("activity_id").ifBlank { null },
-                        keptSource = row.optJSONObject("superseded_by")?.optString("source")?.ifBlank { null },
                         timezone = row.optString("timezone").ifBlank { null },
                     )
                 },
             )
-        }, onResult)
-    }
-
-    /** `GET /v1/uploads/active`'s archives unpacked in the last hour — see [UnpackedArchive]. */
-    fun unpackedArchives(onResult: (Result<List<UnpackedArchive>>) -> Unit) {
-        val request = Request.Builder()
-            .url(BuildConfig.API_BASE_URL + API_V1 + "/uploads/active")
-            .build()
-        call(request, { body ->
-            val rows = JSONObject(body).optJSONArray("unpacked") ?: JSONArray()
-            List(rows.length()) { i ->
-                val row = rows.getJSONObject(i)
-                UnpackedArchive(
-                    batch = row.optString("batch"),
-                    already = row.optInt("already"),
-                    skipped = row.optInt("skipped"),
-                    truncated = row.optBoolean("truncated"),
-                    error = row.optString("error"),
-                )
-            }
         }, onResult)
     }
 
@@ -1674,3 +1684,10 @@ object HoldMyTrackApi {
         })
     }
 }
+
+/** One time span asked about in [HoldMyTrackApi.activityOverlaps], under the caller's [key]. */
+data class OverlapSpan(val key: String, val start: Instant, val end: Instant)
+
+/** The live activity a span overlaps: its [name] (empty when it has none), and its start in the
+ *  zone it was recorded in, which titles it when it has no name. */
+data class ActivityOverlap(val name: String, val startedAt: String, val timezone: String?)

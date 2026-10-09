@@ -120,8 +120,8 @@ func TestSegmentTilesBufferedFarFromEdgeNoNeighbors(t *testing.T) {
 }
 
 // TestSegmentTilesLongSlantedSegmentMissesNone: every tile a long segment passes through is
-// listed, checked by sampling the segment every pixel. The first is a real Google Maps Timeline
-// leg, 14 km across Cleveland, some of whose tiles a Bresenham walk between its endpoints'
+// listed, checked by sampling the segment every pixel. The first is a real leg of a sparse drive,
+// 14 km across Cleveland, some of whose tiles a Bresenham walk between its endpoints'
 // tile indices skipped, leaving the drive cleared in pieces.
 func TestSegmentTilesLongSlantedSegmentMissesNone(t *testing.T) {
 	const zoom = 14

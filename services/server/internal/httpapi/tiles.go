@@ -34,7 +34,6 @@ FROM (
            ) AS geom
     FROM activities, ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) AS env
     WHERE user_id = $4
-      AND superseded_by IS NULL
       AND NOT edit_pending
       AND (trajectory && env OR trajectory && ST_Translate(env, 360, 0) OR trajectory && ST_Translate(env, -360, 0))
       AND ` + inDateRange("$5", "$6") + `

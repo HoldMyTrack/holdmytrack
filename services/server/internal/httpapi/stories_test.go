@@ -21,9 +21,6 @@ func TestStoriesLifecycle(t *testing.T) {
 	// No moving time recorded: counts its elapsed time as moving, as Trends does.
 	driveBack := d.newActivity(me, testActivity{activityType: "driving", distanceMeters: 41000, durationSecs: 2700,
 		startedAt: time.Date(2026, 5, 1, 15, 0, 0, 0, time.UTC)})
-	// A superseded duplicate is a member but isn't counted.
-	duplicate := d.newActivity(me, testActivity{activityType: "walking", distanceMeters: 2900, movingSeconds: intPtr(1700), durationSecs: 1900,
-		startedAt: time.Date(2026, 5, 1, 12, 0, 1, 0, time.UTC), supersededBy: walk})
 
 	var created story
 	d.decode(d.do(me, "POST", "/v1/stories", map[string]any{
@@ -39,10 +36,10 @@ func TestStoriesLifecycle(t *testing.T) {
 
 	var got story
 	d.decode(d.do(me, "POST", "/v1/stories/"+created.ID+"/activities", map[string]any{
-		"activity_ids": []string{driveBack, duplicate, walk},
+		"activity_ids": []string{driveBack, walk},
 	}), http.StatusOK, &got)
-	if len(got.ActivityIDs) != 4 {
-		t.Errorf("after add: %d members, want 4", len(got.ActivityIDs))
+	if len(got.ActivityIDs) != 3 {
+		t.Errorf("after add: %d members, want 3", len(got.ActivityIDs))
 	}
 	if !got.UpdatedAt.After(created.UpdatedAt) {
 		t.Errorf("adding members didn't move updated_at")
@@ -62,7 +59,7 @@ func TestStoriesLifecycle(t *testing.T) {
 	}
 
 	d.decode(d.do(me, "DELETE", "/v1/stories/"+created.ID+"/activities", map[string]any{
-		"activity_ids": []string{duplicate, driveBack, "00000000-0000-0000-0000-000000000000"},
+		"activity_ids": []string{driveBack, "00000000-0000-0000-0000-000000000000"},
 	}), http.StatusOK, &got)
 	if want := []string{driveThere, walk}; !slices.Equal(got.ActivityIDs, want) {
 		t.Errorf("after remove: %v, want %v", got.ActivityIDs, want)
@@ -87,8 +84,8 @@ func TestStoriesLifecycle(t *testing.T) {
 	d.decode(d.do(me, "GET", "/v1/stories/"+created.ID, nil), http.StatusNotFound, nil)
 	// Deleting a Story deletes none of its activities.
 	var n int
-	if err := d.pool.QueryRow(context.Background(), `SELECT count(*) FROM activities WHERE user_id = $1`, me.id).Scan(&n); err != nil || n != 4 {
-		t.Errorf("activities after deleting the Story: %d (%v), want 4", n, err)
+	if err := d.pool.QueryRow(context.Background(), `SELECT count(*) FROM activities WHERE user_id = $1`, me.id).Scan(&n); err != nil || n != 3 {
+		t.Errorf("activities after deleting the Story: %d (%v), want 3", n, err)
 	}
 }
 

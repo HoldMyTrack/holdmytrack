@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One row of the Sync tab (panel/SyncTab), after the Activities rows (item_activity_row): a tile
+     of the activity's kind that is also its tick box — ticked, a ✓ on the accent — then its day
+     and time (or a recording's name) over "[date ·] distance · type · where it is", and "Overlaps
+     Morning walk" when it covers the time of an activity the account has; that text is the
+     row's tap target: its line picked out on the map and flown to. A Hidden badge while hidden
+     rows are shown, and a recording's Edit and Delete. Swiped aside, it's hidden. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_panel_row"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/hmt_space_4"
+    android:paddingEnd="@dimen/hmt_space_4">
+
+    <FrameLayout
+        android:id="@+id/candidate_tick"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="@dimen/hmt_space_8"
+        android:layout_marginEnd="@dimen/hmt_space_8"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:focusable="true">
+
+        <ImageView
+            android:id="@+id/candidate_icon"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_type_tile"
+            android:importantForAccessibility="no"
+            android:padding="9dp"
+            android:src="@drawable/ic_route"
+            app:tint="@color/hmt_ink_secondary" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:id="@+id/candidate_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:minHeight="48dp"
+        android:orientation="vertical"
+        android:paddingTop="@dimen/hmt_space_10"
+        android:paddingBottom="@dimen/hmt_space_10">
+
+        <TextView
+            android:id="@+id/candidate_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleSmall"
+            tools:text="Sep 24, 2026, 4:00 AM" />
+
+        <TextView
+            android:id="@+id/candidate_meta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_2"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textColor="@color/hmt_ink_meta"
+            android:textSize="@dimen/hmt_text_xs"
+            tools:text="10.4 km · Running · Health Connect" />
+
+        <TextView
+            android:id="@+id/candidate_overlap"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_2"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/hmt_accent_strong"
+            android:textSize="@dimen/hmt_text_xs"
+            android:visibility="gone"
+            tools:text="Overlaps Morning walk"
+            tools:visibility="visible" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/candidate_hidden"
+        style="@style/Widget.HoldMyTrack.PanelStatusBadge"
+        android:layout_marginStart="@dimen/hmt_space_8"
+        android:text="@string/panel_hidden"
+        android:visibility="gone" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/candidate_edit"
+        style="@style/Widget.HoldMyTrack.Button.RowIcon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:contentDescription="@string/recording_edit"
+        android:visibility="gone"
+        app:icon="@drawable/ic_pencil"
+        app:iconTint="@color/hmt_ink_secondary" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/candidate_delete"
+        style="@style/Widget.HoldMyTrack.Button.RowIcon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:contentDescription="@string/recording_delete"
+        android:visibility="gone"
+        app:icon="@drawable/ic_trash_2"
+        app:iconTint="@color/hmt_danger" />
+</LinearLayout>
