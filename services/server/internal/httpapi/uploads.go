@@ -25,7 +25,8 @@ type uploadRow struct {
 	Filename   string `json:"filename"`
 	ExternalID string `json:"external_id"`
 	// The `jobs.payload->>'source'` value — "upload", "takeout", "healthconnect",
-	// "healthkit", "recorded" or "timeline" (§3.3). ROADMAP.md's Files/Sync split reads this to decide
+	// "healthkit", "recorded", or "timeline" on jobs from before Timeline import was removed
+	// (§3.3). ROADMAP.md's Files/Sync split reads this to decide
 	// which tab a row belongs in; nothing server-side needed it as a response field until now.
 	Source      string    `json:"source"`
 	Status      string    `json:"status"` // "processing" | "done" | "failed"

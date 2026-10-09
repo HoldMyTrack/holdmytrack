@@ -27,7 +27,7 @@ import (
 // Remove range spanning the points strictly between its two ends (so the ends themselves
 // survive and are joined), and Delete point adds to Drop. A surviving point whose timestamp is
 // in Move takes that entry's [lon, lat] in place of its recorded position — a Move point drag,
-// for the outliers a sparse source like Google Maps Timeline is full of; its elevation and time
+// for the outliers a sparse track (a point every few minutes) is full of; its elevation and time
 // stay as recorded. Points sharing one timestamp are kept, removed or moved together — see
 // EditableTimestamps for the one ordering the spec relies on.
 type TrackEdit struct {

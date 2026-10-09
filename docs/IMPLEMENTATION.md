@@ -75,7 +75,8 @@ CREATE TABLE activities (
     -- (a provider, an Android package, or an uploaded filename).
     source            VARCHAR(32)  NOT NULL,   -- 'upload' | 'takeout' | 'garmin' | 'wahoo'
                                                -- | 'coros' | 'healthkit' | 'healthconnect'
-                                               -- | 'recorded' | 'timeline'
+                                               -- | 'recorded' | 'timeline' (rows from
+                                               -- before Timeline import was removed)
     source_detail     VARCHAR(255),
     external_id       VARCHAR(255),            -- provider activity ID, or HK/HC record UID
     -- The copy that displaced this one, or NULL when this row is live (§4.6). ON DELETE SET
