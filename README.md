@@ -49,7 +49,9 @@ holdmytrack/
 │   ├── BRAINSTORM.md            # ideas raised but not yet decided
 │   ├── adr/                     # Architecture Decision Records — why, not just what
 │   ├── DEVELOPMENT.md           # running it locally, verification, gotchas, commands
-│   └── DEPLOY.md                # the production deployment runbook
+│   ├── DEPLOY.md                # the production deployment runbook
+│   ├── PERFORMANCE.md           # measured performance, one entry per load test or benchmark session
+│   └── performance/             # images those entries show
 ├── AGENTS.md                    # orientation for coding agents
 ├── brand/                       # logo.svg, the mark's master; make_icons.py renders every logo and icon from it, the README's included
 ├── apps/
@@ -90,6 +92,7 @@ This tree is the canonical one; do not let a second tree exist anywhere else to 
 | [`docs/adr/`](docs/adr/) | Architecture Decision Records — why each consequential, hard-to-reverse decision was made, and what was rejected. |
 | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Running it locally, the verification checklist, gotchas worth not rediscovering, and the command reference. |
 | [`docs/DEPLOY.md`](docs/DEPLOY.md) | You're standing up an actual deployment. |
+| [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | Measured performance: each load test or benchmark session, how it ran and what it found. |
 | [`AGENTS.md`](AGENTS.md) | You are a coding agent opening the repo cold — this same routing table, self-contained, plus the documentation and Markdown conventions these docs follow. |
 
 ## License
