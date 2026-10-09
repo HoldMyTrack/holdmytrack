@@ -13,10 +13,17 @@ class TypeIconTest {
     }
 
     @Test
+    fun `an e-scooter type has its own icon, any case, within the type`() {
+        assertEquals(R.drawable.ic_electric_scooter, typeIcon("E_Scooter"))
+        assertEquals(R.drawable.ic_electric_scooter, typeIcon("escooter_commute"))
+    }
+
+    @Test
     fun `every other type takes its kind's icon`() {
         assertEquals(R.drawable.ic_footprints, typeIcon("walking"))
         assertEquals(R.drawable.ic_bike, typeIcon("onewheel"))
         assertEquals(R.drawable.ic_bike, typeIcon("unicycle"))
+        assertEquals(R.drawable.ic_bike, typeIcon("kick_scooter"))
         assertEquals(R.drawable.ic_car, typeIcon("driving"))
         assertEquals(R.drawable.ic_route, typeIcon("kayaking"))
     }

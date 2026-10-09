@@ -26,18 +26,21 @@ data class ActivityRowItem(
     val selecting: Boolean = false,
 )
 
-/** The icon for an activity's type, on its row's tile and its card: a solowheel's own, matched
- *  case-insensitively within the type ("Solowheel", "monowheel_commute"), else its kind's. */
+/** The icon for an activity's type, on its row's tile and its card: a solowheel's or an
+ *  e-scooter's own, matched case-insensitively within the type ("Solowheel", "e_scooter_commute"),
+ *  else its kind's. */
 @DrawableRes
 fun typeIcon(type: String): Int {
     val t = type.lowercase()
     return when {
         MONOWHEEL_WORDS.any { it in t } -> R.drawable.ic_monowheel
+        E_SCOOTER_WORDS.any { it in t } -> R.drawable.ic_electric_scooter
         else -> kindIcon(ActivityKind.of(type))
     }
 }
 
 private val MONOWHEEL_WORDS = listOf("solowheel", "monowheel")
+private val E_SCOOTER_WORDS = listOf("e_scooter", "escooter")
 
 @DrawableRes
 private fun kindIcon(kind: ActivityKind): Int = when (kind) {
