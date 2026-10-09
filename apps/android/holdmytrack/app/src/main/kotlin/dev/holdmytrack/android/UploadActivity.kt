@@ -15,10 +15,10 @@ import dev.holdmytrack.android.net.Session
 
 /**
  * Upload: files made somewhere else — a watch's or an app's export — brought into the account (`apps/android/docs/SPEC.md` FR-3.6).
- * The web's Upload menu as a screen, from the You tab, kept apart from the Sync tab as Upload
+ * The web's Upload menu as a screen, from the Sync tab, kept apart from the Sync tab as Upload
  * sits apart from Sync in the web's header: Sync is for what lives on the phone and keeps coming, this is for a file,
  * usually once. The uploads themselves are [FileImports]'s, so they carry on when this screen
- * goes; once one has gone, its activities are followed in Sync's history.
+ * goes; once one has gone, its activities are followed in Sync history ([SyncHistoryActivity]).
  *
  * Another app's `.gpx` or `.tcx` handed to this app to open or share lands here, and is
  * uploaded as if picked.
@@ -54,7 +54,7 @@ class UploadActivity : AppCompatActivity() {
 
         choose.setOnClickListener { picker.launch(arrayOf("*/*")) }
         seeSync.setOnClickListener {
-            MainActivity.openTab(this, MainActivity.Tab.SYNC)
+            startActivity(Intent(this, SyncHistoryActivity::class.java))
             finish()
         }
 

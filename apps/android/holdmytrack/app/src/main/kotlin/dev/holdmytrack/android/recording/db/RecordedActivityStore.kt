@@ -3,7 +3,6 @@ package dev.holdmytrack.android.recording.db
 import android.content.ContentValues
 import android.content.Context
 import android.database.Cursor
-import android.database.DatabaseUtils
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import dev.holdmytrack.android.net.Session
@@ -147,12 +146,6 @@ class RecordedActivityStore(context: Context) {
         helper.readableDatabase.query(
             RecordingDbHelper.TABLE, null, "account = ?", arrayOf(account()), null, null, "started_at_ms DESC",
         ).use { cursor -> buildList { while (cursor.moveToNext()) add(cursor.toRecord()) } }
-    }
-
-    /** How many there are — the bottom bar's Sync badge (`MainActivity.refreshSyncBadge`), without
-     *  reading every point. */
-    suspend fun count(): Int = withContext(Dispatchers.IO) {
-        DatabaseUtils.queryNumEntries(helper.readableDatabase, RecordingDbHelper.TABLE, "account = ?", arrayOf(account())).toInt()
     }
 
     /** Removes every recording of the signed-in account — its account was just deleted

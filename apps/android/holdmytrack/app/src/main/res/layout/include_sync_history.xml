@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The sync history (the web's /sync list), filled by sync/ImportHistory: its heading with the
-     count, then the rows in a card. On the Sync tab only the latest few, with See all; on
-     SyncHistoryActivity every row a page at a time, the pager under them. -->
+     count, then the rows in a card, a page at a time with the pager under them
+     (SyncHistoryActivity). -->
 <merge xmlns:android="http://schemas.android.com/apk/res/android">
 
     <LinearLayout
@@ -27,16 +27,6 @@
             android:textAppearance="?attr/textAppearanceLabelSmall"
             android:textColor="@color/hmt_ink_meta"
             android:textFontWeight="400" />
-
-        <Button
-            android:id="@+id/sync_see_all"
-            style="@style/Widget.HoldMyTrack.Button.Link"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minHeight="48dp"
-            android:text="@string/sync_see_all"
-            android:textFontWeight="600"
-            android:visibility="gone" />
     </LinearLayout>
 
     <TextView

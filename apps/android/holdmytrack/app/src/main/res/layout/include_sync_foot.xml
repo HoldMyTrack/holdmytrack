@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The bottom of the Sync tab's list (panel/SyncTab): a note when there's nothing to list,
-     Show hidden, then Health Connect's setup (include_health_connect_card), the ways to bring in
-     files (include_sync_files) and the latest of the sync history (include_sync_history, the
-     whole of it in SyncHistoryActivity). -->
+     Show hidden, then Health Connect's setup (include_health_connect_card), and two tiles side by
+     side: Upload files (UploadActivity), gone for an account that can't upload, and Sync history
+     (SyncHistoryActivity). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:divider="@drawable/gap_20"
@@ -32,14 +33,74 @@
 
     <include layout="@layout/include_health_connect_card" />
 
-    <include layout="@layout/include_sync_files" />
-
+    <!-- Side by side, or one over the other at a large font size (LargeText.stack). -->
     <LinearLayout
-        android:id="@+id/sync_history_section"
+        android:id="@+id/sync_tiles"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:baselineAligned="false"
+        android:divider="@drawable/gap_8_both"
+        android:orientation="horizontal"
+        android:showDividers="middle">
 
-        <include layout="@layout/include_sync_history" />
+        <LinearLayout
+            android:id="@+id/sync_upload"
+            style="@style/Widget.HoldMyTrack.Tile"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1">
+
+            <ImageView
+                style="@style/Widget.HoldMyTrack.IconTile"
+                android:contentDescription="@null"
+                android:backgroundTint="@color/hmt_accent_container"
+                android:src="@drawable/ic_upload"
+                app:tint="@color/hmt_accent_strong" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_10"
+                android:text="@string/sync_upload_title"
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleSmall" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_2"
+                android:text="@string/sync_upload_sub"
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.BodySmall"
+                android:textColor="@color/hmt_ink_secondary" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/sync_history"
+            style="@style/Widget.HoldMyTrack.Tile"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1">
+
+            <ImageView
+                style="@style/Widget.HoldMyTrack.IconTile"
+                android:contentDescription="@null"
+                android:backgroundTint="@color/hmt_accent_container"
+                android:src="@drawable/ic_history"
+                app:tint="@color/hmt_accent_strong" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_10"
+                android:text="@string/sync_history_title"
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleSmall" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/hmt_space_2"
+                android:text="@string/sync_history_sub"
+                android:textAppearance="@style/TextAppearance.HoldMyTrack.BodySmall"
+                android:textColor="@color/hmt_ink_secondary" />
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>
