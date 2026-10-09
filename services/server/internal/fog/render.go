@@ -54,8 +54,14 @@ func RenderUser(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, u
 		if err != nil {
 			return fmt.Errorf("fog: list dirty z%d tiles: %w", z, err)
 		}
-		for _, t := range dirty {
+		if len(dirty) > 0 {
 			rendered = true
+		}
+		// A level's tiles are independent of each other, so they render side by side; the
+		// next level up waits for all of them, since its tiles are built from these.
+		err = forEach(ctx, len(dirty), renderParallelism, func(ctx context.Context, i int) error {
+			t := dirty[i]
+			var err error
 			if z == Zoom {
 				err = renderAndStoreTile(ctx, pool, store, userID, z, t[0], t[1], heatmapCap)
 			} else {
@@ -64,6 +70,10 @@ func RenderUser(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, u
 			if err != nil {
 				return fmt.Errorf("fog: render z%d/%d/%d: %w", z, t[0], t[1], err)
 			}
+			return nil
+		})
+		if err != nil {
+			return err
 		}
 	}
 	return nil
@@ -159,15 +169,27 @@ func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.
 		return err
 	}
 
-	fogMasks := make([]*image.Gray, 0, len(rowsOut))
-	heatmapMasks := make([]*image.Gray, 0, len(rowsOut))
-	for _, row := range rowsOut {
-		mask, err := loadCrispMask(ctx, store, row.key)
+	// Fetched side by side: a tile many activities cross (a daily commute) has as many masks.
+	loaded := make([]*image.Gray, len(rowsOut))
+	if err := forEach(ctx, len(rowsOut), renderParallelism, func(ctx context.Context, i int) error {
+		mask, err := loadCrispMask(ctx, store, rowsOut[i].key)
 		if err != nil {
 			// One missing/corrupt mask should not fail the whole tile — every other
 			// activity through it is still real coverage. Skip and continue, the same
 			// "one bad file doesn't abort the batch" principle §5.1 applies to bulk
 			// ingest.
+			return nil
+		}
+		loaded[i] = mask
+		return nil
+	}); err != nil {
+		return err
+	}
+	fogMasks := make([]*image.Gray, 0, len(rowsOut))
+	heatmapMasks := make([]*image.Gray, 0, len(rowsOut))
+	for i, row := range rowsOut {
+		mask := loaded[i]
+		if mask == nil {
 			continue
 		}
 		fogMasks = append(fogMasks, mask)
@@ -229,19 +251,22 @@ func RenderActivityMasks(ctx context.Context, pool *pgxpool.Pool, store *storage
 		return nil
 	}
 
-	xs := make([]int32, 0, len(tiles))
-	ys := make([]int32, 0, len(tiles))
-	keys := make([]string, 0, len(tiles))
-	for _, t := range tiles {
-		x, y := t[0], t[1]
+	xs := make([]int32, len(tiles))
+	ys := make([]int32, len(tiles))
+	keys := make([]string, len(tiles))
+	// Rendered and stored side by side: a long track crosses hundreds of tiles, and storing
+	// their masks one after another cost a 1,500 km drive over three minutes of the worker.
+	if err := forEach(ctx, len(tiles), renderParallelism, func(ctx context.Context, i int) error {
+		x, y := tiles[i][0], tiles[i][1]
 		mask := renderActivityMask(projectToTile(points, x, y, Zoom)...)
 		key := activityMaskObjectKey(activityID, Zoom, x, y)
 		if err := storeTilePNG(ctx, store, key, mask); err != nil {
 			return fmt.Errorf("store activity mask z%d/%d/%d: %w", Zoom, x, y, err)
 		}
-		xs = append(xs, int32(x))
-		ys = append(ys, int32(y))
-		keys = append(keys, key)
+		xs[i], ys[i], keys[i] = int32(x), int32(y), key
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	_, err := pool.Exec(ctx, `
@@ -275,12 +300,13 @@ func RemoveActivityMasks(ctx context.Context, pool *pgxpool.Pool, store *storage
 	`, activityID, Zoom, xs, ys); err != nil {
 		return err
 	}
-	for _, t := range tiles {
+	return forEach(ctx, len(tiles), renderParallelism, func(ctx context.Context, i int) error {
+		t := tiles[i]
 		if err := store.Remove(ctx, activityMaskObjectKey(activityID, Zoom, t[0], t[1])); err != nil {
 			return fmt.Errorf("remove activity mask z%d/%d/%d: %w", Zoom, t[0], t[1], err)
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func activityMaskObjectKey(activityID string, zoom, x, y int) string {
