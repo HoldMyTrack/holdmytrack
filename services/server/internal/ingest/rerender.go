@@ -126,11 +126,11 @@ func RerenderActivityMasks(ctx context.Context, pool *pgxpool.Pool, store *stora
 		if newTiles, err = computeTouchedTiles(points, FogZoom); err != nil {
 			return err
 		}
-		if err := fog.RenderActivityMasks(ctx, pool, store, activityID, points, newTiles); err != nil {
+		if err := fog.RenderActivityMasks(ctx, pool, activityID, points, newTiles); err != nil {
 			return fmt.Errorf("render masks: %w", err)
 		}
 	}
-	if err := fog.RemoveActivityMasks(ctx, pool, store, activityID, tilesNotIn(oldTiles, newTiles)); err != nil {
+	if err := fog.RemoveActivityMasks(ctx, pool, activityID, tilesNotIn(oldTiles, newTiles)); err != nil {
 		return fmt.Errorf("remove stale masks: %w", err)
 	}
 	return MarkFogTilesDirty(ctx, pool, userID, mergeTiles(oldTiles, newTiles))

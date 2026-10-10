@@ -410,11 +410,11 @@ func reprocessActivity(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 		if newTiles, err = computeTouchedTiles(points, FogZoom); err != nil {
 			return err
 		}
-		if err := fog.RenderActivityMasks(ctx, pool, store, activityID, points, newTiles); err != nil {
+		if err := fog.RenderActivityMasks(ctx, pool, activityID, points, newTiles); err != nil {
 			return fmt.Errorf("render activity masks: %w", err)
 		}
 	}
-	if err := fog.RemoveActivityMasks(ctx, pool, store, activityID, tilesNotIn(oldTiles, newTiles)); err != nil {
+	if err := fog.RemoveActivityMasks(ctx, pool, activityID, tilesNotIn(oldTiles, newTiles)); err != nil {
 		return fmt.Errorf("remove stale masks: %w", err)
 	}
 

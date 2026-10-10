@@ -442,12 +442,6 @@ func (s *Server) handleDeleteActivity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Best-effort storage cleanup first, same order and same "log and continue" treatment
-	// demo_purge.go already established — an orphaned blob is a cleanup nuisance, never a
-	// reason to leave the DB still pointing at data the user just asked to delete.
-	if err := s.store.RemoveByPrefix(ctx, "activity-masks/"+activityID+"/"); err != nil {
-		s.log.Error("activity delete: mask cleanup failed, deleting row anyway", "activity_id", activityID, "err", err)
-	}
 	// The activity's photos (§4.27) go with it; the cascade takes their rows, so their images
 	// have to be removed explicitly — after the rows, since a copied Story's photo (§4.23) can
 	// share them and keeps them.
