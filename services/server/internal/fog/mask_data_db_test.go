@@ -5,7 +5,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -18,13 +17,13 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/tilemath"
 )
 
-// maskStore is memStore that also counts the GETs of activity mask objects.
+// maskStore is memStore that also counts the GETs it answers.
 func maskStore(t *testing.T) (*storage.Store, *storagetest.MemS3, *atomic.Int64) {
 	t.Helper()
 	mem := storagetest.New()
 	var gets atomic.Int64
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/activity-masks/") {
+		if _, lookup := r.URL.Query()["location"]; r.Method == http.MethodGet && !lookup {
 			gets.Add(1)
 		}
 		mem.ServeHTTP(w, r)
@@ -88,7 +87,8 @@ func fogTileLit(t *testing.T, mem *storagetest.MemS3, userID string, tile [2]int
 	return false
 }
 
-// A mask is stored in the database, not the store, and a render reads it back from there.
+// A mask is stored in the database, not the store, and a z14 render reads it back from there
+// without a single GET.
 func TestRenderedMaskIsReadBackWithoutTheStore(t *testing.T) {
 	pool, userID := testAccount(t)
 	ctx := context.Background()
@@ -96,53 +96,43 @@ func TestRenderedMaskIsReadBackWithoutTheStore(t *testing.T) {
 	activityID := insertActivity(t, pool, userID)
 	pts, tile := walkInOneTile()
 
-	if err := RenderActivityMasks(ctx, pool, store, activityID, pts, [][2]int{tile}); err != nil {
+	if err := RenderActivityMasks(ctx, pool, activityID, pts, [][2]int{tile}); err != nil {
 		t.Fatal(err)
 	}
-	var key *string
 	var size int
-	if err := pool.QueryRow(ctx, `
-		SELECT m.mask_object_key, length(d.png) FROM activity_tile_masks m
-		JOIN activity_tile_mask_data d USING (activity_id, zoom, tile_x, tile_y)
-		WHERE m.activity_id = $1`, activityID).Scan(&key, &size); err != nil {
-		t.Fatalf("read mask: %v", err)
-	}
-	if key != nil || size == 0 {
-		t.Fatalf("mask key %v, %d bytes; want no key and the PNG in the database", key, size)
+	if err := pool.QueryRow(ctx,
+		`SELECT length(png) FROM activity_tile_mask_data WHERE activity_id = $1`, activityID).Scan(&size); err != nil || size == 0 {
+		t.Fatalf("mask PNG: %d bytes, %v; want it in the database", size, err)
 	}
 
 	markDirty(t, pool, userID, tile)
-	if err := RenderUser(ctx, pool, store, userID); err != nil {
+	var skipped atomic.Int64
+	if err := renderAndStoreTile(ctx, pool, store, userID, Zoom, tile[0], tile[1], 1, &skipped); err != nil {
 		t.Fatal(err)
 	}
 	if n := gets.Load(); n != 0 {
-		t.Errorf("render fetched %d mask objects, want none", n)
+		t.Errorf("render made %d GETs, want none", n)
 	}
 	if !fogTileLit(t, mem, userID, tile) {
 		t.Error("fog tile has nothing revealed")
 	}
 }
 
-// A row from before the bytes moved into the database, with only an object key, is still
-// fetched from the store; one with neither is left out and counted.
-func TestRenderFallsBackToTheStoreAndCountsMissingMasks(t *testing.T) {
+// A mask row with no PNG (a restore leaves them out until rerender-coverage --masks) is left
+// out of the tile and counted; the activities beside it still show.
+func TestRenderCountsMasksWithoutPNG(t *testing.T) {
 	pool, userID := testAccount(t)
 	ctx := context.Background()
-	store, mem, gets := maskStore(t)
+	store, mem, _ := maskStore(t)
 	pts, tile := walkInOneTile()
 
-	keyed := insertActivity(t, pool, userID)
-	png, err := encodeTilePNG(renderActivityMask(projectToTile(pts, tile[0], tile[1], Zoom)...))
-	if err != nil {
+	drawn := insertActivity(t, pool, userID)
+	if err := RenderActivityMasks(ctx, pool, drawn, pts, [][2]int{tile}); err != nil {
 		t.Fatal(err)
 	}
-	key := "activity-masks/" + keyed + "/14/1/2.png"
-	mem.Put(key, png)
 	missing := insertActivity(t, pool, userID)
-	if _, err := pool.Exec(ctx, `
-		INSERT INTO activity_tile_masks (activity_id, zoom, tile_x, tile_y, mask_object_key)
-		VALUES ($1, $3, $4, $5, $6), ($2, $3, $4, $5, NULL)`,
-		keyed, missing, Zoom, tile[0], tile[1], key); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO activity_tile_masks (activity_id, zoom, tile_x, tile_y) VALUES ($1, $2, $3, $4)`,
+		missing, Zoom, tile[0], tile[1]); err != nil {
 		t.Fatal(err)
 	}
 	markDirty(t, pool, userID, tile)
@@ -151,14 +141,11 @@ func TestRenderFallsBackToTheStoreAndCountsMissingMasks(t *testing.T) {
 	if err := renderAndStoreTile(ctx, pool, store, userID, Zoom, tile[0], tile[1], 1, &skipped); err != nil {
 		t.Fatal(err)
 	}
-	if n := gets.Load(); n != 1 {
-		t.Errorf("render fetched %d mask objects, want the one key-only row's", n)
-	}
 	if n := skipped.Load(); n != 1 {
-		t.Errorf("skipped %d masks, want the one with neither bytes nor key", n)
+		t.Errorf("skipped %d masks, want the one without a PNG", n)
 	}
 	if !fogTileLit(t, mem, userID, tile) {
-		t.Error("fog tile left out the key-only mask")
+		t.Error("fog tile left out the mask that has its PNG")
 	}
 }
 
@@ -166,7 +153,6 @@ func TestRenderFallsBackToTheStoreAndCountsMissingMasks(t *testing.T) {
 func TestMaskBytesGoWithTheirRow(t *testing.T) {
 	pool, userID := testAccount(t)
 	ctx := context.Background()
-	store, _, _ := maskStore(t)
 	pts, tile := walkInOneTile()
 	neighbour := [2]int{tile[0] + 1, tile[1]}
 	count := func(activityID string) int {
@@ -178,10 +164,10 @@ func TestMaskBytesGoWithTheirRow(t *testing.T) {
 	}
 
 	edited := insertActivity(t, pool, userID)
-	if err := RenderActivityMasks(ctx, pool, store, edited, pts, [][2]int{tile, neighbour}); err != nil {
+	if err := RenderActivityMasks(ctx, pool, edited, pts, [][2]int{tile, neighbour}); err != nil {
 		t.Fatal(err)
 	}
-	if err := RemoveActivityMasks(ctx, pool, store, edited, [][2]int{neighbour}); err != nil {
+	if err := RemoveActivityMasks(ctx, pool, edited, [][2]int{neighbour}); err != nil {
 		t.Fatal(err)
 	}
 	if n := count(edited); n != 1 {
@@ -189,7 +175,7 @@ func TestMaskBytesGoWithTheirRow(t *testing.T) {
 	}
 
 	deleted := insertActivity(t, pool, userID)
-	if err := RenderActivityMasks(ctx, pool, store, deleted, pts, [][2]int{tile}); err != nil {
+	if err := RenderActivityMasks(ctx, pool, deleted, pts, [][2]int{tile}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := pool.Exec(ctx, `DELETE FROM activities WHERE id = $1`, deleted); err != nil {

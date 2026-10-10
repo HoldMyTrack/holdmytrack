@@ -19,15 +19,9 @@ const demoPurgeBatchSize = 100
 // migrations/0001_users_and_auth.sql; VISION.md §8.2) whose expiry has passed. `DELETE FROM users` cascades the
 // DB side of this for free — activities, activity_streams, activity_tile_masks, fog_tiles,
 // jobs and sessions all reference user_id ON DELETE CASCADE — but object storage has no
-// foreign keys, so raw uploads and rendered tile pyramids have to be swept explicitly first.
-//
-// Known, accepted gap: this sweeps raw/{userID}/, fog/{userID}/ and heatmap/{userID}/ (all
-// namespaced by user id — server.go and internal/fog/render.go's object key builders) but
-// not activity-masks/{activityID}/, which is namespaced by activity id instead. Those are
-// small per-tile crisp masks, not the raw payload or a full tile pyramid — orphaning them
-// for a purged demo account is a low-cost simplification, not a correctness bug (nothing
-// ever looks them up once activity_tile_masks' own rows are gone with the cascade), and can
-// be swept properly later if it ever measures as worth it.
+// foreign keys, so raw uploads and rendered tile pyramids have to be swept explicitly first:
+// raw/{userID}/, fog/{userID}/ and heatmap/{userID}/. Activity masks are rows (ADR-0040), so
+// the cascade takes them.
 func purgeExpiredDemoUsers(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger) error {
 	rows, err := pool.Query(ctx, `
 		SELECT id FROM users WHERE demo_expires_at IS NOT NULL AND demo_expires_at < NOW()

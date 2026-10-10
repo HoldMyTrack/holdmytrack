@@ -81,30 +81,13 @@ func purgeAccount(ctx context.Context, pool *pgxpool.Pool, store *storage.Store,
 		return nil
 	}
 
-	activityRows, err := pool.Query(ctx, `SELECT id FROM activities WHERE user_id = $1`, userID)
-	if err != nil {
-		return fmt.Errorf("activities: %w", err)
-	}
-	var prefixes []string
-	for activityRows.Next() {
-		var id string
-		if err := activityRows.Scan(&id); err != nil {
-			activityRows.Close()
-			return fmt.Errorf("activities: scan: %w", err)
-		}
-		prefixes = append(prefixes, "activity-masks/"+id+"/")
-	}
-	activityRows.Close()
-	if err := activityRows.Err(); err != nil {
-		return fmt.Errorf("activities: rows: %w", err)
-	}
-	prefixes = append(prefixes,
-		"raw/"+userID+"/", "fog/"+userID+"/", "heatmap/"+userID+"/", "exports/"+userID+"/",
+	prefixes := []string{
+		"raw/" + userID + "/", "fog/" + userID + "/", "heatmap/" + userID + "/", "exports/" + userID + "/",
 		// imports/: archives uploaded before .zip import was removed (ADR-0039).
-		"imports/"+userID+"/")
+		"imports/" + userID + "/",
+	}
 	// Side by side: each prefix is a listing and a bulk delete, round trips to object storage,
-	// and an account has one per activity — one after another, a 1,000-activity account took
-	// about 5.5 minutes on production (docs/PERFORMANCE.md, 2026-10-09).
+	// and a big account's fog/ and heatmap/ hold thousands of tiles.
 	// A failed prefix is logged and the rest go on; ForEach itself fails only when the worker
 	// is shutting down, and then the account is left for the next sweep rather than its row
 	// deleted with objects still listed.

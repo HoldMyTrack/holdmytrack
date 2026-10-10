@@ -122,13 +122,6 @@ Skip them and "Try it now" opens an empty demo account (`SPEC.md` FR-2.2), Fog/H
 
 A deploy that changes how Fog/Heatmap tiles are drawn (`services/server/internal/fog`, `IMPLEMENTATION.md` §4.2) needs every account's tiles re-rendered once, or they keep the old look: `docker compose -f compose.prod.yml --env-file .env.prod run --rm api rerender-coverage`, with `--masks` when the change is to the stroke itself (its width), to the tile size (`fog.TileSize`), or to which tiles a track reaches (`internal/tilemath`), which redraws every activity's stored masks first and takes a while. It only queues the renders, so the worker must be up; they finish in the background.
 
-Activity masks moved from R2 into Postgres (`activity_tile_mask_data`, ADR-0040). Once, on the deploy that brings `migrations/0030_activity_tile_mask_data.sql`, run `rerender-coverage --masks` to redraw every mask into the database. Until then a render reads the old objects. When it reports no failures and the first command below prints 0 (no mask left without its PNG), delete the old objects with the second:
-
-```
-docker compose -f compose.prod.yml --env-file .env.prod exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT count(*) FROM activity_tile_masks m WHERE NOT EXISTS (SELECT 1 FROM activity_tile_mask_data d WHERE (d.activity_id, d.zoom, d.tile_x, d.tile_y) = (m.activity_id, m.zoom, m.tile_x, m.tile_y))"'
-docker compose -f compose.prod.yml --env-file .env.prod run --rm rclone purge data:activity-masks
-```
-
 The demo history is picked from real activities on a deployment. To copy some out, with their ids from the admin panel's activity list:
 
 ```
@@ -282,7 +275,7 @@ That's the rename table in `services/server/internal/web/timezones_data.go` (`ti
 
 ## 11. Backups and the restore drill
 
-`scripts/backup.sh` runs nightly: it dumps Postgres, keeps the dump in `/srv/holdmytrack-backups/postgres/` for a week, and copies it to a second R2 bucket. It then syncs the app bucket's `raw/`, `photos/` and `avatars/` into the same bucket. `fog/`, `heatmap/` and `activity-masks/` aren't copied, and the dump leaves out the data of `activity_tile_mask_data` (the activity masks' PNGs), because `rerender-coverage --masks` rebuilds them all (ADR-0029, ADR-0040). `scripts/restore-drill.sh` runs monthly and proves the copies restore. Both run rclone from `compose.prod.yml`'s `rclone` service, which `up` never starts, so nothing needs installing on the host.
+`scripts/backup.sh` runs nightly: it dumps Postgres, keeps the dump in `/srv/holdmytrack-backups/postgres/` for a week, and copies it to a second R2 bucket. It then syncs the app bucket's `raw/`, `photos/` and `avatars/` into the same bucket. `fog/` and `heatmap/` aren't copied, and the dump leaves out the data of `activity_tile_mask_data` (the activity masks' PNGs), because `rerender-coverage --masks` rebuilds them all (ADR-0029, ADR-0040). `scripts/restore-drill.sh` runs monthly and proves the copies restore. Both run rclone from `compose.prod.yml`'s `rclone` service, which `up` never starts, so nothing needs installing on the host.
 
 **Set up.**
 

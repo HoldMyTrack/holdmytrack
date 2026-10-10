@@ -163,7 +163,7 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	// the user never actually visited. Rendering first, dirty-marking second: dirty is what
 	// tells `render_fog` this tile's aggregate needs recompositing, so the mask it would
 	// composite in should already exist by the time that runs.
-	if err := fog.RenderActivityMasks(ctx, pool, store, activityID, points, tiles); err != nil {
+	if err := fog.RenderActivityMasks(ctx, pool, activityID, points, tiles); err != nil {
 		return Result{}, fmt.Errorf("ingest: render activity masks: %w", err)
 	}
 

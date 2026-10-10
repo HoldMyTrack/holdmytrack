@@ -257,12 +257,5 @@ func (s *Server) handleActivityTrackMerge(w http.ResponseWriter, r *http.Request
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	// The rows are gone and their tiles dirty; their masks' images are the one thing the
-	// cascade can't reach — best effort, as in handleDeleteActivity.
-	for _, id := range removed {
-		if err := s.store.RemoveByPrefix(ctx, "activity-masks/"+id+"/"); err != nil {
-			s.log.Error("track merge: mask cleanup failed", "activity_id", id, "err", err)
-		}
-	}
 	writeJSON(w, http.StatusOK, trackMergeResponse{ID: survivor, Removed: removed})
 }

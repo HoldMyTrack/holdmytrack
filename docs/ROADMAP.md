@@ -124,6 +124,5 @@ Public pages, followers and the rest (`VISION.md` §5.7, §5.8). No steps are li
 ## Ongoing, not phase-bound
 
 - [ ] Check the Russian translation — run the Android app in Russian on a real device, and have a native speaker review the Russian across the web, the server's pages and emails, and the app (`IMPLEMENTATION.md` §4.21, ADR-0014).
-- [ ] Render a tile's own round trips side by side: `renderPyramidLevel` fetches its eight child PNGs one after another, and every tile stores its Fog and Heatmap PNGs one after another (`IMPLEMENTATION.md` §4.2 "Invalidation"). With masks in Postgres these are most of a render, about 10 round trips a pyramid tile; a 1,000-activity account still took 6–7 minutes at 80 ms a round trip (`PERFORMANCE.md`, 2026-10-10 dev).
-- [ ] Once production has no `activity_tile_masks` row with a `mask_object_key` (`DEPLOY.md` §6), drop the column in a migration, with `renderAndStoreTile`'s object-store fallback, `RemoveActivityMasks`' object removal and the `activity-masks/{id}/` prefix removals on delete, edit and purge (ADR-0040).
+- [ ] Drop `activity_tile_masks.mask_object_key` in a migration, in a release after the one that stopped using it (`DEVELOPMENT.md` "Writing a migration"): nothing reads or writes it since masks moved into Postgres (ADR-0040).
 - [ ] Re-measure the funding-model assumptions (`VISION.md` §4.3, §6.3) against real usage once any real users exist, rather than assuming the estimates hold — they feed Milestone 2's exit gate.

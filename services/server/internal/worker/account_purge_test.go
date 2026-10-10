@@ -30,7 +30,7 @@ func TestPurgeDeletedAccountRemovesItsObjectsAndRows(t *testing.T) {
 	mine := []string{
 		"raw/" + userID + "/a.gpx", "fog/" + userID + "/14/1/2.png", "heatmap/" + userID + "/14/1/2.png",
 		"photos/" + userID + "/p1", "photos/" + userID + "/p1-thumb", "avatars/" + userID,
-		"activity-masks/" + activityID + "/14/1/2.png", "exports/" + userID + "/e1/1.zip",
+		"exports/" + userID + "/e1/1.zip",
 	}
 	other := []string{"raw/someone-else/a.gpx", "avatars/" + userID + "x"}
 	for _, k := range append(append([]string{}, mine...), other...) {
