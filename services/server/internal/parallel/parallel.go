@@ -5,12 +5,16 @@ package parallel
 
 import (
 	"context"
+	"fmt"
+	"runtime/debug"
 	"sync"
 )
 
 // ForEach runs fn(ctx, i) for every i in [0, n), at most limit at a time, and returns the
 // first error. After an error no further calls start, and the ctx the running ones were given
-// is cancelled; it waits for those to return before it does.
+// is cancelled; it waits for those to return before it does. A call that panics fails the same
+// way, its panic and stack the error: a panic in a goroutine of its own can't be recovered by
+// the caller (the worker's runJobSafely), and would end the process instead of the one job.
 func ForEach(ctx context.Context, n, limit int, fn func(ctx context.Context, i int) error) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -32,7 +36,7 @@ func ForEach(ctx context.Context, n, limit int, fn func(ctx context.Context, i i
 		go func(i int) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			if err := fn(ctx, i); err != nil {
+			if err := call(ctx, i, fn); err != nil {
 				once.Do(func() {
 					firstErr = err
 					cancel()
@@ -46,4 +50,14 @@ func ForEach(ctx context.Context, n, limit int, fn func(ctx context.Context, i i
 	}
 	// A parent context cancelled before any call failed (a worker shutdown).
 	return context.Cause(ctx)
+}
+
+// call is fn(ctx, i) with a panic turned into its error.
+func call(ctx context.Context, i int, fn func(ctx context.Context, i int) error) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic: %v\n%s", r, debug.Stack())
+		}
+	}()
+	return fn(ctx, i)
 }

@@ -3,6 +3,7 @@ package parallel
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -56,6 +57,21 @@ func TestForEachStopsAtTheFirstError(t *testing.T) {
 	}
 	if n := started.Load(); n > 10 {
 		t.Errorf("%d calls started after the failure, want it to stop early", n)
+	}
+}
+
+// A call that panics fails ForEach with the panic, as an error the caller can see, rather than
+// ending the process from a goroutine no caller can recover.
+func TestForEachTurnsAPanicIntoItsError(t *testing.T) {
+	err := ForEach(context.Background(), 4, 4, func(_ context.Context, i int) error {
+		if i == 2 {
+			var s []int
+			_ = s[i]
+		}
+		return nil
+	})
+	if err == nil || !strings.Contains(err.Error(), "panic: runtime error: index out of range") {
+		t.Fatalf("err = %v, want the panic", err)
 	}
 }
 

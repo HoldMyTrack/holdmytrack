@@ -277,12 +277,24 @@ func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.
 		fogObjectKey(userID, zoom, x, y), heatmapObjectKey(userID, zoom, x, y))
 }
 
+// errTileSize is decodeGray's refusal of a PNG that isn't TileSize square.
+var errTileSize = errors.New("fog: stored tile is not TileSize")
+
 // decodeGray decodes a PNG this package wrote. png.Decode hands back *image.Gray for those
 // grayscale PNGs, but convert explicitly rather than assume the concrete type.
+//
+// One of another size is refused: every raster here indexes a TileSize square, so a tile or
+// mask drawn before TileSize last changed (ADR-0041) — until `rerender-coverage --masks` redraws
+// it — would read past a smaller one's end (downsampleQuadrants) or land squashed in a corner of
+// the tile (compositeFogMask) instead. A child tile refused fails its render; an activity's
+// mask refused is skipped and counted, as an unreadable one is.
 func decodeGray(r io.Reader) (*image.Gray, error) {
 	img, err := png.Decode(r)
 	if err != nil {
 		return nil, err
+	}
+	if b := img.Bounds(); b.Dx() != TileSize || b.Dy() != TileSize {
+		return nil, fmt.Errorf("%w: %dx%d, want %d (rerender-coverage --masks redraws it)", errTileSize, b.Dx(), b.Dy(), TileSize)
 	}
 	if gray, ok := img.(*image.Gray); ok {
 		return gray, nil
