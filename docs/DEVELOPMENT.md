@@ -38,7 +38,7 @@ A count needs every plural form its language uses: `.one`/`.other` in English, `
 
 To see a page in Russian, use the header's language menu, set the browser's language, or send the header: `curl -H 'Accept-Language: ru' localhost:5173/help`. The menu's `hmt_lang` cookie beats the header, and a signed-in account's Language setting beats both. The dev server never caches pages, so there's no stale language to clear; production caches each signed-out page per language.
 
-Adding a *language* is a catalog on each surface, `about`/`help` translations, its plural rule (`i18n.PluralForm`) and separators (`Localizer.separators`), and its code in `i18n.Supported`/`Names`, `locales_config.xml` and `build.gradle.kts`'s `localeFilters`. ADR-0014 lists the rest.
+Adding a *language* is a catalog on each surface, `about`/`help` translations, its plural rule (`i18n.PluralForm`) and separators (`Localizer.separators`), and its code in `i18n.Supported`/`Names`, `locales_config.xml` and `build.gradle.kts`'s `localeFilters`, then `npm run build:style` for the map's served styles in that language. ADR-0014 lists the rest.
 
 ### Seeding a fresh database
 

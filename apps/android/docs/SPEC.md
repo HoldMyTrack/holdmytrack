@@ -153,7 +153,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 **Description**: A full-screen map renders on launch for a signed-in account; with no session, the sign-in screen (FR-1.1) is shown instead and the map is not created at all.
 
-**Behavior**: The style document is fetched unauthenticated from `GET /v1/map/style/{flavor}`, `flavor` chosen from the app's night mode (`light` or `dark` — two of the five the API serves), which is the system's day/night setting unless the You tab's Theme overrides it (FR-2.9); the app offers no way to pick the other three. The camera opens on a whole-world view (equator, zoom 1) until an account's own activity extent is known (FR-2.3). A style load failure is reported on screen, not only in logcat: a notice under the chrome reads "The map couldn't load.", with the API origin and MapLibre's error in small print and Try again, which loads the style afresh.
+**Behavior**: The style document is fetched unauthenticated from `GET /v1/map/style/{flavor}?lang=`, `flavor` chosen from the app's night mode (`light` or `dark` — two of the five the API serves), which is the system's day/night setting unless the You tab's Theme overrides it (FR-2.9); the app offers no way to pick the other three. `lang` is the app's language, so the map's place labels follow it (root `docs/SPEC.md` FR-13.1). The camera opens on a whole-world view (equator, zoom 1) until an account's own activity extent is known (FR-2.3). A style load failure is reported on screen, not only in logcat: a notice under the chrome reads "The map couldn't load.", with the API origin and MapLibre's error in small print and Try again, which loads the style afresh.
 
 ### FR-2.2 Three map modes: Normal, Fog of War, Heatmap
 

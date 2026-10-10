@@ -6,10 +6,6 @@ Once an idea here is decided, it moves out: accepted work goes to `docs/ROADMAP.
 
 ---
 
-### Place names on the Android map in the reader's language
-
-The web map's labels follow the page's language (FR-13.1), but the Android app's map reads the served style document (`GET /v1/map/style/{flavor}`), which is built once, ahead of time, in English (`npm run build:style`, checked by `verify:style`). Following the app's language there would mean one served style per flavor and language, chosen by the request.
-
 ### More languages, and language-specific URLs
 
 English and Russian ship (ADR-0014). Every further language is a translation pass over three catalogs and two prose pages, which is cheap once someone can review it. If search traffic in other languages ever matters, `/ru/help`-style URLs with `hreflang` would let search engines index each language, which the current one-URL-per-page approach can't.

@@ -2191,11 +2191,13 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      * Flavor follows the app's night mode, the same one its own colors follow: the system's
      * day/night setting, or the You tab's Theme toggle when that overrides it (`AppTheme`). The
      * API serves five (`light`, `dark`, `white`, `black`, `grayscale`); this picks between the
-     * two general-purpose ones.
+     * two general-purpose ones. Its labels are in the app's language (`?lang=`, root
+     * `docs/SPEC.md` FR-13.1); the server answers English for one it has no catalog for.
      */
     private fun styleUrl(): String {
         val flavor = if (isNight()) "dark" else "light"
-        return "${BuildConfig.API_BASE_URL}/v1/map/style/$flavor"
+        val lang = resources.configuration.locales[0].language
+        return "${BuildConfig.API_BASE_URL}/v1/map/style/$flavor?lang=$lang"
     }
 
     private fun isNight(): Boolean =
