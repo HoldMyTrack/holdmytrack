@@ -20,12 +20,16 @@ func TestFormat(t *testing.T) {
 		FormatElevation(en, 1000, true):         "3,281 ft",
 		FormatHours(en, 5400):                   "2",
 		ShortDate(en, "2026-09-08"):             "Sep 8",
+		ShortDateYear(en, "2026-09-08"):         "Sep 8, 2026",
+		MonthYear(en, "2026-09-01"):             "Sep 2026",
 		FormatDistance(ru, 12345, false):        "12,3 км",
 		FormatDistance(ru, 12345, true):         "7,7 ми",
 		FormatTotalDistance(ru, 8400, false):    "8,4 км",
 		FormatTotalDistance(ru, 1234567, false): "1\u00a0235 км",
 		FormatElevation(ru, 1000, true):         "3\u00a0281 фт",
 		ShortDate(ru, "2026-09-08"):             "8 сент.",
+		ShortDateYear(ru, "2026-09-08"):         "8 сент. 2026 г.",
+		MonthYear(ru, "2026-05-01"):             "май 2026 г.",
 	} {
 		if got != want {
 			t.Errorf("got %q, want %q", got, want)

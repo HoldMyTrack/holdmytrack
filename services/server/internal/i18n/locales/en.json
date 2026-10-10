@@ -208,6 +208,8 @@
   "unit.size.mb": "{v} MB",
   "unit.size.gb": "{v} GB",
   "date.short": "{month} {day}",
+  "date.short_year": "{month} {day}, {year}",
+  "date.month_year": "{month} {year}",
   "month.short.1": "Jan",
   "month.short.2": "Feb",
   "month.short.3": "Mar",

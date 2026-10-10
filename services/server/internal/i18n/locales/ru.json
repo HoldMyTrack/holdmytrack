@@ -212,6 +212,8 @@
   "unit.size.mb": "{v} МБ",
   "unit.size.gb": "{v} ГБ",
   "date.short": "{day} {month}",
+  "date.short_year": "{day} {month} {year} г.",
+  "date.month_year": "{month} {year} г.",
   "month.short.1": "янв.",
   "month.short.2": "февр.",
   "month.short.3": "мар.",
