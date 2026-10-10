@@ -82,7 +82,7 @@ Step 4 was the riskiest part of the whole design going in: SwiftShader WebGL und
 
 Also confirmed against a live stack, not assumed:
 
-- `docker compose up` brings up `web`, `db`, `rustfs`, `migrate`, `api` and `worker` together; `migrate` applies every `*.sql` file under `services/server/migrations/` (embedded via `go:embed`, tracked in `schema_migrations`) and exits.
+- `docker compose up` brings up `web`, `db`, `rustfs`, `migrate`, `api` and `worker` together; `migrate` applies every `*.sql` file under `services/server/migrations/` (embedded via `go:embed`, tracked in `schema_migrations`) and exits. It holds a Postgres advisory lock while it runs, so the Go test packages that migrate the test database at once take turns.
 - A real `.gpx` upload (`curl -F file=@sample.gpx http://localhost:8080/v1/activities/upload`) round-trips through the job queue into `activities` and `activity_streams`, with a correctly typed `LINESTRING M` trajectory.
 - A real `.tcx` upload round-trips the same way; the heart rate in it is ignored (ADR-0017).
 - **Idempotency** (`IMPLEMENTATION.md` §4.0's explicit invariant): the same file uploaded twice sequentially returns `already_processed` from the fast-path check; five *concurrent* uploads of identical new content all enqueue (the fast path can't see each other), but the persist-time `ON CONFLICT (user_id, source, external_id) DO NOTHING` still collapses them to exactly one `activities` row and one `activity_streams` row.
