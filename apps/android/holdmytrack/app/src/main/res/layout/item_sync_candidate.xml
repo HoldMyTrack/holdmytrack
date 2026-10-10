@@ -4,7 +4,8 @@
      and time (or a recording's name) over "[date ·] distance · type · where it is", and "Overlaps
      Morning walk" when it covers the time of an activity the account has; that text is the
      row's tap target: its line picked out on the map and flown to. A Hidden badge while hidden
-     rows are shown, and a recording's Edit and Delete. Swiped aside, it's hidden. -->
+     rows are shown, and a recording's Edit and Delete. Swiped aside, it's hidden. Once sent and
+     until it's on the map, the tile spins and the note line says "Adding to your map…". -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -35,6 +36,18 @@
             android:padding="9dp"
             android:src="@drawable/ic_route"
             app:tint="@color/hmt_ink_secondary" />
+
+        <com.google.android.material.progressindicator.CircularProgressIndicator
+            android:id="@+id/candidate_processing"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:indeterminate="true"
+            android:visibility="gone"
+            app:indicatorColor="@color/hmt_accent"
+            app:indicatorSize="24dp"
+            app:trackThickness="3dp" />
     </FrameLayout>
 
     <LinearLayout

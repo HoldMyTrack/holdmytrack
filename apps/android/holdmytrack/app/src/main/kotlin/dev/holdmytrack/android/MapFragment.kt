@@ -82,6 +82,7 @@ import dev.holdmytrack.android.panel.PrivateLocationEditor
 import dev.holdmytrack.android.panel.PanelState
 import dev.holdmytrack.android.panel.SyncTab
 import dev.holdmytrack.android.sync.Candidate
+import dev.holdmytrack.android.sync.SyncProgress
 import dev.holdmytrack.android.recording.RecordButton
 import dev.holdmytrack.android.recording.RecordingFormat
 import dev.holdmytrack.android.recording.RecordingService
@@ -247,6 +248,10 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
     /** Re-reads the list while any of it is Pending, the web's `EDIT_PENDING_POLL_MS`. */
     private val pendingPoll = Runnable { reloadList() }
+
+    /** Something the Sync tab sent reached the map, whichever tab shows: the list, its days and
+     *  the tiles catch up. Before that its job is only queued, with no row to show Pending. */
+    private val syncProgressListener = SyncProgress.Listener(onChange = {}, onLanded = { onSyncedFromPhone() })
     private lateinit var dateFooter: View
     private lateinit var zoomLevelNotice: ZoomLevelNotice
     private lateinit var dateSlider: DateRangeSlider
@@ -2209,6 +2214,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     override fun onStart() {
         super.onStart()
         mapView.onStart()
+        SyncProgress.addListener(syncProgressListener)
         recorderBound = requireContext().bindService(Intent(requireContext(), RecordingService::class.java), recorderConnection, Context.BIND_AUTO_CREATE)
     }
 
@@ -2251,6 +2257,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         // Health Connect's routes can't be read in the background (`docs/IMPLEMENTATION.md` §4.0).
         if (::panel.isInitialized) panel.syncTab.pause()
         if (::mapView.isInitialized) mapView.removeCallbacks(pendingPoll)
+        SyncProgress.removeListener(syncProgressListener)
         if (recorderBound) {
             recorder?.onChange = null
             requireContext().unbindService(recorderConnection)

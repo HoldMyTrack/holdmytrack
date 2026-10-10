@@ -35,6 +35,7 @@ import dev.holdmytrack.android.sync.HealthConnectCard
 import dev.holdmytrack.android.sync.HealthConnectCard.Companion.isReadable
 import dev.holdmytrack.android.sync.HiddenCandidates
 import dev.holdmytrack.android.sync.SyncCandidates
+import dev.holdmytrack.android.sync.SyncProgress
 import dev.holdmytrack.android.sync.SyncReport
 import dev.holdmytrack.android.sync.SyncRunner
 import dev.holdmytrack.android.ui.LargeText
@@ -135,6 +136,9 @@ class SyncTab(
     private var loadJob: Job? = null
     private var runJob: Job? = null
 
+    /** A row on its way landed — it leaves the list — or failed: it's back, and says so. */
+    private val progressListener = SyncProgress.Listener(onChange = ::progressed, onLanded = {})
+
     init {
         list.adapter = ConcatAdapter(ViewAdapter(head), rows, ViewAdapter(foot))
         ItemTouchHelper(SwipeToHide()).attachToRecyclerView(list)
@@ -160,12 +164,15 @@ class SyncTab(
         highlight = null
         results.visibility = View.GONE
         problems.visibility = View.GONE
+        SyncProgress.addListener(progressListener)
+        showFailed()
         refresh()
     }
 
     /** The tab went: the map's lines go, and so does anything still reading or sending. */
     fun stop() {
         showing = false
+        SyncProgress.removeListener(progressListener)
         pause()
         onCandidates(emptyList(), null)
     }
@@ -211,7 +218,7 @@ class SyncTab(
             loading = false
             render()
             if (!framed) {
-                val all = shown()
+                val all = drawn()
                 if (all.isNotEmpty()) {
                     framed = true
                     onFrame(all)
@@ -233,8 +240,14 @@ class SyncTab(
                 try {
                     val read = SyncCandidates.readHealthConnect(client)
                     val ids = read.sessions.map { it.externalId }
-                    known = if (ids.isEmpty()) emptySet() else HoldMyTrackApi.syncKnown(HoldMyTrackApi.SOURCE_HEALTH_CONNECT, ids)
+                    val answer = if (ids.isEmpty()) null else HoldMyTrackApi.syncKnown(HoldMyTrackApi.SOURCE_HEALTH_CONNECT, ids)
+                    known = answer?.known.orEmpty()
                     sessions = read.sessions
+                    // Sent before the tab last closed, or from another phone, and not on the map
+                    // yet: listed as on its way, like what this tab just sent.
+                    answer?.processing?.takeIf { it.isNotEmpty() }?.let { processing ->
+                        SyncProgress.add(activity, read.sessions.filter { it.externalId in processing })
+                    }
                     complete = read.refused == 0
                     if (read.refused > 0) sourceProblem = res.getQuantityString(R.plurals.sync_routes_refused, read.refused, read.refused)
                 } catch (e: CancellationException) {
@@ -265,7 +278,9 @@ class SyncTab(
             emptyMap()
         } else {
             try {
-                HoldMyTrackApi.activityOverlaps(all().map { OverlapSpan(it.key, it.startedAt, it.endedAt) })
+                // What's on its way would only overlap itself once it lands.
+                val waiting = all().filterNot { SyncProgress.isProcessing(it.key) }
+                HoldMyTrackApi.activityOverlaps(waiting.map { OverlapSpan(it.key, it.startedAt, it.endedAt) })
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -276,15 +291,25 @@ class SyncTab(
 
     private fun hiddenStore() = HiddenCandidates(activity, Session.email)
 
-    /** Everything waiting, hidden or not. */
-    private fun all(): List<Candidate> = SyncCandidates.listed(sessions, known, recordings, hidden, showHidden = true)
+    /** Everything waiting, hidden or not, and what's on its way to the map ([SyncProgress]). */
+    private fun all(): List<Candidate> = withInFlight(SyncCandidates.listed(sessions, known, recordings, hidden, showHidden = true))
 
     /** What the list shows: hidden rows only with Show hidden, and only the chosen types. */
     private fun shown(): List<Candidate> =
-        SyncCandidates.listed(sessions, known, recordings, hidden, showHidden)
+        withInFlight(SyncCandidates.listed(sessions, known, recordings, hidden, showHidden))
             .filter { types.isEmpty() || it.activityType in types }
 
-    private fun sendable(): List<Candidate> = shown().filter { it.key in ticked && it.key !in hidden }
+    /** Sent and not landed yet: the server knows a session, a recording is off the phone, so
+     *  neither is in [SyncCandidates.listed] — they're listed from [SyncProgress] instead. */
+    private fun withInFlight(listed: List<Candidate>): List<Candidate> =
+        (listed + SyncProgress.candidates).distinctBy { it.key }.sortedByDescending { it.startedAt }
+
+    private fun processing(candidate: Candidate) = SyncProgress.isProcessing(candidate.key)
+
+    /** What the map draws dashed: what's on its way will be drawn as itself once it lands. */
+    private fun drawn(): List<Candidate> = shown().filterNot(::processing)
+
+    private fun sendable(): List<Candidate> = shown().filter { it.key in ticked && it.key !in hidden && !processing(it) }
 
     private fun render() {
         if (!showing) return
@@ -302,7 +327,7 @@ class SyncTab(
         sourceNote.setTextColor(activity.getColor(if (sourceProblem != null) R.color.hmt_danger else R.color.hmt_ink_meta))
         sourceNote.visibility = if (!demo && readiness?.isReadable() == true) View.VISIBLE else View.GONE
 
-        val tickable = shown.filter { it.key !in hidden }
+        val tickable = shown.filter { it.key !in hidden && !processing(it) }
         filters.visibility = if (everything.isEmpty()) View.GONE else View.VISIBLE
         selectAll.visibility = if (tickable.isEmpty() || demo) View.GONE else View.VISIBLE
         selectAll.setText(if (tickable.isNotEmpty() && tickable.all { it.key in ticked }) R.string.sync_select_none else R.string.sync_select_all)
@@ -331,7 +356,7 @@ class SyncTab(
         syncNow.isEnabled = !demo && !running && sending.isNotEmpty()
         syncNow.text = if (sending.isEmpty()) res.getString(R.string.sync_now) else res.getString(R.string.sync_send, sending.size)
 
-        onCandidates(shown, highlight)
+        onCandidates(shown.filterNot(::processing), highlight)
     }
 
     /** One chip per type listed, when there's more than one to choose between. */
@@ -363,13 +388,13 @@ class SyncTab(
 
     /** Ticks every row shown, or, when they all are, unticks them. */
     private fun toggleAll() {
-        val tickable = shown().filter { it.key !in hidden }.map { it.key }
+        val tickable = shown().filter { it.key !in hidden && !processing(it) }.map { it.key }
         if (tickable.all { it in ticked }) ticked -= tickable.toSet() else ticked += tickable
         render()
     }
 
     private fun toggle(key: String) {
-        if (key in hidden) return
+        if (key in hidden || SyncProgress.isProcessing(key)) return
         if (!ticked.remove(key)) ticked += key
         render()
     }
@@ -431,7 +456,7 @@ class SyncTab(
                 val report = SyncRunner(store, res).send(sending) { sent ->
                     tickedLine.text = res.getString(R.string.sync_progress, sent, sending.size)
                 }
-                landed(report)
+                landed(report, sending)
                 show(report)
                 if (report.landed.isNotEmpty()) onSynced()
             } catch (e: CancellationException) {
@@ -446,13 +471,36 @@ class SyncTab(
         render()
     }
 
-    /** What the server has now leaves the list: a session is known, a recording is gone. */
-    private fun landed(report: SyncReport) {
+    /** What the server has now is on its way to the map ([SyncProgress]): listed as that until
+     *  it lands, no longer as something to tick — a session is known, a recording is gone. */
+    private fun landed(report: SyncReport, sent: List<Candidate>) {
         val landedSessions = sessions.filter { it.key in report.landed }.map { it.externalId }
         known = known + landedSessions
         recordings = recordings.filterNot { it.key in report.landed }
         ticked -= report.landed
         if (highlight in report.landed) highlight = null
+        SyncProgress.add(activity, sent.filter { it.key in report.landed })
+    }
+
+    /** [SyncProgress] moved on. A failed one is offered again: a session no longer counts as
+     *  known, and a recording is back in the store, so the list is read again. */
+    private fun progressed() {
+        if (!showing) return
+        if (showFailed()) refresh()
+        render()
+    }
+
+    /** Says which sent rows failed since last asked — even while the tab was away — and
+     *  whether any did. */
+    private fun showFailed(): Boolean {
+        val failed = SyncProgress.takeFailed()
+        if (failed.isEmpty()) return false
+        val format = DATE_FORMAT.withZone(ZoneId.systemDefault())
+        val lines = failed.map { res.getString(R.string.sync_row_failed, format.format(it.startedAt), RecordingTypes.format(res, it.activityType)) }
+        val earlier = problems.text.takeIf { problems.visibility == View.VISIBLE && it.isNotEmpty() }?.toString()
+        showProblems(listOfNotNull(earlier) + lines)
+        known = known - failed.map { it.externalId }.toSet()
+        return true
     }
 
     /**
@@ -490,14 +538,20 @@ class SyncTab(
             RecordingTypes.format(res, candidate.activityType),
             res.getString(if (candidate.isRecording) R.string.sync_origin_recorded else R.string.sync_origin_health_connect),
         ).joinToString(" · ")
-        val overlap = overlaps[candidate.key]?.let { o ->
-            res.getString(R.string.sync_row_overlaps, o.name.trim().ifEmpty { PanelFormat.startedAt(res, o.startedAt, o.timezone) })
+        val processing = processing(candidate)
+        val note = if (processing) {
+            res.getString(R.string.sync_row_processing)
+        } else {
+            overlaps[candidate.key]?.let { o ->
+                res.getString(R.string.sync_row_overlaps, o.name.trim().ifEmpty { PanelFormat.startedAt(res, o.startedAt, o.timezone) })
+            }
         }
         return Row(
             key = candidate.key,
             title = if (named) candidate.name else date,
             meta = meta,
-            overlap = overlap,
+            note = note,
+            processing = processing,
             type = candidate.activityType,
             recording = candidate.isRecording,
             ticked = candidate.key in ticked,
@@ -513,8 +567,11 @@ class SyncTab(
         val key: String,
         val title: String,
         val meta: String,
-        /** "Overlaps Morning walk", when it does (`docs/SPEC.md` FR-3.7). */
-        val overlap: String?,
+        /** "Adding to your map…" while it's on its way ([processing]), else "Overlaps Morning
+         *  walk", when it does (`docs/SPEC.md` FR-3.7). */
+        val note: String?,
+        /** Sent, and not on the map yet ([SyncProgress]): nothing to tick, hide or edit. */
+        val processing: Boolean,
         val type: String,
         val recording: Boolean,
         val ticked: Boolean,
@@ -542,7 +599,8 @@ class SyncTab(
         private val text: View = view.findViewById(R.id.candidate_text)
         private val title: TextView = view.findViewById(R.id.candidate_title)
         private val meta: TextView = view.findViewById(R.id.candidate_meta)
-        private val overlap: TextView = view.findViewById(R.id.candidate_overlap)
+        private val note: TextView = view.findViewById(R.id.candidate_overlap)
+        private val spinner: View = view.findViewById(R.id.candidate_processing)
         private val hiddenBadge: View = view.findViewById(R.id.candidate_hidden)
         private val edit: View = view.findViewById(R.id.candidate_edit)
         private val delete: View = view.findViewById(R.id.candidate_delete)
@@ -550,39 +608,52 @@ class SyncTab(
         var key: String? = null
             private set
 
+        var processing = false
+            private set
+
         fun bind(row: Row) {
             key = row.key
+            processing = row.processing
             itemView.isSelected = row.highlighted
             title.text = row.title
             meta.text = row.meta
-            overlap.text = row.overlap
-            overlap.visibility = if (row.overlap != null) View.VISIBLE else View.GONE
+            note.text = row.note
+            note.visibility = if (row.note != null) View.VISIBLE else View.GONE
             val alpha = if (row.hidden) HIDDEN_ALPHA else 1f
             title.alpha = alpha
             meta.alpha = alpha
-            overlap.alpha = alpha
+            note.alpha = alpha
             hiddenBadge.visibility = if (row.hidden) View.VISIBLE else View.GONE
 
             val context = itemView.context
             icon.setImageResource(if (row.ticked) R.drawable.ic_check else typeIcon(row.type))
             icon.backgroundTintList = if (row.ticked) ColorStateList.valueOf(context.getColor(R.color.hmt_accent)) else null
             icon.imageTintList = ColorStateList.valueOf(context.getColor(if (row.ticked) R.color.hmt_on_accent else R.color.hmt_ink_secondary))
-            val tickable = !row.hidden && !Session.isDemo
+            // On its way: the tile spins instead of offering a tick.
+            icon.visibility = if (row.processing) View.INVISIBLE else View.VISIBLE
+            spinner.visibility = if (row.processing) View.VISIBLE else View.GONE
+            val tickable = !row.hidden && !row.processing && !Session.isDemo
             tick.isEnabled = tickable
             tick.isClickable = tickable
-            tick.contentDescription = res.getString(if (row.ticked) R.string.sync_row_untick else R.string.sync_row_tick, row.title)
+            tick.contentDescription = when {
+                row.processing -> row.note
+                row.ticked -> res.getString(R.string.sync_row_untick, row.title)
+                else -> res.getString(R.string.sync_row_tick, row.title)
+            }
             tick.setOnClickListener { toggle(row.key) }
 
-            text.contentDescription = listOfNotNull(res.getString(R.string.sync_row_show, row.title), row.meta, row.overlap).joinToString(". ")
+            text.contentDescription = listOfNotNull(res.getString(R.string.sync_row_show, row.title), row.meta, row.note).joinToString(". ")
             text.setOnClickListener { candidate(row.key)?.let(::pick) }
             text.setOnLongClickListener {
                 if (tickable) toggle(row.key)
                 tickable
             }
 
-            edit.visibility = if (row.recording) View.VISIBLE else View.GONE
-            delete.visibility = if (row.recording) View.VISIBLE else View.GONE
-            if (row.recording) {
+            // A recording sent is off the phone already: nothing here to edit or delete.
+            val editable = row.recording && !row.processing
+            edit.visibility = if (editable) View.VISIBLE else View.GONE
+            delete.visibility = if (editable) View.VISIBLE else View.GONE
+            if (editable) {
                 // Named per row: TalkBack reads each control on its own, and "Delete" alone
                 // doesn't say which recording goes.
                 edit.contentDescription = res.getString(R.string.recorded_row_edit_named, row.title)
@@ -603,7 +674,7 @@ class SyncTab(
     /** A row swiped either way is hidden — or, a hidden one, back. The head and foot stay. */
     private inner class SwipeToHide : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.START or ItemTouchHelper.END) {
         override fun getSwipeDirs(recyclerView: RecyclerView, holder: RecyclerView.ViewHolder): Int =
-            if (holder is RowHolder && runJob == null) super.getSwipeDirs(recyclerView, holder) else 0
+            if (holder is RowHolder && !holder.processing && runJob == null) super.getSwipeDirs(recyclerView, holder) else 0
 
         override fun onMove(recyclerView: RecyclerView, holder: RecyclerView.ViewHolder, target: RecyclerView.ViewHolder) = false
 
