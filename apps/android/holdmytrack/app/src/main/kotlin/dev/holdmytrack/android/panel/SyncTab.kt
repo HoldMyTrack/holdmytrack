@@ -368,10 +368,10 @@ class SyncTab(
         if (current != listedTypes) {
             typeChips.removeAllViews()
             for (type in listedTypes) {
-                typeChips.addView(Chip(activity).apply {
+                val chip = LayoutInflater.from(activity).inflate(R.layout.item_sync_type_chip, typeChips, false) as Chip
+                typeChips.addView(chip.apply {
                     tag = type
                     text = RecordingTypes.format(res, type)
-                    isCheckable = true
                     setOnCheckedChangeListener { _, checked ->
                         if (checked) types += type else types -= type
                         render()
