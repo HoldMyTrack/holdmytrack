@@ -710,6 +710,20 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 
 **Notes**: The widths are at the equator; further from it the same zoom spans less ground (at Ohio's latitude, about a quarter less).
 
+### FR-4.16 Bike-path tiles
+
+**Inputs**: `z`, `x`, `y`; `cv`, the tile version (FR-4.11).
+
+**Outputs**: A vector tile with one layer, `bike_paths`: each cycleway or shared path that reaches into the tile, clipped to it, with `kind` (`cycleway` or `shared`) and `name`, absent when it has none. Below zoom 9, an empty tile. Below zoom 13, a path shorter than a pixel at that zoom is left out.
+
+**Behavior**:
+1. The same paths for every account, behind the session like every other map tile, and cached like them (FR-4.11). A load that changes the paths moves every account's tile version.
+2. A path is a cycleway when OpenStreetMap tags it `highway=cycleway`, and shared when it is a path, footway or bridleway tagged `bicycle=designated`. A street with a bike lane is neither.
+
+**Error cases**:
+- No session → `401`. A demo session sees the paths too.
+- Non-numeric coordinates → `400`.
+
 ## 7. FR-5 — Activities Panel
 
 ### FR-5.1 Activity list
