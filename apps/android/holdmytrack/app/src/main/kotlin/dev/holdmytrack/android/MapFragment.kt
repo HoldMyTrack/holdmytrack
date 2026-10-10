@@ -577,6 +577,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
                 renderDateFooter()
                 // The empty map's notice points to Sync, so it steps aside there.
                 updateNoticeVisibility()
+                // What's already synced steps aside for what's on offer.
+                style?.takeIf { overlaysAttached }?.let { MapOverlays.setSyncing(it, tab == PanelTab.SYNC, mode) }
                 // The bottom bar's Stories is this tab, so the bar follows it.
                 host?.onPanelTabChanged(tab)
             },
@@ -1026,8 +1028,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             renderTrackMetrics()
             // A new style has none of the circles; draw them again if the editor has the map.
             privateEditor.onStyleReady()
-            // Nor the Sync tab's lines.
+            // Nor the Sync tab's lines, which the account's tracks still step aside for.
             drawSyncCandidates(syncCandidates, syncHighlight)
+            MapOverlays.setSyncing(loaded, ::panel.isInitialized && panel.tab == PanelTab.SYNC, mode)
             if (isRecording()) MapOverlays.setRecording(loaded, true, mode)
             frameActivities()
             checkTileVersion()
