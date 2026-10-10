@@ -155,6 +155,8 @@ type syncKnownRequest struct {
 
 type syncKnownResponse struct {
 	Known []string `json:"known"`
+	// The known ones whose ingest hasn't finished: sent, not on the map yet.
+	Processing []string `json:"processing"`
 }
 
 // handleSyncKnown serves IMPLEMENTATION.md §4.0.3's `POST /v1/sync/known`: which of a phone's
@@ -182,7 +184,7 @@ func (s *Server) handleSyncKnown(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	ctx := r.Context()
-	known, err := ingest.KnownExternalIDs(ctx, s.pool, userIDFromContext(ctx), req.Source, req.ExternalIDs)
+	known, processing, err := ingest.KnownExternalIDs(ctx, s.pool, userIDFromContext(ctx), req.Source, req.ExternalIDs)
 	if err != nil {
 		s.log.Error("sync known failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -191,8 +193,11 @@ func (s *Server) handleSyncKnown(w http.ResponseWriter, r *http.Request) {
 	if known == nil {
 		known = []string{}
 	}
+	if processing == nil {
+		processing = []string{}
+	}
 	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, http.StatusOK, syncKnownResponse{Known: known})
+	writeJSON(w, http.StatusOK, syncKnownResponse{Known: known, Processing: processing})
 }
 
 // syncItem validates one batch entry and turns it into the item EnqueueRaw takes, or returns

@@ -433,12 +433,14 @@ func TestSyncKnownAnswersWhatTheAccountHas(t *testing.T) {
 		}
 		d.decode(d.do(as, http.MethodPost, "/v1/sync/activities", map[string]any{"source": source, "activities": acts}), http.StatusOK, nil)
 	}
-	known := func(ids ...string) []string {
+	ask := func(ids ...string) syncKnownResponse {
 		var resp syncKnownResponse
 		d.decode(d.do(me, http.MethodPost, "/v1/sync/known", map[string]any{"source": "healthconnect", "external_ids": ids}), http.StatusOK, &resp)
 		slices.Sort(resp.Known)
-		return resp.Known
+		slices.Sort(resp.Processing)
+		return resp
 	}
+	known := func(ids ...string) []string { return ask(ids...).Known }
 
 	sync(me, "healthconnect", "ingested")
 	job := d.latestIngestJob(me)
@@ -453,8 +455,22 @@ func TestSyncKnownAnswersWhatTheAccountHas(t *testing.T) {
 	sync(me, "recorded", "other-source")
 	sync(other, "healthconnect", "someone-elses")
 
-	if got, want := known("ingested", "queued", "other-source", "someone-elses", "never-sent"), []string{"ingested", "queued"}; !slices.Equal(got, want) {
-		t.Fatalf("known: %v, want %v", got, want)
+	got := ask("ingested", "queued", "other-source", "someone-elses", "never-sent")
+	if want := []string{"ingested", "queued"}; !slices.Equal(got.Known, want) {
+		t.Fatalf("known: %v, want %v", got.Known, want)
+	}
+	// Only the job still waiting is on its way: the ingested one has landed.
+	if want := []string{"queued"}; !slices.Equal(got.Processing, want) {
+		t.Fatalf("processing: %v, want %v", got.Processing, want)
+	}
+
+	// A job that failed before making a row is neither: the phone offers it again.
+	sync(me, "healthconnect", "failing")
+	if _, err := d.pool.Exec(ctx, `UPDATE jobs SET state = 'failed' WHERE user_id = $1 AND payload->>'external_id' = 'failing'`, me.id); err != nil {
+		t.Fatal(err)
+	}
+	if got := ask("failing"); len(got.Known) != 0 || len(got.Processing) != 0 {
+		t.Fatalf("failed job: %+v, want neither known nor processing", got)
 	}
 
 	if rec := d.do(me, http.MethodDelete, "/v1/activities/"+res.ActivityID, nil); rec.Code != http.StatusNoContent && rec.Code != http.StatusOK {
