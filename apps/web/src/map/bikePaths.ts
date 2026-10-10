@@ -87,7 +87,7 @@ export function ensureBikePathLayers(map: MapLibreMap, beforeId: string | undefi
   }
 }
 
-/** Shows or hides each kind. Diffs before setting, like paths.ts's setPathsVisible, since
+/** Shows or hides each kind. Diffs before setting, like mapMode.ts's setVisible, since
  *  reattachOverlays calls it on every `styledata`. A no-op before ensureBikePathLayers. */
 export function setBikePathsVisible(map: MapLibreMap, shown: BikePathOverlays): void {
   for (const [id, on] of [
