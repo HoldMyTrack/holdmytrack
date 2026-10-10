@@ -241,3 +241,22 @@ The laptop's dev stack, first with a worker and API built from `main`, then from
 - A full render was only about 10% faster. These tracks put one or two masks in a tile, so moving the masks saved about one round trip a tile; the rest are the tile's own, two PUTs at z14 and eight GETs and two PUTs a pyramid tile, made one after another (`ROADMAP.md`).
 - The browse p95s move by more between runs of the same code than between the two builds: a kept Region tile took at most 12 ms queried one at a time, so the laptop's 50 people, not the query, set the p95. Rendering during the browse didn't raise any layer's p95. `pg_stat_statements` wasn't measured: `db` was restarted mid-session for unrelated tests, which cut one run short (the 401s and one 500 in its log) and reset the database's settings.
 - `rerender-coverage --masks` left no mask of the two accounts without its PNG. The 1,666 masks of a 45-track account average 616 bytes at 128 px.
+
+### 2026-10-10 — production, `535cec9`, the render lane
+
+The same VPS after the deploy of renders in a lane of their own (`IMPLEMENTATION.md` §3.8, two render loops beside four main ones), activity masks in Postgres (ADR-0040), 128 px tiles (ADR-0041), Country and Region outlines kept per tile (§4.2.4) and Postgres's cache at 1 GB (`DEPLOY.md` §6). The deploy's `rerender-coverage --masks` redrew the 5,777 masks of 780 activities into Postgres, 502 bytes each on average, and their renders took at most 110 s. 21 test accounts; the bypass was on for about 14 s, and `api` ran with `UPLOADS_PER_HOUR=100000` until the cleanup.
+
+| Users | Map views/s | Requests/s | Fog p95 | Heatmap p95 | Tracks p95 | Region p95 | Country p95 | Errors |
+| :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- |
+| 10 | 3.4 | 9.9 | 0.17 s | 0.12 s | 0.07 s | 0.51 s | 0.22 s | 0 |
+| 25 | 8.8 | 24.4 | 0.14 s | 0.13 s | 0.07 s | 0.21 s | 0.11 s | 0 |
+| 50 | 17.4 | 52.2 | 0.15 s | 0.15 s | 0.09 s | 0.22 s | 0.20 s | 0 |
+| 100 | 35.2 | 103.6 | 0.21 s | 0.20 s | 0.13 s | 0.10 s | 0.08 s | 0 |
+| 200 | 69.6 | 203.2 | 0.67 s | 0.62 s | 0.51 s | 0.13 s | 0.11 s | 0 |
+
+- At 200 people Region's p95 fell from 2.31 s to 0.13 s and Country's from 2.04 s to 0.11 s; Fog, Heatmap and Tracks from 1.8–1.9 s to 0.5–0.7 s. Postgres averaged 39% CPU at 200 people (peaks of 97%), against 117% before, and 25% at 100. It averaged 99% and 90% at 25 and 50, most likely while first requests built the kept Country and Region tiles and filled a cache emptied by the deploy's restart. The API stayed under 50% and Caddy averaged 22%. At least 2.2 GB of memory stayed available.
+- The seed's 945 uploads were accepted in 25 s (p95 1.58 s) and ingested in 5 min 21 s; the queue drained in 21 minutes, its renders two at a time, with the worker peaking at 195% CPU.
+- The import's 5,000 files, five accounts at once, were sent in about 2 min 8 s without a failure and ingested in 11 minutes, at up to 510 a minute (38 minutes before). The 19 renders that followed ran two at a time and the last ended 25 minutes after the ingests; the slowest took 32 minutes from queued to done, waiting included. The worker averaged 84% CPU during the ingests and 46% during the renders.
+- A single upload from another account was processed in 5 s two minutes into the import, and again in 5 s once the ingests had drained, with two renders running and five queued. Before, the same moment cost 7 min 35 s.
+- 12 people browsing during the import: every 30 s window's p95 under 236 ms for Fog, 245 ms for Region, 374 ms for Region Heatmap and 162 ms for Tracks, out of 20,859 requests with none failed.
+- The purge removed the 21 accounts in about 9 minutes, leaving 780 activities and 5,777 masks as before, no pending job and no orphaned tile. At its fullest, with the 21 accounts' 5,947 activities, the masks' PNGs table held 82,129 masks in 61 MB; the database grew from 2,428 to 2,658 MB during the test and stood at 2,629 MB after the purge.
