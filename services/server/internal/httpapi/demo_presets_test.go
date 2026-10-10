@@ -42,7 +42,7 @@ func TestEmbeddedDemoDataIsSeedable(t *testing.T) {
 		manifest.Stories[7].Name != "Vietnam" || len(manifest.Stories[7].Activities) != 5 {
 		t.Errorf("demo stories %+v", manifest.Stories)
 	}
-	if len(manifest.SpotCaptures) != 7 {
+	if len(manifest.SpotCaptures) != 9 {
 		t.Errorf("demo captures %+v", manifest.SpotCaptures)
 	}
 }
