@@ -154,7 +154,12 @@ func (s *Server) buildProfile(ctx context.Context, l *i18n.Localizer, acct *page
 	// any of them gets the "nothing recorded" line instead of a row of 2px bars.
 	if slices.ContainsFunc(periods, func(p trendPeriod) bool { return p.Count > 0 }) {
 		view.Trends = buildTrendBars(l, periods, imperial)
-		view.TrendFrom, view.TrendTo = web.ShortDate(l, periods[0].PeriodStart), web.ShortDate(l, periods[len(periods)-1].PeriodStart)
+		// The window is a year long, so its ends share a month and day: the year tells them apart.
+		axisDate := web.ShortDateYear
+		if bucket == "month" {
+			axisDate = web.MonthYear
+		}
+		view.TrendFrom, view.TrendTo = axisDate(l, periods[0].PeriodStart), axisDate(l, periods[len(periods)-1].PeriodStart)
 	}
 	return view, nil
 }

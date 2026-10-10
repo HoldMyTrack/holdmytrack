@@ -98,3 +98,21 @@ func ShortDate(l *i18n.Localizer, day string) string {
 	}
 	return l.T("date.short", "day", strconv.Itoa(t.Day()), "month", l.T("month.short."+strconv.Itoa(int(t.Month()))))
 }
+
+// ShortDateYear is "Sep 8, 2026" / "8 сент. 2026 г." for a YYYY-MM-DD day.
+func ShortDateYear(l *i18n.Localizer, day string) string {
+	t, err := time.Parse("2006-01-02", day)
+	if err != nil {
+		return day
+	}
+	return l.T("date.short_year", "day", strconv.Itoa(t.Day()), "month", l.T("month.short."+strconv.Itoa(int(t.Month()))), "year", strconv.Itoa(t.Year()))
+}
+
+// MonthYear is "Sep 2026" / "сент. 2026 г." for a YYYY-MM-DD day's month.
+func MonthYear(l *i18n.Localizer, day string) string {
+	t, err := time.Parse("2006-01-02", day)
+	if err != nil {
+		return day
+	}
+	return l.T("date.month_year", "month", l.T("month.standalone."+strconv.Itoa(int(t.Month()))), "year", strconv.Itoa(t.Year()))
+}

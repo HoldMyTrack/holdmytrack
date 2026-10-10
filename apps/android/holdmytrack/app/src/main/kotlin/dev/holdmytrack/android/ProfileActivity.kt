@@ -241,8 +241,10 @@ class ProfileActivity : AppCompatActivity() {
         trendsChartBox.visibility = if (recorded) View.VISIBLE else View.GONE
         trendsEmpty.visibility = if (recorded) View.GONE else View.VISIBLE
         if (recorded) {
-            trendsFrom.text = shortDate(list.first().periodStart)
-            trendsTo.text = shortDate(list.last().periodStart)
+            // The window is a year long, so its ends share a month and day: the year tells them apart.
+            val skeleton = if (bucket == BUCKET_MONTH) "yMMM" else "yMMMd"
+            trendsFrom.text = formatDay(list.first().periodStart, skeleton)
+            trendsTo.text = formatDay(list.last().periodStart, skeleton)
         }
         trends.visibility = View.VISIBLE
     }
@@ -284,8 +286,12 @@ class ProfileActivity : AppCompatActivity() {
     private fun plural(id: Int, n: Int) = resources.getQuantityString(id, n, PanelFormat.count(resources, n))
 
     /** The web's `ShortDate`: "Sep 8", "8 сент.". */
-    private fun shortDate(day: String): String = runCatching {
-        DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale(), "MMMd"), locale()).format(LocalDate.parse(day))
+    private fun shortDate(day: String): String = formatDay(day, "MMMd")
+
+    /** [day], `YYYY-MM-DD`, in the locale's best pattern for [skeleton]: "MMMd" is the web's
+     *  `ShortDate`, "yMMMd" its `ShortDateYear` and "yMMM" its `MonthYear`. */
+    private fun formatDay(day: String, skeleton: String): String = runCatching {
+        DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale(), skeleton), locale()).format(LocalDate.parse(day))
     }.getOrDefault(day)
 
     /** The web's `FormatElevation`: whole meters, or feet in the imperial countries. */
