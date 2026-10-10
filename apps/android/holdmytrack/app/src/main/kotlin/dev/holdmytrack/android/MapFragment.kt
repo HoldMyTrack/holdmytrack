@@ -1366,6 +1366,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun onSyncedFromPhone() {
         activityDays.reload()
         reloadList()
+        // The tracks tile is read from the activities as they are, so it's fetched again at once;
+        // the tile version only moves once the coverage render after the ingest is done.
+        style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
         checkTileVersion()
         if (shownNotice == Notice.EMPTY) {
             framed = false
