@@ -337,6 +337,9 @@ func reprocessActivity(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 	if piece := rng.Apply(act.Points, nil); len(piece) > 0 {
 		zonePoint = piece[0]
 	}
+	// The overlap hint's span, from the same points: a split piece covers its own stretch,
+	// while Private locations and the edit leave it as recorded (§4.6).
+	recStart, recEnd := recordedSpan(act.Points, rng)
 	var pp preparedTrack
 	if points != nil {
 		if pp, err = prepareTrack(ctx, pool, points); err != nil {
@@ -367,13 +370,15 @@ func reprocessActivity(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 			trajectory = `+trajectorySQL("$9", "$10", "$11")+`,
 			track_edit = CASE WHEN $14 THEN $12::jsonb ELSE track_edit END,
 			in_heatmap_window = ($8 >= NOW() - make_interval(days => $13)),
-			timezone = `+geo.TimezoneAtSQL("$15::float8", "$16::float8", "$2")+`
+			timezone = `+geo.TimezoneAtSQL("$15::float8", "$16::float8", "$2")+`,
+			recorded_started_at = $17, recorded_ended_at = $18
 		WHERE id = $1 AND user_id = $2
 	`, activityID, userID,
 		m.distanceM, m.durationS, m.movingS, m.elevationGainM, m.avgSpeedMps, startedAt,
 		pp.simpLons, pp.simpLats, pp.simpTs,
 		editJSON, fog.HeatmapWindowDays, userEdit,
 		zonePoint.Lon, zonePoint.Lat,
+		recStart, recEnd,
 	); err != nil {
 		return fmt.Errorf("update activity: %w", err)
 	}

@@ -59,8 +59,8 @@ type Overlap struct {
 	Timezone     *string
 }
 
-// Overlaps answers, for each span, the account's live activity it overlaps the most, if any.
-// A span with no duration overlaps nothing.
+// Overlaps answers, for each span, the account's live activity it overlaps the most, if any,
+// each activity taken as recorded (recordedSpan). A span with no duration overlaps nothing.
 func Overlaps(ctx context.Context, pool *pgxpool.Pool, userID string, spans []Span) ([]Overlap, error) {
 	keys := make([]string, 0, len(spans))
 	starts := make([]time.Time, 0, len(spans))
@@ -84,16 +84,22 @@ func Overlaps(ctx context.Context, pool *pgxpool.Pool, userID string, spans []Sp
 		SELECT DISTINCT ON (span.key) span.key, a.id::text, COALESCE(a.name, ''), a.activity_type, a.started_at, a.timezone
 		FROM span
 		JOIN activities a ON a.user_id = $1
-		  AND a.duration_seconds > 0
-		  AND a.started_at BETWEEN span.s - make_interval(secs => span.secs * $5::float8)
-		                       AND span.s + make_interval(secs => span.secs * $5::float8)
+		  AND COALESCE(a.recorded_started_at, a.started_at)
+		      BETWEEN span.s - make_interval(secs => span.secs * $5::float8)
+		          AND span.s + make_interval(secs => span.secs * $5::float8)
+		-- As recorded, before Private locations and track edits; a row stored before those
+		-- columns existed falls back to its clipped track.
 		CROSS JOIN LATERAL (
-			SELECT extract(epoch FROM
-			         least(a.started_at + make_interval(secs => a.duration_seconds), span.e)
-			         - greatest(a.started_at, span.s))::float8 AS secs
+			SELECT COALESCE(a.recorded_started_at, a.started_at) AS s,
+			       COALESCE(a.recorded_ended_at, a.started_at + make_interval(secs => a.duration_seconds)) AS e
+		) rec
+		CROSS JOIN LATERAL (
+			SELECT extract(epoch FROM least(rec.e, span.e) - greatest(rec.s, span.s))::float8 AS secs,
+			       extract(epoch FROM rec.e - rec.s)::float8 AS dur
 		) shared
 		-- overlapMatches: the overlap covers overlapMinShare of the longer of the two.
-		WHERE shared.secs >= $6::float8 * greatest(a.duration_seconds::float8, span.secs)
+		WHERE shared.dur > 0
+		  AND shared.secs >= $6::float8 * greatest(shared.dur, span.secs)
 		ORDER BY span.key, shared.secs DESC, a.started_at, a.id
 	`, userID, keys, starts, ends, overlapStartSlack, overlapMinShare)
 	if err != nil {

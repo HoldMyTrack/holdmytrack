@@ -71,6 +71,7 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 	// dropping it would lose it for good, even after the location that hides it is deleted.
 	hidden := points == nil
 	startedAt := act.Points[0].Time
+	recStart, recEnd := recordedSpan(act.Points, SplitRange{})
 
 	var pp preparedTrack
 	var tiles [][2]int
@@ -101,7 +102,7 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 				activity_type, distance_meters, duration_seconds, moving_seconds,
 				elevation_gain_m, avg_speed_mps, started_at,
 				trajectory, raw_payload_key, name, description, ingest_complete,
-				in_heatmap_window, timezone
+				in_heatmap_window, timezone, recorded_started_at, recorded_ended_at
 			) VALUES (
 				$1, $2, $3, $4,
 				$5, $6, $7, $8,
@@ -109,7 +110,8 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 				`+trajectorySQL("$12", "$13", "$14")+`,
 				$15, NULLIF($16, ''), NULLIF($17, ''), $18,
 				$11 >= NOW() - make_interval(days => $19),
-				`+geo.TimezoneAtSQL("$20::float8", "$21::float8", "$1")+`
+				`+geo.TimezoneAtSQL("$20::float8", "$21::float8", "$1")+`,
+				$22, $23
 			)
 			ON CONFLICT (user_id, source, external_id) WHERE external_id IS NOT NULL DO NOTHING -- $15 = raw_payload_key
 			RETURNING id
@@ -128,6 +130,7 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 		job.RawPayloadKey, act.Name, act.Description, hidden,
 		fog.HeatmapWindowDays,
 		act.Points[0].Lon, act.Points[0].Lat,
+		recStart, recEnd,
 	).Scan(&activityID, &inserted, &complete)
 	if err != nil {
 		return Result{}, fmt.Errorf("ingest: persist activity: %w", err)
@@ -198,21 +201,9 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 // zones clipped with are returned too, for a caller that applies a track edit and has to clip
 // its result again (TrackEdit.ApplyClipped).
 func loadClippedPoints(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID, sourceDetail, rawKey string) (parse.Activity, []parse.Point, []Zone, error) {
-	obj, err := store.Get(ctx, rawKey)
+	act, err := loadRecorded(ctx, store, sourceDetail, rawKey)
 	if err != nil {
-		return parse.Activity{}, nil, nil, fmt.Errorf("ingest: fetch raw payload: %w", err)
-	}
-	defer obj.Close()
-
-	act, err := parseByExtensionReader(sourceDetail, obj)
-	if err != nil {
-		return parse.Activity{}, nil, nil, parseError{err}
-	}
-	if act.Points, err = keepTimed(keepValid(act.Points)); err != nil {
 		return parse.Activity{}, nil, nil, err
-	}
-	if len(act.Points) < 2 {
-		return parse.Activity{}, nil, nil, fmt.Errorf("ingest: %w (%d)", errTooFewPoints, len(act.Points))
 	}
 
 	// Continuous across the antimeridian from here on: every reader of these points, and the
@@ -224,6 +215,28 @@ func loadClippedPoints(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 		return parse.Activity{}, nil, nil, fmt.Errorf("ingest: load private locations: %w", err)
 	}
 	return act, ClipEnds(act.Points, zones), zones, nil
+}
+
+// loadRecorded fetches and parses the raw payload, keeping the points every reader can use:
+// the whole recording, before Private locations.
+func loadRecorded(ctx context.Context, store *storage.Store, sourceDetail, rawKey string) (parse.Activity, error) {
+	obj, err := store.Get(ctx, rawKey)
+	if err != nil {
+		return parse.Activity{}, fmt.Errorf("ingest: fetch raw payload: %w", err)
+	}
+	defer obj.Close()
+
+	act, err := parseByExtensionReader(sourceDetail, obj)
+	if err != nil {
+		return parse.Activity{}, parseError{err}
+	}
+	if act.Points, err = keepTimed(keepValid(act.Points)); err != nil {
+		return parse.Activity{}, err
+	}
+	if len(act.Points) < 2 {
+		return parse.Activity{}, fmt.Errorf("ingest: %w (%d)", errTooFewPoints, len(act.Points))
+	}
+	return act, nil
 }
 
 // keepValid drops the points no place on Earth has — a NaN or infinite coordinate, a latitude
