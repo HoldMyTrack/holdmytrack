@@ -214,3 +214,28 @@ The decision behind ADR-0041. One dev account seeded with the 45 demo tracks (1,
 
 - At zoom 10 the 64 px tracks merged where they ran close (Parma, downtown Cleveland); at 128 px they stayed apart. At zoom 13 the 128 px lines followed their roads where 64 px drew a coarse staircase. At zoom 16 the band was the same width at both sizes.
 - 300 random jittery walks all drew at 128 px with `minStepPx` at half a pixel.
+
+### 2026-10-10 — dev stack, the render lane and masks in Postgres
+
+The laptop's dev stack, first with a worker and API built from `main`, then from the branch that gives renders their own lane (`IMPLEMENTATION.md` §3.8), moves masks into Postgres (ADR-0040), draws 128 px tiles (ADR-0041) and keeps the Country and Region outlines per tile (§4.2.4). Both workers reached the object store through `delayproxy` at 80 ms a round trip and ran `WORKER_CONCURRENCY=2`, so two accounts' renders could fill the main lane as four did in production; the branch's also ran `WORKER_RENDER_CONCURRENCY=2`. Two accounts each imported a 1,000-track set (`gen 2 1000`, `import 2`); a third probed. On the branch, `rerender-coverage --masks` first redrew both accounts' masks into Postgres.
+
+| | `main` | Branch |
+| :-- | :-- | :-- |
+| 2,000 ingests, both accounts | 9 min 15 s | — |
+| Redraw one account's 1,000 activities' masks (`--masks`) | — | 4–5 s |
+| Full render, 7,813 / 8,134 z14 tiles and their pyramid | 405 / 465 s | 363 / 422 s |
+| A probe upload while both render, to processed | 6 min 15 s | 5 s |
+| That probe's own render, waiting behind both | — | 325 s |
+
+| 50 people, 2 minutes | Region Fog p95 | Country Fog p95 | Tracks p95 |
+| :-- | :-- | :-- | :-- |
+| `main` | 74 ms | 38 ms | 10 ms |
+| Branch, outlines not yet kept | 45 ms | 19 ms | 10 ms |
+| Branch, kept | 19 ms | 14 ms | 10 ms |
+| Branch, kept, after a restart of `db` with the image's 128 MB cache | 80 ms | 35 ms | 10 ms |
+| The same, with both accounts rendering | 57 ms | 31 ms | 5 ms |
+
+- The probe went from waiting for one of the renders to end to being processed at once. Its own account's Fog and Heatmap still waited for a render loop: with two, both were taken by the big renders.
+- A full render was only about 10% faster. These tracks put one or two masks in a tile, so moving the masks saved about one round trip a tile; the rest are the tile's own, two PUTs at z14 and eight GETs and two PUTs a pyramid tile, made one after another (`ROADMAP.md`).
+- The browse p95s move by more between runs of the same code than between the two builds: a kept Region tile took at most 12 ms queried one at a time, so the laptop's 50 people, not the query, set the p95. Rendering during the browse didn't raise any layer's p95. `pg_stat_statements` wasn't measured: `db` was restarted mid-session for unrelated tests, which cut one run short (the 401s and one 500 in its log) and reset the database's settings.
+- `rerender-coverage --masks` left no mask of the two accounts without its PNG. The 1,666 masks of a 45-track account average 616 bytes at 128 px.
