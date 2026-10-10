@@ -20,7 +20,7 @@ const CATEGORY_LABELS: Record<SpotCategory, MessageKey> = {
 
 /**
  * The Layers dropdown beside the map-mode toggle (IMPLEMENTATION.md §4.24, §4.25): layers picked
- * over any mode, in two groups — Paths (Trails, Tracks, Bike paths, FR-4.13) and Points of interest
+ * over any mode, in two groups — Paths (Trails, Tracks, Bike paths, Shared paths, FR-4.13) and Points of interest
  * (each Spots category, FR-15.2). The same open/close rules as the Activities panel's Type
  * dropdown: the button toggles it, and a press outside or Escape closes it. The button shows how
  * many are picked, and the checkbox before it shows or hides all of them at once, keeping the
@@ -59,7 +59,7 @@ export function OverlaysMenu({ overlays, onChange }: OverlaysMenuProps) {
     const on = overlays.spots.includes(category);
     change({ spots: SPOT_CATEGORIES.filter((c) => (c === category ? !on : overlays.spots.includes(c))) }, !on);
   };
-  const togglePath = (kind: 'trails' | 'tracks' | 'bikePaths') => change({ [kind]: !overlays[kind] }, !overlays[kind]);
+  const togglePath = (kind: 'trails' | 'tracks' | 'bikePaths' | 'sharedPaths') => change({ [kind]: !overlays[kind] }, !overlays[kind]);
   const count = pickedCount(overlays);
   const shown = overlays.enabled && count > 0;
 
@@ -118,6 +118,7 @@ export function OverlaysMenu({ overlays, onChange }: OverlaysMenuProps) {
               </p>
             )}
             {item('overlay-bike-paths', t('overlays.bike_paths'), overlays.bikePaths, () => togglePath('bikePaths'))}
+            {item('overlay-shared-paths', t('overlays.shared_paths'), overlays.sharedPaths, () => togglePath('sharedPaths'))}
           </fieldset>
           <fieldset className="overlays-menu__group">
             <legend>{t('overlays.places')}</legend>

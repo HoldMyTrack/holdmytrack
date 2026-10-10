@@ -152,6 +152,7 @@ export const en = {
   'overlays.paths': 'Paths',
   'overlays.places': 'Points of interest',
   'overlays.playgrounds': 'Playgrounds',
+  'overlays.shared_paths': 'Shared paths',
   'overlays.tracks': 'Tracks',
   'overlays.tracks_info': 'Dirt, farm and forest roads: unpaved tracks wide enough for a vehicle.',
   'overlays.tracks_info_label': 'What are tracks?',

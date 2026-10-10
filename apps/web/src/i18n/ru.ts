@@ -169,6 +169,7 @@ export const ru: Record<MessageKey, string> & Record<string, string> = {
   'overlays.paths': 'Тропы и дорожки',
   'overlays.places': 'Интересные места',
   'overlays.playgrounds': 'Детские площадки',
+  'overlays.shared_paths': 'Велопешеходные дорожки',
   'overlays.tracks': 'Грунтовки',
   'overlays.tracks_info': 'Грунтовые, полевые и лесные дороги: без покрытия, шириной с машину.',
   'overlays.tracks_info_label': 'Что такое грунтовки?',

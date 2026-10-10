@@ -661,18 +661,18 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 
 ### FR-4.13 Trails and bike paths
 
-**Description**: The base map's cycleways and walking/hiking paths drawn as lines of their own, standing out from the streets, where otherwise they are barely visible hairlines. They are three entries of the Layers menu under Paths — **Trails**, **Tracks** and **Bike paths**.
+**Description**: Cycleways and walking/hiking paths drawn as lines of their own, standing out from the streets, where otherwise they are barely visible hairlines or not drawn at all. They are four entries of the Layers menu under Paths — **Trails**, **Tracks**, **Bike paths** and **Shared paths**. Bike paths and Shared paths reach further out than the other two, so a rider can see a whole region's bike network at once and pick which way to head.
 
 **Preconditions**: Active session. The Layers menu is beside the map-mode toggle (FR-4.1–FR-4.3) — in the Android app, a pill under the menu button — and is hidden while the Edit window is open (FR-5.10), like that toggle. The Layers button opens a panel of checkboxes under Paths and Points of interest (FR-15.2). The button shows how many paths and places are picked; a press on the button again or outside the panel, or Escape (Back on Android), closes it. Tracks has an info button beside it that shows, under the entry, what tracks are — dirt, farm and forest roads, unpaved and wide enough for a vehicle — and hides it again on a second press; it doesn't tick the box.
 
 **Behavior**:
-1. Off by default. All three start at zoom 13, the zoom points of interest start at too (FR-15.2), so paths and places appear and disappear together. Bike paths draws cycleways as a solid blue line, Trails draws paths, footways and bridleways as a dashed green line, and Tracks draws OSM's `highway=track` — dirt, farm and forest roads — as a longer-dashed, slightly wider brown line, under the trails; each on its own, both widening as the map zooms in. The monochrome flavors (FR-4.5) draw all three in greys, telling them apart by the dash and width.
-2. The choice is kept by this browser (or, in the Android app, this phone) only, not on the account, and applies again on the next visit. A browser that had the former single web toggle on, or a phone that had the former Trails & bike paths toggle on, starts with all three on, and one whose saved choice predates Tracks shows tracks whenever it shows trails.
+1. Off by default. Trails and Tracks start at zoom 13, the zoom points of interest start at too (FR-15.2), so they appear and disappear together. Bike paths and Shared paths start at zoom 9 (FR-4.16). Bike paths draws cycleways — OSM's `highway=cycleway` — as a solid blue line. Shared paths draws paths, footways and bridleways OSM marks `bicycle=designated` — multi-use trails bikes share with people on foot — as a dashed, lighter blue line. Trails draws paths, footways and bridleways as a dashed green line. Tracks draws OSM's `highway=track` — dirt, farm and forest roads — as a longer-dashed, slightly wider brown line, under the trails. Each is on its own, and all widen as the map zooms in. The monochrome flavors (FR-4.5) draw all four in greys, telling them apart by the dash and width.
+2. The choice is kept by this browser (or, in the Android app, this phone) only, not on the account, and applies again on the next visit. A browser that had the former single web toggle on, or a phone that had the former Trails & bike paths toggle on, starts with Trails, Tracks and Bike paths on. One whose saved choice predates Tracks shows tracks whenever it shows trails, and one whose saved choice predates Shared paths starts with it off.
 3. It is independent of the map mode: it works over Normal, Fog and Heatmap alike, and survives a theme change (FR-4.12).
 4. An export (FR-4.10) draws each kind of path when the map shows it and leaves it out when it doesn't.
 5. A checkbox on the Layers button, before its label (in the Android app, before its icon), shows or hides every picked path and place (FR-15.2) at once and keeps the picks. Off, the map draws none of them, the button looks unselected and its count is greyed; on again, they are back as they were. It is on until turned off, and kept by this browser (or phone) like the picks. Picking a path or place in the menu while it's off turns it back on; unpicking one leaves it as it is. With nothing picked it can't be changed, and its tooltip says to pick paths or places first.
 
-**Notes**: It shows what OpenStreetMap tags as a path and is already in the base map, nothing more. Sidewalks, crossings, steps and pedestrian areas keep the base map's own faint styling, since in a city they would bury the real paths. Bike lanes painted on a street, and named routes such as long-distance cycle or hiking networks, are not in the base map and are not shown.
+**Notes**: Trails and Tracks show what OpenStreetMap tags as a path and is already in the base map, nothing more. Bike paths and Shared paths come from an OpenStreetMap import of their own (FR-4.16), since the base map has no paths below zoom 13. Sidewalks, crossings, steps and pedestrian areas keep the base map's own faint styling, since in a city they would bury the real paths. Bike lanes painted on a street, and named routes such as long-distance cycle or hiking networks, are not shown.
 
 ### FR-4.14 Satellite mode
 
@@ -694,18 +694,19 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 
 **Description**: What the map draws at each zoom level, in one place. Each requirement it summarizes remains the authority for its own feature: tracks FR-4.1, Fog FR-4.2, Heatmap FR-4.3, paths FR-4.13, satellite FR-4.14, points of interest FR-15.2 and FR-15.5. Paths and points of interest show only for what is ticked in the Layers menu; with nothing ticked they draw at no zoom.
 
-| Zoom | A 1280 px-wide view spans | Tracks (Normal) | Fog and Heatmap | Paths (ticked) | Points of interest (ticked) |
-| :-- | :-- | :-- | :-- | :-- | :-- |
-| 0–2 | Most of the world or more (~25,000 km and more) | — | Whole countries | — | — |
-| 3 | A continent (~12,000 km) | — | States and regions | — | — |
-| 4–6 | Several countries to a country (~6,000–1,600 km) | Drawn | States and regions | — | — |
-| 7–9 | A state to a region (~800–200 km) | Drawn | Street level | — | — |
-| 10–12 | A metro area to a city (~100–25 km) | Drawn | Street level | — | On request: **Show in this area** |
-| 13 and up | A few neighbourhoods or less (~12 km and less) | Drawn | Street level | Drawn | Drawn, loaded as the map moves |
+| Zoom | A 1280 px-wide view spans | Tracks (Normal) | Fog and Heatmap | Bike and shared paths (ticked) | Trails and tracks (ticked) | Points of interest (ticked) |
+| :-- | :-- | :-- | :-- | :-- | :-- | :-- |
+| 0–2 | Most of the world or more (~25,000 km and more) | — | Whole countries | — | — | — |
+| 3 | A continent (~12,000 km) | — | States and regions | — | — | — |
+| 4–6 | Several countries to a country (~6,000–1,600 km) | Drawn | States and regions | — | — | — |
+| 7–8 | A state (~800–400 km) | Drawn | Street level | — | — | — |
+| 9 | A region (~200 km) | Drawn | Street level | Drawn | — | — |
+| 10–12 | A metro area to a city (~100–25 km) | Drawn | Street level | Drawn | — | On request: **Show in this area** |
+| 13 and up | A few neighbourhoods or less (~12 km and less) | Drawn | Street level | Drawn | Drawn | Drawn, loaded as the map moves |
 
 **Behavior**:
 1. Each band starts at its first zoom and runs up to, not including, the next band's: zoom 6.9 is still States and regions, and zoom 12.9 still offers Show in this area.
-2. Zoomed in far enough, the map runs out of stored detail and enlarges the most detailed level it has instead: tracks, Fog, Heatmap and points of interest past zoom 14, the base map past zoom 15, and satellite imagery (FR-4.14) past the deployment's deepest level (zoom 18 on holdmytrack.com). Lines, labels and badges — the base map, tracks, paths and points of interest — stay sharp when enlarged, though a track's shape gets no more detailed; Fog, Heatmap and satellite imagery are pictures and grow softer.
+2. Zoomed in far enough, the map runs out of stored detail and enlarges the most detailed level it has instead: tracks, Fog, Heatmap, bike and shared paths and points of interest past zoom 14, the base map past zoom 15, and satellite imagery (FR-4.14) past the deployment's deepest level (zoom 18 on holdmytrack.com). Lines, labels and badges — the base map, tracks, paths and points of interest — stay sharp when enlarged, though a track's shape gets no more detailed; Fog, Heatmap and satellite imagery are pictures and grow softer.
 3. The Android app follows the same bands for tracks, Fog, Heatmap, paths and points of interest.
 
 **Notes**: The widths are at the equator; further from it the same zoom spans less ground (at Ohio's latitude, about a quarter less).

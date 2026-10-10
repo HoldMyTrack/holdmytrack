@@ -7,6 +7,7 @@ import { basemapOrigin, satelliteSource } from './config';
 import { withApiCredentials } from './requestCredentials';
 import { customOutputSize } from './exportPresets';
 import { ensureFogLayer } from './fog';
+import { ensureBikePathLayers, setBikePathsVisible } from './bikePaths';
 import { ensureHeatmapLayer } from './heatmap';
 import { labelInsertionPoint } from './layers';
 import { setMapMode, type MapMode } from './mapMode';
@@ -60,8 +61,7 @@ export interface ExportViewState {
   mode: MapMode;
   activityQuery: ActivityQuery;
   hiddenIds: string[];
-  /** The Layers menu's Trails and Bike paths (overlays.ts), so the image shows what the
-   *  screen does. */
+  /** The Layers menu's paths (overlays.ts), so the image shows what the screen does. */
   paths: PathOverlays;
   /** The Satellite button (FR-4.14): satellite imagery, when the deployment has any. */
   satellite: boolean;
@@ -347,6 +347,8 @@ async function renderOffscreen(
     const beforeId = labelInsertionPoint(instance);
     ensureFogLayer(instance, beforeId, isDarkBase(state.flavor, state.satellite));
     ensureHeatmapLayer(instance, beforeId, isDarkBase(state.flavor, state.satellite));
+    ensureBikePathLayers(instance, beforeId, state.flavor);
+    setBikePathsVisible(instance, state.paths);
     ensureTrackLayer(instance, beforeId, state.activityQuery);
     setMapMode(instance, state.mode);
     setHiddenTracks(instance, state.hiddenIds);

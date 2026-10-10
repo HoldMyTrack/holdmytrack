@@ -6,6 +6,7 @@ import { basemapOrigin, satelliteSource, WORLD_VIEW } from './config';
 import { countryView } from './countryView';
 import { exportFramedImage } from './exportMap';
 import type { ExportPreset } from './exportPresets';
+import { ensureBikePathLayers } from './bikePaths';
 import { ensureFogLayer } from './fog';
 import { ensureHeatmapLayer } from './heatmap';
 import { setMapMode, type MapMode } from './mapMode';
@@ -172,7 +173,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // as a "mode" (IMPLEMENTATION.md §4.2.2).
   const [mapMode, setMapModeState] = useState<MapMode>('normal');
   // The Satellite button (BasemapToggle.tsx) and the Layers menu (OverlaysMenu.tsx): Trails,
-  // Tracks, Bike paths and each Spots category, over any mode, drawn while the Layers checkbox is
+  // Tracks, Bike paths, Shared paths and each Spots category, over any mode, drawn while the Layers checkbox is
   // on; remembered per browser (overlays.ts).
   const [overlays, setOverlays] = useState<Overlays>(loadOverlays);
   const changeOverlays = useCallback((next: Overlays) => {
@@ -184,8 +185,9 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
       trails: overlays.enabled && overlays.trails,
       tracks: overlays.enabled && overlays.tracks,
       bikePaths: overlays.enabled && overlays.bikePaths,
+      sharedPaths: overlays.enabled && overlays.sharedPaths,
     }),
-    [overlays.enabled, overlays.trails, overlays.tracks, overlays.bikePaths],
+    [overlays.enabled, overlays.trails, overlays.tracks, overlays.bikePaths, overlays.sharedPaths],
   );
   // Satellite imagery (FR-4.14): only when the deployment configures some, whatever was saved.
   const satelliteAvailable = satelliteSource() !== null;
@@ -1328,6 +1330,8 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
       // Satellite imagery reads dark, so it takes the dark flavors' veil (style.ts's isDarkBase).
       ensureFogLayer(instance, beforeId, isDarkBase(flavor, satellite));
       ensureHeatmapLayer(instance, beforeId, isDarkBase(flavor, satellite));
+      // Bike and shared paths over the veil and the heat, under the tracks (bikePaths.ts).
+      ensureBikePathLayers(instance, beforeId, flavor);
       ensureTrackLayer(instance, beforeId, activityQuery);
       // A style swap brings the tracks source back with no feature-state, the focused track's
       // `selected` included.
