@@ -59,14 +59,6 @@ ADR-0024 keeps a resized copy of each photo on our own storage. If photos ever b
 * Google Photos can't serve as one: its API hands out image URLs that expire within the hour.
 * Decide only once cost-per-user is measured (`ROADMAP.md` Phase 5) and photos show up in it.
 
-### The Activity graph under the gate
-
-The Activity graph (`SPEC.md` FR-7) is a GitHub-style grid of every day with an activity, with totals and a longest streak, built for a history that held every walk. Under ADR-0039 an account holds only what its owner chose to keep, mostly trips and journeys rather than the daily routine, so the grid fills sparsely and a streak counts kept days, not days out.
-
-* Keep it as it is: it shows the kept journeys over the years, and someone who keeps their daily walks still gets a full grid.
-* Reshape it around what's kept: Stories and longer trips on the year's grid rather than single days, or the streak dropped.
-* Remove it, along with the weekly/monthly Trends below it (FR-9), if neither fits the product any more. It's one of `VISION.md` §4.2's core features, so that would be a change of position, not just of the page.
-
 ### Deploy on merge
 
 Deploys to `holdmytrack.com` are run by hand over SSH (`docs/DEPLOY.md` §6). What held back deploying every merge to `main` was that the server held the only copy of real synced history; nightly backups and a monthly restore drill now exist (ADR-0029), so a bad deploy can be undone.
