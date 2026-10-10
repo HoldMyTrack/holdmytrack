@@ -45,6 +45,8 @@ var gitSHA = "unknown"
 
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	// For packages that log without a logger passed in (internal/fog's render warnings).
+	slog.SetDefault(log)
 
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "usage: holdmytrack <serve|work|migrate|seed-demo-customer|export-demo-activities|seed-admin-boundaries|seed-timezones|rerender-coverage|import-spots|set-admin>")
@@ -63,11 +65,12 @@ func main() {
 	// db and the object store are separate compose services with their own startup time; retrying
 	// here means api/worker/migrate don't need a fragile healthcheck-based `depends_on`
 	// condition on the object store specifically (see compose.yaml's comment on that).
-	// `work` runs several jobs at once, each rendering up to 16 tiles side by side
-	// (internal/fog's renderParallelism), so it gets a bigger pool than pgx's default.
+	// `work` runs several jobs at once in its main and render lanes, each rendering up to 16
+	// tiles side by side (internal/fog's renderParallelism), so it gets a bigger pool than
+	// pgx's default.
 	var maxConns int32
 	if os.Args[1] == "work" {
-		maxConns = int32(4 * cfg.WorkerConcurrency)
+		maxConns = int32(4 * (cfg.WorkerConcurrency + cfg.WorkerRenderConcurrency))
 	}
 	var pool *pgxpool.Pool
 	err = retry(ctx, log, "db connect", func() (err error) {
@@ -150,7 +153,7 @@ func main() {
 		metrics.Serve(ctx, cfg.MetricsAddr, log)
 		log.Info("work: polling", "concurrency", cfg.WorkerConcurrency)
 		notifier := &worker.Notifier{Mailer: newMailer(cfg, log, "work"), BaseURL: cfg.AppBaseURL}
-		if err := worker.Run(ctx, pool, store, log, notifier, cfg.WorkerConcurrency); err != nil {
+		if err := worker.Run(ctx, pool, store, log, notifier, cfg.WorkerConcurrency, cfg.WorkerRenderConcurrency); err != nil {
 			log.Error("work", "err", err)
 			os.Exit(1)
 		}

@@ -245,6 +245,61 @@ func TestConcurrentClaimsTakeEachJobOnce(t *testing.T) {
 	}
 }
 
+// A render runs in a lane of its own: one claimed doesn't hold back the main lane, for the same
+// account or another, and the main lane never claims a render.
+func TestRenderLaneRunsBesideTheMainLane(t *testing.T) {
+	pool, renderingID := testPool(t)
+	_, otherID := testPool(t)
+	log := slog.New(slog.DiscardHandler)
+	ctx := context.Background()
+
+	fresh := time.Now()
+	insertJobOfKind(t, pool, renderingID, "render_fog", `{}`, "2000-01-01T00:00:00Z", 1, &fresh)
+	queued := insertJobOfKind(t, pool, otherID, "render_fog", `{}`, "2000-01-02T00:00:00Z", 0, nil)
+	own := insertJob(t, pool, renderingID, "2000-01-03T00:00:00Z", 0, nil)
+	other := insertJob(t, pool, otherID, "2000-01-04T00:00:00Z", 0, nil)
+
+	for i := range 2 {
+		if processed, err := claimAndRun(ctx, pool, nil, log, laneMain); err != nil || !processed {
+			t.Fatalf("main claim %d: processed=%v err=%v", i+1, processed, err)
+		}
+	}
+	if r := readJob(t, pool, own); r.attempts != 1 {
+		t.Errorf("rendering account's own job = %+v, want claimed beside its render", r)
+	}
+	if r := readJob(t, pool, other); r.attempts != 1 {
+		t.Errorf("other account's job = %+v, want claimed", r)
+	}
+	if r := readJob(t, pool, queued); r.state != "pending" || r.attempts != 0 {
+		t.Errorf("queued render = %+v, want left to the render lane", r)
+	}
+}
+
+// Render loops are fair across accounts like the main lane: while one account's render runs,
+// a second loop takes another account's, not the first account's next.
+func TestRenderLoopsTakeAccountsInTurn(t *testing.T) {
+	pool, firstID := testPool(t)
+	_, secondID := testPool(t)
+	log := slog.New(slog.DiscardHandler)
+	ctx := context.Background()
+
+	fresh := time.Now()
+	insertJobOfKind(t, pool, firstID, "render_fog", `{}`, "2000-01-01T00:00:00Z", 1, &fresh)
+	held := insertJobOfKind(t, pool, firstID, "render_fog", fmt.Sprintf(`{"user_id":%q}`, firstID), "2000-01-02T00:00:00Z", 0, nil)
+	next := insertJobOfKind(t, pool, secondID, "render_fog", fmt.Sprintf(`{"user_id":%q}`, secondID), "2000-01-03T00:00:00Z", 0, nil)
+
+	// Neither account has a dirty tile, so the render is done without touching the store.
+	if processed, err := claimAndRun(ctx, pool, nil, log, laneRender); err != nil || !processed {
+		t.Fatalf("render claim: processed=%v err=%v", processed, err)
+	}
+	if r := readJob(t, pool, next); r.state != "done" || r.attempts != 1 {
+		t.Errorf("second account's render = %+v, want claimed and done", r)
+	}
+	if r := readJob(t, pool, held); r.state != "pending" || r.attempts != 0 {
+		t.Errorf("first account's next render = %+v, want held back", r)
+	}
+}
+
 // A deleted account's jobs are never claimed, even before the purge (account_purge.go) has
 // dropped them: the claim passes over them to the next account's job.
 func TestClaimSkipsADeletedAccountsJobs(t *testing.T) {

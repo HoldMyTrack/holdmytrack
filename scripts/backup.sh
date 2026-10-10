@@ -14,8 +14,9 @@
 #   objects-deleted/<UTC stamp>/...                what a run's sync removed or overwrote in
 #                                                  objects/, kept KEEP_DELETED_DAYS
 #
-# fog/, heatmap/ and activity-masks/ are left out: `rerender-coverage --masks` rebuilds all
-# three from the database and raw/ (DEPLOY.md §11's restore steps).
+# fog/, heatmap/ and activity-masks/ are left out, and so is the activity_tile_mask_data
+# table's data (the masks' PNGs, ADR-0040): `rerender-coverage --masks` rebuilds all of them
+# from the database and raw/ (DEPLOY.md §11's restore steps), so the dump doesn't grow with them.
 #
 set -euo pipefail
 # A dump is the whole database, so it's root's alone like .env.prod: nothing written here is
@@ -63,7 +64,7 @@ partial="$BACKUP_DIR/postgres/$name.partial"
 trap 'rm -f "$partial"' EXIT
 
 log "dumping Postgres to $BACKUP_DIR/postgres/$name"
-"${COMPOSE[@]}" exec -T db sh -c 'pg_dump -Fc -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > "$partial"
+"${COMPOSE[@]}" exec -T db sh -c 'pg_dump -Fc --exclude-table-data=activity_tile_mask_data -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > "$partial"
 # A dump whose table of contents pg_restore can't read is no backup — fail here, not at the drill.
 "${COMPOSE[@]}" exec -T db pg_restore --list < "$partial" > /dev/null
 mv "$partial" "$BACKUP_DIR/postgres/$name"

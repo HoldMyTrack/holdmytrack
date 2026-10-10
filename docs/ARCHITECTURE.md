@@ -49,7 +49,7 @@ flowchart LR
     subgraph CF["Cloudflare"]
         edge["CDN edge<br/>tiles.holdmytrack.com (proxied)"]
         pub[("R2 public bucket<br/>planet .pmtiles · fonts · sprites<br/>per dated build prefix")]
-        priv[("R2 private bucket<br/>raw payloads · activity masks ·<br/>fog/heatmap PNGs · avatars")]
+        priv[("R2 private bucket<br/>raw payloads · fog/heatmap PNGs ·<br/>photos · avatars")]
     end
     browser -.->|"tiles with ?cv=<br/>(hit: no request)"| bcache
     android -.->|"tiles with ?cv=<br/>(hit: no request)"| acache

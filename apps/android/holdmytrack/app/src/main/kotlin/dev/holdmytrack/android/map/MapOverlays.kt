@@ -132,7 +132,8 @@ object MapOverlays {
      */
     private const val MAX_ZOOM = 14f
 
-    /** Matches `internal/fog.TileSize` — the server renders 512px masks, not 256px ones. */
+    /** The size Fog and Heatmap tiles are drawn at, whatever the server's image size
+     *  (`internal/fog.TileSize`, 128 px): the web client's `tileSize: 512` too. */
     private const val RASTER_TILE_SIZE = 512
 
     const val TRACK_COLOR = "#b07e2e"

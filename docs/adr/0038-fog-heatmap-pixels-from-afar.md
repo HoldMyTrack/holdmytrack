@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Built in the web client and the Android app (`IMPLEMENTATION.md` §4.2; `SPEC.md` FR-4.2). It changes how ADR-0037's 64 px tiles are drawn below zoom 14; the tiles themselves are unchanged.
+Accepted. Built in the web client and the Android app (`IMPLEMENTATION.md` §4.2; `SPEC.md` FR-4.2). It changes how ADR-0037's 64 px tiles are drawn below zoom 14; the tiles themselves are unchanged. Since ADR-0041 the tiles are 128 px, so a square is about 4 screen pixels rather than 8.
 
 ## Context
 
