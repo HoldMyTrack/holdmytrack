@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Built: `migrations/0030_activity_tile_mask_data.sql`, `internal/fog/render.go` (`RenderActivityMasks`, `renderAndStoreTile`, `RemoveActivityMasks`), `scripts/backup.sh` (`IMPLEMENTATION.md` §3.11, §4.2.3).
+Accepted. Built: `migrations/0030_activity_tile_mask_data.sql`, `migrations/0032_drop_mask_object_key.sql`, `internal/fog/render.go` (`RenderActivityMasks`, `renderAndStoreTile`, `RemoveActivityMasks`), `scripts/backup.sh` (`IMPLEMENTATION.md` §3.11, §4.2.3).
 
 ## Context
 

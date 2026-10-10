@@ -281,7 +281,6 @@ CREATE TABLE activity_tile_masks (
                                                     -- with fog_tiles
     tile_x           INT NOT NULL,
     tile_y           INT NOT NULL,
-    mask_object_key  TEXT,          -- unused, always NULL; to be dropped (ADR-0040)
     rendered_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (activity_id, zoom, tile_x, tile_y)
 );
@@ -301,7 +300,7 @@ CREATE TABLE activity_tile_mask_data (
 );
 ```
 
-**A mask's PNG is in `activity_tile_mask_data`, not object storage** (ADR-0040, `migrations/0030_activity_tile_mask_data.sql`). It is a table of its own so `activity_tile_masks` stays the narrow index a render scans, and so the backups can leave the bytes out (`scripts/backup.sh`, `docs/DEPLOY.md` §11). The bytes go with their row, and so with their activity (§4.7.5's cascade). `mask_object_key` named each mask's object before 0030; nothing reads or writes it any more, and a later migration drops it.
+**A mask's PNG is in `activity_tile_mask_data`, not object storage** (ADR-0040, `migrations/0030_activity_tile_mask_data.sql`). It is a table of its own so `activity_tile_masks` stays the narrow index a render scans, and so the backups can leave the bytes out (`scripts/backup.sh`, `docs/DEPLOY.md` §11). The bytes go with their row, and so with their activity (§4.7.5's cascade).
 
 `fog_tiles` (§3.6) is unchanged in shape and meaning — it stays the cached "everyone, whole history, nothing hidden" composite. What changed is only how that composite (and a filtered one) gets computed: by compositing these per-activity masks, not by re-parsing raw payloads.
 
