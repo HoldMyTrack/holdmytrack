@@ -163,6 +163,29 @@ func TestOversizedFileUploadIsRefused(t *testing.T) {
 	}
 }
 
+// Past the hourly limit an account's uploads are refused before their body is read; another
+// account's still go through.
+func TestUploadsPastTheHourlyLimitAreRefused(t *testing.T) {
+	d := newDBTest(t)
+	d.srv.SetUploadsPerHour(2)
+	me, other := d.newAccount(false), d.newAccount(false)
+	for i := range 2 {
+		if rec := d.uploadRaw(me, "notes.txt", []byte("x")); rec.Code != http.StatusUnsupportedMediaType {
+			t.Fatalf("upload %d: status %d, want 415", i+1, rec.Code)
+		}
+	}
+	rec := d.uploadRaw(me, "ride.gpx", []byte(resumeGPX))
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("third upload: status %d, want 429", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "at most 2") {
+		t.Fatalf("third upload: body %q, want the limit named", rec.Body.String())
+	}
+	if rec := d.uploadRaw(other, "notes.txt", []byte("x")); rec.Code != http.StatusUnsupportedMediaType {
+		t.Fatalf("another account: status %d, want 415", rec.Code)
+	}
+}
+
 // A job's status is its owner's to read: another account asking after the same file (the
 // same external_id, its SHA-256) learns nothing.
 func TestActivityStatusIsPerAccount(t *testing.T) {

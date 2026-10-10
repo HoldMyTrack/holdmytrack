@@ -87,6 +87,9 @@ type Config struct {
 	// their own beside the main lane's WorkerConcurrency (internal/worker's Run), never more
 	// than one per account. Only read by `work`.
 	WorkerRenderConcurrency int
+	// UploadsPerHour is how many files one account may upload in an hour (internal/httpapi's
+	// defaultUploadsPerHour). Raised only on a load test's target. Only read by `serve`.
+	UploadsPerHour int
 }
 
 func Load() (Config, error) {
@@ -126,6 +129,9 @@ func Load() (Config, error) {
 		return c, err
 	}
 	if c.WorkerRenderConcurrency, err = positiveInt("WORKER_RENDER_CONCURRENCY", 2); err != nil {
+		return c, err
+	}
+	if c.UploadsPerHour, err = positiveInt("UPLOADS_PER_HOUR", 100); err != nil {
 		return c, err
 	}
 	c.WebDevDir = env("WEB_DEV_DIR", "")

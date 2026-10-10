@@ -26,7 +26,8 @@ import (
 // optional second way into the same accounts and the same sessions, off unless configured —
 // email+password never depends on it. Password reset (IMPLEMENTATION.md §4.11) and email verification (docs/SPEC.md FR-1.8)
 // share the same token-table shape. Rate limiting is partially built: see demoLimiter/forgotPasswordLimiter
-// below, added specifically because their endpoints are reachable with no credentials at all.
+// below, added specifically because their endpoints are reachable with no credentials at all,
+// and storySendLimiter and Server.uploadLimiter, per account.
 
 const sessionCookieName = "holdmytrack_session"
 

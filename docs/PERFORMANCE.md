@@ -19,6 +19,8 @@ Production requires a verified email (`SPEC.md` FR-1.8), so test accounts are cr
 2. `loadtest signup 21` (20 load accounts, the last one for `probe`). Each returns a verified session.
 3. Recreate `api` without the override straight away and delete the file. Check that no account other than the test ones was created in that window; the bypass has been on for 8–30 s.
 
+`seed` and `import` send far more than the 100 files an hour an account may upload (`SPEC.md` FR-3.1), so `api` runs with `UPLOADS_PER_HOUR` raised (say to 100000) for them, by the same kind of override, and goes back to the default when they're done.
+
 Afterwards `loadtest cleanup` deletes them all; the purge (`IMPLEMENTATION.md` §4.28) removes their rows and objects. Check that no deleted account, test row or pending job is left.
 
 ### Scenarios

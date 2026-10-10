@@ -7,6 +7,9 @@
 //	go run ./cmd/loadtest -base https://example.com -dir /tmp/lt browse 25 3m
 //	go run ./cmd/loadtest -base https://example.com -dir /tmp/lt cleanup
 //
+// seed and import send more files than an account may upload in an hour, so run them against
+// an api with UPLOADS_PER_HOUR raised (docs/PERFORMANCE.md).
+//
 // Subcommands:
 //
 //	signup N        create N accounts (the deployment must skip email verification meanwhile,
