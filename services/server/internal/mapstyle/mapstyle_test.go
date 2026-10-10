@@ -6,6 +6,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 )
 
 // The style is generated from apps/web/src/map/style.ts, so these tests deliberately assert
@@ -31,7 +33,7 @@ func TestFlavorsMatchWebClient(t *testing.T) {
 func TestDocumentSubstitutesOrigin(t *testing.T) {
 	const origin = "https://cdn.example.com"
 	for _, flavor := range Flavors() {
-		doc, err := Document(flavor, origin, Satellite{})
+		doc, err := Document(flavor, "en", origin, Satellite{})
 		if err != nil {
 			t.Fatalf("Document(%q): %v", flavor, err)
 		}
@@ -80,11 +82,11 @@ func TestDocumentSubstitutesOrigin(t *testing.T) {
 }
 
 func TestDocumentTrimsTrailingSlash(t *testing.T) {
-	with, err := Document("light", "https://cdn.example.com/", Satellite{})
+	with, err := Document("light", "en", "https://cdn.example.com/", Satellite{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	without, err := Document("light", "https://cdn.example.com", Satellite{})
+	without, err := Document("light", "en", "https://cdn.example.com", Satellite{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,14 +97,43 @@ func TestDocumentTrimsTrailingSlash(t *testing.T) {
 }
 
 func TestDocumentUnknownFlavor(t *testing.T) {
-	if _, err := Document("neon", "https://example.com", Satellite{}); !errors.Is(err, ErrUnknownFlavor) {
+	if _, err := Document("neon", "en", "https://example.com", Satellite{}); !errors.Is(err, ErrUnknownFlavor) {
 		t.Errorf("err = %v, want ErrUnknownFlavor so the handler can answer 404", err)
 	}
 }
 
+func TestLanguagesMatchCatalogs(t *testing.T) {
+	// The generator writes one set per catalog in apps/web/src/i18n, which has the same
+	// languages as the server's. A language added to one and not the other fails here.
+	want := slices.Sorted(slices.Values(i18n.Supported))
+	if got := Languages(); !slices.Equal(got, want) {
+		t.Fatalf("Languages() = %v, want %v", got, want)
+	}
+}
+
+func TestDocumentLabelsInLanguage(t *testing.T) {
+	for _, lang := range Languages() {
+		for _, flavor := range Flavors() {
+			doc, err := Document(flavor, lang, "https://cdn.example.com", Satellite{})
+			if err != nil {
+				t.Fatalf("Document(%q, %q): %v", flavor, lang, err)
+			}
+			if !strings.Contains(string(doc), `"name:`+lang+`"`) {
+				t.Errorf("%s/%s: labels don't read name:%s", lang, flavor, lang)
+			}
+		}
+	}
+}
+
+func TestDocumentUnknownLanguage(t *testing.T) {
+	if _, err := Document("light", "xx", "https://example.com", Satellite{}); !errors.Is(err, ErrUnknownLanguage) {
+		t.Fatalf("err = %v, want ErrUnknownLanguage", err)
+	}
+}
+
 func TestETagVariesWithOrigin(t *testing.T) {
-	a, _ := Document("light", "https://a.example.com", Satellite{})
-	b, _ := Document("light", "https://b.example.com", Satellite{})
+	a, _ := Document("light", "en", "https://a.example.com", Satellite{})
+	b, _ := Document("light", "en", "https://b.example.com", Satellite{})
 	if ETag(a) == ETag(b) {
 		t.Error("same ETag for different origins — a client would cache the wrong asset URLs")
 	}
@@ -143,7 +174,7 @@ func TestDocumentFillsSatellite(t *testing.T) {
 		Attribution: `<a href="https://example.com">© Imagery "Co"</a>`,
 	}
 	for _, flavor := range Flavors() {
-		doc, err := Document(flavor, "https://cdn.example.com", sat)
+		doc, err := Document(flavor, "en", "https://cdn.example.com", sat)
 		if err != nil {
 			t.Fatalf("Document(%q): %v", flavor, err)
 		}
@@ -192,7 +223,7 @@ func TestDocumentFillsSatellite(t *testing.T) {
 
 func TestDocumentStripsSatelliteUnconfigured(t *testing.T) {
 	for _, flavor := range Flavors() {
-		doc, err := Document(flavor, "https://cdn.example.com", Satellite{})
+		doc, err := Document(flavor, "en", "https://cdn.example.com", Satellite{})
 		if err != nil {
 			t.Fatalf("Document(%q): %v", flavor, err)
 		}
@@ -212,7 +243,7 @@ func TestDocumentStripsSatelliteUnconfigured(t *testing.T) {
 			}
 		}
 		// Only the imagery goes: every other layer is still there.
-		with, _ := Document(flavor, "https://cdn.example.com", Satellite{Tiles: "https://t/{z}/{x}/{y}", TileSize: 256, MaxZoom: 19})
+		with, _ := Document(flavor, "en", "https://cdn.example.com", Satellite{Tiles: "https://t/{z}/{x}/{y}", TileSize: 256, MaxZoom: 19})
 		if got, want := len(s.Layers), len(decodeSatellite(t, with).Layers)-1; got != want {
 			t.Errorf("%s: %d layers without imagery, want %d", flavor, got, want)
 		}
@@ -220,8 +251,8 @@ func TestDocumentStripsSatelliteUnconfigured(t *testing.T) {
 }
 
 func TestETagVariesWithSatellite(t *testing.T) {
-	a, _ := Document("light", "https://a.example.com", Satellite{})
-	b, _ := Document("light", "https://a.example.com", Satellite{Tiles: "https://t/{z}/{x}/{y}", TileSize: 512, MaxZoom: 18})
+	a, _ := Document("light", "en", "https://a.example.com", Satellite{})
+	b, _ := Document("light", "en", "https://a.example.com", Satellite{Tiles: "https://t/{z}/{x}/{y}", TileSize: 512, MaxZoom: 18})
 	if ETag(a) == ETag(b) {
 		t.Error("same ETag with and without imagery — a client would keep a style missing the switch")
 	}

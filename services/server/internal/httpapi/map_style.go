@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mapstyle"
 )
 
@@ -27,10 +28,19 @@ import (
 // The satellite imagery source (docs/SPEC.md FR-4.14) is filled from SATELLITE_* the same way,
 // or left out when the deployment configures none — which is how a client knows to show no
 // Satellite switch.
+//
+// `?lang=` picks the labels' language (docs/SPEC.md FR-13.1), matched on its primary subtag
+// so `ru-RU` is Russian; anything unsupported, or none, is English. A query parameter rather
+// than Accept-Language: MapLibre's offline cache keys the document by URL alone, so one URL per
+// language keeps a cached copy from ever answering for another.
 func (s *Server) handleMapStyle(w http.ResponseWriter, r *http.Request) {
 	flavor := strings.TrimSuffix(r.PathValue("flavor"), ".json")
+	lang, _, _ := strings.Cut(strings.ToLower(r.URL.Query().Get("lang")), "-")
+	if !i18n.IsSupported(lang) {
+		lang = i18n.Default
+	}
 
-	doc, err := mapstyle.Document(flavor, s.basemapOrigin, s.satellite)
+	doc, err := mapstyle.Document(flavor, lang, s.basemapOrigin, s.satellite)
 	if errors.Is(err, mapstyle.ErrUnknownFlavor) {
 		// Name the valid set rather than a bare 404 — the caller is a client developer
 		// wiring this up, and the flavor list is not discoverable from anywhere else.

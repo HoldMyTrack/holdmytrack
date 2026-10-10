@@ -13,7 +13,7 @@ import { basemapOrigin, satelliteSource } from './config';
 import { withApiCredentials } from './requestCredentials';
 import type { ViewState } from './viewState';
 import { API_BASE_URL } from '../api';
-import { t } from '../i18n';
+import { lang, t } from '../i18n';
 
 /**
  * Owns one MapLibre Map's lifecycle for one container element.
@@ -72,6 +72,7 @@ export function useMapInstance({
         origin: basemapOrigin(),
         satellite: satelliteSource(),
         satelliteOn: initial.current.satellite,
+        lang,
       }),
       center: [initial.current.view.longitude, initial.current.view.latitude],
       zoom: initial.current.view.zoom,

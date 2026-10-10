@@ -1,5 +1,6 @@
 import { Map as MapLibreMap } from 'maplibre-gl';
 import { API_BASE_URL, type ActivityQuery } from '../api';
+import { lang } from '../i18n';
 import logoOnDarkUrl from '../assets/logo-on-dark.png';
 import logoOnLightUrl from '../assets/logo-on-light.png';
 import { basemapOrigin, satelliteSource } from './config';
@@ -312,6 +313,7 @@ async function renderOffscreen(
       paths: state.paths,
       satellite: satelliteSource(),
       satelliteOn: state.satellite,
+      lang,
     }),
     center: [view.center.lng, view.center.lat],
     zoom: liveMap.getZoom(),

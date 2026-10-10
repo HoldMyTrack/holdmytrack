@@ -1,6 +1,7 @@
 /**
- * Emits one style document per flavor for the API to serve (ARCHITECTURE.md §2.1:
+ * Emits one style document per language and flavor for the API to serve (ARCHITECTURE.md §2.1:
  * "Serve the style as a document from the API rather than reimplementing it per client").
+ * The language is the labels' (`buildStyle`'s `lang`), one per catalog in `src/i18n`.
  *
  * Generating rather than hand-writing these is the whole point: `buildStyle()` stays the
  * single definition of the style, and a Go reimplementation of 71 layers is exactly the
@@ -42,6 +43,7 @@ registerHooks({
 });
 
 const { buildStyle, FLAVORS } = await import('../src/map/style.ts');
+const { LANGS } = await import('../src/i18n/index.ts');
 
 /** Must match originPlaceholder in services/server/internal/mapstyle/mapstyle.go. */
 const ORIGIN_PLACEHOLDER = '__HOLDMYTRACK_BASEMAP_ORIGIN__';
@@ -59,24 +61,26 @@ const outDir = resolvePath(here, '../../../services/server/internal/mapstyle/sty
 const check = process.argv.includes('--check');
 let drifted = false;
 
-await mkdir(outDir, { recursive: true });
+for (const lang of LANGS) {
+  await mkdir(join(outDir, lang), { recursive: true });
+  for (const flavor of FLAVORS) {
+    const style = buildStyle({ flavor, origin: ORIGIN_PLACEHOLDER, satellite: SATELLITE_PLACEHOLDER, lang });
+    const json = `${JSON.stringify(style, null, 2)}\n`;
+    const name = `${lang}/${flavor}.json`;
+    const path = join(outDir, name);
 
-for (const flavor of FLAVORS) {
-  const style = buildStyle({ flavor, origin: ORIGIN_PLACEHOLDER, satellite: SATELLITE_PLACEHOLDER });
-  const json = `${JSON.stringify(style, null, 2)}\n`;
-  const path = join(outDir, `${flavor}.json`);
-
-  if (check) {
-    const existing = await readFile(path, 'utf8').catch(() => null);
-    if (existing !== json) {
-      console.error(`drift: ${flavor}.json does not match src/map/style.ts`);
-      drifted = true;
+    if (check) {
+      const existing = await readFile(path, 'utf8').catch(() => null);
+      if (existing !== json) {
+        console.error(`drift: ${name} does not match src/map/style.ts`);
+        drifted = true;
+      }
+      continue;
     }
-    continue;
-  }
 
-  await writeFile(path, json);
-  console.log(`wrote ${flavor}.json (${style.layers.length} layers)`);
+    await writeFile(path, json);
+    console.log(`wrote ${name} (${style.layers.length} layers)`);
+  }
 }
 
 if (drifted) {

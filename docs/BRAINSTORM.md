@@ -6,13 +6,6 @@ Once an idea here is decided, it moves out: accepted work goes to `docs/ROADMAP.
 
 ---
 
-### Place names on the map in the reader's language
-
-The map's labels (cities, countries, streets) are whatever `@protomaps/basemaps` picks, which is mostly each place's local name, while the interface around it is in English or Russian (FR-13). Protomaps' layers take a `lang` option and fall back to the local name where OSM has no translation.
-
-* The style is built once, ahead of time (`npm run build:style`, checked by `verify:style`), and served as a static document, so this would mean one style per language (served by `mapstyle`, keyed by the page's language), not a runtime switch.
-* The export image (FR-4.10) would carry the labels too, which is either a feature or a surprise, depending on who the image is for.
-
 ### More languages, and language-specific URLs
 
 English and Russian ship (ADR-0014). Every further language is a translation pass over three catalogs and two prose pages, which is cheap once someone can review it. If search traffic in other languages ever matters, `/ru/help`-style URLs with `hreflang` would let search engines index each language, which the current one-URL-per-page approach can't.

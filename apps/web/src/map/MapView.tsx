@@ -50,7 +50,7 @@ import { useStories } from '../ui/useStories';
 import { useStoryInbox } from '../ui/useStoryInbox';
 import { useStory } from '../ui/useStory';
 import { currentTheme, useTheme } from '../ui/useTheme';
-import { t } from '../i18n';
+import { lang, t } from '../i18n';
 
 /** How often the list is re-read while an Edit track reprocess is pending — the job is one
  *  activity's worth of ingest, so a few seconds is the right order of magnitude. */
@@ -1386,7 +1386,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   useEffect(() => {
     if (!map || appliedFlavor.current === flavor) return;
     appliedFlavor.current = flavor;
-    map.setStyle(buildStyle({ flavor, origin: basemapOrigin(), satellite: satelliteSource(), satelliteOn: satellite }), {
+    map.setStyle(buildStyle({ flavor, origin: basemapOrigin(), satellite: satelliteSource(), satelliteOn: satellite, lang }), {
       diff: false,
     });
     // Only a flavor change swaps the style; the Satellite button flips layers in place (below).

@@ -3,7 +3,8 @@
 // three hand-maintained copies of a 71-layer style would diverge."
 //
 // The style is *not* defined here. It is defined once in apps/web/src/map/style.ts, and
-// apps/web/scripts/build-style.mjs renders that function to the JSON files embedded below.
+// apps/web/scripts/build-style.mjs renders that function to the JSON files embedded below,
+// one per label language and flavor (styles/<lang>/<flavor>.json).
 // Nothing in this package knows what a layer is, which is the point: a Go definition of the
 // style would be the second hand-maintained copy §2.1 exists to prevent. Regenerate with
 // `npm run build:style` in apps/web; `npm run verify:style` fails the build if the committed
@@ -29,7 +30,7 @@ import (
 	"sync"
 )
 
-//go:embed styles/*.json
+//go:embed styles/*/*.json
 var styles embed.FS
 
 // originPlaceholder is baked into the generated JSON in place of a real host, because one
@@ -65,30 +66,46 @@ type Satellite struct {
 // answer 404 rather than 500 — an unknown flavor is a bad request path, not a server fault.
 var ErrUnknownFlavor = fmt.Errorf("mapstyle: unknown flavor")
 
+// ErrUnknownLanguage is returned for a label language with no embedded documents.
+var ErrUnknownLanguage = fmt.Errorf("mapstyle: unknown language")
+
 var (
-	once     sync.Once
-	flavors  []string
-	rendered map[string][]byte // placeholder still in place; origin substituted per request
+	once      sync.Once
+	flavors   []string
+	languages []string
+	rendered  map[string]map[string][]byte // lang → flavor → document, placeholder still in place
 )
 
 func load() {
 	once.Do(func() {
-		rendered = make(map[string][]byte)
-		entries, err := fs.ReadDir(styles, "styles")
+		rendered = make(map[string]map[string][]byte)
+		dirs, err := fs.ReadDir(styles, "styles")
 		if err != nil {
 			panic("mapstyle: embedded styles unreadable: " + err.Error())
 		}
-		for _, e := range entries {
-			name := e.Name()
-			if !strings.HasSuffix(name, ".json") {
-				continue
-			}
-			b, err := styles.ReadFile(path.Join("styles", name))
+		for _, d := range dirs {
+			lang := d.Name()
+			entries, err := fs.ReadDir(styles, path.Join("styles", lang))
 			if err != nil {
 				panic("mapstyle: " + err.Error())
 			}
-			flavor := strings.TrimSuffix(name, ".json")
-			rendered[flavor] = b
+			docs := make(map[string][]byte)
+			for _, e := range entries {
+				name := e.Name()
+				if !strings.HasSuffix(name, ".json") {
+					continue
+				}
+				b, err := styles.ReadFile(path.Join("styles", lang, name))
+				if err != nil {
+					panic("mapstyle: " + err.Error())
+				}
+				docs[strings.TrimSuffix(name, ".json")] = b
+			}
+			rendered[lang] = docs
+			languages = append(languages, lang)
+		}
+		sort.Strings(languages)
+		for flavor := range rendered["en"] {
 			flavors = append(flavors, flavor)
 		}
 		sort.Strings(flavors)
@@ -103,12 +120,26 @@ func Flavors() []string {
 	return out
 }
 
-// Document returns the style for one flavor with basemap asset URLs resolved against origin
-// and the satellite source filled from sat, or removed when sat configures none. origin is an
-// absolute origin with no trailing slash, e.g. "https://map.example.com".
-func Document(flavor, origin string, sat Satellite) ([]byte, error) {
+// Languages lists the embedded label languages, sorted — one per catalog in
+// apps/web/src/i18n, the same set as i18n.Supported.
+func Languages() []string {
 	load()
-	b, ok := rendered[flavor]
+	out := make([]string, len(languages))
+	copy(out, languages)
+	return out
+}
+
+// Document returns the style for one flavor, its labels in lang, with basemap asset URLs
+// resolved against origin and the satellite source filled from sat, or removed when sat
+// configures none. origin is an absolute origin with no trailing slash, e.g.
+// "https://map.example.com".
+func Document(flavor, lang, origin string, sat Satellite) ([]byte, error) {
+	load()
+	docs, ok := rendered[lang]
+	if !ok {
+		return nil, fmt.Errorf("%w: %q", ErrUnknownLanguage, lang)
+	}
+	b, ok := docs[flavor]
 	if !ok {
 		return nil, fmt.Errorf("%w: %q", ErrUnknownFlavor, flavor)
 	}

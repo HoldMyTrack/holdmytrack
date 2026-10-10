@@ -20,6 +20,9 @@ const catalogs = { en, ru } as const;
 
 export type Lang = keyof typeof catalogs;
 
+/** Every language with a catalog — services/server/internal/i18n's Supported. */
+export const LANGS = Object.keys(catalogs) as Lang[];
+
 function detectLang(): Lang {
   const tag = typeof document === 'undefined' ? '' : document.documentElement.lang;
   const primary = tag.toLowerCase().split('-')[0];
