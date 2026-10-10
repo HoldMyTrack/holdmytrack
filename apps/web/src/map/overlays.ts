@@ -3,7 +3,7 @@ import { SPOT_CATEGORIES } from './spots';
 
 /**
  * The map's view choices beside the mode toggle: satellite imagery (the Satellite button,
- * FR-4.14), and what the Layers menu (OverlaysMenu.tsx) has picked — the four kinds of path
+ * FR-4.14), and what the Layers menu (OverlaysMenu.tsx) has picked — bike and shared paths
  * (FR-4.13) and each Spots category (FR-15.2) — with the Layers button's checkbox, which shows or
  * hides all of them at once. A per-browser view preference, kept in localStorage like the theme,
  * not on the account; every path and place off until picked.
@@ -14,9 +14,6 @@ export interface Overlays {
   satellite: boolean;
   /** The Layers checkbox: the picks below are drawn only while it's on, and kept while it's off. */
   enabled: boolean;
-  trails: boolean;
-  /** Dirt, farm and forest roads — OSM's `highway=track`. */
-  tracks: boolean;
   /** Cycleways, from the bike-path tiles (bikePaths.ts). */
   bikePaths: boolean;
   /** Paths, footways and bridleways designated for bikes, from the same tiles. */
@@ -26,15 +23,15 @@ export interface Overlays {
 }
 
 const STORAGE_KEY = 'hmt.overlays';
-// The two toggles the menu replaced: one for both kinds of path, one for every category.
+// The two toggles the menu replaced: one for the paths (now Bike paths), one for every category.
 const LEGACY_PATHS_KEY = 'hmt.showPaths';
 const LEGACY_POI_KEY = 'hmt.showPoi';
 
-export const NO_OVERLAYS: Overlays = { satellite: false, enabled: true, trails: false, tracks: false, bikePaths: false, sharedPaths: false, spots: [] };
+export const NO_OVERLAYS: Overlays = { satellite: false, enabled: true, bikePaths: false, sharedPaths: false, spots: [] };
 
 /** How many paths and places are picked, whether or not the Layers checkbox is on. */
 export function pickedCount(overlays: Overlays): number {
-  return Number(overlays.trails) + Number(overlays.tracks) + Number(overlays.bikePaths) + Number(overlays.sharedPaths) + overlays.spots.length;
+  return Number(overlays.bikePaths) + Number(overlays.sharedPaths) + overlays.spots.length;
 }
 
 export function loadOverlays(): Overlays {
@@ -46,10 +43,6 @@ export function loadOverlays(): Overlays {
         satellite: saved.satellite === true,
         // On unless turned off: a choice saved before the checkbox existed keeps showing its picks.
         enabled: saved.enabled !== false,
-        trails: saved.trails === true,
-        // Tracks were part of Trails before they had their own entry: a choice saved then
-        // keeps showing them.
-        tracks: typeof saved.tracks === 'boolean' ? saved.tracks : saved.trails === true,
         bikePaths: saved.bikePaths === true,
         sharedPaths: saved.sharedPaths === true,
         spots: SPOT_CATEGORIES.filter((c) => Array.isArray(saved.spots) && saved.spots.includes(c)),
@@ -57,7 +50,7 @@ export function loadOverlays(): Overlays {
     }
     const paths = window.localStorage.getItem(LEGACY_PATHS_KEY) === '1';
     const poi = window.localStorage.getItem(LEGACY_POI_KEY) === '1';
-    return { satellite: false, enabled: true, trails: paths, tracks: paths, bikePaths: paths, sharedPaths: false, spots: poi ? [...SPOT_CATEGORIES] : [] };
+    return { satellite: false, enabled: true, bikePaths: paths, sharedPaths: false, spots: poi ? [...SPOT_CATEGORIES] : [] };
   } catch {
     return NO_OVERLAYS;
   }

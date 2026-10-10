@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { pickedCount, type Overlays } from '../map/overlays';
-import { ChevronDown, Info, Layers } from 'lucide-react';
+import { ChevronDown, Layers } from 'lucide-react';
 import { SPOT_CATEGORIES, type SpotCategory } from '../map/spots';
 import { t } from '../i18n';
 import type { MessageKey } from '../i18n/en';
@@ -20,7 +20,7 @@ const CATEGORY_LABELS: Record<SpotCategory, MessageKey> = {
 
 /**
  * The Layers dropdown beside the map-mode toggle (IMPLEMENTATION.md §4.24, §4.25): layers picked
- * over any mode, in two groups — Paths (Trails, Tracks, Bike paths, Shared paths, FR-4.13) and Points of interest
+ * over any mode, in two groups — Paths (Bike paths and Shared paths, FR-4.13) and Points of interest
  * (each Spots category, FR-15.2). The same open/close rules as the Activities panel's Type
  * dropdown: the button toggles it, and a press outside or Escape closes it. The button shows how
  * many are picked, and the checkbox before it shows or hides all of them at once, keeping the
@@ -28,13 +28,7 @@ const CATEGORY_LABELS: Record<SpotCategory, MessageKey> = {
  */
 export function OverlaysMenu({ overlays, onChange }: OverlaysMenuProps) {
   const [open, setOpen] = useState(false);
-  // The Tracks entry's explanation, opened by its info button; closes with the menu.
-  const [tracksInfo, setTracksInfo] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) setTracksInfo(false);
-  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -59,7 +53,7 @@ export function OverlaysMenu({ overlays, onChange }: OverlaysMenuProps) {
     const on = overlays.spots.includes(category);
     change({ spots: SPOT_CATEGORIES.filter((c) => (c === category ? !on : overlays.spots.includes(c))) }, !on);
   };
-  const togglePath = (kind: 'trails' | 'tracks' | 'bikePaths' | 'sharedPaths') => change({ [kind]: !overlays[kind] }, !overlays[kind]);
+  const togglePath = (kind: 'bikePaths' | 'sharedPaths') => change({ [kind]: !overlays[kind] }, !overlays[kind]);
   const count = pickedCount(overlays);
   const shown = overlays.enabled && count > 0;
 
@@ -98,25 +92,6 @@ export function OverlaysMenu({ overlays, onChange }: OverlaysMenuProps) {
         <div className="overlays-menu__panel" role="dialog" aria-label={t('map.overlays')}>
           <fieldset className="overlays-menu__group">
             <legend>{t('overlays.paths')}</legend>
-            {item('overlay-trails', t('overlays.trails'), overlays.trails, () => togglePath('trails'))}
-            <div className="overlays-menu__row">
-              {item('overlay-tracks', t('overlays.tracks'), overlays.tracks, () => togglePath('tracks'))}
-              <button
-                type="button"
-                className="overlays-menu__info"
-                aria-label={t('overlays.tracks_info_label')}
-                aria-expanded={tracksInfo}
-                aria-controls="overlay-tracks-info"
-                onClick={() => setTracksInfo((shown) => !shown)}
-              >
-                <Info size={14} aria-hidden="true" />
-              </button>
-            </div>
-            {tracksInfo && (
-              <p id="overlay-tracks-info" className="overlays-menu__hint" role="note">
-                {t('overlays.tracks_info')}
-              </p>
-            )}
             {item('overlay-bike-paths', t('overlays.bike_paths'), overlays.bikePaths, () => togglePath('bikePaths'))}
             {item('overlay-shared-paths', t('overlays.shared_paths'), overlays.sharedPaths, () => togglePath('sharedPaths'))}
           </fieldset>

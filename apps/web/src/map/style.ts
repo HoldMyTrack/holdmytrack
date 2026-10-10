@@ -81,8 +81,8 @@ export const SATELLITE_ROAD_OPACITY = 0.4;
  * The road lines satellite mode dims to `SATELLITE_ROAD_OPACITY`: the basemap's `roads_*` line
  * layers, casings included, that set no opacity of their own. That leaves out rail (already
  * half-transparent, and not a road), so switching back only has to reset the rest to the
- * default. The path layers (trails, tracks) stay opaque: they're what a user
- * switched on to see.
+ * default. The trail and track layers stay opaque: on satellite imagery they're what the
+ * ground can't show.
  */
 export function satelliteDimmedLayerIds(style: readonly LayerSpecification[]): string[] {
   return style
@@ -131,11 +131,6 @@ export interface BuildStyleOptions {
   pmtilesPath?: string;
   glyphsPath?: string;
   spriteBasePath?: string;
-  /** Which of the path layers start visible: trails (`TRAIL_LAYER_IDS`) and tracks
-   *  (`TRACK_LAYER_IDS`). Both off by default, so the served style documents look the same as
-   *  the stock basemap to a client that never flips them. Bike and shared paths aren't in the
-   *  style: they're an overlay of their own (bikePaths.ts). */
-  paths?: PathOverlays;
   /** The deployment's imagery, or none: then the style has no satellite source at all. */
   satellite?: SatelliteSource | null;
   /** Whether satellite mode starts on. Ignored without `satellite`. */
@@ -143,30 +138,22 @@ export interface BuildStyleOptions {
 }
 
 /**
- * The Trails and Tracks toggles' layers (docs/SPEC.md FR-4.13). Protomaps already carries
- * every OSM path in the `roads` layer (`kind=path`, sorted by `kind_detail`), but the stock
- * style draws them all through `roads_other` as one hairline grey from z14, which reads as no
- * paths at all. These draw trails and tracks over that same geometry from lower zoom, so
- * hiding them just falls back to the stock look. The Android app toggles the same ids by
- * name (`MapPaths`), so they are part of the served style's contract.
+ * The trail and track layers (docs/SPEC.md FR-4.13), part of the map itself rather than the
+ * Layers menu. Protomaps already carries every OSM path in the `roads` layer (`kind=path`,
+ * sorted by `kind_detail`), but the stock style draws them all through `roads_other` as one
+ * hairline grey from z14, which reads as no paths at all. These draw trails and tracks over that
+ * same geometry from further out. Clients find them by id to lift them over Fog's veil
+ * (paths.ts, Android's `MapPaths`), so the ids are part of the served style's contract.
  */
 export const PATH_LAYER_IDS = ['paths_trail', 'paths_track', 'paths_bridges_trail', 'paths_bridges_track'] as const;
 
-/** The two kinds the Layers menu shows separately (overlays.ts, and Android's `MapPaths`). */
-export const TRAIL_LAYER_IDS = ['paths_trail', 'paths_bridges_trail'] as const;
-export const TRACK_LAYER_IDS = ['paths_track', 'paths_bridges_track'] as const;
+/** The zoom the trail and track layers start at: the first the basemap carries tracks at. It
+ *  has trails only from z13, so they join a zoom later. Bike and shared paths start further out,
+ *  from their own tiles (bikePaths.ts). */
+export const PATHS_MIN_ZOOM = 12;
 
-/** The zoom the trail and track layers start at: the first the basemap carries trails at
- *  (below it, the roads layer has only tracks). Points of interest start at the same zoom
- *  (spots.ts's SPOTS_MIN_ZOOM), so the two come and go together. Bike and shared paths start
- *  further out, from their own tiles (bikePaths.ts). */
-export const PATHS_MIN_ZOOM = 13;
-
-/** Which kinds of path are showing: the basemap's trails and tracks, and bikePaths.ts's
- *  cycleways and shared paths. */
+/** Which of the Layers menu's paths are showing: bikePaths.ts's cycleways and shared paths. */
 export interface PathOverlays {
-  trails: boolean;
-  tracks: boolean;
   bikePaths: boolean;
   sharedPaths: boolean;
 }
@@ -181,24 +168,24 @@ const TRACK_DETAIL = 'track';
 
 /** Cool for cycleways and shared paths (bikePaths.ts), green for trails, brown for tracks, all
  *  clear of the ochre activity tracks (tracks.ts). A shared path is a lighter cycleway blue, so
- *  both read as bike routes. The monochrome flavors stay monochrome; there the kinds differ by
- *  weight and dash. */
+ *  both read as bike routes. On the light flavors both blues are dark enough to hold up on Fog's
+ *  grey veil; on the dark ones they stay bright against the dark map. The monochrome flavors
+ *  stay monochrome; there the kinds differ by weight and dash. */
 export const PATH_COLORS: Record<Flavor, { cycleway: string; shared: string; trail: string; track: string }> = {
-  light: { cycleway: '#1f7fa8', shared: '#4ba3c9', trail: '#4f7a3a', track: '#8a5a2b' },
+  light: { cycleway: '#0b5a85', shared: '#1a74a8', trail: '#4f7a3a', track: '#8a5a2b' },
   dark: { cycleway: '#5cbfe0', shared: '#93d6ec', trail: '#8fbf6a', track: '#c9955e' },
-  white: { cycleway: '#4a4a4a', shared: '#6a6a6a', trail: '#6e6e6e', track: '#5c5c5c' },
-  grayscale: { cycleway: '#3d3d3d', shared: '#5a5a5a', trail: '#666666', track: '#555555' },
+  white: { cycleway: '#262626', shared: '#404040', trail: '#6e6e6e', track: '#5c5c5c' },
+  grayscale: { cycleway: '#1f1f1f', shared: '#383838', trail: '#666666', track: '#555555' },
   black: { cycleway: '#c4c4c4', shared: '#a8a8a8', trail: '#9a9a9a', track: '#b0b0b0' },
 };
 
-function pathLayers(flavor: Flavor, bridges: boolean, visible: PathOverlays): LineLayerSpecification[] {
+function pathLayers(flavor: Flavor, bridges: boolean): LineLayerSpecification[] {
   const colors = PATH_COLORS[flavor];
   // Legacy filter syntax, the same as the stock road layers use.
   const structure = bridges ? [['has', 'is_bridge']] : [['!has', 'is_tunnel'], ['!has', 'is_bridge']];
   const filter = (detail: unknown[]) =>
     ['all', ...structure, ['==', 'kind', 'path'], detail] as unknown as FilterSpecification;
   const prefix = bridges ? 'paths_bridges_' : 'paths_';
-  const visibility = (on: boolean) => (on ? 'visible' : 'none');
   // Tracks first, so a trail sharing a stretch with one draws over it.
   return [
     {
@@ -208,7 +195,6 @@ function pathLayers(flavor: Flavor, bridges: boolean, visible: PathOverlays): Li
       'source-layer': 'roads',
       minzoom: PATHS_MIN_ZOOM,
       filter: filter(['==', 'kind_detail', TRACK_DETAIL]),
-      layout: { visibility: visibility(visible.tracks) },
       paint: {
         'line-color': colors.track,
         // Longer dashes and a wider line than a trail: a road a vehicle fits on.
@@ -223,7 +209,6 @@ function pathLayers(flavor: Flavor, bridges: boolean, visible: PathOverlays): Li
       'source-layer': 'roads',
       minzoom: PATHS_MIN_ZOOM,
       filter: filter(['in', 'kind_detail', ...TRAIL_DETAILS]),
-      layout: { visibility: visibility(visible.trails) },
       paint: {
         'line-color': colors.trail,
         'line-dasharray': [2, 1],
@@ -235,10 +220,10 @@ function pathLayers(flavor: Flavor, bridges: boolean, visible: PathOverlays): Li
 
 /** Stock layers with the path layers spliced in right after the one that draws the same
  *  features, so bridges, casings and labels keep stacking over them as they did. */
-function withPathLayers(base: LayerSpecification[], flavor: Flavor, visible: PathOverlays): LayerSpecification[] {
+function withPathLayers(base: LayerSpecification[], flavor: Flavor): LayerSpecification[] {
   return base.flatMap((layer) => {
-    if (layer.id === 'roads_other') return [layer, ...pathLayers(flavor, false, visible)];
-    if (layer.id === 'roads_bridges_other') return [layer, ...pathLayers(flavor, true, visible)];
+    if (layer.id === 'roads_other') return [layer, ...pathLayers(flavor, false)];
+    if (layer.id === 'roads_bridges_other') return [layer, ...pathLayers(flavor, true)];
     return [layer];
   });
 }
@@ -251,13 +236,12 @@ export function buildStyle(options: BuildStyleOptions): StyleSpecification {
     pmtilesPath = PMTILES_PATH,
     glyphsPath = GLYPHS_PATH,
     spriteBasePath = SPRITE_BASE_PATH,
-    paths = { trails: false, tracks: false, bikePaths: false, sharedPaths: false },
     satellite = null,
     satelliteOn = false,
   } = options;
 
   const base = origin.replace(/\/$/, '');
-  const vector = withPathLayers(layers(BASEMAP_SOURCE, namedFlavor(flavor), { lang }), flavor, paths);
+  const vector = withPathLayers(layers(BASEMAP_SOURCE, namedFlavor(flavor), { lang }), flavor);
   const hidden = satellite ? satelliteHiddenLayerIds(vector) : [];
   const dimmed = satellite ? satelliteDimmedLayerIds(vector) : [];
 

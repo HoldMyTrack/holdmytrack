@@ -61,7 +61,7 @@ export function ensureBikePathLayers(map: MapLibreMap, beforeId: string | undefi
           'line-color': colors.shared,
           // Dashed like a trail, since people walk it too; a cycleway is solid.
           'line-dasharray': [2, 1],
-          'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], BIKE_PATHS_MIN_ZOOM, 0.8, 13, 1, 18, 3.5],
+          'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], BIKE_PATHS_MIN_ZOOM, 1.5, 13, 2, 18, 4.5],
         },
       },
       beforeId,
@@ -79,7 +79,7 @@ export function ensureBikePathLayers(map: MapLibreMap, beforeId: string | undefi
         layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': colors.cycleway,
-          'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], BIKE_PATHS_MIN_ZOOM, 1, 13, 1.4, 18, 4],
+          'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], BIKE_PATHS_MIN_ZOOM, 1.8, 13, 2.4, 18, 5.5],
         },
       },
       beforeId,

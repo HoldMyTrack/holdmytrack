@@ -311,7 +311,6 @@ async function renderOffscreen(
     style: buildStyle({
       flavor: state.flavor,
       origin: basemapOrigin(),
-      paths: state.paths,
       satellite: satelliteSource(),
       satelliteOn: state.satellite,
       lang,
