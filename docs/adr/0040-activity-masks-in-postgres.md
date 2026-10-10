@@ -12,7 +12,7 @@ The 2026-10-09 production load test (`PERFORMANCE.md`) found a render to be most
 
 ## Decision
 
-**A mask's PNG is stored in `activity_tile_mask_data`, beside its `activity_tile_masks` row, and a render reads it in the same query that finds the tile's masks.** `RenderActivityMasks` encodes each mask in memory and writes both rows in one transaction. A z14 tile then costs one SQL read for all its masks instead of a round trip per mask. The bytes stay well under Postgres's roughly 2 KB inline-storage threshold, so they aren't moved out to TOAST.
+**A mask's PNG is stored in `activity_tile_mask_data`, beside its `activity_tile_masks` row, and a render reads it in the same query that finds the tile's masks.** `RenderActivityMasks` encodes each mask in memory and writes both rows in one transaction. A z14 tile then costs one SQL read for all its masks instead of a round trip per mask. The bytes stay well under Postgres's roughly 2 KB inline-storage threshold, about 600 bytes a mask at 128 px (ADR-0041), so they aren't moved out to TOAST.
 
 **The bytes get a table of their own, not a column on `activity_tile_masks`.** `activity_tile_masks` stays the narrow table a render scans for "which activities touch this tile" and the Heatmap cap's count groups (`fog.RecomputeHeatmapCap`). The bytes reference it with `ON DELETE CASCADE`, so they go with their row and, through it, with their activity.
 
@@ -30,6 +30,6 @@ The 2026-10-09 production load test (`PERFORMANCE.md`) found a render to be most
 ## Consequences
 
 - A render's z14 tile is one query, no object-storage reads. Its two PUTs and the pyramid's reads remain.
-- The database grows by about 2 KB per activity at 64 px. At a million activities that is about 2 GB, in a table the backups leave out.
+- The database grows by about 5 KB per activity at 128 px (2 KB at 64 px). At a million activities that is about 5 GB, in a table the backups leave out.
 - Mask reads now share Postgres's CPU and cache with the map's queries, which were already the first thing to run out at 200 users. `PERFORMANCE.md` records the measurement of a render under load.
 - After a restore, Fog and Heatmap are missing every activity until `rerender-coverage --masks` finishes; the restore steps already end with it (`DEPLOY.md` §11).

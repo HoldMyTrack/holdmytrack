@@ -132,7 +132,7 @@ func TestDownsampleMatchesTheReference(t *testing.T) {
 }
 
 // A track recorded standing still for stretches — GPS jitter of a few centimetres, repeated
-// points — still draws. At 64 px those moves are a small fraction of a pixel, and a stroke
+// points — still draws. At 128 px those moves are a small fraction of a pixel, and a stroke
 // through them used to come out empty: the rasterizer works in 1/64-pixel fixed point, where
 // such a segment has no length.
 func TestActivityMaskSurvivesJitter(t *testing.T) {

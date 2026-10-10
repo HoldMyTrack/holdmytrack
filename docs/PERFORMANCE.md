@@ -197,3 +197,20 @@ Where a Region or Country tile's time goes, and what keeping its clipped outline
 
 - Transforming and clipping the outlines is nearly all of every expensive tile. The filter costs about 1 ms, except over Ohio, where every test account's activities share the same few regions: the old `EXISTS` looked through all of their matches (1,949 activities for one z5 tile) to find the Demo Customer's. The `visited` CTE starts from the account's own activities instead.
 - A kept tile served the same bytes as the live one in every case, at 0.7–2.3 ms. Its first request pays about twice the live cost, once per tile for every account.
+
+### 2026-10-09 — dev stack, 128 px Fog and Heatmap
+
+The decision behind ADR-0041. One dev account seeded with the 45 demo tracks (1,666 masks, all in Postgres, ADR-0040) was redrawn with `rerender-coverage --masks --user` at 64 px and at 128 px, and Fog and Heatmap were screenshotted at zoom 10, 13 and 16 in light and dark, headless, in compose's test container.
+
+| Per tile, development laptop | 64 px | 128 px |
+| :-- | :-- | :-- |
+| Composite a Fog tile | 6.8 µs | 27 µs |
+| Composite a Heatmap tile | 13 µs | 65 µs |
+| A pyramid step | 7.8 µs | 31 µs |
+| Decode a mask | 15 µs | 38 µs |
+| Encode a mask | 135 µs | 188 µs |
+| Serve a Fog tile | 0.39 µs | 0.43 µs |
+| A stored mask, average | about 275 bytes | 616 bytes |
+
+- At zoom 10 the 64 px tracks merged where they ran close (Parma, downtown Cleveland); at 128 px they stayed apart. At zoom 13 the 128 px lines followed their roads where 64 px drew a coarse staircase. At zoom 16 the band was the same width at both sizes.
+- 300 random jittery walks all drew at 128 px with `minStepPx` at half a pixel.

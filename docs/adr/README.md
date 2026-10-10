@@ -49,6 +49,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0038](0038-fog-heatmap-pixels-from-afar.md) | Fog and Heatmap show square pixels from afar and are smoothed from zoom 14 |
 | [0039](0039-the-app-is-the-gate.md) | The app is the gate: every source brings in only what the user ticks, and nothing is guessed on their behalf |
 | [0040](0040-activity-masks-in-postgres.md) | Activity masks' PNGs live in a Postgres table of their own, left out of backups |
+| [0041](0041-fog-heatmap-128px-tiles.md) | Fog and Heatmap tiles are 128 px |
 
 ## Writing a new one
 
