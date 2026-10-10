@@ -1018,7 +1018,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
         val loaded = style ?: return
         if (!overlaysAttached) {
-            MapOverlays.attach(loaded, mode, selectedRange, darkBase(loaded), storyId)
+            MapOverlays.attach(loaded, mode, selectedRange, darkBase(loaded), isNight(), storyId)
+            // The bike-path layers attach just added start hidden.
+            MapPaths.apply(loaded, shownPaths(MapPaths.get(requireContext())))
             MapOverlays.setTrackFilter(loaded, panelState.mapHidden, panelState.highlighted)
             // Last, so the places are over everything else, labels included.
             MapSpots.attach(loaded, requireContext(), shownSpots(MapSpots.get(requireContext())))

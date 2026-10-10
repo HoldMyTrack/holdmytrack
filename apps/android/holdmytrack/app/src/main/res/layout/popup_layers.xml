@@ -102,6 +102,13 @@
             android:layout_height="wrap_content"
             android:text="@string/layers_bike_paths" />
 
+        <com.google.android.material.checkbox.MaterialCheckBox
+            android:id="@+id/layers_shared_paths"
+            style="@style/Widget.HoldMyTrack.LayersOption.Check"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/layers_shared_paths" />
+
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"

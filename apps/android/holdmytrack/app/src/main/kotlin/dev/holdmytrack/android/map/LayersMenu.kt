@@ -117,6 +117,7 @@ class LayersMenu(
         bind(R.id.layers_trails, current.trails) { p, on -> p.copy(trails = on) }
         bind(R.id.layers_tracks, current.tracks) { p, on -> p.copy(tracks = on) }
         bind(R.id.layers_bike_paths, current.bikePaths) { p, on -> p.copy(bikePaths = on) }
+        bind(R.id.layers_shared_paths, current.sharedPaths) { p, on -> p.copy(sharedPaths = on) }
 
         for ((category, id) in SPOT_BOXES) {
             content.findViewById<CheckBox>(id).apply {

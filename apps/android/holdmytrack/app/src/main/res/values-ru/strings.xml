@@ -125,6 +125,7 @@
     <string name="layers_tracks_info">Грунтовые, полевые и лесные дороги: без покрытия, шириной с машину.</string>
     <string name="layers_tracks_info_label">Что такое грунтовки?</string>
     <string name="layers_bike_paths">Велодорожки</string>
+    <string name="layers_shared_paths">Велопешеходные дорожки</string>
     <string name="layers_places">Интересные места</string>
     <string name="layers_playgrounds">Детские площадки</string>
     <string name="layers_dog_parks">Площадки для собак</string>

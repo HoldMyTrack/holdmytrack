@@ -118,6 +118,7 @@
     <string name="layers_tracks_info">Dirt, farm and forest roads: unpaved tracks wide enough for a vehicle.</string>
     <string name="layers_tracks_info_label">What are tracks?</string>
     <string name="layers_bike_paths">Bike paths</string>
+    <string name="layers_shared_paths">Shared paths</string>
     <string name="layers_places">Points of interest</string>
     <string name="layers_playgrounds">Playgrounds</string>
     <string name="layers_dog_parks">Dog parks</string>
