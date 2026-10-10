@@ -83,6 +83,9 @@ type Config struct {
 	// never more than one per account. The jobs are mostly waiting on object storage, so this
 	// is bounded by memory, not CPU count (IMPLEMENTATION.md §5.2). Only read by `work`.
 	WorkerConcurrency int
+	// UploadsPerHour is how many files one account may upload in an hour (internal/httpapi's
+	// defaultUploadsPerHour). Raised only on a load test's target. Only read by `serve`.
+	UploadsPerHour int
 }
 
 func Load() (Config, error) {
@@ -119,6 +122,9 @@ func Load() (Config, error) {
 		return c, err
 	}
 	if c.WorkerConcurrency, err = positiveInt("WORKER_CONCURRENCY", 4); err != nil {
+		return c, err
+	}
+	if c.UploadsPerHour, err = positiveInt("UPLOADS_PER_HOUR", 100); err != nil {
 		return c, err
 	}
 	c.WebDevDir = env("WEB_DEV_DIR", "")

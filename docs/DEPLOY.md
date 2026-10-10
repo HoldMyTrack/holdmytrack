@@ -26,6 +26,8 @@ Fill in every value — see that file's own comments for what each one means and
 
 **Worker concurrency.** `WORKER_CONCURRENCY` (default 4) is how many jobs the worker runs at once — imports, renders, edits — taking accounts in turn and never two of one account's at the same time (`IMPLEMENTATION.md` §3.8). A job mostly waits on R2, so the bound is memory, not CPUs: 4 is comfortable on 2 vCPU / 4 GB. The worker's database pool is 4 connections per unit of it. A change needs only `up -d` for `worker`.
 
+**Uploads per hour.** `UPLOADS_PER_HOUR` (default 100) is how many files one account may send to `POST /v1/activities/upload` in an hour (`docs/SPEC.md` FR-3.1). Leave it at 100. A load test's `seed` and `import` send more than that per account, so raise it for their run (`docs/PERFORMANCE.md`). A change needs only `up -d` for `api`, which also starts every account's count afresh.
+
 **Sign in with Google (optional).** Leave `GOOGLE_CLIENT_ID` empty to run without it; the sign-in screen then shows only email and password. To turn it on:
 
 1. In the Google Cloud console, create a project (or reuse one) and set up the OAuth consent screen: user type External, app name HoldMyTrack, the domain from step 3 as an authorized domain, and only the `openid`, `email` and `profile` scopes — none of them needs Google's app verification. Publish it ("In production"); in "Testing" only listed test users can sign in.

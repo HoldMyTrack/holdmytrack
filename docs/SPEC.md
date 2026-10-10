@@ -393,6 +393,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 **Error cases**:
 - Unsupported file extension → `415 Unsupported Media Type`; a `.zip` with a message of its own, to upload the files inside it instead.
 - File too large, or malformed request → `413 Request Entity Too Large`.
+- More than 100 upload requests from one account in an hour (refused and already-imported files count too) → `429 Too Many Requests` before the file is read, with a message naming the limit; the file shows as failed with that message, and later files of the batch fail the same way until the hour is up. The count restarts when the server does.
 - Empty file → `400 Bad Request`.
 - Unparseable/corrupt file content → the background job fails; the Sync page (FR-3.9) shows it "Failed" with a reason, the header's Sync item carries a red dot until that page has been opened (FR-3.9), and no `Activity` is created.
 - A file whose points carry no timestamps at all (a planned route rather than a recorded activity) → the background job fails the same way, with a reason saying the file has no timestamps. Points without a timestamp inside an otherwise timed track are dropped, not failed on.

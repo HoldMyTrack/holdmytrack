@@ -81,7 +81,14 @@ type Server struct {
 	google                googleOAuth
 	facebook              facebookOAuth
 	pages                 *web.Renderer
+	uploadLimiter         *fixedWindowLimiter
 }
+
+// defaultUploadsPerHour is how many files one account may send to `POST /v1/activities/upload`
+// in an hour: five of the clients' 20-file batches, plenty to bring a season in by hand, and a
+// stop to a script pouring a whole archive in one file at a time (ADR-0039). UPLOADS_PER_HOUR
+// overrides it, for a load test's target.
+const defaultUploadsPerHour = 100
 
 func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail.Sender, appBaseURL, basemapOrigin string, satellite mapstyle.Satellite, version string, skipEmailVerification bool, google GoogleOAuthConfig, facebook FacebookOAuthConfig, pages *web.Renderer) *Server {
 	s := &Server{
@@ -91,6 +98,7 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 		google:                newGoogleOAuth(google),
 		facebook:              newFacebookOAuth(facebook),
 		pages:                 pages,
+		uploadLimiter:         newFixedWindowLimiter(defaultUploadsPerHour, time.Hour),
 	}
 	s.registerPages()
 	s.mux.HandleFunc(route("POST", "/auth/signup"), s.handleSignup)
@@ -419,6 +427,12 @@ type uploadResponse struct {
 // payload (ingest.EnqueueRaw), return. No parsing happens here — see internal/ingest,
 // run by cmd/holdmytrack work.
 func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
+	// Before the body is read, so a refused request costs no memory. Every request counts,
+	// a refused or already-imported file too.
+	if !s.uploadLimiter.allow(userIDFromContext(r.Context())) {
+		httpErrorT(w, r, http.StatusTooManyRequests, "error.upload_rate_limit", "max", s.uploadLimiter.limit)
+		return
+	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxUploadBytes+1<<20) // +1MiB of multipart overhead
 	if err := r.ParseMultipartForm(multipartMemoryBytes); err != nil {
 		httpErrorT(w, r, http.StatusRequestEntityTooLarge, "error.upload_too_large")
@@ -474,6 +488,12 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusAccepted, uploadResponse{Status: "enqueued", ExternalID: res[0].ExternalID, Filename: header.Filename})
+}
+
+// SetUploadsPerHour replaces the per-account upload limit (defaultUploadsPerHour), starting
+// every account's count afresh.
+func (s *Server) SetUploadsPerHour(n int) {
+	s.uploadLimiter = newFixedWindowLimiter(n, time.Hour)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
