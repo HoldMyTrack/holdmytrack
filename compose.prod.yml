@@ -31,6 +31,10 @@ services:
     image: postgis/postgis:16-3.4
     restart: unless-stopped
     logging: *logging
+    # About 25% and 65% of a 4 GB droplet's RAM, rather than the image's 128MB of cache, which
+    # renders reading activity masks would push the map's queries out of (docs/DEPLOY.md §6).
+    # A change restarts db, so it needs maintenance mode.
+    command: ["postgres", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=2560MB"]
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
