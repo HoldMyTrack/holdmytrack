@@ -236,9 +236,11 @@ class ProfileActivity : AppCompatActivity() {
         trendsChart.heights = ProfileStats.trendHeights(list)
         trendsChart.selected = -1
         trendsDetail.visibility = View.GONE
-        trendsChartBox.visibility = if (list.isEmpty()) View.GONE else View.VISIBLE
-        trendsEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
-        if (list.isNotEmpty()) {
+        // Every period of the window comes back, the empty ones as zeroes.
+        val recorded = list.any { it.count > 0 }
+        trendsChartBox.visibility = if (recorded) View.VISIBLE else View.GONE
+        trendsEmpty.visibility = if (recorded) View.GONE else View.VISIBLE
+        if (recorded) {
             trendsFrom.text = shortDate(list.first().periodStart)
             trendsTo.text = shortDate(list.last().periodStart)
         }

@@ -382,7 +382,7 @@ data class ActivityDay(val date: String, val count: Int, val distanceMeters: Dou
 data class ActivityDayPage(val days: List<ActivityDay>, val earliest: String?)
 
 /** One week's or month's totals, as `GET /v1/activities/trends` sums them; [periodStart] is the
- *  bucket's first day, `YYYY-MM-DD`. Periods with nothing are never returned. */
+ *  bucket's first day, `YYYY-MM-DD`. Every period of the window is returned, an empty one as zeroes. */
 data class TrendPeriod(
     val periodStart: String,
     val count: Int,
