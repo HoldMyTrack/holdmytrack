@@ -8,7 +8,10 @@ import (
 	"image"
 	"image/draw"
 	"image/png"
+	"io"
+	"log/slog"
 	"math"
+	"sync/atomic"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -20,9 +23,10 @@ import (
 )
 
 // renderParallelism bounds how many tiles (or masks) a render works on at once. The work is
-// mostly waiting on object storage — a tile is one or more GETs and two PUTs, each a round
-// trip to R2 — so running them one after another left a render at about 1.3 tiles a second
-// on the production droplet (the 2026-10-08 load test), almost none of it CPU. Bounded rather
+// mostly waiting — a z14 tile is a query for its masks and two PUTs, a pyramid tile four
+// GETs and two PUTs, each PUT or GET a round trip to R2 — so running them one after another
+// left a render at about 1.3 tiles a second on the production droplet (the 2026-10-08 load
+// test), almost none of it CPU. Bounded rather
 // than unbounded so memory stays predictable (IMPLEMENTATION.md §5.2): each in-flight tile
 // holds a few decoded masks.
 const renderParallelism = 16
@@ -65,6 +69,14 @@ func RenderUser(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, u
 	if err != nil {
 		return fmt.Errorf("fog: load heatmap cap: %w", err)
 	}
+	// Masks a z14 tile was composited without (renderAndStoreTile): logged once per pass, so
+	// coverage missing after a restore isn't silent.
+	var skipped atomic.Int64
+	defer func() {
+		if n := skipped.Load(); n > 0 {
+			slog.Warn("fog: render skipped unreadable activity masks", "user", userID, "masks", n)
+		}
+	}()
 
 	// Above z14 the client overzooms the z14 raster directly (§4.2) — no pyramid needed there.
 	for z := Zoom; z >= 0; z-- {
@@ -81,7 +93,7 @@ func RenderUser(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, u
 			t := dirty[i]
 			var err error
 			if z == Zoom {
-				err = renderAndStoreTile(ctx, pool, store, userID, z, t[0], t[1], heatmapCap)
+				err = renderAndStoreTile(ctx, pool, store, userID, z, t[0], t[1], heatmapCap, &skipped)
 			} else {
 				err = renderPyramidLevel(ctx, pool, store, userID, z, t[0], t[1])
 			}
@@ -174,6 +186,15 @@ func dirtyTiles(ctx context.Context, pool *pgxpool.Pool, userID string, zoom int
 // contains tiles the *raw* trajectory actually passed through, not an approximation from the
 // simplified trajectory's bounding box.
 //
+// The masks' bytes come in the same query, from activity_tile_mask_data (ADR-0040), so a tile
+// costs one SQL read rather than a round trip to object storage per activity through it. A
+// row from before that table, with an object key and no bytes yet, is still fetched from the
+// store until `rerender-coverage --masks` redraws it. A mask that can't be read — neither
+// bytes nor key (a restore leaves the bytes out until that same rerun), or a failed fetch or
+// decode — is left out of the tile and counted in skipped, rather than failing it: every other
+// activity through the tile is still real coverage, the same "one bad file doesn't abort the
+// batch" principle §5.1 applies to bulk ingest.
+//
 // Fog and Heatmap draw from the same query but not the same *rows*: Fog is a true all-time
 // aggregate (every activity's mask), while Heatmap only composites masks whose
 // activity is currently flagged `in_heatmap_window` — a plain column read, not a comparison
@@ -185,31 +206,33 @@ func dirtyTiles(ctx context.Context, pool *pgxpool.Pool, userID string, zoom int
 // Neither includes a Pending activity (edit_pending, §4.7.7): its masks are the pre-reprocess
 // ones, or mid-rewrite. The reprocess marks its tiles dirty when it goes Pending and renders
 // them again after clearing the flag, so it drops out of both rasters for the duration.
-func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID string, zoom, x, y int, heatmapCap float64) error {
+func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID string, zoom, x, y int, heatmapCap float64, skipped *atomic.Int64) error {
 	gen, err := tileDirtyGen(ctx, pool, userID, zoom, x, y)
 	if err != nil {
 		return err
 	}
 	rows, err := pool.Query(ctx, `
-		SELECT m.mask_object_key, a.in_heatmap_window
+		SELECT d.png, m.mask_object_key, a.in_heatmap_window
 		FROM activity_tile_masks m
 		JOIN activities a ON a.id = m.activity_id
+		LEFT JOIN activity_tile_mask_data d USING (activity_id, zoom, tile_x, tile_y)
 		WHERE a.user_id = $1 AND NOT a.edit_pending
 		  AND m.zoom = $2 AND m.tile_x = $3 AND m.tile_y = $4
 	`, userID, zoom, x, y)
 	if err != nil {
 		return fmt.Errorf("query activity masks: %w", err)
 	}
-	type keyedMask struct {
-		key      string
+	type storedMask struct {
+		png      []byte
+		key      *string
 		inWindow bool
 	}
-	var rowsOut []keyedMask
+	var rowsOut []storedMask
 	for rows.Next() {
-		var row keyedMask
-		if err := rows.Scan(&row.key, &row.inWindow); err != nil {
+		var row storedMask
+		if err := rows.Scan(&row.png, &row.key, &row.inWindow); err != nil {
 			rows.Close()
-			return fmt.Errorf("scan activity mask key: %w", err)
+			return fmt.Errorf("scan activity mask: %w", err)
 		}
 		rowsOut = append(rowsOut, row)
 	}
@@ -218,15 +241,22 @@ func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.
 		return err
 	}
 
-	// Fetched side by side: a tile many activities cross (a daily commute) has as many masks.
+	// Side by side: a tile many activities cross (a daily commute) has as many masks, and one
+	// not yet moved into the database is a round trip to the store.
 	loaded := make([]*image.Gray, len(rowsOut))
 	if err := parallel.ForEach(ctx, len(rowsOut), renderParallelism, func(ctx context.Context, i int) error {
-		mask, err := loadCrispMask(ctx, store, rowsOut[i].key)
+		var mask *image.Gray
+		var err error
+		switch row := rowsOut[i]; {
+		case row.png != nil:
+			mask, err = decodeGray(bytes.NewReader(row.png))
+		case row.key != nil:
+			mask, err = loadCrispMask(ctx, store, *row.key)
+		default:
+			err = errors.New("no stored mask")
+		}
 		if err != nil {
-			// One missing/corrupt mask should not fail the whole tile — every other
-			// activity through it is still real coverage. Skip and continue, the same
-			// "one bad file doesn't abort the batch" principle §5.1 applies to bulk
-			// ingest.
+			skipped.Add(1)
 			return nil
 		}
 		loaded[i] = mask
@@ -262,16 +292,22 @@ func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.
 		fogObjectKey(userID, zoom, x, y), heatmapObjectKey(userID, zoom, x, y))
 }
 
-// loadCrispMask fetches and decodes one activity's stored crisp (unblurred) mask —
-// activity_tile_masks' own object, read back here by renderAndStoreTile to build both the
-// Fog and Heatmap aggregates for one tile.
+// loadCrispMask fetches and decodes one activity's crisp (unblurred) mask stored as an object
+// — a row written before activity_tile_mask_data, read back by renderAndStoreTile until
+// `rerender-coverage --masks` moves it into the database.
 func loadCrispMask(ctx context.Context, store *storage.Store, key string) (*image.Gray, error) {
 	obj, err := store.Get(ctx, key)
 	if err != nil {
 		return nil, err
 	}
 	defer obj.Close()
-	img, err := png.Decode(obj)
+	return decodeGray(obj)
+}
+
+// decodeGray decodes a PNG this package wrote. png.Decode hands back *image.Gray for those
+// grayscale PNGs, but convert explicitly rather than assume the concrete type.
+func decodeGray(r io.Reader) (*image.Gray, error) {
+	img, err := png.Decode(r)
 	if err != nil {
 		return nil, err
 	}
@@ -284,10 +320,13 @@ func loadCrispMask(ctx context.Context, store *storage.Store, key string) (*imag
 	return gray, nil
 }
 
-// RenderActivityMasks renders and stores exactly one activity's own crisp (unblurred) stroke
-// mask for each of its already-computed touched z14 tiles (internal/ingest's
-// computeTouchedTiles), then upserts one activity_tile_masks row per tile. Idempotent: safe
-// to re-run for the same activity (a redelivered ingest job).
+// RenderActivityMasks renders exactly one activity's own crisp (unblurred) stroke mask for
+// each of its already-computed touched z14 tiles (internal/ingest's computeTouchedTiles), and
+// upserts one activity_tile_masks row per tile with its PNG in activity_tile_mask_data, both
+// in one transaction (ADR-0040). Idempotent: safe to re-run for the same activity (a
+// redelivered ingest job). A redrawn row's object key is cleared; the object itself, from
+// before the bytes moved into the database, goes with the activity's prefix
+// (activity-masks/{id}/) or the one-time cleanup in docs/DEPLOY.md §6.
 //
 // Called from ingest.Process with the points already in memory (pre-simplification, already
 // privacy-clipped) — unlike the old per-tile re-render this replaces, this never reads raw
@@ -302,36 +341,51 @@ func RenderActivityMasks(ctx context.Context, pool *pgxpool.Pool, store *storage
 
 	xs := make([]int32, len(tiles))
 	ys := make([]int32, len(tiles))
-	keys := make([]string, len(tiles))
-	// Rendered and stored side by side: a long track crosses hundreds of tiles, and storing
-	// their masks one after another cost a 1,500 km drive over three minutes of the worker.
+	pngs := make([][]byte, len(tiles))
+	// Rendered side by side: a long track crosses hundreds of tiles.
 	if err := parallel.ForEach(ctx, len(tiles), renderParallelism, func(ctx context.Context, i int) error {
 		x, y := tiles[i][0], tiles[i][1]
-		mask := renderActivityMask(projectToTile(points, x, y, Zoom)...)
-		key := activityMaskObjectKey(activityID, Zoom, x, y)
-		if err := storeTilePNG(ctx, store, key, mask); err != nil {
-			return fmt.Errorf("store activity mask z%d/%d/%d: %w", Zoom, x, y, err)
+		b, err := encodeTilePNG(renderActivityMask(projectToTile(points, x, y, Zoom)...))
+		if err != nil {
+			return fmt.Errorf("activity mask z%d/%d/%d: %w", Zoom, x, y, err)
 		}
-		xs[i], ys[i], keys[i] = int32(x), int32(y), key
+		xs[i], ys[i], pngs[i] = int32(x), int32(y), b
 		return nil
 	}); err != nil {
 		return err
 	}
 
-	_, err := pool.Exec(ctx, `
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op if already committed
+	if _, err := tx.Exec(ctx, `
 		INSERT INTO activity_tile_masks (activity_id, zoom, tile_x, tile_y, mask_object_key, rendered_at)
-		SELECT $1, $2, x, y, key, NOW()
-		FROM unnest($3::int[], $4::int[], $5::text[]) AS t(x, y, key)
+		SELECT $1, $2, x, y, NULL, NOW()
+		FROM unnest($3::int[], $4::int[]) AS t(x, y)
 		ON CONFLICT (activity_id, zoom, tile_x, tile_y)
-		DO UPDATE SET mask_object_key = EXCLUDED.mask_object_key, rendered_at = NOW()
-	`, activityID, Zoom, xs, ys, keys)
-	return err
+		DO UPDATE SET mask_object_key = NULL, rendered_at = NOW()
+	`, activityID, Zoom, xs, ys); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO activity_tile_mask_data (activity_id, zoom, tile_x, tile_y, png)
+		SELECT $1, $2, x, y, png
+		FROM unnest($3::int[], $4::int[], $5::bytea[]) AS t(x, y, png)
+		ON CONFLICT (activity_id, zoom, tile_x, tile_y)
+		DO UPDATE SET png = EXCLUDED.png
+	`, activityID, Zoom, xs, ys, pngs); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
-// RemoveActivityMasks deletes one activity's masks for the given tiles, both the
-// activity_tile_masks rows and their objects — the tiles an edited track (internal/ingest's
-// ProcessTrackEdit) no longer touches. Rows go first: a render_fog pass running in between
-// then simply composites without them, rather than failing on a row whose object is gone.
+// RemoveActivityMasks deletes one activity's masks for the given tiles — the tiles an edited
+// track (internal/ingest's ProcessTrackEdit) no longer touches. Deleting the rows takes their
+// bytes with them (the cascade); a row still pointing at an object from before
+// activity_tile_mask_data has that object removed after. Rows go first: a render_fog pass
+// running in between then simply composites without them.
 func RemoveActivityMasks(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, activityID string, tiles [][2]int) error {
 	if len(tiles) == 0 {
 		return nil
@@ -342,24 +396,31 @@ func RemoveActivityMasks(ctx context.Context, pool *pgxpool.Pool, store *storage
 		xs = append(xs, int32(t[0]))
 		ys = append(ys, int32(t[1]))
 	}
-	if _, err := pool.Exec(ctx, `
+	rows, err := pool.Query(ctx, `
 		DELETE FROM activity_tile_masks m
 		USING unnest($3::int[], $4::int[]) AS t(x, y)
 		WHERE m.activity_id = $1 AND m.zoom = $2 AND m.tile_x = t.x AND m.tile_y = t.y
-	`, activityID, Zoom, xs, ys); err != nil {
+		RETURNING m.mask_object_key
+	`, activityID, Zoom, xs, ys)
+	if err != nil {
 		return err
 	}
-	return parallel.ForEach(ctx, len(tiles), renderParallelism, func(ctx context.Context, i int) error {
-		t := tiles[i]
-		if err := store.Remove(ctx, activityMaskObjectKey(activityID, Zoom, t[0], t[1])); err != nil {
-			return fmt.Errorf("remove activity mask z%d/%d/%d: %w", Zoom, t[0], t[1], err)
+	keys, err := pgx.CollectRows(rows, pgx.RowTo[*string])
+	if err != nil {
+		return err
+	}
+	var objects []string
+	for _, k := range keys {
+		if k != nil {
+			objects = append(objects, *k)
+		}
+	}
+	return parallel.ForEach(ctx, len(objects), renderParallelism, func(ctx context.Context, i int) error {
+		if err := store.Remove(ctx, objects[i]); err != nil {
+			return fmt.Errorf("remove activity mask %s: %w", objects[i], err)
 		}
 		return nil
 	})
-}
-
-func activityMaskObjectKey(activityID string, zoom, x, y int) string {
-	return fmt.Sprintf("activity-masks/%s/%d/%d/%d.png", activityID, zoom, x, y)
 }
 
 // projectToTile places points in the tile's own pixels, once for each copy of the world that
@@ -462,28 +523,23 @@ func loadTileImage(ctx context.Context, pool *pgxpool.Pool, store *storage.Store
 		return nil, err
 	}
 	defer obj.Close()
-
-	img, err := png.Decode(obj)
-	if err != nil {
-		return nil, err
-	}
-	if gray, ok := img.(*image.Gray); ok {
-		return gray, nil
-	}
-	// Defensive: png.Decode should hand back *image.Gray for the grayscale PNGs this
-	// package itself writes, but convert explicitly rather than assume the concrete type.
-	b := img.Bounds()
-	gray := image.NewGray(b)
-	draw.Draw(gray, b, img, b.Min, draw.Src)
-	return gray, nil
+	return decodeGray(obj)
 }
 
 func storeTilePNG(ctx context.Context, store *storage.Store, key string, mask *image.Gray) error {
+	b, err := encodeTilePNG(mask)
+	if err != nil {
+		return err
+	}
+	return store.Put(ctx, key, bytes.NewReader(b), int64(len(b)))
+}
+
+func encodeTilePNG(mask *image.Gray) ([]byte, error) {
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, mask); err != nil {
-		return fmt.Errorf("encode png: %w", err)
+		return nil, fmt.Errorf("encode png: %w", err)
 	}
-	return store.Put(ctx, key, bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+	return buf.Bytes(), nil
 }
 
 func fogObjectKey(userID string, zoom, x, y int) string {

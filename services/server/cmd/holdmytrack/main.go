@@ -45,6 +45,8 @@ var gitSHA = "unknown"
 
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	// For packages that log without a logger passed in (internal/fog's render warnings).
+	slog.SetDefault(log)
 
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "usage: holdmytrack <serve|work|migrate|seed-demo-customer|export-demo-activities|seed-admin-boundaries|seed-timezones|rerender-coverage|import-spots|set-admin>")

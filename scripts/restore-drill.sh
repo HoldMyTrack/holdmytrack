@@ -84,6 +84,9 @@ for table in users activities activity_streams activity_photos stories privacy_z
   printf '%-18s %10s %10s\n' "$table" "$(drill_psql "SELECT count(*) FROM $table")" "$(live_psql "SELECT count(*) FROM $table")"
 done
 [[ $(drill_psql 'SELECT count(*) FROM users') -gt 0 ]] || fail "the restored database has no users"
+# The masks' PNGs are left out of the dump (backup.sh) but their table isn't.
+[[ $(drill_psql 'SELECT count(*) FROM activity_tile_mask_data') -eq 0 ]] ||
+  fail "the restored activity_tile_mask_data isn't empty — is backup.sh still leaving its data out?"
 
 # Every key the restored database refers to, against what's in the backup bucket.
 drill_psql "

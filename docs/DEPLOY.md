@@ -118,6 +118,13 @@ Skip them and "Try it now" opens an empty demo account (`SPEC.md` FR-2.2), Fog/H
 
 A deploy that changes how Fog/Heatmap tiles are drawn (`services/server/internal/fog`, `IMPLEMENTATION.md` §4.2) needs every account's tiles re-rendered once, or they keep the old look: `docker compose -f compose.prod.yml --env-file .env.prod run --rm api rerender-coverage`, with `--masks` when the change is to the stroke itself (its width), to the tile size (`fog.TileSize`), or to which tiles a track reaches (`internal/tilemath`), which redraws every activity's stored masks first and takes a while. It only queues the renders, so the worker must be up; they finish in the background.
 
+Activity masks moved from R2 into Postgres (`activity_tile_mask_data`, ADR-0040). Once, on the deploy that brings `migrations/0030_activity_tile_mask_data.sql`, run `rerender-coverage --masks` to redraw every mask into the database. Until then a render reads the old objects. When it reports no failures and the first command below prints 0 (no mask left without its PNG), delete the old objects with the second:
+
+```
+docker compose -f compose.prod.yml --env-file .env.prod exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT count(*) FROM activity_tile_masks m WHERE NOT EXISTS (SELECT 1 FROM activity_tile_mask_data d WHERE (d.activity_id, d.zoom, d.tile_x, d.tile_y) = (m.activity_id, m.zoom, m.tile_x, m.tile_y))"'
+docker compose -f compose.prod.yml --env-file .env.prod run --rm rclone purge data:activity-masks
+```
+
 The demo history is picked from real activities on a deployment. To copy some out, with their ids from the admin panel's activity list:
 
 ```
@@ -271,7 +278,7 @@ That's the rename table in `services/server/internal/web/timezones_data.go` (`ti
 
 ## 11. Backups and the restore drill
 
-`scripts/backup.sh` runs nightly: it dumps Postgres, keeps the dump in `/srv/holdmytrack-backups/postgres/` for a week, and copies it to a second R2 bucket. It then syncs the app bucket's `raw/`, `photos/` and `avatars/` into the same bucket. `fog/`, `heatmap/` and `activity-masks/` aren't copied, because `rerender-coverage --masks` rebuilds them (ADR-0029). `scripts/restore-drill.sh` runs monthly and proves the copies restore. Both run rclone from `compose.prod.yml`'s `rclone` service, which `up` never starts, so nothing needs installing on the host.
+`scripts/backup.sh` runs nightly: it dumps Postgres, keeps the dump in `/srv/holdmytrack-backups/postgres/` for a week, and copies it to a second R2 bucket. It then syncs the app bucket's `raw/`, `photos/` and `avatars/` into the same bucket. `fog/`, `heatmap/` and `activity-masks/` aren't copied, and the dump leaves out the data of `activity_tile_mask_data` (the activity masks' PNGs), because `rerender-coverage --masks` rebuilds them all (ADR-0029, ADR-0040). `scripts/restore-drill.sh` runs monthly and proves the copies restore. Both run rclone from `compose.prod.yml`'s `rclone` service, which `up` never starts, so nothing needs installing on the host.
 
 **Set up.**
 
@@ -298,7 +305,7 @@ That's the rename table in `services/server/internal/web/timezones_data.go` (`ti
 
 **What's in the backup bucket.** `postgres/daily/` holds each night's dump for 14 days, and `postgres/weekly/` holds Sunday's for 8 weeks. `objects/` mirrors the app bucket's keys. When the sync would delete or overwrite an object there, it moves the old copy into `objects-deleted/<UTC stamp of that run>/` instead, where it stays for 30 days. An account deleted on request therefore stays in the backups for up to 8 weeks.
 
-**The drill** takes the newest dump from the bucket and restores it into a throwaway container of the live `db` image, which has no network and is removed afterwards. It prints row counts next to the live database's. It then checks every object key the restored database refers to: each activity's raw payload, each photo and its thumbnail, each avatar. Every one must be in `objects/`, or in `objects-deleted/` if the app removed it after the dump. It fails, and records no success for the "Restore drill overdue" alert (§13), if the newest dump is more than 36 hours old, if `pg_restore` fails, if the restored database has no users, or if any object is missing. When an object is missing, it also says whether the object is gone from the app bucket too. That would mean the database already pointed at nothing before the backup ran. Run the drill by hand after changing `backup.sh`, or after adding anything that stores objects under a new key.
+**The drill** takes the newest dump from the bucket and restores it into a throwaway container of the live `db` image, which has no network and is removed afterwards. It prints row counts next to the live database's. It then checks every object key the restored database refers to: each activity's raw payload, each photo and its thumbnail, each avatar. Every one must be in `objects/`, or in `objects-deleted/` if the app removed it after the dump. It fails, and records no success for the "Restore drill overdue" alert (§13), if the newest dump is more than 36 hours old, if `pg_restore` fails, if the restored database has no users, if its `activity_tile_mask_data` isn't empty (the dump is meant to leave its data out), or if any object is missing. When an object is missing, it also says whether the object is gone from the app bucket too. That would mean the database already pointed at nothing before the backup ran. Run the drill by hand after changing `backup.sh`, or after adding anything that stores objects under a new key.
 
 **Restoring for real.** Take a manual `./scripts/backup.sh` first if the live database still runs, so the current state is kept too. Then:
 
@@ -310,7 +317,7 @@ docker compose -f compose.prod.yml --env-file .env.prod exec -T db sh -c 'dropdb
 docker compose -f compose.prod.yml --env-file .env.prod exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --exit-on-error --no-owner' < /srv/holdmytrack-backups/postgres/<name>
 ```
 
-Recreating the database from `template0` keeps the image's own PostGIS setup from colliding with the dump's. On a new server, bring up `db` alone first (`up -d db`), then run the same two commands. If objects were lost too, copy them back with `run --rm rclone copy backup:objects data:`. Use `copy`, never `sync`: `copy` doesn't delete anything in the app bucket. An object removed by mistake within the last 30 days is in `objects-deleted/`, under the stamp of the first backup that ran after it was removed. Then `GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod up -d`, which also runs any migrations newer than the dump. If tiles were lost, or the database is older than them, also run `run --rm api rerender-coverage --masks` (§6). Check `/healthz` and the map, and finish with `./scripts/maintenance.sh off`.
+Recreating the database from `template0` keeps the image's own PostGIS setup from colliding with the dump's. On a new server, bring up `db` alone first (`up -d db`), then run the same two commands. If objects were lost too, copy them back with `run --rm rclone copy backup:objects data:`. Use `copy`, never `sync`: `copy` doesn't delete anything in the app bucket. An object removed by mistake within the last 30 days is in `objects-deleted/`, under the stamp of the first backup that ran after it was removed. Then `GIT_SHA=$(git rev-parse --short HEAD) docker compose -f compose.prod.yml --env-file .env.prod up -d`, which also runs any migrations newer than the dump. Then run `run --rm api rerender-coverage --masks` (§6): the dump has no activity masks' PNGs, so Fog and Heatmap show none of the restored activities until it has redrawn them, and it also rebuilds tiles that were lost or are newer than the database. Check `/healthz` and the map, and finish with `./scripts/maintenance.sh off`.
 
 ## 12. Host hardening
 
