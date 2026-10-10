@@ -181,3 +181,19 @@ The same VPS with 64 px tiles (ADR-0037), the parallel purge and the per-file im
 - A single upload from another account was processed in 5 s with 4,254 jobs queued ahead of it, but took 7 minutes 35 s when sent at 23:04: by then the renders of the four accounts that had finished ingesting held all four worker loops (`IMPLEMENTATION.md` §3.8), and the upload waited until the first of them ended at 23:12. Those four renders ended between 23:12 and 23:15 with the worker averaging 81% CPU of its 200%, waiting more than computing.
 - 12 people browsing during the import: every 30 s window's Fog p95 under 155 ms (median 59 ms), Tracks under 245 ms (63 ms), Region under 940 ms (118 ms), with no errors.
 - The purge removed the 21 accounts and their 5,947 activities in about 10 minutes, leaving no row with their `user_id` in any table and no job pending. The database grew from 2,452 to 2,582 MB during the test and stood at 2,564 MB after the purge.
+
+### 2026-10-09 — dev stack, Region and Country tiles kept per tile
+
+Where a Region or Country tile's time goes, and what keeping its clipped outlines (`admin_tile_geoms`, `IMPLEMENTATION.md` §4.2.4) saves. Each query was run three times in `psql` against the dev database, as the Demo Customer (611 activities) over the world, Ohio and Europe. The outlines were drawn alone, with the account's `EXISTS` filter alone, and both together, then built into the new tables inside a transaction rolled back afterwards. The table shows the third run.
+
+| Tile | Live, before | Outlines alone | Filter alone | Live, `visited` CTE | Built once | Kept |
+| :-- | :-- | :-- | :-- | :-- | :-- | :-- |
+| Country z0/0/0 (110 KB) | 80 ms | 85 ms | 0.8 ms | 84 ms | 191 ms | 2.3 ms |
+| Country z1/0/0 | 34 ms | 40 ms | 0.8 ms | 34 ms | 87 ms | 1.3 ms |
+| Country z2/1/1 | 20 ms | 23 ms | 0.8 ms | 20 ms | 46 ms | 1.0 ms |
+| Region z4/4/5 | 29 ms | 29 ms | 0.8 ms | 29 ms | 56 ms | 0.9 ms |
+| Region z5/8/11 (Ohio) | 5.5 ms | 3.0 ms | 2.6 ms | 3.5 ms | 6 ms | 0.7 ms |
+| Region z6/17/23 (Ohio) | 4.7 ms | 2.5 ms | 2.5 ms | 2.7 ms | 3 ms | 0.9 ms |
+
+- Transforming and clipping the outlines is nearly all of every expensive tile. The filter costs about 1 ms, except over Ohio, where every test account's activities share the same few regions: the old `EXISTS` looked through all of their matches (1,949 activities for one z5 tile) to find the Demo Customer's. The `visited` CTE starts from the account's own activities instead.
+- A kept tile served the same bytes as the live one in every case, at 0.7–2.3 ms. Its first request pays about twice the live cost, once per tile for every account.

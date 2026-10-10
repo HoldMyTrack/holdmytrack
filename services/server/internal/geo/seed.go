@@ -177,6 +177,12 @@ func loadBoundaries(ctx context.Context, tx pgx.Tx, log *slog.Logger, r io.Reade
 	if _, err := tx.Exec(ctx, `UPDATE users SET map_version = map_version + 1`); err != nil {
 		return stats, err
 	}
+	// And so do the outlines the tiles keep, drawn from the old ones (internal/httpapi's
+	// serveAdminTile). Last, so the lock TRUNCATE takes holds tile requests back only until this
+	// commits, and a tile built meanwhile waits for it and draws the new outlines.
+	if _, err := tx.Exec(ctx, `TRUNCATE admin_tiles_built, admin_tile_geoms`); err != nil {
+		return stats, err
+	}
 	return stats, nil
 }
 

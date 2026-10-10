@@ -106,6 +106,13 @@ func TestLoadBoundaries(t *testing.T) {
 		return s
 	}
 
+	// A tile the Country tier drew from the old outlines (internal/httpapi's serveAdminTile).
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO admin_tiles_built VALUES ('countries', 0, 0, 0);
+		INSERT INTO admin_tile_geoms VALUES ('countries', 0, 0, 0, 1, ST_MakePoint(0, 0))`); err != nil {
+		t.Fatal(err)
+	}
+
 	before := version()
 	stats, err := loadBoundaries(ctx, tx, log, extract(), "test-1.csv.gz", false, 3, 1)
 	if err != nil {
@@ -129,6 +136,10 @@ func TestLoadBoundaries(t *testing.T) {
 	}
 	if v := version(); v != before+1 {
 		t.Errorf("map_version %d, want %d", v, before+1)
+	}
+	var kept int
+	if err := tx.QueryRow(ctx, `SELECT (SELECT count(*) FROM admin_tiles_built) + (SELECT count(*) FROM admin_tile_geoms)`).Scan(&kept); err != nil || kept != 0 {
+		t.Errorf("tiles drawn from the old outlines: %d rows kept, %v", kept, err)
 	}
 
 	stats, err = loadBoundaries(ctx, tx, log, extract(), "test-1.csv.gz", false, 3, 1)

@@ -99,7 +99,7 @@ scp ~/boundaries/overture-2026-09-23.0-boundaries.csv.gz holdmytrack:/tmp/
 docker compose -f compose.prod.yml --env-file .env.prod run --rm -v /tmp:/in:ro rclone copyto /in/overture-2026-09-23.0-boundaries.csv.gz data:boundaries/overture-2026-09-23.0-boundaries.csv.gz
 ```
 
-`seed-admin-boundaries` then replaces every outline and re-matches every activity in one transaction. That takes several minutes, and activities ingested meanwhile wait on it for their country matches, so on a database with users take a backup and turn maintenance mode on first (§7, §11). Run it again whenever a deploy brings a new `geo.BoundariesKey`; with the file already loaded it does nothing, and the tiers render blank until it has run once. Delete the copy in `/tmp` afterwards.
+`seed-admin-boundaries` then replaces every outline and re-matches every activity in one transaction. That takes several minutes, and activities ingested meanwhile wait on it for their country matches, so on a database with users take a backup and turn maintenance mode on first (§7, §11). Run it again whenever a deploy brings a new `geo.BoundariesKey`; with the file already loaded it does nothing, and the tiers render blank until it has run once. It also empties the outlines the Country and Region tiles keep (`admin_tile_geoms`, `IMPLEMENTATION.md` §4.2.4), which the next request for each tile draws again from the new outlines. Delete the copy in `/tmp` afterwards.
 
 The timezone polygons each activity's zone is looked up in (ADR-0035) are also a file in the app bucket, under the key `geo.TimezonesKey` names (`timezones/timezones-with-oceans-<release>.geojson.zip`). It's timezone-boundary-builder's release asset as published, renamed to carry its release, so there's nothing to make:
 

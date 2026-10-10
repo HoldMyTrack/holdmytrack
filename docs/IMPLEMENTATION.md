@@ -582,6 +582,30 @@ CREATE TABLE received_origins (
 );
 ```
 
+### 3.26 `admin_tile_geoms` / `admin_tiles_built`
+
+The Country and Region tiles' outlines, each already transformed and clipped to one tile (§4.2.4, `migrations/0031_admin_tile_geoms.sql`). They're the same for every account, built on a tile's first request and emptied by `seed-admin-boundaries`. `admin_tiles_built` marks a tile as built, including one with no outline in it.
+
+```sql
+CREATE TABLE admin_tile_geoms (
+    layer     TEXT NOT NULL,      -- 'countries' or 'regions', the tile's MVT layer
+    zoom      SMALLINT NOT NULL,
+    tile_x    INT NOT NULL,
+    tile_y    INT NOT NULL,
+    admin_id  INT NOT NULL,       -- admin_countries.id or admin_regions.id, by layer
+    geom      GEOMETRY NOT NULL,  -- ST_AsMVTGeom's output, in the tile's 4096-unit grid
+    PRIMARY KEY (layer, zoom, tile_x, tile_y, admin_id)
+);
+
+CREATE TABLE admin_tiles_built (
+    layer   TEXT NOT NULL,
+    zoom    SMALLINT NOT NULL,
+    tile_x  INT NOT NULL,
+    tile_y  INT NOT NULL,
+    PRIMARY KEY (layer, zoom, tile_x, tile_y)
+);
+```
+
 ---
 
 ## 4. Core Technical Workflows
@@ -845,7 +869,7 @@ Tracks never draw in Fog or Heatmap at any zoom (FR-4.2, FR-4.3); the tiers only
 
 **What it costs**, measured on the 2026-09-23.0 extract (521 MB gzipped, 272 countries and 3,922 regions): the seed took 6 minutes on a development laptop, almost all of it in `ST_MakeValid` and `ST_Subdivide`, and re-matched 1,682 activities in under a second. The four tables hold about 660 MB: 1.4 MB and 13 MB of simplified outlines (70,000 and 708,000 vertices, against Natural Earth's 95,000 and 437,000), 114 MB and 529 MB of pieces. The reload's deleted rows take as much again until autovacuum reclaims them. The heaviest tiles draw about as fast as Natural Earth's did: the world's z0 Country Fog tile in 230 ms (110 KB), a z3 Region Fog tile over Europe in 150 ms (214 KB), everything deeper in under 25 ms. Simplifying the tiles' outlines to 200 m instead had made the z0 tile take 1.4 s.
 
-**Serving**: live vector tiles (MVT), not a precomputed raster — see ADR-0008 for the reasoning. Four endpoints, mirroring `handleTracksTile`'s live-query shape:
+**Serving**: vector tiles (MVT), not a precomputed raster — see ADR-0008 for the reasoning. Four endpoints, mirroring `handleTracksTile`'s query-per-request shape:
 
 ```http
 GET /tiles/v1/country-fog/{z}/{x}/{y}.mvt
@@ -856,15 +880,19 @@ GET /tiles/v1/region-heatmap/{z}/{x}/{y}.mvt
 
 Fog's query returns the **locked** set — countries/regions with no matching `activity_country`/`activity_region` row for the current user (not Pending — §4.2.5) — rendered as a flat fill in fog's own veil colour (`LightVeil`/`DarkVeil`'s colour and opacity for the basemap's theme, identical to the raster tier's, so nothing shifts hue crossing the zoom boundary); unlocked polygons are simply absent from the tile, same "no veil = revealed" semantic as the raster tier. Heatmap's query returns the **unlocked** set — with a matching row *and* `in_heatmap_window` true, so a country visited only long ago cools off at this tier exactly as it already does at city zoom — rendered as a flat fill in the heatmap ramp's single-visit colour (`#b3261e`) at a fixed opacity (0.55), on both clients, so nothing shifts colour crossing into city zoom: "you've been here," not graded by how much — a whole-country intensity gradient would be a second scoring dimension nobody asked for.
 
-**Why a live query is safe here despite the cost that ruled it out for Heatmap's own raster tier (§4.2.3)**: `admin_countries`/`admin_regions` have a small, fixed row count (~270 / ~3,950) that never grows with a user's activity history; each query is one indexed `EXISTS`/`NOT EXISTS` join against `activity_country`/`activity_region`, never the `ST_Intersects` geometry test itself, which only ever runs once, at ingest.
+**The outlines are drawn once per tile, for every account** (`serveAdminTile`, `migrations/0031_admin_tile_geoms.sql`, §3.26). Transforming and clipping the outlines (`ST_Transform`, `ST_AsMVTGeom`) is most of a tile's cost, and its result is the same for every account. The 2026-10-09 dev measurement (`PERFORMANCE.md`) had it at 85 of 86 ms for the world's z0 Country tile and 29 of 30 ms for a z4 Region tile. So the first request for a tile stores its clipped outlines in `admin_tile_geoms` and marks the tile in `admin_tiles_built` (`buildAdminTile`), and every request after reads them back. The mark goes in first, in the same transaction, with `ON CONFLICT DO NOTHING`, so a second request building the same tile at once waits for the first and leaves it be. Only tiles up to the source's own maxzoom are kept, z3 for Countries and z7 for Regions (`cacheMaxZoom`, matching `zoomTiers.ts`); a deeper one, which no client asks for, is drawn live, so a request can't fill the table with tiles nothing draws. A built tile then costs about 1–2 ms, the z0 Country tile included.
 
-**Deletion**: `ON DELETE CASCADE` on `activity_country`/`activity_region` means `handleDeleteActivity` needs no new code — a deleted activity's membership rows disappear with it, and the next tile request simply sees a different join result. There is no dirty flag, cache, or rebuild step for this tier to invalidate.
+**Which outlines a tile shows is the account's own**, chosen per request by one `visited` CTE: the distinct `activity_country.country_id` (or `activity_region.region_id`) of the account's non-Pending activities, the in-window ones for Heatmap. It starts from the account's own activities rather than from every account's matches in the tile's outlines, so its cost is that account's history alone; never the `ST_Intersects` geometry test itself, which only ever runs once, at ingest. The features come in outline order, so a built tile is byte for byte the tile drawn live. Tested in `admin_tiles_test.go`: each of the four tiles, built on its first request, equals the live query's, and a built tile is read back rather than drawn again.
+
+**`seed-admin-boundaries` empties both tables** (`TRUNCATE`), last thing in the transaction that replaces the outlines (§4.2.4's seed above). Its lock then holds tile requests back only until the commit, and a tile built meanwhile waits for it and is drawn from the new outlines, since `buildAdminTile` reads them in a statement after its mark.
+
+**Deletion**: `ON DELETE CASCADE` on `activity_country`/`activity_region` means `handleDeleteActivity` needs no new code — a deleted activity's membership rows disappear with it, and the next tile request simply sees a different `visited` set. The kept outlines aren't anyone's, so nothing in them changes either.
 
 #### 4.2.5 Pending activities drop out of every map read (FR-5.15)
 
 An activity is Pending (`activities.edit_pending`) while an Edit track (§4.7.7) or Private location (§7) reprocess is queued or running. Its geometry and masks are the pre-reprocess ones, or half-rewritten, so every map read leaves it out with `AND NOT edit_pending`: the tracks tile (§4.3), `renderAndStoreTile`'s composite (Fog and Heatmap, every pyramid level), the heatmap cap (`fog.RecomputeHeatmapCap`), and the four Country/Region tier queries (§4.2.4). The Activities list itself still returns it, with `pending: true`.
 
-**Two renders per reprocess, in the job.** `EnqueueTrackEdit` and `EnqueueReprivacy` set the flag and, in the same transaction, mark every z14 tile the activities' current masks cover dirty (`markPendingTilesDirty` — `MarkFogTilesDirty`'s upsert fed from `activity_tile_masks`). The job then runs `fog.RenderUser` first, which drops them from Fog/Heatmap; reprocesses; clears `edit_pending` (the same conditional UPDATE as before — not while a later `reprivacy` job still covers the activity); and runs `fog.RenderUser` again, which brings them back with their new masks. A failed track edit clears the flag and renders too, so the activity returns with its old masks. Both renders run inside the one job rather than as `render_fog` jobs, since a separate job could run concurrently and race it over the same dirty flags. The cost is one extra render of the affected tiles per reprocess.
+**Two renders per reprocess, in the job.** `EnqueueTrackEdit` and `EnqueueReprivacy` set the flag and, in the same transaction, mark every z14 tile the activities' current masks cover dirty (`markPendingTilesDirty` — `MarkFogTilesDirty`'s upsert fed from `activity_tile_masks`). The job then runs `fog.RenderUser` first, which drops them from Fog/Heatmap; reprocesses; clears `edit_pending` (the same conditional UPDATE as before — not while a later `reprivacy` job still covers the activity); and runs `fog.RenderUser` again, which brings them back with their new masks. A failed track edit clears the flag and renders too, so the activity returns with its old masks. Both renders run inside the one job rather than as `render_fog` jobs, so each is done before the step after it. A `render_fog` job left by an earlier upload can still run beside it in the render lane (§3.8); `fog.RenderUser` takes the account's advisory lock, so the two passes run one after the other rather than racing over the same dirty flags. The cost is one extra render of the affected tiles per reprocess.
 
 **Pending now clears a moment before the rasters are current** — the reverse of the ordering this replaced, which rendered first and cleared last so the client could refetch Fog/Heatmap the instant a badge cleared. The client uses `/v1/coverage/status` instead (§4.2.3): the reprocess job stays `pending` in `jobs` until its second render has finished, so "rendering: false" is the real signal.
 
