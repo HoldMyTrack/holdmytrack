@@ -345,12 +345,14 @@
     <string name="sync_send">Синхронизировать %1$d</string>
     <string name="sync_progress">Отправлено %1$d из %2$d…</string>
     <plurals name="sync_summary">
-        <item quantity="one">Добавлено на карту: %1$d.</item>
-        <item quantity="few">Добавлено на карту: %1$d.</item>
-        <item quantity="many">Добавлено на карту: %1$d.</item>
-        <item quantity="other">Добавлено на карту: %1$d.</item>
+        <item quantity="one">Отправлено: %1$d. Тренировки остаются в списке, пока не появятся на карте.</item>
+        <item quantity="few">Отправлено: %1$d. Тренировки остаются в списке, пока не появятся на карте.</item>
+        <item quantity="many">Отправлено: %1$d. Тренировки остаются в списке, пока не появятся на карте.</item>
+        <item quantity="other">Отправлено: %1$d. Тренировки остаются в списке, пока не появятся на карте.</item>
     </plurals>
-    <string name="sync_summary_with_present">Добавлено на карту: %1$d; уже было в HoldMyTrack: %2$d.</string>
+    <string name="sync_summary_with_present">Отправлено новых: %1$d; уже было в HoldMyTrack: %2$d. Тренировки остаются в списке, пока не появятся на карте.</string>
+    <string name="sync_row_processing">Добавляется на карту…</string>
+    <string name="sync_row_failed">Не удалось добавить %1$s %2$s — причина в истории синхронизации. Тренировка снова в списке.</string>
     <string name="sync_origin_health_connect">Health Connect</string>
     <string name="sync_origin_recorded">Записано на этом телефоне</string>
     <string name="sync_row_tick">Отметить: %1$s</string>

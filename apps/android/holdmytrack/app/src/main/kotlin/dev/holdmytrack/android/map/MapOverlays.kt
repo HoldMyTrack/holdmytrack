@@ -180,6 +180,10 @@ object MapOverlays {
      *  aside for it, as the web's `setMapMode(…, editingTrack)` has them. */
     private var editingTrack = false
 
+    /** The Sync tab shows: the account's tracks and bands step aside, so the map draws only
+     *  what's on offer (`SyncCandidatesOverlay`), not a slice of what's already synced. */
+    private var syncing = false
+
     /** Every Fog and Heatmap layer and the source under it — what [refreshCoverage] replaces. */
     private val COVERAGE_LAYERS = listOf(
         FOG_LAYER_ID to FOG_SOURCE_ID,
@@ -429,6 +433,12 @@ object MapOverlays {
         setMode(style, mode)
     }
 
+    /** See [syncing]. */
+    fun setSyncing(style: Style, on: Boolean, mode: MapMode) {
+        syncing = on
+        setMode(style, mode)
+    }
+
     fun setMode(style: Style, mode: MapMode) {
         setVisible(style, FOG_LAYER_ID, mode == MapMode.FOG)
         setVisible(style, COUNTRY_FOG_LAYER_ID, mode == MapMode.FOG)
@@ -437,8 +447,9 @@ object MapOverlays {
         setVisible(style, HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
         setVisible(style, COUNTRY_HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
         setVisible(style, REGION_HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
-        TRACK_LAYER_IDS.forEach { setVisible(style, it, mode == MapMode.NORMAL && !editingTrack) }
-        setVisible(style, BAND_LAYER_ID, mode == MapMode.NORMAL && !editingTrack)
+        val tracks = mode == MapMode.NORMAL && !editingTrack && !syncing
+        TRACK_LAYER_IDS.forEach { setVisible(style, it, tracks) }
+        setVisible(style, BAND_LAYER_ID, tracks)
         setLabelOpacity(style, if (mode == MapMode.FOG) FOG_LABEL_OPACITY else 1f)
     }
 

@@ -144,26 +144,43 @@ func EnqueueRaw(ctx context.Context, db Querier, userID string, items []RawItem)
 // sync would answer `already_processed` for, plus what's
 // queued, so a session sent a moment ago doesn't come back while the worker catches up. A
 // deleted activity's row is gone and its job finished, so its id isn't known any more.
-func KnownExternalIDs(ctx context.Context, db Querier, userID, source string, ids []string) ([]string, error) {
+// processing is the known ids whose ingest job is still pending — queued or running — the ones
+// sent and not on the map yet; a job that ended, done or failed, isn't.
+func KnownExternalIDs(ctx context.Context, db Querier, userID, source string, ids []string) (known, processing []string, err error) {
 	if len(ids) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	rows, err := db.Query(ctx, `
-		SELECT external_id FROM activities
+		SELECT external_id, false FROM activities
 		WHERE user_id = $1 AND source = $2 AND external_id = ANY($3::text[])
 		UNION
-		SELECT payload->>'external_id' FROM jobs
+		SELECT payload->>'external_id', true FROM jobs
 		WHERE user_id = $1 AND kind = 'ingest' AND state = 'pending'
 		  AND payload->>'source' = $2 AND payload->>'external_id' = ANY($3::text[])`,
 		userID, source, ids)
 	if err != nil {
-		return nil, fmt.Errorf("ingest: known ids: %w", err)
+		return nil, nil, fmt.Errorf("ingest: known ids: %w", err)
 	}
-	known, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	type knownRow struct {
+		ID      string
+		Pending bool
+	}
+	found, err := pgx.CollectRows(rows, pgx.RowToStructByPos[knownRow])
 	if err != nil {
-		return nil, fmt.Errorf("ingest: known ids: %w", err)
+		return nil, nil, fmt.Errorf("ingest: known ids: %w", err)
 	}
-	return known, nil
+	// An id with a row and a pending job — a cut-off ingest running again — comes back twice.
+	seen := make(map[string]bool, len(found))
+	for _, row := range found {
+		if !seen[row.ID] {
+			seen[row.ID] = true
+			known = append(known, row.ID)
+		}
+		if row.Pending {
+			processing = append(processing, row.ID)
+		}
+	}
+	return known, processing, nil
 }
 
 // PromoteRaw writes a job's inline raw payload (EnqueueRaw) to its raw key and clears it from

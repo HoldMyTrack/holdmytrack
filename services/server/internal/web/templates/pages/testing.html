@@ -417,11 +417,11 @@
 
     <h3 id="HC-2">HC-2 · What's waiting</h3>
     <p>Open the Sync tab.</p>
-    <p class="testing__expect"><strong>Expected:</strong> the Sync sheet opens over the map, listing your Health Connect sessions with a route from the last 3 months, newest first, each with its day, distance, type and "Health Connect". <strong>Nothing is ticked.</strong> Each one is drawn on the map as a dashed line. Indoor sessions and anything older than 3 months aren't listed. Tapping a row picks out its line, colored by pace (blue where slowest, red where fastest) over a dark outline, and moves the map to it; tapping a line picks out its row.</p>
+    <p class="testing__expect"><strong>Expected:</strong> the Sync sheet opens over the map, listing your Health Connect sessions with a route from the last 3 months, newest first, each with its day, distance, type and "Health Connect". <strong>Nothing is ticked.</strong> Each one is drawn on the map as a dashed line, and the activities already in your account aren't drawn until you leave the Sync tab. Indoor sessions and anything older than 3 months aren't listed. Tapping a row picks out its line, colored by pace (blue where slowest, red where fastest) over a dark outline, and moves the map to it; tapping a line picks out its row.</p>
 
     <h3 id="HC-3">HC-3 · Sync what you tick</h3>
     <p>Tick two rows (tap their icons), then tap Sync 2.</p>
-    <p class="testing__expect"><strong>Expected:</strong> "2 of … ticked" while ticking. After Sync, those two leave the list and "Added 2 activities to your map." shows; they appear on the map and in Activities. Nothing you didn't tick was added.</p>
+    <p class="testing__expect"><strong>Expected:</strong> "2 of … ticked" while ticking. After Sync, "Sent 2 activities. They stay listed until they're on your map." shows, and the two stay on the list with a spinning tile and "Adding to your map…" — they can't be ticked or swiped. Each leaves the list as it appears on the map and in Activities, with no reload, also if you switch to the Map tab meanwhile. Nothing you didn't tick was added.</p>
 
     <h3 id="HC-4">HC-4 · Hide a row</h3>
     <p>Swipe a row sideways. Then tap Show hidden, and swipe the hidden row again.</p>

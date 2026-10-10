@@ -132,6 +132,12 @@ data class Providers(val google: Boolean, val facebook: Boolean, val googleClien
  */
 data class SyncResult(val externalId: String, val status: String, val error: String)
 
+/**
+ * What `POST /v1/sync/known` said: the ids the account has from that source, and, of those, the
+ * ones still [processing] — sent, their ingest not finished, so not on the map yet.
+ */
+data class SyncKnown(val known: Set<String>, val processing: Set<String>)
+
 /** What `POST /v1/activities/upload` said about one file: "enqueued" or "already_processed". */
 data class UploadOutcome(val status: String)
 
@@ -579,12 +585,14 @@ object HoldMyTrackApi {
     /**
      * `POST /v1/sync/known` (`docs/IMPLEMENTATION.md` §4.0.3): which of [externalIds] the
      * account already has from [source] — the Sync tab's list is what's on the phone minus these,
-     * so a reinstall or a second phone agrees with the server. Suspending, like [syncActivities],
-     * for the same caller; a failure throws.
+     * so a reinstall or a second phone agrees with the server — and, of those, which are still
+     * processing: sent, not on the map yet. Suspending, like [syncActivities], for the same
+     * caller; a failure throws.
      */
-    suspend fun syncKnown(source: String, externalIds: List<String>): Set<String> =
+    suspend fun syncKnown(source: String, externalIds: List<String>): SyncKnown =
         withContext(Dispatchers.IO) {
             val known = mutableSetOf<String>()
+            val processing = mutableSetOf<String>()
             for (chunk in externalIds.chunked(MAX_KNOWN_IDS)) {
                 val body = JSONObject()
                     .put("source", source)
@@ -596,10 +604,13 @@ object HoldMyTrackApi {
                 val response = client.newCall(request).execute()
                 val text = response.use { it.body?.string().orEmpty() }
                 if (!response.isSuccessful) throw ApiException.from(response.code, text)
-                val ids = JSONObject(text).getJSONArray("known")
+                val json = JSONObject(text)
+                val ids = json.getJSONArray("known")
                 for (i in 0 until ids.length()) known += ids.getString(i)
+                // Absent from an older server: nothing reads as still processing.
+                json.optJSONArray("processing")?.let { for (i in 0 until it.length()) processing += it.getString(i) }
             }
-            known
+            SyncKnown(known, processing)
         }
 
     /**

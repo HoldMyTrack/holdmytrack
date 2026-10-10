@@ -333,10 +333,12 @@
     <string name="sync_send">Sync %1$d</string>
     <string name="sync_progress">Sent %1$d of %2$d…</string>
     <plurals name="sync_summary">
-        <item quantity="one">Added %1$d activity to your map.</item>
-        <item quantity="other">Added %1$d activities to your map.</item>
+        <item quantity="one">Sent %1$d activity. It stays listed until it\'s on your map.</item>
+        <item quantity="other">Sent %1$d activities. They stay listed until they\'re on your map.</item>
     </plurals>
-    <string name="sync_summary_with_present">Added to your map: %1$d new, %2$d already in HoldMyTrack.</string>
+    <string name="sync_summary_with_present">Sent %1$d new, %2$d already in HoldMyTrack. They stay listed until they\'re on your map.</string>
+    <string name="sync_row_processing">Adding to your map…</string>
+    <string name="sync_row_failed">Couldn\'t add %1$s %2$s — Sync history says why. It\'s back on the list.</string>
     <string name="sync_origin_health_connect">Health Connect</string>
     <string name="sync_origin_recorded">Recorded on this phone</string>
     <string name="sync_row_tick">Tick %1$s</string>

@@ -834,6 +834,18 @@
         <item name="android:insetBottom">0dp</item>
     </style>
 
+    <!-- A type chip over the Sync list (item_sync_type_chip), on .profile__toggle-btn's colours:
+         ticked, accent-filled with on-accent text and a check; otherwise the surface with an ink
+         20% border. Material's checked tint alone is the faint secondary container, which can't
+         be told from unticked in dark mode. -->
+    <style name="Widget.HoldMyTrack.SyncTypeChip" parent="Widget.Material3.Chip.Filter">
+        <item name="chipBackgroundColor">@color/profile_toggle_bg</item>
+        <item name="chipStrokeColor">@color/profile_toggle_stroke</item>
+        <item name="android:textColor">@color/profile_toggle_text</item>
+        <item name="checkedIconTint">@color/hmt_on_accent</item>
+        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
+    </style>
+
     <!-- The You and Privacy screens (fragment_you, activity_privacy): a
          serif title over cream, uppercase section headings, and white cards of rows. -->
     <style name="TextAppearance.HoldMyTrack.ScreenTitle" parent="TextAppearance.HoldMyTrack.TitleLarge">
