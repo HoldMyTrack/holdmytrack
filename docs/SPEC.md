@@ -379,7 +379,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Preconditions**: Active session.
 
-**Inputs**: One or more files, each a `.gpx`, `.fit`, or `.tcx` file no larger than 64 MiB. Up to 20 files per batch (a larger selection is rejected client-side in full, before any upload begins, with a message saying to choose up to 20 at a time). A `.zip` archive isn't imported (ADR-0039): the clients don't send one, and say so naming it.
+**Inputs**: One or more files, each a `.gpx`, `.fit`, or `.tcx` file no larger than 16 MiB. Up to 20 files per batch (a larger selection is rejected client-side in full, before any upload begins, with a message saying to choose up to 20 at a time). A `.zip` archive isn't imported (ADR-0039): the clients don't send one, and say so naming it.
 
 **Behavior**:
 1. User chooses files from the header's **Upload** menu (FR-3.4), on any page, or drops them on the map. The Android app sends them from its Upload screen (`apps/android/docs/SPEC.md` FR-3.6).

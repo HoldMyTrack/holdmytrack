@@ -41,7 +41,7 @@ object FileImports {
 
     /** The server's limits (`services/server/internal/httpapi/server.go`): checked here too, so
      *  a file it would refuse isn't sent first. */
-    private const val MAX_FILE_BYTES = 64L shl 20
+    private const val MAX_FILE_BYTES = 16L shl 20
 
     private val ACCEPTED = Regex("""\.(gpx|fit|tcx)$""", RegexOption.IGNORE_CASE)
     private val ZIP = Regex("""\.zip$""", RegexOption.IGNORE_CASE)
@@ -122,7 +122,7 @@ object FileImports {
         changed()
         scope.launch {
             try {
-                // Redrawn once a percent, not once a chunk: a 64 MiB file is 1,000 chunks.
+                // Redrawn once a percent, not once a chunk: a 16 MiB file is 256 chunks.
                 var shown = -1L
                 val outcome = HoldMyTrackApi.uploadActivityFile(context.contentResolver, next.uri, transfer.name, transfer.size) { sent ->
                     val percent = if (transfer.size > 0) sent * 100 / transfer.size else sent shr 20

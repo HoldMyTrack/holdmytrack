@@ -31,8 +31,10 @@ import (
 // (worker, ingest.Process) streams the format from object storage without buffering — this
 // cap is specifically about not accepting an unbounded HTTP body here (§5.1: "cap file
 // size... before reading the body fully"), not a claim that the whole pipeline never
-// buffers. A single activity file is realistically well under this.
-const maxUploadBytes = 64 << 20 // 64 MiB
+// buffers. An activity of a few hours is a few MB of GPX or TCX and far less as FIT; only a
+// day or more recorded once a second as GPX or TCX comes near this, and such a file has to be
+// split or sent as FIT.
+const maxUploadBytes = 16 << 20 // 16 MiB
 
 // multipartMemoryBytes is how much of an upload's multipart body ParseMultipartForm keeps in
 // memory; a larger file part goes to a temp file.

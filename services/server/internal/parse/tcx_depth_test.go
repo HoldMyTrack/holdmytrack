@@ -7,8 +7,8 @@ import (
 )
 
 // Parsing time is linear in nesting depth: scanning the open-element stack on every text token
-// made a 440 KB file of nested elements take a second, and a 64 MiB upload hold the worker for
-// hours.
+// made a 440 KB file of nested elements take a second, and a 16 MiB upload hold the worker for
+// about half an hour.
 func TestParseTCXDeepNestingIsLinear(t *testing.T) {
 	const depth = 100_000
 	var b strings.Builder
