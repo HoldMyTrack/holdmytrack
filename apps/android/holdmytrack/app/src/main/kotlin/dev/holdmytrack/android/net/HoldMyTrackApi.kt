@@ -639,7 +639,7 @@ object HoldMyTrackApi {
     private const val MAX_KNOWN_IDS = 5000
 
     /**
-     * Uploads take as long as sending the file does, up to 64 MiB, which over a slow connection
+     * Uploads take as long as sending the file does, up to 16 MiB, which over a slow connection
      * takes longer than the default ten seconds.
      * The same client otherwise, so the same interceptors.
      */
@@ -653,7 +653,7 @@ object HoldMyTrackApi {
     /**
      * `POST /v1/activities/upload` — the web's Upload menu's request (root `docs/SPEC.md`
      * FR-3.1): one `.gpx`, `.fit` or `.tcx`. The file is streamed from [uri] rather than read into
-     * memory first, since it can be 64 MiB; [onProgress] gets the bytes sent so far, on the
+     * memory first, since it can be 16 MiB; [onProgress] gets the bytes sent so far, on the
      * I/O thread sending them. Suspending, like [syncActivities]: its caller (`imports/FileImports.kt`)
      * sends one file after another and waits for each.
      */

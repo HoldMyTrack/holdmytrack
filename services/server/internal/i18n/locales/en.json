@@ -298,6 +298,7 @@
   "error.photo_too_large": "Photo too large or malformed multipart body.",
   "error.photo_type": "Unsupported image type {type} (want JPEG or WebP).",
   "error.photo_dimensions": "Photo is larger than {max} px on a side; it should be resized before upload.",
+  "error.upload_rate_limit": "Too many files uploaded in the last hour (at most {max}). Try again later.",
   "error.story_send_limit": "Too many copies sent in the last hour. Try again later.",
   "error.photo_limit": "This account already holds {max} photos, the most it can.",
   "error.photo_caption_too_long": "Caption must be {max} characters or fewer.",

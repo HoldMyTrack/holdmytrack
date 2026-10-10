@@ -95,6 +95,8 @@ services:
       SATELLITE_TILE_SIZE: ${VITE_SATELLITE_TILE_SIZE:-512}
       SATELLITE_MAXZOOM: ${VITE_SATELLITE_MAXZOOM:-18}
       SATELLITE_ATTRIBUTION: ${VITE_SATELLITE_ATTRIBUTION:-}
+      # Files one account may upload an hour (docs/DEPLOY.md §4); raised only for a load test.
+      UPLOADS_PER_HOUR: ${UPLOADS_PER_HOUR:-100}
       # Sign in with Google (docs/SPEC.md FR-1.9, docs/DEPLOY.md) — optional; empty turns it
       # off. The redirect URL defaults to APP_BASE_URL + /v1/auth/google/callback (config.go),
       # which is right here because Caddy serves the app and the API from one origin.
