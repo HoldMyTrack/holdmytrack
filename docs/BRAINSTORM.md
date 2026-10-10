@@ -6,12 +6,9 @@ Once an idea here is decided, it moves out: accepted work goes to `docs/ROADMAP.
 
 ---
 
-### Place names on the map in the reader's language
+### Place names on the Android map in the reader's language
 
-The map's labels (cities, countries, streets) are whatever `@protomaps/basemaps` picks, which is mostly each place's local name, while the interface around it is in English or Russian (FR-13). Protomaps' layers take a `lang` option and fall back to the local name where OSM has no translation.
-
-* The style is built once, ahead of time (`npm run build:style`, checked by `verify:style`), and served as a static document, so this would mean one style per language (served by `mapstyle`, keyed by the page's language), not a runtime switch.
-* The export image (FR-4.10) would carry the labels too, which is either a feature or a surprise, depending on who the image is for.
+The web map's labels follow the page's language (FR-13.1), but the Android app's map reads the served style document (`GET /v1/map/style/{flavor}`), which is built once, ahead of time, in English (`npm run build:style`, checked by `verify:style`). Following the app's language there would mean one served style per flavor and language, chosen by the request.
 
 ### More languages, and language-specific URLs
 
