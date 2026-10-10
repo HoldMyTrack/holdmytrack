@@ -174,8 +174,9 @@ func processTrackEdit(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 		edit = &TrackEdit{} // reset: an explicitly empty spec, not "keep the stored one"
 	}
 	// Rendered here, in the job, rather than enqueued as `render_fog` jobs the way ingest does
-	// it — a separate job could run alongside this one and race it over the same dirty flags.
-	// First, with the activity Pending (EnqueueTrackEdit dirtied its tiles), so it drops out
+	// it, so each pass is done before the step after it. A `render_fog` job an earlier upload
+	// left can still run in its own lane beside this one; RenderUser runs one account's passes
+	// one at a time, so the two never race over the same dirty flags. First, with the activity Pending (EnqueueTrackEdit dirtied its tiles), so it drops out
 	// of Fog/Heatmap while it's reprocessed.
 	if err := fog.RenderUser(ctx, pool, store, job.UserID); err != nil {
 		return fmt.Errorf("edit: render fog/heatmap: %w", err)

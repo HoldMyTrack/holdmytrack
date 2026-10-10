@@ -83,6 +83,10 @@ type Config struct {
 	// never more than one per account. The jobs are mostly waiting on object storage, so this
 	// is bounded by memory, not CPU count (IMPLEMENTATION.md §5.2). Only read by `work`.
 	WorkerConcurrency int
+	// WorkerRenderConcurrency is how many render_fog jobs `work` runs at once, in a lane of
+	// their own beside the main lane's WorkerConcurrency (internal/worker's Run), never more
+	// than one per account. Only read by `work`.
+	WorkerRenderConcurrency int
 }
 
 func Load() (Config, error) {
@@ -119,6 +123,9 @@ func Load() (Config, error) {
 		return c, err
 	}
 	if c.WorkerConcurrency, err = positiveInt("WORKER_CONCURRENCY", 4); err != nil {
+		return c, err
+	}
+	if c.WorkerRenderConcurrency, err = positiveInt("WORKER_RENDER_CONCURRENCY", 2); err != nil {
 		return c, err
 	}
 	c.WebDevDir = env("WEB_DEV_DIR", "")

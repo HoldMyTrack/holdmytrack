@@ -164,3 +164,35 @@ func TestRenderUserFinishesAnInterruptedPyramid(t *testing.T) {
 		}
 	}
 }
+
+// One account's render passes run one at a time: a pass started while another holds the
+// account's lock waits for it, while another account's pass goes ahead.
+func TestRenderUserWaitsForTheAccountsRunningPass(t *testing.T) {
+	pool, userID := testAccount(t)
+	_, otherID := testAccount(t)
+	ctx := context.Background()
+
+	unlock, err := lockRenders(ctx, pool, userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := RenderUser(ctx, pool, nil, otherID); err != nil {
+		t.Fatalf("another account's render: %v", err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- RenderUser(ctx, pool, nil, userID) }()
+	select {
+	case err := <-done:
+		t.Fatalf("render finished (err %v) while the account's other pass held the lock", err)
+	case <-time.After(200 * time.Millisecond):
+	}
+	unlock()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("render after unlock: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("render still waiting after the other pass unlocked")
+	}
+}

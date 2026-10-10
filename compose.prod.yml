@@ -136,6 +136,8 @@ services:
       # How many jobs run at once, never two of one account's (internal/worker's claimQuery,
       # docs/DEPLOY.md §4). Mostly waiting on R2, so bounded by memory rather than CPUs.
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+      # How many renders run at once, in a lane of their own beside those (docs/DEPLOY.md §4).
+      WORKER_RENDER_CONCURRENCY: ${WORKER_RENDER_CONCURRENCY:-2}
     depends_on:
       db: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }

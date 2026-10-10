@@ -40,7 +40,16 @@ const renderParallelism = 16
 //
 // A pass that stored anything ends by bumping map_version (BumpMapVersion), a failed one
 // too — its tiles are already overwritten — so a client never keeps a cached tile past it.
+//
+// One account's passes never overlap (lockRenders): a `render_fog` job runs in a lane of its
+// own (internal/worker), beside the account's edit or reprivacy job that renders inline.
 func RenderUser(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID string) (err error) {
+	unlock, err := lockRenders(ctx, pool, userID)
+	if err != nil {
+		return fmt.Errorf("fog: lock renders: %w", err)
+	}
+	defer unlock()
+
 	rendered := false
 	defer func() {
 		if !rendered {
@@ -86,6 +95,37 @@ func RenderUser(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, u
 		}
 	}
 	return nil
+}
+
+// renderLockClass is the first key of the advisory lock lockRenders takes, so it can't meet
+// any other advisory lock this database might take with the same user hash.
+const renderLockClass = 0x666f67 // "fog"
+
+// lockRenders waits for, then holds, a session advisory lock on one account's renders until
+// the returned unlock is called. Two passes side by side would race over the same tile: the
+// one that read the masks first can store its tile after the other's fresher one, and the
+// fresher pass has already cleared the dirty flag (upsertTileRendered), so nothing would ever
+// redraw it. A session lock rather than a transaction's, so a pass minutes long doesn't keep a
+// transaction open; it holds one pool connection for as long.
+func lockRenders(ctx context.Context, pool *pgxpool.Pool, userID string) (unlock func(), err error) {
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := conn.Exec(ctx, `SELECT pg_advisory_lock($1, hashtext($2))`, renderLockClass, userID); err != nil {
+		// Cancelled mid-wait, the session may or may not hold the lock: drop it rather than
+		// hand it back to the pool.
+		_ = conn.Conn().Close(context.WithoutCancel(ctx))
+		conn.Release()
+		return nil, err
+	}
+	return func() {
+		if _, err := conn.Exec(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock($1, hashtext($2))`, renderLockClass, userID); err != nil {
+			// Closing the session is what releases the lock now.
+			_ = conn.Conn().Close(context.WithoutCancel(ctx))
+		}
+		conn.Release()
+	}, nil
 }
 
 // Private locations are never re-applied here: RenderActivityMasks renders from points

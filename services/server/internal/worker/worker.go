@@ -73,12 +73,15 @@ const exportSweepInterval = time.Hour
 // The fresh locked_at, not the row lock, is what keeps a second worker process off a job
 // that is still running (claimLease).
 //
-// Long jobs have a lane of their own, a second loop beside this one: building an export takes
-// minutes, and nobody's single upload or phone sync should wait behind it. The main lane itself runs as `concurrency` loops side by side, fair across
-// accounts (claimQuery). n tells an export's owner when it's ready (export_job.go). The periodic
-// sweeps (runSweeps) have a third goroutine, so a busy queue never holds them back. A deleted
-// account's jobs are never claimed: its purge drops them within accountPurgeInterval.
-func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, n *Notifier, concurrency int) error {
+// Jobs run in three lanes, each fair across accounts on its own (claimQuery). Long jobs have a
+// loop of their own: building an export takes minutes, and nobody's single upload or phone
+// sync should wait behind it. Renders (render_fog) run as `renderConcurrency` loops: a big
+// import's renders take minutes each, and a new upload shouldn't wait behind them either. The
+// main lane runs everything else as `concurrency` loops side by side. n tells an export's
+// owner when it's ready (export_job.go). The periodic sweeps (runSweeps) have a goroutine of
+// their own, so a busy queue never holds them back. A deleted account's jobs are never
+// claimed: its purge drops them within accountPurgeInterval.
+func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, n *Notifier, concurrency, renderConcurrency int) error {
 	notifier = n
 	var lanes sync.WaitGroup
 	defer lanes.Wait() // a long job cut off by shutdown is released before Run returns
@@ -109,17 +112,24 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 		lanes.Add(1)
 		go func() {
 			defer lanes.Done()
-			runMainLane(ctx, pool, store, log)
+			runLane(ctx, pool, store, log, laneMain)
+		}()
+	}
+	for range renderConcurrency {
+		lanes.Add(1)
+		go func() {
+			defer lanes.Done()
+			runLane(ctx, pool, store, log, laneRender)
 		}()
 	}
 	<-ctx.Done()
 	return nil
 }
 
-// runMainLane is one of Run's `concurrency` main-lane loops: claim and run jobs until the
-// queue has nothing this loop may take (claimQuery: one job per account at a time), then wait
-// for the next tick.
-func runMainLane(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger) {
+// runLane is one of Run's main-lane or render-lane loops: claim and run the lane's jobs until
+// the queue has nothing this loop may take (claimQuery: one job per account at a time), then
+// wait for the next tick.
+func runLane(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, l lane) {
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 	for {
@@ -128,7 +138,7 @@ func runMainLane(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, 
 			return
 		case <-ticker.C:
 			for {
-				processed, err := claimAndRunOne(ctx, pool, store, log)
+				processed, err := claimAndRun(ctx, pool, store, log, l)
 				if err != nil {
 					log.Error("job processing error", "err", err)
 					break
@@ -198,10 +208,20 @@ func runSweeps(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, lo
 	}
 }
 
-// The two lanes Run claims from: the long-running kind (an export) and everything else.
-const (
-	laneMain = false
-	laneLong = true
+// lane is one of the queues Run claims from: the job kinds it takes, or, for the main lane,
+// every kind the other lanes don't.
+type lane struct {
+	kinds []string
+	rest  bool
+}
+
+// longKinds and renderKinds are the long and render lanes' kinds; the main lane takes the rest.
+var (
+	longKinds   = []string{"export"}
+	renderKinds = []string{"render_fog"}
+	laneLong    = lane{kinds: longKinds}
+	laneRender  = lane{kinds: renderKinds}
+	laneMain    = lane{kinds: append(append([]string{}, longKinds...), renderKinds...), rest: true}
 )
 
 // heartbeat refreshes a long job's claim: a big account's export or a big archive can take
@@ -234,11 +254,14 @@ func claimAndRunOne(ctx context.Context, pool *pgxpool.Pool, store *storage.Stor
 	return claimAndRun(ctx, pool, store, log, laneMain)
 }
 
-// claimQuery picks the lane's next job, fairly across accounts:
+// claimQuery picks the lane's next job, fairly across accounts. $2 is the lane's kinds and $3
+// whether the lane takes those kinds ($3 false) or every other kind (the main lane, $3 true).
 //
-//   - One job per account at a time. An account with a job of this lane already claimed
-//     (busy) waits, which keeps its own jobs in order (an edit, then its render) and stops
-//     one account's import from taking every worker.
+//   - One job per account per lane at a time. An account with a job of this lane already
+//     claimed (busy) waits, which keeps its own jobs of the lane in order (an ingest, then an
+//     edit) and stops one account's import from taking every worker. Its job on another lane
+//     can run beside it: a render beside an ingest or an edit, which dirty_gen and
+//     edit_pending make safe (IMPLEMENTATION.md §3.8).
 //   - Of each other account, only its next job (runnable, by run_after then id) is a
 //     candidate, and the candidates go in order of when their account was last served (its
 //     latest claim on this lane, idx_jobs_user_locked), never-served first. A new user's single
@@ -255,14 +278,14 @@ const claimQuery = `
 		SELECT DISTINCT user_id FROM jobs
 		WHERE state = 'pending' AND user_id IS NOT NULL
 		  AND locked_at >= NOW() - make_interval(secs => $1)
-		  AND (kind IN ('export')) = $2
+		  AND (kind = ANY($2)) = NOT $3
 	),
 	heads AS (
 		SELECT DISTINCT ON (j.user_id) j.id, j.user_id, j.run_after
 		FROM jobs j
 		WHERE j.state = 'pending' AND j.run_after <= NOW()
 		  AND (j.locked_at IS NULL OR j.locked_at < NOW() - make_interval(secs => $1))
-		  AND (j.kind IN ('export')) = $2
+		  AND (j.kind = ANY($2)) = NOT $3
 		  AND (j.user_id IS NULL OR j.user_id NOT IN (SELECT user_id FROM busy))
 		  AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = j.user_id AND u.deleted_at IS NOT NULL)
 		ORDER BY j.user_id, j.run_after, j.id
@@ -270,7 +293,7 @@ const claimQuery = `
 	ranked AS (
 		SELECT h.id, h.run_after,
 			(SELECT max(s.locked_at) FROM jobs s
-			 WHERE s.user_id = h.user_id AND (s.kind IN ('export')) = $2) AS served
+			 WHERE s.user_id = h.user_id AND (s.kind = ANY($2)) = NOT $3) AS served
 		FROM heads h
 	)
 	SELECT j.id, j.kind, j.payload, j.attempts
@@ -281,7 +304,7 @@ const claimQuery = `
 	FOR UPDATE OF j SKIP LOCKED
 	LIMIT 1`
 
-func claimAndRun(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, long bool) (bool, error) {
+func claimAndRun(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, l lane) (bool, error) {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return false, fmt.Errorf("worker: begin: %w", err)
@@ -290,7 +313,7 @@ func claimAndRun(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, 
 
 	var j job
 	var attempts int
-	err = tx.QueryRow(ctx, claimQuery, claimLease.Seconds(), long).Scan(&j.id, &j.kind, &j.payload, &attempts)
+	err = tx.QueryRow(ctx, claimQuery, claimLease.Seconds(), l.kinds, l.rest).Scan(&j.id, &j.kind, &j.payload, &attempts)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
@@ -434,6 +457,8 @@ func runJob(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *
 		if err := json.Unmarshal(j.payload, &rj); err != nil {
 			return fmt.Errorf("unmarshal render_fog job: %w", err)
 		}
+		// A big account's first render can outlast claimLease.
+		defer keepClaimed(ctx, pool, log, j.id)()
 		return fog.RenderUser(ctx, pool, store, rj.UserID)
 	case "edit_track":
 		var ej ingest.EditJob
