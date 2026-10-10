@@ -612,6 +612,22 @@ CREATE TABLE admin_tiles_built (
 );
 ```
 
+### 3.27 `bike_paths`
+
+Bike paths and Shared paths (§4.24, FR-4.13) — `migrations/0034_bike_paths.sql`. The same for every account: OpenStreetMap's cycleways and bike-designated paths, filled by the `import-bike-paths` subcommand and upserted on `osm_id`. Each row is one OSM way. `kind` is `cycleway` (`highway=cycleway`) or `shared` (a `path`, `footway` or `bridleway` tagged `bicycle=designated`). The line is stored in Web Mercator, already projected the way the tiles need it (§4.24). Nothing refers to a row, so a planet import deletes the ways it didn't see rather than retiring them as Spots does (§3.20).
+
+```sql
+CREATE TABLE bike_paths (
+    id               BIGSERIAL PRIMARY KEY,
+    kind             VARCHAR(8) NOT NULL CHECK (kind IN ('cycleway', 'shared')),
+    name             TEXT,                   -- OSM's `name`; NULL when it has none
+    geom             GEOMETRY(MultiLineString, 3857) NOT NULL, -- Web Mercator, the tiles' projection
+    osm_id           BIGINT NOT NULL UNIQUE, -- the OSM way; the import's upsert key
+    last_seen_import TIMESTAMPTZ NOT NULL    -- the start of the import run that last had the way
+);
+CREATE INDEX idx_bike_paths_geom ON bike_paths USING GIST (geom);
+```
+
 ---
 
 ## 4. Core Technical Workflows
@@ -1528,6 +1544,8 @@ The app then posts `{code, verifier}` to `POST /v1/auth/handoff` (`handleAuthHan
 **Web.** Trails, Tracks and Bike paths are three checkboxes of the Layers menu (`ui/OverlaysMenu.tsx`), whose whole state — the three, the Spots categories (§4.25), the Layers checkbox (`enabled`) and the Satellite button (§4.26) — is `map/overlays.ts`'s `Overlays`, kept in `localStorage` as `hmt.overlays` (try/catch around every access). A browser with none yet reads the two toggles the menu replaced, `hmt.showPaths` (every kind of path) and `hmt.showPoi` (every category), and the first save removes them; a saved `hmt.overlays` from before Tracks had its own entry takes `tracks` from `trails`, and one from before the checkbox has it on (`enabled !== false`). `map/paths.ts`'s `setPathsVisible` flips each pair. It diffs against the current `visibility` first, like `mapMode.ts`'s `setVisible`, because `reattachOverlays` calls it on every `styledata` to restore the choice after a theme's `setStyle` (`docs/DEVELOPMENT.md`'s `setLayoutProperty` gotcha). The menu is its own `.map-mode-toggle` group beside the mode toggle, both inside `.map-toggles`, which does the positioning: the checkbox (`#overlay-master`, in its own padded `<label>` so it never opens the menu), then one button (a Lucide `Layers`, the word, a count of what's picked — `pickedCount` — greyed by `.overlays-menu__count--off` while the checkbox is off, a caret) opening `.overlays-menu__panel`: two `<fieldset>`s, Paths and Points of interest, closed by a press outside or Escape like the Activities panel's Type dropdown. The checkbox is disabled while nothing is picked, and its `title` says why. MapView ANDs `enabled` into `paths` and empties `spotsShown` while it's off, so the layers, the export and Show in this area (which hides with no categories) all follow it; the picks themselves stay in `Overlays`. An entry ticked while it's off sets `enabled` back on in the same change (OverlaysMenu's `change`); an entry unticked leaves it alone. Tracks sits in an `.overlays-menu__row` with an info button (a Lucide `Info`, `aria-expanded`/`aria-controls`) outside its `<label>`, so pressing it never ticks the box; it toggles `.overlays-menu__hint`, a note under the entry saying what tracks are, which closes with the menu. The export builds its style with `paths` from `ExportViewState`.
 
 **Android.** `map/MapPaths.kt` keeps the choice in SharedPreferences (`map_paths`) and applies it with `PropertyFactory.visibility` on the ids of `TRAIL_LAYER_IDS`, `TRACK_LAYER_IDS` and `BIKE_PATH_LAYER_IDS`, each kind on its own as on the web — all hidden while the Layers checkbox (`map/MapLayersSwitch.kt`) is off — after every `loadStyle` and on each change in the Layers menu (`map/LayersMenu.kt`, `apps/android/docs/IMPLEMENTATION.md`).
+
+**Bike paths and Shared paths come from an OSM import, not the basemap.** The basemap has no paths below z13, and the point of the bike-path entries is seeing a region's worth of them at once. So they're imported into `bike_paths` (§3.27) by `internal/bikepaths`'s `Import`, the `import-bike-paths [--planet] <file>` subcommand (`docs/DEPLOY.md` §6). It reads a GeoJSON Text Sequence that `scripts/bike-paths-extract.sh` makes off the server with osmium: every way tagged `highway=cycleway` or `bicycle=designated`, exported as lines with `-u type_id` so each feature's id is `w<way id>`. That script shares its download and checksum step with `spots-extract.sh` (`scripts/lib/osm-download.sh`), so both run from one planet file. `Kind` sorts a way into `cycleway` (`highway=cycleway`, whatever else it carries) or `shared` (`path`, `footway` or `bridleway` with `bicycle=designated`); anything else, a road with a designated bike lane above all, is skipped. Upserts go 1,000 ways to a statement on `osm_id`, each stamped with the run's `clock_timestamp()` in `last_seen_import`, the line projected to Web Mercator on the way in. A `--planet` run then deletes the rows the run didn't stamp, unless that's more than 1% of them (`ErrTooManyDeleted`, the same guard as Spots' retiring, §4.25). Any change or deletion bumps every account's `map_version`, so clients fetch the new tiles. In the Ohio extract: 14,195 cycleways (4,398 km) and 2,013 shared paths (756 km), with 881 roads skipped.
 
 **Tested**: `tests/smoke.mjs` step 8, against the Ohio extract: hidden by default; over the Olentangy Trail, ticking Bike paths in the Layers menu shows only the cycleway layers, Trails the trail ones and Tracks the track ones, with features rendered in both `paths_cycleway` and `paths_trail`. The choice survives a reload. Unticking the Layers checkbox hides all three while the menu keeps them ticked and greys the count, survives a reload, and ticking it shows them again; unticking a path while it's off leaves it off, and ticking one turns it back on. Unticking all three hides the layers again and disables the checkbox. Tracks' info button shows its note without ticking the box, and the menu has no All checkbox.
 

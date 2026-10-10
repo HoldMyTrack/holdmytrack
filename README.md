@@ -35,6 +35,8 @@ holdmytrack/
 ├── scripts/maintenance.sh       # flips the deployment's maintenance page (docs/DEPLOY.md §7)
 ├── scripts/restore-drill.sh     # restores the newest backup into a throwaway container and checks it (docs/DEPLOY.md §11)
 ├── scripts/spots-extract.sh     # downloads OSM data and filters it into the Spots places file, off the server (docs/DEPLOY.md §6)
+├── scripts/bike-paths-extract.sh # the same for the bike paths file (docs/DEPLOY.md §6)
+├── scripts/lib/osm-download.sh  # the OSM download and checksum both extract scripts share
 ├── scripts/loadtest-sampler.sh  # samples a deployment's CPU, memory and job queue during a load test (docs/PERFORMANCE.md)
 ├── .env.example                 # Compose interpolation only — never VITE_*
 ├── .env.prod.example            # compose.prod.yml's own env template

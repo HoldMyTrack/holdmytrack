@@ -11,45 +11,21 @@
 #   scripts/spots-extract.sh <work-dir> <pbf-url>       # a region (Geofabrik), without --planet
 #
 # Re-running reuses a finished download (and resumes a cut-off one), so a failed filter step
-# doesn't mean downloading 85 GB again. The result is <work-dir>/spots.geojsonseq.
+# doesn't mean downloading 85 GB again; so does bike-paths-extract.sh given the same work-dir.
+# The result is <work-dir>/spots.geojsonseq.
 #
 set -euo pipefail
 
-PLANET_URL=https://planet.openstreetmap.org/pbf/planet-latest.osm.pbf
-
 [[ $# -ge 1 && $# -le 2 ]] || { echo "Usage: $0 <work-dir> [<pbf-url>]  (the planet when no URL is given)" >&2; exit 2; }
 command -v osmium > /dev/null || { echo "osmium not found: install osmium-tool (brew install osmium-tool, apt install osmium-tool)." >&2; exit 1; }
+source "$(dirname "$0")/lib/osm-download.sh"
 
 work=$1
 url=${2:-$PLANET_URL}
 mkdir -p "$work"
 cd "$work"
 src=source.osm.pbf
-
-log() { echo "$(date -u +%FT%TZ) $*"; }
-
-# The planet's latest-* name is a redirect to a dated file; the checksum beside it names that
-# dated file, so download both under fixed names and compare only the hash. Geofabrik serves
-# a .md5 beside each extract too.
-log "fetching the checksum for $url"
-curl -fsSL -o source.md5 "$url.md5"
-want=$(awk '{print $1}' source.md5)
-
-if [[ -f "$src" && -f "$src.ok" && "$(cat "$src.ok")" == "$want" ]]; then
-  log "already downloaded and checked: $src"
-else
-  rm -f "$src.ok"
-  log "downloading $url (resumable; re-run to continue after an interruption)"
-  curl -fL -C - --retry 5 --retry-delay 30 -o "$src" "$url"
-  log "checking md5"
-  if command -v md5sum > /dev/null; then got=$(md5sum "$src" | awk '{print $1}'); else got=$(md5 -q "$src"); fi
-  if [[ "$got" != "$want" ]]; then
-    # A newer file may have been published mid-download, so resuming can't fix this.
-    echo "md5 mismatch: got $got, want $want. Delete $work/$src and run again." >&2
-    exit 1
-  fi
-  echo "$want" > "$src.ok"
-fi
+osm_download "$url"
 
 # Keep every node, way and relation in the five categories (spots.Category, IMPLEMENTATION.md
 # §4.25), plus the nodes the ways and relations need for their geometry.

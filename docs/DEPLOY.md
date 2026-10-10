@@ -156,6 +156,21 @@ docker compose -f compose.prod.yml --env-file .env.prod run --rm -v /tmp/spots:/
 
 It upserts every place by its OSM id, so a re-run with a newer extract updates the places already there. `--planet` says the file is the whole planet: after the upserts, every place the file didn't have is retired — hidden from everyone who hasn't captured it, never deleted (ADR-0027). Leave `--planet` off for a regional extract, or it would retire the rest of the world. If a planet run would retire more than 1% of the places on the map, it stops with `the file is missing too many places to be the whole planet` and retires nothing: the file is likelier cut short or mis-filtered than OSM down that much, so check the export (its line count against the last run's) before running again. The log's last line counts the places `imported`, `changed` (new, different, or back in OSM), `retired` and `skipped`. Only when something changed or was retired does it move every account's tile version, so browsers fetch the new places (`IMPLEMENTATION.md` §4.25); a refresh that changed nothing leaves their cached tiles alone. Delete `/tmp/spots` afterwards.
 
+Bike paths and Shared paths (`SPEC.md` FR-4.13) need their ways loaded the same way, and refreshed when Spots is; until the first load those two entries of the Layers menu draw nothing. `scripts/bike-paths-extract.sh` makes the file off the server, as `spots-extract.sh` does. Given the same work directory it reuses that script's checked planet download, so run the two one after the other:
+
+```
+scripts/bike-paths-extract.sh ~/spots-work    # result: ~/spots-work/bike-paths.geojsonseq
+```
+
+It keeps every way tagged `highway=cycleway` or `bicycle=designated`, as lines, and prints the count of each; the import keeps the second only on paths, footways and bridleways. Compare the total with the last run's, take a backup, then on the server, inside `tmux`:
+
+```
+mkdir -p /tmp/bike-paths && chmod 755 /tmp/bike-paths   # put bike-paths.geojsonseq here, world-readable
+docker compose -f compose.prod.yml --env-file .env.prod run --rm -v /tmp/bike-paths:/data:ro api import-bike-paths --planet /data/bike-paths.geojsonseq
+```
+
+It upserts every way by its OSM id. With `--planet`, it then **deletes** every way the file didn't have — nothing refers to a bike path, so there's nothing to retire — and the same 1% guard applies: past it, it stops with `the file is missing too many ways to be the whole planet` and deletes nothing. Leave `--planet` off for a regional file. The log's last line counts the ways `imported`, `changed`, `deleted` and `skipped`; only a change or a deletion moves every account's tile version. Delete `/tmp/bike-paths` afterwards.
+
 ## 7. Maintenance mode
 
 A deploy pulls and builds first, with the old containers still serving: building is the slow part, minutes on this VPS, and it leaves the running containers alone, since none of them mounts the source. What comes after the build depends on the new migrations, if any. Most work with the release already running (`DEVELOPMENT.md`'s "Writing a migration"), so they run with the site up:

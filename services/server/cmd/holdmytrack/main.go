@@ -24,6 +24,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/bikepaths"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/config"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/db"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/geo"
@@ -49,7 +50,7 @@ func main() {
 	slog.SetDefault(log)
 
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: holdmytrack <serve|work|migrate|seed-demo-customer|export-demo-activities|seed-admin-boundaries|seed-timezones|rerender-coverage|backfill-recorded-spans|import-spots|set-admin>")
+		fmt.Fprintln(os.Stderr, "usage: holdmytrack <serve|work|migrate|seed-demo-customer|export-demo-activities|seed-admin-boundaries|seed-timezones|rerender-coverage|backfill-recorded-spans|import-spots|import-bike-paths|set-admin>")
 		os.Exit(2)
 	}
 
@@ -375,6 +376,35 @@ func main() {
 		}
 		log.Info("import-spots: done", "imported", stats.Imported, "changed", stats.Changed,
 			"retired", stats.Retired, "skipped", stats.Skipped)
+
+	case "import-bike-paths":
+		// The load, and each refresh, of the Bike paths and Shared paths overlay from an
+		// OpenStreetMap extract made off-box (docs/DEPLOY.md §6) — upserted, so safe to re-run.
+		// --planet says the file is the whole planet, so the ways it doesn't have are deleted.
+		// See internal/bikepaths.Import's doc comment.
+		args := os.Args[2:]
+		planet := len(args) > 0 && args[0] == "--planet"
+		if planet {
+			args = args[1:]
+		}
+		if len(args) != 1 {
+			fmt.Fprintln(os.Stderr, "usage: holdmytrack import-bike-paths [--planet] <file.geojsonseq>")
+			os.Exit(2)
+		}
+		f, err := os.Open(args[0])
+		if err != nil {
+			log.Error("import-bike-paths", "err", err)
+			os.Exit(1)
+		}
+		log.Info("import-bike-paths: starting", "file", args[0], "planet", planet)
+		stats, err := bikepaths.Import(ctx, pool, log, f, planet)
+		f.Close()
+		if err != nil {
+			log.Error("import-bike-paths", "err", err, "imported", stats.Imported, "changed", stats.Changed)
+			os.Exit(1)
+		}
+		log.Info("import-bike-paths: done", "imported", stats.Imported, "changed", stats.Changed,
+			"deleted", stats.Deleted, "skipped", stats.Skipped)
 
 	case "set-admin":
 		// Grants or revokes the admin panel (/admin, FR-12) — deliberately a shell-only
