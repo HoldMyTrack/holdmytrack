@@ -3,6 +3,7 @@ package fog
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"image"
 	"net/http/httptest"
@@ -272,5 +273,42 @@ func TestRenderPyramidLevelReadsEachChild(t *testing.T) {
 		if !bytes.Equal(got.Pix, c.want.Pix) {
 			t.Errorf("%s isn't the downsample of its children as stored", c.key)
 		}
+	}
+}
+
+// A child stored at a size TileSize no longer is — one rendered before ADR-0041, not yet redrawn
+// by rerender-coverage --masks — fails the parent's render with errTileSize. It read past the
+// child's end in downsampleQuadrants and panicked, taking the worker down with it.
+func TestRenderPyramidLevelRefusesAChildOfAnotherSize(t *testing.T) {
+	pool, userID := testAccount(t)
+	ctx := context.Background()
+	mem := storagetest.New()
+	srv := httptest.NewServer(mem)
+	t.Cleanup(srv.Close)
+	store, err := storage.New(srv.URL, "test", "test", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const z, px, py = Zoom - 1, 4400, 2700
+	for i, size := range []int{TileSize, TileSize / 2} {
+		x := px*2 + i
+		b, err := encodeTilePNG(image.NewGray(image.Rect(0, 0, size, size)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		key := fogObjectKey(userID, z+1, x, py*2)
+		mem.Put(key, b)
+		if _, err := pool.Exec(ctx, `
+			INSERT INTO fog_tiles (user_id, zoom, tile_x, tile_y, object_key, dirty, rendered_at)
+			VALUES ($1, $2, $3, $4, $5, false, NOW())`, userID, z+1, x, py*2, key); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := renderPyramidLevel(ctx, pool, store, userID, z, px, py); !errors.Is(err, errTileSize) {
+		t.Fatalf("err = %v, want errTileSize", err)
+	}
+	if _, ok := mem.Object(fogObjectKey(userID, z, px, py)); ok {
+		t.Error("the parent was stored from a child it couldn't read")
 	}
 }

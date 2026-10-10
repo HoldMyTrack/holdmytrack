@@ -2,11 +2,27 @@ package fog
 
 import (
 	"bytes"
+	"errors"
 	"image"
 	"image/color"
 	"math/rand/v2"
 	"testing"
 )
+
+// A stored PNG of another size than TileSize is refused, not handed to a raster that indexes a
+// TileSize square; one of TileSize decodes as before.
+func TestDecodeGrayRefusesAnotherSize(t *testing.T) {
+	for _, size := range []int{TileSize / 2, TileSize, TileSize * 2} {
+		b, err := encodeTilePNG(image.NewGray(image.Rect(0, 0, size, size)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = decodeGray(bytes.NewReader(b))
+		if want := size != TileSize; errors.Is(err, errTileSize) != want {
+			t.Errorf("%d px: err = %v, want refused %v", size, err, want)
+		}
+	}
+}
 
 func TestFogTileVeils(t *testing.T) {
 	mask := image.NewGray(image.Rect(0, 0, 2, 1))
