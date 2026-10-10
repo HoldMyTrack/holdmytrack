@@ -361,6 +361,27 @@
           "height": 1536
         }
       ]
+    },
+    "2026-10-10 Solowheel.gpx": {
+      "type": "Solowheel",
+      "photos": [
+        {
+          "file": "2026-10-10 Solowheel 1.webp",
+          "thumb": "2026-10-10 Solowheel 1-thumb.webp",
+          "taken_at": "2026-10-10T20:05:14Z",
+          "route_at": "2026-10-10T20:05:14Z",
+          "width": 1536,
+          "height": 2048
+        },
+        {
+          "file": "2026-10-10 Solowheel 2.webp",
+          "thumb": "2026-10-10 Solowheel 2-thumb.webp",
+          "taken_at": "2026-10-10T20:27:50Z",
+          "route_at": "2026-10-10T20:26:59Z",
+          "width": 2048,
+          "height": 1536
+        }
+      ]
     }
   },
   "stories": [
@@ -393,7 +414,8 @@
         "2026-10-04 Solowheel.gpx",
         "2026-10-04 Solowheel-2.gpx",
         "2026-10-05 Evening loop.gpx",
-        "2026-10-06 Mill Creek Falls.gpx"
+        "2026-10-06 Mill Creek Falls.gpx",
+        "2026-10-10 Solowheel.gpx"
       ]
     },
     {
@@ -490,6 +512,18 @@
       "osm_id": 4066048415,
       "name": "Mill Creek Falls Overlook",
       "captured_at": "2026-10-06T21:24:07.167148Z"
+    },
+    {
+      "osm_type": "node",
+      "osm_id": 4937617707,
+      "name": "Little Overlook",
+      "captured_at": "2026-10-10T20:41:26.181052Z"
+    },
+    {
+      "osm_type": "node",
+      "osm_id": 2141917791,
+      "name": "Tinker's Creek Gorge Scenic Overlook",
+      "captured_at": "2026-10-10T20:48:17.15636Z"
     }
   ]
 }
