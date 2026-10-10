@@ -260,3 +260,14 @@ The same VPS after the deploy of renders in a lane of their own (`IMPLEMENTATION
 - A single upload from another account was processed in 5 s two minutes into the import, and again in 5 s once the ingests had drained, with two renders running and five queued. Before, the same moment cost 7 min 35 s.
 - 12 people browsing during the import: every 30 s window's p95 under 236 ms for Fog, 245 ms for Region, 374 ms for Region Heatmap and 162 ms for Tracks, out of 20,859 requests with none failed.
 - The purge removed the 21 accounts in about 9 minutes, leaving 780 activities and 5,777 masks as before, no pending job and no orphaned tile. At its fullest, with the 21 accounts' 5,947 activities, the masks' PNGs table held 82,129 masks in 61 MB; the database grew from 2,428 to 2,658 MB during the test and stood at 2,629 MB after the purge.
+
+### 2026-10-10 — dev stack, a tile's round trips side by side
+
+The laptop's dev stack, with a worker and API built from `main` and then from the branch that runs a tile's own object-store round trips side by side (`IMPLEMENTATION.md` §4.2 "Invalidation"): its Fog and Heatmap PUTs together, and a pyramid tile's four children read in one query and fetched together. Both reached the store through `delayproxy` at 80 ms a round trip, with two main and two render loops. Two accounts each imported a 1,000-track set (`gen 2 1000`); each round re-rendered both in full (`rerender-coverage --user`) and timed every render from queued to done.
+
+| Full render, 7,813 / 8,134 z14 tiles and their pyramid | `main` | Branch |
+| :-- | :-- | :-- |
+| Both accounts at once, two render loops | 365 / 423 s | 152 / 180 s |
+
+- 132 served tiles of one account, five of every zoom level from 0 to 14, Fog and Heatmap, were byte-identical between the two builds.
+- `main`'s times match the 363 / 422 s of the session that moved the masks into Postgres, so the 2.4-fold drop is this change alone.

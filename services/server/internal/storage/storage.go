@@ -31,9 +31,19 @@ func New(endpoint, accessKey, secretKey, bucket string) (*Store, error) {
 		host = u.Path // endpoint given without a scheme
 	}
 
+	// minio's own transport keeps 16 idle connections to the store. A fog render has up to
+	// about 128 requests in flight (16 tiles side by side, each fetching its children at once,
+	// internal/fog's renderParallelism), and every one past those 16 would open a connection and
+	// close it after, each a TLS handshake to R2.
+	transport, err := minio.DefaultTransport(secure)
+	if err != nil {
+		return nil, fmt.Errorf("storage: transport: %w", err)
+	}
+	transport.MaxIdleConnsPerHost = 128
 	client, err := minio.New(host, &minio.Options{
-		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
-		Secure: secure,
+		Creds:     credentials.NewStaticV4(accessKey, secretKey, ""),
+		Secure:    secure,
+		Transport: transport,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("storage: new client: %w", err)

@@ -1,8 +1,10 @@
 package fog
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"image"
 	"net/http/httptest"
 	"os"
 	"testing"
@@ -194,5 +196,81 @@ func TestRenderUserWaitsForTheAccountsRunningPass(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("render still waiting after the other pass unlocked")
+	}
+}
+
+// A pyramid tile is the downsample of its four children as stored, read in the right
+// quadrants: one child with both rasters, one with both again, one with only Fog, one never
+// rendered.
+func TestRenderPyramidLevelReadsEachChild(t *testing.T) {
+	pool, userID := testAccount(t)
+	ctx := context.Background()
+	mem := storagetest.New()
+	srv := httptest.NewServer(mem)
+	t.Cleanup(srv.Close)
+	store, err := storage.New(srv.URL, "test", "test", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const z, px, py = Zoom - 1, 4400, 2700
+
+	// Each child lit in a different column, so a child read into the wrong quadrant shows.
+	child := func(col int, v uint8) *image.Gray {
+		m := blankTile()
+		for y := range TileSize {
+			m.Pix[y*m.Stride+col] = v
+		}
+		return m
+	}
+	var fog, heat [4]*image.Gray
+	for q := range 4 {
+		fog[q], heat[q] = blankTile(), blankTile()
+	}
+	put := func(key string, m *image.Gray) {
+		b, err := encodeTilePNG(m)
+		if err != nil {
+			t.Fatal(err)
+		}
+		mem.Put(key, b)
+	}
+	for q, c := range [][2]int{{px * 2, py * 2}, {px*2 + 1, py * 2}, {px * 2, py*2 + 1}} {
+		fog[q] = child(10+q*20, 255)
+		fogKey := fogObjectKey(userID, z+1, c[0], c[1])
+		put(fogKey, fog[q])
+		var heatKey *string
+		if q < 2 {
+			heat[q] = child(15+q*20, 128)
+			k := heatmapObjectKey(userID, z+1, c[0], c[1])
+			put(k, heat[q])
+			heatKey = &k
+		}
+		if _, err := pool.Exec(ctx, `
+			INSERT INTO fog_tiles (user_id, zoom, tile_x, tile_y, object_key, heatmap_object_key, dirty, rendered_at)
+			VALUES ($1, $2, $3, $4, $5, $6, false, NOW())`, userID, z+1, c[0], c[1], fogKey, heatKey); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := renderPyramidLevel(ctx, pool, store, userID, z, px, py); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		key  string
+		want *image.Gray
+	}{
+		{fogObjectKey(userID, z, px, py), downsampleQuadrants(fog)},
+		{heatmapObjectKey(userID, z, px, py), downsampleQuadrants(heat)},
+	} {
+		b, ok := mem.Object(c.key)
+		if !ok {
+			t.Fatalf("%s not stored", c.key)
+		}
+		got, err := decodeGray(bytes.NewReader(b))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(got.Pix, c.want.Pix) {
+			t.Errorf("%s isn't the downsample of its children as stored", c.key)
+		}
 	}
 }

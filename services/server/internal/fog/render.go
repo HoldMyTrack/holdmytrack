@@ -23,10 +23,10 @@ import (
 )
 
 // renderParallelism bounds how many tiles (or masks) a render works on at once. The work is
-// mostly waiting — a z14 tile is a query for its masks and two PUTs, a pyramid tile four
-// GETs and two PUTs, each PUT or GET a round trip to R2 — so running them one after another
-// left a render at about 1.3 tiles a second on the production droplet (the 2026-10-08 load
-// test), almost none of it CPU. Bounded rather
+// mostly waiting — a z14 tile is a query for its masks and its two PUTs side by side, a
+// pyramid tile a query, its children's GETs side by side and its two PUTs, each PUT or GET a
+// round trip to R2 — so running tiles one after another left a render at about 1.3 tiles a
+// second on the production droplet (the 2026-10-08 load test), almost none of it CPU. Bounded rather
 // than unbounded so memory stays predictable (IMPLEMENTATION.md §5.2): each in-flight tile
 // holds a few decoded masks.
 const renderParallelism = 16
@@ -282,10 +282,7 @@ func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.
 	// necessarily the same *set* of masks.
 	fogMask := compositeFogMask(fogMasks)
 	heatmapMask := compositeHeatmapMask(heatmapMasks, heatmapCap)
-	if err := storeTilePNG(ctx, store, fogObjectKey(userID, zoom, x, y), fogMask); err != nil {
-		return err
-	}
-	if err := storeTilePNG(ctx, store, heatmapObjectKey(userID, zoom, x, y), heatmapMask); err != nil {
+	if err := storeTilePair(ctx, store, userID, zoom, x, y, fogMask, heatmapMask); err != nil {
 		return err
 	}
 	return upsertTileRendered(ctx, pool, userID, zoom, x, y, gen,
@@ -465,65 +462,91 @@ func projectToTile(points []parse.Point, tileX, tileY, zoom int) [][]pixelPoint 
 // completeness requirement renderAndStoreTile has at z14. Both rasters' pyramids are built
 // here together — they change together, from the same z14 renders, so there is no case
 // where one needs a pyramid rebuild and the other doesn't.
+//
+// The children's keys come in one query and their images are fetched side by side: one
+// after another, a pyramid tile was about ten round trips to object storage.
 func renderPyramidLevel(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID string, zoom, x, y int) error {
 	gen, err := tileDirtyGen(ctx, pool, userID, zoom, x, y)
 	if err != nil {
 		return err
 	}
-	coords := [4][2]int{{x * 2, y * 2}, {x*2 + 1, y * 2}, {x * 2, y*2 + 1}, {x*2 + 1, y*2 + 1}}
-	var fogChildren, heatmapChildren [4]*image.Gray
-	for i, c := range coords {
-		fogImg, err := loadTileImage(ctx, pool, store, userID, zoom+1, c[0], c[1], "object_key")
-		if err != nil {
-			return err
-		}
-		fogChildren[i] = fogImg
-		heatmapImg, err := loadTileImage(ctx, pool, store, userID, zoom+1, c[0], c[1], "heatmap_object_key")
-		if err != nil {
-			return err
-		}
-		heatmapChildren[i] = heatmapImg
-	}
-
-	fogMask := downsampleQuadrants(fogChildren)
-	heatmapMask := downsampleQuadrants(heatmapChildren)
-	if err := storeTilePNG(ctx, store, fogObjectKey(userID, zoom, x, y), fogMask); err != nil {
+	children, err := loadChildren(ctx, pool, store, userID, zoom+1, x, y)
+	if err != nil {
 		return err
 	}
-	if err := storeTilePNG(ctx, store, heatmapObjectKey(userID, zoom, x, y), heatmapMask); err != nil {
+	fogMask := downsampleQuadrants([4]*image.Gray{children[0], children[1], children[2], children[3]})
+	heatmapMask := downsampleQuadrants([4]*image.Gray{children[4], children[5], children[6], children[7]})
+	if err := storeTilePair(ctx, store, userID, zoom, x, y, fogMask, heatmapMask); err != nil {
 		return err
 	}
 	return upsertTileRendered(ctx, pool, userID, zoom, x, y, gen,
 		fogObjectKey(userID, zoom, x, y), heatmapObjectKey(userID, zoom, x, y))
 }
 
-// loadTileImage fetches a tile's currently-stored mask (fog or heatmap, per column) or a
-// blank one if the tile has no fog_tiles row yet or hasn't been rendered on that side — the
+// loadChildren reads the four children at zoom of parent (px, py), in downsampleQuadrants'
+// order (top left, top right, bottom left, bottom right): their Fog masks, then their Heatmap
+// masks. A child with no fog_tiles row, or not rendered on one side, is a blank tile — the
 // correct stand-in for "nothing here", not an error, since a user's history need not touch
-// every sibling tile. A blank mask is all-zero either way; FogTile and HeatmapTile
-// each interpret zero correctly for their own mode (fully fogged vs. fully transparent).
-//
-// column is a Go identifier, not user input — always one of the two literal call sites
-// below, never interpolated from a request.
-func loadTileImage(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID string, zoom, x, y int, column string) (*image.Gray, error) {
-	var key *string
-	err := pool.QueryRow(ctx,
-		fmt.Sprintf(`SELECT %s FROM fog_tiles WHERE user_id = $1 AND zoom = $2 AND tile_x = $3 AND tile_y = $4`, column),
-		userID, zoom, x, y,
-	).Scan(&key)
-	if errors.Is(err, pgx.ErrNoRows) || key == nil {
-		return blankTile(), nil
+// every sibling tile. A blank mask is all-zero either way; FogTile and HeatmapTile each
+// interpret zero correctly for their own mode (fully fogged vs. fully transparent).
+func loadChildren(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID string, zoom, px, py int) ([8]*image.Gray, error) {
+	var out [8]*image.Gray
+	for i := range out {
+		out[i] = blankTile()
 	}
+	rows, err := pool.Query(ctx, `
+		SELECT tile_x, tile_y, object_key, heatmap_object_key FROM fog_tiles
+		WHERE user_id = $1 AND zoom = $2 AND tile_x = ANY($3) AND tile_y = ANY($4)`,
+		userID, zoom, []int32{int32(px * 2), int32(px*2 + 1)}, []int32{int32(py * 2), int32(py*2 + 1)})
 	if err != nil {
-		return nil, err
+		return out, err
 	}
+	keys := make([]string, 8)
+	for rows.Next() {
+		var cx, cy int
+		var fogKey, heatmapKey *string
+		if err := rows.Scan(&cx, &cy, &fogKey, &heatmapKey); err != nil {
+			rows.Close()
+			return out, err
+		}
+		q := (cx - px*2) + 2*(cy-py*2)
+		if fogKey != nil {
+			keys[q] = *fogKey
+		}
+		if heatmapKey != nil {
+			keys[4+q] = *heatmapKey
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return out, err
+	}
+	err = parallel.ForEach(ctx, len(keys), len(keys), func(ctx context.Context, i int) error {
+		if keys[i] == "" {
+			return nil
+		}
+		obj, err := store.Get(ctx, keys[i])
+		if err != nil {
+			return err
+		}
+		defer obj.Close()
+		img, err := decodeGray(obj)
+		if err != nil {
+			return err
+		}
+		out[i] = img
+		return nil
+	})
+	return out, err
+}
 
-	obj, err := store.Get(ctx, *key)
-	if err != nil {
-		return nil, err
-	}
-	defer obj.Close()
-	return decodeGray(obj)
+// storeTilePair stores one tile's Fog and Heatmap masks, side by side.
+func storeTilePair(ctx context.Context, store *storage.Store, userID string, zoom, x, y int, fogMask, heatmapMask *image.Gray) error {
+	keys := [2]string{fogObjectKey(userID, zoom, x, y), heatmapObjectKey(userID, zoom, x, y)}
+	masks := [2]*image.Gray{fogMask, heatmapMask}
+	return parallel.ForEach(ctx, 2, 2, func(ctx context.Context, i int) error {
+		return storeTilePNG(ctx, store, keys[i], masks[i])
+	})
 }
 
 func storeTilePNG(ctx context.Context, store *storage.Store, key string, mask *image.Gray) error {
