@@ -935,7 +935,10 @@ func (s *Server) handleActivityGraphStats(w http.ResponseWriter, r *http.Request
 }
 
 // activityTrendsQuery is docs/SPEC.md FR-9's "trends": count/distance/moving-time/
-// elevation-gain per calendar bucket (week or month), over an optional [from, to) window.
+// elevation-gain per calendar bucket (week or month), over the [from, to) window. Every bucket
+// the window touches comes back, an empty one as zeroes: generate_series lists them from the
+// bucket holding $3 to the one holding the day before $4, and the account's sums are left-joined
+// onto that list, so a chart drawn one bar per period spans the whole window.
 // $1 (the bucket) is a bound parameter, not string-interpolated — date_trunc accepts its
 // first argument as a plain value, so this is not an injection vector — but the handler
 // still validates it against an allow-list first, so a bad value gets a clean 400 instead
@@ -946,17 +949,24 @@ func (s *Server) handleActivityGraphStats(w http.ResponseWriter, r *http.Request
 // ingested before that have NULL there — COALESCE keeps old and new activities rendering
 // consistently in the same trend line rather than silently undercounting older periods.
 const activityTrendsQuery = `
-SELECT date_trunc($1, ` + localStartedAt + `)::date AS period,
-       COUNT(*),
-       COALESCE(SUM(distance_meters), 0),
-       COALESCE(SUM(COALESCE(moving_seconds, duration_seconds)), 0),
-       COALESCE(SUM(elevation_gain_m), 0)
-FROM activities
-WHERE user_id = $2
-  AND ` + localStartedAt + ` >= $3::date
-  AND ` + localStartedAt + ` < $4::date
-GROUP BY period
-ORDER BY period`
+WITH sums AS (
+  SELECT date_trunc($1::text, ` + localStartedAt + `)::date AS period,
+         COUNT(*) AS count,
+         COALESCE(SUM(distance_meters), 0) AS distance,
+         COALESCE(SUM(COALESCE(moving_seconds, duration_seconds)), 0) AS moving,
+         COALESCE(SUM(elevation_gain_m), 0) AS gain
+  FROM activities
+  WHERE user_id = $2
+    AND ` + localStartedAt + ` >= $3::date
+    AND ` + localStartedAt + ` < $4::date
+  GROUP BY period
+)
+SELECT b.ts::date, COALESCE(s.count, 0), COALESCE(s.distance, 0), COALESCE(s.moving, 0), COALESCE(s.gain, 0)
+FROM generate_series(date_trunc($1::text, $3::date::timestamp),
+                     date_trunc($1::text, ($4::date - 1)::timestamp),
+                     ('1 ' || $1::text)::interval) AS b(ts)
+LEFT JOIN sums s ON s.period = b.ts::date
+ORDER BY b.ts`
 
 type trendPeriod struct {
 	PeriodStart    string  `json:"period_start"` // YYYY-MM-DD, the bucket's own start day

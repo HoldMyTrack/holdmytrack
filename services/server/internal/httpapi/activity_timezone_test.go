@@ -77,8 +77,8 @@ func TestActivitiesGroupByTheirOwnTimezone(t *testing.T) {
 
 	var trends activityTrendsResponse
 	d.decode(d.do(me, "GET", "/v1/activities/trends?bucket=week&from=2026-03-01&to=2026-03-31", nil), http.StatusOK, &trends)
-	// Monday the 9th's week holds both.
-	if len(trends.Periods) != 1 || trends.Periods[0].PeriodStart != "2026-03-09" || trends.Periods[0].Count != 2 {
+	// Monday the 9th's week holds both; the weeks of February 23 to March 30 are the window's.
+	if len(trends.Periods) != 6 || trends.Periods[2].PeriodStart != "2026-03-09" || trends.Periods[2].Count != 2 {
 		t.Errorf("trends %+v, want both in the week of the 9th", trends.Periods)
 	}
 }
