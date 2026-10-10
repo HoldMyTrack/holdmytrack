@@ -2,6 +2,8 @@ package httpapi
 
 import (
 	"context"
+	"io"
+	"log/slog"
 	"net/http"
 	"testing"
 	"time"
@@ -75,5 +77,70 @@ func TestOverlappingSyncsStayLive(t *testing.T) {
 	}
 	if live != 2 {
 		t.Errorf("%d live, want both", live)
+	}
+}
+
+
+// A walk from home is compared as recorded: the minutes its Private location clipped off the
+// start still count, so the other source's full copy of it is marked — also once an activity
+// stored before the recorded span existed has been backfilled.
+func TestOverlapIgnoresPrivateLocationClip(t *testing.T) {
+	d := newDBTestWithS3(t, newMemS3())
+	me := d.newAccount(false)
+	ctx := context.Background()
+	// Home: 100 m around the start, where the first 6 of the walk's 20 minutes are spent.
+	if _, err := d.pool.Exec(ctx, `INSERT INTO privacy_zones (user_id, center, radius_m)
+		VALUES ($1, ST_SetSRID(ST_MakePoint(10.0, 50.0), 4326)::geography, 100)`, me.id); err != nil {
+		t.Fatal(err)
+	}
+	t0 := time.Date(2026, 10, 10, 14, 19, 0, 0, time.UTC)
+	point := func(lat float64, m int) map[string]any {
+		return map[string]any{"lat": lat, "lon": 10.0, "time": t0.Add(time.Duration(m) * time.Minute)}
+	}
+	body := map[string]any{"source": "recorded", "activities": []map[string]any{{
+		"external_id": "rec-1", "activity_type": "walking",
+		"points": []map[string]any{
+			point(50.0, 0), point(50.0003, 3), point(50.0006, 6),
+			point(50.003, 7), point(50.006, 12), point(50.009, 16), point(50.012, 20),
+		},
+	}}}
+	var synced syncActivitiesResponse
+	d.decode(d.do(me, http.MethodPost, "/v1/sync/activities", body), http.StatusOK, &synced)
+	res, err := ingest.Process(ctx, d.pool, d.srv.store, d.latestIngestJob(me))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var started time.Time
+	if err := d.pool.QueryRow(ctx, `SELECT started_at FROM activities WHERE id = $1`, res.ActivityID).Scan(&started); err != nil {
+		t.Fatal(err)
+	}
+	if !started.After(t0.Add(5 * time.Minute)) {
+		t.Fatalf("started_at %v, want the clipped start after %v", started, t0.Add(5*time.Minute))
+	}
+
+	overlaps := func() []overlapJSON {
+		var resp overlapsResponse
+		d.decode(d.do(me, http.MethodPost, "/v1/activities/overlaps", map[string]any{"spans": []map[string]any{
+			{"key": "hc", "start": t0, "end": t0.Add(20 * time.Minute)},
+		}}), http.StatusOK, &resp)
+		return resp.Overlaps
+	}
+	if o := overlaps(); len(o) != 1 || o[0].ActivityID != res.ActivityID {
+		t.Fatalf("overlaps %+v, want the recorded walk", o)
+	}
+
+	// Stored before the columns existed, it's compared by its clipped track and missed...
+	if _, err := d.pool.Exec(ctx, `UPDATE activities SET recorded_started_at = NULL, recorded_ended_at = NULL WHERE id = $1`, res.ActivityID); err != nil {
+		t.Fatal(err)
+	}
+	if o := overlaps(); len(o) != 0 {
+		t.Fatalf("overlaps %+v before the backfill, want none", o)
+	}
+	// ...until the backfill reads its span back from the upload.
+	if err := ingest.BackfillRecordedSpans(ctx, d.pool, d.srv.store, slog.New(slog.NewTextHandler(io.Discard, nil))); err != nil {
+		t.Fatal(err)
+	}
+	if o := overlaps(); len(o) != 1 || o[0].ActivityID != res.ActivityID {
+		t.Fatalf("overlaps %+v after the backfill, want the recorded walk", o)
 	}
 }

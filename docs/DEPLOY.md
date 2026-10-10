@@ -122,6 +122,8 @@ Skip them and "Try it now" opens an empty demo account (`SPEC.md` FR-2.2), Fog/H
 
 A deploy that changes how Fog/Heatmap tiles are drawn (`services/server/internal/fog`, `IMPLEMENTATION.md` §4.2) needs every account's tiles re-rendered once, or they keep the old look: `docker compose -f compose.prod.yml --env-file .env.prod run --rm api rerender-coverage`, with `--masks` when the change is to the stroke itself (its width), to the tile size (`fog.TileSize`), or to which tiles a track reaches (`internal/tilemath`), which redraws every activity's stored masks first and takes a while. It only queues the renders, so the worker must be up; they finish in the background.
 
+The deploy that brings migration 0033 needs `docker compose -f compose.prod.yml --env-file .env.prod run --rm api backfill-recorded-spans` once, after `up -d`: it fills each older activity's time as recorded (`IMPLEMENTATION.md` §4.6), re-reading every upload, which takes a few minutes. Until it has run, the Sync tab's overlap hint misses activities whose ends a Private location cut away. It's idempotent.
+
 The demo history is picked from real activities on a deployment. To copy some out, with their ids from the admin panel's activity list:
 
 ```

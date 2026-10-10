@@ -122,6 +122,11 @@ CREATE TABLE activities (
     split_group       UUID,
     split_from        BIGINT,
     split_to          BIGINT,
+    -- §4.6: the stretch of time the upload, or this split piece of it, covers as recorded —
+    -- before Private locations clip its ends and before track_edit (0033). What the overlap
+    -- hint compares. NULL until set by ingest, a reprocess or `backfill-recorded-spans`.
+    recorded_started_at TIMESTAMPTZ,
+    recorded_ended_at   TIMESTAMPTZ,
     created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
@@ -131,6 +136,8 @@ CREATE INDEX idx_activities_user_time   ON activities (user_id, started_at DESC)
 CREATE INDEX idx_activities_spatial     ON activities USING GIST (trajectory);
 CREATE INDEX idx_activities_type        ON activities (user_id, activity_type);
 CREATE INDEX idx_activities_split_group ON activities (split_group) WHERE split_group IS NOT NULL;
+CREATE INDEX idx_activities_user_recorded_start
+    ON activities (user_id, (COALESCE(recorded_started_at, started_at)));
 ```
 
 **Removed: the `bbox BOX2D` column and its index.** `CREATE INDEX … USING GIST(bbox)` on a `BOX2D` column fails — PostGIS provides no default GiST operator class for `box2d`. It was also redundant: the GiST index on `trajectory` is a bounding-box index, so `trajectory && ST_TileEnvelope(...)` already gets an index-backed viewport filter.
@@ -991,7 +998,9 @@ The same ride can reach an account by more than one path: recorded on a watch an
 
 **The rule** is time overlap: same user, and the two time ranges overlap by at least 80% of the longer one's duration (`overlapMinShare`). One person is not on two rides at once, so the stretch of time an activity covers is the one thing every copy of it agrees on. Activity type and distance are deliberately not compared: sources disagree on both for the same ride — `"walking"` against `"hiking"`, or a type-less `"unknown"`; distance from a watch, a phone, a smoothed export or a wheel sensor, a few percent apart. Start-time drift between sources (a late GPS lock, trimmed auto-pause) is absorbed by the overlap fraction. Measuring against the *longer* duration keeps back-to-back recordings with a few seconds of clock skew, an auto-detected ten-minute walk inside a two-hour hike and a day hike inside a multi-day log apart. Anything with no duration overlaps nothing. `overlapMatches` is the rule in Go, for tests.
 
-**`POST /v1/activities/overlaps`** (`internal/httpapi/overlaps.go`, SPEC FR-3.7) takes `{"spans": [{"key", "start", "end"}]}`, up to 5,000 (`maxOverlapSpans`), and answers `{"overlaps": [{"key", "activity_id", "name", "activity_type", "started_at", "timezone"}]}`: for each span that overlaps a live activity of the account's, the one it overlaps the most, ties to the earliest. `ingest.Overlaps` does it in one query, the spans `unnest`ed and joined to `activities` on a start-time range, so the lookup stays a range scan on `idx_activities_user_time`: an overlap needs ≥ f·max and ≤ max − |Δstart|, so |Δstart| ≤ (1−f)·max, and since min ≥ f·max the longer one is at most D/f for the span's duration D — together |Δstart| ≤ (1−f)/f · D (`overlapStartSlack`, a quarter of D at f = 0.8). The exact test is applied to that range in SQL. The Android Sync tab sends every row it lists and marks the ones answered (`apps/android/docs/IMPLEMENTATION.md` §5.1).
+**An activity is compared as recorded**, not as shown. `started_at` and `duration_seconds` describe the track after Private locations clip its ends (§4.1 step 3), while another source's copy of the same walk still covers the minutes spent inside one — a short walk from home could lose more than the 20% the rule allows and go unmarked. So each activity also stores `recorded_started_at`/`recorded_ended_at` (§3.3, `migrations/0033_activity_recorded_span.sql`): the first and last point of the parsed upload, narrowed to its split range (§4.7.8) but before the clip and the track edit (`recordedSpan`, `internal/ingest/recorded_span.go`). `Process` sets them on insert and `reprocessActivity` on every edit, split, merge and reprivacy pass; a track hidden entirely by Private locations has them too, so it's still matched. Rows stored before 0033 are filled once by `backfill-recorded-spans` (`ingest.BackfillRecordedSpans`), which re-reads each upload eight at a time and leaves one it can't read to the fallback: until filled, a row is compared by `started_at` and `duration_seconds`.
+
+**`POST /v1/activities/overlaps`** (`internal/httpapi/overlaps.go`, SPEC FR-3.7) takes `{"spans": [{"key", "start", "end"}]}`, up to 5,000 (`maxOverlapSpans`), and answers `{"overlaps": [{"key", "activity_id", "name", "activity_type", "started_at", "timezone"}]}`: for each span that overlaps a live activity of the account's, the one it overlaps the most, ties to the earliest. `ingest.Overlaps` does it in one query, the spans `unnest`ed and joined to `activities` on a range of the recorded start, so the lookup stays a range scan on `idx_activities_user_recorded_start`: an overlap needs ≥ f·max and ≤ max − |Δstart|, so |Δstart| ≤ (1−f)·max, and since min ≥ f·max the longer one is at most D/f for the span's duration D — together |Δstart| ≤ (1−f)/f · D (`overlapStartSlack`, a quarter of D at f = 0.8). The exact test is applied to that range in SQL. The Android Sync tab sends every row it lists and marks the ones answered (`apps/android/docs/IMPLEMENTATION.md` §5.1).
 
 ### 4.7 Activity listing and filtering
 
