@@ -663,10 +663,19 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 
 **Description**: Cycleways and walking/hiking paths drawn as lines of their own, standing out from the streets, where otherwise they are barely visible hairlines or not drawn at all. They are four entries of the Layers menu under Paths — **Trails**, **Tracks**, **Bike paths** and **Shared paths**. Bike paths and Shared paths reach further out than the other two, so a rider can see a whole region's bike network at once and pick which way to head.
 
+| Entry | What it draws (OpenStreetMap tags) | Typically | Drawn as | From zoom | Data from |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| **Bike paths** | `highway=cycleway` | A path built for bikes, separate from the road | Solid blue | 9 | HoldMyTrack's own import (FR-4.16) |
+| **Shared paths** | `highway=path`, `footway` or `bridleway` with `bicycle=designated` | A multi-use trail or greenway bikes share with people on foot | Dashed lighter blue | 9 | HoldMyTrack's own import (FR-4.16) |
+| **Trails** | `highway=path`, `footway` or `bridleway` | A walking, hiking or horse path, any surface | Dashed green | 13 | The base map |
+| **Tracks** | `highway=track` | A dirt, farm or forest road, unpaved and wide enough for a vehicle | Longer-dashed, wider brown, under the trails | 13 | The base map |
+
+A shared path is also a trail, so with both entries on it is drawn twice, the blue over the green. A street with a bike lane painted on it is in none of the four. The monochrome flavors (FR-4.5) draw all four in greys, telling them apart by the dash and width.
+
 **Preconditions**: Active session. The Layers menu is beside the map-mode toggle (FR-4.1–FR-4.3) — in the Android app, a pill under the menu button — and is hidden while the Edit window is open (FR-5.10), like that toggle. The Layers button opens a panel of checkboxes under Paths and Points of interest (FR-15.2). The button shows how many paths and places are picked; a press on the button again or outside the panel, or Escape (Back on Android), closes it. Tracks has an info button beside it that shows, under the entry, what tracks are — dirt, farm and forest roads, unpaved and wide enough for a vehicle — and hides it again on a second press; it doesn't tick the box.
 
 **Behavior**:
-1. Off by default. Trails and Tracks start at zoom 13, the zoom points of interest start at too (FR-15.2), so they appear and disappear together. Bike paths and Shared paths start at zoom 9 (FR-4.16). Bike paths draws cycleways — OSM's `highway=cycleway` — as a solid blue line. Shared paths draws paths, footways and bridleways OSM marks `bicycle=designated` — multi-use trails bikes share with people on foot — as a dashed, lighter blue line. Trails draws paths, footways and bridleways as a dashed green line. Tracks draws OSM's `highway=track` — dirt, farm and forest roads — as a longer-dashed, slightly wider brown line, under the trails. Each is on its own, and all widen as the map zooms in. The monochrome flavors (FR-4.5) draw all four in greys, telling them apart by the dash and width.
+1. Off by default. Each entry draws what the table above gives, from the zoom it gives, on its own, and every line widens as the map zooms in. Trails and Tracks start where points of interest do (FR-15.2), so they appear and disappear together.
 2. The choice is kept by this browser (or, in the Android app, this phone) only, not on the account, and applies again on the next visit. A browser that had the former single web toggle on, or a phone that had the former Trails & bike paths toggle on, starts with Trails, Tracks and Bike paths on. One whose saved choice predates Tracks shows tracks whenever it shows trails, and one whose saved choice predates Shared paths starts with it off.
 3. It is independent of the map mode: it works over Normal, Fog and Heatmap alike, and survives a theme change (FR-4.12). Paths are drawn over Fog's veil and Heatmap's heat at full strength, so a path not yet ridden shows through the veil, and under the activity tracks.
 4. An export (FR-4.10) draws each kind of path when the map shows it and leaves it out when it doesn't.
