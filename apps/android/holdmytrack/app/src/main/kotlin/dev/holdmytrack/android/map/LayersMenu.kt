@@ -16,7 +16,7 @@ import dev.holdmytrack.android.R
 
 /**
  * The Layers button on the map's rail and the menu it opens — the web's `OverlaysMenu`
- * (`docs/SPEC.md` FR-4.13): Paths — Trails, Tracks and Bike paths — and Points of interest, one
+ * (`docs/SPEC.md` FR-4.13): Paths — Bike paths and Shared paths — and Points of interest, one
  * entry per [MapSpots.Category], each picked over any mode.
  *
  * The button is filled like the active map mode while picks show, with a badge on its corner
@@ -114,8 +114,6 @@ class LayersMenu(
                 }
             }
         }
-        bind(R.id.layers_trails, current.trails) { p, on -> p.copy(trails = on) }
-        bind(R.id.layers_tracks, current.tracks) { p, on -> p.copy(tracks = on) }
         bind(R.id.layers_bike_paths, current.bikePaths) { p, on -> p.copy(bikePaths = on) }
         bind(R.id.layers_shared_paths, current.sharedPaths) { p, on -> p.copy(sharedPaths = on) }
 
@@ -131,15 +129,7 @@ class LayersMenu(
             }
         }
 
-        // The Tracks explanation: shown and hidden again by its info button, without ticking the
-        // box; it closes with the menu, since each opening inflates the menu afresh.
-        val info = content.findViewById<TextView>(R.id.layers_tracks_info)
-        content.findViewById<View>(R.id.layers_tracks_info_button).setOnClickListener {
-            info.isVisible = !info.isVisible
-        }
-
-        // A fixed width, the web panel's 14rem, so the Tracks explanation wraps inside it rather
-        // than widening the menu when it opens.
+        // A fixed width, the web panel's 14rem.
         val width = (MENU_WIDTH_DP * res.displayMetrics.density).toInt()
         val window = PopupWindow(content, width, ViewGroup.LayoutParams.WRAP_CONTENT, true)
         window.elevation = res.getDimension(R.dimen.hmt_space_8)

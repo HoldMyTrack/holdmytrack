@@ -113,10 +113,6 @@
     <string name="layers_master_empty">Pick paths or places first</string>
     <string name="layers_satellite">Satellite</string>
     <string name="layers_paths">Paths</string>
-    <string name="layers_trails">Trails</string>
-    <string name="layers_tracks">Tracks</string>
-    <string name="layers_tracks_info">Dirt, farm and forest roads: unpaved tracks wide enough for a vehicle.</string>
-    <string name="layers_tracks_info_label">What are tracks?</string>
     <string name="layers_bike_paths">Bike paths</string>
     <string name="layers_shared_paths">Shared paths</string>
     <string name="layers_places">Points of interest</string>

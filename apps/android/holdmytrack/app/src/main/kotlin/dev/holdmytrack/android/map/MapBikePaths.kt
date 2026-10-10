@@ -33,8 +33,8 @@ object MapBikePaths {
     const val SHARED_LAYER_ID = "bike-paths-shared"
 
     /** Must match `PATH_COLORS` in apps/web/src/map/style.ts, for the light and dark flavors. */
-    private const val CYCLEWAY_LIGHT = "#1f7fa8"
-    private const val SHARED_LIGHT = "#4ba3c9"
+    private const val CYCLEWAY_LIGHT = "#0b5a85"
+    private const val SHARED_LIGHT = "#1a74a8"
     private const val CYCLEWAY_DARK = "#5cbfe0"
     private const val SHARED_DARK = "#93d6ec"
 
@@ -50,7 +50,7 @@ object MapBikePaths {
                 PropertyFactory.lineColor(if (night) SHARED_DARK else SHARED_LIGHT),
                 // Dashed like a trail, since people walk it too; a cycleway is solid.
                 PropertyFactory.lineDasharray(arrayOf(2f, 1f)),
-                PropertyFactory.lineWidth(width(0.8f, 1f, 3.5f)),
+                PropertyFactory.lineWidth(width(1.5f, 2f, 4.5f)),
             ).apply {
                 setFilter(Expression.eq(Expression.get("kind"), Expression.literal("shared")))
                 setMinZoom(MIN_ZOOM)
@@ -62,7 +62,7 @@ object MapBikePaths {
                 PropertyFactory.lineColor(if (night) CYCLEWAY_DARK else CYCLEWAY_LIGHT),
                 PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                 PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
-                PropertyFactory.lineWidth(width(1f, 1.4f, 4f)),
+                PropertyFactory.lineWidth(width(1.8f, 2.4f, 5.5f)),
             ).apply {
                 setFilter(Expression.eq(Expression.get("kind"), Expression.literal("cycleway")))
                 setMinZoom(MIN_ZOOM)
