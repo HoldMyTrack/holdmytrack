@@ -11,7 +11,7 @@ import { ensureFogLayer } from './fog';
 import { ensureHeatmapLayer } from './heatmap';
 import { setMapMode, type MapMode } from './mapMode';
 import { loadOverlays, saveOverlays, type Overlays } from './overlays';
-import { setPathsVisible } from './paths';
+import { raisePathLayers, setPathsVisible } from './paths';
 import { usePhotoMarkers, type PhotoMarkerItem, type PhotoMarkerOverlay } from './photos';
 import { setSatelliteVisible } from './satellite';
 import { ensureSpotsLayer, setSpotClickHandler, setSpotsCaptured, setSpotsVisible, type Spot, type SpotCategory } from './spots';
@@ -1330,7 +1330,9 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
       // Satellite imagery reads dark, so it takes the dark flavors' veil (style.ts's isDarkBase).
       ensureFogLayer(instance, beforeId, isDarkBase(flavor, satellite));
       ensureHeatmapLayer(instance, beforeId, isDarkBase(flavor, satellite));
-      // Bike and shared paths over the veil and the heat, under the tracks (bikePaths.ts).
+      // Trails and tracks, then bike and shared paths, over the veil and the heat and under the
+      // activity tracks (paths.ts, bikePaths.ts).
+      raisePathLayers(instance, beforeId);
       ensureBikePathLayers(instance, beforeId, flavor);
       ensureTrackLayer(instance, beforeId, activityQuery);
       // A style swap brings the tracks source back with no feature-state, the focused track's

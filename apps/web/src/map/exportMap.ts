@@ -9,6 +9,7 @@ import { customOutputSize } from './exportPresets';
 import { ensureFogLayer } from './fog';
 import { ensureBikePathLayers, setBikePathsVisible } from './bikePaths';
 import { ensureHeatmapLayer } from './heatmap';
+import { raisePathLayers } from './paths';
 import { labelInsertionPoint } from './layers';
 import { setMapMode, type MapMode } from './mapMode';
 import { ATTRIBUTION_TEXT, buildStyle, isDarkBase, type Flavor, type PathOverlays } from './style';
@@ -347,6 +348,7 @@ async function renderOffscreen(
     const beforeId = labelInsertionPoint(instance);
     ensureFogLayer(instance, beforeId, isDarkBase(state.flavor, state.satellite));
     ensureHeatmapLayer(instance, beforeId, isDarkBase(state.flavor, state.satellite));
+    raisePathLayers(instance, beforeId);
     ensureBikePathLayers(instance, beforeId, state.flavor);
     setBikePathsVisible(instance, state.paths);
     ensureTrackLayer(instance, beforeId, state.activityQuery);

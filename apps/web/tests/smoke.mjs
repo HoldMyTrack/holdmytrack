@@ -272,6 +272,23 @@ describe('basemap foundation', () => {
     await styleLoaded();
     assert.deepEqual(await visibility(ALL), ALL.map(() => 'visible'), 'remembered across reload');
 
+    // Every path paints over Fog's veil and under the activity tracks (FR-4.13).
+    const order = await page.evaluate(() => window.__holdmytrack.getStyle().layers.map((layer) => layer.id));
+    const fogAt = order.indexOf('fog-raster');
+    const tracksAt = order.indexOf('tracks-casing');
+    for (const id of ALL) {
+      const at = order.indexOf(id);
+      assert.ok(at > fogAt && at < tracksAt, `${id} between the veil and the tracks (${fogAt} < ${at} < ${tracksAt})`);
+    }
+    // What a rider sees deciding which way to head: a region's bike paths through the veil.
+    await page.getByRole('button', { name: 'Fog', exact: true }).click();
+    await page.evaluate(() => window.__holdmytrack.jumpTo({ center: [-81.69, 41.45], zoom: 10 }));
+    await styleLoaded();
+    await page.waitForFunction(() => window.__holdmytrack.areTilesLoaded(), undefined, { timeout: 30_000 });
+    await page.screenshot({ path: new URL('cleveland-bike-paths-fog.png', SHOTS).pathname });
+    await page.getByRole('button', { name: 'Normal', exact: true }).click();
+    await page.evaluate(() => window.__holdmytrack.jumpTo({ center: [-83.02, 39.99], zoom: 14 }));
+
     // The checkbox on the Layers button hides every pick at once and keeps them.
     const master = page.locator('#overlay-master');
     assert.equal(await master.isChecked(), true, 'checkbox on while picks show');
