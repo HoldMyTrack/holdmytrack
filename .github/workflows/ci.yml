@@ -40,7 +40,9 @@ jobs:
         with:
           go-version-file: services/server/go.mod
           cache-dependency-path: services/server/go.sum
-      - run: go test -coverprofile=coverage.out ./...
+      # One package at a time: the database tests share one database, and the worker's claim
+      # takes any runnable job in it, another package's included (docs/DEVELOPMENT.md).
+      - run: go test -p 1 -coverprofile=coverage.out ./...
       # Coverage of the Go unit tests only: the Playwright suites exercise far more of the
       # server but aren't instrumented. Informational (codecov.yml), never a merge gate, and
       # an upload failure doesn't fail the build.
