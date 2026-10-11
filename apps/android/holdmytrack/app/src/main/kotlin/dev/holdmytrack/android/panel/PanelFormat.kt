@@ -6,6 +6,7 @@ import dev.holdmytrack.android.net.Activity
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.recording.RecordingFormat
 import java.text.NumberFormat
+import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -25,6 +26,23 @@ object PanelFormat {
     private const val EM_DASH = "—"
 
     private fun locale(res: Resources): Locale = res.configuration.locales[0] ?: Locale.getDefault()
+
+    /**
+     * A moment on this phone, in its time zone: "Oct 11, 2026, 9:39 AM" — the app's language,
+     * written the way the account's Country writes a date and a time, as its units follow it
+     * (English with Germany: "11 Oct 2026, 09:39"). The language's own way until a Country is
+     * saved.
+     */
+    fun phoneDateTime(res: Resources, at: Instant): String {
+        val language = locale(res)
+        val written = Session.country.takeIf { it.isNotEmpty() }
+            ?.let { runCatching { Locale.Builder().setLocale(language).setRegion(it).build() }.getOrNull() }
+            ?: language
+        return DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
+            .withLocale(written)
+            .withZone(ZoneId.systemDefault())
+            .format(at)
+    }
 
     /** A count, grouped in the app's language, as the web's `toLocaleString`. */
     fun count(res: Resources, n: Int): String = NumberFormat.getIntegerInstance(locale(res)).format(n)

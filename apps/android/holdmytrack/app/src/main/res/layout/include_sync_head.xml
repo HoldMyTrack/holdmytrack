@@ -56,6 +56,18 @@
         android:visibility="gone"
         tools:text="Health Connect sessions from the last 3 months. Older ones stay in Health Connect." />
 
+    <!-- Health Connect switched off, or not set up yet: Settings › Sync (SyncActivity). -->
+    <Button
+        android:id="@+id/sync_source_settings"
+        style="@style/Widget.HoldMyTrack.Button.Link"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/hmt_space_16"
+        android:layout_marginBottom="@dimen/hmt_space_8"
+        android:minHeight="48dp"
+        android:text="@string/sync_open_sources"
+        android:visibility="gone" />
+
     <LinearLayout
         android:id="@+id/sync_filters"
         android:layout_width="match_parent"

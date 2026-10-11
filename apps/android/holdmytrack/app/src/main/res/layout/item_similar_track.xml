@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One track in the Similar tracks dialog (dialog_similar_tracks): its kind's tile, its name or
+     day and time over "time · distance · where it is", and Show — the whole row one tap target. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center_vertical"
+    android:minHeight="56dp"
+    android:orientation="horizontal"
+    android:paddingTop="@dimen/hmt_space_6"
+    android:paddingBottom="@dimen/hmt_space_6">
+
+    <ImageView
+        android:id="@+id/similar_icon"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginEnd="@dimen/hmt_space_12"
+        android:background="@drawable/bg_type_tile"
+        android:importantForAccessibility="no"
+        android:padding="9dp"
+        android:src="@drawable/ic_route"
+        app:tint="@color/hmt_ink_secondary" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/similar_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.HoldMyTrack.TitleSmall"
+            tools:text="Morning walk" />
+
+        <TextView
+            android:id="@+id/similar_meta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/hmt_space_2"
+            android:textColor="@color/hmt_ink_meta"
+            android:textSize="@dimen/hmt_text_xs"
+            tools:text="Oct 11, 2026, 7:00 AM · 4.0 km · Recorded on this phone" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/hmt_space_8"
+        android:importantForAccessibility="no"
+        android:text="@string/similar_show"
+        android:textColor="@color/hmt_accent_strong"
+        android:textSize="@dimen/hmt_text_md"
+        android:textStyle="bold" />
+</LinearLayout>

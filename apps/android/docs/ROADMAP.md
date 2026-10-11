@@ -108,3 +108,14 @@ Features the web has that the app doesn't yet. The server side of each is built;
   - A Split tool in the Track tab, its two-color preview, and the confirm for a part left inside a Private location (`apps/android/docs/SPEC.md` FR-2.7 item 12). Merge waits for the web's (`docs/ROADMAP.md`). Checked on the emulator against a local stack, in English and Russian: a walk ending inside a Private location split at a point inside it, the confirm, Split anyway, and two rows, one of them Private.
 - [x] **The Private badge** (`docs/SPEC.md` FR-5.1)
   - A lock-and-"Private" badge in place of distance and duration, and its explanation on the selected activity's card in place of its stats (`apps/android/docs/SPEC.md` FR-2.7 item 2). Checked in the same run.
+
+## Phase 9: Sync rework
+
+Setting a source up moves to a Settings screen of its own, Health Connect is read when the user asks, and the Sync tab says which waiting rows are the same journey as each other. Each item below is one pull request, each working on its own.
+
+- [ ] **Similar tracks**
+  - An ⓘ on a row that covers the same time as another row or an activity the account has, opening Similar tracks: the rows, picked out on the map when tapped, and the activity, opened on the Map tab; the bar says when ticked rows are similar (`apps/android/docs/SPEC.md` FR-3.2 step 5, FR-3.4 step 2; `docs/SPEC.md` FR-3.7). The server's 80% rule ported to Kotlin and tested against the server's cases.
+- [ ] **Settings › Sync**
+  - The sources on a screen of their own, reached from You and from the Sync tab: Health Connect with an on/off switch, off for everyone until switched on, and its permissions as one checklist; Recorded on this phone, always on. The Health Connect card leaves the Sync tab.
+- [ ] **Load**
+  - Health Connect read only when Load is tapped, and once by itself after it's switched on, Load and Sync side by side at the top of the Sync tab, each over its status; the list kept on the phone across restarts with when it was last checked, and a restored row's route read again when it's sent. Recordings listed straight away, as now.

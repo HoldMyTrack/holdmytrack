@@ -82,14 +82,24 @@ object HealthConnect {
      * on screen — the routes one *only* changes that way, since the user grants it in another
      * app's settings and comes back.
      */
-    suspend fun readiness(context: Context): Readiness {
+    suspend fun readiness(context: Context): Readiness = access(context).readiness
+
+    /** Where Health Connect stands, and which of [READ_EXERCISE], [READ_EXERCISE_ROUTES] and
+     *  [READ_HISTORY] it has granted — one read, for Settings › Sync's checklist. */
+    class Access(val readiness: Readiness, val granted: Set<String>)
+
+    suspend fun access(context: Context): Access {
         when (HealthConnectClient.getSdkStatus(context)) {
-            HealthConnectClient.SDK_UNAVAILABLE -> return Readiness.UNAVAILABLE
-            HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> return Readiness.UPDATE_REQUIRED
+            HealthConnectClient.SDK_UNAVAILABLE -> return Access(Readiness.UNAVAILABLE, emptySet())
+            HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> return Access(Readiness.UPDATE_REQUIRED, emptySet())
         }
-        val client = clientOrNull(context) ?: return Readiness.UNAVAILABLE
+        val client = clientOrNull(context) ?: return Access(Readiness.UNAVAILABLE, emptySet())
         val granted = runCatching { client.permissionController.getGrantedPermissions() }
-            .getOrElse { return Readiness.NEEDS_EXERCISE_PERMISSION }
+            .getOrElse { return Access(Readiness.NEEDS_EXERCISE_PERMISSION, emptySet()) }
+        return Access(readinessOf(granted), granted)
+    }
+
+    private fun readinessOf(granted: Set<String>): Readiness {
         return when {
             READ_EXERCISE !in granted -> Readiness.NEEDS_EXERCISE_PERMISSION
             READ_EXERCISE_ROUTES !in granted -> Readiness.NEEDS_ROUTES_PERMISSION

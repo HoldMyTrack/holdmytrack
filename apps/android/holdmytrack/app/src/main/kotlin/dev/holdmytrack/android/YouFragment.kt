@@ -73,6 +73,9 @@ class YouFragment : Fragment(R.layout.fragment_you) {
         findViewById<View>(R.id.you_stats).setOnClickListener {
             startActivity(Intent(context, ProfileActivity::class.java))
         }
+        findViewById<View>(R.id.you_sync).setOnClickListener {
+            startActivity(Intent(context, SyncActivity::class.java))
+        }
         findViewById<View>(R.id.you_privacy).setOnClickListener {
             startActivity(Intent(context, PrivacyActivity::class.java))
         }

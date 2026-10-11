@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- SyncActivity: Health Connect's rationale and setup (include_health_connect_card) on its own,
-     and the way to the Sync tab, where what's on the phone is chosen and sent. -->
+<!-- Settings › Sync (SyncActivity): where journeys come from. Health Connect, with its switch and
+     its permissions (include_health_connect_card), and Recorded on this phone, which is always
+     on; then the way to the Sync tab, where what's on the phone is chosen and sent. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -15,6 +16,13 @@
         android:padding="@dimen/hmt_space_16"
         android:showDividers="middle">
 
+        <TextView
+            android:id="@+id/sync_sources_intro"
+            style="@style/Widget.HoldMyTrack.Hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/sync_sources_intro" />
+
         <!-- Why nothing here can sync: signed out, email unconfirmed, or the read-only demo
              account (SyncActivity.render). -->
         <TextView
@@ -25,6 +33,63 @@
             android:visibility="gone" />
 
         <include layout="@layout/include_health_connect_card" />
+
+        <!-- Recorded on this phone: the app's own, so always on, with no switch; its icon green
+             once recording's permissions are granted (SyncActivity.renderRecorded). -->
+        <LinearLayout
+            android:id="@+id/sync_recorded_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/Widget.HoldMyTrack.SectionHeading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/hmt_space_8"
+                android:text="@string/sync_origin_recorded" />
+
+            <LinearLayout
+                style="@style/Widget.HoldMyTrack.CardRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_section_card"
+                android:minHeight="68dp">
+
+                <ImageView
+                    android:id="@+id/sync_recorded_icon"
+                    style="@style/Widget.HoldMyTrack.IconTile"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_record_start" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/sync_recorded_title"
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowTitle" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/hmt_space_2"
+                        android:text="@string/sync_recorded_sub"
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowSub" />
+
+                    <TextView
+                        android:id="@+id/sync_recorded_status"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/hmt_space_4"
+                        android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowSub" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
 
         <Button
             android:id="@+id/sync_open_list"

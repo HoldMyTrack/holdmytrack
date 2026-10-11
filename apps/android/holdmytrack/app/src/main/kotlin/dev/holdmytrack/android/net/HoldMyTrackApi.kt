@@ -615,8 +615,9 @@ object HoldMyTrackApi {
 
     /**
      * `POST /v1/activities/overlaps` (root `docs/IMPLEMENTATION.md` §4.6): for each of [spans],
-     * keyed by the caller, the live activity it overlaps, if any — the Sync tab's "Overlaps
-     * Morning walk" hint (`docs/SPEC.md` FR-3.7). Keys with no overlap aren't in the map.
+     * keyed by the caller, the live activity it overlaps, if any — the Already on your map half
+     * of the Sync tab's similar tracks (`docs/SPEC.md` FR-3.7). Keys with no overlap aren't in
+     * the map.
      */
     suspend fun activityOverlaps(spans: List<OverlapSpan>): Map<String, ActivityOverlap> =
         withContext(Dispatchers.IO) {
@@ -637,7 +638,9 @@ object HoldMyTrackApi {
                 for (i in 0 until rows.length()) {
                     val row = rows.getJSONObject(i)
                     found[row.getString("key")] = ActivityOverlap(
+                        id = row.getString("activity_id"),
                         name = row.optString("name"),
+                        activityType = row.optString("activity_type"),
                         startedAt = row.getString("started_at"),
                         timezone = if (row.isNull("timezone")) null else row.optString("timezone"),
                     )
@@ -1699,6 +1702,7 @@ object HoldMyTrackApi {
 /** One time span asked about in [HoldMyTrackApi.activityOverlaps], under the caller's [key]. */
 data class OverlapSpan(val key: String, val start: Instant, val end: Instant)
 
-/** The live activity a span overlaps: its [name] (empty when it has none), and its start in the
- *  zone it was recorded in, which titles it when it has no name. */
-data class ActivityOverlap(val name: String, val startedAt: String, val timezone: String?)
+/** The live activity a span overlaps: its [id], to open it on the map, its [name] (empty when it
+ *  has none) and type, and its start in the zone it was recorded in, which titles it when it has
+ *  no name and gives the day the map opens on. */
+data class ActivityOverlap(val id: String, val name: String, val activityType: String, val startedAt: String, val timezone: String?)
