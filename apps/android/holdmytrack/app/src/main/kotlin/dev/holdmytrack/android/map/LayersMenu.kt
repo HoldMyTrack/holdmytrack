@@ -1,6 +1,7 @@
 package dev.holdmytrack.android.map
 
 import android.annotation.SuppressLint
+import android.content.res.Configuration
 import android.os.SystemClock
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -116,6 +117,20 @@ class LayersMenu(
         }
         bind(R.id.layers_bike_paths, current.bikePaths) { p, on -> p.copy(bikePaths = on) }
         bind(R.id.layers_shared_paths, current.sharedPaths) { p, on -> p.copy(sharedPaths = on) }
+
+        // The legend: each bike entry's line at its end, and the trails and tracks the map always
+        // draws, in the flavor's colors.
+        val night = (res.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        val density = res.displayMetrics.density
+        fun TextView.swatch(color: String, dash: FloatArray?, atEnd: Boolean) {
+            val drawable = PathSwatch(color, dash, density)
+            if (atEnd) setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, drawable, null)
+            else setCompoundDrawablesRelativeWithIntrinsicBounds(drawable, null, null, null)
+        }
+        content.findViewById<TextView>(R.id.layers_bike_paths).swatch(MapBikePaths.cyclewayColor(night), null, atEnd = true)
+        content.findViewById<TextView>(R.id.layers_shared_paths).swatch(MapBikePaths.sharedColor(night), null, atEnd = true)
+        content.findViewById<TextView>(R.id.layers_key_trails).swatch(MapPaths.trailColor(night), MapPaths.TRAIL_DASH, atEnd = false)
+        content.findViewById<TextView>(R.id.layers_key_tracks).swatch(MapPaths.trackColor(night), MapPaths.TRACK_DASH, atEnd = false)
 
         for ((category, id) in SPOT_BOXES) {
             content.findViewById<CheckBox>(id).apply {

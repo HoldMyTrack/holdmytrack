@@ -20,6 +20,18 @@ object MapPaths {
     /** Both hidden: what's drawn while Show layers is off ([MapLayersSwitch]). */
     val NONE = Paths(bikePaths = false, sharedPaths = false)
 
+    /** The trail and track colors the served style draws with, for the Layers menu's legend: must
+     *  match `PATH_COLORS` in apps/web/src/map/style.ts, as must their dashes, `pathDash`. */
+    private const val TRAIL_LIGHT = "#4f7a3a"
+    private const val TRAIL_DARK = "#8fbf6a"
+    private const val TRACK_LIGHT = "#8a5a2b"
+    private const val TRACK_DARK = "#c9955e"
+    val TRAIL_DASH = floatArrayOf(2f, 1f)
+    val TRACK_DASH = floatArrayOf(3f, 1.5f)
+
+    fun trailColor(night: Boolean) = if (night) TRAIL_DARK else TRAIL_LIGHT
+    fun trackColor(night: Boolean) = if (night) TRACK_DARK else TRACK_LIGHT
+
     /** Must match `PATH_LAYER_IDS` in apps/web/src/map/style.ts, which builds the served style. */
     private val PATH_LAYER_IDS = listOf("paths_trail", "paths_track", "paths_bridges_trail", "paths_bridges_track")
 

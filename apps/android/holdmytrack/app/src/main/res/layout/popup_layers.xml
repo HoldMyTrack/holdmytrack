@@ -58,6 +58,48 @@
             android:layout_height="wrap_content"
             android:text="@string/layers_shared_paths" />
 
+        <!-- Trails and tracks have no entry: they're part of the map, and this says so. -->
+        <TextView
+            android:id="@+id/layers_always"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="@dimen/hmt_space_2"
+            android:paddingTop="@dimen/hmt_space_4"
+            android:paddingEnd="@dimen/hmt_space_2"
+            android:text="@string/layers_always_shown"
+            android:textColor="@color/hmt_ink_muted"
+            android:textSize="@dimen/hmt_text_sm" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingStart="@dimen/hmt_space_2"
+            android:paddingTop="@dimen/hmt_space_4"
+            android:paddingEnd="@dimen/hmt_space_2">
+
+            <TextView
+                android:id="@+id/layers_key_trails"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="@dimen/hmt_space_16"
+                android:drawablePadding="@dimen/hmt_space_4"
+                android:gravity="center_vertical"
+                android:text="@string/layers_trails"
+                android:textColor="@color/hmt_ink_muted"
+                android:textSize="@dimen/hmt_text_sm" />
+
+            <TextView
+                android:id="@+id/layers_key_tracks"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:drawablePadding="@dimen/hmt_space_4"
+                android:gravity="center_vertical"
+                android:text="@string/layers_dirt_tracks"
+                android:textColor="@color/hmt_ink_muted"
+                android:textSize="@dimen/hmt_text_sm" />
+        </LinearLayout>
+
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"

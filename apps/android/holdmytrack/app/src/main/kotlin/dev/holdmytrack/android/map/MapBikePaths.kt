@@ -34,9 +34,9 @@ object MapBikePaths {
 
     /** Must match `PATH_COLORS` in apps/web/src/map/style.ts, for the light and dark flavors. */
     private const val CYCLEWAY_LIGHT = "#0b5a85"
-    private const val SHARED_LIGHT = "#1a74a8"
+    private const val SHARED_LIGHT = "#0b7f74"
     private const val CYCLEWAY_DARK = "#5cbfe0"
-    private const val SHARED_DARK = "#93d6ec"
+    private const val SHARED_DARK = "#4fd6c2"
 
     /**
      * Adds the source and both layers below [beforeId], hidden, if they aren't already there.
@@ -48,8 +48,9 @@ object MapBikePaths {
             insert(style, LineLayer(SHARED_LAYER_ID, SOURCE_ID).withSourceLayer(SOURCE_LAYER).withProperties(
                 PropertyFactory.visibility(Property.NONE),
                 PropertyFactory.lineColor(if (night) SHARED_DARK else SHARED_LIGHT),
-                // Dashed like a trail, since people walk it too; a cycleway is solid.
-                PropertyFactory.lineDasharray(arrayOf(2f, 1f)),
+                // Told from a cycleway by its teal; the app has no monochrome flavor to dash it on.
+                PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
                 PropertyFactory.lineWidth(width(1.5f, 2f, 4.5f)),
             ).apply {
                 setFilter(Expression.eq(Expression.get("kind"), Expression.literal("shared")))
@@ -69,6 +70,12 @@ object MapBikePaths {
             }, beforeId)
         }
     }
+
+    /** The cycleway's color on the light or, with [night], the dark flavor: the legend's too. */
+    fun cyclewayColor(night: Boolean) = if (night) CYCLEWAY_DARK else CYCLEWAY_LIGHT
+
+    /** The shared path's, likewise. */
+    fun sharedColor(night: Boolean) = if (night) SHARED_DARK else SHARED_LIGHT
 
     /** Shows or hides each kind; a no-op before [add]. */
     fun apply(style: Style, bikePaths: Boolean, sharedPaths: Boolean) {
