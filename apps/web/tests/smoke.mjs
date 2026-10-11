@@ -223,11 +223,12 @@ describe('basemap foundation', () => {
     assert.ok(true);
   });
 
-  it('8. Trails and tracks always drawn from zoom 12; Layers menu: bike and shared paths off by default, each shown on its own, all hidden by the checkbox, remembered across reload', async () => {
+  it('8. Trails and tracks always drawn from zoom 12; Layers menu: bike paths, shared paths and mountain-bike trails off by default, each shown on its own, all hidden by the checkbox, remembered across reload', async () => {
     const BASE_PATHS = ['paths_trail', 'paths_bridges_trail', 'paths_track', 'paths_bridges_track'];
     const BIKES = ['bike-paths-cycleway'];
     const SHARED = ['bike-paths-shared'];
-    const PICKS = [...BIKES, ...SHARED];
+    const MTB = ['bike-paths-mtb'];
+    const PICKS = [...BIKES, ...SHARED, ...MTB];
     const visibility = (ids) =>
       page.evaluate((ids) => ids.map((id) => window.__holdmytrack.getLayoutProperty(id, 'visibility')), ids);
     const minzoom = (ids) => page.evaluate((ids) => ids.map((id) => window.__holdmytrack.getLayer(id).minzoom), ids);
@@ -242,17 +243,20 @@ describe('basemap foundation', () => {
     assert.deepEqual(await visibility(BASE_PATHS), BASE_PATHS.map(() => undefined), 'trails and tracks shown without a pick');
     assert.deepEqual(await minzoom(BASE_PATHS), BASE_PATHS.map(() => 12), 'trails and tracks from zoom 12');
     assert.equal(await page.locator('#overlay-trails, #overlay-tracks').count(), 0, 'no Trails or Tracks entries');
-    assert.deepEqual(await visibility(PICKS), PICKS.map(() => 'none'), 'bike and shared paths hidden until ticked');
-    assert.deepEqual(await minzoom(PICKS), PICKS.map(() => 9), 'bike and shared paths from zoom 9');
+    assert.deepEqual(await visibility(PICKS), PICKS.map(() => 'none'), 'bike-path layers hidden until ticked');
+    assert.deepEqual(await minzoom(PICKS), PICKS.map(() => 9), 'bike-path layers from zoom 9');
 
     // The Olentangy Trail, Columbus: trails in the extract at z14.
     await page.evaluate(() => window.__holdmytrack.jumpTo({ center: [-83.02, 39.99], zoom: 14 }));
     await openMenu();
     await page.locator('#overlay-bike-paths').check();
     assert.deepEqual(await visibility(BIKES), BIKES.map(() => 'visible'), 'bike paths shown once ticked');
-    assert.deepEqual(await visibility(SHARED), SHARED.map(() => 'none'), 'shared paths still hidden');
+    assert.deepEqual(await visibility([...SHARED, ...MTB]), [...SHARED, ...MTB].map(() => 'none'), 'shared paths and mountain-bike trails still hidden');
     await page.locator('#overlay-shared-paths').check();
     assert.deepEqual(await visibility(SHARED), SHARED.map(() => 'visible'), 'shared paths shown once ticked');
+    assert.deepEqual(await visibility(MTB), MTB.map(() => 'none'), 'mountain-bike trails their own entry');
+    await page.locator('#overlay-mtb-trails').check();
+    assert.deepEqual(await visibility(MTB), MTB.map(() => 'visible'), 'mountain-bike trails shown once ticked');
     await styleLoaded();
     await page.waitForFunction(() => window.__holdmytrack.areTilesLoaded(), undefined, { timeout: 30_000 });
     const rendered = await page.evaluate(() => window.__holdmytrack.queryRenderedFeatures({ layers: ['paths_trail'] }).length);
@@ -281,8 +285,13 @@ describe('basemap foundation', () => {
     // What a rider sees deciding which way to head: a region's bike paths through the veil, and
     // a closer look with the trails and tracks.
     await page.getByRole('button', { name: 'Fog', exact: true }).click();
-    for (const [zoom, name] of [[10, 'cleveland-bike-paths-fog.png'], [13, 'cleveland-paths-fog-z13.png']]) {
-      await page.evaluate((zoom) => window.__holdmytrack.jumpTo({ center: [-81.69, 41.45], zoom }), zoom);
+    // The East Rim singletrack beside the paved Bike and Hike Trail, in Boston Heights.
+    for (const [center, zoom, name] of [
+      [[-81.69, 41.45], 10, 'cleveland-bike-paths-fog.png'],
+      [[-81.69, 41.45], 13, 'cleveland-paths-fog-z13.png'],
+      [[-81.523, 41.259], 13.5, 'east-rim-paths-fog.png'],
+    ]) {
+      await page.evaluate(([center, zoom]) => window.__holdmytrack.jumpTo({ center, zoom }), [center, zoom]);
       await styleLoaded();
       await page.waitForFunction(() => window.__holdmytrack.areTilesLoaded(), undefined, { timeout: 30_000 });
       await page.screenshot({ path: new URL(name, SHOTS).pathname });
@@ -299,7 +308,7 @@ describe('basemap foundation', () => {
     assert.deepEqual(await visibility(BASE_PATHS), BASE_PATHS.map(() => undefined), 'trails and tracks stay');
     await openMenu();
     assert.equal(await page.locator('#overlay-bike-paths').isChecked(), true, 'picks kept while hidden');
-    assert.equal(await menu.locator('.overlays-menu__count--off').textContent(), '2', 'count greyed, not cleared');
+    assert.equal(await menu.locator('.overlays-menu__count--off').textContent(), '3', 'count greyed, not cleared');
     await page.reload();
     await styleLoaded();
     assert.equal(await master.isChecked(), false, 'checkbox remembered across reload');
@@ -317,11 +326,12 @@ describe('basemap foundation', () => {
 
     await page.locator('#overlay-bike-paths').uncheck();
     await page.locator('#overlay-shared-paths').uncheck();
+    await page.locator('#overlay-mtb-trails').uncheck();
     assert.deepEqual(await visibility(PICKS), PICKS.map(() => 'none'), 'hidden again once unticked');
     assert.equal(await master.isDisabled(), true, 'nothing picked: nothing for the checkbox to show');
     assert.equal(await page.locator('#overlay-all, #overlay-spots-all').count(), 0, 'no All checkboxes');
     // The legend: each bike entry's line, and the trails and tracks the map always draws.
-    assert.equal(await menu.locator('.overlays-menu__item .overlays-menu__swatch').count(), 2, 'a line sample on each bike entry');
+    assert.equal(await menu.locator('.overlays-menu__item .overlays-menu__swatch').count(), 3, 'a line sample on each bike entry');
     assert.ok(await page.getByTestId('overlays-always').isVisible(), 'the always-shown note');
     assert.equal(await page.getByTestId('overlays-always').locator('.overlays-menu__swatch').count(), 2, 'trails and tracks in the note');
     await page.screenshot({ path: new URL('layers-menu.png', SHOTS).pathname });

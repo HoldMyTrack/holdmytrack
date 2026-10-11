@@ -173,7 +173,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // as a "mode" (IMPLEMENTATION.md §4.2.2).
   const [mapMode, setMapModeState] = useState<MapMode>('normal');
   // The Satellite button (BasemapToggle.tsx) and the Layers menu (OverlaysMenu.tsx): Bike
-  // paths, Shared paths and each Spots category, over any mode, drawn while the Layers checkbox is
+  // paths, Shared paths, Mountain bike trails and each Spots category, over any mode, drawn while the Layers checkbox is
   // on; remembered per browser (overlays.ts).
   const [overlays, setOverlays] = useState<Overlays>(loadOverlays);
   const changeOverlays = useCallback((next: Overlays) => {
@@ -184,8 +184,9 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     () => ({
       bikePaths: overlays.enabled && overlays.bikePaths,
       sharedPaths: overlays.enabled && overlays.sharedPaths,
+      mtbTrails: overlays.enabled && overlays.mtbTrails,
     }),
-    [overlays.enabled, overlays.bikePaths, overlays.sharedPaths],
+    [overlays.enabled, overlays.bikePaths, overlays.sharedPaths, overlays.mtbTrails],
   );
   // Satellite imagery (FR-4.14): only when the deployment configures some, whatever was saved.
   const satelliteAvailable = satelliteSource() !== null;

@@ -661,27 +661,28 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 
 ### FR-4.13 Trails and bike paths
 
-**Description**: Cycleways and walking/hiking paths drawn as lines of their own, standing out from the streets, where otherwise they are barely visible hairlines or not drawn at all. Trails and tracks are part of the map itself, drawn once zoomed in to a few neighbourhoods. Bike paths and shared paths are two entries of the Layers menu under Paths — **Bike paths** and **Shared paths** — drawn from a whole region out, so a rider can see the bike network at once and pick which way to head.
+**Description**: Cycleways and walking/hiking paths drawn as lines of their own, standing out from the streets, where otherwise they are barely visible hairlines or not drawn at all. Trails and tracks are part of the map itself, drawn once zoomed in to a few neighbourhoods. Bike paths, shared paths and mountain-bike trails are three entries of the Layers menu under Paths — **Bike paths**, **Shared paths** and **Mountain bike trails** — drawn from a whole region out, so a rider can see the bike network at once and pick which way to head.
 
 | Kind | What it draws (OpenStreetMap tags) | Typically | Drawn as | Shown | From zoom |
 | :-- | :-- | :-- | :-- | :-- | :-- |
-| **Bike paths** | `highway=cycleway` | A path built for bikes, separate from the road | Solid blue | When ticked in Layers | 9 |
+| **Bike paths** | `highway=cycleway` | A path built for bikes, separate from the road, paved or of gravel or crushed stone | Solid blue | When ticked in Layers | 9 |
 | **Shared paths** | `highway=path`, `footway` or `bridleway` with `bicycle=designated` | A multi-use trail or greenway bikes share with people on foot | Solid teal | When ticked in Layers | 9 |
+| **Mountain bike trails** | A cycleway, path, footway or bridleway with a mountain-bike rating (`mtb:scale`), or a cycleway or shared path of rough ground (`surface=ground`, `dirt`, `earth`, `mud`, `sand`, `grass`, `rock`, `woodchips` or `unpaved`) | Singletrack: narrow, rough, rideable on a mountain bike and hardly on anything else | Solid purple | When ticked in Layers | 9 |
 | Trails | `highway=path`, `footway` or `bridleway` | A walking, hiking or horse path, any surface | Dashed green | Always | 13 |
 | Tracks | `highway=track` | A dirt, farm or forest road, unpaved and wide enough for a vehicle | Longer-dashed, wider brown, under the trails | Always | 12 |
 
-A shared path is also a trail, so from zoom 13 with Shared paths ticked it is drawn twice, the blue over the green. A street with a bike lane painted on it is none of the four. Blue and teal are dark on the light map, to hold up on Fog's grey veil, and bright on the dark flavors (FR-4.5), to stand out on the dark map; the monochrome flavors draw all four in greys, telling them apart by the dash and width, a shared path dashed there.
+The first three never overlap: a way tagged as a cycleway or shared path that is rated for mountain bikes or of rough ground is a mountain-bike trail only. A shared path or a mountain-bike trail is also a trail, so from zoom 13 with its entry ticked it is drawn twice, its color over the green. A street with a bike lane painted on it is none of the five, and neither is a way with no surface tag that is singletrack all the same: only its tags say what it is. The three bike colors are dark on the light map, to hold up on Fog's grey veil, and bright on the dark flavors (FR-4.5), to stand out on the dark map; the monochrome flavors draw all five in greys, telling them apart by the dash and width, shared paths and mountain-bike trails dashed there.
 
-**Preconditions**: Active session. The Layers menu is beside the map-mode toggle (FR-4.1–FR-4.3) — in the Android app, a pill under the menu button — and is hidden while the Edit window is open (FR-5.10), like that toggle. The Layers button opens a panel of checkboxes under Paths and Points of interest (FR-15.2). Each path entry ends in a short sample of its line, in the current flavor's color, and under the two a note — "Always shown when zoomed in:" — samples trails and dirt tracks, which have no entry. The button shows how many paths and places are picked; a press on the button again or outside the panel, or Escape (Back on Android), closes it.
+**Preconditions**: Active session. The Layers menu is beside the map-mode toggle (FR-4.1–FR-4.3) — in the Android app, a pill under the menu button — and is hidden while the Edit window is open (FR-5.10), like that toggle. The Layers button opens a panel of checkboxes under Paths and Points of interest (FR-15.2). Each path entry ends in a short sample of its line, in the current flavor's color, and under the three a note — "Always shown when zoomed in:" — samples trails and dirt tracks, which have no entry. The button shows how many paths and places are picked; a press on the button again or outside the panel, or Escape (Back on Android), closes it.
 
 **Behavior**:
-1. Bike paths and Shared paths are off by default. Each entry draws what the table above gives, from zoom 9, on its own. Trails and tracks are always drawn, from the zooms the table gives, with no entry to turn them off. Every line widens as the map zooms in, and bike and shared paths are drawn bolder than trails and tracks.
-2. The choice is kept by this browser (or, in the Android app, this phone) only, not on the account, and applies again on the next visit. A browser that had the former single web toggle on, or a phone that had the former Trails & bike paths toggle on, starts with Bike paths on, and one whose saved choice predates Shared paths starts with it off.
+1. Bike paths, Shared paths and Mountain bike trails are off by default. Each entry draws what the table above gives, from zoom 9, on its own. Trails and tracks are always drawn, from the zooms the table gives, with no entry to turn them off. Every line widens as the map zooms in, and the three bike kinds are drawn bolder than trails and tracks.
+2. The choice is kept by this browser (or, in the Android app, this phone) only, not on the account, and applies again on the next visit. A browser that had the former single web toggle on, or a phone that had the former Trails & bike paths toggle on, starts with Bike paths on, and one whose saved choice predates Shared paths or Mountain bike trails starts with that entry off.
 3. It is independent of the map mode: it works over Normal, Fog and Heatmap alike, and survives a theme change (FR-4.12). Every path, trails and tracks included, is drawn over Fog's veil and Heatmap's heat at full strength, so a path not yet ridden shows through the veil, and under the activity tracks.
-4. An export (FR-4.10) draws trails and tracks always, and bike and shared paths when the map shows them.
+4. An export (FR-4.10) draws trails and tracks always, and each bike kind when the map shows it.
 5. A checkbox on the Layers button, before its label (in the Android app, before its icon), shows or hides every picked path and place (FR-15.2) at once and keeps the picks. Off, the map draws none of them, the button looks unselected and its count is greyed; on again, they are back as they were. It is on until turned off, and kept by this browser (or phone) like the picks. Picking a path or place in the menu while it's off turns it back on; unpicking one leaves it as it is. With nothing picked it can't be changed, and its tooltip says to pick paths or places first.
 
-**Notes**: Trails and tracks show what OpenStreetMap tags as a path and is already in the base map, nothing more; the base map has tracks from zoom 12 and trails only from 13, which is why the two start apart. Bike paths and Shared paths come from an OpenStreetMap import of their own (FR-4.16), which is what lets them start at zoom 9. Sidewalks, crossings, steps and pedestrian areas keep the base map's own faint styling, since in a city they would bury the real paths. Named routes such as long-distance cycle or hiking networks are not shown.
+**Notes**: Trails and tracks show what OpenStreetMap tags as a path and is already in the base map, nothing more; the base map has tracks from zoom 12 and trails only from 13, which is why the two start apart. The three bike kinds come from an OpenStreetMap import of their own (FR-4.16), which is what lets them start at zoom 9. Sidewalks, crossings, steps and pedestrian areas keep the base map's own faint styling, since in a city they would bury the real paths. Named routes such as long-distance cycle or hiking networks are not shown.
 
 ### FR-4.14 Satellite mode
 
@@ -703,7 +704,7 @@ A shared path is also a trail, so from zoom 13 with Shared paths ticked it is dr
 
 **Description**: What the map draws at each zoom level, in one place. Each requirement it summarizes remains the authority for its own feature: tracks FR-4.1, Fog FR-4.2, Heatmap FR-4.3, paths FR-4.13, satellite FR-4.14, points of interest FR-15.2 and FR-15.5. Bike and shared paths and points of interest show only for what is ticked in the Layers menu; with nothing ticked they draw at no zoom. Trails and dirt tracks are always drawn.
 
-| Zoom | A 1280 px-wide view spans | Tracks (Normal) | Fog and Heatmap | Bike and shared paths (ticked) | Trails and dirt tracks | Points of interest (ticked) |
+| Zoom | A 1280 px-wide view spans | Tracks (Normal) | Fog and Heatmap | Bike paths, shared paths and mountain-bike trails (ticked) | Trails and dirt tracks | Points of interest (ticked) |
 | :-- | :-- | :-- | :-- | :-- | :-- | :-- |
 | 0–2 | Most of the world or more (~25,000 km and more) | — | Whole countries | — | — | — |
 | 3 | A continent (~12,000 km) | — | States and regions | — | — | — |
@@ -716,7 +717,7 @@ A shared path is also a trail, so from zoom 13 with Shared paths ticked it is dr
 
 **Behavior**:
 1. Each band starts at its first zoom and runs up to, not including, the next band's: zoom 6.9 is still States and regions, and zoom 12.9 still offers Show in this area.
-2. Zoomed in far enough, the map runs out of stored detail and enlarges the most detailed level it has instead: tracks, Fog, Heatmap, bike and shared paths and points of interest past zoom 14, the base map past zoom 15, and satellite imagery (FR-4.14) past the deployment's deepest level (zoom 18 on holdmytrack.com). Lines, labels and badges — the base map, tracks, paths and points of interest — stay sharp when enlarged, though a track's shape gets no more detailed; Fog, Heatmap and satellite imagery are pictures and grow softer.
+2. Zoomed in far enough, the map runs out of stored detail and enlarges the most detailed level it has instead: tracks, Fog, Heatmap, the three bike kinds and points of interest past zoom 14, the base map past zoom 15, and satellite imagery (FR-4.14) past the deployment's deepest level (zoom 18 on holdmytrack.com). Lines, labels and badges — the base map, tracks, paths and points of interest — stay sharp when enlarged, though a track's shape gets no more detailed; Fog, Heatmap and satellite imagery are pictures and grow softer.
 3. The Android app follows the same bands for tracks, Fog, Heatmap, paths and points of interest.
 
 **Notes**: The widths are at the equator; further from it the same zoom spans less ground (at Ohio's latitude, about a quarter less).
@@ -725,11 +726,11 @@ A shared path is also a trail, so from zoom 13 with Shared paths ticked it is dr
 
 **Inputs**: `z`, `x`, `y`; `cv`, the tile version (FR-4.11).
 
-**Outputs**: A vector tile with one layer, `bike_paths`: each cycleway or shared path that reaches into the tile, clipped to it, with `kind` (`cycleway` or `shared`) and `name`, absent when it has none. Below zoom 9, an empty tile. Below zoom 13, a path shorter than a pixel at that zoom is left out.
+**Outputs**: A vector tile with one layer, `bike_paths`: each cycleway, shared path or mountain-bike trail that reaches into the tile, clipped to it, with `kind` (`cycleway`, `shared` or `mtb`) and `name`, absent when it has none. Below zoom 9, an empty tile. Below zoom 13, a path shorter than a pixel at that zoom is left out.
 
 **Behavior**:
 1. The same paths for every account, behind the session like every other map tile, and cached like them (FR-4.11). A load that changes the paths moves every account's tile version.
-2. A path is a cycleway when OpenStreetMap tags it `highway=cycleway`, and shared when it is a path, footway or bridleway tagged `bicycle=designated`. A street with a bike lane is neither.
+2. A way is a mountain-bike trail, a cycleway or a shared path as FR-4.13's table gives, the first of the three that fits: a cycleway rated for mountain bikes, or of rough ground, is a mountain-bike trail. A street with a bike lane is none of them, and neither is a rated forest road (`highway=track`).
 
 **Error cases**:
 - No session → `401`. A demo session sees the paths too.

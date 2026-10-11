@@ -151,6 +151,7 @@ export const en = {
   'overlays.master': 'Show layers',
   'overlays.master_empty': 'Pick paths or places first',
   'overlays.monuments': 'Monuments',
+  'overlays.mtb_trails': 'Mountain bike trails',
   'overlays.paths': 'Paths',
   'overlays.places': 'Points of interest',
   'overlays.playgrounds': 'Playgrounds',

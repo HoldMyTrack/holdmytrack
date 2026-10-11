@@ -168,6 +168,7 @@ export const ru: Record<MessageKey, string> & Record<string, string> = {
   'overlays.master': 'Показывать слои',
   'overlays.master_empty': 'Сначала выберите тропы или места',
   'overlays.monuments': 'Памятники',
+  'overlays.mtb_trails': 'Трассы для горных велосипедов',
   'overlays.paths': 'Тропы и дорожки',
   'overlays.places': 'Интересные места',
   'overlays.playgrounds': 'Детские площадки',
