@@ -24,12 +24,10 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
 import androidx.core.view.AccessibilityDelegateCompat
 import androidx.core.view.ViewCompat
@@ -398,13 +396,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
     }
 
-    /** The Sync tab's Health Connect permissions (`sync/HealthConnectCard`). */
-    private val healthPermissionLauncher = registerForActivityResult(
-        @Suppress("UNCHECKED_CAST")
-        PermissionController.createRequestPermissionResultContract()
-            as ActivityResultContract<Set<String>, Set<String>>,
-    ) { if (::panel.isInitialized) panel.syncTab.permissionsAnswered() }
-
     /** What the Sync tab has the map draw (`map/SyncCandidatesOverlay`), kept for a style
      *  reload, which drops the layers. */
     private var syncCandidates: List<Candidate> = emptyList()
@@ -558,7 +549,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             findViewById(R.id.panel_sync_content),
             requireActivity() as AppCompatActivity,
             scope = { viewLifecycleOwner.lifecycleScope },
-            requestPermissions = healthPermissionLauncher::launch,
             onCandidates = ::drawSyncCandidates,
             onFrame = { candidates -> BoxUnion.of(candidates.map { it.bbox }.filter { it.isNotEmpty() })?.let { flyTo(it) } },
             onSynced = ::onSyncedFromPhone,

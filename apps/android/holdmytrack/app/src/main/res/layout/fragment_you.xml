@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- You (YouFragment), the bottom bar's last tab: the account and its all-time numbers in one
-     card — Settings and Profile behind its two halves — then Privacy, this phone's Theme and
+     card — Settings and Profile behind its two halves — then Sync, Privacy, this phone's Theme and
      the account's Language, the web's pages, Sign out and Delete account, and the version. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -188,6 +188,46 @@
                         app:tint="@color/hmt_accent_strong" />
                 </LinearLayout>
             </LinearLayout>
+        </LinearLayout>
+
+        <!-- Sync: where journeys come from, its own screen (SyncActivity). -->
+        <LinearLayout
+            android:id="@+id/you_sync"
+            style="@style/Widget.HoldMyTrack.CardRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_section_card"
+            android:foreground="?attr/selectableItemBackground"
+            android:minHeight="68dp">
+
+            <ImageView
+                style="@style/Widget.HoldMyTrack.IconTile"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_refresh_cw" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/sync_title"
+                    android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowTitle" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/hmt_space_2"
+                    android:text="@string/you_sync_sub"
+                    android:textAppearance="@style/TextAppearance.HoldMyTrack.CardRowSub" />
+            </LinearLayout>
+
+            <ImageView
+                    style="@style/Widget.HoldMyTrack.RowChevron"
+                    android:contentDescription="@null" />
         </LinearLayout>
 
         <!-- Privacy: its own screen (privacy/PrivacyActivity). -->

@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- One row of the Sync tab (panel/SyncTab), after the Activities rows (item_activity_row): a tile
      of the activity's kind that is also its tick box — ticked, a ✓ on the accent — then its day
-     and time (or a recording's name) over "[date ·] distance · type · where it is", and "Overlaps
-     Morning walk" when it covers the time of an activity the account has; that text is the
-     row's tap target: its line picked out on the map and flown to. A Hidden badge while hidden
-     rows are shown, and a recording's Edit and Delete. Swiped aside, it's hidden. Once sent and
-     until it's on the map, the tile spins and the note line says "Adding to your map…". -->
+     and time (or a recording's name) over "[date ·] distance · type · where it is"; that text is
+     the row's tap target: its line picked out on the map and flown to. An ⓘ when something else
+     covers the same time — another row, or an activity the account has — opening Similar tracks.
+     A Hidden badge while hidden rows are shown, and a recording's Edit and Delete. Swiped aside,
+     it's hidden. Once sent and until it's on the map, the tile spins and the note line says
+     "Adding to your map…". -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -85,7 +86,7 @@
             tools:text="10.4 km · Running · Health Connect" />
 
         <TextView
-            android:id="@+id/candidate_overlap"
+            android:id="@+id/candidate_note"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/hmt_space_2"
@@ -94,9 +95,20 @@
             android:textColor="@color/hmt_accent_strong"
             android:textSize="@dimen/hmt_text_xs"
             android:visibility="gone"
-            tools:text="Overlaps Morning walk"
+            tools:text="Adding to your map…"
             tools:visibility="visible" />
     </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/candidate_similar"
+        style="@style/Widget.HoldMyTrack.Button.RowIcon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:contentDescription="@string/similar_title"
+        android:visibility="gone"
+        app:icon="@drawable/ic_info"
+        app:iconTint="@color/hmt_accent_strong"
+        tools:visibility="visible" />
 
     <TextView
         android:id="@+id/candidate_hidden"

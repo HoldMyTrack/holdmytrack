@@ -408,17 +408,18 @@
     <h2>10. Health Connect <em>(optional)</em></h2>
     <p>This needs exercise sessions with GPS routes in Health Connect, for example from Fitbit, Samsung Health or Google Fit.</p>
 
-    <h3 id="HC-1">HC-1 · Allow access</h3>
+    <h3 id="HC-1">HC-1 · Turn it on and allow access</h3>
     <ol class="page-list">
-      <li>Sync tab → Health Connect → Allow Health Connect access. Allow exercise.</li>
+      <li>Open the Sync tab before anything else.</li>
+      <li>You tab → Sync. Turn on the Health Connect switch, and allow exercise in the dialog that opens.</li>
       <li>Follow the steps on screen to allow exercise routes inside Health Connect, then come back.</li>
       <li>Tap the info button next to Health Connect.</li>
     </ol>
-    <p class="testing__expect"><strong>Expected:</strong> after each step the screen moves on: "One more step" until routes are allowed, then "Ready, the last 30 days only" until past data is allowed, then "Ready to read". The info explains that only exercise sessions and their routes are read, never heart rate or other health data.</p>
+    <p class="testing__expect"><strong>Expected:</strong> at first the Sync tab lists no Health Connect sessions and says "Health Connect is off", with Open Sync settings, and Load is greyed out over "No source set up yet"; and the switch on the Sync screen is off. Once it's on, three permissions are listed, each ticked as it's allowed: "One more step" until routes are allowed, then "Ready, the last 30 days only" until past data is allowed, then "Ready to read". As soon as Health Connect can be read, the card says "Reading Health Connect…" and then how many sessions it found. The info explains that only exercise sessions and their routes are read, never heart rate or other health data.</p>
 
     <h3 id="HC-2">HC-2 · What's waiting</h3>
-    <p>Open the Sync tab.</p>
-    <p class="testing__expect"><strong>Expected:</strong> the Sync sheet opens over the map, listing your Health Connect sessions with a route from the last 3 months, newest first, each with its day, distance, type and "Health Connect". <strong>Nothing is ticked.</strong> Each one is drawn on the map as a dashed line, and the activities already in your account aren't drawn until you leave the Sync tab. Indoor sessions and anything older than 3 months aren't listed. Tapping a row picks out its line, colored by pace (blue where slowest, red where fastest) over a dark outline, and moves the map to it; tapping a line picks out its row.</p>
+    <p>Open the Sync tab. Then close the app completely, open it again and go to the Sync tab. Then tap Load.</p>
+    <p class="testing__expect"><strong>Expected:</strong> the Sync sheet opens over the map with Load and Sync side by side, "Last load:" and the time HC-1 read it under Load, written the way your country writes dates, listing your Health Connect sessions with a route from the last 3 months, newest first, each with its day, distance, type and "Health Connect". <strong>Nothing is ticked.</strong> Each one is drawn on the map as a dashed line, and the activities already in your account aren't drawn until you leave the Sync tab. Indoor sessions and anything older than 3 months aren't listed. Tapping a row picks out its line, colored by pace (blue where slowest, red where fastest) over a dark outline, and moves the map to it; tapping a line picks out its row. After reopening the app the same list is there with the same time, without "Reading Health Connect…". Load reads again and moves the time to now.</p>
 
     <h3 id="HC-3">HC-3 · Sync what you tick</h3>
     <p>Tick two rows (tap their icons), then tap Sync 2.</p>
@@ -429,7 +430,7 @@
     <p class="testing__expect"><strong>Expected:</strong> the row goes, with "Hidden — it won't be offered again" and Undo. Show hidden lists it again, faded and marked Hidden, and it can't be ticked. Swiping it brings it back to the list. Hidden rows stay hidden after closing and reopening the app.</p>
 
     <h3 id="HC-5">HC-5 · Synced stays synced</h3>
-    <p>Uninstall and reinstall the app, sign in and open Sync. Then delete one of the activities from HC-3 on the website, and open Sync again.</p>
+    <p>Uninstall and reinstall the app, sign in, turn Health Connect on again (You → Sync) and open the Sync tab. Then delete one of the activities from HC-3 on the website, and tap Load.</p>
     <p class="testing__expect"><strong>Expected:</strong> after reinstalling, the activities synced in HC-3 aren't listed. After deleting one on the website, its session is listed again, unticked.</p>
   </section>
 
@@ -469,8 +470,12 @@
     <p class="testing__expect"><strong>Expected:</strong> Download GPX says "Track saved." Delete warns "It hasn't been synced, so this is the only copy. This can't be undone."</p>
 
     <h3 id="RC-7">RC-7 · A walk you already have <em>(needs a watch or another app that writes to Health Connect)</em></h3>
-    <p>Record a walk with the app while your watch, or another app, records the same walk into Health Connect. Sync the app's recording first (RC-2), then open the Sync tab again.</p>
-    <p class="testing__expect"><strong>Expected:</strong> the Health Connect session of that walk is listed, unticked, with a third line "Overlaps" and the recording's date and time. Ticked and synced anyway, it becomes a second walk on the map.</p>
+    <p>Record a walk with the app while your watch, or another app, records the same walk into Health Connect. Sync the app's recording first (RC-2), then tap Load on the Sync tab.</p>
+    <p class="testing__expect"><strong>Expected:</strong> the Health Connect session of that walk is listed, unticked, with an ⓘ at its end. Tapping it says "Hey, there are similar tracks" and lists the recording under "Already on your map"; tapping that opens it on the Map tab. Ticked and synced anyway, the session becomes a second walk on the map.</p>
+
+    <h3 id="RC-8">RC-8 · Two copies waiting <em>(needs a watch or another app that writes to Health Connect)</em></h3>
+    <p>Record another walk with the app while your watch records it too, and tap Load on the Sync tab before syncing either.</p>
+    <p class="testing__expect"><strong>Expected:</strong> both rows have an ⓘ. Each one's lists the other under "Waiting here"; tapping it closes the dialog and picks that row out on the map. Ticking both makes the bar read "2 of … ticked · 2 are similar", and Sync still sends both if you go on.</p>
   </section>
 
   <section class="page-section" id="you">
@@ -520,7 +525,7 @@
 
     <h3 id="DM-1">DM-1 · Look around without an account</h3>
     <p>Signed out, tap Try the demo.</p>
-    <p class="testing__expect"><strong>Expected:</strong> a ready-made account with activities in Cleveland, Niagara Falls, Rome, Tallinn and Vietnam, Stories and photos. Everything can be looked at, but nothing can be changed. Editing says "Not available for demo accounts — create an account to edit activities", and Upload says the same for uploading. The Sync tab says "The demo account is read-only — it can't add, edit, or delete activities. Create an account to sync your own data.", with nothing to tick and no Sync now.</p>
+    <p class="testing__expect"><strong>Expected:</strong> a ready-made account with activities in Cleveland, Niagara Falls, Rome, Tallinn and Vietnam, Stories and photos. Everything can be looked at, but nothing can be changed. Editing says "Not available for demo accounts — create an account to edit activities", and Upload says the same for uploading. The Sync tab says "The demo account is read-only — it can't add, edit, or delete activities. Create an account to sync your own data.", with nothing to tick and no Load or Sync.</p>
   </section>
 
   <section class="page-section" id="report">

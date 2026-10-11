@@ -14,6 +14,7 @@ import dev.holdmytrack.android.net.TrackMetricPoint
 import dev.holdmytrack.android.recording.db.RecordedActivityRecord
 import java.time.Duration
 import java.time.Instant
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -61,8 +62,9 @@ data class HealthConnectRead(val sessions: List<Candidate>, val refused: Int)
  * The Sync tab's list (`docs/SPEC.md` FR-3.6): Health Connect sessions with a route from the
  * last [WINDOW], minus what the account already has (`POST /v1/sync/known`), plus every recording
  * waiting on the phone, which never ages out — the phone holds its only copy. There is no
- * cursor: the list is worked out afresh each time from the phone and the server, so a reinstall
- * or a second phone agrees, and an activity deleted on the web is offered again.
+ * cursor: each Load works Health Connect's part out afresh from the phone and the server
+ * ([WaitingLoader]), so a reinstall or a second phone agrees, and an activity deleted on the web
+ * is offered again; between loads it's kept as last read ([WaitingStore]).
  */
 object SyncCandidates {
 
@@ -107,6 +109,33 @@ object SyncCandidates {
             pageToken = page.pageToken
         } while (pageToken != null)
         return HealthConnectRead(sessions, refused)
+    }
+
+    /** What [reread] found: the session's route again, or why not. */
+    sealed interface Reread {
+        class Found(val origin: HealthConnectSession) : Reread
+        /** No longer in Health Connect — deleted there, or by the app that wrote it. */
+        data object Gone : Reread
+        /** There, but its route isn't to be had right now (`ConsentRequired`, or none). */
+        data object Refused : Reread
+    }
+
+    /**
+     * A kept row's session, read again by its id to send — a row restored from [WaitingStore]
+     * holds only what's drawn, and a route is sent as read. Health Connect answers a missing
+     * id with an exception rather than null, so any failure to find it is [Reread.Gone].
+     */
+    suspend fun reread(client: HealthConnectClient, externalId: String): Reread {
+        val record = try {
+            client.readRecord(ExerciseSessionRecord::class, externalId).record
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return Reread.Gone
+        }
+        val result = record.exerciseRouteResult as? ExerciseRouteResult.Data ?: return Reread.Refused
+        val route = result.exerciseRoute.route
+        return if (route.size >= MIN_POINTS) Reread.Found(HealthConnectSession(record, route)) else Reread.Refused
     }
 
     private suspend fun fromHealthConnect(record: ExerciseSessionRecord, route: List<ExerciseRoute.Location>): Candidate =
