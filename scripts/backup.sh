@@ -3,13 +3,22 @@
 # Back up a prod deployment (docs/DEPLOY.md §11): dump Postgres, keep the dump on this host
 # and copy it to the backup bucket, then sync the objects that can't be rebuilt into the same
 # bucket. Run from the VPS, in the same directory as compose.prod.yml and .env.prod — nightly,
-# from cron:
+# from cron, with --nightly:
 #
-#   17 3 * * * root /srv/holdmytrack/scripts/backup.sh >> /var/log/holdmytrack-backup.log 2>&1
+#   17 3 * * * root /srv/holdmytrack/scripts/backup.sh --nightly >> /var/log/holdmytrack-backup.log 2>&1
+#
+# and by hand, without it, before a deploy or a migration (DEPLOY.md §6), as a rollback point.
+# Only a nightly run counts for the "Backup overdue" alert and fills the bucket's history: a
+# deploy-day's manual runs would otherwise crowd it with near-identical dumps, and could hide a
+# nightly job that stopped running.
+#
+# On this host, the newest KEEP_LOCAL_DUMPS dumps, whichever kind: the bucket holds the history,
+# and a local copy is only for undoing the last deploy without fetching one.
 #
 # The backup bucket's layout:
-#   postgres/daily/holdmytrack-<UTC stamp>.dump    every run, kept KEEP_DAILY_DAYS
-#   postgres/weekly/holdmytrack-<UTC stamp>.dump   Sunday's run, kept KEEP_WEEKLY_DAYS
+#   postgres/daily/holdmytrack-<UTC stamp>.dump    every nightly run, kept KEEP_DAILY_DAYS
+#   postgres/weekly/holdmytrack-<UTC stamp>.dump   Sunday's nightly run, kept KEEP_WEEKLY_DAYS
+#   postgres/manual/holdmytrack-<UTC stamp>.dump   every manual run, kept KEEP_MANUAL_DAYS
 #   objects/{raw,photos,avatars}/...               a mirror of the app bucket's own keys
 #   objects-deleted/<UTC stamp>/...                what a run's sync removed or overwrote in
 #                                                  objects/, kept KEEP_DELETED_DAYS
@@ -28,10 +37,18 @@ cd "$(dirname "$0")/.."
 ENV_FILE=.env.prod
 COMPOSE=(docker compose -f compose.prod.yml --env-file "$ENV_FILE")
 
-KEEP_LOCAL_DAYS=7
+KEEP_LOCAL_DUMPS=3
 KEEP_DAILY_DAYS=14
 KEEP_WEEKLY_DAYS=56
+KEEP_MANUAL_DAYS=3
 KEEP_DELETED_DAYS=30
+
+nightly=false
+case "${1:-}" in
+  --nightly) nightly=true ;;
+  "") ;;
+  *) echo "Usage: $0 [--nightly]" >&2; exit 2 ;;
+esac
 
 [[ -f "$ENV_FILE" ]] || { echo "$ENV_FILE not found — run this from the deploy directory." >&2; exit 1; }
 
@@ -71,9 +88,13 @@ mv "$partial" "$BACKUP_DIR/postgres/$name"
 log "dump is $(du -h "$BACKUP_DIR/postgres/$name" | cut -f 1)"
 
 log "uploading the dump"
-rclone copyto "/backups/postgres/$name" "backup:postgres/daily/$name"
-if [[ $(date -u +%u) == 7 ]]; then
-  rclone copyto "/backups/postgres/$name" "backup:postgres/weekly/$name"
+if $nightly; then
+  rclone copyto "/backups/postgres/$name" "backup:postgres/daily/$name"
+  if [[ $(date -u +%u) == 7 ]]; then
+    rclone copyto "/backups/postgres/$name" "backup:postgres/weekly/$name"
+  fi
+else
+  rclone copyto "/backups/postgres/$name" "backup:postgres/manual/$name"
 fi
 
 log "syncing raw/, photos/ and avatars/"
@@ -83,9 +104,14 @@ rclone sync data: backup:objects \
   --checksum --fast-list --stats 0 -v
 
 log "pruning old copies"
-find "$BACKUP_DIR/postgres" -name 'holdmytrack-*.dump' -mtime +"$KEEP_LOCAL_DAYS" -delete
-rclone delete backup:postgres/daily --min-age "${KEEP_DAILY_DAYS}d"
-rclone delete backup:postgres/weekly --min-age "${KEEP_WEEKLY_DAYS}d"
+# Newest first by the UTC stamp in the name, then everything past the first KEEP_LOCAL_DUMPS.
+ls -1 "$BACKUP_DIR/postgres"/holdmytrack-*.dump | sort -r | tail -n +"$((KEEP_LOCAL_DUMPS + 1))" | while read -r old; do
+  rm -f -- "$old"
+done
+prune_older() { rclone delete "$1" --min-age "$2" || [[ $? == 3 ]]; }  # 3: the folder isn't there yet
+prune_older backup:postgres/daily "${KEEP_DAILY_DAYS}d"
+prune_older backup:postgres/weekly "${KEEP_WEEKLY_DAYS}d"
+prune_older backup:postgres/manual "${KEEP_MANUAL_DAYS}d"
 # By the folder's stamp, not --min-age: a moved object keeps its own modification time, so an
 # avatar uploaded a year ago and replaced last night would otherwise go on the next run.
 cutoff=$(date -u -d "$KEEP_DELETED_DAYS days ago" +%Y%m%d-%H%M 2>/dev/null || date -u -v-"$KEEP_DELETED_DAYS"d +%Y%m%d-%H%M)
@@ -93,5 +119,8 @@ for dir in $(rclone lsf --dirs-only backup:objects-deleted); do
   if [[ "${dir%/}" < "$cutoff" ]]; then rclone purge "backup:objects-deleted/${dir%/}"; fi
 done
 
-record_success holdmytrack_backup_last_success_timestamp_seconds backup
+# Only the nightly run: a manual one before a deploy mustn't hide a cron job that stopped.
+if $nightly; then
+  record_success holdmytrack_backup_last_success_timestamp_seconds backup
+fi
 log "backup done"
