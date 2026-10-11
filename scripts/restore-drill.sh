@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
-# Prove the backups restore (docs/DEPLOY.md §11): take the newest dump from the backup bucket,
-# restore it into a throwaway Postgres container with no network, and check that every object
+# Prove the backups restore (docs/DEPLOY.md §11): take the newest nightly dump from the backup
+# bucket and the reference dump it pairs with (backup.sh), restore the two into a throwaway
+# Postgres container with no network the way DEPLOY.md §11 restores them, and check that every object
 # the restored database refers to is in the backup bucket too. Touches nothing the app uses —
 # the live database is only read, for counts to compare. Run from the VPS, in the same
 # directory as compose.prod.yml and .env.prod — monthly, from cron, and by hand after any
@@ -55,8 +56,18 @@ latest=$(rclone lsf --files-only backup:postgres/daily | sort | tail -n 1)
 [[ -n "$latest" ]] || fail "no dump in backup:postgres/daily"
 [[ -n "$(rclone lsf --files-only --max-age "$MAX_DUMP_AGE" backup:postgres/daily)" ]] ||
   fail "the newest dump, $latest, is older than $MAX_DUMP_AGE — is backup.sh running?"
-log "restoring $latest"
+# The newest reference dump no newer than it: what the tables it leaves out held then.
+latest_stamp=${latest#holdmytrack-}; latest_stamp=${latest_stamp%.dump}
+reference=""
+while read -r name; do
+  ref_stamp=${name#holdmytrack-reference-}; ref_stamp=${ref_stamp%.dump}
+  [[ "$ref_stamp" > "$latest_stamp" ]] && break
+  reference=$name
+done < <(rclone lsf --files-only backup:postgres/reference < /dev/null | sort)
+[[ -n "$reference" ]] || fail "no reference dump in backup:postgres/reference from before $latest"
+log "restoring $latest with $reference"
 rclone copyto "backup:postgres/daily/$latest" "/backups/$(basename "$work")/$latest"
+rclone copyto "backup:postgres/reference/$reference" "/backups/$(basename "$work")/$reference"
 
 # The image the live database runs, so the drill restores into exactly that PostGIS.
 image=$(docker inspect -f '{{.Config.Image}}' "$("${COMPOSE[@]}" ps -q db)")
@@ -73,17 +84,23 @@ docker exec "$CONTAINER" pg_isready -q -h 127.0.0.1 -U postgres || fail "the dri
 # From template0, so the image's own PostGIS setup in template1 doesn't collide with the
 # dump's.
 docker exec "$CONTAINER" createdb -U postgres -T template0 restored
-docker exec "$CONTAINER" pg_restore -U postgres -d restored --exit-on-error --no-owner --no-acl "/drill/$latest" ||
-  fail "pg_restore of $latest"
+# The schema, then the reference tables' data, then the rest, then the indexes and foreign
+# keys, which then find every row they point at (DEPLOY.md §11).
+restore() { docker exec "$CONTAINER" pg_restore -U postgres -d restored --exit-on-error --no-owner --no-acl "$@"; }
+restore --section=pre-data "/drill/$latest" || fail "pg_restore of $latest's schema"
+restore --data-only "/drill/$reference" || fail "pg_restore of $reference"
+restore --section=data "/drill/$latest" || fail "pg_restore of $latest's data"
+restore --section=post-data "/drill/$latest" || fail "pg_restore of $latest's indexes and constraints"
 
 newest_migration=$(ls services/server/migrations/*.sql | sort | tail -n 1 | xargs basename)
 log "newest migration: restored $(drill_psql 'SELECT max(filename) FROM schema_migrations'), checked out $newest_migration"
 
 printf '%-18s %10s %10s\n' table restored live
-for table in users activities activity_streams activity_photos stories privacy_zones; do
+for table in users activities activity_streams activity_photos stories privacy_zones spot_captures spots bike_paths admin_countries tz_parts; do
   printf '%-18s %10s %10s\n' "$table" "$(drill_psql "SELECT count(*) FROM $table")" "$(live_psql "SELECT count(*) FROM $table")"
 done
 [[ $(drill_psql 'SELECT count(*) FROM users') -gt 0 ]] || fail "the restored database has no users"
+[[ $(drill_psql 'SELECT count(*) FROM admin_countries') -gt 0 ]] || fail "the restored database has no countries — is the reference dump empty?"
 # The masks' PNGs are left out of the dump (backup.sh) but their table isn't.
 [[ $(drill_psql 'SELECT count(*) FROM activity_tile_mask_data') -eq 0 ]] ||
   fail "the restored activity_tile_mask_data isn't empty — is backup.sh still leaving its data out?"
