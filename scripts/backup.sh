@@ -84,9 +84,10 @@ log() { echo "$(date -u +%FT%TZ) $*"; }
 # When this last succeeded, for the alerts (docs/DEPLOY.md §13): a file in Prometheus's text
 # format that the alloy service's textfile collector reads. Written beside its final name and
 # renamed, so a scrape never reads half of it.
-record_success() {
+record_success() { record_time "$1" "$2" "Unix time of the last successful run." "$(date +%s)"; }
+record_time() {
   mkdir -p "$BACKUP_DIR/metrics"
-  printf '# HELP %s Unix time of the last successful run.\n# TYPE %s gauge\n%s %s\n' "$1" "$1" "$1" "$(date +%s)" > "$BACKUP_DIR/metrics/$2.prom.tmp"
+  printf '# HELP %s %s\n# TYPE %s gauge\n%s %s\n' "$1" "$3" "$1" "$1" "$4" > "$BACKUP_DIR/metrics/$2.prom.tmp"
   mv "$BACKUP_DIR/metrics/$2.prom.tmp" "$BACKUP_DIR/metrics/$2.prom"
 }
 
@@ -114,22 +115,44 @@ reference_fingerprint() {
 # A folder the bucket doesn't have yet lists as nothing, not as a failure (rclone's exit 3).
 bucket_list() { rclone lsf --files-only "$1" || [[ $? == 3 ]]; }
 
-fingerprint_file="$BACKUP_DIR/postgres/reference/fingerprint"
+# What the last reference dump was: its name, then the fingerprint it was taken at. A new one
+# is taken when the fingerprint moved, or when that dump is no longer in the bucket — deleted
+# by hand, by a lifecycle rule, or with a misused token — so a missing one is replaced the same
+# night rather than at the next import. A TRUNCATE isn't counted by those counters (an import
+# or seed deletes, which is): after changing a reference table by hand, run this by hand too.
+state_file="$BACKUP_DIR/postgres/reference/last"
+rm -f "$BACKUP_DIR/postgres/reference/fingerprint"  # the state file before it named its dump
+saved_name=$(sed -n 1p "$state_file" 2>/dev/null || true)
+saved_fingerprint=$(sed -n 2p "$state_file" 2>/dev/null || true)
 fingerprint=$(reference_fingerprint)
-if [[ "$fingerprint" != "$(cat "$fingerprint_file" 2>/dev/null)" ]] || [[ -z "$(bucket_list backup:postgres/reference)" ]]; then
+if [[ "$fingerprint" != "$saved_fingerprint" ]]; then
+  reason="the reference tables changed"
+elif ! grep -qxF "$saved_name" <<< "$(bucket_list backup:postgres/reference)"; then
+  reason="the last reference dump, ${saved_name:-(none)}, isn't in the bucket"
+else
+  reason=""
+fi
+if [[ -n "$reason" ]]; then
   ref_name="holdmytrack-reference-$stamp.dump"
   ref_partial="$BACKUP_DIR/postgres/reference/$ref_name.partial"
-  log "the reference tables changed: dumping them to $BACKUP_DIR/postgres/reference/$ref_name"
+  log "$reason: dumping them to $BACKUP_DIR/postgres/reference/$ref_name"
   "${COMPOSE[@]}" exec -T db sh -c 'pg_dump -Fc --data-only '"$(printf -- '-t %s ' "${REFERENCE_TABLES[@]}")"' -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > "$ref_partial"
   "${COMPOSE[@]}" exec -T db pg_restore --list < "$ref_partial" > /dev/null
   mv "$ref_partial" "$BACKUP_DIR/postgres/reference/$ref_name"
   log "reference dump is $(du -h "$BACKUP_DIR/postgres/reference/$ref_name" | cut -f 1)"
   rclone copyto "/backups/postgres/reference/$ref_name" "backup:postgres/reference/$ref_name"
   # Only once it's in the bucket: a failed upload means the next run tries again.
-  echo "$fingerprint" > "$fingerprint_file"
+  printf '%s\n%s\n' "$ref_name" "$fingerprint" > "$state_file"
+  saved_name=$ref_name
 else
-  log "the reference tables haven't changed since the last reference dump"
+  log "the reference tables haven't changed since $saved_name, which is in the bucket"
 fi
+# When the reference dump in the bucket was taken, for the dashboard: months old is normal.
+ref_stamp=${saved_name#holdmytrack-reference-}; ref_stamp=${ref_stamp%.dump}
+ref_time=$(date -u -d "${ref_stamp:0:4}-${ref_stamp:4:2}-${ref_stamp:6:2} ${ref_stamp:9:2}:${ref_stamp:11:2}" +%s 2>/dev/null ||
+  date -u -j -f %Y%m%d-%H%M%S "${ref_stamp}00" +%s)
+record_time holdmytrack_backup_reference_timestamp_seconds backup_reference \
+  "Unix time the reference dump in the bucket was taken." "$ref_time"
 
 log "dumping Postgres to $BACKUP_DIR/postgres/$name"
 "${COMPOSE[@]}" exec -T db sh -c 'pg_dump -Fc '"$(printf -- '--exclude-table-data=%s ' "${REFERENCE_TABLES[@]}" "${REBUILT_TABLES[@]}")"' -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > "$partial"
