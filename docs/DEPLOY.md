@@ -306,7 +306,7 @@ It's served with `Cache-Control: no-cache`, so a replaced file is never masked b
 
 ## 11. Backups and the restore drill
 
-`scripts/backup.sh` runs nightly: it dumps Postgres, keeps the dump in `/srv/holdmytrack-backups/postgres/` for a week, and copies it to a second R2 bucket. It then syncs the app bucket's `raw/`, `photos/` and `avatars/` into the same bucket. `fog/` and `heatmap/` aren't copied, and the dump leaves out the data of `activity_tile_mask_data` (the activity masks' PNGs), because `rerender-coverage --masks` rebuilds them all (ADR-0029, ADR-0040). `scripts/restore-drill.sh` runs monthly and proves the copies restore. Both run rclone from `compose.prod.yml`'s `rclone` service, which `up` never starts, so nothing needs installing on the host.
+`scripts/backup.sh` runs nightly: it dumps Postgres, copies the dump to a second R2 bucket, and keeps the newest three dumps in `/srv/holdmytrack-backups/postgres/`, so the last deploy can be undone without fetching one. It then syncs the app bucket's `raw/`, `photos/` and `avatars/` into the same bucket. `fog/` and `heatmap/` aren't copied, and the dump leaves out the data of `activity_tile_mask_data` (the activity masks' PNGs), because `rerender-coverage --masks` rebuilds them all (ADR-0029, ADR-0040). `scripts/restore-drill.sh` runs monthly and proves the copies restore. Both run rclone from `compose.prod.yml`'s `rclone` service, which `up` never starts, so nothing needs installing on the host.
 
 **Set up.**
 
@@ -315,7 +315,7 @@ It's served with `Cache-Control: no-cache`, so a replaced file is never masked b
 3. Run both scripts once by hand: `./scripts/backup.sh`, then `./scripts/restore-drill.sh`. The first backup copies every object, so it takes longest.
 4. Schedule them in `/etc/cron.d/holdmytrack-backup`:
    ```
-   17 3 * * * root /srv/holdmytrack/scripts/backup.sh >> /var/log/holdmytrack-backup.log 2>&1
+   17 3 * * * root /srv/holdmytrack/scripts/backup.sh --nightly >> /var/log/holdmytrack-backup.log 2>&1
    47 4 1 * * root /srv/holdmytrack/scripts/restore-drill.sh >> /var/log/holdmytrack-backup.log 2>&1
    ```
 5. Rotate that log, which otherwise grows a little every night (more on the first run, which lists every object it copies), in `/etc/logrotate.d/holdmytrack-backup`:
@@ -331,7 +331,7 @@ It's served with `Cache-Control: no-cache`, so a replaced file is never masked b
    ```
    `su` is needed on Ubuntu, whose `/var/log` is group-writable by `syslog`: without it, logrotate skips the file as insecure. `logrotate -d /etc/logrotate.d/holdmytrack-backup` checks the rule without rotating anything.
 
-**What's in the backup bucket.** `postgres/daily/` holds each night's dump for 14 days, and `postgres/weekly/` holds Sunday's for 8 weeks. `objects/` mirrors the app bucket's keys. When the sync would delete or overwrite an object there, it moves the old copy into `objects-deleted/<UTC stamp of that run>/` instead, where it stays for 30 days. An account deleted on request therefore stays in the backups for up to 8 weeks.
+**What's in the backup bucket.** `postgres/daily/` holds each night's dump for 14 days, and `postgres/weekly/` holds Sunday's for 8 weeks. A run by hand, without `--nightly` — the one before a deploy (§6) — goes to `postgres/manual/` instead, kept 3 days: long enough to undo the deploy, and a busy deploy day doesn't fill the history with near-identical dumps. Only a nightly run updates the "Backup overdue" alert's timestamp (§13), so a manual one can't hide a cron job that stopped. `objects/` mirrors the app bucket's keys. When the sync would delete or overwrite an object there, it moves the old copy into `objects-deleted/<UTC stamp of that run>/` instead, where it stays for 30 days. An account deleted on request therefore stays in the backups for up to 8 weeks.
 
 **The drill** takes the newest dump from the bucket and restores it into a throwaway container of the live `db` image, which has no network and is removed afterwards. It prints row counts next to the live database's. It then checks every object key the restored database refers to: each activity's raw payload, each photo and its thumbnail, each avatar. Every one must be in `objects/`, or in `objects-deleted/` if the app removed it after the dump. It fails, and records no success for the "Restore drill overdue" alert (§13), if the newest dump is more than 36 hours old, if `pg_restore` fails, if the restored database has no users, if its `activity_tile_mask_data` isn't empty (the dump is meant to leave its data out), or if any object is missing. When an object is missing, it also says whether the object is gone from the app bucket too. That would mean the database already pointed at nothing before the backup ran. Run the drill by hand after changing `backup.sh`, or after adding anything that stores objects under a new key.
 
@@ -340,7 +340,7 @@ It's served with `Cache-Control: no-cache`, so a replaced file is never masked b
 ```
 ./scripts/maintenance.sh on
 docker compose -f compose.prod.yml --env-file .env.prod stop api worker
-# The newest local dump, or fetch one: … run --rm rclone copyto backup:postgres/daily/<name> /backups/<name>
+# The newest local dump, or fetch one: … run --rm rclone copyto backup:postgres/daily/<name> /backups/<name> (or manual/, for a deploy's)
 docker compose -f compose.prod.yml --env-file .env.prod exec -T db sh -c 'dropdb -U "$POSTGRES_USER" "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" -T template0 "$POSTGRES_DB"'
 docker compose -f compose.prod.yml --env-file .env.prod exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --exit-on-error --no-owner' < /srv/holdmytrack-backups/postgres/<name>
 ```
@@ -370,6 +370,14 @@ printf 'Unattended-Upgrade::Automatic-Reboot "true";\nUnattended-Upgrade::Automa
 apt-config dump | grep Automatic-Reboot
 ```
 
+**Docker's build cache pruned weekly.** Every deploy builds on this server (§6), and Docker keeps every layer it built, so the cache grows with each one: 34 GB of this 77 GB disk after the first month. A weekly prune keeps the newest 5 GB of it, so a deploy still reuses its recent layers, and removes the untagged images rebuilds leave behind. It touches no container, volume or tagged image. Sunday 04:17 falls after `backup.sh` (03:17). In `/etc/cron.d/holdmytrack-docker-prune`:
+
+```
+17 4 * * 0 root (docker builder prune -f --keep-storage 5GB && docker image prune -f) >> /var/log/holdmytrack-docker-prune.log 2>&1
+```
+
+`docker system df` shows what the build cache holds now.
+
 **Secrets readable by root only.** `chmod 600 .env.prod`. `backup.sh` itself keeps `BACKUP_DIR` at `700` and writes its dumps as `600` (§11).
 
 ## 13. Monitoring
@@ -380,7 +388,7 @@ Grafana Cloud's free tier holds the deployment's logs and metrics, with dashboar
 - **The app's metrics** from `api` and `worker` (`GET /metrics` on port 9100, on the Docker network only): requests by route and status class with their timings, recovered panics, finished jobs by kind, outcome and failure code, and the queue's runnable jobs and the oldest one's age, by kind.
 - **The host's metrics**: CPU, memory, swap, disk, network and OOM kills (`node_vmstat_oom_kill`).
 - **Postgres's metrics**, database-wide: connections, size, locks, transactions.
-- **Backup freshness**: `backup.sh` and `restore-drill.sh` write the time of their last successful run to `BACKUP_DIR/metrics/` (`holdmytrack_backup_last_success_timestamp_seconds`, `holdmytrack_restore_drill_last_success_timestamp_seconds`).
+- **Backup freshness**: `backup.sh --nightly` and `restore-drill.sh` write the time of their last successful run to `BACKUP_DIR/metrics/` (`holdmytrack_backup_last_success_timestamp_seconds`, `holdmytrack_restore_drill_last_success_timestamp_seconds`).
 
 Every series and stream carries `deployment="<your-domain>"`. The stack sends about 1,400 metric series, against the free tier's 10,000. Alloy itself uses about 70 MB of memory and is capped at 400 MB.
 
@@ -413,7 +421,7 @@ It creates the `holdmytrack` contact point, a **HoldMyTrack** folder holding the
 | Memory nearly exhausted | under 10% available for 10 minutes |
 | Process killed for lack of memory | any OOM kill in the last 10 minutes |
 | Site down from outside | under half the uptime checks of `/healthz` succeeded over 5 minutes, or the check reports nothing |
-| Backup overdue | `backup.sh` last succeeded over 26 hours ago, or never |
+| Backup overdue | The nightly `backup.sh` last succeeded over 26 hours ago, or never |
 | Restore drill overdue | `restore-drill.sh` last succeeded over 33 days ago, or never |
 
 The two backup alerts read the files the scripts write after a successful run (§11), so on a server whose scripts haven't run since that was added, they fire until each script has run once. Run `./scripts/backup.sh` and `./scripts/restore-drill.sh` by hand to start them off.
