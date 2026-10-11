@@ -166,18 +166,41 @@ export interface PathOverlays {
 const TRAIL_DETAILS = ['path', 'footway', 'bridleway'];
 const TRACK_DETAIL = 'track';
 
-/** Cool for cycleways and shared paths (bikePaths.ts), green for trails, brown for tracks, all
- *  clear of the ochre activity tracks (tracks.ts). A shared path is a lighter cycleway blue, so
- *  both read as bike routes. On the light flavors both blues are dark enough to hold up on Fog's
- *  grey veil; on the dark ones they stay bright against the dark map. The monochrome flavors
- *  stay monochrome; there the kinds differ by weight and dash. */
+/** Blue for cycleways, teal for shared paths (bikePaths.ts), green for trails, brown for tracks,
+ *  all clear of the ochre activity tracks (tracks.ts). Teal sits between the cycleway blue and
+ *  the trail green, so a shared path reads as a bike route people walk too, and the hue alone
+ *  tells it from a cycleway when the map is zoomed out too far for a dash to show. On the light
+ *  flavors the two bike colors are dark enough to hold up on Fog's grey veil; on the dark ones
+ *  they stay bright against the dark map. The monochrome flavors stay monochrome; there the
+ *  kinds differ by weight and dash. */
 export const PATH_COLORS: Record<Flavor, { cycleway: string; shared: string; trail: string; track: string }> = {
-  light: { cycleway: '#0b5a85', shared: '#1a74a8', trail: '#4f7a3a', track: '#8a5a2b' },
-  dark: { cycleway: '#5cbfe0', shared: '#93d6ec', trail: '#8fbf6a', track: '#c9955e' },
+  light: { cycleway: '#0b5a85', shared: '#0b7f74', trail: '#4f7a3a', track: '#8a5a2b' },
+  dark: { cycleway: '#5cbfe0', shared: '#4fd6c2', trail: '#8fbf6a', track: '#c9955e' },
   white: { cycleway: '#262626', shared: '#404040', trail: '#6e6e6e', track: '#5c5c5c' },
   grayscale: { cycleway: '#1f1f1f', shared: '#383838', trail: '#666666', track: '#555555' },
   black: { cycleway: '#c4c4c4', shared: '#a8a8a8', trail: '#9a9a9a', track: '#b0b0b0' },
 };
+
+/** Each kind's dash, in line widths as MapLibre's `line-dasharray` takes it, or none for a solid
+ *  line: the map's layers and the Layers menu's legend (OverlaysMenu.tsx) both draw from it. A
+ *  shared path is solid in every flavor but the monochrome ones, where only a dash tells it from
+ *  a cycleway. */
+export function pathDash(flavor: Flavor, kind: keyof (typeof PATH_COLORS)[Flavor]): number[] | undefined {
+  switch (kind) {
+    case 'cycleway':
+      return undefined;
+    case 'shared':
+      return isMonochrome(flavor) ? [2, 1] : undefined;
+    case 'trail':
+      return [2, 1];
+    case 'track':
+      return [3, 1.5];
+  }
+}
+
+function isMonochrome(flavor: Flavor): boolean {
+  return flavor === 'white' || flavor === 'grayscale' || flavor === 'black';
+}
 
 function pathLayers(flavor: Flavor, bridges: boolean): LineLayerSpecification[] {
   const colors = PATH_COLORS[flavor];
@@ -198,8 +221,8 @@ function pathLayers(flavor: Flavor, bridges: boolean): LineLayerSpecification[] 
       paint: {
         'line-color': colors.track,
         // Longer dashes and a wider line than a trail: a road a vehicle fits on.
-        'line-dasharray': [3, 1.5],
-        'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], PATHS_MIN_ZOOM, 1, 18, 3.5],
+        'line-dasharray': pathDash(flavor, 'track') ?? [],
+        'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], PATHS_MIN_ZOOM, 1.5, 18, 4],
       },
     },
     {
@@ -211,8 +234,8 @@ function pathLayers(flavor: Flavor, bridges: boolean): LineLayerSpecification[] 
       filter: filter(['in', 'kind_detail', ...TRAIL_DETAILS]),
       paint: {
         'line-color': colors.trail,
-        'line-dasharray': [2, 1],
-        'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], PATHS_MIN_ZOOM, 0.8, 18, 3],
+        'line-dasharray': pathDash(flavor, 'trail') ?? [],
+        'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], PATHS_MIN_ZOOM, 1.3, 18, 3.5],
       },
     },
   ];

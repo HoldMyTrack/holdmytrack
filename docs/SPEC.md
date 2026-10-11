@@ -665,14 +665,14 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 
 | Kind | What it draws (OpenStreetMap tags) | Typically | Drawn as | Shown | From zoom |
 | :-- | :-- | :-- | :-- | :-- | :-- |
-| **Bike paths** | `highway=cycleway` | A path built for bikes, separate from the road | Solid dark blue | When ticked in Layers | 9 |
-| **Shared paths** | `highway=path`, `footway` or `bridleway` with `bicycle=designated` | A multi-use trail or greenway bikes share with people on foot | Dashed, lighter blue | When ticked in Layers | 9 |
+| **Bike paths** | `highway=cycleway` | A path built for bikes, separate from the road | Solid blue | When ticked in Layers | 9 |
+| **Shared paths** | `highway=path`, `footway` or `bridleway` with `bicycle=designated` | A multi-use trail or greenway bikes share with people on foot | Solid teal | When ticked in Layers | 9 |
 | Trails | `highway=path`, `footway` or `bridleway` | A walking, hiking or horse path, any surface | Dashed green | Always | 13 |
 | Tracks | `highway=track` | A dirt, farm or forest road, unpaved and wide enough for a vehicle | Longer-dashed, wider brown, under the trails | Always | 12 |
 
-A shared path is also a trail, so from zoom 13 with Shared paths ticked it is drawn twice, the blue over the green. A street with a bike lane painted on it is none of the four. On the dark flavors (FR-4.5) the two blues are bright rather than dark, to stand out on the dark map; the monochrome flavors draw all four in greys, telling them apart by the dash and width.
+A shared path is also a trail, so from zoom 13 with Shared paths ticked it is drawn twice, the blue over the green. A street with a bike lane painted on it is none of the four. Blue and teal are dark on the light map, to hold up on Fog's grey veil, and bright on the dark flavors (FR-4.5), to stand out on the dark map; the monochrome flavors draw all four in greys, telling them apart by the dash and width, a shared path dashed there.
 
-**Preconditions**: Active session. The Layers menu is beside the map-mode toggle (FR-4.1–FR-4.3) — in the Android app, a pill under the menu button — and is hidden while the Edit window is open (FR-5.10), like that toggle. The Layers button opens a panel of checkboxes under Paths and Points of interest (FR-15.2). The button shows how many paths and places are picked; a press on the button again or outside the panel, or Escape (Back on Android), closes it.
+**Preconditions**: Active session. The Layers menu is beside the map-mode toggle (FR-4.1–FR-4.3) — in the Android app, a pill under the menu button — and is hidden while the Edit window is open (FR-5.10), like that toggle. The Layers button opens a panel of checkboxes under Paths and Points of interest (FR-15.2). Each path entry ends in a short sample of its line, in the current flavor's color, and under the two a note — "Always shown when zoomed in:" — samples trails and dirt tracks, which have no entry. The button shows how many paths and places are picked; a press on the button again or outside the panel, or Escape (Back on Android), closes it.
 
 **Behavior**:
 1. Bike paths and Shared paths are off by default. Each entry draws what the table above gives, from zoom 9, on its own. Trails and tracks are always drawn, from the zooms the table gives, with no entry to turn them off. Every line widens as the map zooms in, and bike and shared paths are drawn bolder than trails and tracks.

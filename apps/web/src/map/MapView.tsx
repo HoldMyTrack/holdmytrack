@@ -1614,7 +1614,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
                 </button>
               </div>
               {/* Its own group: layers switched on and off over any mode, not a fourth mode. */}
-              <OverlaysMenu overlays={overlays} onChange={changeOverlays} />
+              <OverlaysMenu overlays={overlays} onChange={changeOverlays} flavor={flavor} />
               {satelliteAvailable && (
                 <BasemapToggle satellite={overlays.satellite} onChange={(on) => changeOverlays({ ...overlays, satellite: on })} />
               )}

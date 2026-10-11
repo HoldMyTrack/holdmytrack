@@ -1581,6 +1581,32 @@ button.activities-panel__story-badge:hover {
   accent-color: var(--fm-accent);
 }
 
+/* A sample of how the map draws a kind of path, at the end of its entry. */
+.overlays-menu__item .overlays-menu__swatch {
+  margin-left: auto;
+}
+
+.overlays-menu__swatch {
+  flex: none;
+}
+
+/* Under the path entries: the trails and tracks the map draws without a pick. */
+.overlays-menu__always {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fm-space-4) var(--fm-space-8);
+  margin: var(--fm-space-4) var(--fm-space-2) 0;
+  font-size: var(--fm-text-sm);
+  color: var(--fm-ink-muted);
+}
+
+.overlays-menu__key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fm-space-4);
+}
+
 /* "Show in this area" (ShowInArea.tsx): a pill centered over the map, under the toggles. */
 .show-in-area {
   position: absolute;

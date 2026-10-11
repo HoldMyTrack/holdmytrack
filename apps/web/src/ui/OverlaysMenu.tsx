@@ -2,12 +2,39 @@ import { useEffect, useRef, useState } from 'react';
 import { pickedCount, type Overlays } from '../map/overlays';
 import { ChevronDown, Layers } from 'lucide-react';
 import { SPOT_CATEGORIES, type SpotCategory } from '../map/spots';
+import { PATH_COLORS, pathDash, type Flavor } from '../map/style';
 import { t } from '../i18n';
 import type { MessageKey } from '../i18n/en';
 
 export interface OverlaysMenuProps {
   overlays: Overlays;
   onChange: (next: Overlays) => void;
+  /** The basemap's flavor, whose path colors the legend shows. */
+  flavor: Flavor;
+}
+
+type PathKind = keyof (typeof PATH_COLORS)[Flavor];
+
+/** How wide the legend draws a line; the dash scales with it, as on the map. */
+const SWATCH_WIDTH = 3;
+
+/** A short sample of a kind of path, in the color and dash the map draws it with. */
+function PathSwatch({ flavor, kind }: { flavor: Flavor; kind: PathKind }) {
+  const dash = pathDash(flavor, kind);
+  return (
+    <svg className="overlays-menu__swatch" width="24" height="8" viewBox="0 0 24 8" aria-hidden="true">
+      <line
+        x1="2"
+        y1="4"
+        x2="22"
+        y2="4"
+        stroke={PATH_COLORS[flavor][kind]}
+        strokeWidth={SWATCH_WIDTH}
+        strokeLinecap={dash ? 'butt' : 'round'}
+        strokeDasharray={dash?.map((d) => d * SWATCH_WIDTH).join(' ')}
+      />
+    </svg>
+  );
 }
 
 const CATEGORY_LABELS: Record<SpotCategory, MessageKey> = {
@@ -26,7 +53,7 @@ const CATEGORY_LABELS: Record<SpotCategory, MessageKey> = {
  * many are picked, and the checkbox before it shows or hides all of them at once, keeping the
  * picks; picking one while it's off turns it back on, or the pick would seem to do nothing.
  */
-export function OverlaysMenu({ overlays, onChange }: OverlaysMenuProps) {
+export function OverlaysMenu({ overlays, onChange, flavor }: OverlaysMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -57,10 +84,11 @@ export function OverlaysMenu({ overlays, onChange }: OverlaysMenuProps) {
   const count = pickedCount(overlays);
   const shown = overlays.enabled && count > 0;
 
-  const item = (id: string, label: string, checked: boolean, onToggle: () => void) => (
+  const item = (id: string, label: string, checked: boolean, onToggle: () => void, swatch?: PathKind) => (
     <label key={id} htmlFor={id} className="overlays-menu__item">
       <input id={id} type="checkbox" checked={checked} onChange={onToggle} />
       <span>{label}</span>
+      {swatch && <PathSwatch flavor={flavor} kind={swatch} />}
     </label>
   );
 
@@ -92,8 +120,20 @@ export function OverlaysMenu({ overlays, onChange }: OverlaysMenuProps) {
         <div className="overlays-menu__panel" role="dialog" aria-label={t('map.overlays')}>
           <fieldset className="overlays-menu__group">
             <legend>{t('overlays.paths')}</legend>
-            {item('overlay-bike-paths', t('overlays.bike_paths'), overlays.bikePaths, () => togglePath('bikePaths'))}
-            {item('overlay-shared-paths', t('overlays.shared_paths'), overlays.sharedPaths, () => togglePath('sharedPaths'))}
+            {item('overlay-bike-paths', t('overlays.bike_paths'), overlays.bikePaths, () => togglePath('bikePaths'), 'cycleway')}
+            {item('overlay-shared-paths', t('overlays.shared_paths'), overlays.sharedPaths, () => togglePath('sharedPaths'), 'shared')}
+            {/* Trails and tracks have no entry: they're part of the map (FR-4.13), and this says so. */}
+            <p className="overlays-menu__always" data-testid="overlays-always">
+              {t('overlays.always_shown')}
+              <span className="overlays-menu__key">
+                <PathSwatch flavor={flavor} kind="trail" />
+                {t('overlays.trails')}
+              </span>
+              <span className="overlays-menu__key">
+                <PathSwatch flavor={flavor} kind="track" />
+                {t('overlays.dirt_tracks')}
+              </span>
+            </p>
           </fieldset>
           <fieldset className="overlays-menu__group">
             <legend>{t('overlays.places')}</legend>

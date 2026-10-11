@@ -1,7 +1,7 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { API_BASE_URL, TILES_V1 } from '../api';
 import { versionedTileURL } from './coverageVersion';
-import { PATH_COLORS, type Flavor } from './style';
+import { PATH_COLORS, pathDash, type Flavor } from './style';
 
 /**
  * The Layers menu's Bike paths and Shared paths (docs/SPEC.md FR-4.13, IMPLEMENTATION.md §4.24):
@@ -47,6 +47,7 @@ export function ensureBikePathLayers(map: MapLibreMap, beforeId: string | undefi
     });
   }
   const colors = PATH_COLORS[flavor];
+  const sharedDash = pathDash(flavor, 'shared');
   if (!map.getLayer(BIKE_PATHS_SHARED_LAYER_ID)) {
     map.addLayer(
       {
@@ -59,8 +60,8 @@ export function ensureBikePathLayers(map: MapLibreMap, beforeId: string | undefi
         layout: { visibility: 'none' },
         paint: {
           'line-color': colors.shared,
-          // Dashed like a trail, since people walk it too; a cycleway is solid.
-          'line-dasharray': [2, 1],
+          // Told from a cycleway by its teal, or on a monochrome flavor by a dash (style.ts).
+          ...(sharedDash ? { 'line-dasharray': sharedDash } : {}),
           'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], BIKE_PATHS_MIN_ZOOM, 1.5, 13, 2, 18, 4.5],
         },
       },

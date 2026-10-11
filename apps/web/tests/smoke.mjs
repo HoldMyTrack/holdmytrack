@@ -320,6 +320,10 @@ describe('basemap foundation', () => {
     assert.deepEqual(await visibility(PICKS), PICKS.map(() => 'none'), 'hidden again once unticked');
     assert.equal(await master.isDisabled(), true, 'nothing picked: nothing for the checkbox to show');
     assert.equal(await page.locator('#overlay-all, #overlay-spots-all').count(), 0, 'no All checkboxes');
+    // The legend: each bike entry's line, and the trails and tracks the map always draws.
+    assert.equal(await menu.locator('.overlays-menu__item .overlays-menu__swatch').count(), 2, 'a line sample on each bike entry');
+    assert.ok(await page.getByTestId('overlays-always').isVisible(), 'the always-shown note');
+    assert.equal(await page.getByTestId('overlays-always').locator('.overlays-menu__swatch').count(), 2, 'trails and tracks in the note');
     await page.screenshot({ path: new URL('layers-menu.png', SHOTS).pathname });
   });
 
