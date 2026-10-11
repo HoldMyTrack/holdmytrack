@@ -44,7 +44,7 @@ basemap: ## Re-cut the .pmtiles extract (pmtiles is baked into the dev image)
 test-go: ## Go unit tests (services/server), the database ones against compose's db
 	$(COMPOSE) up -d --wait db
 	$(COMPOSE) exec -T db sh -c 'createdb -U holdmytrack holdmytrack_test 2>/dev/null || true'
-	$(GO) go test ./...
+	$(GO) go test -p 1 ./...
 
 # verify:style compares against services/server/internal/mapstyle/styles, which the web
 # container does not otherwise see; mounted where the script's own relative path lands.
