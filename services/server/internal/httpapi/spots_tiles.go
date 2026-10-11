@@ -6,7 +6,7 @@ import (
 
 // spotsMinZoom is the lowest zoom the spots tiles carry anything at: a neighbourhood or two in
 // view. Below it a city's playgrounds and memorials would be one pile of icons. It's the zoom
-// the basemap's trails and bike paths start at too (apps/web/src/map/style.ts's PATHS_MIN_ZOOM),
+// the basemap's trails start at too (apps/web/src/map/style.ts's PATHS_MIN_ZOOM),
 // so places and paths come and go together. Must match SPOTS_MIN_ZOOM in apps/web/src/map/spots.ts.
 const spotsMinZoom = 13
 

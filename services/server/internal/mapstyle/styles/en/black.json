@@ -1359,7 +1359,7 @@
       "type": "line",
       "source": "protomaps",
       "source-layer": "roads",
-      "minzoom": 13,
+      "minzoom": 12,
       "filter": [
         "all",
         [
@@ -1381,9 +1381,6 @@
           "track"
         ]
       ],
-      "layout": {
-        "visibility": "none"
-      },
       "paint": {
         "line-color": "#b0b0b0",
         "line-dasharray": [
@@ -1399,10 +1396,10 @@
           [
             "zoom"
           ],
-          13,
-          1,
+          12,
+          1.5,
           18,
-          3.5
+          4
         ]
       }
     },
@@ -1411,7 +1408,7 @@
       "type": "line",
       "source": "protomaps",
       "source-layer": "roads",
-      "minzoom": 13,
+      "minzoom": 12,
       "filter": [
         "all",
         [
@@ -1435,9 +1432,6 @@
           "bridleway"
         ]
       ],
-      "layout": {
-        "visibility": "none"
-      },
       "paint": {
         "line-color": "#9a9a9a",
         "line-dasharray": [
@@ -1453,59 +1447,10 @@
           [
             "zoom"
           ],
-          13,
-          0.8,
+          12,
+          1.3,
           18,
-          3
-        ]
-      }
-    },
-    {
-      "id": "paths_cycleway",
-      "type": "line",
-      "source": "protomaps",
-      "source-layer": "roads",
-      "minzoom": 13,
-      "filter": [
-        "all",
-        [
-          "!has",
-          "is_tunnel"
-        ],
-        [
-          "!has",
-          "is_bridge"
-        ],
-        [
-          "==",
-          "kind",
-          "path"
-        ],
-        [
-          "==",
-          "kind_detail",
-          "cycleway"
-        ]
-      ],
-      "layout": {
-        "visibility": "none",
-        "line-cap": "round"
-      },
-      "paint": {
-        "line-color": "#c4c4c4",
-        "line-width": [
-          "interpolate",
-          [
-            "exponential",
-            1.6
-          ],
-          [
-            "zoom"
-          ],
-          13,
-          1,
-          18,
-          4
+          3.5
         ]
       }
     },
@@ -2198,7 +2143,7 @@
       "type": "line",
       "source": "protomaps",
       "source-layer": "roads",
-      "minzoom": 13,
+      "minzoom": 12,
       "filter": [
         "all",
         [
@@ -2216,9 +2161,6 @@
           "track"
         ]
       ],
-      "layout": {
-        "visibility": "none"
-      },
       "paint": {
         "line-color": "#b0b0b0",
         "line-dasharray": [
@@ -2234,10 +2176,10 @@
           [
             "zoom"
           ],
-          13,
-          1,
+          12,
+          1.5,
           18,
-          3.5
+          4
         ]
       }
     },
@@ -2246,7 +2188,7 @@
       "type": "line",
       "source": "protomaps",
       "source-layer": "roads",
-      "minzoom": 13,
+      "minzoom": 12,
       "filter": [
         "all",
         [
@@ -2266,9 +2208,6 @@
           "bridleway"
         ]
       ],
-      "layout": {
-        "visibility": "none"
-      },
       "paint": {
         "line-color": "#9a9a9a",
         "line-dasharray": [
@@ -2284,55 +2223,10 @@
           [
             "zoom"
           ],
-          13,
-          0.8,
+          12,
+          1.3,
           18,
-          3
-        ]
-      }
-    },
-    {
-      "id": "paths_bridges_cycleway",
-      "type": "line",
-      "source": "protomaps",
-      "source-layer": "roads",
-      "minzoom": 13,
-      "filter": [
-        "all",
-        [
-          "has",
-          "is_bridge"
-        ],
-        [
-          "==",
-          "kind",
-          "path"
-        ],
-        [
-          "==",
-          "kind_detail",
-          "cycleway"
-        ]
-      ],
-      "layout": {
-        "visibility": "none",
-        "line-cap": "round"
-      },
-      "paint": {
-        "line-color": "#c4c4c4",
-        "line-width": [
-          "interpolate",
-          [
-            "exponential",
-            1.6
-          ],
-          [
-            "zoom"
-          ],
-          13,
-          1,
-          18,
-          4
+          3.5
         ]
       }
     },

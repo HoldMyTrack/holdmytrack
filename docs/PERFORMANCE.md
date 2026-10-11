@@ -271,3 +271,19 @@ The laptop's dev stack, with a worker and API built from `main` and then from th
 
 - 132 served tiles of one account, five of every zoom level from 0 to 14, Fog and Heatmap, were byte-identical between the two builds.
 - `main`'s times match the 363 / 422 s of the session that moved the masks into Postgres, so the 2.4-fold drop is this change alone.
+
+### 2026-10-10 — dev stack, bike-path tiles
+
+The laptop's dev stack, with the Ohio extract's bike paths imported (16,208 ways, `IMPLEMENTATION.md` §4.24): `bikePathsQuery` run straight in `psql` for the tile over downtown Cleveland at each zoom, warm, once with the lines stored in WGS 84 and reprojected per request, once stored in Web Mercator as shipped.
+
+| Zoom | Tile size | Reprojected per request | Stored in Web Mercator |
+| :-- | :-- | :-- | :-- |
+| 9 | 13.6 KB | 140 ms | 2.2 ms |
+| 10 | 13.7 KB | 16 ms | 1.9 ms |
+| 11 | 10.3 KB | 7.9 ms | 1.3 ms |
+| 12 | 6.3 KB | 3.9 ms | 0.9 ms |
+| 13 | 3.2 KB | 1.2 ms | 0.5 ms |
+| 14 | 0.7 KB | 0.5 ms | 0.3 ms |
+
+- The tiles came out the same size at every zoom from either storage; the table stores Web Mercator.
+- Ohio is sparse next to the Netherlands or Denmark, where a z9 tile holds many times the ways; no denser region was measured.

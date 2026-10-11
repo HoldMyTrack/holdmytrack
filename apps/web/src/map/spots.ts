@@ -6,7 +6,6 @@ import type { FeatureCollection, Point } from 'geojson';
 import { Binoculars, Castle, createLucideIcon, Dog, Landmark, type LucideProps } from 'lucide-react';
 import { API_BASE_URL, TILES_V1 } from '../api';
 import { versionedTileURL } from './coverageVersion';
-import { PATHS_MIN_ZOOM } from './style';
 
 /**
  * The Spots layers (IMPLEMENTATION.md §4.25, ADR-0021): outdoor places from OpenStreetMap, each an
@@ -41,10 +40,9 @@ const SPOTS_SOURCE_LAYER = 'spots';
 const SPOTS_AREA_SOURCE_LAYER = 'spot_areas';
 
 /** The server sends nothing below the first (internal/httpapi's spotsMinZoom) — "Show in this
- *  area" covers the zooms down to Region's. It's the paths' zoom (style.ts's PATHS_MIN_ZOOM), so
- *  places and paths appear together. Past the second, its tiles serve every zoom above by
+ *  area" covers the zooms down to Region's. Past the second, its tiles serve every zoom above by
  *  overzooming, the way the tracks tiles do past z14. */
-export const SPOTS_MIN_ZOOM = PATHS_MIN_ZOOM;
+export const SPOTS_MIN_ZOOM = 13;
 
 /** The lowest zoom "Show in this area" (ShowInArea.tsx) offers places at, where a screen is
  *  about a metro area (~100 km across). Below it a view spans a state or more, where the dense

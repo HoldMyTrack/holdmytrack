@@ -81,8 +81,8 @@ export const SATELLITE_ROAD_OPACITY = 0.4;
  * The road lines satellite mode dims to `SATELLITE_ROAD_OPACITY`: the basemap's `roads_*` line
  * layers, casings included, that set no opacity of their own. That leaves out rail (already
  * half-transparent, and not a road), so switching back only has to reset the rest to the
- * default. The path layers (trails, tracks, bike paths) stay opaque: they're what a user
- * switched on to see.
+ * default. The trail and track layers stay opaque: on satellite imagery they're what the
+ * ground can't show.
  */
 export function satelliteDimmedLayerIds(style: readonly LayerSpecification[]): string[] {
   return style
@@ -131,10 +131,6 @@ export interface BuildStyleOptions {
   pmtilesPath?: string;
   glyphsPath?: string;
   spriteBasePath?: string;
-  /** Which of the path layers start visible: trails (`TRAIL_LAYER_IDS`) and bike paths
-   *  (`BIKE_PATH_LAYER_IDS`). Both off by default, so the served style documents look the same
-   *  as the stock basemap to a client that never flips them. */
-  paths?: PathOverlays;
   /** The deployment's imagery, or none: then the style has no satellite source at all. */
   satellite?: SatelliteSource | null;
   /** Whether satellite mode starts on. Ignored without `satellite`. */
@@ -142,37 +138,26 @@ export interface BuildStyleOptions {
 }
 
 /**
- * The trails and bike paths toggle's layers (docs/SPEC.md FR-4.5). Protomaps already carries
- * every OSM path in the `roads` layer (`kind=path`, sorted by `kind_detail`), but the stock
- * style draws them all through `roads_other` as one hairline grey from z14, which reads as no
- * paths at all. These draw cycleways and trails over that same geometry from lower zoom, so
- * hiding them just falls back to the stock look. The Android app toggles the same ids by
- * name (`MapPaths`), so they are part of the served style's contract.
+ * The trail and track layers (docs/SPEC.md FR-4.13), part of the map itself rather than the
+ * Layers menu. Protomaps already carries every OSM path in the `roads` layer (`kind=path`,
+ * sorted by `kind_detail`), but the stock style draws them all through `roads_other` as one
+ * hairline grey from z14, which reads as no paths at all. These draw trails and tracks over that
+ * same geometry from further out. Clients find them by id to lift them over Fog's veil
+ * (paths.ts, Android's `MapPaths`), so the ids are part of the served style's contract.
  */
-export const PATH_LAYER_IDS = [
-  'paths_cycleway',
-  'paths_trail',
-  'paths_track',
-  'paths_bridges_cycleway',
-  'paths_bridges_trail',
-  'paths_bridges_track',
-] as const;
+export const PATH_LAYER_IDS = ['paths_trail', 'paths_track', 'paths_bridges_trail', 'paths_bridges_track'] as const;
 
-/** The three kinds the Layers menu shows separately (overlays.ts, and Android's `MapPaths`). */
-export const TRAIL_LAYER_IDS = ['paths_trail', 'paths_bridges_trail'] as const;
-export const TRACK_LAYER_IDS = ['paths_track', 'paths_bridges_track'] as const;
-export const BIKE_PATH_LAYER_IDS = ['paths_cycleway', 'paths_bridges_cycleway'] as const;
+/** The zoom the trail and track layers start at: the first the basemap carries tracks at. It
+ *  has trails only from z13, so they join a zoom later. Bike and shared paths start further out,
+ *  from their own tiles (bikePaths.ts). */
+export const PATHS_MIN_ZOOM = 12;
 
-/** The zoom every path layer starts at: the first the basemap carries trails and cycleways
- *  at (below it, the roads layer has only tracks). Points of interest start at the same zoom
- *  (spots.ts's SPOTS_MIN_ZOOM), so the two come and go together. */
-export const PATHS_MIN_ZOOM = 13;
-
-/** Which path layers are showing. */
+/** Which of the Layers menu's paths are showing: bikePaths.ts's cycleways, shared paths and
+ *  mountain-bike trails. */
 export interface PathOverlays {
-  trails: boolean;
-  tracks: boolean;
   bikePaths: boolean;
+  sharedPaths: boolean;
+  mtbTrails: boolean;
 }
 
 /** Sidewalks, crossings, steps and pedestrian areas stay on the stock grey on purpose: in a
@@ -183,25 +168,51 @@ export interface PathOverlays {
 const TRAIL_DETAILS = ['path', 'footway', 'bridleway'];
 const TRACK_DETAIL = 'track';
 
-/** Cool for cycleways, green for trails, brown for tracks, all clear of the ochre activity
- *  tracks (tracks.ts). The monochrome flavors stay monochrome; there the three differ by weight
- *  and dash. */
-const PATH_COLORS: Record<Flavor, { cycleway: string; trail: string; track: string }> = {
-  light: { cycleway: '#1f7fa8', trail: '#4f7a3a', track: '#8a5a2b' },
-  dark: { cycleway: '#5cbfe0', trail: '#8fbf6a', track: '#c9955e' },
-  white: { cycleway: '#4a4a4a', trail: '#6e6e6e', track: '#5c5c5c' },
-  grayscale: { cycleway: '#3d3d3d', trail: '#666666', track: '#555555' },
-  black: { cycleway: '#c4c4c4', trail: '#9a9a9a', track: '#b0b0b0' },
+/** Blue for cycleways, teal for shared paths, purple for mountain-bike trails (bikePaths.ts),
+ *  green for trails, brown for tracks, all clear of the ochre activity tracks (tracks.ts). Teal sits between the cycleway blue and
+ *  the trail green, so a shared path reads as a bike route people walk too, and the hue alone
+ *  tells it from a cycleway when the map is zoomed out too far for a dash to show. On the light
+ *  flavors the two bike colors are dark enough to hold up on Fog's grey veil; on the dark ones
+ *  they stay bright against the dark map. The monochrome flavors stay monochrome; there the
+ *  kinds differ by weight and dash. */
+export const PATH_COLORS: Record<Flavor, { cycleway: string; shared: string; mtb: string; trail: string; track: string }> = {
+  light: { cycleway: '#0b5a85', shared: '#0b7f74', mtb: '#7d3a96', trail: '#4f7a3a', track: '#8a5a2b' },
+  dark: { cycleway: '#5cbfe0', shared: '#4fd6c2', mtb: '#d29bef', trail: '#8fbf6a', track: '#c9955e' },
+  white: { cycleway: '#262626', shared: '#404040', mtb: '#333333', trail: '#6e6e6e', track: '#5c5c5c' },
+  grayscale: { cycleway: '#1f1f1f', shared: '#383838', mtb: '#2b2b2b', trail: '#666666', track: '#555555' },
+  black: { cycleway: '#c4c4c4', shared: '#a8a8a8', mtb: '#b8b8b8', trail: '#9a9a9a', track: '#b0b0b0' },
 };
 
-function pathLayers(flavor: Flavor, bridges: boolean, visible: PathOverlays): LineLayerSpecification[] {
+/** Each kind's dash, in line widths as MapLibre's `line-dasharray` takes it, or none for a solid
+ *  line: the map's layers and the Layers menu's legend (OverlaysMenu.tsx) both draw from it.
+ *  Shared paths and mountain-bike trails are solid in every flavor but the monochrome ones, where
+ *  only a dash tells them from a cycleway. */
+export function pathDash(flavor: Flavor, kind: keyof (typeof PATH_COLORS)[Flavor]): number[] | undefined {
+  switch (kind) {
+    case 'cycleway':
+      return undefined;
+    case 'shared':
+      return isMonochrome(flavor) ? [2, 1] : undefined;
+    case 'mtb':
+      return isMonochrome(flavor) ? [1, 1] : undefined;
+    case 'trail':
+      return [2, 1];
+    case 'track':
+      return [3, 1.5];
+  }
+}
+
+function isMonochrome(flavor: Flavor): boolean {
+  return flavor === 'white' || flavor === 'grayscale' || flavor === 'black';
+}
+
+function pathLayers(flavor: Flavor, bridges: boolean): LineLayerSpecification[] {
   const colors = PATH_COLORS[flavor];
   // Legacy filter syntax, the same as the stock road layers use.
   const structure = bridges ? [['has', 'is_bridge']] : [['!has', 'is_tunnel'], ['!has', 'is_bridge']];
   const filter = (detail: unknown[]) =>
     ['all', ...structure, ['==', 'kind', 'path'], detail] as unknown as FilterSpecification;
   const prefix = bridges ? 'paths_bridges_' : 'paths_';
-  const visibility = (on: boolean) => (on ? 'visible' : 'none');
   // Tracks first, so a trail sharing a stretch with one draws over it.
   return [
     {
@@ -211,12 +222,11 @@ function pathLayers(flavor: Flavor, bridges: boolean, visible: PathOverlays): Li
       'source-layer': 'roads',
       minzoom: PATHS_MIN_ZOOM,
       filter: filter(['==', 'kind_detail', TRACK_DETAIL]),
-      layout: { visibility: visibility(visible.tracks) },
       paint: {
         'line-color': colors.track,
         // Longer dashes and a wider line than a trail: a road a vehicle fits on.
-        'line-dasharray': [3, 1.5],
-        'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], PATHS_MIN_ZOOM, 1, 18, 3.5],
+        'line-dasharray': pathDash(flavor, 'track') ?? [],
+        'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], PATHS_MIN_ZOOM, 1.5, 18, 4],
       },
     },
     {
@@ -226,24 +236,10 @@ function pathLayers(flavor: Flavor, bridges: boolean, visible: PathOverlays): Li
       'source-layer': 'roads',
       minzoom: PATHS_MIN_ZOOM,
       filter: filter(['in', 'kind_detail', ...TRAIL_DETAILS]),
-      layout: { visibility: visibility(visible.trails) },
       paint: {
         'line-color': colors.trail,
-        'line-dasharray': [2, 1],
-        'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], PATHS_MIN_ZOOM, 0.8, 18, 3],
-      },
-    },
-    {
-      id: `${prefix}cycleway`,
-      type: 'line',
-      source: BASEMAP_SOURCE,
-      'source-layer': 'roads',
-      minzoom: PATHS_MIN_ZOOM,
-      filter: filter(['==', 'kind_detail', 'cycleway']),
-      layout: { visibility: visibility(visible.bikePaths), 'line-cap': 'round' },
-      paint: {
-        'line-color': colors.cycleway,
-        'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], PATHS_MIN_ZOOM, 1, 18, 4],
+        'line-dasharray': pathDash(flavor, 'trail') ?? [],
+        'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], PATHS_MIN_ZOOM, 1.3, 18, 3.5],
       },
     },
   ];
@@ -251,10 +247,10 @@ function pathLayers(flavor: Flavor, bridges: boolean, visible: PathOverlays): Li
 
 /** Stock layers with the path layers spliced in right after the one that draws the same
  *  features, so bridges, casings and labels keep stacking over them as they did. */
-function withPathLayers(base: LayerSpecification[], flavor: Flavor, visible: PathOverlays): LayerSpecification[] {
+function withPathLayers(base: LayerSpecification[], flavor: Flavor): LayerSpecification[] {
   return base.flatMap((layer) => {
-    if (layer.id === 'roads_other') return [layer, ...pathLayers(flavor, false, visible)];
-    if (layer.id === 'roads_bridges_other') return [layer, ...pathLayers(flavor, true, visible)];
+    if (layer.id === 'roads_other') return [layer, ...pathLayers(flavor, false)];
+    if (layer.id === 'roads_bridges_other') return [layer, ...pathLayers(flavor, true)];
     return [layer];
   });
 }
@@ -267,13 +263,12 @@ export function buildStyle(options: BuildStyleOptions): StyleSpecification {
     pmtilesPath = PMTILES_PATH,
     glyphsPath = GLYPHS_PATH,
     spriteBasePath = SPRITE_BASE_PATH,
-    paths = { trails: false, tracks: false, bikePaths: false },
     satellite = null,
     satelliteOn = false,
   } = options;
 
   const base = origin.replace(/\/$/, '');
-  const vector = withPathLayers(layers(BASEMAP_SOURCE, namedFlavor(flavor), { lang }), flavor, paths);
+  const vector = withPathLayers(layers(BASEMAP_SOURCE, namedFlavor(flavor), { lang }), flavor);
   const hidden = satellite ? satelliteHiddenLayerIds(vector) : [];
   const dimmed = satellite ? satelliteDimmedLayerIds(vector) : [];
 

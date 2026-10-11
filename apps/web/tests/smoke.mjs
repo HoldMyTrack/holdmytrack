@@ -223,13 +223,15 @@ describe('basemap foundation', () => {
     assert.ok(true);
   });
 
-  it('8. Layers menu: trails, tracks and bike paths off by default, each shown on its own, all hidden by the checkbox, remembered across reload', async () => {
-    const TRAILS = ['paths_trail', 'paths_bridges_trail'];
-    const TRACKS = ['paths_track', 'paths_bridges_track'];
-    const BIKES = ['paths_cycleway', 'paths_bridges_cycleway'];
-    const ALL = [...TRAILS, ...TRACKS, ...BIKES];
+  it('8. Trails and tracks always drawn from zoom 12; Layers menu: bike paths, shared paths and mountain-bike trails off by default, each shown on its own, all hidden by the checkbox, remembered across reload', async () => {
+    const BASE_PATHS = ['paths_trail', 'paths_bridges_trail', 'paths_track', 'paths_bridges_track'];
+    const BIKES = ['bike-paths-cycleway'];
+    const SHARED = ['bike-paths-shared'];
+    const MTB = ['bike-paths-mtb'];
+    const PICKS = [...BIKES, ...SHARED, ...MTB];
     const visibility = (ids) =>
       page.evaluate((ids) => ids.map((id) => window.__holdmytrack.getLayoutProperty(id, 'visibility')), ids);
+    const minzoom = (ids) => page.evaluate((ids) => ids.map((id) => window.__holdmytrack.getLayer(id).minzoom), ids);
     const menu = page.getByTestId('map-overlays');
     // Opens the menu if it's closed; the checkboxes live in its panel.
     const openMenu = async () => {
@@ -237,67 +239,101 @@ describe('basemap foundation', () => {
       if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
     };
 
-    assert.deepEqual(await visibility(ALL), ALL.map(() => 'none'), 'hidden until turned on');
+    // Trails and tracks are part of the map, with no entry of their own.
+    assert.deepEqual(await visibility(BASE_PATHS), BASE_PATHS.map(() => undefined), 'trails and tracks shown without a pick');
+    assert.deepEqual(await minzoom(BASE_PATHS), BASE_PATHS.map(() => 12), 'trails and tracks from zoom 12');
+    assert.equal(await page.locator('#overlay-trails, #overlay-tracks').count(), 0, 'no Trails or Tracks entries');
+    assert.deepEqual(await visibility(PICKS), PICKS.map(() => 'none'), 'bike-path layers hidden until ticked');
+    assert.deepEqual(await minzoom(PICKS), PICKS.map(() => 9), 'bike-path layers from zoom 9');
 
-    // The Olentangy Trail, Columbus: cycleways and footpaths in the extract at z14.
+    // The Olentangy Trail, Columbus: trails in the extract at z14.
     await page.evaluate(() => window.__holdmytrack.jumpTo({ center: [-83.02, 39.99], zoom: 14 }));
     await openMenu();
     await page.locator('#overlay-bike-paths').check();
     assert.deepEqual(await visibility(BIKES), BIKES.map(() => 'visible'), 'bike paths shown once ticked');
-    assert.deepEqual(await visibility([...TRAILS, ...TRACKS]), [...TRAILS, ...TRACKS].map(() => 'none'), 'trails and tracks still hidden');
-    await page.locator('#overlay-trails').check();
-    assert.deepEqual(await visibility(TRAILS), TRAILS.map(() => 'visible'), 'trails shown once ticked');
-    assert.deepEqual(await visibility(TRACKS), TRACKS.map(() => 'none'), 'tracks their own entry');
-    await page.locator('#overlay-tracks').check();
-    assert.deepEqual(await visibility(TRACKS), TRACKS.map(() => 'visible'), 'tracks shown once ticked');
+    assert.deepEqual(await visibility([...SHARED, ...MTB]), [...SHARED, ...MTB].map(() => 'none'), 'shared paths and mountain-bike trails still hidden');
+    await page.locator('#overlay-shared-paths').check();
+    assert.deepEqual(await visibility(SHARED), SHARED.map(() => 'visible'), 'shared paths shown once ticked');
+    assert.deepEqual(await visibility(MTB), MTB.map(() => 'none'), 'mountain-bike trails their own entry');
+    await page.locator('#overlay-mtb-trails').check();
+    assert.deepEqual(await visibility(MTB), MTB.map(() => 'visible'), 'mountain-bike trails shown once ticked');
     await styleLoaded();
     await page.waitForFunction(() => window.__holdmytrack.areTilesLoaded(), undefined, { timeout: 30_000 });
-    const rendered = await page.evaluate(() => ({
-      cycleway: window.__holdmytrack.queryRenderedFeatures({ layers: ['paths_cycleway'] }).length,
-      trail: window.__holdmytrack.queryRenderedFeatures({ layers: ['paths_trail'] }).length,
-    }));
-    assert.ok(rendered.cycleway > 0, `cycleways drawn (${rendered.cycleway})`);
-    assert.ok(rendered.trail > 0, `trails drawn (${rendered.trail})`);
+    const rendered = await page.evaluate(() => window.__holdmytrack.queryRenderedFeatures({ layers: ['paths_trail'] }).length);
+    assert.ok(rendered > 0, `trails drawn (${rendered})`);
+    // Bike and shared paths come from their own tiles (FR-4.16). This database may have none
+    // imported, so the check is that the tiles answer, not what they hold.
+    const tileStatus = await page.evaluate(async () => {
+      const url = window.__holdmytrack.getStyle().sources['bike-paths'].tiles[0];
+      return (await fetch(url.replace('{z}/{x}/{y}', '9/139/191'), { credentials: 'include' })).status;
+    });
+    assert.equal(tileStatus, 200, 'the bike-path tiles answer');
     await page.screenshot({ path: new URL('columbus-paths-light.png', SHOTS).pathname });
 
     await page.reload();
     await styleLoaded();
-    assert.deepEqual(await visibility(ALL), ALL.map(() => 'visible'), 'remembered across reload');
+    assert.deepEqual(await visibility(PICKS), PICKS.map(() => 'visible'), 'remembered across reload');
 
-    // The checkbox on the Layers button hides every pick at once and keeps them.
+    // Every path paints over Fog's veil and under the activity tracks (FR-4.13).
+    const order = await page.evaluate(() => window.__holdmytrack.getStyle().layers.map((layer) => layer.id));
+    const fogAt = order.indexOf('fog-raster');
+    const tracksAt = order.indexOf('tracks-casing');
+    for (const id of [...BASE_PATHS, ...PICKS]) {
+      const at = order.indexOf(id);
+      assert.ok(at > fogAt && at < tracksAt, `${id} between the veil and the tracks (${fogAt} < ${at} < ${tracksAt})`);
+    }
+    // What a rider sees deciding which way to head: a region's bike paths through the veil, and
+    // a closer look with the trails and tracks.
+    await page.getByRole('button', { name: 'Fog', exact: true }).click();
+    // The East Rim singletrack beside the paved Bike and Hike Trail, in Boston Heights.
+    for (const [center, zoom, name] of [
+      [[-81.69, 41.45], 10, 'cleveland-bike-paths-fog.png'],
+      [[-81.69, 41.45], 13, 'cleveland-paths-fog-z13.png'],
+      [[-81.523, 41.259], 13.5, 'east-rim-paths-fog.png'],
+    ]) {
+      await page.evaluate(([center, zoom]) => window.__holdmytrack.jumpTo({ center, zoom }), [center, zoom]);
+      await styleLoaded();
+      await page.waitForFunction(() => window.__holdmytrack.areTilesLoaded(), undefined, { timeout: 30_000 });
+      await page.screenshot({ path: new URL(name, SHOTS).pathname });
+    }
+    await page.getByRole('button', { name: 'Normal', exact: true }).click();
+    await page.evaluate(() => window.__holdmytrack.jumpTo({ center: [-83.02, 39.99], zoom: 14 }));
+
+    // The checkbox on the Layers button hides every pick at once and keeps them; the trails and
+    // tracks aren't picks, so they stay.
     const master = page.locator('#overlay-master');
     assert.equal(await master.isChecked(), true, 'checkbox on while picks show');
     await master.uncheck();
-    assert.deepEqual(await visibility(ALL), ALL.map(() => 'none'), 'all hidden by the checkbox');
+    assert.deepEqual(await visibility(PICKS), PICKS.map(() => 'none'), 'all hidden by the checkbox');
+    assert.deepEqual(await visibility(BASE_PATHS), BASE_PATHS.map(() => undefined), 'trails and tracks stay');
     await openMenu();
-    assert.equal(await page.locator('#overlay-trails').isChecked(), true, 'picks kept while hidden');
+    assert.equal(await page.locator('#overlay-bike-paths').isChecked(), true, 'picks kept while hidden');
     assert.equal(await menu.locator('.overlays-menu__count--off').textContent(), '3', 'count greyed, not cleared');
     await page.reload();
     await styleLoaded();
     assert.equal(await master.isChecked(), false, 'checkbox remembered across reload');
-    assert.deepEqual(await visibility(ALL), ALL.map(() => 'none'), 'still hidden after reload');
+    assert.deepEqual(await visibility(PICKS), PICKS.map(() => 'none'), 'still hidden after reload');
     await master.check();
-    assert.deepEqual(await visibility(ALL), ALL.map(() => 'visible'), 'all back with the checkbox');
+    assert.deepEqual(await visibility(PICKS), PICKS.map(() => 'visible'), 'all back with the checkbox');
     // Picking something while it's off turns it back on, or the pick would seem to do nothing.
     await master.uncheck();
     await openMenu();
-    await page.locator('#overlay-trails').uncheck();
-    assert.equal(await master.isChecked(), false, 'unpicking leaves the checkbox off');
-    await page.locator('#overlay-trails').check();
-    assert.equal(await master.isChecked(), true, 'picking turns the checkbox back on');
-    assert.deepEqual(await visibility(ALL), ALL.map(() => 'visible'), 'picks shown again');
-
-    await page.locator('#overlay-trails').uncheck();
-    await page.locator('#overlay-tracks').uncheck();
     await page.locator('#overlay-bike-paths').uncheck();
-    assert.deepEqual(await visibility(ALL), ALL.map(() => 'none'), 'hidden again once unticked');
-    assert.equal(await master.isDisabled(), true, 'nothing picked: nothing for the checkbox to show');
+    assert.equal(await master.isChecked(), false, 'unpicking leaves the checkbox off');
+    await page.locator('#overlay-bike-paths').check();
+    assert.equal(await master.isChecked(), true, 'picking turns the checkbox back on');
+    assert.deepEqual(await visibility(PICKS), PICKS.map(() => 'visible'), 'picks shown again');
 
-    // Tracks explains itself behind an info button, without ticking the box.
-    await page.locator('.overlays-menu__info').click();
-    assert.ok(await page.locator('#overlay-tracks-info').isVisible(), 'tracks explanation shown');
-    assert.equal(await page.locator('#overlay-tracks').isChecked(), false, 'info button leaves the box alone');
+    await page.locator('#overlay-bike-paths').uncheck();
+    await page.locator('#overlay-shared-paths').uncheck();
+    await page.locator('#overlay-mtb-trails').uncheck();
+    assert.deepEqual(await visibility(PICKS), PICKS.map(() => 'none'), 'hidden again once unticked');
+    assert.equal(await master.isDisabled(), true, 'nothing picked: nothing for the checkbox to show');
     assert.equal(await page.locator('#overlay-all, #overlay-spots-all').count(), 0, 'no All checkboxes');
+    // The legend: each bike entry's line, and the trails and tracks the map always draws.
+    assert.equal(await menu.locator('.overlays-menu__item .overlays-menu__swatch').count(), 3, 'a line sample on each bike entry');
+    assert.ok(await page.getByTestId('overlays-always').isVisible(), 'the always-shown note');
+    assert.equal(await page.getByTestId('overlays-always').locator('.overlays-menu__swatch').count(), 2, 'trails and tracks in the note');
     await page.screenshot({ path: new URL('layers-menu.png', SHOTS).pathname });
   });
 
@@ -355,7 +391,7 @@ describe('basemap foundation', () => {
   });
 
   // Points of interest (docs/SPEC.md FR-15.2, FR-15.5): nothing below zoom 10, "Show in this area"
-  // from 10 until the tiles take over at 13, where the paths start too.
+  // from 10 until the tiles take over at 13.
   it('10. Show in this area offered only between zoom 10 and 13', async () => {
     const menu = page.getByTestId('map-overlays');
     const trigger = menu.getByRole('button').first();
@@ -371,8 +407,6 @@ describe('basemap foundation', () => {
     assert.equal(await offeredAt(10), true, 'offered at zoom 10');
     assert.equal(await offeredAt(12.5), true, 'offered at zoom 12.5');
     assert.equal(await offeredAt(13), false, 'the tiles take over at zoom 13');
-    const minzoom = await page.evaluate(() => window.__holdmytrack.getLayer('paths_trail').minzoom);
-    assert.equal(minzoom, 13, 'paths start where the tiles do');
 
     if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
     await page.locator('#overlay-spots-playground').uncheck();

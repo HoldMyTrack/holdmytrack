@@ -6,11 +6,12 @@ import { basemapOrigin, satelliteSource, WORLD_VIEW } from './config';
 import { countryView } from './countryView';
 import { exportFramedImage } from './exportMap';
 import type { ExportPreset } from './exportPresets';
+import { ensureBikePathLayers, setBikePathsVisible } from './bikePaths';
 import { ensureFogLayer } from './fog';
 import { ensureHeatmapLayer } from './heatmap';
 import { setMapMode, type MapMode } from './mapMode';
 import { loadOverlays, saveOverlays, type Overlays } from './overlays';
-import { setPathsVisible } from './paths';
+import { raisePathLayers } from './paths';
 import { usePhotoMarkers, type PhotoMarkerItem, type PhotoMarkerOverlay } from './photos';
 import { setSatelliteVisible } from './satellite';
 import { ensureSpotsLayer, setSpotClickHandler, setSpotsCaptured, setSpotsVisible, type Spot, type SpotCategory } from './spots';
@@ -171,8 +172,8 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // Normal is what already rendered before fog existed — it needed no new work to count
   // as a "mode" (IMPLEMENTATION.md §4.2.2).
   const [mapMode, setMapModeState] = useState<MapMode>('normal');
-  // The Satellite button (BasemapToggle.tsx) and the Layers menu (OverlaysMenu.tsx): Trails,
-  // Tracks, Bike paths and each Spots category, over any mode, drawn while the Layers checkbox is
+  // The Satellite button (BasemapToggle.tsx) and the Layers menu (OverlaysMenu.tsx): Bike
+  // paths, Shared paths, Mountain bike trails and each Spots category, over any mode, drawn while the Layers checkbox is
   // on; remembered per browser (overlays.ts).
   const [overlays, setOverlays] = useState<Overlays>(loadOverlays);
   const changeOverlays = useCallback((next: Overlays) => {
@@ -181,11 +182,11 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   }, []);
   const paths = useMemo(
     () => ({
-      trails: overlays.enabled && overlays.trails,
-      tracks: overlays.enabled && overlays.tracks,
       bikePaths: overlays.enabled && overlays.bikePaths,
+      sharedPaths: overlays.enabled && overlays.sharedPaths,
+      mtbTrails: overlays.enabled && overlays.mtbTrails,
     }),
-    [overlays.enabled, overlays.trails, overlays.tracks, overlays.bikePaths],
+    [overlays.enabled, overlays.bikePaths, overlays.sharedPaths, overlays.mtbTrails],
   );
   // Satellite imagery (FR-4.14): only when the deployment configures some, whatever was saved.
   const satelliteAvailable = satelliteSource() !== null;
@@ -1328,6 +1329,10 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
       // Satellite imagery reads dark, so it takes the dark flavors' veil (style.ts's isDarkBase).
       ensureFogLayer(instance, beforeId, isDarkBase(flavor, satellite));
       ensureHeatmapLayer(instance, beforeId, isDarkBase(flavor, satellite));
+      // Trails and tracks, then bike and shared paths, over the veil and the heat and under the
+      // activity tracks (paths.ts, bikePaths.ts).
+      raisePathLayers(instance, beforeId);
+      ensureBikePathLayers(instance, beforeId, flavor);
       ensureTrackLayer(instance, beforeId, activityQuery);
       // A style swap brings the tracks source back with no feature-state, the focused track's
       // `selected` included.
@@ -1339,9 +1344,9 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
       // Spots last, above everything including the basemap's labels (spots.ts).
       ensureSpotsLayer(instance, spotsShown);
       setMapMode(instance, mapMode, editingTrack);
-      // A style swap brings the path layers back at the style's default (hidden), and the
-      // imagery back at whatever the swap's buildStyle was given.
-      setPathsVisible(instance, paths);
+      // The bike-path layers just added start hidden, and a style swap brings the imagery back
+      // at whatever the swap's buildStyle was given.
+      setBikePathsVisible(instance, paths);
       setSatelliteVisible(instance, satellite);
       // Same reasoning as setMapMode just above: addLayer always starts the tracks layer
       // with no filter, so a styledata that recreates it would otherwise silently un-hide
@@ -1401,7 +1406,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
 
   useEffect(() => {
     if (!map) return;
-    setPathsVisible(map, paths);
+    setBikePathsVisible(map, paths);
   }, [map, paths]);
 
   useEffect(() => {
@@ -1610,7 +1615,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
                 </button>
               </div>
               {/* Its own group: layers switched on and off over any mode, not a fourth mode. */}
-              <OverlaysMenu overlays={overlays} onChange={changeOverlays} />
+              <OverlaysMenu overlays={overlays} onChange={changeOverlays} flavor={flavor} />
               {satelliteAvailable && (
                 <BasemapToggle satellite={overlays.satellite} onChange={(on) => changeOverlays({ ...overlays, satellite: on })} />
               )}

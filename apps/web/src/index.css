@@ -1581,45 +1581,30 @@ button.activities-panel__story-badge:hover {
   accent-color: var(--fm-accent);
 }
 
-/* An entry with an info button beside it (Tracks): the label keeps its full-width hit area. */
-.overlays-menu__row {
-  display: flex;
-  align-items: center;
+/* A sample of how the map draws a kind of path, at the end of its entry. */
+.overlays-menu__item .overlays-menu__swatch {
+  margin-left: auto;
 }
 
-.overlays-menu__row .overlays-menu__item {
-  flex: 1;
-}
-
-.overlays-menu__info {
-  display: inline-flex;
+.overlays-menu__swatch {
   flex: none;
+}
+
+/* Under the path entries: the trails and tracks the map draws without a pick. */
+.overlays-menu__always {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  color: var(--fm-ink-muted);
-  cursor: pointer;
-}
-
-.overlays-menu__info:hover,
-.overlays-menu__info[aria-expanded='true'] {
-  background: var(--fm-surface-tint);
-  color: var(--fm-ink);
-}
-
-/* The explanation the info button opens, indented under its checkbox's label. */
-.overlays-menu__hint {
-  margin: 0 var(--fm-space-2) var(--fm-space-4) calc(var(--fm-space-2) + 13px + var(--fm-space-8));
-  padding: var(--fm-space-4) var(--fm-space-8);
-  border-radius: var(--fm-radius-md);
-  background: var(--fm-surface-tint);
+  gap: var(--fm-space-4) var(--fm-space-8);
+  margin: var(--fm-space-4) var(--fm-space-2) 0;
   font-size: var(--fm-text-sm);
   color: var(--fm-ink-muted);
+}
+
+.overlays-menu__key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fm-space-4);
 }
 
 /* "Show in this area" (ShowInArea.tsx): a pill centered over the map, under the toggles. */

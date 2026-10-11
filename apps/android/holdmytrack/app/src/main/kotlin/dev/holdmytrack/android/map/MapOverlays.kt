@@ -259,11 +259,14 @@ object MapOverlays {
      * the cream veil and Heatmap the black wash ([setDarkVeil]); [story] is
      * the open Story, or null ([setTrackStory]).
      */
-    fun attach(style: Style, mode: MapMode, range: DateRange?, dark: Boolean, story: String?) {
+    fun attach(style: Style, mode: MapMode, range: DateRange?, dark: Boolean, night: Boolean, story: String?) {
         darkVeil = dark
         trackStory = story
         val beforeId = labelInsertionPoint(style)
         addCoverage(style, beforeId)
+        // Every path over the veil and the heat, under the tracks (`docs/SPEC.md` FR-4.13).
+        MapPaths.raise(style, beforeId)
+        MapBikePaths.add(style, beforeId, night)
         addTracks(style, beforeId, range)
         addBands(style, beforeId)
         setMode(style, mode)
@@ -358,17 +361,22 @@ object MapOverlays {
      * Every Fog and Heatmap tile fetched again, once the server has re-rendered them
      * (`CoverageWatch`) — the web's `refreshFogLayers`/`refreshHeatmapLayers`. Replaced, not
      * updated, for the same reason as [setTrackRange], each at the same place in the stack —
-     * under the tracks — and with its old visibility (the wash, with [dimShown]).
+     * under the paths and the tracks — and with its old visibility (the wash, with [dimShown]).
      */
     fun refreshCoverage(style: Style) {
         if (style.getLayer(FOG_LAYER_ID) == null) return
         val visibility = COVERAGE_LAYERS.associate { (layer, _) -> layer to style.getLayer(layer)?.visibility?.value }
+        // Back where they were: under whatever sat right over them — the paths, which paint over
+        // the veil, or the tracks.
+        val coverage = COVERAGE_LAYERS.map { it.first } + HEATMAP_DIM_LAYER_ID
+        val order = style.layers.map { it.id }
+        val beforeId = order.drop(order.indexOfLast { it in coverage } + 1).firstOrNull { it !in coverage }
+            ?: labelInsertionPoint(style)
         COVERAGE_LAYERS.forEach { (layer, source) ->
             style.getLayer(layer)?.let(style::removeLayer)
             style.removeSource(source)
         }
         style.getLayer(HEATMAP_DIM_LAYER_ID)?.let(style::removeLayer)
-        val beforeId = if (style.getLayer(TRACKS_CASING_LAYER_ID) != null) TRACKS_CASING_LAYER_ID else labelInsertionPoint(style)
         addCoverage(style, beforeId)
         visibility.forEach { (layer, value) ->
             if (value != null) style.getLayer(layer)?.setProperties(PropertyFactory.visibility(value))

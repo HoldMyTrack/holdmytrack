@@ -55,6 +55,7 @@ import dev.holdmytrack.android.map.MapModeButton
 import dev.holdmytrack.android.map.MapOverlays
 import dev.holdmytrack.android.map.LayersMenu
 import dev.holdmytrack.android.map.MapLayersSwitch
+import dev.holdmytrack.android.map.MapBikePaths
 import dev.holdmytrack.android.map.MapPaths
 import dev.holdmytrack.android.map.MapSatellite
 import dev.holdmytrack.android.map.MapSpots
@@ -1018,7 +1019,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
         val loaded = style ?: return
         if (!overlaysAttached) {
-            MapOverlays.attach(loaded, mode, selectedRange, darkBase(loaded), storyId)
+            MapOverlays.attach(loaded, mode, selectedRange, darkBase(loaded), isNight(), storyId)
+            // The bike-path layers attach just added start hidden.
+            MapPaths.apply(loaded, shownPaths(MapPaths.get(requireContext())))
             MapOverlays.setTrackFilter(loaded, panelState.mapHidden, panelState.highlighted)
             // Last, so the places are over everything else, labels included.
             MapSpots.attach(loaded, requireContext(), shownSpots(MapSpots.get(requireContext())))
@@ -1064,8 +1067,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             style?.takeIf { overlaysAttached }?.let {
                 MapOverlays.refreshCoverage(it)
                 MapOverlays.refreshTracks(it, selectedRange)
-                // Loading places bumps the version too.
+                // Loading places or bike paths bumps the version too.
                 MapSpots.refresh(it)
+                MapBikePaths.refresh(it)
             }
         }
     }
