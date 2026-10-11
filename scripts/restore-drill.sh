@@ -108,8 +108,8 @@ done
 # Every key the restored database refers to, against what's in the backup bucket.
 drill_psql "
   SELECT raw_payload_key FROM activities WHERE raw_payload_key IS NOT NULL
-  UNION ALL SELECT 'photos/' || user_id || '/' || id FROM activity_photos
-  UNION ALL SELECT 'photos/' || user_id || '/' || id || '-thumb' FROM activity_photos
+  UNION ALL SELECT image_key FROM activity_photos
+  UNION ALL SELECT image_key || '-thumb' FROM activity_photos
   UNION ALL SELECT avatar_key FROM users WHERE avatar_key IS NOT NULL" | sort -u > "$work/expected"
 rclone lsf -R --files-only --fast-list backup:objects | sort -u > "$work/present"
 comm -23 "$work/expected" "$work/present" > "$work/missing"
