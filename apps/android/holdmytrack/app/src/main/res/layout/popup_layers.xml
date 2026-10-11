@@ -58,6 +58,13 @@
             android:layout_height="wrap_content"
             android:text="@string/layers_shared_paths" />
 
+        <com.google.android.material.checkbox.MaterialCheckBox
+            android:id="@+id/layers_mtb_trails"
+            style="@style/Widget.HoldMyTrack.LayersOption.Check"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/layers_mtb_trails" />
+
         <!-- Trails and tracks have no entry: they're part of the map, and this says so. -->
         <TextView
             android:id="@+id/layers_always"

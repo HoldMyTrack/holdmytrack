@@ -115,6 +115,7 @@
     <string name="layers_paths">Paths</string>
     <string name="layers_bike_paths">Bike paths</string>
     <string name="layers_shared_paths">Shared paths</string>
+    <string name="layers_mtb_trails">Mountain bike trails</string>
     <string name="layers_always_shown">Always shown when zoomed in:</string>
     <string name="layers_trails">Trails</string>
     <string name="layers_dirt_tracks">Dirt tracks</string>

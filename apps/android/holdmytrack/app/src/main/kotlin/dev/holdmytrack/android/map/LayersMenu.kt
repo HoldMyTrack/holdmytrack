@@ -17,8 +17,8 @@ import dev.holdmytrack.android.R
 
 /**
  * The Layers button on the map's rail and the menu it opens — the web's `OverlaysMenu`
- * (`docs/SPEC.md` FR-4.13): Paths — Bike paths and Shared paths — and Points of interest, one
- * entry per [MapSpots.Category], each picked over any mode.
+ * (`docs/SPEC.md` FR-4.13): Paths — Bike paths, Shared paths and Mountain bike trails — and
+ * Points of interest, one entry per [MapSpots.Category], each picked over any mode.
  *
  * The button is filled like the active map mode while picks show, with a badge on its corner
  * counting them, greyed while they're hidden. The menu opens with a switch that shows or hides
@@ -117,6 +117,7 @@ class LayersMenu(
         }
         bind(R.id.layers_bike_paths, current.bikePaths) { p, on -> p.copy(bikePaths = on) }
         bind(R.id.layers_shared_paths, current.sharedPaths) { p, on -> p.copy(sharedPaths = on) }
+        bind(R.id.layers_mtb_trails, current.mtbTrails) { p, on -> p.copy(mtbTrails = on) }
 
         // The legend: each bike entry's line at its end, and the trails and tracks the map always
         // draws, in the flavor's colors.
@@ -129,6 +130,7 @@ class LayersMenu(
         }
         content.findViewById<TextView>(R.id.layers_bike_paths).swatch(MapBikePaths.cyclewayColor(night), null, atEnd = true)
         content.findViewById<TextView>(R.id.layers_shared_paths).swatch(MapBikePaths.sharedColor(night), null, atEnd = true)
+        content.findViewById<TextView>(R.id.layers_mtb_trails).swatch(MapBikePaths.mtbColor(night), null, atEnd = true)
         content.findViewById<TextView>(R.id.layers_key_trails).swatch(MapPaths.trailColor(night), MapPaths.TRAIL_DASH, atEnd = false)
         content.findViewById<TextView>(R.id.layers_key_tracks).swatch(MapPaths.trackColor(night), MapPaths.TRACK_DASH, atEnd = false)
 

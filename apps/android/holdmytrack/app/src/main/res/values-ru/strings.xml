@@ -122,6 +122,7 @@
     <string name="layers_paths">Тропы и дорожки</string>
     <string name="layers_bike_paths">Велодорожки</string>
     <string name="layers_shared_paths">Велопешеходные дорожки</string>
+    <string name="layers_mtb_trails">Трассы для горных велосипедов</string>
     <string name="layers_always_shown">Всегда видны при приближении:</string>
     <string name="layers_trails">Тропы</string>
     <string name="layers_dirt_tracks">Грунтовки</string>

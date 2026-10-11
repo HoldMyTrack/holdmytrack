@@ -5,20 +5,21 @@ import androidx.core.content.edit
 import org.maplibre.android.maps.Style
 
 /**
- * The Layers menu's Bike paths and Shared paths (`docs/SPEC.md` FR-4.13, [LayersMenu]), drawn
+ * The Layers menu's Bike paths, Shared paths and Mountain bike trails (`docs/SPEC.md` FR-4.13,
+ * [LayersMenu]), drawn
  * by [MapBikePaths]: a per-device choice, each off until turned on, kept in SharedPreferences
  * like the theme (`settings/AppTheme.kt`). Also lifts the served style's trail and track layers,
  * which are always drawn, over Fog's veil ([raise]).
  */
 object MapPaths {
 
-    data class Paths(val bikePaths: Boolean, val sharedPaths: Boolean) {
+    data class Paths(val bikePaths: Boolean, val sharedPaths: Boolean, val mtbTrails: Boolean) {
         /** How many are on: the Layers button's count. */
-        val count: Int get() = listOf(bikePaths, sharedPaths).count { it }
+        val count: Int get() = listOf(bikePaths, sharedPaths, mtbTrails).count { it }
     }
 
-    /** Both hidden: what's drawn while Show layers is off ([MapLayersSwitch]). */
-    val NONE = Paths(bikePaths = false, sharedPaths = false)
+    /** All hidden: what's drawn while Show layers is off ([MapLayersSwitch]). */
+    val NONE = Paths(bikePaths = false, sharedPaths = false, mtbTrails = false)
 
     /** The trail and track colors the served style draws with, for the Layers menu's legend: must
      *  match `PATH_COLORS` in apps/web/src/map/style.ts, as must their dashes, `pathDash`. */
@@ -38,6 +39,7 @@ object MapPaths {
     private const val PREFS = "map_paths"
     private const val KEY_BIKE_PATHS = "bike_paths"
     private const val KEY_SHARED_PATHS = "shared_paths"
+    private const val KEY_MTB_TRAILS = "mtb_trails"
 
     /** The single Trails & bike paths toggle's key, from before the Layers menu: a phone that had
      *  it on starts with Bike paths on. */
@@ -51,6 +53,7 @@ object MapPaths {
         return Paths(
             bikePaths = prefs.getBoolean(KEY_BIKE_PATHS, prefs.getBoolean(KEY_LEGACY, false)),
             sharedPaths = prefs.getBoolean(KEY_SHARED_PATHS, false),
+            mtbTrails = prefs.getBoolean(KEY_MTB_TRAILS, false),
         )
     }
 
@@ -58,6 +61,7 @@ object MapPaths {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
             putBoolean(KEY_BIKE_PATHS, paths.bikePaths)
             putBoolean(KEY_SHARED_PATHS, paths.sharedPaths)
+            putBoolean(KEY_MTB_TRAILS, paths.mtbTrails)
             remove(KEY_LEGACY)
             RETIRED_KEYS.forEach(::remove)
         }
@@ -65,7 +69,7 @@ object MapPaths {
 
     /** A no-op before [MapOverlays.attach] has added the bike-path layers. */
     fun apply(style: Style, paths: Paths) {
-        MapBikePaths.apply(style, paths.bikePaths, paths.sharedPaths)
+        MapBikePaths.apply(style, paths.bikePaths, paths.sharedPaths, paths.mtbTrails)
     }
 
     /**
