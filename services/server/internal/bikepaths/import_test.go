@@ -10,6 +10,20 @@ func TestKind(t *testing.T) {
 		{map[string]string{"highway": "cycleway"}, KindCycleway},
 		// A cycleway is one whatever its bicycle tag says.
 		{map[string]string{"highway": "cycleway", "bicycle": "designated"}, KindCycleway},
+		// A rail-trail of crushed stone, or a boardwalk, is a cycleway any bike rides.
+		{map[string]string{"highway": "cycleway", "surface": "fine_gravel"}, KindCycleway},
+		{map[string]string{"highway": "cycleway", "surface": "wood"}, KindCycleway},
+		// Singletrack mapped as a cycleway, by its rating or its ground.
+		{map[string]string{"highway": "cycleway", "mtb:scale": "2", "surface": "unpaved"}, KindMTB},
+		{map[string]string{"highway": "cycleway", "surface": "ground"}, KindMTB},
+		{map[string]string{"highway": "path", "bicycle": "designated", "surface": "dirt"}, KindMTB},
+		// A rated trail is one even without bicycle=designated.
+		{map[string]string{"highway": "path", "mtb:scale": "1"}, KindMTB},
+		{map[string]string{"highway": "path", "bicycle": "yes", "mtb:scale:imba": "2"}, KindMTB},
+		// A rough path bikes aren't designated on is just a trail.
+		{map[string]string{"highway": "path", "surface": "ground"}, ""},
+		// A rating on a road doesn't make it a trail.
+		{map[string]string{"highway": "track", "mtb:scale": "1"}, ""},
 		{map[string]string{"highway": "path", "bicycle": "designated"}, KindShared},
 		{map[string]string{"highway": "footway", "bicycle": "designated"}, KindShared},
 		{map[string]string{"highway": "bridleway", "bicycle": "designated"}, KindShared},

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Make the bike paths file (docs/DEPLOY.md §6): download an OpenStreetMap extract, check it, and
-# filter it down to cycleways and bike-designated paths as GeoJSON lines for
+# filter it down to cycleways, bike-designated paths and mountain-bike trails as GeoJSON lines for
 # `import-bike-paths`. Run OFF the server, like spots-extract.sh and for the same reason.
 # Nothing here touches a deployment.
 #
@@ -25,11 +25,13 @@ cd "$work"
 src=source.osm.pbf
 osm_download "$url"
 
-# Keep every way that's a cycleway or carries bicycle=designated, plus the nodes they need. The
-# import narrows the second to paths, footways and bridleways (bikepaths.Kind,
-# IMPLEMENTATION.md §4.24): a road with a designated bike lane comes through here too.
+# Keep every way that's a cycleway, carries bicycle=designated or has a mountain-bike rating,
+# plus the nodes they need. The import narrows the last two to cycleways, paths, footways and
+# bridleways (bikepaths.Kind, IMPLEMENTATION.md §4.24): a road with a designated bike lane, or a
+# rated forest road, comes through here too.
 log "filtering"
-osmium tags-filter "$src" w/highway=cycleway w/bicycle=designated --overwrite -o bike-paths.osm.pbf
+osmium tags-filter "$src" w/highway=cycleway w/bicycle=designated w/mtb:scale w/mtb:scale:imba \
+  --overwrite -o bike-paths.osm.pbf
 
 # -u type_id gives each feature the way id the import upserts by; lines only.
 log "exporting"
@@ -40,6 +42,6 @@ osmium export bike-paths.osm.pbf -f geojsonseq -u type_id --geometry-types=lines
 # last one means a cut-short or mis-filtered file, which --planet would refuse anyway past 1%.
 total=$(wc -l < bike-paths.geojsonseq | tr -d ' ')
 log "done: $work/bike-paths.geojsonseq, $total ways, $(du -h bike-paths.geojsonseq | cut -f 1)"
-for tag in '"highway":"cycleway"' '"bicycle":"designated"'; do
+for tag in '"highway":"cycleway"' '"bicycle":"designated"' '"mtb:scale"'; do
   printf '  %-36s %s\n' "$tag" "$(grep -c -F "$tag" bike-paths.geojsonseq || true)"
 done

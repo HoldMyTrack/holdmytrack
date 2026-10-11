@@ -54,7 +54,7 @@ Boundaries and timezones first, so the demo's activities get their country/regio
 
 Spots (`SPEC.md` FR-15) has no places until some are imported. Make a small extract from a [Geofabrik](https://download.geofabrik.de/) region with `docs/DEPLOY.md` §6's two osmium commands, put `spots.geojsonseq` in `/tmp/spots`, and run `docker compose run --rm -v /tmp/spots:/data:ro api import-spots /data/spots.geojsonseq`.
 
-Bike paths and Shared paths (`SPEC.md` FR-4.13) draw nothing until their ways are imported the same way: `scripts/bike-paths-extract.sh <work-dir> <geofabrik-url>` (given the work-dir the Spots extract used, it reuses that download), put `bike-paths.geojsonseq` in `/tmp/bike-paths`, and run `docker compose run --rm -v /tmp/bike-paths:/data:ro api import-bike-paths /data/bike-paths.geojsonseq`. Ohio's file is about 17,000 ways, of which the import keeps about 16,200; the rest are roads with a designated bike lane.
+Bike paths, Shared paths and Mountain bike trails (`SPEC.md` FR-4.13) draw nothing until their ways are imported the same way: `scripts/bike-paths-extract.sh <work-dir> <geofabrik-url>` (given the work-dir the Spots extract used, it reuses that download), put `bike-paths.geojsonseq` in `/tmp/bike-paths`, and run `docker compose run --rm -v /tmp/bike-paths:/data:ro api import-bike-paths /data/bike-paths.geojsonseq`. Ohio's file is about 17,200 ways, of which the import keeps about 16,300; the rest are roads with a designated bike lane or rated forest roads.
 
 To see the admin panel (`/admin`, `IMPLEMENTATION.md` §4.20), sign up a local account and make it an admin: `docker compose run --rm api set-admin you@example.com true`.
 

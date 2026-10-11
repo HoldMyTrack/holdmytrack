@@ -32,6 +32,7 @@ const maxDeletedShare = 0.01
 const (
 	KindCycleway = "cycleway"
 	KindShared   = "shared"
+	KindMTB      = "mtb"
 )
 
 // DB is what Import needs of the database: a *pgxpool.Pool, or a pgx.Tx in a test.
@@ -43,7 +44,7 @@ type DB interface {
 // ImportStats is what Import reports back for the log.
 type ImportStats struct {
 	Imported int // upserted into bike_paths
-	Skipped  int // features of neither kind, with no way id or no line
+	Skipped  int // features of no kind, with no way id or no line
 	Changed  int // of Imported, ways new or different from what was stored
 	Deleted  int // ways a planet import no longer saw
 }
@@ -198,19 +199,45 @@ func parseFeature(raw []byte) (way, bool, error) {
 	return way{kind: kind, name: strings.TrimSpace(tags["name"]), geometry: string(f.Geometry), osmID: id}, true, nil
 }
 
-// Kind maps a way's OSM tags to its kind, or "" for neither: a cycleway (highway=cycleway), or
-// a shared path — a path, footway or bridleway marked bicycle=designated. A way under
-// construction or proposed carries its future highway value in another key, so it's neither.
+// Kind maps a way's OSM tags to its kind, or "" for none:
+//   - a mountain-bike trail: a cycleway, path, footway or bridleway rated for mountain bikes
+//     (`mtb:scale` or `mtb:scale:imba`), or a cycleway or bike-designated path whose surface is
+//     rough ground (roughSurfaces) — singletrack, rideable on a mountain bike and hardly on
+//     anything else, however it's tagged;
+//   - a cycleway (highway=cycleway), whatever else it carries;
+//   - a shared path: a path, footway or bridleway marked bicycle=designated.
+//
+// Anything else, a road with a designated bike lane above all, is none. A way under construction
+// or proposed carries its future highway value in another key, so it's none either.
 func Kind(tags map[string]string) string {
-	switch tags["highway"] {
-	case "cycleway":
-		return KindCycleway
-	case "path", "footway", "bridleway":
-		if tags["bicycle"] == "designated" {
-			return KindShared
-		}
+	highway := tags["highway"]
+	path := highway == "path" || highway == "footway" || highway == "bridleway"
+	if highway != "cycleway" && !path {
+		return ""
 	}
-	return ""
+	if tags["mtb:scale"] != "" || tags["mtb:scale:imba"] != "" {
+		return KindMTB
+	}
+	designated := highway == "cycleway" || tags["bicycle"] == "designated"
+	if !designated {
+		return ""
+	}
+	if roughSurfaces[tags["surface"]] {
+		return KindMTB
+	}
+	if highway == "cycleway" {
+		return KindCycleway
+	}
+	return KindShared
+}
+
+// roughSurfaces are the OSM `surface` values of singletrack. Gravel, compacted and crushed
+// stone, and boardwalk (`wood`) are left out: a rail-trail or a towpath is often made of them,
+// and any bike rides it. Plain `unpaved` is in: on a cycleway it's most often a dirt trail no
+// one bothered to describe further.
+var roughSurfaces = map[string]bool{
+	"ground": true, "dirt": true, "earth": true, "mud": true, "sand": true, "grass": true,
+	"rock": true, "rocks": true, "woodchips": true, "unpaved": true,
 }
 
 // parseWayID reads osmium's type_id feature id for a way exported as a line, "w123".
