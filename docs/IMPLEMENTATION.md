@@ -1101,6 +1101,17 @@ Keep in step: a new per-account object prefix needs adding to the purge, or it o
 
 **Tested**: `internal/geo`'s `TestLoadTimezones` (a point at sea, an unknown zone and an uncovered point falling back to the account's zone, the same file skipped, a short one refused) and `TestTimezoneHistory` (Moscow's 2011 and 2014 changes); `internal/httpapi`'s `TestActivitiesGroupByTheirOwnTimezone` (a Tokyo run on its Tokyo date for a New York account, across every grouping).
 
+### 4.31 The API contract (`services/server/api/openapi.yaml`)
+
+**One file states the JSON the server and its clients exchange, and the server's tests hold the server to it.** The web's `api.ts` and Android's `HoldMyTrackApi.kt` each parse responses by hand, so nothing else notices when a handler renames a field, drops one or starts sending `null` where a client expects an array. The file describes some of the `/v1` endpoints so far; a path it doesn't describe goes unchecked, so it can grow one endpoint at a time. A change to the request or response of a described endpoint changes the file in the same change.
+
+**Enforced by tests, not by generating handlers from it.** `dbTest.do` (`internal/httpapi/dbtest_test.go`) passes every exchange a database test makes to `checkContract` (`contract_test.go`), which matches it to the file with kin-openapi and fails the test on a mismatch. That checks the bytes actually sent, which generated Go types can't: a nil slice encoded as `null`, an `omitempty` dropping a required field, a time in another format. It also leaves the handlers and their middleware as they are. The cost is that only exchanges some test makes are checked: a status or a shape no test reaches can drift unnoticed. kin-openapi is imported only by test files, so it isn't in the server binary. Traps:
+- The response is always checked, the request only when the server accepted it (a status below 400): a test that sends a bad body to get its 400 isn't a contract violation.
+- The file has to describe what the Go decoder actually accepts, not what the clients happen to send. `encoding/json` takes a missing field as its zero value, so a field the handler doesn't insist on is optional in the file (a Private location's `name`).
+- `format: uuid` is the handlers' own `uuidPattern`, any hex UUID, not kin-openapi's RFC 4122 one, which would refuse ids with other version bits.
+- The file's `servers` entry (`/v1`) is for readers; the router can't match a relative one, so `checkContract` cuts `apiPrefix` itself and the loaded copy has no servers. A path outside `/v1` (tiles, pages) is never checked.
+- `TestContractIsValid` loads and validates the file without a database, so a malformed file fails even a bare `go test ./...`.
+
 ## 5. Engineering Risks & Mitigations
 
 ### 5.1 Ingest path risk, per path
