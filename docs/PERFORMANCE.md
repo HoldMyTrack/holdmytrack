@@ -100,11 +100,11 @@ Storage was measured by re-encoding the demo account's 2,529 Fog and 2,529 Heatm
 | 128 | 19 | 2.05 MB | 2.02 MB | 17–20% |
 | 64 | 38 | 0.92 MB | 0.94 MB | 8–9% |
 
-256 px looks the same as 512; 128 px is softer up close; 64 px smears thin tracks at zoom 13 and pales the Heatmap; the pixel-art versions are crisp and deliberately blocky. 64 px with smooth stretching was chosen for both layers (ADR-0037).
+256 px looks the same as 512; 128 px is softer up close; 64 px smears thin tracks at zoom 13 and pales the Heatmap; the pixel-art versions are crisp and deliberately blocky. 64 px with smooth stretching was chosen for both layers (`IMPLEMENTATION.md` §4.2).
 
 ### 2026-10-09 — dev stack, the true 64 px render
 
-The 64 px code (ADR-0037) on the dev stack, the demo account re-rendered with `rerender-coverage --masks --user`, and its stored bytes summed from the dev object store before and after. The dev store adds a few hundred bytes of metadata per object, which at 64 px outweighs many of the images themselves, so production's R2 saving sits nearer the PNG ratios of the resolution session above.
+The 64 px code (`IMPLEMENTATION.md` §4.2) on the dev stack, the demo account re-rendered with `rerender-coverage --masks --user`, and its stored bytes summed from the dev object store before and after. The dev store adds a few hundred bytes of metadata per object, which at 64 px outweighs many of the images themselves, so production's R2 saving sits nearer the PNG ratios of the resolution session above.
 
 | Stored for the demo account | 512 px | 64 px |
 | :-- | :-- | :-- |
@@ -128,7 +128,7 @@ The 64 px code (ADR-0037) on the dev stack, the demo account re-rendered with `r
 
 ### 2026-10-09 — production, `7d013f0`, the 64 px re-render
 
-Deploying ADR-0037 ran `rerender-coverage --masks` once over production's four accounts with coverage, 835 activities. Bucket sizes from `rclone size` before and after:
+Deploying the 64 px tiles (`IMPLEMENTATION.md` §4.2) ran `rerender-coverage --masks` once over production's four accounts with coverage, 835 activities. Bucket sizes from `rclone size` before and after:
 
 | R2 prefix | 512 px | 64 px |
 | :-- | :-- | :-- |
@@ -167,7 +167,7 @@ Two dev accounts imported the same kind of 1,000-track archive. A worker built f
 
 ### 2026-10-09 — production, `f3f28d2`, the client's browse
 
-The same VPS with 64 px tiles (ADR-0037), the parallel purge and the per-file import (ADR-0039), and the first production run of the browse that follows the client. 21 test accounts; the bypass was on for 6 s. Region and Country are the Fog-mode requests, the heavier of the two modes' for both.
+The same VPS with 64 px tiles (`IMPLEMENTATION.md` §4.2), the parallel purge and the per-file import (ADR-0039), and the first production run of the browse that follows the client. 21 test accounts; the bypass was on for 6 s. Region and Country are the Fog-mode requests, the heavier of the two modes' for both.
 
 | Users | Map views/s | Requests/s | Fog p95 | Heatmap p95 | Tracks p95 | Region p95 | Country p95 | Errors |
 | :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- |
@@ -202,7 +202,7 @@ Where a Region or Country tile's time goes, and what keeping its clipped outline
 
 ### 2026-10-09 — dev stack, 128 px Fog and Heatmap
 
-The decision behind ADR-0041. One dev account seeded with the 45 demo tracks (1,666 masks, all in Postgres, ADR-0040) was redrawn with `rerender-coverage --masks --user` at 64 px and at 128 px, and Fog and Heatmap were screenshotted at zoom 10, 13 and 16 in light and dark, headless, in compose's test container.
+The decision behind the 128 px tile size (`IMPLEMENTATION.md` §4.2). One dev account seeded with the 45 demo tracks (1,666 masks, all in Postgres, `IMPLEMENTATION.md` §3.11) was redrawn with `rerender-coverage --masks --user` at 64 px and at 128 px, and Fog and Heatmap were screenshotted at zoom 10, 13 and 16 in light and dark, headless, in compose's test container.
 
 | Per tile, development laptop | 64 px | 128 px |
 | :-- | :-- | :-- |
@@ -219,7 +219,7 @@ The decision behind ADR-0041. One dev account seeded with the 45 demo tracks (1,
 
 ### 2026-10-10 — dev stack, the render lane and masks in Postgres
 
-The laptop's dev stack, first with a worker and API built from `main`, then from the branch that gives renders their own lane (`IMPLEMENTATION.md` §3.8), moves masks into Postgres (ADR-0040), draws 128 px tiles (ADR-0041) and keeps the Country and Region outlines per tile (§4.2.4). Both workers reached the object store through `delayproxy` at 80 ms a round trip and ran `WORKER_CONCURRENCY=2`, so two accounts' renders could fill the main lane as four did in production; the branch's also ran `WORKER_RENDER_CONCURRENCY=2`. Two accounts each imported a 1,000-track set (`gen 2 1000`, `import 2`); a third probed. On the branch, `rerender-coverage --masks` first redrew both accounts' masks into Postgres.
+The laptop's dev stack, first with a worker and API built from `main`, then from the branch that gives renders their own lane (`IMPLEMENTATION.md` §3.8), moves masks into Postgres (§3.11), draws 128 px tiles (§4.2) and keeps the Country and Region outlines per tile (§4.2.4). Both workers reached the object store through `delayproxy` at 80 ms a round trip and ran `WORKER_CONCURRENCY=2`, so two accounts' renders could fill the main lane as four did in production; the branch's also ran `WORKER_RENDER_CONCURRENCY=2`. Two accounts each imported a 1,000-track set (`gen 2 1000`, `import 2`); a third probed. On the branch, `rerender-coverage --masks` first redrew both accounts' masks into Postgres.
 
 | | `main` | Branch |
 | :-- | :-- | :-- |
@@ -244,7 +244,7 @@ The laptop's dev stack, first with a worker and API built from `main`, then from
 
 ### 2026-10-10 — production, `535cec9`, the render lane
 
-The same VPS after the deploy of renders in a lane of their own (`IMPLEMENTATION.md` §3.8, two render loops beside four main ones), activity masks in Postgres (ADR-0040), 128 px tiles (ADR-0041), Country and Region outlines kept per tile (§4.2.4) and Postgres's cache at 1 GB (`DEPLOY.md` §6). The deploy's `rerender-coverage --masks` redrew the 5,777 masks of 780 activities into Postgres, 502 bytes each on average, and their renders took at most 110 s. 21 test accounts; the bypass was on for about 14 s, and `api` ran with `UPLOADS_PER_HOUR=100000` until the cleanup.
+The same VPS after the deploy of renders in a lane of their own (`IMPLEMENTATION.md` §3.8, two render loops beside four main ones), activity masks in Postgres (§3.11), 128 px tiles (§4.2), Country and Region outlines kept per tile (§4.2.4) and Postgres's cache at 1 GB (`DEPLOY.md` §6). The deploy's `rerender-coverage --masks` redrew the 5,777 masks of 780 activities into Postgres, 502 bytes each on average, and their renders took at most 110 s. 21 test accounts; the bypass was on for about 14 s, and `api` ran with `UPLOADS_PER_HOUR=100000` until the cleanup.
 
 | Users | Map views/s | Requests/s | Fog p95 | Heatmap p95 | Tracks p95 | Region p95 | Country p95 | Errors |
 | :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- |

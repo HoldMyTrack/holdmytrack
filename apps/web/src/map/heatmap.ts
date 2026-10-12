@@ -87,7 +87,7 @@ export function ensureHeatmapLayer(map: MapLibreMap, beforeId: string | undefine
         layout: { visibility: 'none' }, // starts hidden — Normal is the default mode
         // Square pixels below z14, where each tile pixel shows 8 screen pixels wide however far out
         // the map is; smoothed from z14, where there's no finer tile and the z14 one is stretched
-        // further with every zoom (ADR-0038).
+        // further with every zoom (IMPLEMENTATION.md §4.2).
         paint: { 'raster-resampling': ['step', ['zoom'], 'nearest', PIXELS_MAX_ZOOM, 'linear'] },
       },
       beforeId,

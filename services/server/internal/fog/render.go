@@ -186,7 +186,7 @@ func dirtyTiles(ctx context.Context, pool *pgxpool.Pool, userID string, zoom int
 // contains tiles the *raw* trajectory actually passed through, not an approximation from the
 // simplified trajectory's bounding box.
 //
-// The masks' bytes come in the same query, from activity_tile_mask_data (ADR-0040), so a tile
+// The masks' bytes come in the same query, from activity_tile_mask_data (IMPLEMENTATION.md §3.11), so a tile
 // costs one SQL read rather than a round trip to object storage per activity through it. A
 // mask that can't be read — no bytes (a restore leaves them out until `rerender-coverage
 // --masks` redraws them), or bytes that don't decode — is left out of the tile and counted in
@@ -284,7 +284,7 @@ var errTileSize = errors.New("fog: stored tile is not TileSize")
 // grayscale PNGs, but convert explicitly rather than assume the concrete type.
 //
 // One of another size is refused: every raster here indexes a TileSize square, so a tile or
-// mask drawn before TileSize last changed (ADR-0041) — until `rerender-coverage --masks` redraws
+// mask drawn before TileSize last changed (IMPLEMENTATION.md §4.2) — until `rerender-coverage --masks` redraws
 // it — would read past a smaller one's end (downsampleQuadrants) or land squashed in a corner of
 // the tile (compositeFogMask) instead. A child tile refused fails its render; an activity's
 // mask refused is skipped and counted, as an unreadable one is.
@@ -308,7 +308,7 @@ func decodeGray(r io.Reader) (*image.Gray, error) {
 // RenderActivityMasks renders exactly one activity's own crisp (unblurred) stroke mask for
 // each of its already-computed touched z14 tiles (internal/ingest's computeTouchedTiles), and
 // upserts one activity_tile_masks row per tile with its PNG in activity_tile_mask_data, both
-// in one transaction (ADR-0040). Idempotent: safe to re-run for the same activity (a
+// in one transaction (IMPLEMENTATION.md §3.11). Idempotent: safe to re-run for the same activity (a
 // redelivered ingest job).
 //
 // Called from ingest.Process with the points already in memory (pre-simplification, already

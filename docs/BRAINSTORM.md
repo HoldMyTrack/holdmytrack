@@ -8,7 +8,7 @@ Once an idea here is decided, it moves out: accepted work goes to `docs/ROADMAP.
 
 ### More languages, and language-specific URLs
 
-English and Russian ship (ADR-0014). Every further language is a translation pass over three catalogs and two prose pages, which is cheap once someone can review it. If search traffic in other languages ever matters, `/ru/help`-style URLs with `hreflang` would let search engines index each language, which the current one-URL-per-page approach can't.
+English and Russian ship (`IMPLEMENTATION.md` §4.21). Every further language is a translation pass over three catalogs and two prose pages, which is cheap once someone can review it. If search traffic in other languages ever matters, `/ru/help`-style URLs with `hreflang` would let search engines index each language, which the current one-URL-per-page approach can't.
 
 * Spanish and German are the obvious next candidates, for reach and for their long words respectively (the second is a good layout stress test).
 * The Android app could read the account's Language (it's in `GET /v1/auth/me`) and apply it as its per-app language, so the two apps agree without the user setting it twice.
@@ -61,7 +61,7 @@ ADR-0024 keeps a resized copy of each photo on our own storage. If photos ever b
 
 ### Deploy on merge
 
-Deploys to `holdmytrack.com` are run by hand over SSH (`docs/DEPLOY.md` §6). What held back deploying every merge to `main` was that the server held the only copy of real synced history; nightly backups and a monthly restore drill now exist (ADR-0029), so a bad deploy can be undone.
+Deploys to `holdmytrack.com` are run by hand over SSH (`docs/DEPLOY.md` §6). What held back deploying every merge to `main` was that the server held the only copy of real synced history; nightly backups and a monthly restore drill now exist (`docs/DEPLOY.md` §11), so a bad deploy can be undone.
 
 * A GitHub Actions job would need an SSH key to the server in the repository's secrets, which is a new way in to the box; that key should only be able to run the deploy, not get a shell (`restrict,command="…"` in root's `authorized_keys`, since the server takes SSH as root by key only, `docs/DEPLOY.md` §12).
 * A deploy with a migration needs `backup.sh` first, and maintenance mode around it when the migration says so (`docs/DEPLOY.md` §7); the job can read that marker, but it can't tell in advance whether a migration is going to go wrong.

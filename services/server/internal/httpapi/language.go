@@ -14,7 +14,7 @@ import (
 const languageCookieAge = 365 * 24 * time.Hour
 
 // handleLanguageForm serves `POST /language` — the header's language menu, on every page,
-// signed in or not (ADR-0025), and the web's only language control. It remembers the choice
+// signed in or not (IMPLEMENTATION.md §4.21), and the web's only language control. It remembers the choice
 // on this browser (i18n.CookieName), so a visitor without an account can read the site in a
 // language their browser doesn't ask for. A signed-in real account's Language setting is
 // saved too, since that setting outranks the cookie (i18n.Resolve) and would otherwise undo
@@ -39,7 +39,7 @@ func (s *Server) handleLanguageForm(w http.ResponseWriter, r *http.Request) {
 }
 
 // setLanguageCookie remembers lang on this browser; "" forgets it. HttpOnly, since nothing on
-// the client reads it: the server decides the language (ADR-0014).
+// the client reads it: the server decides the language (IMPLEMENTATION.md §4.21).
 func (s *Server) setLanguageCookie(w http.ResponseWriter, lang string) {
 	c := &http.Cookie{
 		Name:     i18n.CookieName,

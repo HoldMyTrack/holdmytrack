@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Accepted. The endpoint trimming this ADR mentions no longer exists: Private locations are the only clipping (`VISION.md` §7, `SPEC.md` FR-8.1).
 
 ## Context
 
@@ -26,4 +26,4 @@ Adding a privacy zone after the fact means re-processing already-ingested activi
 - Every current and future renderer (fog, tracks, colored bands, export, and any print pipeline built later) inherits correct privacy behavior automatically, with nothing extra to implement or to get wrong.
 - Raw, unclipped payloads have to be retained server-side to make retroactive re-clipping possible at all — which makes them, by HoldMyTrack's own account, "the most sensitive artifact in the system" (`IMPLEMENTATION.md` §7), requiring encryption at rest and aggressive, scheduled expiry (§5.7). An activity whose raw payload has already expired by the time a new privacy zone is added simply can't be retroactively re-clipped — an accepted limit of the retention window, not a bug.
 - Adding a privacy zone is not instant for existing history — it requires a real background job over every activity that zone affects, not an immediate render-time change.
-- This decision is exactly why the no-signup demo account (ADR-0004) could safely reuse the real ingest pipeline: privacy enforcement is identical for a demo account and a real one, with nothing demo-specific to get wrong.
+- This decision is exactly why the no-signup demo account (`IMPLEMENTATION.md` §4.10) could safely reuse the real ingest pipeline: privacy enforcement is identical for a demo account and a real one, with nothing demo-specific to get wrong.

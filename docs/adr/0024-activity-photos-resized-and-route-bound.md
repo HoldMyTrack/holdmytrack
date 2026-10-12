@@ -6,7 +6,7 @@ Accepted. Built for the server and the web (`SPEC.md` FR-16, `IMPLEMENTATION.md`
 
 ## Context
 
-A Story keeps a trip as one thing — its tracks, its name, its totals (ADR-0020) — but a trip is remembered as much by what was seen on it as by where it went. The request was to add one's own photos to an activity, each bound to a point on the route, so that looking back at a journey shows the pictures where they were taken. Four choices decide what that means: where the files live, what is kept of them, how a photo finds its point on the route, and what Private locations do to it. A fifth is the cost to the promise ADR-0017 made: "we don't keep your health profile, only the geographical data you trust us with." A photo isn't geographical data; it can show faces, other people and the inside of a home.
+A Story keeps a trip as one thing — its tracks, its name, its totals (`VISION.md` §4.2) — but a trip is remembered as much by what was seen on it as by where it went. The request was to add one's own photos to an activity, each bound to a point on the route, so that looking back at a journey shows the pictures where they were taken. Four choices decide what that means: where the files live, what is kept of them, how a photo finds its point on the route, and what Private locations do to it. A fifth is the cost to the promise ADR-0017 made: "we don't keep your health profile, only the geographical data you trust us with." A photo isn't geographical data; it can show faces, other people and the inside of a home.
 
 ## Decision
 

@@ -18,7 +18,7 @@ const spotCaptureSlackM = 10
 
 // spotDetailQuery is one place with its whole area and the caller's capture of it, if any —
 // what the Android app's capture mode measures a position against (FR-15.6). A retired place
-// (ADR-0027) is there only for an account that captured it.
+// (docs/SPEC.md FR-15.1) is there only for an account that captured it.
 const spotDetailQuery = `
 SELECT s.id, s.category, s.name, s.address, s.description, s.inscription, s.memorial,
        s.start_date, s.wikipedia, ST_X(p.pt), ST_Y(p.pt), ST_AsGeoJSON(s.geom, 7), c.captured_at
@@ -114,7 +114,7 @@ func (s *Server) handleListSpotCaptures(w http.ResponseWriter, r *http.Request) 
 // inside the place for 30 s, and sends the last position it measured. The server checks that
 // position against the area once more, within spotCaptureSlackM, and keeps the first capture —
 // 201 for a new one, 200 with the earlier one's time when the place was already captured. A
-// retired place (ADR-0027) can't be captured: 410.
+// retired place (docs/SPEC.md FR-15.1) can't be captured: 410.
 func (s *Server) handleCaptureSpot(w http.ResponseWriter, r *http.Request) {
 	id, ok := spotIDFromPath(w, r)
 	if !ok {

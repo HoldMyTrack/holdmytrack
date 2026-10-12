@@ -234,7 +234,7 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 
 ### FR-2.8 Spots
 
-**Description**: The web's points of interest (`docs/SPEC.md` FR-15.2–FR-15.5) — outdoor places from OpenStreetMap — on the same tiles and endpoint, chosen per category in the Layers menu (FR-2.2 item 8); and, here only, capturing one by going there (`docs/SPEC.md` FR-15.6, ADR-0023).
+**Description**: The web's points of interest (`docs/SPEC.md` FR-15.2–FR-15.5) — outdoor places from OpenStreetMap — on the same tiles and endpoint, chosen per category in the Layers menu (FR-2.2 item 8); and, here only, capturing one by going there (`docs/SPEC.md` FR-15.6).
 
 **Behavior**:
 1. The Layers menu's **Points of interest** has one checkbox per category — Playgrounds, Dog parks, Monuments, Mesmerizing views, Historic sites — all off until ticked, kept on the phone only, and drawn only while Show layers (FR-2.2 item 8) is on. Each works the same in Normal, Fog and Heatmap, and while recording.

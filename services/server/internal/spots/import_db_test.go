@@ -51,7 +51,7 @@ func testTx(t *testing.T) pgx.Tx {
 	return tx
 }
 
-// A refresh (ADR-0027): an unchanged re-run changes nothing and leaves the tile version alone; a
+// A refresh (docs/SPEC.md FR-15.1): an unchanged re-run changes nothing and leaves the tile version alone; a
 // planet run retires what it didn't see, keeping its captures, and brings it back when it
 // returns; a regional run retires nothing; and a run that would retire too much retires none.
 func TestImportRetires(t *testing.T) {

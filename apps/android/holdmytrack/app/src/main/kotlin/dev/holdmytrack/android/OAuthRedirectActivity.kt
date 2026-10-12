@@ -13,7 +13,7 @@ import android.os.Bundle
  * brings the existing sign-in screen back to the front and, in doing so, removes the Custom Tab
  * that was open on top of it. Any other app can send this URI too; that's harmless, since a
  * code is only redeemable with the verifier [SignInActivity] generated and kept to itself
- * (`docs/adr/0016-native-sign-in.md`).
+ * (`docs/IMPLEMENTATION.md` §4.22).
  */
 class OAuthRedirectActivity : Activity() {
 

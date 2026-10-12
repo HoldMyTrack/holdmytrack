@@ -75,7 +75,7 @@ func (f facebookOAuth) enabled() bool { return f.AppID != "" }
 // it, and the code is only redeemable with the app secret, which never leaves this server;
 // state still ties the callback to this browser. The Android app opens this same URL in a
 // browser tab with `&app_challenge=` added (oauth.go), which is how it signs in with Facebook
-// without Meta's SDK (docs/adr/0016-native-sign-in.md).
+// without Meta's SDK (docs/IMPLEMENTATION.md §4.22).
 func (s *Server) handleFacebookStart(w http.ResponseWriter, r *http.Request) {
 	if !s.facebook.enabled() {
 		http.NotFound(w, r)

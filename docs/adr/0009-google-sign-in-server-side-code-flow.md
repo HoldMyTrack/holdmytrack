@@ -35,5 +35,5 @@ The feature is optional per deployment: an empty `GOOGLE_CLIENT_ID` turns it off
 - The callback is a full-page redirect, so failures can only be reported by redirecting back with a query parameter. They are deliberately generic (`?auth_error=google`), and the cause is only in the server log.
 - Auto-linking makes Google's email verification part of this app's security boundary: anyone who controls a Google account for an address can sign in to the HoldMyTrack account with that address. That is the same trust the password-reset email already places in whoever controls the mailbox.
 - Google-only accounts have no password until they set one through Forgot password, so `sendPasswordReset`'s filter had to widen to include them.
-- In dev, where the app and the API are separate origins, `GOOGLE_REDIRECT_URL` must be set explicitly to the API's own origin; in production (ADR-0006, one origin) the default is right.
+- In dev, where the app and the API are separate origins, `GOOGLE_REDIRECT_URL` must be set explicitly to the API's own origin; in production (`IMPLEMENTATION.md` §5.8, one origin) the default is right.
 - Android sign-in needs a second, client-token endpoint with real signature verification. That work is recorded in `docs/ROADMAP.md`.

@@ -11,7 +11,7 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/tilemath"
 )
 
-// A retired place (§4.25, ADR-0027): flagged in the tiles, returned by "Show in this area" and
+// A retired place (§4.25): flagged in the tiles, returned by "Show in this area" and
 // the detail only to an account that captured it, and capturable by no one.
 func TestRetiredSpot(t *testing.T) {
 	d := newDBTest(t)

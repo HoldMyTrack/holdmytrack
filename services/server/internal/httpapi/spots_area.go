@@ -16,7 +16,7 @@ const spotsAreaLimit = 2000
 var spotCategories = []string{"playground", "dog_park", "monument", "viewpoint", "history"}
 
 // spotsAreaQuery is the places in an area, in the chosen categories, at most $6 of them,
-// leaving out a retired place (ADR-0027) unless the account $7 captured it. The area is one or
+// leaving out a retired place (docs/SPEC.md FR-15.1) unless the account $7 captured it. The area is one or
 // two boxes (spotArea, $1–$4): two when the view crosses the antimeridian. Named places first — the ones worth a popup — then by a hash of the id: a stable order that's
 // spread evenly over the area, so a cut-off leaves a thinner map rather than an empty corner.
 var spotsAreaQuery = `

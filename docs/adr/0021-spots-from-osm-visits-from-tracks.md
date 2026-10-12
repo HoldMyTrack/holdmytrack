@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for the places; its visits are superseded by ADR-0028 and were never built. The places are built on the web and in the Android app (`SPEC.md` FR-15, `IMPLEMENTATION.md` §4.25), with a 30 m circle rather than 50 m for a place mapped as a point, refreshed by a manual re-import that retires places gone from OSM (ADR-0027). ADR-0023 adds capturing a spot live in the Android app, now the only mark a place carries.
+Accepted for the places; its visits were never built and are dropped — a place's only mark is a capture made live in the Android app (`VISION.md` §4.2, `SPEC.md` FR-15.6). The places are built on the web and in the Android app (`SPEC.md` FR-15, `IMPLEMENTATION.md` §4.25), with a 30 m circle rather than 50 m for a place mapped as a point, refreshed by a manual re-import that retires places gone from OSM rather than deleting them (`IMPLEMENTATION.md` §4.25).
 
 ## Context
 

@@ -1,4 +1,4 @@
--- Spot captures (IMPLEMENTATION.md §4.25, ADR-0023): a spot an account captured by staying 30 s
+-- Spot captures (IMPLEMENTATION.md §4.25, SPEC.md FR-15.6): a spot an account captured by staying 30 s
 -- inside it with the Android app's capture mode on. One per account and place; gone with either.
 
 CREATE TABLE spot_captures (
