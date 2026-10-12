@@ -46,7 +46,7 @@ CREATE TABLE users (
 CREATE TABLE connections (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    provider          VARCHAR(32) NOT NULL,   -- 'garmin' | 'wahoo' | 'coros'
+    provider          VARCHAR(32) NOT NULL,   -- 'wahoo' | 'coros'
     provider_user_id  VARCHAR(255) NOT NULL,
     access_token      BYTEA NOT NULL,         -- encrypted at rest, never logged
     refresh_token     BYTEA,
@@ -60,9 +60,9 @@ CREATE TABLE connections (
 );
 ```
 
-The second unique constraint matters: without it, two HoldMyTrack accounts can connect the same Garmin account and each receive the same webhook, doubling both storage and fog.
+The second unique constraint matters: without it, two HoldMyTrack accounts can connect the same Wahoo account and each receive the same webhook, doubling both storage and fog.
 
-Tokens are encrypted at rest with a key outside the database. Deauthorization deletion (§7) is a hard requirement of all three activity providers, so disconnecting must delete the synced data, not merely the row here.
+Tokens are encrypted at rest with a key outside the database. Deauthorization deletion (§7) is a hard requirement of both activity providers, so disconnecting must delete the synced data, not merely the row here.
 
 ### 3.3 `activities`
 
@@ -73,8 +73,8 @@ CREATE TABLE activities (
 
     -- Provenance. `source` is the ingest path; `source_detail` names the origin within it
     -- (a provider, an Android package, or an uploaded filename).
-    source            VARCHAR(32)  NOT NULL,   -- 'upload' | 'garmin' | 'wahoo'
-                                               -- | 'coros' | 'healthkit' | 'healthconnect'
+    source            VARCHAR(32)  NOT NULL,   -- 'upload' | 'wahoo' | 'coros'
+                                               -- | 'healthkit' | 'healthconnect'
                                                -- | 'recorded' | 'takeout' and 'timeline'
                                                -- (rows from before those imports went)
     source_detail     VARCHAR(255),
@@ -639,7 +639,7 @@ They differ only in how bytes arrive. All converge on §4.1 step 2.
 ```mermaid
 flowchart LR
     subgraph P1["Path 1 — cloud-to-cloud (not built)"]
-        prov["Provider<br/>(Garmin .FIT, JSON)"] -->|webhook| wh["POST /v1/webhooks/{provider}<br/>200 OK, nothing fetched inline"]
+        prov["Provider<br/>(.FIT, JSON)"] -->|webhook| wh["POST /v1/webhooks/{provider}<br/>200 OK, nothing fetched inline"]
         wh --> ps[["provider_sync job<br/>(+ resumable backfill at connect)"]]
     end
     subgraph P2["Path 2 — on-device sync"]
@@ -656,7 +656,7 @@ flowchart LR
     job --> parse["§4.1 step 2: parse<br/>(shared from here on)"] --> rest["steps 3–5<br/>clip · coverage · simplify"] --> persist[("§4.1 step 6: activities<br/>ON CONFLICT DO NOTHING")]
 ```
 
-**Path 1 — cloud-to-cloud. Not built yet** (`docs/ROADMAP.md`, "Path 1"); this is the design it is to follow, and only its `connections` table (§3.2) exists. OAuth connect, then webhook-driven where the provider supports it. Never poll on a schedule: a webhook returns `200 OK` in milliseconds and enqueues a `provider_sync` job; nothing is fetched inline. Providers deliver either a file (Garmin pushes `.FIT`) or structured JSON, so the parse step is per-provider and everything after it is shared. Backfill of history at connect time is a separate, rate-limited, resumable job — it is the largest single fetch the system ever performs.
+**Path 1 — cloud-to-cloud. Not built yet** (`docs/ROADMAP.md`, "Path 1"); this is the design it is to follow, and only its `connections` table (§3.2) exists. OAuth connect, then webhook-driven where the provider supports it. Never poll on a schedule: a webhook returns `200 OK` in milliseconds and enqueues a `provider_sync` job; nothing is fetched inline. Providers deliver either a file (such as `.FIT`) or structured JSON, so the parse step is per-provider and everything after it is shared. Backfill of history at connect time is a separate, rate-limited, resumable job — it is the largest single fetch the system ever performs.
 
 **Path 2 — on-device sync.** A native app reads the platform health store and uploads normalized points.
 
@@ -1094,7 +1094,7 @@ TYPE rows are real checkboxes in a scrolling list (§4.7.6), not a fixed categor
 
 #### 4.7.2 `activity_type` is not a controlled vocabulary
 
-Revising §3.3's comment: `activity_type` is whatever the source reports, not the small fixed set the old `-- 'run' | 'ride' | 'hike' | ...` comment implied. Garmin/FIT's `sport`/`sub_sport`, TCX's `Sport` attribute, and GPX's optional `<type>` element each use their own vocabulary, and values like "Gravel" existing alongside "Ride" from the same source are real, not a data error. The product's answer: show it, don't normalize it — a filter list is built from whatever distinct values a given user's own activities actually contain, never a hardcoded set.
+Revising §3.3's comment: `activity_type` is whatever the source reports, not the small fixed set the old `-- 'run' | 'ride' | 'hike' | ...` comment implied. FIT's `sport`/`sub_sport`, TCX's `Sport` attribute, and GPX's optional `<type>` element each use their own vocabulary, and values like "Gravel" existing alongside "Ride" from the same source are real, not a data error. The product's answer: show it, don't normalize it — a filter list is built from whatever distinct values a given user's own activities actually contain, never a hardcoded set.
 
 **Resolved for all three formats**, verified directly against `internal/parse` and against a live upload through the real HTTP endpoint (not just unit tests) for GPX and FIT — TCX's live path was already covered. GPX reads its optional `<trk><type>` element (`internal/parse/gpx.go`). FIT reads the `session` message (global message 18, not `record`) and resolves `sport`/`sub_sport` (fields 5/6) through `internal/parse/fit_sport.go`'s lookup tables — transcribed programmatically from python-fitparse's `profile.py` (itself generated from Garmin's own FIT SDK `Profile.xlsx`), not typed by hand, since a wrong numeric mapping in ~110 enum values is exactly the kind of error that can't be caught by inspection. `sub_sport` wins when it says something `sport` doesn't (`gravel_cycling` over plain `cycling` — confirmed live: a real `.fit` upload with sport=cycling, sub_sport=gravel_cycling lands as `activity_type = 'gravel_cycling'`), falling back to `sport` when `sub_sport` is `0` ("generic") or unset.
 
@@ -1681,7 +1681,7 @@ Three paths means three different failure modes, and the mitigation is that they
 **Path 1 — provider terms and licences.** A business risk before an engineering one; see `VISION.md` §4.1. Engineering consequences:
 * **Never poll.** Webhook receivers only. Return `200 OK` in milliseconds and enqueue.
 * **Rate-limit defensively.** A token-bucket limiter per provider, shared across workers. Backfill is the dangerous operation — thousands of activities on connect.
-* **Deletion on deauthorization.** Required by all three activity providers. Build it with the first connector, not after.
+* **Deletion on deauthorization.** Required by both activity providers. Build it with the first connector, not after.
 * **Assume revocation.** Everything must work with zero connected providers.
 
 **Path 2 — platform route access.** Verified constraints, not assumptions: Android route reads are foreground-only and cannot be requested programmatically; Samsung Health exposes no route geometry at all. **Degrade honestly** — a session with no route isn't offered, and routes Health Connect wouldn't hand over are counted and explained on the Sync tab. The failure mode to avoid is a user expecting 400 activities and seeing an empty list with no explanation.
@@ -1811,7 +1811,7 @@ Privacy is enforced at **ingest**, not at render. Once a point is excluded at st
 * **Retroactive application** — every mutation runs in one transaction with its reprocessing: `ingest.AffectedActivities` finds the activities whose `trajectory` comes within the old and/or new circle's radius + 25 m (`zoneMarginM` — the stored trajectory is simplified, and an end already clipped sits exactly on the edge), plus every fully hidden activity (`trajectory IS NULL`, `AffectedHiddenActivities` — nothing to search by, and few). `ingest.EnqueueReprivacy` sets `edit_pending = true` on all of them — the Activities panel's Pending badge, same as Edit track — marks their tiles dirty, and inserts one `reprivacy` job `{user_id, activity_ids}`. A rename alone reprocesses nothing. `ingest.ProcessReprivacy` renders once with the batch left out (§4.2.5), runs each through `reprocessActivity` (§4.7.7's function, with the stored `track_edit`), clears `edit_pending` — skipping any id a later still-pending `reprivacy` job covers — and renders again. Each render is once for the batch rather than once per activity: a circle at home can touch hundreds of activities over the same few tiles. One activity failing doesn't stop the rest; the job fails afterwards naming them, with their badges cleared. `reprivacy` counts in `GET /v1/coverage/status`, which the web client's Private locations save uses (`useCoverageRefresh`'s `onDone`) to refresh tracks, totals and bands even when the batch finishes before the list ever shows it Pending. This is also the reason privacy is applied server-side rather than before upload: retroactive re-clipping requires the server to hold re-clippable raw points, which is why raw payloads are retained per source (§5.7) rather than discarded after parse.
 * **Raw payload handling** — payloads from all three paths retain unclipped data, including points inside privacy zones, and are what retroactive re-clipping re-parses from (above). They must be private, server-side-encrypted, never publicly addressable, and aggressively expired (§5.7). This is the most sensitive artifact in the system.
 * **Provider tokens** — encrypted at rest with a key outside the database, never logged, never returned by an API.
-* **Deauthorization deletion** — disconnecting a provider must delete the data synced from it, not merely the `connections` row. Required by Garmin, Wahoo and COROS.
+* **Deauthorization deletion** — disconnecting a provider must delete the data synced from it, not merely the `connections` row. Required by Wahoo and COROS.
 * **Sensitive personal data** — a precise location history is sensitive under GDPR even with no health data in it (`VISION.md` §7). DPIA before launch, working export and deletion endpoints, documented retention, EU-region storage for EU users. **Being free changes none of this.**
 * **Tile authorization** — `/tiles/…?user_id=` is an IDOR. Derive the user from the session; never accept a user ID as a tile parameter. Signed, expiring URLs for any shared map.
 * **Operator access** — the admin panel (§4.20) is the one place an account sees another's data: every account and each one's activity list (ids, dates, names, countries/regions — not tracks). It takes the account id in the path by design, so it is gated on `users.is_admin`, which only the server's own CLI can set, and answers 404 to everyone else. Anything that later lets an admin see a track, or act on one, should come with an audit log of who looked at or changed what.

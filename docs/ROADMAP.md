@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-10-09.
+Last updated: 2026-10-11.
 
 ## How to read this document
 
@@ -75,17 +75,15 @@ Connecting the app to third-party services.
 
 ### Prerequisites — gate the specific connectors below
 
-- [ ] Get Garmin's Connect Developer Program licence position in writing for a free, donation-funded service (`VISION.md` §4.1, §4.3, §8.3).
 - [ ] File the Wahoo partner-API application (lead time, not cost, is the risk).
 - [ ] File the COROS partner-API application.
 
 ### Path 1 — cloud connectors (gated on the prerequisites above)
 
 - [ ] Generic OAuth connection scaffolding — `connections` table already exists (`migrations/0002_activities.sql`, `IMPLEMENTATION.md` §3.2); build the authorize/callback/token-refresh flow once, provider-agnostic, before any specific provider, with a picker: a connector lists what it would bring in and imports only what the user ticks (ADR-0039). That is how bulk history arrives, since archives aren't imported.
-- [ ] Garmin connector (after the licence prerequisite is settled).
 - [ ] Wahoo connector (after partner approval).
 - [ ] COROS connector (after partner approval).
-- [ ] Deauthorization deletion for each connector as it ships, not after — Garmin/Wahoo/COROS contractually require it (`VISION.md` §7).
+- [ ] Deauthorization deletion for each connector as it ships, not after — Wahoo and COROS contractually require it (`VISION.md` §7).
 - [ ] Connect/disconnect for each connector on the web's Sync page, `/sync` (`docs/IMPLEMENTATION.md` §4.0.1), and (once token-refresh runs on a schedule) a last-synced/status summary beside Health Connect/GPS Logger's read-only rows.
 
 ---

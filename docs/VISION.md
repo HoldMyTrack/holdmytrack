@@ -55,7 +55,7 @@ To let athletes, runners, cyclists, travellers and explorers see and keep the sh
 * **Endurance athletes** — cyclists, runners and hikers who already log meticulously.
 * **Urban explorers** — people who gamify coverage of their city.
 * **Casual smartwatch owners** — want a nice seasonal or annual summary, not analytics.
-* **The multi-device athlete** — a Garmin for rides, an Apple Watch for runs, and no single place that shows all of it. This segment is served specifically by §4.1's three ingest paths and is underserved by every single-source competitor.
+* **The multi-device athlete** — a bike computer for rides, an Apple Watch for runs, and no single place that shows all of it. This segment is served specifically by §4.1's three ingest paths and is underserved by every single-source competitor.
 * **Travellers** — people who want a holiday, a road trip or a multi-day trek kept as one journey on a map, with its photos. Served by Stories, photos and in-app recording (§4.2, §4.1); held back by having no route history to bring unless they recorded one, since most travellers' trace sits in Google Maps Timeline, which HoldMyTrack doesn't import (§1.1). A trip recorded in the app, or on a watch, is how theirs comes in.
 
 ### 3.2 Market Opportunity
@@ -97,11 +97,10 @@ The central structural decision. Each path has a different failure mode, and no 
 
 #### Path 1 — Cloud-to-cloud integration
 
-Server-side OAuth connections to services that hold the user's history. Target set: **Garmin, Wahoo, COROS.**
+Server-side OAuth connections to services that hold the user's history. Target set: **Wahoo, COROS.**
 
 | Provider | What it gives | Constraint to verify before building |
 | :--- | :--- | :--- |
-| **Garmin** | Full activities with GPS, HR, power, cadence | Connect Developer Program historically requires a **paid commercial licence**. Whether a free, donation-funded service qualifies as commercial is the open question — get it in writing |
 | **Wahoo** | Rides with full sensor data | Partner API with an approval process |
 | **COROS** | Runs, rides, multisport | Partner API with an approval process |
 
@@ -131,7 +130,7 @@ So Android on-device sync is foreground-only, and Samsung Galaxy Watch is unsupp
 
 #### Path 3 needs no one's permission
 
-Paths 1 and 2 depend on things HoldMyTrack doesn't control: Garmin's licence terms, Wahoo's and COROS's partner approvals, and what HealthKit and Health Connect actually expose. **Path 3 is unconditional.** If every one of those fails, file upload still delivers the entire product to every user willing to export once. That is what source independence buys, and it is why Path 3 comes first (§5.2).
+Paths 1 and 2 depend on things HoldMyTrack doesn't control: Wahoo's and COROS's partner approvals, and what HealthKit and Health Connect actually expose. **Path 3 is unconditional.** If every one of those fails, file upload still delivers the entire product to every user willing to export once. That is what source independence buys, and it is why Path 3 comes first (§5.2).
 
 #### Casual in-app GPS recording — mobile-only, and not a fourth path
 
@@ -181,7 +180,6 @@ The critical section for a product with no revenue. Costs must be *bounded by de
 | Photos | **Users × photos** | About 0.5 MB each — a resized copy and a thumbnail, never the original — capped at 2,000 per account |
 | Spots | Fixed | Several million OSM places, roughly 1 GB in Postgres; matching them is one indexed query per activity processed |
 | Compute | Users | One application server + Postgres/PostGIS to start |
-| Garmin licence | Fixed, if applicable | §4.1. The only line that could be large, fixed, and unavoidable |
 | Compliance | Fixed | DPA/DPIA work, EU-region hosting (§7) |
 | Egress | — | Cloudflare R2 charges none. This is why R2, not S3 |
 
@@ -200,11 +198,10 @@ The critical section for a product with no revenue. Costs must be *bounded by de
 
 That is a genuinely small number, and it is the whole argument for this model working. At $5/month per supporter, **break-even is on the order of 30–70 recurring donors out of 10,000 users — well under 1%.** Intervals.icu and Runalyze sustain themselves on comparable ratios.
 
-**The three things that break this model**, in order of likelihood:
+**The two things that break this model**, in order of likelihood:
 
-1. **The Garmin licence.** A four-figure annual fee dwarfs every other line and cannot be covered by a sub-1% donation rate at small scale. If it is commercial-only, Garmin support may have to wait for the donor base, or route through Path 3.
-2. **Storage growing without bound.** Every user who ever signs up costs money forever. A retention and dormancy policy is not a nicety here; it is what keeps the curve flat. See `IMPLEMENTATION.md` §5.7.
-3. **A viral moment.** Free products have no natural throttle. A front-page day at 100× traffic is a cost event with no matching revenue event. Rate limits and a spend cap on the CDN and object store are load-bearing infrastructure, not hardening.
+1. **Storage growing without bound.** Every user who ever signs up costs money forever. A retention and dormancy policy is not a nicety here; it is what keeps the curve flat. See `IMPLEMENTATION.md` §5.7.
+2. **A viral moment.** Free products have no natural throttle. A front-page day at 100× traffic is a cost event with no matching revenue event. Rate limits and a spend cap on the CDN and object store are load-bearing infrastructure, not hardening.
 
 ---
 
@@ -219,7 +216,7 @@ The product moves through three milestones (ADR-0031):
 Within the milestones, phases are sequenced so the unconditional ingest path ships first and the ones that depend on other companies' permission come later. The phase numbers are the ones `docs/ROADMAP.md` uses, which carries each phase's step-by-step detail.
 
 ### 5.1 Phase 0: Validation — *no application code*
-Settle what the plan rests on before building on it: whether Garmin's licence applies to a free service, whether the partner APIs and the HealthKit and Samsung route access are what they appear to be (§4.1), and whether "free, funded by its users" reads as credible (§8.3). The funding page stands before launch, not after — the ask is much weaker retrofitted (§6.1).
+Settle what the plan rests on before building on it: whether the partner APIs and the HealthKit and Samsung route access are what they appear to be (§4.1), and whether "free, funded by its users" reads as credible (§8.3). The funding page stands before launch, not after — the ask is much weaker retrofitted (§6.1).
 
 ### 5.2 Phase 1: Upload + Map
 The product on the web, on the one ingest path that needs nobody's permission: file upload (Path 3, §4.1), the map in all its modes, the no-signup demo (§8.2), accounts, the activity graph, export, Stories and Spots (§4.2). Path 3 comes first so that the first usable version waits on no one's approval.
@@ -281,7 +278,7 @@ Non-negotiable. A Fog of War map is a precise map of where a person lives — th
 * **Applied at ingest, server-side** — before anything is persisted or indexed, per `IMPLEMENTATION.md` §4.1. Privacy applied at render time leaks through any bug in the render path.
 * **Share scoping** — shared maps and exports must respect zones; an exported file is permanent and cannot be recalled.
 * **Legal basis** — HoldMyTrack processes no health data (§1.1): heart rate or other body data that happens to sit inside an original upload stays in that file and is never read out of it. A precise location history is sensitive personal data regardless: explicit consent, a DPIA before launch, a documented retention policy, working export and deletion, EU-region hosting for EU users. **Being free changes none of this.** There is no small-project exemption, and the compliance burden is one of the few fixed costs a donation model has to carry regardless of scale.
-* **Deauthorization deletion** — Garmin, Wahoo and COROS require deletion of synced data when a user disconnects, so every connector deletes on disconnect.
+* **Deauthorization deletion** — Wahoo and COROS require deletion of synced data when a user disconnects, so every connector deletes on disconnect.
 * **Health Connect declarations** — Android health data types must be declared in the Play Console with justified use. Requesting more types than the product demonstrably uses is a known rejection cause. HoldMyTrack requests exercise sessions and their routes (plus the history window over them) and no health measurement at all.
 * **Photos are stored stripped and placed after clipping** — the browser re-encodes a photo before upload, so no EXIF field (the position included) reaches the server inside the file; its place on the map is worked out from the clipped track on every read, so a photo taken inside a Private location — even one added afterwards — shows at the visible end of the track, never inside it (ADR-0024).
 * **Spot captures are private** — visible only to the account itself.
@@ -305,7 +302,6 @@ The single best asset in this plan: **a no-signup demo** — one click opens a f
 
 Everything else follows from it — the screenshot people post is the marketing, and the fog reveal is inherently screenshot-friendly.
 
-### 8.3 The key validation questions
+### 8.3 The key validation question
 
-1. **Does Garmin's licence apply to a free service?** (§4.1.) The one item that can impose a fixed cost this model cannot absorb.
-2. **Will people fund a free tool they like?** (§6.) Under 1% of users at $5/month covers the bill. This is a low bar and a real one — measure it through Milestone 2 rather than assuming it. Its answer is what the Milestone 3 decision (§5) is made from.
+**Will people fund a free tool they like?** (§6.) Under 1% of users at $5/month covers the bill. This is a low bar and a real one — measure it through Milestone 2 rather than assuming it. Its answer is what the Milestone 3 decision (§5) is made from.
