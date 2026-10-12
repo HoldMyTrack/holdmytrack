@@ -52,13 +52,14 @@ func (s *Server) pageAccount(r *http.Request) *pageAccount {
 	}
 	var info authInfo
 	err := s.pool.QueryRow(r.Context(), `
-		SELECT u.id, u.demo_expires_at IS NOT NULL, u.email_verified, u.timezone, COALESCE(u.locale, ''), u.is_admin
+		SELECT u.id, u.email_verified, u.timezone, COALESCE(u.locale, ''), u.is_admin
 		FROM sessions se JOIN users u ON u.id = se.user_id
 		WHERE se.id = $1 AND se.expires_at > NOW()
-	`, sessionID).Scan(&info.userID, &info.isDemo, &info.emailVerified, &info.timezone, &info.locale, &info.isAdmin)
+	`, sessionID).Scan(&info.userID, &info.emailVerified, &info.timezone, &info.locale, &info.isAdmin)
 	if err != nil {
 		return nil
 	}
+	info.isDemo = info.userID == DemoCustomerUserID
 	resp, err := s.loadAuthResponse(r.Context(), info.userID)
 	if err != nil {
 		s.log.Error("page account lookup failed", "err", err)

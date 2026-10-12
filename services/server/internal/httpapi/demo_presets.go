@@ -24,8 +24,8 @@ import (
 
 // DemoCustomerUserID is the one persistent, shared demo account every "Try Demo" visitor's
 // session is pointed at (handleDemoStart) — not a fresh row created and re-seeded per visitor.
-// Must match migrations/0006_demo_customer.sql's fixed id. Its demo_expires_at is a
-// far-future timestamp, not NULL, so it stays isDemo == true (read-only, verification-exempt).
+// Must match migrations/0006_demo_customer.sql's fixed id. This id is what makes an account
+// the demo (authInfo.isDemo): read-only and exempt from email verification.
 const DemoCustomerUserID = "22222222-2222-2222-2222-222222222222"
 
 // demo_data/ holds the account's history as raw activity files in any format ingest parses

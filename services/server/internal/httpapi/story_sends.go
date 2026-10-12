@@ -66,10 +66,10 @@ func (s *Server) handleSendStory(w http.ResponseWriter, r *http.Request) {
 	err = s.pool.QueryRow(ctx, `
 		INSERT INTO story_sends (story_id, recipient_id)
 		SELECT $1, id FROM users
-		WHERE email = $2 AND id <> $3 AND email_verified AND demo_expires_at IS NULL AND deleted_at IS NULL
+		WHERE email = $2 AND id <> $3 AND id <> $4 AND email_verified AND deleted_at IS NULL
 		ON CONFLICT (story_id, recipient_id) DO UPDATE SET sent_at = NOW()
 		RETURNING (SELECT COALESCE(locale, '') FROM users WHERE id = recipient_id)
-	`, storyID, email, userID).Scan(&lang)
+	`, storyID, email, userID, DemoCustomerUserID).Scan(&lang)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		s.log.Error("story send failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)

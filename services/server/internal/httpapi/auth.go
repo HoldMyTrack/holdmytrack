@@ -133,17 +133,16 @@ type authResponseWithSession struct {
 func (s *Server) loadAuthResponse(ctx context.Context, userID string) (authResponse, error) {
 	var email, displayName, country, avatarKey, timezone, locale string
 	var avatarUpdatedAt *time.Time
-	var demoExpiresAt *time.Time
 	var emailVerified bool
 	err := s.pool.QueryRow(ctx, `
-		SELECT email, demo_expires_at, COALESCE(display_name, ''), COALESCE(country, ''),
+		SELECT email, COALESCE(display_name, ''), COALESCE(country, ''),
 		       COALESCE(avatar_key, ''), avatar_updated_at, email_verified, timezone, COALESCE(locale, '')
 		FROM users WHERE id = $1
-	`, userID).Scan(&email, &demoExpiresAt, &displayName, &country, &avatarKey, &avatarUpdatedAt, &emailVerified, &timezone, &locale)
+	`, userID).Scan(&email, &displayName, &country, &avatarKey, &avatarUpdatedAt, &emailVerified, &timezone, &locale)
 	if err != nil {
 		return authResponse{}, err
 	}
-	isDemo := demoExpiresAt != nil
+	isDemo := userID == DemoCustomerUserID
 	if isDemo {
 		email = ""           // never leak the internal, synthetic demo email — see handleDemoStart
 		emailVerified = true // the gate never applies to a demo account — see requireVerified
@@ -552,8 +551,8 @@ func (s *Server) sendPasswordReset(r *http.Request, email string) error {
 	var userID, locale string
 	err := s.pool.QueryRow(ctx, `
 		SELECT id, COALESCE(locale, '') FROM users
-		WHERE email = $1 AND demo_expires_at IS NULL AND (password_hash IS NOT NULL OR EXISTS (SELECT 1 FROM user_identities i WHERE i.user_id = users.id))
-	`, email).Scan(&userID, &locale)
+		WHERE email = $1 AND id <> $2 AND (password_hash IS NOT NULL OR EXISTS (SELECT 1 FROM user_identities i WHERE i.user_id = users.id))
+	`, email, DemoCustomerUserID).Scan(&userID, &locale)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
@@ -1070,14 +1069,15 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 		}
 		var info authInfo
 		err := s.pool.QueryRow(r.Context(), `
-			SELECT u.id, u.demo_expires_at IS NOT NULL, u.email_verified, u.timezone, COALESCE(u.locale, '')
+			SELECT u.id, u.email_verified, u.timezone, COALESCE(u.locale, '')
 			FROM sessions se JOIN users u ON u.id = se.user_id
 			WHERE se.id = $1 AND se.expires_at > NOW()
-		`, sessionID).Scan(&info.userID, &info.isDemo, &info.emailVerified, &info.timezone, &info.locale)
+		`, sessionID).Scan(&info.userID, &info.emailVerified, &info.timezone, &info.locale)
 		if err != nil {
 			http.Error(w, "authentication required", http.StatusUnauthorized)
 			return
 		}
+		info.isDemo = info.userID == DemoCustomerUserID
 		next(w, r.WithContext(context.WithValue(r.Context(), authContextKey, info)))
 	}
 }

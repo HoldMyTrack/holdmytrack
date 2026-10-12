@@ -142,7 +142,7 @@ func (s *Server) handleAdminUserPage(w http.ResponseWriter, r *http.Request) {
 func (s *Server) adminUsers(ctx context.Context, l *i18n.Localizer, userID string, imperial bool) ([]adminUserRow, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT u.id, u.email, COALESCE(u.display_name, ''), u.created_at, COALESCE(u.country, ''),
-		       u.timezone, u.demo_expires_at IS NOT NULL, u.is_admin, u.email_verified,
+		       u.timezone, u.is_admin, u.email_verified,
 		       count(a.id), min((a.started_at AT TIME ZONE a.timezone)::date), max((a.started_at AT TIME ZONE a.timezone)::date),
 		       COALESCE(sum(a.distance_meters), 0)::float8
 		FROM users u
@@ -163,10 +163,11 @@ func (s *Server) adminUsers(ctx context.Context, l *i18n.Localizer, userID strin
 		var count int64
 		var meters float64
 		if err := rows.Scan(&u.ID, &u.Email, &u.DisplayName, &created, &u.Country,
-			&u.Timezone, &u.IsDemo, &u.IsAdmin, &u.Verified,
+			&u.Timezone, &u.IsAdmin, &u.Verified,
 			&count, &first, &last, &meters); err != nil {
 			return nil, fmt.Errorf("admin: scan user: %w", err)
 		}
+		u.IsDemo = u.ID == DemoCustomerUserID
 		loc := adminLocation(u.Timezone)
 		u.SignedUp = created.In(loc).Format("2006-01-02")
 		u.ActivityCount = count
@@ -289,7 +290,7 @@ func SetAdmin(ctx context.Context, pool *pgxpool.Pool, rawEmail string, admin bo
 		return err
 	}
 	tag, err := pool.Exec(ctx,
-		`UPDATE users SET is_admin = $2 WHERE email = $1 AND demo_expires_at IS NULL`, email, admin)
+		`UPDATE users SET is_admin = $2 WHERE email = $1 AND id <> $3`, email, admin, DemoCustomerUserID)
 	if err != nil {
 		return fmt.Errorf("set admin: %w", err)
 	}

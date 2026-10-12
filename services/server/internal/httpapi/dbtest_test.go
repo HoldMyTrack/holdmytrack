@@ -86,26 +86,39 @@ type account struct {
 	id, session string
 }
 
+// newAccount creates a verified account with a live session, or opens a session on the demo.
+// The demo is the one shared Demo Customer row the migrations create, so it is never deleted;
+// its cleanup removes what the test gave it instead.
 func (d *dbTest) newAccount(demo bool) account {
 	d.t.Helper()
 	ctx := context.Background()
-	var demoExpires *time.Time
-	if demo {
-		e := time.Now().Add(time.Hour)
-		demoExpires = &e
-	}
 	var a account
-	email := fmt.Sprintf("test-%d@holdmytrack.invalid", time.Now().UnixNano())
-	if err := d.pool.QueryRow(ctx,
-		`INSERT INTO users (email, email_verified, demo_expires_at, country) VALUES ($1, true, $2, 'DE') RETURNING id`,
-		email, demoExpires).Scan(&a.id); err != nil {
-		d.t.Fatalf("create account: %v", err)
-	}
-	d.t.Cleanup(func() {
-		if _, err := d.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, a.id); err != nil {
-			d.t.Errorf("delete account: %v", err)
+	if demo {
+		a.id = DemoCustomerUserID
+		d.t.Cleanup(func() {
+			for _, q := range []string{
+				`DELETE FROM stories WHERE user_id = $1`,
+				`DELETE FROM activities WHERE user_id = $1`,
+				`DELETE FROM sessions WHERE user_id = $1`,
+			} {
+				if _, err := d.pool.Exec(context.Background(), q, a.id); err != nil {
+					d.t.Errorf("clean demo account: %v", err)
+				}
+			}
+		})
+	} else {
+		email := fmt.Sprintf("test-%d@holdmytrack.invalid", time.Now().UnixNano())
+		if err := d.pool.QueryRow(ctx,
+			`INSERT INTO users (email, email_verified, country) VALUES ($1, true, 'DE') RETURNING id`,
+			email).Scan(&a.id); err != nil {
+			d.t.Fatalf("create account: %v", err)
 		}
-	})
+		d.t.Cleanup(func() {
+			if _, err := d.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, a.id); err != nil {
+				d.t.Errorf("delete account: %v", err)
+			}
+		})
+	}
 	if err := d.pool.QueryRow(ctx,
 		`INSERT INTO sessions (user_id, expires_at) VALUES ($1, NOW() + INTERVAL '1 hour') RETURNING id`,
 		a.id).Scan(&a.session); err != nil {

@@ -12,9 +12,7 @@ CREATE TABLE users (
     password_hash        VARCHAR(255),  -- NULL for an account that only signs in via user_identities
     last_seen_at         TIMESTAMPTZ,   -- drives the dormancy policy, VISION.md §5.7
     created_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    demo_expires_at      TIMESTAMPTZ,   -- §4.10's demo; NULL for a real account. The shared Demo
-                                        -- Customer (0006) sets it far in the future: non-NULL keeps
-                                        -- it read-only
+    demo_expires_at      TIMESTAMPTZ,   -- dropped in 0035
     display_name         VARCHAR(255),  -- §4.12 account settings
     country              CHAR(2),       -- ISO 3166-1 alpha-2; NULL means unset, defaults the UI
                                         -- to metric units

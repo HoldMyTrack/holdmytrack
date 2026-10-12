@@ -2,8 +2,7 @@
 -- §4.10; the fixed id is internal/httpapi.DemoCustomerUserID). Its activities are seeded by the
 -- `seed-demo-customer` subcommand, not here.
 --
--- demo_expires_at is far in the future rather than NULL: non-NULL keeps the account read-only
--- (requireNotDemo) and exempt from email verification (requireVerified).
+-- demo_expires_at is dropped in 0035; the fixed id is what makes the account the demo.
 -- Country/timezone match where its history actually is (Lakewood/Cleveland, OH).
 INSERT INTO users (id, email, demo_expires_at, display_name, country, timezone)
 VALUES ('22222222-2222-2222-2222-222222222222', 'demo-customer@holdmytrack.invalid',
