@@ -8,8 +8,8 @@ CREATE TABLE activities (
 
     -- Provenance. `source` is the ingest path; `source_detail` names the origin within it
     -- (a provider, an Android package, or an uploaded filename).
-    source            VARCHAR(32)  NOT NULL,   -- 'upload' | 'takeout' | 'garmin' | 'wahoo' | 'coros'
-                                               -- | 'oura' | 'healthkit' | 'health_connect'
+    source            VARCHAR(32)  NOT NULL,   -- 'upload' | 'healthconnect' | 'healthkit' | 'recorded';
+                                               -- older rows may say 'takeout' or 'timeline'
     source_detail     VARCHAR(255),
     external_id       VARCHAR(255),            -- provider activity ID, or HK/HC record UID
 
@@ -31,9 +31,7 @@ CREATE TABLE activities (
     description       TEXT,                    -- §4.7.4; user-editable free text. NULL means never set.
     created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
 
-    -- §4.6 cross-source dedup: the copy that lost points at the one that won, rather than being
-    -- deleted, so a user can see why an activity disappeared. ON DELETE SET NULL is deliberate:
-    -- deleting the winner puts the copy it displaced back on the map and in the totals.
+    -- Dropped in 0028 (ADR-0039).
     superseded_by     UUID REFERENCES activities(id) ON DELETE SET NULL,
     name              VARCHAR(200),            -- §4.7.4; user-entered title, never parsed from a file
     in_heatmap_window BOOLEAN NOT NULL DEFAULT true,  -- §4.2.2; flipped true -> false only by
@@ -86,7 +84,7 @@ CREATE INDEX idx_privacy_user ON privacy_zones (user_id);
 CREATE TABLE connections (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    provider          VARCHAR(32) NOT NULL,   -- 'garmin' | 'wahoo' | 'coros' | 'oura'
+    provider          VARCHAR(32) NOT NULL,   -- a cloud provider's id (Path 1, not built)
     provider_user_id  VARCHAR(255) NOT NULL,
     access_token      BYTEA NOT NULL,         -- encrypted at rest, never logged
     refresh_token     BYTEA,

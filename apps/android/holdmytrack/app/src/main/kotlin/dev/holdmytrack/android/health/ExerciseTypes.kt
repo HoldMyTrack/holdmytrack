@@ -18,8 +18,7 @@ import androidx.health.connect.client.records.ExerciseSessionRecord
  * ingest paths speak the FIT vocabulary — a bike ride uploaded as a `.FIT` file lands as
  * `cycling` — while Health Connect calls the same thing `biking`. Left alone, one ride synced
  * from a watch and uploaded from a file would be two different activity types, which splits
- * the Activities panel's TYPE facets and breaks cross-source deduplication, whose `dedupe_key`
- * includes the activity type (`docs/IMPLEMENTATION.md` §4.6). The handful of renames marked
+ * the Activities panel's TYPE facets (`docs/IMPLEMENTATION.md` §4.7.2). The handful of renames marked
  * below are what keep the two sources describing the same thing the same way.
  *
  * Indoor types are here for completeness rather than need: a session with no route never

@@ -105,9 +105,8 @@ export function ensureTrackLayer(map: MapLibreMap, beforeId: string | undefined,
     map.addSource(TRACKS_SOURCE_ID, {
       type: 'vector',
       tiles: [trackTileURL(range)],
-      // Matches the basemap archive's own max zoom (IMPLEMENTATION.md
-      // §5.4); MapLibre overzooms a vector source past its declared maxzoom the same way
-      // it already does for the basemap.
+      // MapLibre overzooms a vector source past its declared maxzoom, so tiles stop at 14
+      // while the map zooms further.
       minzoom: 0,
       maxzoom: 14,
       // Feature-state (hover/selected below) is keyed by whatever id setFeatureState is
