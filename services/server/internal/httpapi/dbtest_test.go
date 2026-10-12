@@ -166,20 +166,23 @@ func (d *dbTest) newActivity(owner account, a testActivity) string {
 // it isn't nil.
 func (d *dbTest) do(as account, method, path string, body any) *httptest.ResponseRecorder {
 	d.t.Helper()
-	var r io.Reader
+	var b []byte
 	if body != nil {
-		b, err := json.Marshal(body)
-		if err != nil {
+		var err error
+		if b, err = json.Marshal(body); err != nil {
 			d.t.Fatalf("encode body: %v", err)
 		}
-		r = bytes.NewReader(b)
 	}
-	req := httptest.NewRequest(method, path, r)
+	req := httptest.NewRequest(method, path, bytes.NewReader(b))
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	if as.session != "" {
 		req.Header.Set("Authorization", bearerPrefix+as.session)
 	}
 	rec := httptest.NewRecorder()
 	d.srv.ServeHTTP(rec, req)
+	checkContract(d.t, req, b, rec)
 	return rec
 }
 
