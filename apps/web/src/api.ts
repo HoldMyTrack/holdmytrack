@@ -25,9 +25,7 @@ export const TILES_V1 = '/tiles/v1';
  * branch on — requireVerified's `email_not_verified`, requireNotDemo's `demo_read_only`).
  * Whichever it is, this pulls out the part actually worth putting in front of a person: the
  * JSON body's own `message` field when there is one, the plain text otherwise — never the raw
- * `{"error":...,"message":...}` blob itself, which is what every caller below used to throw
- * verbatim (reported live: the Settings page, when it was React, showing the whole JSON string as its
- * save error).
+ * `{"error":...,"message":...}` blob itself.
  */
 function messageFromErrorBody(text: string, fallback: string): string {
   if (!text) return fallback;
@@ -85,18 +83,14 @@ export interface AuthUser extends UserProfile {
   emailVerified: boolean;
 }
 
-/** VISION.md §8.2's ephemeral demo account. Its real email is an internal,
+/** VISION.md §8.2's shared demo account. Its real email is an internal,
  *  never-shown placeholder the backend strips (see auth.go's handleMe/handleDemoStart), and
  *  having no `email` field at all is what lets `'email' in user` narrow a SessionUser
  *  correctly with no separate discriminant tag needed — the rest of `UserProfile` is still
  *  real, though, since a demo account is a real row with real column defaults. */
 export interface DemoUser extends UserProfile {}
 
-/** What `getCurrentUser` can resolve to — the one place this file doesn't already know in
- *  advance which of the two it's got. `login`/`signup` are never a demo account (a
- *  successful one always returns a real AuthUser) and `startDemo` always is, so those three
- *  keep their own narrower return types instead of forcing every caller to re-narrow
- *  something that can't happen for them. */
+/** What `getCurrentUser` can resolve to: a signed-in account or the demo. */
 export type SessionUser = AuthUser | DemoUser;
 
 interface AuthResponseBody {

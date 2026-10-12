@@ -28,7 +28,7 @@ const accountPurgeBatchSize = 20
 // the job could write a raw file, a tile or a mask after the sweep had already listed them.
 // Its pending jobs are dropped first, so nothing new starts for it in the meantime.
 //
-// Objects first, row second, as demo_purge.go does: a failed removal is logged and the row is
+// Objects first, row second: a failed removal is logged and the row is
 // deleted anyway, since leaving the account in place is worse than an orphaned object. The
 // activity masks are keyed by activity id, so those ids are read before the row goes.
 //

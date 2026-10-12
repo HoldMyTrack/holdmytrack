@@ -24,9 +24,8 @@ import (
 
 // DemoCustomerUserID is the one persistent, shared demo account every "Try Demo" visitor's
 // session is pointed at (handleDemoStart) — not a fresh row created and re-seeded per visitor.
-// Must match migrations/0006_demo_customer.sql's fixed id. Its demo_expires_at is a
-// far-future timestamp, not NULL, so it stays isDemo == true (read-only, verification-exempt)
-// without ever being swept by internal/worker/demo_purge.go.
+// Must match migrations/0006_demo_customer.sql's fixed id. This id is what makes an account
+// the demo (authInfo.isDemo): read-only and exempt from email verification.
 const DemoCustomerUserID = "22222222-2222-2222-2222-222222222222"
 
 // demo_data/ holds the account's history as raw activity files in any format ingest parses
@@ -472,7 +471,7 @@ func seedDemoStories(ctx context.Context, pool *pgxpool.Pool, userID string, sto
 // (streams, tile masks, country/region matches, photos); fog_tiles is per user, not per activity, so
 // it's deleted explicitly — ingest recreates each row a new activity touches, and a row left
 // behind would keep a tile only the old history reached. Object storage has no foreign keys,
-// so its prefixes are swept first, in the same log-and-continue style demo_purge.go uses.
+// so its prefixes are swept first, logging a failure and carrying on.
 // heatmap_cap goes back to its column default: the old history's value would scale the new
 // one's heatmap until the worker's daily cap sweep caught up.
 //

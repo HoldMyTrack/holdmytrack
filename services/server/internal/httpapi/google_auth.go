@@ -303,9 +303,9 @@ func (s *Server) resolveGoogleUser(ctx context.Context, c googleClaims, tz strin
 		SELECT id, email_verified,
 		       EXISTS (SELECT 1 FROM user_identities i WHERE i.user_id = users.id AND i.provider = 'google')
 		FROM users
-		WHERE email = $1 AND demo_expires_at IS NULL
+		WHERE email = $1 AND id <> $2
 		FOR UPDATE
-	`, c.Email).Scan(&userID, &verified, &linked)
+	`, c.Email, DemoCustomerUserID).Scan(&userID, &verified, &linked)
 	switch {
 	case err == nil:
 		if linked {
