@@ -105,7 +105,8 @@ object MapOverlays {
     private const val CITY_MIN_ZOOM = 7f
 
     /** Fog and Heatmap show as square pixels below this zoom and smoothed from it up — the zoom
-     *  their finest tiles are stored at, the web's `PIXELS_MAX_ZOOM` (ADR-0038). */
+     *  their finest tiles are stored at, the web's `PIXELS_MAX_ZOOM`
+     *  (`docs/IMPLEMENTATION.md` §4.2). */
     private const val PIXELS_MAX_ZOOM = 14f
 
     /** Which [ZoomTier] Fog and Heatmap draw at [zoom] — the same bands the layers switch on (a

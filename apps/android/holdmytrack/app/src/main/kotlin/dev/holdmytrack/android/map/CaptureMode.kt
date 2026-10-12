@@ -34,7 +34,7 @@ import org.maplibre.android.maps.Style
 import kotlin.math.roundToInt
 
 /**
- * Capture mode (`apps/android/docs/SPEC.md` FR-2.8, ADR-0023): started from a spot's popup, it
+ * Capture mode (`apps/android/docs/SPEC.md` FR-2.8): started from a spot's popup, it
  * reads the phone's GPS and guides the user to that spot — an arrow turned towards it, the
  * distance, a dashed line on the map and every spot area shaded darker ([MapSpots.setCapturing])
  * — then counts 30 s inside it ([SpotCapture]) and captures it on the server.
@@ -177,8 +177,8 @@ class CaptureMode(
         HoldMyTrackApi.spotDetail(target.id) { result ->
             if (spot?.id != target.id) return@spotDetail
             val detail = result.getOrElse { error ->
-                // A place retired since the map loaded it (ADR-0027) is a 404 to anyone who
-                // hasn't captured it — the only accounts capture mode starts for.
+                // A place retired since the map loaded it (`docs/SPEC.md` FR-15.1) is a 404
+                // to anyone who hasn't captured it — the only accounts capture mode starts for.
                 if (error is ApiException && error.code == 404) return@spotDetail gone()
                 this.detail.setText(R.string.spots_capture_load_failed)
                 banner.postDelayed(retryLoad, RETRY_MS)
@@ -286,8 +286,8 @@ class CaptureMode(
         }
     }
 
-    /** The place is gone from OpenStreetMap and retired (ADR-0027): there's nothing to capture.
-     *  Says so, and ends capture mode a moment later. */
+    /** The place is gone from OpenStreetMap and retired (`docs/SPEC.md` FR-15.1): there's
+     *  nothing to capture. Says so, and ends capture mode a moment later. */
     private fun gone() {
         capture = null // so resume() doesn't start listening again
         stopListening()

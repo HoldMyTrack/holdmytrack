@@ -2,7 +2,7 @@ import { en, type MessageKey } from './en';
 import { ru } from './ru';
 
 /**
- * The map app's localization (ADR-0014, IMPLEMENTATION.md §4.21) — the client-side twin of
+ * The map app's localization (IMPLEMENTATION.md §4.21) — the client-side twin of
  * services/server/internal/i18n. The app doesn't choose its language: the server already did
  * (the account's Language setting, else the header menu's cookie, else the browser's
  * Accept-Language, else English) when it rendered the app shell, and wrote the answer into

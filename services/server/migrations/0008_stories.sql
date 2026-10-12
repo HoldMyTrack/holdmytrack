@@ -1,4 +1,4 @@
--- Stories (IMPLEMENTATION.md §3.19, ADR-0020): hand-picked, private sets of activities.
+-- Stories (IMPLEMENTATION.md §3.19): hand-picked, private sets of activities.
 -- Deleting an activity cascades it out of every Story; a Story left empty stays. Deleting a
 -- Story deletes no activity.
 

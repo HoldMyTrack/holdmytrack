@@ -276,7 +276,7 @@ func TestRenderPyramidLevelReadsEachChild(t *testing.T) {
 	}
 }
 
-// A child stored at a size TileSize no longer is — one rendered before ADR-0041, not yet redrawn
+// A child stored at a size TileSize no longer is — one rendered before it last changed, not yet redrawn
 // by rerender-coverage --masks — fails the parent's render with errTileSize. It read past the
 // child's end in downsampleQuadrants and panicked, taking the worker down with it.
 func TestRenderPyramidLevelRefusesAChildOfAnotherSize(t *testing.T) {

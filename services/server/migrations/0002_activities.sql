@@ -69,7 +69,7 @@ CREATE TABLE activity_streams (
     dist_m       REAL[]   -- cumulative distance at this point
 );
 
--- §3.7 privacy_zones -- shown to users as Private locations (FR-8.1, ADR-0010): ingest drops the
+-- §3.7 privacy_zones -- shown to users as Private locations (FR-8.1, VISION.md §7): ingest drops the
 -- leading and trailing points inside one.
 CREATE TABLE privacy_zones (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),

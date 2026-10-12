@@ -84,7 +84,7 @@ CREATE TABLE user_identities (
     UNIQUE (user_id, provider)
 );
 
--- §3.18 auth_handoffs -- one-time sign-in codes for a native app (FR-1.10, ADR-0016). The
+-- §3.18 auth_handoffs -- one-time sign-in codes for a native app (FR-1.10, IMPLEMENTATION.md §4.22). The
 -- browser-tab callback stores a row and redirects to the app with its id; the app redeems it once
 -- at POST /v1/auth/handoff with the PKCE verifier for `challenge`, so the id alone is worthless to
 -- anyone who intercepts the redirect. Deleted on use; expired rows are purged on each insert.

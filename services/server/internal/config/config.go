@@ -41,7 +41,7 @@ type Config struct {
 	// serves it from there. Set it only for a deployment reading the archive from object
 	// storage or a CDN. Only read by `serve`.
 	BasemapOrigin string
-	// Satellite* are the deployment's satellite imagery (docs/SPEC.md FR-4.14, ADR-0022), which
+	// Satellite* are the deployment's satellite imagery (docs/SPEC.md FR-4.14, docs/IMPLEMENTATION.md §4.26), which
 	// the served style document hands native clients: an XYZ tile template with the provider's
 	// key in it, the deepest zoom it serves, and the credit its terms require. Mirrors the web
 	// client's VITE_SATELLITE_* (apps/web/src/map/config.ts's satelliteSource), and compose.prod.yml
@@ -63,7 +63,7 @@ type Config struct {
 	// web client hides the button — so, like SMTP_HOST, leaving these unset is a working
 	// default rather than a half-configured one. GoogleRedirectURL defaults to AppBaseURL's
 	// own /v1/auth/google/callback, right for any deployment serving the app and the API
-	// from one origin (ADR 0006); local dev overrides it because Vite (5173) and the API
+	// from one origin (docs/IMPLEMENTATION.md §5.8); local dev overrides it because Vite (5173) and the API
 	// (8080) are separate origins there. Only read by `serve`.
 	GoogleClientID     string
 	GoogleClientSecret string

@@ -19,7 +19,7 @@ import (
 )
 
 // Verifying a Google id_token a native client hands over — Sign in with Google on Android
-// (docs/SPEC.md FR-1.9, docs/adr/0016-native-sign-in.md). The web flow's id_token comes
+// (docs/SPEC.md FR-1.9, docs/IMPLEMENTATION.md §4.15). The web flow's id_token comes
 // straight from Google's token endpoint over TLS, so parseGoogleIDToken's claim checks are all
 // it needs. One posted by an app could have been written by anyone, so its RS256 signature is
 // checked against Google's published keys first — still with the standard library alone, no

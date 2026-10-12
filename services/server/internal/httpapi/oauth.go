@@ -23,7 +23,7 @@ import (
 // calls beginOAuth, its callback calls readOAuthCallback, resolves the account its own way,
 // and ends in finishOAuth — or failOAuth.
 //
-// A native app can run the same round trip in a browser tab (docs/adr/0016-native-sign-in.md):
+// A native app can run the same round trip in a browser tab (docs/IMPLEMENTATION.md §4.22):
 // it starts it with ?app_challenge=, the S256 challenge of a verifier only the app holds, and
 // instead of a session cookie in that tab the callback hands the app a one-time code at
 // appRedirectURI, which only the verifier redeems (handleAuthHandoff).

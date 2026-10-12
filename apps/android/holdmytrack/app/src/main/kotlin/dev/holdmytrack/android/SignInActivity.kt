@@ -34,7 +34,7 @@ import kotlinx.coroutines.launch
 /**
  * Sign in, create an account, or start a demo account — the three ways
  * `services/server/internal/httpapi/auth.go` mints a session — or continue with Google or
- * Facebook, when the server has them configured (`docs/adr/0016-native-sign-in.md`).
+ * Facebook, when the server has them configured (`docs/IMPLEMENTATION.md` §4.15 and §4.22).
  *
  * Designed as the web's sign-in and sign-up pages (`templates/pages/signin.html`,
  * `signup.html`): one card, the serif title inside it, the providers, then the email form, then

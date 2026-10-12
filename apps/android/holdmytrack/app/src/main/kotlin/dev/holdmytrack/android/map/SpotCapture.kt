@@ -1,7 +1,7 @@
 package dev.holdmytrack.android.map
 
 /**
- * Capture mode's count (`apps/android/docs/SPEC.md` FR-2.8, ADR-0023): fed the phone's
+ * Capture mode's count (`apps/android/docs/SPEC.md` FR-2.8): fed the phone's
  * location fixes, it says whether the user is still on the way to the spot, holding inside it,
  * or has held for [HOLD_MS] and captured it. Only a fix accurate to [MAX_ACCURACY_M] counts —
  * a coarse fix can land inside a spot its owner is only walking past. A counted fix outside the

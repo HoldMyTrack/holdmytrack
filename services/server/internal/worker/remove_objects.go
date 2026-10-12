@@ -12,7 +12,7 @@ import (
 // removeActivityObjectsJob is a `remove_activity_objects` job's payload: the raw uploads of
 // activities a migration deleted, which SQL can't reach (`0028_drop_superseded.sql`), each
 // listed only when no remaining activity points at it. The payload's `activity_ids`, whose
-// mask objects the job also removed until masks moved into Postgres (ADR-0040), are ignored.
+// mask objects the job also removed until masks moved into Postgres (IMPLEMENTATION.md §3.11), are ignored.
 type removeActivityObjectsJob struct {
 	RawKeys []string `json:"raw_keys"`
 }

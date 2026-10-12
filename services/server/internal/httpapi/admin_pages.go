@@ -13,7 +13,7 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 )
 
-// The admin panel (ADR-0013, IMPLEMENTATION.md §4.20, docs/SPEC.md FR-12): every account, and
+// The admin panel (IMPLEMENTATION.md §4.20, docs/SPEC.md FR-12): every account, and
 // any one account's activities with their ids — rendered on the server like /profile, read-only.
 // Only an account with users.is_admin (granted by the `set-admin` CLI subcommand, nowhere on
 // the web) gets in; everyone else, signed out or not, gets the ordinary 404 page, so the panel

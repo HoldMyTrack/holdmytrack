@@ -1,4 +1,4 @@
--- Spots places refresh (IMPLEMENTATION.md §4.25, ADR-0027): a place a planet import no longer
+-- Spots places refresh (IMPLEMENTATION.md §4.25): a place a planet import no longer
 -- sees is retired, never deleted, so the captures that refer to it stay.
 --   last_seen_import: when the import run that last had the place started; NULL before any run
 --                     stamped it, which a planet run treats as unseen.

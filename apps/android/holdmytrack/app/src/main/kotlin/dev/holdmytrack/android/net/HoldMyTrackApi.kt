@@ -771,7 +771,7 @@ object HoldMyTrackApi {
     /**
      * `POST /v1/auth/google/token` — trades the ID token Credential Manager returned for a
      * session. The server checks the token's signature against Google's keys before trusting
-     * anything in it (`docs/adr/0016-native-sign-in.md`).
+     * anything in it (`docs/IMPLEMENTATION.md` §4.15).
      */
     fun signInWithGoogle(idToken: String, timezone: String, onResult: (Result<Account>) -> Unit) {
         val body = JSONObject().put("id_token", idToken).put("tz", timezone)

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. The tile size below, 512 px, is 64 px since ADR-0037.
+Accepted. The tile size below, 512 px, is now 128 px (`IMPLEMENTATION.md` §4.2); the rest stands.
 
 ## Context
 

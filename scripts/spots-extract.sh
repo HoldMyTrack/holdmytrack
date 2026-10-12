@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Make the Spots places file (docs/DEPLOY.md §6, ADR-0027): download an OpenStreetMap extract,
+# Make the Spots places file (docs/DEPLOY.md §6, docs/SPEC.md FR-15.1): download an OpenStreetMap extract,
 # check it, and filter it down to the five Spots categories as GeoJSON lines for
 # `import-spots`. Run OFF the server, on any machine with osmium-tool, curl and the disk the
 # source needs (about 100 GB free for the planet): the server has neither the disk nor the

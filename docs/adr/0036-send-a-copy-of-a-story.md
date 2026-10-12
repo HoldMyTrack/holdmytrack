@@ -2,11 +2,11 @@
 
 ## Status
 
-Accepted. Built on the server, the web and in the Android app (`SPEC.md` FR-14.7, FR-14.8; `IMPLEMENTATION.md` §3.25, §4.23). ADR-0020 stands: a Story stays private to its account, and what is sent is a copy, not a view of it.
+Accepted. Built on the server, the web and in the Android app (`SPEC.md` FR-14.7, FR-14.8; `IMPLEMENTATION.md` §3.25, §4.23). A Story stays private to its account (`VISION.md` §4.2), and what is sent is a copy, not a view of it.
 
 ## Context
 
-A family trip is one trip for everyone who went, but usually only one device records it: two people in the same car, or a child walking beside a parent's watch. The others have nothing on their Fog of War, Heatmap, totals or countries for a trip they were on. ADR-0020 made Stories private and left sharing to an exported image (`IMPLEMENTATION.md` §4.3.3), which shows the trip but doesn't put it in anyone's history.
+A family trip is one trip for everyone who went, but usually only one device records it: two people in the same car, or a child walking beside a parent's watch. The others have nothing on their Fog of War, Heatmap, totals or countries for a trip they were on. Stories are private (`VISION.md` §4.2), and sharing one meant an exported image (`IMPLEMENTATION.md` §4.3.3), which shows the trip but doesn't put it in anyone's history.
 
 The request was to give the trip to the people who were on it, as theirs, and to keep it theirs: nothing the sender does later — an edit, a deletion, a deleted account — should take it away from them. Several shapes were weighed against that, from one Story every member sees to Stories that stay linked and keep syncing; each kept the recipient's history dependent on someone else's account in some way. A copy that becomes the recipient's own data doesn't.
 

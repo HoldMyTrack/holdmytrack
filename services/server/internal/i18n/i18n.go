@@ -1,4 +1,4 @@
-// Package i18n is the server's localization (ADR-0014, IMPLEMENTATION.md §4.21): one flat
+// Package i18n is the server's localization (IMPLEMENTATION.md §4.21): one flat
 // catalog per language (locales/*.json, embedded), which language a request gets, and the
 // number formatting that differs between them. No dependency — two languages' plural rules
 // and separators are a few lines each, and a message format library would be most of the code

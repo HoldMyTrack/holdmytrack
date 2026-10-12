@@ -1,5 +1,5 @@
 -- §3.11 activity_tile_mask_data: each activity mask's PNG, in Postgres instead of object
--- storage (ADR-0040). Its own table, so activity_tile_masks stays the narrow index a render
+-- storage (IMPLEMENTATION.md §3.11). Its own table, so activity_tile_masks stays the narrow index a render
 -- scans for "which activities touch this tile", and a backup can leave the bytes out
 -- (scripts/backup.sh): they're redrawn from raw uploads by `rerender-coverage --masks`.
 -- Safe beside the previous release: it never reads this table, and still writes a key.

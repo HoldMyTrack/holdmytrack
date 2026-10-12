@@ -352,8 +352,8 @@ object MapSpots {
 
     /** Every layer filtered to the wanted categories and shown, or all hidden with none wanted
      *  or a track being edited; the badges drawn captured or not. The tiles' layers also leave
-     *  out a retired place (ADR-0027) unless the account captured it; "Show in this area" gets
-     *  only those from the server already. */
+     *  out a retired place (`docs/SPEC.md` FR-15.1) unless the account captured it; "Show in
+     *  this area" gets only those from the server already. */
     private fun apply(style: Style) {
         val shown = wanted.isNotEmpty() && !editing
         val visibility = PropertyFactory.visibility(if (shown) Property.VISIBLE else Property.NONE)

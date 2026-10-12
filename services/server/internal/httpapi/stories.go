@@ -13,7 +13,7 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
 )
 
-// Stories (IMPLEMENTATION.md §4.23, ADR-0020) — hand-picked, private sets of activities, each
+// Stories (IMPLEMENTATION.md §4.23) — hand-picked, private sets of activities, each
 // with a name, a description and joint statistics. Stored in stories and story_activities
 // (§3.19). Another account's Story answers exactly like a missing one, `404`, on every route.
 //

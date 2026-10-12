@@ -246,7 +246,7 @@ The JSON endpoints in this section are refused (`403`) the same way when a brows
 
 **Notes**: A Google-only account has no password, so FR-1.2 rejects it with the same generic error as any other mismatch; it can set a password at any time through FR-1.5/FR-1.6, after which both ways in work. Changing the account's email (FR-1.8 step 4) leaves the Google link in place.
 
-**On Android** (ADR-0016):
+**On Android** (`IMPLEMENTATION.md` §4.15):
 1. The sign-in screen shows "Continue with Google" when `GET /v1/auth/providers` reports `google: true` with a `google_client_id`.
 2. Tapping it opens the system's Google account picker (Credential Manager), which returns a Google ID token issued for that client ID.
 3. The app posts `{id_token, tz}` to `POST /v1/auth/google/token`, `tz` being the device's IANA timezone. The server checks the token's signature against Google's published keys, then everything in steps 3–4 above applies unchanged: the same claim checks, the same choice of account.
@@ -280,7 +280,7 @@ The JSON endpoints in this section are refused (`403`) the same way when a brows
 
 **Notes**: A Facebook-only account has no password, so FR-1.2 rejects it with the same generic error as any other mismatch; it can set one through FR-1.5/FR-1.6. Changing the account's email (FR-1.8 step 4) leaves the Facebook link in place. An account created here whose email is later claimed through Sign in with Google while still unverified loses its Facebook link (FR-1.9 step 4). There is no way yet to link Facebook to an existing account.
 
-**On Android** (ADR-0016). The app runs the same flow in a browser tab rather than through Meta's SDK:
+**On Android** (`IMPLEMENTATION.md` §4.22). The app runs the same flow in a browser tab rather than through Meta's SDK:
 1. The sign-in screen shows "Continue with Facebook" when `GET /v1/auth/providers` reports `facebook: true`.
 2. Tapping it makes a random verifier and opens `GET /v1/auth/facebook/start?tz=<timezone>&app_challenge=<S256 hash of the verifier>` in a browser tab. A malformed `app_challenge` → `400 Bad Request`.
 3. Steps 2–4 above happen in the tab, unchanged, including the verification email for a new account.
@@ -696,7 +696,7 @@ The first three never overlap: a way tagged as a cycleway or shared path that is
 5. The imagery provider's credit appears in the map's attribution while the imagery is on.
 6. An export (FR-4.10) with Satellite on draws the imagery, with the provider's credit baked in after OSM's and the watermark in its light colors.
 
-**Notes**: The imagery is fetched from a metered provider (ADR-0022). On a quota-capped plan such as MapTiler's Free plan, the imagery stops loading once the month's quota is used up and returns the next month; the roads and labels still draw.
+**Notes**: The imagery is fetched from a metered provider (`IMPLEMENTATION.md` §4.26). On a quota-capped plan such as MapTiler's Free plan, the imagery stops loading once the month's quota is used up and returns the next month; the roads and labels still draw.
 
 ### FR-4.15 Zoom levels at a glance
 
@@ -1081,9 +1081,9 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 3. It lists what is kept — the account (email, a password hash, a Google or Facebook account's id, email and name, the settings), activities and their original files, Private locations, Stories, photos (a resized copy without its metadata), captures and the import history — and that all of it is visible only to the account. It says that a copy of a Story sent by email address (FR-14.7) becomes part of the recipient's account once they accept it, made from the activities as the sender sees them with the sender's Private locations cut off, and stays theirs whatever the sender deletes; and that a copy sent to the account is added only once it's accepted. It says what isn't: no health data (`VISION.md` §1.1), no live location from the map's location button, no analytics, advertising or tracking, and that user data is never sold (ADR-0031).
 4. It says what the Android app reads — exercise sessions and their routes from Health Connect, only while the Sync screen is open, never writing back — and when it uses the phone's location: recording, Find my location and capturing, a capture sending only the place and the time.
 5. Its legal bases are the GDPR's contract (the service), consent (Health Connect and location) and legitimate interest (logs, backups, sign-in limits). Email is only about the account: confirming the address, a password reset, a download being ready, and a copy of a Story someone sent (FR-14.7).
-6. It names the processors — DigitalOcean (the server, US), Cloudflare R2 (files, photos, tiles and backups), Grafana Labs (logs and metrics, US, 14 days, with no tracks, names, email or IP addresses — ADR-0030) and an unnamed email delivery provider — and what the browser or phone loads from others: Google Fonts, MapTiler's satellite imagery when chosen, and Google or Facebook sign-in. It says the data is stored in the US.
+6. It names the processors — DigitalOcean (the server, US), Cloudflare R2 (files, photos, tiles and backups), Grafana Labs (logs and metrics, US, 14 days, with no tracks, names, email or IP addresses — `DEPLOY.md` §13) and an unnamed email delivery provider — and what the browser or phone loads from others: Google Fonts, MapTiler's satellite imagery when chosen, and Google or Facebook sign-in. It says the data is stored in the US.
 7. It lists the cookies (`holdmytrack_session`, 30 days or 24 hours for the demo, and `hmt_lang`) and the `hmt_theme` local-storage key, and why there is no cookie banner.
-8. Retention: an account until it's deleted; deleting an activity deletes its route, file and photos, but not a copy of it someone else accepted; sign-ins last 30 days; a requested download of the account's data, 7 days (FR-1.12); logs are rotated on the server and kept 14 days with Grafana Labs; deleted data stays in backups for up to 8 weeks (ADR-0029).
+8. Retention: an account until it's deleted; deleting an activity deletes its route, file and photos, but not a copy of it someone else accepted; sign-ins last 30 days; a requested download of the account's data, 7 days (FR-1.12); logs are rotated on the server and kept 14 days with Grafana Labs; deleted data stays in backups for up to 8 weeks (`DEPLOY.md` §11).
 9. Rights: a copy of the data (the original files included), correction, a copy of the data — in Settings (FR-1.12) — deletion — in Settings (FR-1.11, pointing to Help's `#delete-account`, FR-10.2), or by email for someone who can't sign in — and objection, answered within a month, and a complaint to a data protection authority. The service isn't meant for children under 16.
 
 ### FR-10.7 Android test suite
@@ -1170,7 +1170,7 @@ A read-only view of every account and every account's activities, for the people
 
 ### FR-13.2 The language menu
 
-**Description**: Anyone can choose the language, signed in or not, from the shared header (ADR-0025).
+**Description**: Anyone can choose the language, signed in or not, from the shared header (`IMPLEMENTATION.md` §4.21).
 
 **Inputs**: The header's language menu (FR-10.4), on every page, signed in or not, and the web's only language control: it shows the page's language code and opens to each language named in itself (English, Русский), the current one bold, then, under a rule, "Automatic (browser)" in the page's language. Choosing one submits `POST /language` with `lang`: `en`, `ru`, or empty for Automatic; it works without JavaScript.
 
@@ -1186,7 +1186,7 @@ A read-only view of every account and every account's activities, for the people
 
 ## 16. FR-14 — Stories
 
-A Story is a hand-picked, private set of the account's activities — a hike, a holiday, a race weekend — with a name, an optional description and joint statistics (`VISION.md` §4.2, ADR-0020). An activity can be in any number of Stories. This section covers the API and the Activities panel's Stories tab (FR-14.6), where a Story is opened on the map; a Story is made, and activities go into Stories, with the Activities toolbar's Add to story (FR-5.16); activities come out of a Story from its rows on the Stories tab; and a row's Story badge is FR-5.1.
+A Story is a hand-picked, private set of the account's activities — a hike, a holiday, a race weekend — with a name, an optional description and joint statistics (`VISION.md` §4.2). An activity can be in any number of Stories. This section covers the API and the Activities panel's Stories tab (FR-14.6), where a Story is opened on the map; a Story is made, and activities go into Stories, with the Activities toolbar's Add to story (FR-5.16); activities come out of a Story from its rows on the Stories tab; and a row's Story badge is FR-5.1.
 
 | Endpoint | Purpose |
 | :-- | :-- |
@@ -1227,6 +1227,7 @@ A Story is a hand-picked, private set of the account's activities — a hike, a 
 1. `POST /v1/stories/{id}/activities` with `{activity_ids}` adds them; one already in the Story stays as it is. It answers with the updated Story.
 2. `DELETE /v1/stories/{id}/activities` with `{activity_ids}` removes them; an id not in the Story is ignored. The activities themselves stay. It answers with the updated Story.
 3. Deleting an activity (FR-5.11) takes it out of every Story holding it. A Story left with no activities stays, with zero statistics.
+4. An activity joins a Story only when added: one uploaded later from the trip's dates isn't in it until the user adds it.
 
 **Error cases**:
 - `activity_ids` empty, over 10,000 ids, or holding an id that isn't a UUID → `400`.
@@ -1315,7 +1316,7 @@ A Story is a hand-picked, private set of the account's activities — a hike, a 
 
 ## 17. FR-15 — Spots
 
-Outdoor places from OpenStreetMap on the map, in five categories, with what OSM says about each (`VISION.md` §4.2, ADR-0021). Built on the web and in the Android app (`apps/android/docs/SPEC.md` FR-2.8); the places are loaded by the operator (FR-15.1), not by users. A place's only mark is a capture (FR-15.6, ADR-0028).
+Outdoor places from OpenStreetMap on the map, in five categories, with what OSM says about each (`VISION.md` §4.2, ADR-0021). Built on the web and in the Android app (`apps/android/docs/SPEC.md` FR-2.8); the places are loaded by the operator (FR-15.1), not by users. A place's only mark is a capture (FR-15.6).
 
 | Endpoint | Purpose |
 | :-- | :-- |
@@ -1334,7 +1335,7 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 2. A place has, each only when OSM has it: a name; an address built from its `addr:*` tags — `addr:full`, or a house number, street (or `addr:place`), city and postcode — when it has at least a street or place; a description; an inscription; a memorial type (a statue, a plaque, a war memorial…); a start date as OSM writes it (a year, a date, "~1850"); and a Wikipedia article, from a `wikipedia` tag in OSM's "language:Title" form (any other form is left out).
 3. A place's area is its OSM outline, or a 30 m circle around a place mapped as a single point.
 4. The operator loads the places with `holdmytrack import-spots [--planet] <file>`, from an extract made off the server (`docs/DEPLOY.md` §6), and refreshes them the same way. Loading the same place again updates it rather than adding a second one.
-5. A place is never deleted. With `--planet`, a place missing from the file is **retired** (ADR-0027): from then on it is shown only to the accounts that captured it (FR-15.4–FR-15.6), and no one can capture it. A place that comes back to OSM is live again at the next load. A load without `--planet` retires nothing. A `--planet` load that would retire more than 1% of the live places stops with an error and retires none of them; the places it read are still updated.
+5. A place is never deleted. With `--planet`, a place missing from the file is **retired**: from then on it is shown only to the accounts that captured it (FR-15.4–FR-15.6), and no one can capture it. A place that comes back to OSM is live again at the next load. A load without `--planet` retires nothing. A `--planet` load that would retire more than 1% of the live places stops with an error and retires none of them; the places it read are still updated.
 6. A load moves every account's tile version (FR-4.11) only if it added, changed, brought back or retired a place.
 
 ### FR-15.2 Points of interest
@@ -1391,7 +1392,7 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 
 ### FR-15.6 Captures
 
-**Description**: A place an account has captured by staying inside it for 30 seconds with the Android app's capture mode on (`apps/android/docs/SPEC.md` FR-2.8, ADR-0023). Only the app captures; the web and the app both show what's captured (FR-15.2, FR-15.3).
+**Description**: A place an account has captured by staying inside it for 30 seconds with the Android app's capture mode on (`apps/android/docs/SPEC.md` FR-2.8). Only the app captures; the web and the app both show what's captured (FR-15.2, FR-15.3).
 
 **Behavior**:
 1. `GET /v1/spots/{id}` answers one place: the fields of FR-15.5's places, `area` — its whole area as a GeoJSON MultiPolygon — and `captured_at` when the caller has captured it (absent otherwise). A retired place (FR-15.1) is answered only to an account that captured it.
@@ -1439,7 +1440,7 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 Not built by design, and not planned:
 
 - Performance analysis — best-effort curves, personal bests, power curves, training load — and recovery data (sleep, HRV, readiness): `VISION.md` §1.1 rules HoldMyTrack out as a health or fitness advisor. Pace stays per-activity route context (FR-4.8), and heart rate and every other health measurement are never read, stored or shown (ADR-0017).
-- Explorer-tile scoring — Fog of War is the exploration mechanic (ADR-0018).
+- Explorer-tile scoring — Fog of War is the exploration mechanic (`VISION.md` §3.3).
 - Splitting a track that passes through a Private location mid-way — FR-8.1 hides only the leading and trailing portions.
 
 What is planned but not yet built is in `docs/ROADMAP.md`.

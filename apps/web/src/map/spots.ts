@@ -321,8 +321,8 @@ function addAreaLayers(map: MapLibreMap): void {
 /**
  * Shows the chosen categories (the Layers menu, overlays.ts) and hides the rest — a filter on
  * every layer, and every layer hidden when none is chosen. The tiles' layers also leave out a
- * retired place (ADR-0027) unless the account captured it; "Show in this area" gets only those
- * from the server already. Diffs first, like mapMode.ts's setVisible: a bare setLayoutProperty or
+ * retired place (docs/SPEC.md FR-15.1) unless the account captured it; "Show in this area" gets
+ * only those from the server already. Diffs first, like mapMode.ts's setVisible: a bare setLayoutProperty or
  * setFilter would start the styledata loop its comment describes.
  */
 export function setSpotsVisible(map: MapLibreMap, categories: readonly SpotCategory[]): void {

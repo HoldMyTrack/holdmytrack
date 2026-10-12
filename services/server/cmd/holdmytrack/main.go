@@ -351,7 +351,7 @@ func main() {
 	case "import-spots":
 		// The load, and each quarterly refresh, of the Spots places from an OpenStreetMap extract
 		// made off-box (docs/DEPLOY.md §6) — upserted, so safe to re-run. --planet says the file
-		// is the whole planet, so the places it doesn't have are retired (ADR-0027). See
+		// is the whole planet, so the places it doesn't have are retired (docs/SPEC.md FR-15.1). See
 		// internal/spots.Import's doc comment.
 		args := os.Args[2:]
 		planet := len(args) > 0 && args[0] == "--planet"

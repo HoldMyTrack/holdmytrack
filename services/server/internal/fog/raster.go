@@ -15,9 +15,9 @@ import (
 const (
 	// TileSize is a stored and served tile's width and height. A 128 px tile at z14 (~2,446 m
 	// across) is ~19 m/px; the clients draw it at 512 px, so a pixel is ~4 screen pixels wide,
-	// a square below zoom 14 and smoothed from it (ADR-0038). 64 px smeared thin tracks
+	// a square below zoom 14 and smoothed from it (IMPLEMENTATION.md §4.2). 64 px smeared thin tracks
 	// together and paled the Heatmap from zoom 13 out; 512 px (~4.8 m/px) took 16 times the
-	// pixels to draw, composite and pyramid for little visible gain (ADR-0041, ADR-0037,
+	// pixels to draw, composite and pyramid for little visible gain (IMPLEMENTATION.md §4.2,
 	// docs/PERFORMANCE.md). Changing it means redrawing every stored mask: rerender-coverage
 	// --masks.
 	TileSize = 128
