@@ -16,9 +16,8 @@ import { ATTRIBUTION_TEXT, buildStyle, isDarkBase, type Flavor, type PathOverlay
 import { ensureTrackLayer, setHiddenTracks } from './tracks';
 
 /**
- * `VISION.md` §4.2's "print-grade... export" — the client-side slice
- * (`IMPLEMENTATION.md` §5.5's "Revised" note explains why this isn't the
- * headless server-side pipeline that section originally specified). The map is already fully
+ * `VISION.md` §4.2's "print-grade... export", rendered in the browser (`IMPLEMENTATION.md`
+ * §5.5 says why, and what to build past its ceiling). The map is already fully
  * client-rendered, so this reuses every overlay module exactly as `MapView.tsx`'s own
  * `reattachOverlays` does, just against a second, temporary, hidden `Map` instead of the live
  * one — the live map is never resized, never flickers, and never pays `preserveDrawingBuffer`'s

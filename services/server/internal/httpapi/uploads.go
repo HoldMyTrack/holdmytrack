@@ -17,8 +17,8 @@ const defaultUploadsLimit = 5
 // comment on why LIMIT/OFFSET is fine here despite §4.7's list endpoint dropping pagination.
 const maxUploadsLimit = 50
 
-// uploadRow is one entry in the persistent upload history — IMPLEMENTATION.md
-// §4.0.1's "the more valuable of the two" feature, distinct from live in-flight status
+// uploadRow is one entry in the persistent upload history (IMPLEMENTATION.md §4.0.1),
+// distinct from live in-flight status
 // (handleActivityStatus): this answers "what happened to every upload ever, including ones
 // whose tab is long closed," which nothing before this endpoint could answer at all.
 type uploadRow struct {

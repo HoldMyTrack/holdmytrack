@@ -45,7 +45,7 @@ var (
 )
 
 // ByExtension dispatches on the uploaded filename's extension and streams from r — callers
-// must not read r into memory first (§5.2: a 100-mile ride at 1 Hz is 36,000+ points).
+// must not read r into memory first (IMPLEMENTATION.md §5.2; a 100-mile ride at 1 Hz is 36,000+ points).
 func ByExtension(filename string, r io.Reader) (Activity, error) {
 	switch strings.ToLower(filepath.Ext(filename)) {
 	case ".gpx":

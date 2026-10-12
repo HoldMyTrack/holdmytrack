@@ -2635,8 +2635,8 @@ button.activities-panel__story-badge:hover {
    query. Scope is "core flows fully touch-usable," a direct decision, not full parity with
    every desktop interaction: the map-track-hover ↔ Activities-row-underline two-way
    highlight (FR-4.1/FR-5.4) stays mouse-only on purpose — a continuous-position hover
-   read with no discrete point to tap. See functional_specification.md's
-   mobile-support note and technical_implementation_plan.md §5.9 for the full account. */
+   read with no discrete point to tap. See docs/SPEC.md §19
+   and docs/IMPLEMENTATION.md §5.9. */
 @media (max-width: 768px) {
   /* Defensive backstop, not a fix for a specific known overflow (those are fixed at their
      own source below) — a phone browser turns any stray horizontal overflow into a

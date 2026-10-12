@@ -5,8 +5,8 @@
    (ADR-0012); its scales are IMPLEMENTATION.md §4.18.
 
    Two palettes: the light one below, and a dark one further down that replaces only the
-   colors. Which one applies is data-theme on <html> — "light" or "dark", written by the server
-   from the hmt_theme cookie the account menu's theme control sets (§4.18) — and, with no
+   colors. Which one applies is data-theme on <html> — "light" or "dark", set by theme.html's
+   script from the hmt_theme localStorage key Settings' Theme control writes (§4.18) — and, with no
    data-theme (the "System" choice), the OS's prefers-color-scheme. The Android app's
    res/values/colors.xml and res/values-night/colors.xml carry the same two palettes.
 
