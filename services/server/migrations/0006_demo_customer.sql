@@ -3,8 +3,7 @@
 -- `seed-demo-customer` subcommand, not here.
 --
 -- demo_expires_at is far in the future rather than NULL: non-NULL keeps the account read-only
--- (requireNotDemo) and exempt from email verification (requireVerified), and
--- internal/worker/demo_purge.go's `demo_expires_at < NOW()` sweep never matches it.
+-- (requireNotDemo) and exempt from email verification (requireVerified).
 -- Country/timezone match where its history actually is (Lakewood/Cleveland, OH).
 INSERT INTO users (id, email, demo_expires_at, display_name, country, timezone)
 VALUES ('22222222-2222-2222-2222-222222222222', 'demo-customer@holdmytrack.invalid',

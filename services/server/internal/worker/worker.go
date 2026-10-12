@@ -38,11 +38,6 @@ const claimLease = 30 * time.Minute
 // out first again on every restart, stalling the queue for every account behind it.
 const maxAttempts = 3
 
-// demoPurgeInterval is far coarser than pollInterval — expired demo accounts (business_
-// plan.md §8.2, demo_purge.go) are bounded by demoSessionTTL (hours), not something that
-// needs sub-second responsiveness the way the job queue does.
-const demoPurgeInterval = 5 * time.Minute
-
 // accountPurgeInterval is how long a deleted account's data can outlast the request that
 // deleted it (account_purge.go), plus however long a job of its takes to finish.
 const accountPurgeInterval = time.Minute
@@ -154,10 +149,8 @@ func runLane(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log 
 // runSweeps runs the periodic sweeps until ctx is cancelled. It has a goroutine of its own
 // rather than a case in Run's job loop: that loop drains the whole queue before it selects
 // again, so a queue that never empties (a big import) would hold back a deleted account's
-// purge, the demo purge and the daily sweeps for as long as it lasts.
+// purge and the daily sweeps for as long as it lasts.
 func runSweeps(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger) {
-	demoTicker := time.NewTicker(demoPurgeInterval)
-	defer demoTicker.Stop()
 	accountTicker := time.NewTicker(accountPurgeInterval)
 	defer accountTicker.Stop()
 	heatmapTicker := time.NewTicker(heatmapAgingInterval)
@@ -184,10 +177,6 @@ func runSweeps(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, lo
 		select {
 		case <-ctx.Done():
 			return
-		case <-demoTicker.C:
-			if err := purgeExpiredDemoUsers(ctx, pool, store, log); err != nil {
-				log.Error("demo purge error", "err", err)
-			}
 		case <-accountTicker.C:
 			if err := purgeDeletedAccounts(ctx, pool, store, log); err != nil {
 				log.Error("account purge error", "err", err)

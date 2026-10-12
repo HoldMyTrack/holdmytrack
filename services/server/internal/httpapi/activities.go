@@ -399,7 +399,7 @@ func (s *Server) handleUpdateActivity(w http.ResponseWriter, r *http.Request) {
 // `ON DELETE CASCADE` back to activities.id), and Trends is live-aggregated over whatever
 // rows remain, so neither needs any explicit cleanup here. Two things genuinely do:
 //
-//   - Object storage has no foreign keys (demo_purge.go's own reasoning), so the raw upload
+//   - Object storage has no foreign keys, so the raw upload
 //     and this activity's rendered fog/heatmap masks have to be removed explicitly.
 //   - Fog and Heatmap both read a precomputed per-user, per-tile cache that ingest builds by
 //     compositing activity_tile_masks rows together, but only ingest ever marks a tile dirty
@@ -452,8 +452,8 @@ func (s *Server) handleDeleteActivity(w http.ResponseWriter, r *http.Request) {
 	if rawKey != nil {
 		// raw_payload_key is content-addressed (raw/{userID}/{sha256(bytes)}{ext}), not
 		// scoped by source — two distinct activities can share one key if their raw bytes are
-		// byte-identical (e.g. the same file re-ingested once via plain upload and once via a
-		// Takeout import). Only remove it if this is the last activity actually pointing at
+		// byte-identical (e.g. the same file uploaded twice, or an activity in a copied Story).
+		// Only remove it if this is the last activity actually pointing at
 		// it, or a sibling activity's still-referenced raw file disappears with this one.
 		var stillReferenced bool
 		if err := s.pool.QueryRow(ctx,

@@ -13,6 +13,9 @@ dist/
 # c8's coverage report from `npm run test:coverage` (apps/web/.c8rc.json).
 /apps/web/coverage/
 
+# tsc's incremental build cache.
+*.tsbuildinfo
+
 # Playwright output from `npm run verify:map` and `npm run verify:build`.
 **/tests/screenshots/
 

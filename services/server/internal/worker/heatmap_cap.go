@@ -19,10 +19,9 @@ import (
 // other self-corrects on its own next tick from whatever in_heatmap_window state exists by
 // then, so there's no ordering dependency between them).
 //
-// Unlike demo_purge.go's sweep, there is no LIMIT/batch here: fog.RecomputeHeatmapCap's own
-// query per user is cheap (one indexed GROUP BY), and a LIMIT would just starve whichever
-// users sort last, since — unlike expired demo accounts — recomputing a cap never removes a
-// user from tomorrow's candidate set.
+// There is no LIMIT/batch here: fog.RecomputeHeatmapCap's own query per user is cheap (one
+// indexed GROUP BY), and a LIMIT would just starve whichever users sort last, since
+// recomputing a cap never removes a user from tomorrow's candidate set.
 func recomputeHeatmapCaps(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger) error {
 	rows, err := pool.Query(ctx, `
 		SELECT DISTINCT user_id FROM activities WHERE in_heatmap_window
