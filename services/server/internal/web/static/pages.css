@@ -884,6 +884,15 @@ code {
   background: var(--fm-accent);
 }
 
+.year-grid__cells .year-grid__cell[title] {
+  cursor: pointer;
+}
+
+.year-grid__cell--selected {
+  outline: 2px solid var(--fm-ink);
+  outline-offset: 1px;
+}
+
 .profile__legend {
   display: flex;
   align-items: center;

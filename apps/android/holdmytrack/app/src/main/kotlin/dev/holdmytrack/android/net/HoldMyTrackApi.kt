@@ -142,36 +142,6 @@ data class SyncKnown(val known: Set<String>, val processing: Set<String>)
 data class UploadOutcome(val status: String)
 
 /**
- * One row of the sync history — an `ingest` job and, once it has produced one, the activity it
- * became; the web's `UploadHistoryRow`. [filename] is the job's `source_detail`: a real name for
- * an uploaded file or a Takeout entry, a raw external id for everything else. [startedAt],
- * [distanceMeters] and [activityId] are null while the job is still processing, or forever if
- * it failed: there is no activity behind it to describe. [finishedAt] is when the import finished
- * — when it was synced.
- */
-data class SyncHistoryEntry(
-    val filename: String,
-    val source: String,
-    val status: String,
-    val error: String,
-    val finishedAt: String?,
-    val startedAt: String?,
-    val distanceMeters: Double?,
-    val activityId: String?,
-    /** The zone [startedAt]'s activity was recorded in (`docs/IMPLEMENTATION.md` §4.30). */
-    val timezone: String? = null,
-)
-
-/** A page of the sync history, plus the counts that describe the whole of it. */
-data class SyncHistory(
-    val total: Long,
-    val processing: Long,
-    val limit: Int,
-    val offset: Int,
-    val entries: List<SyncHistoryEntry>,
-)
-
-/**
  * One row of `GET /v1/activities` (`docs/IMPLEMENTATION.md` §4.7) — what the map's Activities
  * panel lists, the web's `Activity`. [startedAt] is the server's RFC 3339 instant, shown in
  * [timezone], the zone it was recorded in (§4.30; empty from an older server). [name],
@@ -380,16 +350,6 @@ data class ActivityDay(val date: String, val count: Int, val distanceMeters: Dou
  * paging can go, independent of this page's own bounds; null for an account with no activity.
  */
 data class ActivityDayPage(val days: List<ActivityDay>, val earliest: String?)
-
-/** One week's or month's totals, as `GET /v1/activities/trends` sums them; [periodStart] is the
- *  bucket's first day, `YYYY-MM-DD`. Every period of the window is returned, an empty one as zeroes. */
-data class TrendPeriod(
-    val periodStart: String,
-    val count: Int,
-    val distanceMeters: Double,
-    val movingSeconds: Long,
-    val elevationGainM: Double,
-)
 
 /**
  * A request the server answered with a non-2xx status. The API writes its errors as plain
@@ -720,41 +680,6 @@ object HoldMyTrackApi {
         }
     }
 
-    /**
-     * `GET /v1/uploads` — every ingest job this account has, newest first, whatever path it
-     * arrived by. The sync screen and an uploaded file share one history because they are the
-     * same jobs table; there is no separate notion of "a sync" to list.
-     */
-    fun syncHistory(limit: Int, offset: Int, onResult: (Result<SyncHistory>) -> Unit) {
-        val request = Request.Builder()
-            .url(BuildConfig.API_BASE_URL + API_V1 + "/uploads?limit=" + limit + "&offset=" + offset)
-            .build()
-        call(request, { body ->
-            val json = JSONObject(body)
-            val rows = json.getJSONArray("uploads")
-            SyncHistory(
-                total = json.optLong("total"),
-                processing = json.optLong("processing"),
-                limit = json.optInt("limit", limit),
-                offset = json.optInt("offset", offset),
-                entries = List(rows.length()) { i ->
-                    val row = rows.getJSONObject(i)
-                    SyncHistoryEntry(
-                        filename = row.optString("filename").ifBlank { row.optString("external_id") },
-                        source = row.optString("source"),
-                        status = row.optString("status"),
-                        error = row.optString("error"),
-                        finishedAt = row.optString("finished_at").ifBlank { null },
-                        startedAt = row.optString("started_at").ifBlank { null },
-                        distanceMeters = if (row.isNull("distance_meters")) null else row.optDouble("distance_meters"),
-                        activityId = row.optString("activity_id").ifBlank { null },
-                        timezone = row.optString("timezone").ifBlank { null },
-                    )
-                },
-            )
-        }, onResult)
-    }
-
     /** `GET /v1/auth/providers` — which of the Google and Facebook buttons to show. */
     fun providers(onResult: (Result<Providers>) -> Unit) {
         val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/auth/providers").build()
@@ -902,23 +827,6 @@ object HoldMyTrackApi {
             .url(BuildConfig.API_BASE_URL + API_V1 + "/account/settings")
             .patch(body.toString().toRequestBody(JSON))
             .build()
-        call(request, { text -> Profile.parse(JSONObject(text)) }, onResult)
-    }
-
-    /** `POST /v1/account/avatar` — the image as picked; the server checks its type (PNG,
-     *  JPEG, WebP) and size (5 MB) itself. */
-    fun uploadAvatar(bytes: ByteArray, contentType: String, onResult: (Result<Profile>) -> Unit) {
-        val body = MultipartBody.Builder()
-            .setType(MultipartBody.FORM)
-            .addFormDataPart("file", "avatar", bytes.toRequestBody(contentType.toMediaType()))
-            .build()
-        val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/account/avatar").post(body).build()
-        call(request, { text -> Profile.parse(JSONObject(text)) }, onResult)
-    }
-
-    /** `DELETE /v1/account/avatar`. */
-    fun deleteAvatar(onResult: (Result<Profile>) -> Unit) {
-        val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/account/avatar").delete().build()
         call(request, { text -> Profile.parse(JSONObject(text)) }, onResult)
     }
 
@@ -1597,27 +1505,6 @@ object HoldMyTrackApi {
             },
             earliest = json.optString("earliest").ifEmpty { null },
         )
-    }
-
-    /** `GET /v1/activities/trends?bucket=week|month` over its default window, the trailing 12
-     *  months — what the web's Profile page charts. */
-    fun activityTrends(bucket: String, onResult: (Result<List<TrendPeriod>>) -> Unit) {
-        val url = (BuildConfig.API_BASE_URL + API_V1 + "/activities/trends").toHttpUrl().newBuilder()
-            .addQueryParameter("bucket", bucket)
-            .build()
-        call(Request.Builder().url(url).build(), { body ->
-            val periods = JSONObject(body).optJSONArray("periods") ?: JSONArray()
-            List(periods.length()) { i ->
-                val p = periods.getJSONObject(i)
-                TrendPeriod(
-                    periodStart = p.getString("period_start"),
-                    count = p.optInt("count"),
-                    distanceMeters = p.optDouble("distance_meters", 0.0),
-                    movingSeconds = p.optLong("moving_seconds"),
-                    elevationGainM = p.optDouble("elevation_gain_m", 0.0),
-                )
-            }
-        }, onResult)
     }
 
     /**

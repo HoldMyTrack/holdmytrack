@@ -962,7 +962,7 @@ The slider counts only days with at least one activity, each activity on its loc
 - **Count**: number of activities that day (empty / one / two / three-or-more).
 - **Distance**: quantile-based thresholds computed over that account's own active days for that year (so "a busy day" is relative to this account's own typical distances, not a fixed absolute number).
 
-Hovering a day shows its date, activity count and distance. The page needs a session like the map does: no session goes to `/signin`, an unverified account to `/verify-pending`, and an account that has never saved Settings to `/settings` (FR-1.7).
+Hovering a day shows its date, activity count and distance; so does tapping or clicking it, under its year, with the day ringed — one day at a time, and tapping it again hides it. A year wider than the screen scrolls sideways, and this year's opens scrolled to today. The page needs a session like the map does: no session goes to `/signin`, an unverified account to `/verify-pending`, and an account that has never saved Settings to `/settings` (FR-1.7).
 
 ### FR-7.2 All-time and per-year stat cards
 
@@ -1030,7 +1030,7 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 **Behavior**:
 1. `GET /about` returns the page. It is also the site's front page: a visit to `/` without a session gets the same page (titled "HoldMyTrack — Every journey, mapped."), and both carry a canonical link to `/`, so search engines index the one URL. With a session, `/` is the map (FR-4).
 2. It has sections for: what HoldMyTrack is and what it is for, how it works (three numbered steps: bring what you already recorded, see it on one map, go somewhere new), why someone might want it, what it isn't, how it is funded (section id `funding`), and a pointer to Contacts (FR-10.3).
-3. "Try the demo — no signup" links to `/signin`, where the demo starts from its own button (FR-2.1). The page never starts a demo session itself.
+3. "Try the demo — no signup" links to `/signin`, where the demo starts from its own button (FR-2.1). The page never starts a demo session itself. The Android app's About has no such button (FR-10.8).
 4. About, Help, Contacts and the privacy policy are reachable from every page's header and footer (FR-10.4) — the map and the sign-in pages included.
 5. `/robots.txt` allows crawling except for `/v1/` and `/tiles/`, and points to `/sitemap.xml`, which lists `/`, `/help`, `/contacts` and `/privacy` (`/about` is the same page as `/`).
 6. The front page carries structured data (a schema.org `WebApplication`, as JSON-LD) naming the site, its URL, description and share image, and that it's free.
@@ -1082,7 +1082,7 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 4. It says what the Android app reads — exercise sessions and their routes from Health Connect, only while the Sync screen is open, never writing back — and when it uses the phone's location: recording, Find my location and capturing, a capture sending only the place and the time.
 5. Its legal bases are the GDPR's contract (the service), consent (Health Connect and location) and legitimate interest (logs, backups, sign-in limits). Email is only about the account: confirming the address, a password reset, a download being ready, and a copy of a Story someone sent (FR-14.7).
 6. It names the processors — DigitalOcean (the server, US), Cloudflare R2 (files, photos, tiles and backups), Grafana Labs (logs and metrics, US, 14 days, with no tracks, names, email or IP addresses — `DEPLOY.md` §13) and an unnamed email delivery provider — and what the browser or phone loads from others: Google Fonts, MapTiler's satellite imagery when chosen, and Google or Facebook sign-in. It says the data is stored in the US.
-7. It lists the cookies (`holdmytrack_session`, 30 days or 24 hours for the demo, and `hmt_lang`) and the `hmt_theme` local-storage key, and why there is no cookie banner.
+7. It lists the cookies (`holdmytrack_session`, 30 days or 24 hours for the demo, `hmt_lang`, and `hmt_app`, set only inside the Android app — FR-10.8) and the `hmt_theme` local-storage key, and why there is no cookie banner.
 8. Retention: an account until it's deleted; deleting an activity deletes its route, file and photos, but not a copy of it someone else accepted; sign-ins last 30 days; a requested download of the account's data, 7 days (FR-1.12); logs are rotated on the server and kept 14 days with Grafana Labs; deleted data stays in backups for up to 8 weeks (`DEPLOY.md` §11).
 9. Rights: a copy of the data (the original files included), correction, a copy of the data — in Settings (FR-1.12) — deletion — in Settings (FR-1.11, pointing to Help's `#delete-account`, FR-10.2), or by email for someone who can't sign in — and objection, answered within a month, and a complaint to a data protection authority. The service isn't meant for children under 16.
 
@@ -1097,6 +1097,17 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 2. Setup comes first: install the app, create an account, set it up (FR-1.7), and upload the 20 files in `holdmytrack-sample.zip`, extracted on the phone — 20 of the Demo Customer's activities, in Vietnam, Estonia, Italy and Cleveland (FR-2.1). The tests after it assume that account: uploads (FR-3, including each failure reason, a file uploaded twice, a `.zip` refused, more than 20 files at once and the same activity from another source), the map's modes and layers (FR-4), the date slider, the Activities panel, editing and splitting (FR-5), Private locations (FR-8.1), Stories (FR-14), photos (FR-16), points of interest (FR-15), and the Android-only Health Connect sync, recording, You tab and Settings, account and demo screens (`apps/android/docs/SPEC.md`). It ends with how to report a problem, by email to the Contacts address (FR-10.3).
 3. Its expected results quote the app's own text, so a change to what the Android app shows or says, or to a server message it shows, is a change to this page too.
 4. Each sample file is a link under `/static/testing/` that downloads under its own name: the zip of Setup's 20 files, single GPX, TCX and FIT activities, a TCX duplicating one of Setup's activities, a file for each import failure (unreadable, no timestamps, no GPS points, one point, empty, an unsupported type), and photos whose capture time places them on one of the activities, or on none.
+
+### FR-10.8 Pages inside the Android app
+
+**Description**: The Android app shows four of the site's pages on screens of its own — Settings (FR-1.7), Profile (FR-7, FR-9), the Sync page (FR-3.9) and About (FR-10.1) — rather than native screens of the same thing (`apps/android/docs/SPEC.md` FR-1.5, FR-1.6, FR-4.1, FR-2.9). A request carrying the `hmt_app` cookie, which the app sets, gets the page for an app.
+
+**Behavior**:
+1. A page for an app has no header (FR-10.4), no footer and no "Back to map": the app's own screen has its title and Back. So Settings has no title of its own, and the Sync page no "Sync history" heading.
+2. Settings for an app leaves out the Theme control (FR-1.7 behavior 8), Download your data (FR-1.12) and Delete account (FR-1.11): the app's own Theme decides, and it keeps the other two on screens of its own.
+3. The Sync page for an app says what it lists without pointing to the Upload menu, which an app doesn't have, and About for an app has no "Try the demo" button (FR-10.1), since the app is signed in.
+4. Everything else is as in a browser: the page's content, its forms and what they save, the session it needs and where it sends a visitor without one, and its language (FR-13.1).
+5. Without a session, About for an app is cached apart from About for a browser, so neither is ever sent in place of the other (FR-10.4 item 7).
 
 ## 13. FR-11 — Donations
 
@@ -1427,7 +1438,7 @@ This section summarizes cross-cutting behavior specified elsewhere in this docum
 **Behavior**:
 1. Below approximately 768px viewport width, the Activities panel (FR-5.1) is a collapsible bottom sheet instead of a permanent sidebar — on the Activities tab sitting directly above the date slider (item 2 below), on the other tabs on the bottom edge of the screen — collapsed by default to a slim strip that is the panel's tab row (Activities, Stories, Privacy) with an expand chevron at its end — with the map fully interactive above it; tapping the chevron, or any tab, expands it upward, onto that tab, over the map to show the tab's description, full list, filters, and footer actions (FR-5.2–FR-5.7), exactly as they behave at desktop width. Expanding or collapsing the sheet never changes the checked group (FR-5.6) or the row-click focus (FR-5.5). While the Edit window (FR-5.10) is open the sheet is shown collapsed, whatever its state, so the window and the track stay visible; closing it returns the sheet to the state it was in.
 2. The date slider (FR-6) leaves the sheet for the very bottom of the screen, where it stays visible in either sheet state, so the range can be changed with the sheet collapsed and the map in view. As on a desktop it shows only while the Activities tab is showing.
-3. Trends (FR-9.1) — a hover-tooltip chart at desktop width — also responds to a tap: tapping a bar shows the same tooltip a hover would, tapping it again (or tapping empty chart space) hides it. A tap and a mouse hover never conflict with each other on the same chart.
+3. Trends (FR-9.1) — a hover-tooltip chart at desktop width — also responds to a tap: tapping a bar shows the same tooltip a hover would, tapping it again (or tapping empty chart space) hides it. A tap and a mouse hover never conflict with each other on the same chart. The activity grid's days do the same (FR-7.1).
 4. The page fills the visible area as the browser's own toolbar slides in and out: the date slider stays at the bottom edge of what's visible, never under the toolbar, and dragging the page's own controls never scrolls, rubber-bands or pull-to-refreshes the page. Focusing a text field (a name, a search, a sign-in field) never zooms the page in.
 5. Tapping within about 14px of a track focuses it, as a click does within about 4px (FR-4.1) — a fingertip lands less precisely than a pointer.
 6. Focusing an activity by tapping its track leaves the collapsed sheet as it was: its strip stays visible and tappable, and the focused row is scrolled into view within the list when the sheet is expanded.

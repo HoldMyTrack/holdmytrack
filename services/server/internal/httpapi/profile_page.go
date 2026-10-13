@@ -63,6 +63,8 @@ type gridCell struct {
 	Pad   bool
 	Level int
 	Title string
+	// Today marks today's cell, which the page scrolls into view: a year is wider than a phone.
+	Today bool
 }
 
 type trendBar struct {
@@ -99,7 +101,7 @@ func (s *Server) handleProfilePage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	s.pages.Render(w, http.StatusOK, "profile", web.PageData{Title: l.T("meta.profile_title"), Path: "/profile", NoIndex: true, User: acct.user, Page: view, Lang: lang})
+	s.pages.Render(w, http.StatusOK, "profile", web.PageData{Title: l.T("meta.profile_title"), Path: "/profile", NoIndex: true, User: acct.user, Page: view, Lang: lang, InApp: inApp(r)})
 }
 
 func (s *Server) buildProfile(ctx context.Context, l *i18n.Localizer, acct *pageAccount, shade, bucket string, now time.Time) (profileView, error) {
@@ -148,7 +150,7 @@ func (s *Server) buildProfile(ctx context.Context, l *i18n.Localizer, acct *page
 		Legend:    l.T("profile.legend_" + shade),
 	}
 	for year := currentYear; year >= firstYear; year-- {
-		view.Years = append(view.Years, buildYearGrid(l, year, daysInYear(days, year), shade, imperial))
+		view.Years = append(view.Years, buildYearGrid(l, year, daysInYear(days, year), shade, imperial, now.Format(dateLayout)))
 	}
 	// Every bucket of the window comes back, the empty ones as zeroes; a window with nothing in
 	// any of them gets the "nothing recorded" line instead of a row of 2px bars.
@@ -211,10 +213,11 @@ func daysInYear(days []histogramBucket, year int) []histogramBucket {
 }
 
 // buildYearGrid lays one year out as whole weeks, Sunday to Saturday — so the first and last
-// columns carry padding days outside the year — with each day's shading level and tooltip.
+// columns carry padding days outside the year — with each day's shading level and tooltip, and
+// today (the account's, `YYYY-MM-DD`) marked.
 // Dates are calendar days, laid out in UTC arithmetic: the buckets are already the account's
 // own local days.
-func buildYearGrid(l *i18n.Localizer, year int, days []histogramBucket, shade string, imperial bool) yearGrid {
+func buildYearGrid(l *i18n.Localizer, year int, days []histogramBucket, shade string, imperial bool, today string) yearGrid {
 	byDate := make(map[string]histogramBucket, len(days))
 	for _, d := range days {
 		byDate[d.Date] = d
@@ -240,7 +243,7 @@ func buildYearGrid(l *i18n.Localizer, year int, days []histogramBucket, shade st
 			}
 			date := day.Format(dateLayout)
 			b := byDate[date]
-			cell := gridCell{Level: shadeLevel(b, shade, t1, t2), Title: l.T("profile.cell_empty", "date", date)}
+			cell := gridCell{Level: shadeLevel(b, shade, t1, t2), Title: l.T("profile.cell_empty", "date", date), Today: date == today}
 			if b.Count > 0 {
 				cell.Title = l.T("profile.cell", "date", date, "activities", l.N("count.activities", b.Count), "distance", web.FormatDistance(l, b.DistanceMeters, imperial))
 			}

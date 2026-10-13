@@ -5,6 +5,7 @@
     <string name="map_unreachable">Couldn\'t reach HoldMyTrack, so your tracks aren\'t on the map yet.</string>
     <string name="map_empty">Nothing on your map yet. Sync from Health Connect, or record a walk with the button below.</string>
     <string name="retry">Try again</string>
+    <string name="web_page_failed">Couldn\'t load this page. Check your connection and try again.</string>
 
     <string name="sign_in">Sign in</string>
     <string name="sign_out">Sign out</string>
@@ -30,64 +31,11 @@
 
     <string name="checking_session">Checking your session…</string>
 
-    <!-- Profile's activity graph and Trends, the web's /profile (services/server/internal/i18n/locales/en.json, profile.*). -->
+    <!-- The You tab's all-time numbers, the web's /profile cards (services/server/internal/i18n/locales/en.json, profile.*). -->
     <string name="profile_card_activities">Activities</string>
     <string name="profile_card_distance">Distance</string>
     <string name="profile_card_active_days">Active days</string>
     <string name="profile_card_longest_streak">Longest streak</string>
-    <string name="profile_grid_title">Activity grid</string>
-    <string name="profile_grid_subtext">Every day you moved, year by year. Only you can see this. Tap a day for its totals.</string>
-    <string name="profile_shade_by">Shade by</string>
-    <string name="profile_shade_count">Activities</string>
-    <string name="profile_shade_distance">Distance</string>
-    <string name="profile_year_grid_label">%1$d activity grid: %2$s</string>
-    <string name="profile_legend_count">Shaded by activity count: less</string>
-    <string name="profile_legend_distance">Shaded by distance: less</string>
-    <string name="profile_legend_more">more</string>
-    <string name="profile_year_stats">%1$s · %2$s · %3$s · longest streak %4$s</string>
-    <string name="profile_cell_empty">%1$s: no activity</string>
-    <string name="profile_cell">%1$s: %2$s, %3$s</string>
-    <string name="profile_trend_bar">%1$s: %2$s · %3$s · %4$s h moving · %5$s gain</string>
-    <string name="profile_trends">Trends</string>
-    <string name="profile_trends_subtext">Distance over time — tap a bar for the full breakdown.</string>
-    <string name="profile_trends_label">Distance per period over the last 12 months</string>
-    <string name="profile_week">Week</string>
-    <string name="profile_month">Month</string>
-    <string name="profile_trends_empty">Nothing recorded in this window yet.</string>
-    <string name="profile_loading">Loading…</string>
-    <string name="profile_failed">Could not load your activity: %1$s</string>
-    <plurals name="profile_activities">
-        <item quantity="one">%1$s activity</item>
-        <item quantity="other">%1$s activities</item>
-    </plurals>
-    <plurals name="profile_active_days">
-        <item quantity="one">%1$s active day</item>
-        <item quantity="other">%1$s active days</item>
-    </plurals>
-    <plurals name="profile_days">
-        <item quantity="one">%1$s day</item>
-        <item quantity="other">%1$s days</item>
-    </plurals>
-    <string-array name="profile_months">
-        <item>Jan</item>
-        <item>Feb</item>
-        <item>Mar</item>
-        <item>Apr</item>
-        <item>May</item>
-        <item>Jun</item>
-        <item>Jul</item>
-        <item>Aug</item>
-        <item>Sep</item>
-        <item>Oct</item>
-        <item>Nov</item>
-        <item>Dec</item>
-    </string-array>
-    <!-- The grid's row labels, rows 1, 3 and 5: the web's weekday.short.1, .3 and .5. -->
-    <string-array name="profile_weekdays">
-        <item>Mon</item>
-        <item>Wed</item>
-        <item>Fri</item>
-    </string-array>
 
     <string name="verify_email_title">Verify your email</string>
     <string name="verify_email_hint">We sent a confirmation link to %1$s. Open it to unlock your account — your map and sync start working as soon as you do.</string>
@@ -188,26 +136,9 @@
 
     <string name="settings_title">Settings</string>
     <string name="settings_onboarding_title">Welcome — set up your account</string>
-    <string name="settings_onboarding_intro">Two things before your map: your country sets whether distances show in km or miles, and your timezone sets which day each activity falls on. You can change both here later.</string>
-    <string name="settings_demo_notice">This is the shared demo account, so its settings can\'t be changed. Create your own account to save yours.</string>
-    <string name="settings_load_failed">Couldn\'t load your settings: %1$s</string>
-    <string name="settings_avatar">Avatar</string>
-    <string name="settings_avatar_description">Your avatar</string>
-    <string name="settings_avatar_choose">Choose an image</string>
-    <string name="settings_avatar_remove">Remove</string>
-    <string name="settings_avatar_hint">A photo from your phone, shrunk to fit.</string>
     <string name="settings_avatar_unreadable">Couldn\'t read that image.</string>
-    <string name="settings_name">Name</string>
-    <string name="settings_name_placeholder">Not set</string>
-    <string name="settings_country">Country</string>
-    <string name="settings_country_choose">Choose a country</string>
-    <string name="settings_country_hint">Decides whether distance and elevation show in km/m or mi/ft, here and on the website.</string>
-    <string name="settings_timezone">Timezone</string>
-    <string name="settings_timezone_hint">Decides which day is today. Each activity shows the date and time where it was recorded; this zone stands in when that place isn\'t known. Set from your phone when you signed up; change it here if you\'ve moved.</string>
     <string name="settings_language">Language</string>
     <string name="settings_language_auto">Automatic (phone)</string>
-    <string name="settings_language_hint">The language of the app, the website and the emails we send you. Automatic follows your phone\'s language.</string>
-    <string name="settings_save">Save</string>
     <string name="settings_theme">Theme</string>
     <string name="settings_export_title">Download your data</string>
     <string name="settings_export_hint">A copy of everything in your account, as zip archives: the files you uploaded or synced, every activity as GPX, your photos, and your settings, Stories, Private locations and captured places.</string>
@@ -228,10 +159,6 @@
     <string name="settings_theme_system">System</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
-    <string name="settings_save_continue">Save and continue</string>
-    <string name="settings_saved">Saved.</string>
-    <string name="settings_avatar_updated">Avatar updated.</string>
-    <string name="settings_avatar_removed">Avatar removed.</string>
     <string name="settings_search_hint">Search</string>
     <string name="settings_no_match">Nothing matches.</string>
 
@@ -421,30 +348,6 @@
     <string name="upload_already">%1$s was already uploaded before.</string>
     <string name="upload_failed_transfer">%1$s: %2$s</string>
     <string name="upload_network_error">Network error</string>
-    <string name="status_history">History</string>
-    <string name="status_loading">Loading…</string>
-    <string name="status_summary_empty">Nothing imported yet.</string>
-    <plurals name="status_count">
-        <item quantity="one">%d activity</item>
-        <item quantity="other">%d activities</item>
-    </plurals>
-    <string name="status_in_progress">%1$d in progress</string>
-    <string name="status_failed">Could not read the sync history: %1$s</string>
-    <string name="status_row_processing">Processing…</string>
-    <string name="status_row_ready">Ready</string>
-    <string name="status_row_failed">Failed</string>
-    <string name="status_row_failed_with">Failed: %1$s</string>
-    <string name="status_view_on_map">View on map</string>
-    <string name="status_range">%1$d–%2$d of %3$d</string>
-    <string name="status_range_one">%1$d of %2$d</string>
-    <string name="status_newer">← Newer</string>
-    <string name="status_older">Older →</string>
-    <string name="source_health_connect" translatable="false">Health Connect</string>
-    <string name="source_health_kit" translatable="false">HealthKit</string>
-    <string name="source_title_upload">Uploaded file</string>
-    <string name="source_title_takeout" translatable="false">Google Takeout</string>
-    <string name="source_title_recorded">GPS Logger</string>
-    <string name="source_title_timeline">Google Maps Timeline</string>
 
     <!-- The map's Activities panel (panel/ActivitiesPanel.kt), after the web's activities.* and filters.* messages. -->
     <string name="panel_label">Activities panel</string>

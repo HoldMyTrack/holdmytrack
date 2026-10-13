@@ -37,7 +37,7 @@ func TestStatsOf(t *testing.T) {
 
 func TestBuildYearGrid(t *testing.T) {
 	// 2026 starts on a Thursday: four padding days before Jan 1 in the first column.
-	g := buildYearGrid(i18n.Get("en"), 2026, []histogramBucket{day("2026-01-01", 2, 5000), day("2026-12-31", 1, 100)}, "count", false)
+	g := buildYearGrid(i18n.Get("en"), 2026, []histogramBucket{day("2026-01-01", 2, 5000), day("2026-12-31", 1, 100)}, "count", false, "2026-01-02")
 	if g.Weeks != 53 || len(g.Cells) != 53*7 {
 		t.Fatalf("weeks %d, cells %d", g.Weeks, len(g.Cells))
 	}
@@ -49,8 +49,13 @@ func TestBuildYearGrid(t *testing.T) {
 	if c := g.Cells[4]; c.Pad || c.Level != 2 || c.Title != "2026-01-01: 2 activities, 5.0 km" {
 		t.Errorf("Jan 1: %+v", c)
 	}
-	if c := g.Cells[5]; c.Level != 0 || c.Title != "2026-01-02: no activity" {
+	if c := g.Cells[5]; c.Level != 0 || c.Title != "2026-01-02: no activity" || !c.Today {
 		t.Errorf("Jan 2: %+v", c)
+	}
+	for i, c := range g.Cells {
+		if c.Today && i != 5 {
+			t.Errorf("cell %d marked today too", i)
+		}
 	}
 	if len(g.Months) != 12 || g.Months[0] != (monthTick{"JAN", 1}) {
 		t.Errorf("months: %v", g.Months)
@@ -105,7 +110,7 @@ func TestTrendBars(t *testing.T) {
 
 func TestProfileInRussian(t *testing.T) {
 	ru := i18n.Get("ru")
-	g := buildYearGrid(ru, 2026, []histogramBucket{day("2026-01-01", 2, 5000), day("2026-01-02", 5, 1234567)}, "count", false)
+	g := buildYearGrid(ru, 2026, []histogramBucket{day("2026-01-01", 2, 5000), day("2026-01-02", 5, 1234567)}, "count", false, "")
 	if c := g.Cells[4]; c.Title != "2026-01-01: 2 занятия, 5,0 км" {
 		t.Errorf("Jan 1: %q", c.Title)
 	}

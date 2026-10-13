@@ -39,13 +39,13 @@
     {{block "head" .}}{{end}}
   </head>
   <body>
-    {{template "header" .}}
+    {{if not .InApp}}{{template "header" .}}{{end}}
     {{template "content" .}}
-    <footer class="page-footer">
+    {{if not .InApp}}<footer class="page-footer">
       <span>© HoldMyTrack</span>
       <a href="/">{{t "footer.open_map"}}</a>
       {{range .InfoLinks}}<a href="{{.Href}}">{{t .LabelKey}}</a>{{end}}
       <a href="https://github.com/HoldMyTrack/holdmytrack">GitHub</a>
-    </footer>
+    </footer>{{end}}
   </body>
 </html>

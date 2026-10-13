@@ -1,6 +1,6 @@
 {{define "content"}}{{with .Page}}
 <main class="page-main profile">
-  <a class="settings__back" href="/">{{t "common.back_to_map"}}</a>
+  {{if not $.InApp}}<a class="settings__back" href="/">{{t "common.back_to_map"}}</a>{{end}}
 
   <section class="activity-graph" aria-label="{{t "profile.graph_label"}}">
     <div class="activity-graph__cards">
@@ -34,12 +34,43 @@
             {{range .Months}}<span class="year-grid__month" style="grid-column-start: {{.Col}}">{{.Label}}</span>{{end}}
           </div>
           <div class="year-grid__cells" style="grid-template-columns: repeat({{.Weeks}}, 12px)">
-            {{- range .Cells}}{{if .Pad}}<span class="year-grid__cell year-grid__cell--pad"></span>{{else}}<span class="year-grid__cell year-grid__cell--level-{{.Level}}" title="{{.Title}}"></span>{{end}}{{end -}}
+            {{- range .Cells}}{{if .Pad}}<span class="year-grid__cell year-grid__cell--pad"></span>{{else}}<span class="year-grid__cell year-grid__cell--level-{{.Level}}" title="{{.Title}}"{{if .Today}} data-today{{end}}></span>{{end}}{{end -}}
           </div>
         </div>
       </div>
+      <p class="trends__detail year-grid__detail" role="status" hidden></p>
     </section>
     {{end}}
+    {{/* A day's numbers are its cell's hover tooltip, which a touch screen never shows: a tap
+         (or click) shows the cell's own title under its year and rings the cell, one day at
+         a time; tapping it again hides it. Today's cell is scrolled into view. */}}
+    <script>
+      (function () {
+        var current = null;
+        function select(cell) {
+          if (current) {
+            current.classList.remove('year-grid__cell--selected');
+            current.closest('.year-grid').querySelector('.year-grid__detail').hidden = true;
+          }
+          current = cell;
+          if (!cell) return;
+          cell.classList.add('year-grid__cell--selected');
+          var detail = cell.closest('.year-grid').querySelector('.year-grid__detail');
+          detail.textContent = cell.title;
+          detail.hidden = false;
+        }
+        document.querySelectorAll('.year-grid__cell[title]').forEach(function (cell) {
+          cell.addEventListener('click', function () { select(current === cell ? null : cell); });
+        });
+        // A year is wider than a phone: open this year's on today rather than on January.
+        var today = document.querySelector('.year-grid__cell[data-today]');
+        if (today) {
+          var body = today.closest('.year-grid__body');
+          var past = today.getBoundingClientRect().right - body.getBoundingClientRect().right;
+          if (past > 0) body.scrollLeft += past + 24;
+        }
+      })();
+    </script>
 
     <p class="profile__legend">
       <span>{{.Legend}}</span>

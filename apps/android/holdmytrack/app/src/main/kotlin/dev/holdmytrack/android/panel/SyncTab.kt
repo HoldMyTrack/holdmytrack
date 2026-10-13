@@ -22,7 +22,6 @@ import com.google.android.material.snackbar.Snackbar
 import dev.holdmytrack.android.MainActivity
 import dev.holdmytrack.android.R
 import dev.holdmytrack.android.SyncActivity
-import dev.holdmytrack.android.SyncHistoryActivity
 import dev.holdmytrack.android.UploadActivity
 import dev.holdmytrack.android.health.HealthConnect
 import dev.holdmytrack.android.net.ActivityOverlap
@@ -45,6 +44,7 @@ import dev.holdmytrack.android.sync.SyncSources
 import dev.holdmytrack.android.sync.WaitingLoader
 import dev.holdmytrack.android.sync.WaitingStore
 import dev.holdmytrack.android.ui.LargeText
+import dev.holdmytrack.android.web.WebPageActivity
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneId
@@ -173,7 +173,7 @@ class SyncTab(
         }
         upload.setOnClickListener { activity.startActivity(Intent(activity, UploadActivity::class.java)) }
         foot.findViewById<View>(R.id.sync_history).setOnClickListener {
-            activity.startActivity(Intent(activity, SyncHistoryActivity::class.java))
+            WebPageActivity.open(activity, WebPageActivity.Page.SYNC_HISTORY)
         }
         for (link in listOf(foot.findViewById<View>(R.id.sync_sources), sourceSettings)) {
             link.setOnClickListener { activity.startActivity(Intent(activity, SyncActivity::class.java)) }

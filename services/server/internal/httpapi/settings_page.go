@@ -112,7 +112,7 @@ func (s *Server) renderSettings(w http.ResponseWriter, r *http.Request, status i
 	if form.Onboarding {
 		title = l.T("meta.welcome_title")
 	}
-	s.pages.Render(w, status, "settings", web.PageData{Title: title, Path: "/settings", NoIndex: true, User: acct.user, Page: form, Lang: lang})
+	s.pages.Render(w, status, "settings", web.PageData{Title: title, Path: "/settings", NoIndex: true, User: acct.user, Page: form, Lang: lang, InApp: inApp(r)})
 }
 
 // formWithSaved is the form showing the account's saved values.

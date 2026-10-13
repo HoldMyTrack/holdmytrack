@@ -8,6 +8,7 @@
     <string name="map_unreachable">Не удалось связаться с HoldMyTrack, поэтому ваших треков пока нет на карте.</string>
     <string name="map_empty">На карте пока ничего нет. Синхронизируйте занятия из Health Connect или запишите прогулку кнопкой внизу.</string>
     <string name="retry">Повторить</string>
+    <string name="web_page_failed">Не удалось загрузить страницу. Проверьте подключение и попробуйте снова.</string>
 
     <string name="sign_in">Войти</string>
     <string name="sign_out">Выйти</string>
@@ -37,64 +38,6 @@
     <string name="profile_card_distance">Расстояние</string>
     <string name="profile_card_active_days">Активные дни</string>
     <string name="profile_card_longest_streak">Самая длинная серия</string>
-    <string name="profile_grid_title">Сетка активности</string>
-    <string name="profile_grid_subtext">Каждый день, когда вы двигались, год за годом. Видно только вам. Нажмите на день, чтобы увидеть итоги.</string>
-    <string name="profile_shade_by">Закрашивать по</string>
-    <string name="profile_shade_count">занятиям</string>
-    <string name="profile_shade_distance">расстоянию</string>
-    <string name="profile_year_grid_label">Сетка активности за %1$d год: %2$s</string>
-    <string name="profile_legend_count">По числу занятий: меньше</string>
-    <string name="profile_legend_distance">По расстоянию: меньше</string>
-    <string name="profile_legend_more">больше</string>
-    <string name="profile_year_stats">%1$s · %2$s · %3$s · самая длинная серия: %4$s</string>
-    <string name="profile_cell_empty">%1$s: нет занятий</string>
-    <string name="profile_cell">%1$s: %2$s, %3$s</string>
-    <string name="profile_trend_bar">%1$s: %2$s · %3$s · %4$s ч в движении · набор %5$s</string>
-    <string name="profile_trends">Динамика</string>
-    <string name="profile_trends_subtext">Расстояние по времени — нажмите на столбец, чтобы увидеть подробности.</string>
-    <string name="profile_trends_label">Расстояние по периодам за последние 12 месяцев</string>
-    <string name="profile_week">Неделя</string>
-    <string name="profile_month">Месяц</string>
-    <string name="profile_trends_empty">За этот период пока ничего не записано.</string>
-    <string name="profile_loading">Загрузка…</string>
-    <string name="profile_failed">Не удалось загрузить активность: %1$s</string>
-    <plurals name="profile_activities">
-        <item quantity="one">%1$s занятие</item>
-        <item quantity="few">%1$s занятия</item>
-        <item quantity="many">%1$s занятий</item>
-        <item quantity="other">%1$s занятия</item>
-    </plurals>
-    <plurals name="profile_active_days">
-        <item quantity="one">%1$s активный день</item>
-        <item quantity="few">%1$s активных дня</item>
-        <item quantity="many">%1$s активных дней</item>
-        <item quantity="other">%1$s активного дня</item>
-    </plurals>
-    <plurals name="profile_days">
-        <item quantity="one">%1$s день</item>
-        <item quantity="few">%1$s дня</item>
-        <item quantity="many">%1$s дней</item>
-        <item quantity="other">%1$s дня</item>
-    </plurals>
-    <string-array name="profile_months">
-        <item>янв.</item>
-        <item>февр.</item>
-        <item>март</item>
-        <item>апр.</item>
-        <item>май</item>
-        <item>июнь</item>
-        <item>июль</item>
-        <item>авг.</item>
-        <item>сент.</item>
-        <item>окт.</item>
-        <item>нояб.</item>
-        <item>дек.</item>
-    </string-array>
-    <string-array name="profile_weekdays">
-        <item>Пн</item>
-        <item>Ср</item>
-        <item>Пт</item>
-    </string-array>
 
     <string name="verify_email_title">Подтвердите почту</string>
     <string name="verify_email_hint">Мы отправили ссылку для подтверждения на %1$s. Перейдите по ней, чтобы открыть доступ к аккаунту, — карта и синхронизация заработают сразу после этого.</string>
@@ -199,26 +142,9 @@
 
     <string name="settings_title">Настройки</string>
     <string name="settings_onboarding_title">Добро пожаловать! Настройте аккаунт</string>
-    <string name="settings_onboarding_intro">Два шага перед картой: страна определяет, в километрах или милях показывать расстояния, а часовой пояс — к какому дню относится каждое занятие. Позже всё это можно изменить здесь.</string>
-    <string name="settings_demo_notice">Это общий демо-аккаунт, его настройки изменить нельзя. Создайте свой аккаунт, чтобы сохранить свои.</string>
-    <string name="settings_load_failed">Не удалось загрузить настройки: %1$s</string>
-    <string name="settings_avatar">Аватар</string>
-    <string name="settings_avatar_description">Ваш аватар</string>
-    <string name="settings_avatar_choose">Выбрать изображение</string>
-    <string name="settings_avatar_remove">Удалить</string>
-    <string name="settings_avatar_hint">Фото с телефона, уменьшенное до нужного размера.</string>
     <string name="settings_avatar_unreadable">Не удалось прочитать это изображение.</string>
-    <string name="settings_name">Имя</string>
-    <string name="settings_name_placeholder">Не указано</string>
-    <string name="settings_country">Страна</string>
-    <string name="settings_country_choose">Выберите страну</string>
-    <string name="settings_country_hint">Определяет, в каких единицах показывать расстояние и высоту — км/м или мили/футы — здесь и на сайте.</string>
-    <string name="settings_timezone">Часовой пояс</string>
-    <string name="settings_timezone_hint">Определяет, какой день сегодня. Каждое занятие показывает дату и время того места, где оно записано; этот пояс нужен, если место неизвестно. Определён по телефону при регистрации; измените его, если вы переехали.</string>
     <string name="settings_language">Язык</string>
     <string name="settings_language_auto">Автоматически (как на телефоне)</string>
-    <string name="settings_language_hint">Язык приложения, сайта и писем, которые мы вам отправляем. «Автоматически» — язык вашего телефона.</string>
-    <string name="settings_save">Сохранить</string>
     <string name="settings_theme">Тема</string>
     <string name="settings_export_title">Скачать свои данные</string>
     <string name="settings_export_hint">Копия всего, что есть в вашем аккаунте, в zip-архивах: загруженные и синхронизированные файлы, все занятия в виде GPX, фотографии, а также настройки, истории, приватные и отмеченные места.</string>
@@ -239,10 +165,6 @@
     <string name="settings_theme_system">Системная</string>
     <string name="settings_theme_light">Светлая</string>
     <string name="settings_theme_dark">Тёмная</string>
-    <string name="settings_save_continue">Сохранить и продолжить</string>
-    <string name="settings_saved">Сохранено.</string>
-    <string name="settings_avatar_updated">Аватар обновлён.</string>
-    <string name="settings_avatar_removed">Аватар удалён.</string>
     <string name="settings_search_hint">Поиск</string>
     <string name="settings_no_match">Ничего не найдено.</string>
 
@@ -426,9 +348,6 @@
     <string name="sync_upload_sub">Файлы GPX, FIT или TCX</string>
     <string name="sync_history_title">История синхронизации</string>
     <string name="sync_history_sub">Все импорты и чем они закончились</string>
-    <string name="status_history">История</string>
-    <string name="status_loading">Загрузка…</string>
-    <string name="status_summary_empty">Пока ничего не импортировано.</string>
     <string name="upload_title">Загрузить</string>
     <string name="upload_demo">Недоступно в демо-аккаунте — создайте аккаунт, чтобы загружать свои занятия.</string>
     <string name="upload_see_sync">Смотреть в истории синхронизации</string>
@@ -444,26 +363,6 @@
     <string name="upload_already">%1$s уже был загружен раньше.</string>
     <string name="upload_failed_transfer">%1$s: %2$s</string>
     <string name="upload_network_error">Ошибка сети</string>
-    <plurals name="status_count">
-        <item quantity="one">%d занятие</item>
-        <item quantity="few">%d занятия</item>
-        <item quantity="many">%d занятий</item>
-        <item quantity="other">%d занятия</item>
-    </plurals>
-    <string name="status_in_progress">в обработке: %1$d</string>
-    <string name="status_failed">Не удалось прочитать историю синхронизации: %1$s</string>
-    <string name="status_row_processing">Обработка…</string>
-    <string name="status_row_ready">Готово</string>
-    <string name="status_row_failed">Ошибка</string>
-    <string name="status_row_failed_with">Ошибка: %1$s</string>
-    <string name="status_view_on_map">Показать на карте</string>
-    <string name="status_range">%1$d–%2$d из %3$d</string>
-    <string name="status_range_one">%1$d из %2$d</string>
-    <string name="status_newer">← Новее</string>
-    <string name="status_older">Старше →</string>
-    <string name="source_title_upload">Загруженный файл</string>
-    <string name="source_title_recorded">GPS-запись</string>
-    <string name="source_title_timeline">Хронология Google Карт</string>
 
     <!-- The map's Activities panel (panel/ActivitiesPanel.kt), after the web's activities.* and filters.* messages. -->
     <string name="panel_label">Панель занятий</string>

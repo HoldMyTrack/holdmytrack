@@ -68,6 +68,18 @@ func (s *Server) pageAccount(r *http.Request) *pageAccount {
 	return &pageAccount{info: info, profile: resp, user: &web.User{Email: resp.Email, DisplayName: resp.DisplayName, AvatarURL: resp.AvatarURL, IsDemo: resp.IsDemo, IsAdmin: info.isAdmin && !info.isDemo}}
 }
 
+// appCookieName marks a request from a native app's WebView (SPEC.md FR-10.8): the app puts it
+// in the WebView's own cookie store, so every request the WebView makes carries it — a link, a
+// form POST, the redirect after one. A page asked for that way leaves out the site's header,
+// footer and Back to map, whose jobs the app's own screen does, and what the app keeps as
+// native screens of its own (web.PageData.InApp).
+const appCookieName = "hmt_app"
+
+func inApp(r *http.Request) bool {
+	c, err := r.Cookie(appCookieName)
+	return err == nil && c.Value != ""
+}
+
 // pageLang is the language a page renders in for acct (nil when signed out): the account's own
 // setting, else the browser's (i18n.Resolve).
 func pageLang(acct *pageAccount, r *http.Request) string {

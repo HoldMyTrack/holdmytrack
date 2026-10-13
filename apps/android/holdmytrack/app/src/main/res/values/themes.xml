@@ -737,12 +737,6 @@
         <item name="tickVisible">false</item>
     </style>
 
-    <!-- A drop-down field: the outlined text field with Lucide's chevron, what the Type field
-         already is on the recording form. -->
-    <style name="Widget.HoldMyTrack.Dropdown" parent="Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
-        <item name="endIconDrawable">@drawable/ic_chevron_down</item>
-    </style>
-
     <!-- A list's small uppercase title: the web's .sync-tab__list-title, 11sp bold, tracked. -->
     <style name="TextAppearance.HoldMyTrack.Overline" parent="TextAppearance.HoldMyTrack.LabelSmall">
         <item name="android:textFontWeight">700</item>
@@ -776,45 +770,6 @@
         <item name="iconPadding">@dimen/hmt_space_10</item>
         <item name="backgroundTint">@color/hmt_facebook</item>
         <item name="android:textColor">@color/hmt_surface</item>
-    </style>
-
-    <!-- Profile, after the web's /profile (services/server/internal/web/static/pages.css). A
-         section title, .profile__title: 13sp bold, tracked, uppercase, ink 60%. -->
-    <style name="TextAppearance.HoldMyTrack.ProfileTitle" parent="TextAppearance.HoldMyTrack.TitleSmall">
-        <item name="android:textFontWeight">700</item>
-        <item name="android:textAllCaps">true</item>
-        <item name="android:letterSpacing">0.06</item>
-        <item name="android:textColor">@color/profile_ink_60</item>
-    </style>
-
-    <!-- A stat card's value, .activity-graph__card-value: 20sp bold. -->
-    <style name="TextAppearance.HoldMyTrack.ProfileStat" parent="TextAppearance.HoldMyTrack.HeadlineSmall">
-        <item name="android:textFontWeight">700</item>
-        <item name="android:textColor">@color/hmt_ink</item>
-    </style>
-
-    <!-- Text under a title and a year's stats line, .profile__subtext and .year-grid__stats:
-         13sp at ink 55%. -->
-    <style name="Widget.HoldMyTrack.ProfileSubtext" parent="">
-        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
-        <item name="android:textColor">@color/hmt_ink_meta</item>
-    </style>
-
-    <!-- The legend and Trends' axis, .profile__legend and .trends__axis: 11sp regular at ink 50%. -->
-    <style name="TextAppearance.HoldMyTrack.ProfileCaption" parent="TextAppearance.HoldMyTrack.BodySmall">
-        <item name="android:textSize">@dimen/hmt_text_xs</item>
-        <item name="android:textColor">@color/panel_ink_50</item>
-    </style>
-
-    <!-- A tapped day's or bar's breakdown, .trends__detail: 13sp on ink 4%, 8/12 padding. -->
-    <style name="Widget.HoldMyTrack.ProfileDetail" parent="">
-        <item name="android:background">@drawable/bg_profile_detail</item>
-        <item name="android:paddingStart">@dimen/hmt_space_12</item>
-        <item name="android:paddingEnd">@dimen/hmt_space_12</item>
-        <item name="android:paddingTop">@dimen/hmt_space_8</item>
-        <item name="android:paddingBottom">@dimen/hmt_space_8</item>
-        <item name="android:textAppearance">@style/TextAppearance.HoldMyTrack.BodyMedium</item>
-        <item name="android:textColor">@color/hmt_ink</item>
     </style>
 
     <!-- One side of a two-way switch, .profile__toggle-btn: white with an ink 20% border, the
