@@ -482,7 +482,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Error cases**: A too-long custom activity type (over 50 characters, the column's own bound) is rejected by the sync endpoint with a clear reason rather than failing as a raw database error at insert time. So is an `external_id` that isn't 1–200 letters, digits, `.`, `_` or `-` (not starting with `.`). A row that fails to sync (network error, server rejection) is left on the device, listed and still ticked, to be sent again.
 
-**Not yet built**: a discard confirmation before Stop finalizes a save; the iOS half (`docs/ROADMAP.md` Phase 2).
+**Not yet built**: a discard confirmation before Stop finalizes a save; the iOS half (`docs/ROADMAP.md`, "Ongoing, not phase-bound").
 
 ### FR-3.9 The Sync page
 

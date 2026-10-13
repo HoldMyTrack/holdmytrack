@@ -216,13 +216,13 @@ The product moves through three milestones (ADR-0031):
 Within the milestones, phases are sequenced so the unconditional ingest path ships first and the ones that depend on other companies' permission come later. The phase numbers are the ones `docs/ROADMAP.md` uses, which carries each phase's step-by-step detail.
 
 ### 5.1 Phase 0: Validation — *no application code*
-Settle what the plan rests on before building on it: whether the partner APIs and the HealthKit and Samsung route access are what they appear to be (§4.1), and whether "free, funded by its users" reads as credible (§8.3). The funding page stands before launch, not after — the ask is much weaker retrofitted (§6.1).
+Settle what the plan rests on before building on it: whether the partner APIs and Samsung route access are what they appear to be (§4.1; HealthKit's is checked when the iOS app is built, §5.3), and whether "free, funded by its users" reads as credible (§8.3). The funding page stands before launch, not after — the ask is much weaker retrofitted (§6.1).
 
 ### 5.2 Phase 1: Upload + Map
 The product on the web, on the one ingest path that needs nobody's permission: file upload (Path 3, §4.1), the map in all its modes, the no-signup demo (§8.2), accounts, the activity graph, export, Stories and Spots (§4.2). Path 3 comes first so that the first usable version waits on no one's approval.
 
 ### 5.3 Phase 2: Mobile
-Native apps for the on-device path (Path 2, §4.1) and for in-app GPS recording. Android goes first although it is the more constrained platform — foreground-only route reads, and no Samsung routes at all, which the app states plainly rather than quietly degrading — so the sync contract is designed against the harder case; iOS, on HealthKit and Apple Watch, the stronger of the two routes, inherits it. Picking what to sync belongs here too: the phone holds every walk, and only the ones the user ticks come in (ADR-0039).
+Native apps for the on-device path (Path 2, §4.1) and for in-app GPS recording. Android goes first although it is the more constrained platform — foreground-only route reads, and no Samsung routes at all, which the app states plainly rather than quietly degrading — so the sync contract is designed against the harder case. iOS, on HealthKit and Apple Watch, the stronger of the two routes, inherits it, after the public launch rather than as part of the MVP. Picking what to sync belongs here too: the phone holds every walk, and only the ones the user ticks come in (ADR-0039).
 
 ### 5.4 Phase 3: Finalized design + mobile browser support
 One visual language across desktop and phone browsers, then frozen: the `--fm-*` tokens, Inter and Fraunces (Source Serif 4 for Russian headings), and Lucide icons. The mobile apps inherit the freeze rather than inventing a second visual language: two clients that each chose their own would not read as one product.

@@ -42,27 +42,6 @@ Sign in with Facebook is built (`SPEC.md` FR-1.10) and the Meta app exists, but 
 
 ---
 
-## Phase 2 — Mobile
-
-Path 2 on-device sync and in-app GPS recording (`VISION.md` §5.3). Android and iOS are tracked separately below; iOS reuses the sync contract Android settled: the payload shape, and the list of what's on the phone that the user ticks from, with the server answering what the account already has (`SPEC.md` FR-3.6).
-
-### Android
-
-- [ ] Load the map page in a WebView on a mid-range Android phone and compare it with the native map — panning and zooming, memory, a long track's first draw — to decide whether the map stays native (ADR-0042).
-- [ ] Confirm the Samsung Health Connect route-geometry limitation empirically, not just from documentation (`VISION.md` §4.1) — Samsung's own developer docs already state `EXERCISE_ROUTE` cannot be read via Health Connect; this is double-checking in case reality is better than documented, not an open question blocking the build.
-- [x] Android app: Health Connect sync, foreground-only, end to end (`SPEC.md` FR-3.6). The app's own remaining work is in `apps/android/docs/ROADMAP.md`.
-- [x] In-app GPS recording, Android half (`SPEC.md` FR-3.8, ADR-0007).
-- [x] Photos on Android (`SPEC.md` FR-16, ADR-0024; `apps/android/docs/SPEC.md` FR-2.10).
-- [x] The map's Activities panel on Android (`apps/android/docs/SPEC.md` FR-2.7, FR-3.5, FR-4.1).
-
-### iOS
-
-- [ ] Confirm `HKWorkoutRoute` access with a throwaway iOS app (`VISION.md` §4.1) — due diligence before committing engineering effort to the full iOS build, not resolving a real unknown: Apple's docs already say this works.
-- [ ] iOS app: HealthKit sync, `HKWorkoutRoute` for full GPS geometry, on the payload and the pick-what-to-send design Android settled, with the site's own pages in a `WKWebView` for Settings, Profile, the Sync page and About (ADR-0042).
-- [ ] In-app GPS recording, iOS half — inherits the Android build's wire shape and `source` convention once the iOS app itself exists (see the iOS Path 2 item above, which this depends on).
-
----
-
 ## Phase 4 — More sources
 
 Connecting the app to third-party services.
@@ -103,7 +82,7 @@ Gates any public launch: a precise location history is sensitive personal data u
 - [ ] EU-region hosting for EU users.
 - [x] A privacy policy page — `/privacy` (`SPEC.md` FR-10.6). It names the email delivery provider only generically; name it there once settled, and update the policy when EU-region hosting moves the data.
 - [x] Account deletion and data export — Settings' Delete account and Download your data, on the web and in the Android app (`SPEC.md` FR-1.11, FR-1.12). Named "Download your data" so it doesn't collide with the map's Export control (FR-4.10).
-- [ ] Health Connect data-type declarations in the Play Console, scoped to only what's actually used (Phase 2 builds the app; the declaration work belongs here).
+- [ ] Health Connect data-type declarations in the Play Console, scoped to only what's actually used (the app is built; the declaration work belongs here).
 
 ---
 
@@ -124,3 +103,4 @@ Public pages, followers and the rest (`VISION.md` §5.7, §5.8). No steps are li
 - [ ] Split the Android app's `MapFragment.kt` by feature when the next feature touches it, the part that feature needs first: the session and first-run check, Story mode, View on map, the notice panel, camera framing, photo markers — pure logic out first, with unit tests as `panel/PanelState` has, the UI wiring last.
 - [ ] Keep decisions in pure logic, tested as they're written: new code puts what it decides — which screen a session goes to, whether a day is in range, where a link leads — in functions that take values and return values, with no View, `Context`, map, network or timer in them, and unit-tests them in the same change; code touched for another reason gets the same. The wiring around them stays thin, covered by a few end-to-end flows instead of mocks. First in line: `WebPageActivity.route`, which takes an Android `Uri` and so has no test, though the first-run redirect bug lived in it.
 - [ ] Re-measure the funding-model assumptions (`VISION.md` §4.3, §6.3) against real usage once any real users exist, rather than assuming the estimates hold — they feed Milestone 2's exit gate.
+- [ ] The iOS app (`VISION.md` §5.3), likely after the public launch, with no date set: first confirm `HKWorkoutRoute` access with a throwaway app (`VISION.md` §4.1); then HealthKit sync, with `HKWorkoutRoute` for full GPS geometry, on the payload and the pick-what-to-send design Android settled (`SPEC.md` FR-3.6), and the site's own pages in a `WKWebView` for Settings, Profile, the Sync page and About (ADR-0042); then in-app GPS recording, on the Android build's wire shape and `source` convention (`SPEC.md` FR-3.8, ADR-0007).
