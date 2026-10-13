@@ -82,7 +82,7 @@ Gates any public launch: a precise location history is sensitive personal data u
 - [ ] EU-region hosting for EU users.
 - [x] A privacy policy page — `/privacy` (`SPEC.md` FR-10.6). It names the email delivery provider only generically; name it there once settled, and update the policy when EU-region hosting moves the data.
 - [x] Account deletion and data export — Settings' Delete account and Download your data, on the web and in the Android app (`SPEC.md` FR-1.11, FR-1.12). Named "Download your data" so it doesn't collide with the map's Export control (FR-4.10).
-- [ ] Health Connect data-type declarations in the Play Console, scoped to only what's actually used (the app is built; the declaration work belongs here).
+- [x] Health Connect data-type declarations in the Play Console, scoped to only what's actually used — filed 2026-10-07 (`apps/android/docs/ROADMAP.md` Phase 6).
 
 ---
 
