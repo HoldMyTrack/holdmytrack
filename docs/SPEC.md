@@ -482,7 +482,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Error cases**: A too-long custom activity type (over 50 characters, the column's own bound) is rejected by the sync endpoint with a clear reason rather than failing as a raw database error at insert time. So is an `external_id` that isn't 1–200 letters, digits, `.`, `_` or `-` (not starting with `.`). A row that fails to sync (network error, server rejection) is left on the device, listed and still ticked, to be sent again.
 
-**Not yet built**: a discard confirmation before Stop finalizes a save; the iOS half (`docs/ROADMAP.md` Phase 2).
+**Not yet built**: a discard confirmation before Stop finalizes a save; the iOS half (`docs/ROADMAP.md`, "Ongoing, not phase-bound").
 
 ### FR-3.9 The Sync page
 
@@ -908,7 +908,7 @@ The first three never overlap: a way tagged as a cycleway or shared path that is
 
 **Preconditions**: Splitting: the same as Edit track (FR-5.14) — one activity, with a recorded track, not Pending. Merging: a real account, and two or more parts of one split activity that meet end to end, none of them Pending.
 
-**Inputs**: Splitting: the **Split** button on the Edit window's Track tab (FR-5.14), and its two-knob slider. Merging: `POST /v1/activities/track-merge` with the parts' ids — the API only; neither the web nor the Android app has a control for it yet (`ROADMAP.md`). The Android app's Split is `apps/android/docs/SPEC.md` FR-2.7 item 12.
+**Inputs**: Splitting: the **Split** button on the Edit window's Track tab (FR-5.14), and its two-knob slider. Merging: `POST /v1/activities/track-merge` with the parts' ids — the API only; neither the web nor the Android app has a control for it. The Android app's Split is `apps/android/docs/SPEC.md` FR-2.7 item 12.
 
 **Behavior**:
 1. Split splits at the one slider knob moved off its end; it's disabled while both knobs are at the ends, or both have moved. Hovering it previews the result: the part before the knob drawn in the editor's color, the part after it in blue, joined at the knob. The point at the knob belongs to both parts, so nothing between them goes missing. Each part needs at least two points; the button is disabled when one wouldn't have them.

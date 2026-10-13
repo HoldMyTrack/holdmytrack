@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-10-11.
+Last updated: 2026-10-13.
 
 ## How to read this document
 
@@ -28,13 +28,6 @@ The phases below sit inside three milestones (`VISION.md` §5, ADR-0031):
 
 **Shipped and deployable** — `SPEC.md` FR-1 through FR-16 describe it. What's left before the public launch:
 
-### Merge a split activity back — server built, no control yet
-
-Splitting an activity is built on the web (`SPEC.md` FR-5.17), and so is merging its parts back on the server (`POST /v1/activities/track-merge`, `IMPLEMENTATION.md` §4.7.8). Neither client offers Merge yet, so a split can't be undone from the app.
-
-- [ ] Decide where Merge lives — a toolbar action over checked neighboring parts, or a "Merge with the next part" in the Edit window — and build it on the web, from the list rows' `split` field.
-- [ ] Carry it to the Android app, next to its Split tool (`apps/android/docs/SPEC.md` FR-2.7 item 12).
-
 ### Pre-launch validation — gates any public launch (Milestone 2), regardless of which paths are live
 
 - [ ] Stand up the funding page (Open Collective, public ledger — `VISION.md` §6.1) before any public launch, not retrofitted after. The app side is built (`IMPLEMENTATION.md` §4.16), and the `holdmytrack` collective applied to Open Source Collective as fiscal host on 2026-09-24; what's left: once approved, set the slug — `services/server/internal/web/web.go`'s `OpenCollectiveSlug` — and replace the About page template's "donations are not open yet" line with a link to it.
@@ -46,27 +39,6 @@ Sign in with Facebook is built (`SPEC.md` FR-1.10) and the Meta app exists, but 
 
 - [ ] Get a business document for the "Holdmytrack" business portfolio. Meta accepts one of: an IRS 147C letter (EIN confirmation), a business bank statement, a business tax document, or a "Doing Business As" (DBA) filing. The name on it must match the portfolio's. A sole-proprietor EIN with "HoldMyTrack" as its trade name, or a county/state DBA filing, are the cheapest routes; so may be whatever legal standing the Open Collective fiscal host above gives the project. Check the legal and tax implications before filing just for this.
 - [ ] Complete Business Verification with it, connect the Meta app to the verified portfolio and publish it (`docs/DEPLOY.md` §4 step 6), then set `FACEBOOK_APP_ID`/`FACEBOOK_APP_SECRET` in the server's `.env.prod` and recreate `api`.
-
----
-
-## Phase 2 — Mobile
-
-Path 2 on-device sync and in-app GPS recording (`VISION.md` §5.3). Android and iOS are tracked separately below; iOS reuses the sync contract Android settled: the payload shape, and the list of what's on the phone that the user ticks from, with the server answering what the account already has (`SPEC.md` FR-3.6).
-
-### Android
-
-- [ ] Load the map page in a WebView on a mid-range Android phone and compare it with the native map — panning and zooming, memory, a long track's first draw — to decide whether the map stays native (ADR-0042).
-- [ ] Confirm the Samsung Health Connect route-geometry limitation empirically, not just from documentation (`VISION.md` §4.1) — Samsung's own developer docs already state `EXERCISE_ROUTE` cannot be read via Health Connect; this is double-checking in case reality is better than documented, not an open question blocking the build.
-- [x] Android app: Health Connect sync, foreground-only, end to end (`SPEC.md` FR-3.6). The app's own remaining work is in `apps/android/docs/ROADMAP.md`.
-- [x] In-app GPS recording, Android half (`SPEC.md` FR-3.8, ADR-0007).
-- [x] Photos on Android (`SPEC.md` FR-16, ADR-0024; `apps/android/docs/SPEC.md` FR-2.10).
-- [x] The map's Activities panel on Android (`apps/android/docs/SPEC.md` FR-2.7, FR-3.5, FR-4.1).
-
-### iOS
-
-- [ ] Confirm `HKWorkoutRoute` access with a throwaway iOS app (`VISION.md` §4.1) — due diligence before committing engineering effort to the full iOS build, not resolving a real unknown: Apple's docs already say this works.
-- [ ] iOS app: HealthKit sync, `HKWorkoutRoute` for full GPS geometry, on the payload and the pick-what-to-send design Android settled, with the site's own pages in a `WKWebView` for Settings, Profile, the Sync page and About (ADR-0042).
-- [ ] In-app GPS recording, iOS half — inherits the Android build's wire shape and `source` convention once the iOS app itself exists (see the iOS Path 2 item above, which this depends on).
 
 ---
 
@@ -106,11 +78,11 @@ An engineering requirement, can land alongside any of the above (`IMPLEMENTATION
 
 Gates any public launch: a precise location history is sensitive personal data under GDPR (`VISION.md` §7).
 
-- [ ] DPIA before any public launch. As part of it, re-check that the cookies and browser storage `apps/web` and the server's pages set still match `/privacy`'s Cookies list (`SPEC.md` FR-10.6), all strictly necessary or a preference set at the user's request, so the site still needs no cookie banner; anything non-essential (analytics, an ad pixel, marketing tracking) would flip that.
+- [ ] DPIA before any public launch — drafted in `docs/DPIA.md`; what's left is its section 7 pre-launch actions and the controller's sign-off.
 - [ ] EU-region hosting for EU users.
 - [x] A privacy policy page — `/privacy` (`SPEC.md` FR-10.6). It names the email delivery provider only generically; name it there once settled, and update the policy when EU-region hosting moves the data.
 - [x] Account deletion and data export — Settings' Delete account and Download your data, on the web and in the Android app (`SPEC.md` FR-1.11, FR-1.12). Named "Download your data" so it doesn't collide with the map's Export control (FR-4.10).
-- [ ] Health Connect data-type declarations in the Play Console, scoped to only what's actually used (Phase 2 builds the app; the declaration work belongs here).
+- [x] Health Connect data-type declarations in the Play Console, scoped to only what's actually used — filed 2026-10-07 (`apps/android/docs/ROADMAP.md` Phase 6).
 
 ---
 
@@ -129,5 +101,5 @@ Public pages, followers and the rest (`VISION.md` §5.7, §5.8). No steps are li
 - [ ] Check the Russian translation — run the Android app in Russian on a real device, and have a native speaker review the Russian across the web, the server's pages and emails, and the app (`IMPLEMENTATION.md` §4.21).
 - [ ] Split `apps/web/src/map/MapView.tsx` by feature when the next feature touches it, the part that feature needs first: its state rules — Story mode, the Pending poll, track editing, selection and focus — into a reducer or a few custom hooks, under `verify:map` and the unit tests.
 - [ ] Split the Android app's `MapFragment.kt` by feature when the next feature touches it, the part that feature needs first: the session and first-run check, Story mode, View on map, the notice panel, camera framing, photo markers — pure logic out first, with unit tests as `panel/PanelState` has, the UI wiring last.
-- [ ] Keep decisions in pure logic, tested as they're written: new code puts what it decides — which screen a session goes to, whether a day is in range, where a link leads — in functions that take values and return values, with no View, `Context`, map, network or timer in them, and unit-tests them in the same change; code touched for another reason gets the same. The wiring around them stays thin, covered by a few end-to-end flows instead of mocks. First in line: `WebPageActivity.route`, which takes an Android `Uri` and so has no test, though the first-run redirect bug lived in it.
 - [ ] Re-measure the funding-model assumptions (`VISION.md` §4.3, §6.3) against real usage once any real users exist, rather than assuming the estimates hold — they feed Milestone 2's exit gate.
+- [ ] The iOS app (`VISION.md` §5.3), likely after the public launch, with no date set: first confirm `HKWorkoutRoute` access with a throwaway app (`VISION.md` §4.1); then HealthKit sync, with `HKWorkoutRoute` for full GPS geometry, on the payload and the pick-what-to-send design Android settled (`SPEC.md` FR-3.6), and the site's own pages in a `WKWebView` for Settings, Profile, the Sync page and About (ADR-0042); then in-app GPS recording, on the Android build's wire shape and `source` convention (`SPEC.md` FR-3.8, ADR-0007).

@@ -53,6 +53,7 @@ holdmytrack/
 │   ├── DEVELOPMENT.md           # running it locally, verification, gotchas, commands
 │   ├── DEPLOY.md                # the production deployment runbook
 │   ├── PERFORMANCE.md           # measured performance, one entry per load test or benchmark session
+│   ├── DPIA.md                  # the data protection impact assessment
 │   └── performance/             # images those entries show
 ├── AGENTS.md                    # orientation for coding agents
 ├── brand/                       # logo.svg, the mark's master; make_icons.py renders every logo and icon from it, the README's included
@@ -95,6 +96,7 @@ This tree is the canonical one; do not let a second tree exist anywhere else to 
 | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Running it locally, the verification checklist, gotchas worth not rediscovering, and the command reference. |
 | [`docs/DEPLOY.md`](docs/DEPLOY.md) | You're standing up an actual deployment. |
 | [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | Measured performance: each load test or benchmark session, how it ran and what it found. |
+| [`docs/DPIA.md`](docs/DPIA.md) | The data protection impact assessment: the personal data processed, its legal basis, the risks to users and the measures against them. |
 | [`AGENTS.md`](AGENTS.md) | You are a coding agent opening the repo cold — this same routing table, self-contained, plus the documentation and Markdown conventions these docs follow. |
 
 ## License

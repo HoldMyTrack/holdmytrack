@@ -8,7 +8,7 @@ As stated in `apps/android/README.md`, the Android development environment is no
 
 ## Where this sits in the wider plan
 
-Read `docs/ROADMAP.md` (Phase 2 — Mobile) first; this document expands one item of it and does not override it.
+Read `docs/VISION.md` §5.3 (Phase 2 — Mobile) first; this document is the Android app's remaining work within it and does not override it.
 
 - **The toolchain is on the host, not in a container** (`apps/android/README.md`), and it is installed: the Android SDK at `/opt/homebrew/share/android-commandlinetools` with platform 37, build-tools 37 and `adb` under `platform-tools/`, alongside JDK 21, which the Android Gradle Plugin supports. `ANDROID_HOME` is not exported by default, so export it (or write `sdk.dir` into `local.properties`) before invoking `./gradlew`. There is no Android Studio, but an AVD now exists (`holdmytrack`, a Pixel 7 image on Android 16/API 36, under `emulator/`) — used to verify in-app recording (`apps/android/docs/SPEC.md` §9); FR-1 through FR-4's own verification record still names a physical device specifically, and that distinction is worth preserving rather than blurring the two.
 - **Android ships first of the two mobile apps** (`VISION.md` §5.3): it defines the payload shape `POST /v1/sync/activities` accepts and the pick-what-to-send model over `POST /v1/sync/known` (root `docs/SPEC.md` FR-3.6), and iOS inherits them.
@@ -32,7 +32,7 @@ Before implementing any UI or sync routines, we must design around two hard plat
 
 ## Phase 1: Research & Verification
 
-Framed as due diligence rather than an open blocker: root `ROADMAP.md` notes that Samsung's own developer docs already state `EXERCISE_ROUTE` is unreachable, and this is "double-checking in case reality is better than documented".
+Framed as due diligence rather than an open blocker: Samsung's own developer docs already state `EXERCISE_ROUTE` is unreachable (`docs/VISION.md` §4.1), so this is double-checking in case reality is better than documented.
 
 - [ ] **Empirical Samsung Health check** — needs a Galaxy Watch paired to Samsung Health, which the Pixel the app was verified on can't stand in for.
   - On a real Galaxy Watch paired to Samsung Health, confirm whether route geometry is genuinely unreachable via Health Connect, or whether there is any supported route we have missed (`docs/VISION.md` §4.1, Path 2). If routes turn out to be readable, Android's product improves materially and Samsung Galaxy Watch stops being unsupported.
@@ -105,7 +105,7 @@ The map screen and its menus carry the web's phone layout over, which on a phone
 Features the web has that the app doesn't yet. The server side of each is built; only the app's own part is listed.
 
 - [x] **Split an activity** (`docs/SPEC.md` FR-5.17, `docs/IMPLEMENTATION.md` §4.7.8)
-  - A Split tool in the Track tab, its two-color preview, and the confirm for a part left inside a Private location (`apps/android/docs/SPEC.md` FR-2.7 item 12). Merge waits for the web's (`docs/ROADMAP.md`). Checked on the emulator against a local stack, in English and Russian: a walk ending inside a Private location split at a point inside it, the confirm, Split anyway, and two rows, one of them Private.
+  - A Split tool in the Track tab, its two-color preview, and the confirm for a part left inside a Private location (`apps/android/docs/SPEC.md` FR-2.7 item 12). Checked on the emulator against a local stack, in English and Russian: a walk ending inside a Private location split at a point inside it, the confirm, Split anyway, and two rows, one of them Private.
 - [x] **The Private badge** (`docs/SPEC.md` FR-5.1)
   - A lock-and-"Private" badge in place of distance and duration, and its explanation on the selected activity's card in place of its stats (`apps/android/docs/SPEC.md` FR-2.7 item 2). Checked in the same run.
 
@@ -119,3 +119,8 @@ Setting a source up moves to a Settings screen of its own, Health Connect is rea
   - The sources on a screen of their own, reached from You and from the Sync tab: Health Connect with an on/off switch, off for everyone until switched on, and its permissions as one checklist; Recorded on this phone, always on. The Health Connect card leaves the Sync tab.
 - [x] **Load**
   - Health Connect read only when Load is tapped, and once by itself after it's switched on, Load and Sync side by side at the top of the Sync tab, each over its status; the list kept on the phone across restarts with when it was last checked, and a restored row's route read again when it's sent. Recordings listed straight away, as now. Checked, all three together, on a Pixel 10a against holdmytrack.com.
+
+## Ongoing
+
+- [ ] **`WebPageActivity.route` under test**
+  - It takes an Android `Uri`, so it has no unit test, though the first-run redirect bug lived in it. Move the decision into a function over plain values and test it, as `AGENTS.md`'s "Decisions in pure logic" asks of new code.
