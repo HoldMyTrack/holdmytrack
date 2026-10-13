@@ -78,7 +78,7 @@ An engineering requirement, can land alongside any of the above (`IMPLEMENTATION
 
 Gates any public launch: a precise location history is sensitive personal data under GDPR (`VISION.md` §7).
 
-- [ ] DPIA before any public launch. As part of it, re-check that the cookies and browser storage `apps/web` and the server's pages set still match `/privacy`'s Cookies list (`SPEC.md` FR-10.6), all strictly necessary or a preference set at the user's request, so the site still needs no cookie banner; anything non-essential (analytics, an ad pixel, marketing tracking) would flip that.
+- [ ] DPIA before any public launch — drafted in `docs/DPIA.md`; what's left is its section 7 pre-launch actions and the controller's sign-off.
 - [ ] EU-region hosting for EU users.
 - [x] A privacy policy page — `/privacy` (`SPEC.md` FR-10.6). It names the email delivery provider only generically; name it there once settled, and update the policy when EU-region hosting moves the data.
 - [x] Account deletion and data export — Settings' Delete account and Download your data, on the web and in the Android app (`SPEC.md` FR-1.11, FR-1.12). Named "Download your data" so it doesn't collide with the map's Export control (FR-4.10).

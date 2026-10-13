@@ -21,6 +21,7 @@ HoldMyTrack is a free, community-funded platform that keeps the outdoor journeys
 | `docs/DEVELOPMENT.md` | You need to run the stack, verify a change, or you're about to rediscover a gotcha someone already hit. |
 | `docs/DEPLOY.md` | You're standing up an actual deployment, not just reading about the deployment scaffolding's design (`IMPLEMENTATION.md` §5.8 covers that). |
 | `services/server/api/openapi.yaml` | You are changing what a JSON endpoint takes or returns. It is the API's contract, which the server's tests hold handlers to (`IMPLEMENTATION.md` §4.31); change it in the same change. |
+| `docs/DPIA.md` | You need the data protection impact assessment — what personal data is processed, on what legal basis, the risks to users and the measures against them — or you're changing what is collected, where it's stored, who processes it or how long it's kept, which means updating it in the same change. |
 | `docs/PERFORMANCE.md` | You need what HoldMyTrack's performance has been measured to be — each load test or benchmark session's date, target, method and results — or you're about to run one. A session you run gets its entry there; how the measured piece works stays in `IMPLEMENTATION.md`. |
 
 For repository layout, the root `README.md` is now the authority — it absorbed a former third planning document once that document's structure had actually been applied and its checklist finished. `services/server/README.md` covers the backend scaffold's open decisions specifically.
