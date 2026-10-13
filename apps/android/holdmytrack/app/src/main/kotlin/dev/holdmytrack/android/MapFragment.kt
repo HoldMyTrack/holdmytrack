@@ -89,7 +89,7 @@ import dev.holdmytrack.android.ui.LargeText
 import dev.holdmytrack.android.recording.RecordingState
 import dev.holdmytrack.android.recording.db.LiveRecordingJournal
 import dev.holdmytrack.android.settings.AppLanguage
-import dev.holdmytrack.android.settings.SettingsActivity
+import dev.holdmytrack.android.web.WebPageActivity
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -986,7 +986,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         // Country) goes there before the map — its Country decides the units the map's own
         // screens show, and nothing else would ever ask for it.
         if (!Session.isDemo && Session.country.isEmpty()) {
-            SettingsActivity.openOnboarding(requireContext())
+            WebPageActivity.openOnboarding(requireContext())
             requireActivity().finish()
             return
         }

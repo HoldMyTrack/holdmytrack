@@ -68,11 +68,11 @@
             </intent-filter>
         </activity>
 
-        <!-- Not exported: reached from the You tab, or as a new account's first run. -->
+        <!-- Not exported: the web's own pages shown in the app — the You tab's Settings, Activity
+             graph & trends and About, Sync history, and a new account's first run. -->
         <activity
-            android:name=".settings.SettingsActivity"
+            android:name=".web.WebPageActivity"
             android:exported="false"
-            android:label="@string/settings_title"
             android:theme="@style/Theme.HoldMyTrack" />
 
         <!-- Not exported: the You tab's Privacy, and its Download your data. -->
@@ -86,20 +86,6 @@
             android:name=".privacy.DataExportActivity"
             android:exported="false"
             android:label="@string/settings_export_title"
-            android:theme="@style/Theme.HoldMyTrack" />
-
-        <!-- Not exported: the Sync tab's Sync history, and Upload's See them in Sync history. -->
-        <activity
-            android:name=".SyncHistoryActivity"
-            android:exported="false"
-            android:label="@string/sync_history_title"
-            android:theme="@style/Theme.HoldMyTrack" />
-
-        <!-- Not exported: reached only from MainActivity's You tab, never by another app. -->
-        <activity
-            android:name=".ProfileActivity"
-            android:exported="false"
-            android:label="@string/you_graph_link"
             android:theme="@style/Theme.HoldMyTrack" />
 
         <!-- Not exported: reached only from MainActivity, never by another app. No action bar:

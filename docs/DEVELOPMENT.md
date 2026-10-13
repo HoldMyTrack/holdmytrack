@@ -56,6 +56,8 @@ Spots (`SPEC.md` FR-15) has no places until some are imported. Make a small extr
 
 Bike paths, Shared paths and Mountain bike trails (`SPEC.md` FR-4.13) draw nothing until their ways are imported the same way: `scripts/bike-paths-extract.sh <work-dir> <geofabrik-url>` (given the work-dir the Spots extract used, it reuses that download), put `bike-paths.geojsonseq` in `/tmp/bike-paths`, and run `docker compose run --rm -v /tmp/bike-paths:/data:ro api import-bike-paths /data/bike-paths.geojsonseq`. Ohio's file is about 17,200 ways, of which the import keeps about 16,300; the rest are roads with a designated bike lane or rated forest roads.
 
+The Android app shows Settings, Profile, the Sync page and About as these same pages in a WebView (`IMPLEMENTATION.md` §4.19). Against the dev stack they load, but every form on them — Settings' Save, its avatar — is refused with a `403`: a page form must come from `APP_BASE_URL`'s origin, which is Vite's `http://localhost:5173`, while an emulator reaches the API at `http://10.0.2.2:8080`. To try them, run the app against an origin that is both: `adb reverse tcp:8080 tcp:8080`, `APP_BASE_URL=http://localhost:8080` for `api`, and `holdmytrack.apiBaseUrl=http://localhost:8080` for the app.
+
 To see the admin panel (`/admin`, `IMPLEMENTATION.md` §4.20), sign up a local account and make it an admin: `docker compose run --rm api set-admin you@example.com true`.
 
 ### Dev uses the planet basemap from `tiles.holdmytrack.com`

@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -94,6 +95,9 @@ type PageData struct {
 	User          *User
 	// Lang is the language the page renders in (i18n.Resolve) — "" is English.
 	Lang string
+	// InApp is a page shown inside a native app's WebView (httpapi's appCookieName): no site
+	// header, footer or Back to map, and none of what the app has native screens for.
+	InApp bool
 	// Page holds whatever a single page needs beyond the shared fields.
 	Page any
 
@@ -118,8 +122,8 @@ type Renderer struct {
 
 	mu   sync.Mutex
 	sets map[string]*templateSet
-	// public caches RenderPublic's output — a signed-out page's bytes, by page, path and
-	// language.
+	// public caches RenderPublic's output — a signed-out page's bytes, by page, path,
+	// language and whether it's in-app.
 	public sync.Map
 }
 
@@ -332,13 +336,14 @@ func (r *Renderer) execute(w http.ResponseWriter, status int, t *template.Templa
 // RenderPublic is Render for a page with no session behind it and nothing request-specific
 // in it (About, Help, Contacts, the signed-out home page): the same bytes for every visitor
 // and every crawler in one language. So they're rendered once and kept (per page, path and
-// language; not in dev, where templates reload), and sent cacheable for five minutes.
+// language, and in-app or not; not in dev, where templates reload), and sent cacheable for
+// five minutes.
 // `Vary: Cookie` keeps a browser from reusing the signed-out copy once it holds a session
-// cookie, whose pages have a different header; `Vary: Accept-Language` keeps a shared cache
+// cookie, whose pages have a different header, or the in-app one, which has none; `Vary: Accept-Language` keeps a shared cache
 // from handing one language's copy to a browser that asked for another.
 func (r *Renderer) RenderPublic(w http.ResponseWriter, page string, data PageData) {
 	r.fill(&data)
-	key := page + "|" + data.Path + "|" + data.Lang
+	key := page + "|" + data.Path + "|" + data.Lang + "|" + strconv.FormatBool(data.InApp)
 	if cached, ok := r.public.Load(key); ok && !r.reload {
 		writePublic(w, cached.([]byte))
 		return

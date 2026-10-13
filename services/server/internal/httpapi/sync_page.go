@@ -84,7 +84,7 @@ func (s *Server) handleSyncPage(w http.ResponseWriter, r *http.Request) {
 			s.log.Error("mark imports seen failed", "err", err)
 		}
 	}
-	s.pages.Render(w, http.StatusOK, "sync", web.PageData{Title: l.T("meta.sync_title"), Path: "/sync", NoIndex: true, User: acct.user, Page: view, Lang: lang})
+	s.pages.Render(w, http.StatusOK, "sync", web.PageData{Title: l.T("meta.sync_title"), Path: "/sync", NoIndex: true, User: acct.user, Page: view, Lang: lang, InApp: inApp(r)})
 }
 
 func (s *Server) buildSync(ctx context.Context, l *i18n.Localizer, acct *pageAccount, offset int) (syncView, error) {

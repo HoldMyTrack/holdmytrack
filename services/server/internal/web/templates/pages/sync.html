@@ -1,12 +1,13 @@
 {{define "content"}}{{with .Page}}
 <main class="page-main sync">
-  <a class="settings__back" href="/">{{t "common.back_to_map"}}</a>
+  {{if not $.InApp}}<a class="settings__back" href="/">{{t "common.back_to_map"}}</a>{{end}}
 
-  <section class="sync__section" aria-labelledby="sync-history">
+  <section class="sync__section" {{if $.InApp}}aria-label="{{t "sync.title"}}"{{else}}aria-labelledby="sync-history"{{end}}>
     <div class="profile__head">
       <div>
-        <h2 class="profile__title" id="sync-history">{{t "sync.title"}}</h2>
-        <p class="profile__subtext">{{if .IsDemo}}{{t "sync.demo"}}{{else}}{{t "sync.subtext"}}{{end}}</p>
+        {{/* In an app, its own screen's title is the heading, and there is no Upload menu. */}}
+        {{if not $.InApp}}<h2 class="profile__title" id="sync-history">{{t "sync.title"}}</h2>{{end}}
+        <p class="profile__subtext">{{if .IsDemo}}{{t "sync.demo"}}{{else if $.InApp}}{{t "sync.subtext_app"}}{{else}}{{t "sync.subtext"}}{{end}}</p>
       </div>
     </div>
     {{if .Rows}}

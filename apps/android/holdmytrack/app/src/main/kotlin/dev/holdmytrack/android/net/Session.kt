@@ -2,6 +2,7 @@ package dev.holdmytrack.android.net
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.webkit.CookieManager
 
 /**
  * The credential the app holds for the API: an opaque `sessions` row id the server minted at
@@ -138,6 +139,8 @@ object Session {
     }
 
     fun clear() {
+        // The session cookie WebPageActivity gave its WebView goes with the session.
+        runCatching { CookieManager.getInstance().removeAllCookies(null) }
         cachedToken = null
         verified = false
         prefs.edit()

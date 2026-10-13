@@ -35,7 +35,7 @@ func (s *Server) publicPage(page, titleKey, descriptionKey, canonicalPath string
 		acct := s.pageAccount(r)
 		lang := pageLang(acct, r)
 		l := i18n.Get(lang)
-		data := web.PageData{Title: l.T(titleKey), Description: l.T(descriptionKey), Path: r.URL.Path, CanonicalPath: canonicalPath, NoIndex: noIndex, Lang: lang}
+		data := web.PageData{Title: l.T(titleKey), Description: l.T(descriptionKey), Path: r.URL.Path, CanonicalPath: canonicalPath, NoIndex: noIndex, Lang: lang, InApp: inApp(r)}
 		if acct != nil {
 			data.User = acct.user
 		}

@@ -22,8 +22,8 @@ import dev.holdmytrack.android.settings.AccountDeletion
 import dev.holdmytrack.android.settings.AppLanguage
 import dev.holdmytrack.android.settings.AppTheme
 import dev.holdmytrack.android.settings.ChoicePicker
-import dev.holdmytrack.android.settings.SettingsActivity
 import dev.holdmytrack.android.ui.LargeText
+import dev.holdmytrack.android.web.WebPageActivity
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Locale
@@ -31,8 +31,9 @@ import java.util.Locale
 /**
  * The bottom bar's You tab: the account — avatar, name, email, and "country · timezone · units"
  * — over its all-time numbers and the last weeks of its activity graph, one card whose halves
- * open Settings and Profile; then Privacy; this phone's Theme ([AppTheme]) and the account's
- * Language; the web's About, Help and Contacts, opened in a browser tab, with Donate where
+ * open Settings and Profile, the web's own pages shown in the app ([WebPageActivity]); then
+ * Privacy; this phone's Theme ([AppTheme]) and the account's Language; the web's About, in the
+ * app too, and its Help and Contacts, opened in a browser tab, with Donate where
  * `BuildConfig.DONATE_LINK` allows it, which the Play build doesn't; Sign out and Delete
  * account ([AccountDeletion]); and last the app's version, a line to read rather than an action.
  *
@@ -69,9 +70,9 @@ class YouFragment : Fragment(R.layout.fragment_you) {
         privacySub = findViewById(R.id.you_privacy_sub)
         languageValue = findViewById(R.id.you_language_value)
 
-        findViewById<View>(R.id.you_account).setOnClickListener { SettingsActivity.open(context) }
+        findViewById<View>(R.id.you_account).setOnClickListener { WebPageActivity.open(context, WebPageActivity.Page.SETTINGS) }
         findViewById<View>(R.id.you_stats).setOnClickListener {
-            startActivity(Intent(context, ProfileActivity::class.java))
+            WebPageActivity.open(context, WebPageActivity.Page.PROFILE)
         }
         findViewById<View>(R.id.you_sync).setOnClickListener {
             startActivity(Intent(context, SyncActivity::class.java))
@@ -87,7 +88,7 @@ class YouFragment : Fragment(R.layout.fragment_you) {
             visibility = if (BuildConfig.DONATE_LINK) View.VISIBLE else View.GONE
             setOnClickListener { openWebPage("/about#funding") }
         }
-        findViewById<View>(R.id.you_about).setOnClickListener { openWebPage("/about") }
+        findViewById<View>(R.id.you_about).setOnClickListener { WebPageActivity.open(context, WebPageActivity.Page.ABOUT) }
         findViewById<View>(R.id.you_help).setOnClickListener { openWebPage("/help") }
         findViewById<View>(R.id.you_contacts).setOnClickListener { openWebPage("/contacts") }
         findViewById<View>(R.id.you_sign_out).setOnClickListener {
