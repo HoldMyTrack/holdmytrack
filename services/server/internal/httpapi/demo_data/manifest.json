@@ -382,6 +382,19 @@
           "height": 1536
         }
       ]
+    },
+    "2026-10-11 Solowheel.gpx": {
+      "type": "Solowheel",
+      "photos": [
+        {
+          "file": "2026-10-11 Solowheel 1.webp",
+          "thumb": "2026-10-11 Solowheel 1-thumb.webp",
+          "taken_at": "2026-10-11T20:16:22Z",
+          "route_at": "2026-10-11T20:16:22Z",
+          "width": 2048,
+          "height": 1536
+        }
+      ]
     }
   },
   "stories": [
@@ -415,7 +428,8 @@
         "2026-10-04 Solowheel-2.gpx",
         "2026-10-05 Evening loop.gpx",
         "2026-10-06 Mill Creek Falls.gpx",
-        "2026-10-10 Solowheel.gpx"
+        "2026-10-10 Solowheel.gpx",
+        "2026-10-11 Solowheel.gpx"
       ]
     },
     {
