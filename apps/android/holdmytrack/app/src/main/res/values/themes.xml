@@ -327,14 +327,18 @@
     </style>
 
     <!-- ‹ › beside the date range in the Activities sheet (include_activities_sheet): a 44dp round
-         icon button on the tinted surface. -->
+         icon button on the tinted surface, a faint outline when it can't move the range. The
+         tints are state lists: a plain colour here would override Material's disabled look and
+         leave a disabled button looking pressable. -->
     <style name="Widget.HoldMyTrack.Button.SheetShift" parent="Widget.Material3.Button.IconButton.Filled.Tonal">
         <item name="android:minWidth">48dp</item>
         <item name="android:minHeight">48dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
-        <item name="backgroundTint">@color/hmt_surface_tint_strong</item>
-        <item name="iconTint">@color/hmt_ink</item>
+        <item name="backgroundTint">@color/sheet_shift_bg</item>
+        <item name="iconTint">@color/sheet_shift_icon</item>
+        <item name="strokeColor">@color/sheet_shift_stroke</item>
+        <item name="strokeWidth">1dp</item>
         <item name="iconSize">20dp</item>
     </style>
 
