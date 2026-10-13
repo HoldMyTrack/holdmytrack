@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The date range's ‹ › (Widget.HoldMyTrack.Button.SheetShift) fill: the strong tint, the plain
+     surface while the selection can't move that way — the web's .date-range-slider__page:disabled. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/hmt_surface" android:state_enabled="false" />
+    <item android:color="@color/hmt_surface_tint_strong" />
+</selector>

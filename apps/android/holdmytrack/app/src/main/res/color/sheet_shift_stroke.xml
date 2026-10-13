@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The date range's ‹ › outline: none while enabled, the faint divider tint while disabled, so
+     the plain fill still reads as a button. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/hmt_divider_tint" android:state_enabled="false" />
+    <item android:color="@android:color/transparent" />
+</selector>
