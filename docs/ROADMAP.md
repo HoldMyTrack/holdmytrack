@@ -55,6 +55,7 @@ Path 2 on-device sync and in-app GPS recording (`VISION.md` §5.3). Android and 
 
 ### Android
 
+- [ ] Load the map page in a WebView on a mid-range Android phone and compare it with the native map — panning and zooming, memory, a long track's first draw — to decide whether the map stays native (ADR-0042).
 - [ ] Confirm the Samsung Health Connect route-geometry limitation empirically, not just from documentation (`VISION.md` §4.1) — Samsung's own developer docs already state `EXERCISE_ROUTE` cannot be read via Health Connect; this is double-checking in case reality is better than documented, not an open question blocking the build.
 - [x] Android app: Health Connect sync, foreground-only, end to end (`SPEC.md` FR-3.6). The app's own remaining work is in `apps/android/docs/ROADMAP.md`.
 - [x] In-app GPS recording, Android half (`SPEC.md` FR-3.8, ADR-0007).
@@ -64,7 +65,7 @@ Path 2 on-device sync and in-app GPS recording (`VISION.md` §5.3). Android and 
 ### iOS
 
 - [ ] Confirm `HKWorkoutRoute` access with a throwaway iOS app (`VISION.md` §4.1) — due diligence before committing engineering effort to the full iOS build, not resolving a real unknown: Apple's docs already say this works.
-- [ ] iOS app: HealthKit sync, `HKWorkoutRoute` for full GPS geometry, on the payload and the pick-what-to-send design Android settled.
+- [ ] iOS app: HealthKit sync, `HKWorkoutRoute` for full GPS geometry, on the payload and the pick-what-to-send design Android settled, with the site's own pages in a `WKWebView` for Settings, Profile, the Sync page and About (ADR-0042).
 - [ ] In-app GPS recording, iOS half — inherits the Android build's wire shape and `source` convention once the iOS app itself exists (see the iOS Path 2 item above, which this depends on).
 
 ---
@@ -121,5 +122,9 @@ Public pages, followers and the rest (`VISION.md` §5.7, §5.8). No steps are li
 
 ## Ongoing, not phase-bound
 
+- [ ] Describe the rest of the `/v1` JSON endpoints in `services/server/api/openapi.yaml` (`IMPLEMENTATION.md` §4.31), a few at a time: any test that already calls one checks it from then on.
+- [ ] Decide one error shape for the JSON API — plain text from `http.Error`, or `{"error","message"}` everywhere — and describe it in the contract.
+- [ ] Generate the web client's types from the contract (`openapi-typescript`) in place of `apps/web/src/api.ts`'s hand-written `*Body` interfaces.
+- [ ] Move the Android app's `net/HoldMyTrackApi.kt` from hand-parsed `org.json` to typed data classes, checked against the contract.
 - [ ] Check the Russian translation — run the Android app in Russian on a real device, and have a native speaker review the Russian across the web, the server's pages and emails, and the app (`IMPLEMENTATION.md` §4.21).
 - [ ] Re-measure the funding-model assumptions (`VISION.md` §4.3, §6.3) against real usage once any real users exist, rather than assuming the estimates hold — they feed Milestone 2's exit gate.
