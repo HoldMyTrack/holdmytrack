@@ -27,6 +27,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0035](0035-activity-local-timezone.md) | An activity's times show, and its days group, in the timezone it was recorded in |
 | [0036](0036-send-a-copy-of-a-story.md) | A Story can be sent as a copy to another account, which accepts it into a Story and activities of its own; nothing syncs afterwards |
 | [0039](0039-the-app-is-the-gate.md) | The app is the gate: every source brings in only what the user ticks, and nothing is guessed on their behalf |
+| [0042](0042-mobile-apps-show-the-sites-pages.md) | The mobile apps are native where the platform is the point, and show the site's own pages for the rest |
 
 ## Writing a new one
 
