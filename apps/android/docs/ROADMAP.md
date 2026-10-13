@@ -119,3 +119,8 @@ Setting a source up moves to a Settings screen of its own, Health Connect is rea
   - The sources on a screen of their own, reached from You and from the Sync tab: Health Connect with an on/off switch, off for everyone until switched on, and its permissions as one checklist; Recorded on this phone, always on. The Health Connect card leaves the Sync tab.
 - [x] **Load**
   - Health Connect read only when Load is tapped, and once by itself after it's switched on, Load and Sync side by side at the top of the Sync tab, each over its status; the list kept on the phone across restarts with when it was last checked, and a restored row's route read again when it's sent. Recordings listed straight away, as now. Checked, all three together, on a Pixel 10a against holdmytrack.com.
+
+## Ongoing
+
+- [ ] **`WebPageActivity.route` under test**
+  - It takes an Android `Uri`, so it has no unit test, though the first-run redirect bug lived in it. Move the decision into a function over plain values and test it, as `AGENTS.md`'s "Decisions in pure logic" asks of new code.

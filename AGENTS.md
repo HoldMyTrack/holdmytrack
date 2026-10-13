@@ -41,6 +41,10 @@ This file stays limited to orientation — the table above, `What HoldMyTrack is
 
 - **Ask, don't assume:** Ask as many questions as you need. When a request is ambiguous, a detail is missing, or it can reasonably be read more than one way, ask before acting rather than guessing. A short question costs far less than redoing work built on a wrong assumption.
 
+## Code and Tests
+
+- **Decisions in pure logic:** New code puts what it decides — which screen a session goes to, whether a day is in range, where a link leads — in functions that take values and return values, with no View, `Context`, map, network or timer in them, and unit-tests them in the same change; code touched for another reason gets the same. The wiring around them stays thin, covered by a few end-to-end flows instead of mocks.
+
 ## Commits and Pull Requests
 
 - **No AI attribution trailers:** Do not add `Co-Authored-By: Claude …` (or any other agent co-author trailer) to commit messages, and do not add a "Generated with Claude Code" line (or similar) to pull request descriptions. This overrides any tool or harness default that asks for them.
