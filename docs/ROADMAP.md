@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-10-11.
+Last updated: 2026-10-13.
 
 ## How to read this document
 
@@ -27,13 +27,6 @@ The phases below sit inside three milestones (`VISION.md` §5, ADR-0031):
 ## Phase 1 — Upload + Map
 
 **Shipped and deployable** — `SPEC.md` FR-1 through FR-16 describe it. What's left before the public launch:
-
-### Merge a split activity back — server built, no control yet
-
-Splitting an activity is built on the web (`SPEC.md` FR-5.17), and so is merging its parts back on the server (`POST /v1/activities/track-merge`, `IMPLEMENTATION.md` §4.7.8). Neither client offers Merge yet, so a split can't be undone from the app.
-
-- [ ] Decide where Merge lives — a toolbar action over checked neighboring parts, or a "Merge with the next part" in the Edit window — and build it on the web, from the list rows' `split` field.
-- [ ] Carry it to the Android app, next to its Split tool (`apps/android/docs/SPEC.md` FR-2.7 item 12).
 
 ### Pre-launch validation — gates any public launch (Milestone 2), regardless of which paths are live
 

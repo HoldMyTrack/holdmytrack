@@ -105,7 +105,7 @@ The map screen and its menus carry the web's phone layout over, which on a phone
 Features the web has that the app doesn't yet. The server side of each is built; only the app's own part is listed.
 
 - [x] **Split an activity** (`docs/SPEC.md` FR-5.17, `docs/IMPLEMENTATION.md` §4.7.8)
-  - A Split tool in the Track tab, its two-color preview, and the confirm for a part left inside a Private location (`apps/android/docs/SPEC.md` FR-2.7 item 12). Merge waits for the web's (`docs/ROADMAP.md`). Checked on the emulator against a local stack, in English and Russian: a walk ending inside a Private location split at a point inside it, the confirm, Split anyway, and two rows, one of them Private.
+  - A Split tool in the Track tab, its two-color preview, and the confirm for a part left inside a Private location (`apps/android/docs/SPEC.md` FR-2.7 item 12). Checked on the emulator against a local stack, in English and Russian: a walk ending inside a Private location split at a point inside it, the confirm, Split anyway, and two rows, one of them Private.
 - [x] **The Private badge** (`docs/SPEC.md` FR-5.1)
   - A lock-and-"Private" badge in place of distance and duration, and its explanation on the selected activity's card in place of its stats (`apps/android/docs/SPEC.md` FR-2.7 item 2). Checked in the same run.
 
