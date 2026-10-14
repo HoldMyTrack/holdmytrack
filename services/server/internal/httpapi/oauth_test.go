@@ -18,16 +18,14 @@ func testChallenge(verifier string) string {
 func TestBeginOAuthAppChallenge(t *testing.T) {
 	challenge := testChallenge("the-verifier")
 
-	rec := httptest.NewRecorder()
-	testFacebookServer("").handleFacebookStart(rec, httptest.NewRequest("GET", "/v1/auth/facebook/start?tz=UTC&app_challenge="+challenge, nil))
+	rec := serveChecked(t, testFacebookServer("").handleFacebookStart, httptest.NewRequest("GET", "/v1/auth/facebook/start?tz=UTC&app_challenge="+challenge, nil))
 	cookies := rec.Result().Cookies()
 	if rec.Code != http.StatusFound || len(cookies) != 1 || !strings.HasSuffix(cookies[0].Value, "..UTC."+challenge) {
 		t.Fatalf("got %d, cookies %+v", rec.Code, cookies)
 	}
 
 	for _, bad := range []string{"short", strings.Repeat("a", 42) + "!", strings.Repeat("a", 44)} {
-		rec := httptest.NewRecorder()
-		testFacebookServer("").handleFacebookStart(rec, httptest.NewRequest("GET", "/v1/auth/facebook/start?app_challenge="+bad, nil))
+		rec := serveChecked(t, testFacebookServer("").handleFacebookStart, httptest.NewRequest("GET", "/v1/auth/facebook/start?app_challenge="+bad, nil))
 		if rec.Code != http.StatusBadRequest || len(rec.Result().Cookies()) != 0 {
 			t.Errorf("%q: got %d, want 400 and no cookie", bad, rec.Code)
 		}
@@ -55,8 +53,7 @@ func TestNativeCallbackFailuresReturnToApp(t *testing.T) {
 		if tc.cookie != "" {
 			req.AddCookie(&http.Cookie{Name: oauthCookieName, Value: tc.cookie})
 		}
-		rec := httptest.NewRecorder()
-		testFacebookServer(srv.URL).handleFacebookCallback(rec, req)
+		rec := serveChecked(t, testFacebookServer(srv.URL).handleFacebookCallback, req)
 		if loc := rec.Header().Get("Location"); rec.Code != http.StatusFound || loc != tc.want {
 			t.Errorf("%s: got %d %q, want %q", name, rec.Code, loc, tc.want)
 		}
@@ -71,14 +68,12 @@ func TestAuthHandoffRejectsMalformed(t *testing.T) {
 		"short verifier": `{"code":"8f14e45f-ceea-467a-9575-6f8d4a3c1b2e","verifier":"short"}`,
 		"no verifier":    `{"code":"8f14e45f-ceea-467a-9575-6f8d4a3c1b2e"}`,
 	} {
-		rec := httptest.NewRecorder()
-		testFacebookServer("").handleAuthHandoff(rec, httptest.NewRequest("POST", "/v1/auth/handoff", strings.NewReader(body)))
+		rec := serveChecked(t, testFacebookServer("").handleAuthHandoff, httptest.NewRequest("POST", "/v1/auth/handoff", strings.NewReader(body)))
 		if rec.Code != http.StatusUnauthorized {
 			t.Errorf("%s: status %d, want 401", name, rec.Code)
 		}
 	}
-	rec := httptest.NewRecorder()
-	testFacebookServer("").handleAuthHandoff(rec, httptest.NewRequest("POST", "/v1/auth/handoff", strings.NewReader("{")))
+	rec := serveChecked(t, testFacebookServer("").handleAuthHandoff, httptest.NewRequest("POST", "/v1/auth/handoff", strings.NewReader("{")))
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("bad JSON: status %d, want 400", rec.Code)
 	}

@@ -59,6 +59,24 @@ func TestContractIsValid(t *testing.T) {
 	}
 }
 
+// serveChecked runs h on req and checks the exchange against the contract, as dbTest.do does —
+// for a test that calls a handler directly, or the server without a dbTest.
+func serveChecked(t *testing.T, h http.HandlerFunc, req *http.Request) *httptest.ResponseRecorder {
+	t.Helper()
+	var body []byte
+	if req.Body != nil {
+		var err error
+		if body, err = io.ReadAll(req.Body); err != nil {
+			t.Fatalf("read request body: %v", err)
+		}
+		req.Body = io.NopCloser(bytes.NewReader(body))
+	}
+	rec := httptest.NewRecorder()
+	h(rec, req)
+	checkContract(t, req, body, rec)
+	return rec
+}
+
 // checkContract checks one exchange against the contract: the response always, the request
 // only when the server accepted it — a test sending a body the server must refuse is not a
 // contract violation.

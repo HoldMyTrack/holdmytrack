@@ -86,8 +86,7 @@ func testGoogleServer(tokenURL string) *Server {
 
 func TestGoogleStartRedirectsWithPKCE(t *testing.T) {
 	s := testGoogleServer("")
-	rec := httptest.NewRecorder()
-	s.handleGoogleStart(rec, httptest.NewRequest("GET", "/v1/auth/google/start?tz=Europe/Berlin", nil))
+	rec := serveChecked(t, s.handleGoogleStart, httptest.NewRequest("GET", "/v1/auth/google/start?tz=Europe/Berlin", nil))
 
 	if rec.Code != http.StatusFound {
 		t.Fatalf("status %d", rec.Code)
@@ -125,8 +124,7 @@ func TestGoogleCallbackRejectsStateMismatch(t *testing.T) {
 	s := testGoogleServer("")
 	req := httptest.NewRequest("GET", "/v1/auth/google/callback?state=forged&code=x", nil)
 	req.AddCookie(&http.Cookie{Name: oauthCookieName, Value: "real.verifier.UTC"})
-	rec := httptest.NewRecorder()
-	s.handleGoogleCallback(rec, req)
+	rec := serveChecked(t, s.handleGoogleCallback, req)
 	if loc := rec.Header().Get("Location"); rec.Code != http.StatusFound || loc != "https://app.example/signin?error=google" {
 		t.Fatalf("got %d %q", rec.Code, loc)
 	}

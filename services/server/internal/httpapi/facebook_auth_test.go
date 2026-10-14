@@ -57,8 +57,7 @@ func (g *fakeGraph) serve(t *testing.T) *httptest.Server {
 
 func TestFacebookStartRedirectsToDialog(t *testing.T) {
 	s := testFacebookServer("")
-	rec := httptest.NewRecorder()
-	s.handleFacebookStart(rec, httptest.NewRequest("GET", "/v1/auth/facebook/start?tz=Europe/Berlin", nil))
+	rec := serveChecked(t, s.handleFacebookStart, httptest.NewRequest("GET", "/v1/auth/facebook/start?tz=Europe/Berlin", nil))
 
 	if rec.Code != http.StatusFound {
 		t.Fatalf("status %d", rec.Code)
@@ -108,8 +107,7 @@ func TestFacebookCallbackFailures(t *testing.T) {
 		if tc.cookie != "" {
 			req.AddCookie(&http.Cookie{Name: oauthCookieName, Value: tc.cookie})
 		}
-		rec := httptest.NewRecorder()
-		testFacebookServer(srv.URL).handleFacebookCallback(rec, req)
+		rec := serveChecked(t, testFacebookServer(srv.URL).handleFacebookCallback, req)
 		if loc := rec.Header().Get("Location"); rec.Code != http.StatusFound || loc != "https://app.example/signin?error="+tc.want {
 			t.Errorf("%s: got %d %q", name, rec.Code, loc)
 		}

@@ -11,6 +11,425 @@ servers:
 security:
   - session: []
 paths:
+  /auth/signup:
+    post:
+      summary: Create a password account and sign in to it
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Credentials" }
+      responses:
+        "201": { $ref: "#/components/responses/Session" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "409": { $ref: "#/components/responses/PlainError" }
+        "429": { $ref: "#/components/responses/PlainError" }
+  /auth/login:
+    post:
+      summary: Sign in with email and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Credentials" }
+      responses:
+        "200": { $ref: "#/components/responses/Session" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/PlainError" }
+        "429": { $ref: "#/components/responses/PlainError" }
+  /auth/logout:
+    post:
+      summary: End the current session, if any, and clear its cookie
+      security: []
+      responses:
+        "204":
+          description: Signed out
+  /auth/me:
+    get:
+      summary: The signed-in account
+      security: []
+      responses:
+        "200":
+          description: The account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Account" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /auth/demo:
+    post:
+      summary: Start a session on the shared, read-only demo account
+      security: []
+      responses:
+        "201": { $ref: "#/components/responses/Session" }
+        "429": { $ref: "#/components/responses/PlainError" }
+  /auth/forgot-password:
+    post:
+      summary: Email a password reset link, if the address has an account
+      description: The same answer whether or not it has one.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string }
+      responses:
+        "200": { $ref: "#/components/responses/Message" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "429": { $ref: "#/components/responses/PlainError" }
+  /auth/reset-password:
+    post:
+      summary: Set a new password with a reset link's token, ending every other session, and sign in
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token: { type: string }
+                password: { type: string }
+      responses:
+        "200": { $ref: "#/components/responses/Session" }
+        "400": { $ref: "#/components/responses/PlainError" }
+  /auth/verify-email:
+    post:
+      summary: Verify an address with a verification link's token, and sign in
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token: { type: string }
+      responses:
+        "200": { $ref: "#/components/responses/Session" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "409": { $ref: "#/components/responses/PlainError" }
+  /auth/providers:
+    get:
+      summary: Which sign-in providers this server has configured
+      security: []
+      responses:
+        "200":
+          description: The providers
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [google, facebook]
+                additionalProperties: false
+                properties:
+                  google: { type: boolean }
+                  facebook: { type: boolean }
+                  google_client_id:
+                    type: string
+                    description: The web client id a native app asks Google for an id_token with; only when google is true.
+  /auth/google/start:
+    get:
+      summary: Start Sign in with Google in a browser
+      description: A page navigation, not a fetch.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/OAuthTZ"
+        - $ref: "#/components/parameters/OAuthAppChallenge"
+      responses:
+        "302": { $ref: "#/components/responses/Redirect" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "404": { $ref: "#/components/responses/PlainError" }
+  /auth/google/callback:
+    get:
+      summary: Where Google sends the browser back
+      description: >-
+        Redirects to the app with a session cookie, to the sign-in page with ?error=, or for a
+        round trip an app started, to holdmytrack://oauth with ?code= or ?error=.
+      security: []
+      responses:
+        "302": { $ref: "#/components/responses/Redirect" }
+        "404": { $ref: "#/components/responses/PlainError" }
+  /auth/facebook/start:
+    get:
+      summary: Start Sign in with Facebook in a browser
+      description: A page navigation, not a fetch.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/OAuthTZ"
+        - $ref: "#/components/parameters/OAuthAppChallenge"
+      responses:
+        "302": { $ref: "#/components/responses/Redirect" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "404": { $ref: "#/components/responses/PlainError" }
+  /auth/facebook/callback:
+    get:
+      summary: Where Facebook sends the browser back; redirects as Google's callback does
+      security: []
+      responses:
+        "302": { $ref: "#/components/responses/Redirect" }
+        "404": { $ref: "#/components/responses/PlainError" }
+  /auth/google/token:
+    post:
+      summary: Sign in with a Google id_token a native app got from the platform
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id_token: { type: string }
+                tz:
+                  type: string
+                  description: The device's IANA zone, for a new account.
+      responses:
+        "200": { $ref: "#/components/responses/Session" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/PlainError" }
+        "404": { $ref: "#/components/responses/PlainError" }
+  /auth/handoff:
+    post:
+      summary: Redeem the one-time code a browser-tab sign-in handed an app, with the app's PKCE verifier
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: { type: string }
+                verifier: { type: string }
+      responses:
+        "200": { $ref: "#/components/responses/Session" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/PlainError" }
+  /auth/resend-verification:
+    post:
+      summary: Email the verification link again; works before the account is verified
+      responses:
+        "200": { $ref: "#/components/responses/Message" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "429": { $ref: "#/components/responses/PlainError" }
+  /auth/email:
+    patch:
+      summary: Change the address of an account that isn't verified yet, and send it a new link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string }
+      responses:
+        "200":
+          description: The account as saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Account" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/PlainError" }
+        "429": { $ref: "#/components/responses/PlainError" }
+  /account:
+    delete:
+      summary: Delete the account and everything in it
+      description: Works before the account is verified; refused for the demo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  description: The account's address, typed again to confirm.
+      responses:
+        "204":
+          description: Deleted, and signed out
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/PlainError" }
+  /account/settings:
+    patch:
+      summary: Save the Settings page (a full replace, but locale)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name:
+                  type: string
+                  description: Trimmed; empty clears it.
+                country:
+                  type: string
+                  description: ISO 3166-1 alpha-2; required.
+                timezone:
+                  type: string
+                  description: An IANA zone; required.
+                locale:
+                  type: string
+                  nullable: true
+                  description: A supported language, or empty for automatic; missing or null keeps it.
+      responses:
+        "200":
+          description: The account as saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Account" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /account/settings/options:
+    get:
+      summary: The Settings page's choices, labelled in the request's language
+      responses:
+        "200":
+          description: The choices
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [countries, timezones, languages]
+                additionalProperties: false
+                properties:
+                  countries:
+                    type: array
+                    items: { $ref: "#/components/schemas/SettingsOption" }
+                  timezones:
+                    type: array
+                    items:
+                      type: object
+                      required: [region, label, options]
+                      additionalProperties: false
+                      properties:
+                        region: { type: string }
+                        label: { type: string }
+                        options:
+                          type: array
+                          items: { $ref: "#/components/schemas/SettingsOption" }
+                  languages:
+                    type: array
+                    items: { $ref: "#/components/schemas/SettingsOption" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+  /account/avatar:
+    get:
+      summary: The account's avatar image
+      responses:
+        "200":
+          description: The image, as the type it was sniffed as on upload
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+            image/jpeg:
+              schema: { type: string, format: binary }
+            image/webp:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+        "404": { $ref: "#/components/responses/PlainError" }
+        "503": { $ref: "#/components/responses/DailyCapacity" }
+    post:
+      summary: Set the avatar
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PNG, JPEG or WebP.
+      responses:
+        "200":
+          description: The account as saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Account" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "413": { $ref: "#/components/responses/PlainError" }
+        "415": { $ref: "#/components/responses/PlainError" }
+        "503": { $ref: "#/components/responses/PlainError" }
+    delete:
+      summary: Remove the avatar
+      responses:
+        "200":
+          description: The account as saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Account" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /account/export:
+    get:
+      summary: The latest download of the account's data, if any
+      responses:
+        "200":
+          description: Its state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExportStatus" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+    post:
+      summary: Prepare a download of the account's data
+      description: One already being prepared is answered as it stands rather than started again.
+      responses:
+        "202":
+          description: Being prepared
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExportStatus" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/PlainError" }
+        "503": { $ref: "#/components/responses/PlainError" }
+  /account/exports/{id}/parts/{n}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        # Not format: uuid — a malformed id is a 404 from the handler, not a request error.
+        schema: { type: string }
+      - name: n
+        in: path
+        required: true
+        description: The part, from 1.
+        schema: { type: string }
+    get:
+      summary: One part of a ready download, as a zip; Range requests are honoured
+      responses:
+        "200":
+          description: The part
+          content:
+            application/zip:
+              schema: { type: string, format: binary }
+        "206":
+          description: The requested range of it
+          content:
+            application/zip:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+        "404": { $ref: "#/components/responses/PlainError" }
+        "503": { $ref: "#/components/responses/DailyCapacity" }
   /activities:
     get:
       summary: The signed-in account's activities, newest first, unpaginated
@@ -931,6 +1350,16 @@ paths:
         "404": { $ref: "#/components/responses/PlainError" }
 components:
   parameters:
+    OAuthTZ:
+      name: tz
+      in: query
+      description: The browser's IANA zone, for a new account; anything invalid is ignored.
+      schema: { type: string }
+    OAuthAppChallenge:
+      name: app_challenge
+      in: query
+      description: A native app's S256 PKCE challenge; the round trip then ends in the app with a one-time code.
+      schema: { type: string }
     FilterFrom:
       name: from
       in: query
@@ -1001,6 +1430,26 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/CodedError" }
+    Session:
+      description: Signed in; the session is also set as a cookie
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/AccountWithSession" }
+    Message:
+      description: A message to show the user
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [message]
+            additionalProperties: false
+            properties:
+              message: { type: string }
+    Redirect:
+      description: A redirect
+      headers:
+        Location:
+          schema: { type: string }
     PhotoNeedsPlace:
       description: Nothing places the photo on the track; ask the user where and send route_at
       content:
@@ -1255,3 +1704,94 @@ components:
       properties:
         error: { type: string, enum: [photo_needs_place] }
         message: { type: string }
+    Credentials:
+      type: object
+      properties:
+        email: { type: string }
+        password:
+          type: string
+          description: A password shorter than the minimum or longer than the maximum is a 400.
+        timezone:
+          type: string
+          description: The browser's IANA zone, for a new account; anything invalid falls back to UTC.
+    Account:
+      type: object
+      required: [email, isDemo, email_verified, display_name, country, avatar_url, timezone, locale]
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          description: Empty for the demo.
+        isDemo: { type: boolean }
+        email_verified:
+          type: boolean
+          description: Always true for the demo.
+        display_name:
+          type: string
+          description: Empty when unset, like country and avatar_url.
+        country: { type: string }
+        avatar_url: { type: string }
+        timezone: { type: string }
+        locale:
+          type: string
+          description: Empty for automatic.
+    AccountWithSession:
+      type: object
+      required: [session_token, email, isDemo, email_verified, display_name, country, avatar_url, timezone, locale]
+      additionalProperties: false
+      description: The Account, and the session's token.
+      properties:
+        session_token:
+          type: string
+          description: The session cookie's value, for a client with no cookie jar to send as a bearer token.
+        email:
+          type: string
+          description: Empty for the demo.
+        isDemo: { type: boolean }
+        email_verified:
+          type: boolean
+          description: Always true for the demo.
+        display_name:
+          type: string
+          description: Empty when unset, like country and avatar_url.
+        country: { type: string }
+        avatar_url: { type: string }
+        timezone: { type: string }
+        locale:
+          type: string
+          description: Empty for automatic.
+    SettingsOption:
+      type: object
+      required: [value, label]
+      additionalProperties: false
+      properties:
+        value: { type: string }
+        label: { type: string }
+    ExportStatus:
+      type: object
+      required: [state]
+      additionalProperties: false
+      properties:
+        state: { type: string, enum: [none, preparing, ready, failed] }
+        id: { type: string, format: uuid }
+        requested_at: { type: string, format: date-time }
+        expires_at:
+          type: string
+          format: date-time
+          description: Only when ready, like total_size and parts.
+        total_size: { type: integer }
+        parts:
+          type: array
+          items:
+            type: object
+            required: [n, size, name, url]
+            additionalProperties: false
+            properties:
+              n: { type: integer }
+              size: { type: integer }
+              name:
+                type: string
+                description: The file it downloads as.
+              url:
+                type: string
+                description: Relative to the site.

@@ -56,8 +56,7 @@ func TestTilesPastTheMinuteLimitAreRefused(t *testing.T) {
 		req := httptest.NewRequest("GET", path, nil)
 		req.RemoteAddr = ip + ":1234"
 		req.Header.Set("Authorization", bearerPrefix+demo.session)
-		rec := httptest.NewRecorder()
-		d.srv.ServeHTTP(rec, req)
+		rec := serveChecked(t, d.srv.ServeHTTP, req)
 		return rec.Code
 	}
 	for range 2 {
@@ -175,8 +174,7 @@ func TestSignupsPastTheHourlyLimitAreRefused(t *testing.T) {
 		body := strings.NewReader(fmt.Sprintf(`{"email": %q, "password": "a long enough password"}`, email))
 		req := httptest.NewRequest("POST", "/v1/auth/signup", body)
 		req.Header.Set("Content-Type", "application/json")
-		rec := httptest.NewRecorder()
-		d.srv.ServeHTTP(rec, req)
+		rec := serveChecked(t, d.srv.ServeHTTP, req)
 		return rec.Code
 	}
 	page := func(email string) int {
@@ -184,8 +182,7 @@ func TestSignupsPastTheHourlyLimitAreRefused(t *testing.T) {
 		req := httptest.NewRequest("POST", "/signup", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Set("Origin", "https://app.example")
-		rec := httptest.NewRecorder()
-		d.srv.ServeHTTP(rec, req)
+		rec := serveChecked(t, d.srv.ServeHTTP, req)
 		return rec.Code
 	}
 	if code := signup(prefix + "1@holdmytrack.invalid"); code != http.StatusCreated {
