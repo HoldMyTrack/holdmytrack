@@ -8,7 +8,7 @@ As stated in `apps/android/README.md`, the Android development environment is no
 
 ## Where this sits in the wider plan
 
-Read `docs/VISION.md` §5.3 (Phase 2 — Mobile) first; this document is the Android app's remaining work within it and does not override it.
+Read `docs/VISION.md` §5.3 (Mobile) first; this document is the Android app's remaining work within it and does not override it.
 
 - **The toolchain is on the host, not in a container** (`apps/android/README.md`), and it is installed: the Android SDK at `/opt/homebrew/share/android-commandlinetools` with platform 37, build-tools 37 and `adb` under `platform-tools/`, alongside JDK 21, which the Android Gradle Plugin supports. `ANDROID_HOME` is not exported by default, so export it (or write `sdk.dir` into `local.properties`) before invoking `./gradlew`. There is no Android Studio, but an AVD now exists (`holdmytrack`, a Pixel 7 image on Android 16/API 36, under `emulator/`) — used to verify in-app recording (`apps/android/docs/SPEC.md` §9); FR-1 through FR-4's own verification record still names a physical device specifically, and that distinction is worth preserving rather than blurring the two.
 - **Android ships first of the two mobile apps** (`VISION.md` §5.3): it defines the payload shape `POST /v1/sync/activities` accepts and the pick-what-to-send model over `POST /v1/sync/known` (root `docs/SPEC.md` FR-3.6), and iOS inherits them.
@@ -30,16 +30,52 @@ Before implementing any UI or sync routines, we must design around two hard plat
 
 ---
 
-## Phase 1: Research & Verification
+## Milestone 1 — MVP
 
-Framed as due diligence rather than an open blocker: Samsung's own developer docs already state `EXERCISE_ROUTE` is unreachable (`docs/VISION.md` §4.1), so this is double-checking in case reality is better than documented.
+The Android app's part of root `ROADMAP.md`'s Milestone 1; what's left is the Play release.
 
-- [ ] **Empirical Samsung Health check** — needs a Galaxy Watch paired to Samsung Health, which the Pixel the app was verified on can't stand in for.
-  - On a real Galaxy Watch paired to Samsung Health, confirm whether route geometry is genuinely unreachable via Health Connect, or whether there is any supported route we have missed (`docs/VISION.md` §4.1, Path 2). If routes turn out to be readable, Android's product improves materially and Samsung Galaxy Watch stops being unsupported.
+### Phone-first redesign
 
----
+The map screen and its menus carry the web's phone layout over, which on a phone stacks the chrome in bands and hides the most-used screens behind a burger. This gives the app a layout of its own, on the same tokens, fonts and icons: a bottom navigation bar (Map, Stories, Record, Sync, You), one floating row at the map's top, a draggable sheet whose peek holds the date range, and track editing as a focused mode. The decision to make the tabs Fragments of one Activity is `apps/android/docs/ARCHITECTURE.md` §1.1. Each item below is one pull request, each working on its own.
 
-## Phase 6: Verification & Compliance (Pre-Launch)
+- [x] **The map as a Fragment**
+  - `MapFragment` holds everything the map did, hosted by `MainActivity` with no change in behavior (`apps/android/docs/IMPLEMENTATION.md` §1.2). Checked on the emulator against a local stack: sign-in, rotation in Fog, a recording surviving rotation, the notification's Stop, a row selected from the panel, the burger menu, View on map, and a day/night switch.
+- [x] **The bottom navigation bar**
+  - Map, Stories, Record (the record button, raised in the middle), Sync and You (`apps/android/docs/SPEC.md` FR-2.9); Sync is the map's sheet on its Sync tab, its reads and runs cancelled the moment it leaves the foreground or another tab hides it; the burger menu is gone, and You lists what it held until it gets its own design. Checked on the emulator against a local stack, in English and Russian: each tab, Stories marking the map's Stories tab, Back to Map, a recording started from Sync landing on Map and stopped by a hold, rotation on Sync, and Health Connect's rationale opening the Sync screen on its own.
+- [x] **The map's top chrome**
+  - One row: Normal, Fog and Heatmap with icons, and Layers over Find my location on the right; Show layers and Satellite are switches in the Layers menu; the recording's status, with Stop, takes the toggle's place while recording; a chip says what Fog and Heatmap show (`apps/android/docs/SPEC.md` FR-2.2). Checked on the emulator against a local stack, in English and Russian: the row, the Layers menu, Fog's chip, and a recording's card with Stop confirmed.
+- [x] **The sheet and the date scrubber**
+  - A draggable sheet with collapsed, half and expanded heights; its head is the range, its totals and a day scrubber whose bars are each activity day's distance, paged by holding a handle past the edge; the tab row is gone, Stories and Private locations reached from the bottom bar and the You tab (`apps/android/docs/SPEC.md` FR-2.6, FR-2.7 item 1). Checked on the emulator against a local stack: the three heights by drag, handle and Back, a bar picked, ‹ shifting the range, Stories and Private locations, and rotation in both orientations.
+- [x] **The selected activity and multi-select**
+  - A selected activity's card at the sheet's head (distance, moving time, pace or speed, the pace bands' legend, its actions), Select making the rows checkable with the toolbar as a bar over the map, Type and Distance as chips, and rows with a tile of their kind (`apps/android/docs/SPEC.md` FR-2.7 items 2–7). Checked on the emulator against a local stack: a drive's card with its speed and legend, checking rows and the bar's partial master checkbox, the Distance popup narrowing the list, and × ending selecting.
+- [x] **Track editing as a focused mode**
+  - An edit bar (Cancel, the title, Save) in the top row's place and the Edit window along the bottom, the sheet and the bottom bar away; the Track tab's four tools as large icon buttons, Undo and Reset beside RANGE; the Private location editor in the same frame (`apps/android/docs/SPEC.md` FR-2.7 items 9, 12, 13; FR-2.9). Checked on the emulator against a local stack with a real account: a walk's start chopped and saved, reprocessed to 1.0 mi with its bands redrawn, and a new private location opened and cancelled.
+- [x] **The Sync, You and Privacy screens**
+  - Sync: what's on the phone, drawn on the map, to tick and send, Health Connect, and Upload and Sync history a tap away. You: the account, all-time totals leading to Activity graph & trends, Privacy, Theme and Language, the web's pages, Sign out and Delete account. Privacy: Private locations, edited on the map, what HoldMyTrack keeps, and Download your data (`apps/android/docs/SPEC.md` FR-1.7, FR-2.9, FR-3.5). Donate stays out of the Play build. Checked on the emulator against a local stack, in dark mode: Sync signed in and as the demo account, Sync history, You's card and Language set to Русский and back, the Delete account dialog, and a private location added, reopened and deleted.
+- [x] **Polish and accessibility**
+  - Every target 48dp, the record button's raised part included; Normal, Fog and Heatmap read as radio buttons; rows that don't fit a large font size stack, and the mode toggle keeps only the active label; the sheet's head whole in landscape, the camera kept across a rotation, theme or language change, and the content inset from a side navigation bar and the camera cutout (`apps/android/docs/SPEC.md` §8). Checked on the emulator against a local stack: a `uiautomator` audit of every screen at font scales 1.0 and 2.0, light and dark, Russian, and landscape with three-button navigation. TalkBack's spoken pass on a physical device is still to do.
+
+### Web features to carry over
+
+Features the web has that the app doesn't yet. The server side of each is built; only the app's own part is listed.
+
+- [x] **Split an activity** (`docs/SPEC.md` FR-5.17, `docs/IMPLEMENTATION.md` §4.7.8)
+  - A Split tool in the Track tab, its two-color preview, and the confirm for a part left inside a Private location (`apps/android/docs/SPEC.md` FR-2.7 item 12). Checked on the emulator against a local stack, in English and Russian: a walk ending inside a Private location split at a point inside it, the confirm, Split anyway, and two rows, one of them Private.
+- [x] **The Private badge** (`docs/SPEC.md` FR-5.1)
+  - A lock-and-"Private" badge in place of distance and duration, and its explanation on the selected activity's card in place of its stats (`apps/android/docs/SPEC.md` FR-2.7 item 2). Checked in the same run.
+
+### Sync rework
+
+Setting a source up moves to a Settings screen of its own, Health Connect is read when the user asks, and the Sync tab says which waiting rows are the same journey as each other. Each item below is one pull request, each working on its own.
+
+- [x] **Similar tracks**
+  - An ⓘ on a row that covers the same time as another row or an activity the account has, opening Similar tracks: the rows, picked out on the map when tapped, and the activity, opened on the Map tab; the bar says when ticked rows are similar (`apps/android/docs/SPEC.md` FR-3.2 step 5, FR-3.4 step 2; `docs/SPEC.md` FR-3.7). The server's 80% rule ported to Kotlin and tested against the server's cases.
+- [x] **Settings › Sync**
+  - The sources on a screen of their own, reached from You and from the Sync tab: Health Connect with an on/off switch, off for everyone until switched on, and its permissions as one checklist; Recorded on this phone, always on. The Health Connect card leaves the Sync tab.
+- [x] **Load**
+  - Health Connect read only when Load is tapped, and once by itself after it's switched on, Load and Sync side by side at the top of the Sync tab, each over its status; the list kept on the phone across restarts with when it was last checked, and a restored row's route read again when it's sent. Recordings listed straight away, as now. Checked, all three together, on a Pixel 10a against holdmytrack.com.
+
+### Before launch
 
 Everything between a tested app and its Play Store listing, roughly in the order it has to happen. Requirements below were checked against Google's Play Console Help and Android developer documentation on 2026-10-02; Play's rules change, so recheck each against its current page when you reach it.
 
@@ -60,7 +96,7 @@ Everything between a tested app and its Play Store listing, roughly in the order
 - [x] **Account deletion, in the app and on the web**
   - In the app, Settings' Delete account (`apps/android/docs/SPEC.md` FR-1.5); on the web, Settings' Delete account section. The Data safety form's deletion URL is Help's `https://holdmytrack.com/help#delete-account`, which explains both and the email route for someone who can't sign in (root `docs/SPEC.md` FR-1.11).
 - [x] **Play Store Health Connect data-type declarations**
-  - The list is settled and is as short as it can be: **one data type, Exercise** (`READ_EXERCISE`), plus `READ_EXERCISE_ROUTES` and `READ_HEALTH_DATA_HISTORY`, neither of which is an additional type — routes are part of an exercise session, and history is a time window over it. Confirmed on the device: Health Connect's own permission dialog for HoldMyTrack offers exactly one toggle. No heart rate, distance, calories, sleep or weight; the product draws outdoor GPS routes, so anything else would be requesting more than it demonstrably uses, which is a known rejection cause (`docs/VISION.md` §7; root `ROADMAP.md` Phase 6).
+  - The list is settled and is as short as it can be: **one data type, Exercise** (`READ_EXERCISE`), plus `READ_EXERCISE_ROUTES` and `READ_HEALTH_DATA_HISTORY`, neither of which is an additional type — routes are part of an exercise session, and history is a time window over it. Confirmed on the device: Health Connect's own permission dialog for HoldMyTrack offers exactly one toggle. No heart rate, distance, calories, sleep or weight; the product draws outdoor GPS routes, so anything else would be requesting more than it demonstrably uses, which is a known rejection cause (`docs/VISION.md` §7; root `ROADMAP.md`, "Before launch").
   - Filed 2026-10-07 as the Health apps declaration on Play Console's App content page: Activity and fitness as the only feature, and a justification for each of the three permissions.
 - [x] **The foreground-service declaration for recording**
   - No Location permissions declaration: Play asks for one only from an app targeting Android 10 or newer that declares `ACCESS_BACKGROUND_LOCATION` (Play Console Help, "Location permissions declaration", checked 2026-10-03), and recording is foreground-only, `ACCESS_FINE_LOCATION` asked for on the record button's first tap.
@@ -75,52 +111,13 @@ Everything between a tested app and its Play Store listing, roughly in the order
 - [ ] **Testing tracks, then production**
   - Version 896 (`0.9`) is on the internal and closed testing tracks; Google sign-in against Play's key was checked on the internal track's earlier build. Next, the closed test's 12 testers opted in for 14 days on a personal account, recruited through Testers Community, and its pre-launch report read. Testers are pointed at `https://holdmytrack.com/testing`, the step-by-step test suite with its sample files (root `docs/SPEC.md` FR-10.7). Then apply for production access and release in stages.
 - [ ] **Confirm the wider launch gates are met**
-  - A Play Store release is a public launch and is gated by the same items as any other: the DPIA, EU-region hosting for EU users (root `ROADMAP.md` Phase 6), plus the rest of Milestone 2's entry gate (root `ROADMAP.md`, Milestones). These are not Android work, but shipping the app without them is not an option.
+  - A Play Store release is a public launch and is gated by the same items as any other: the DPIA, EU-region hosting for EU users, plus the rest of root `ROADMAP.md`'s "Before launch". These are not Android work, but shipping the app without them is not an option.
 
 ---
-
-## Phase 7: Phone-first redesign
-
-The map screen and its menus carry the web's phone layout over, which on a phone stacks the chrome in bands and hides the most-used screens behind a burger. This phase gives the app a layout of its own, on the same tokens, fonts and icons: a bottom navigation bar (Map, Stories, Record, Sync, You), one floating row at the map's top, a draggable sheet whose peek holds the date range, and track editing as a focused mode. The decision to make the tabs Fragments of one Activity is `apps/android/docs/ARCHITECTURE.md` §1.1. Each item below is one pull request, each working on its own.
-
-- [x] **The map as a Fragment**
-  - `MapFragment` holds everything the map did, hosted by `MainActivity` with no change in behavior (`apps/android/docs/IMPLEMENTATION.md` §1.2). Checked on the emulator against a local stack: sign-in, rotation in Fog, a recording surviving rotation, the notification's Stop, a row selected from the panel, the burger menu, View on map, and a day/night switch.
-- [x] **The bottom navigation bar**
-  - Map, Stories, Record (the record button, raised in the middle), Sync and You (`apps/android/docs/SPEC.md` FR-2.9); Sync is the map's sheet on its Sync tab, its reads and runs cancelled the moment it leaves the foreground or another tab hides it; the burger menu is gone, and You lists what it held until it gets its own design. Checked on the emulator against a local stack, in English and Russian: each tab, Stories marking the map's Stories tab, Back to Map, a recording started from Sync landing on Map and stopped by a hold, rotation on Sync, and Health Connect's rationale opening the Sync screen on its own.
-- [x] **The map's top chrome**
-  - One row: Normal, Fog and Heatmap with icons, and Layers over Find my location on the right; Show layers and Satellite are switches in the Layers menu; the recording's status, with Stop, takes the toggle's place while recording; a chip says what Fog and Heatmap show (`apps/android/docs/SPEC.md` FR-2.2). Checked on the emulator against a local stack, in English and Russian: the row, the Layers menu, Fog's chip, and a recording's card with Stop confirmed.
-- [x] **The sheet and the date scrubber**
-  - A draggable sheet with collapsed, half and expanded heights; its head is the range, its totals and a day scrubber whose bars are each activity day's distance, paged by holding a handle past the edge; the tab row is gone, Stories and Private locations reached from the bottom bar and the You tab (`apps/android/docs/SPEC.md` FR-2.6, FR-2.7 item 1). Checked on the emulator against a local stack: the three heights by drag, handle and Back, a bar picked, ‹ shifting the range, Stories and Private locations, and rotation in both orientations.
-- [x] **The selected activity and multi-select**
-  - A selected activity's card at the sheet's head (distance, moving time, pace or speed, the pace bands' legend, its actions), Select making the rows checkable with the toolbar as a bar over the map, Type and Distance as chips, and rows with a tile of their kind (`apps/android/docs/SPEC.md` FR-2.7 items 2–7). Checked on the emulator against a local stack: a drive's card with its speed and legend, checking rows and the bar's partial master checkbox, the Distance popup narrowing the list, and × ending selecting.
-- [x] **Track editing as a focused mode**
-  - An edit bar (Cancel, the title, Save) in the top row's place and the Edit window along the bottom, the sheet and the bottom bar away; the Track tab's four tools as large icon buttons, Undo and Reset beside RANGE; the Private location editor in the same frame (`apps/android/docs/SPEC.md` FR-2.7 items 9, 12, 13; FR-2.9). Checked on the emulator against a local stack with a real account: a walk's start chopped and saved, reprocessed to 1.0 mi with its bands redrawn, and a new private location opened and cancelled.
-- [x] **The Sync, You and Privacy screens**
-  - Sync: what's on the phone, drawn on the map, to tick and send, Health Connect, and Upload and Sync history a tap away. You: the account, all-time totals leading to Activity graph & trends, Privacy, Theme and Language, the web's pages, Sign out and Delete account. Privacy: Private locations, edited on the map, what HoldMyTrack keeps, and Download your data (`apps/android/docs/SPEC.md` FR-1.7, FR-2.9, FR-3.5). Donate stays out of the Play build. Checked on the emulator against a local stack, in dark mode: Sync signed in and as the demo account, Sync history, You's card and Language set to Русский and back, the Delete account dialog, and a private location added, reopened and deleted.
-- [x] **Polish and accessibility**
-  - Every target 48dp, the record button's raised part included; Normal, Fog and Heatmap read as radio buttons; rows that don't fit a large font size stack, and the mode toggle keeps only the active label; the sheet's head whole in landscape, the camera kept across a rotation, theme or language change, and the content inset from a side navigation bar and the camera cutout (`apps/android/docs/SPEC.md` §8). Checked on the emulator against a local stack: a `uiautomator` audit of every screen at font scales 1.0 and 2.0, light and dark, Russian, and landscape with three-button navigation. TalkBack's spoken pass on a physical device is still to do.
-
-## Phase 8: Web features to carry over
-
-Features the web has that the app doesn't yet. The server side of each is built; only the app's own part is listed.
-
-- [x] **Split an activity** (`docs/SPEC.md` FR-5.17, `docs/IMPLEMENTATION.md` §4.7.8)
-  - A Split tool in the Track tab, its two-color preview, and the confirm for a part left inside a Private location (`apps/android/docs/SPEC.md` FR-2.7 item 12). Checked on the emulator against a local stack, in English and Russian: a walk ending inside a Private location split at a point inside it, the confirm, Split anyway, and two rows, one of them Private.
-- [x] **The Private badge** (`docs/SPEC.md` FR-5.1)
-  - A lock-and-"Private" badge in place of distance and duration, and its explanation on the selected activity's card in place of its stats (`apps/android/docs/SPEC.md` FR-2.7 item 2). Checked in the same run.
-
-## Phase 9: Sync rework
-
-Setting a source up moves to a Settings screen of its own, Health Connect is read when the user asks, and the Sync tab says which waiting rows are the same journey as each other. Each item below is one pull request, each working on its own.
-
-- [x] **Similar tracks**
-  - An ⓘ on a row that covers the same time as another row or an activity the account has, opening Similar tracks: the rows, picked out on the map when tapped, and the activity, opened on the Map tab; the bar says when ticked rows are similar (`apps/android/docs/SPEC.md` FR-3.2 step 5, FR-3.4 step 2; `docs/SPEC.md` FR-3.7). The server's 80% rule ported to Kotlin and tested against the server's cases.
-- [x] **Settings › Sync**
-  - The sources on a screen of their own, reached from You and from the Sync tab: Health Connect with an on/off switch, off for everyone until switched on, and its permissions as one checklist; Recorded on this phone, always on. The Health Connect card leaves the Sync tab.
-- [x] **Load**
-  - Health Connect read only when Load is tapped, and once by itself after it's switched on, Load and Sync side by side at the top of the Sync tab, each over its status; the list kept on the phone across restarts with when it was last checked, and a restored row's route read again when it's sent. Recordings listed straight away, as now. Checked, all three together, on a Pixel 10a against holdmytrack.com.
 
 ## Ongoing
 
 - [ ] **`WebPageActivity.route` under test**
   - It takes an Android `Uri`, so it has no unit test, though the first-run redirect bug lived in it. Move the decision into a function over plain values and test it, as `AGENTS.md`'s "Decisions in pure logic" asks of new code.
+- [ ] **Empirical Samsung Health check** — due diligence rather than an open blocker, since Samsung's own developer docs already state `EXERCISE_ROUTE` is unreachable; needs a Galaxy Watch paired to Samsung Health, which the Pixel the app was verified on can't stand in for.
+  - On a real Galaxy Watch paired to Samsung Health, confirm whether route geometry is genuinely unreachable via Health Connect, or whether there is any supported route we have missed (`docs/VISION.md` §4.1, Path 2). If routes turn out to be readable, Android's product improves materially and Samsung Galaxy Watch stops being unsupported.

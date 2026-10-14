@@ -120,8 +120,8 @@ const activityStoriesColumn = `COALESCE((
 // treatment. No pagination: the client that used to page through this (ActivitiesPanel)
 // renders every matching row on the map and computes stats and type/distance facets across
 // all of them at once, so a partial page was never actually usable — a caller wanting page
-// 2 always had to have fetched page 1 first anyway. Phase 0/1 has one seeded user and
-// activity counts in the hundreds to low thousands at most; revisit if that stops holding.
+// 2 always had to have fetched page 1 first anyway. An account's activity count
+// is in the hundreds to low thousands; revisit if that stops holding.
 //
 // The four ST_*Min/Max calls are the row's bounding box, so a client can fly the map to an
 // activity without a follow-up request per row. They are cheaper than they look: PostGIS

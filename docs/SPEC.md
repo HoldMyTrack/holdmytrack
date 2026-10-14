@@ -5,7 +5,7 @@
 | **Version** | 1.0 |
 | **Status** | Current — describes Milestone 1 (MVP) functionality as built |
 | **Last updated** | 2026-10-03 |
-| **Related documents** | `VISION.md` (product scope, market rationale, phase roadmap — the authority on *what ships and why*); `ARCHITECTURE.md` (system-level shape, key decisions, the stack); `IMPLEMENTATION.md` (schema, each feature's own implementation — the authority on *how it's built*); `AGENTS.md` (repository orientation) |
+| **Related documents** | `VISION.md` (product scope, market rationale, milestones — the authority on *what ships and why*); `ARCHITECTURE.md` (system-level shape, key decisions, the stack); `IMPLEMENTATION.md` (schema, each feature's own implementation — the authority on *how it's built*); `AGENTS.md` (repository orientation) |
 
 ## 1. Introduction
 
@@ -496,7 +496,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Error cases**: A too-long custom activity type (over 50 characters, the column's own bound) is rejected by the sync endpoint with a clear reason rather than failing as a raw database error at insert time. So is an `external_id` that isn't 1–200 letters, digits, `.`, `_` or `-` (not starting with `.`). A row that fails to sync (network error, server rejection) is left on the device, listed and still ticked, to be sent again.
 
-**Not yet built**: a discard confirmation before Stop finalizes a save; the iOS half (`docs/ROADMAP.md`, "Ongoing, not phase-bound").
+**Not yet built**: a discard confirmation before Stop finalizes a save; the iOS half (`docs/ROADMAP.md`, "After launch").
 
 ### FR-3.9 The Sync page
 

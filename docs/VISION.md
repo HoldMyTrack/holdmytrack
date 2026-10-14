@@ -209,31 +209,31 @@ That is a genuinely small number, and it is the whole argument for this model wo
 
 The product moves through three milestones (ADR-0031):
 
-1. **MVP** — where HoldMyTrack is now. Activities, the map modes, Spots, Stories and photos, on the web and Android (Phases 0–3 below). Free for everyone, community-funded.
-2. **Release and community** (Phases 5–6). Open HoldMyTrack to the public and build a community around it: polish, fix, and shape the features around what the people using it ask for. Its other job is to find out what community funding can actually carry, and that answer is what Milestone 3 is decided from.
-3. **Social graph** (Phase 7). Public pages, followers and the rest — if at all. Whether to build it, and whether to pay for it with paid features, community funding or sponsors, is decided from Milestone 2's numbers. Staying a single-player product and never starting this milestone is one of the options.
+1. **MVP** — where HoldMyTrack is now. Activities, the map modes, Spots, Stories and photos, on the web and Android (§5.1–5.4). Free for everyone, community-funded. It ends at the public launch, which validation (§5.1) and compliance (§5.6) gate.
+2. **Release and community** (§5.5–5.6). Open HoldMyTrack to the public and build a community around it: polish, fix, and shape the features around what the people using it ask for. Its other job is to find out what community funding can actually carry, and that answer is what Milestone 3 is decided from.
+3. **Social graph** (§5.7). Public pages, followers and the rest — if at all. Whether to build it, and whether to pay for it with paid features, community funding or sponsors, is decided from Milestone 2's numbers. Staying a single-player product and never starting this milestone is one of the options.
 
-Within the milestones, phases are sequenced so the unconditional ingest path ships first and the ones that depend on other companies' permission come later. The phase numbers are the ones `docs/ROADMAP.md` uses, which carries each phase's step-by-step detail.
+Within the milestones, the unconditional ingest path ships first and the ones that depend on other companies' permission come later. `docs/ROADMAP.md` carries each milestone's step-by-step detail.
 
-### 5.1 Phase 0: Validation — *no application code*
-Settle what the plan rests on before building on it: whether the partner APIs and Samsung route access are what they appear to be (§4.1; HealthKit's is checked when the iOS app is built, §5.3), and whether "free, funded by its users" reads as credible (§8.3). The funding page stands before launch, not after — the ask is much weaker retrofitted (§6.1).
+### 5.1 Validation — *no application code*
+Settle what the plan rests on before building on it: whether Samsung route access is what it appears to be (§4.1; HealthKit's is checked when the iOS app is built, §5.3), and whether "free, funded by its users" reads as credible (§8.3). The funding page stands before launch, not after — the ask is much weaker retrofitted (§6.1).
 
-### 5.2 Phase 1: Upload + Map
+### 5.2 Upload + Map
 The product on the web, on the one ingest path that needs nobody's permission: file upload (Path 3, §4.1), the map in all its modes, the no-signup demo (§8.2), accounts, the activity graph, export, Stories and Spots (§4.2). Path 3 comes first so that the first usable version waits on no one's approval.
 
-### 5.3 Phase 2: Mobile
+### 5.3 Mobile
 Native apps for the on-device path (Path 2, §4.1) and for in-app GPS recording. Android goes first although it is the more constrained platform — foreground-only route reads, and no Samsung routes at all, which the app states plainly rather than quietly degrading — so the sync contract is designed against the harder case. iOS, on HealthKit and Apple Watch, the stronger of the two routes, inherits it, after the public launch rather than as part of the MVP. Picking what to sync belongs here too: the phone holds every walk, and only the ones the user ticks come in (ADR-0039).
 
-### 5.4 Phase 3: Finalized design + mobile browser support
+### 5.4 Finalized design + mobile browser support
 One visual language across desktop and phone browsers, then frozen: the `--fm-*` tokens, Inter and Fraunces (Source Serif 4 for Russian headings), and Lucide icons. The mobile apps inherit the freeze rather than inventing a second visual language: two clients that each chose their own would not read as one product.
 
-### 5.5 Phase 4: More sources
+### 5.5 More sources
 Path 1 connectors (§4.1), not planned: which to build, if any, is decided after launch from what the people using HoldMyTrack ask for, as part of Milestone 2's shaping the product around them. They come last among the sources anyway, being the ones that depend on other companies' permission, and the work they'd need is in `BRAINSTORM.md`. Each lists what it would bring in, and only what the user ticks comes in (ADR-0039).
 
-### 5.6 Phases 5–6: Cost control and compliance
-Gates rather than features. Cost control keeps the cost per user bounded and measured (§4.3), can land alongside any phase, and is what keeps §6's funding model honest. Compliance (§7) gates any public launch, however small.
+### 5.6 Cost control and compliance
+Gates rather than features. Cost control keeps the cost per user bounded and measured (§4.3), can land alongside any other work, and is what keeps §6's funding model honest. Compliance (§7) gates any public launch, however small.
 
-### 5.7 Phase 7: Social graph (Milestone 3, not committed)
+### 5.7 Social graph (Milestone 3, not committed)
 Public pages, followers and the rest of a social graph make up Milestone 3, and it is deliberately unscheduled. It doesn't start until Milestone 2 has shown what community funding can carry, because social features add moderation, abuse handling and safety obligations that are **staff costs, not server costs** — the one category donations scale to worst. The decision at that point is which way to pay for them — paid features, community funding or sponsors — or not to build them at all. See §5.8.
 
 ### 5.8 Why social is last, not just later

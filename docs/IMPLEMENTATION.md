@@ -1027,7 +1027,7 @@ Three paths means three different failure modes, and the mitigation is that they
 
 ### 5.7 Cost control — an engineering requirement, not an ops concern
 
-Being free means costs scale with users while donations scale with goodwill (`VISION.md` §4.3, §6.3), so the system has to bound itself; the remaining tasks are `docs/ROADMAP.md`'s Phase 5. The constraints they work within:
+Being free means costs scale with users while donations scale with goodwill (`VISION.md` §4.3, §6.3), so the system has to bound itself; the remaining tasks are under Milestone 2's Cost control in `docs/ROADMAP.md`. The constraints they work within:
 
 * **Per-point streams aren't stored.** No feature reads per-point time, elevation or distance, and ingest can derive them from the raw payload when one does. Storage still only grows, since an account keeps what it brought until its owner deletes it (`VISION.md` §4.3); the photo cap (§4.27) bounds the line that grows with use, so one account can't become a material share of the bill.
 * **Raw payloads are needed, and the most sensitive thing held (§7).** They are what a `reprivacy` job and a track edit re-parse from, since `activities` keeps only the simplified track, so they're kept as long as their activity. How long that should be is reviewed after the public launch (`docs/ROADMAP.md`'s "Ongoing"): an expired payload would leave its activity unable to be re-clipped or edited.

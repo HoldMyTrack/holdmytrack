@@ -71,7 +71,7 @@ export default defineConfig({
   },
   build: {
     // The basemap archive lives in public/ and is copied verbatim into dist/.
-    // At ~326 MB that is slow but correct for Phase 1; production moves it to
+    // At ~326 MB that is slow but correct locally; production moves it to
     // object storage (IMPLEMENTATION.md §5.4).
     chunkSizeWarningLimit: 1500,
     // No index.html: the page is the Go server's (templates/app/app.html), which loads the

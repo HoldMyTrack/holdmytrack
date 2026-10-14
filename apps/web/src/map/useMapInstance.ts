@@ -78,8 +78,8 @@ export function useMapInstance({
       zoom: initial.current.view.zoom,
       // We render our own, positioned with the rest of the UI.
       attributionControl: false,
-      // Nothing in Phase 1 benefits from a globe, and a flat map keeps the
-      // later fog raster and print export in one predictable projection.
+      // Nothing here benefits from a globe, and a flat map keeps the
+      // fog raster and print export in one predictable projection.
       maxPitch: 0,
       // The session cookie for the API's own tiles, and nothing else (requestCredentials.ts).
       transformRequest: withApiCredentials(API_BASE_URL, window.location.href),

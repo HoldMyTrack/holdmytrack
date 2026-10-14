@@ -10,7 +10,7 @@ HoldMyTrack is a free, community-funded platform that keeps the outdoor journeys
 
 | Document | Read it when |
 | :-- | :-- |
-| `docs/VISION.md` | You need product scope, market rationale, the funding model, or the milestones and phases (§5). It is the authority on *what* ships and in what order. |
+| `docs/VISION.md` | You need product scope, market rationale, the funding model, or the milestones (§5). It is the authority on *what* ships and in what order. |
 | `docs/ARCHITECTURE.md` | You need the system-level shape — key decisions, the target architecture diagram, the stack, what's deliberately deferred. Read this *before* `IMPLEMENTATION.md` for anything touching more than one feature. |
 | `docs/IMPLEMENTATION.md` | You are touching the database schema, ingest or tile workflows, or any specific feature's server-side implementation. It explains how each already-built piece works where the code can't say it for itself — flows across files, invariants, reasons, traps — one level down from `ARCHITECTURE.md`'s system-level view. |
 | `docs/SPEC.md` | You need a precise, testable statement of what the system currently does — numbered functional requirements (FR-N.M), by feature area, independent of both the business rationale and the implementation details. The authority on *observable behavior*: given these preconditions and inputs, this is what happens. |
