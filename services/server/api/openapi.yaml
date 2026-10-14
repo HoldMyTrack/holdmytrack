@@ -474,6 +474,193 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/PlainError" }
+  /photos:
+    get:
+      summary: One activity's photos, or those of every activity in a Story, in route order
+      description: Exactly one of activity and story; activity wins when both are sent.
+      parameters:
+        - name: activity
+          in: query
+          schema: { type: string }
+        - name: story
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: The photos
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [photos]
+                additionalProperties: false
+                properties:
+                  photos:
+                    type: array
+                    items: { $ref: "#/components/schemas/Photo" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+        "404": { $ref: "#/components/responses/PlainError" }
+    post:
+      summary: Add a photo to an activity, placed on its track
+      description: >-
+        The client sends a resized copy and its thumbnail, plus what it read from the original's
+        EXIF before resizing. One the server can't place is refused with 422 photo_needs_place,
+        and the client sends it again with the user's route_at.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [activity_id, file, thumb]
+              properties:
+                activity_id: { type: string }
+                file:
+                  type: string
+                  format: binary
+                  description: JPEG or WebP, at most 3 MiB and 2560 px on its long side.
+                thumb:
+                  type: string
+                  format: binary
+                  description: JPEG or WebP, at most 256 KiB and 640 px on its long side.
+                taken_at:
+                  type: string
+                  description: RFC 3339, when the file says its zone or carries a GPS time.
+                taken_local:
+                  type: string
+                  description: 2006-01-02T15:04:05, a camera clock with no zone.
+                lat: { type: number }
+                lon: { type: number }
+                route_at:
+                  type: string
+                  description: RFC 3339, where on the track the user put it.
+                caption:
+                  type: string
+                  description: Trimmed; empty means none. Longer than 500 characters is a 400.
+      responses:
+        "201":
+          description: The new photo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Photo" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/PlainError" }
+        "409":
+          description: The account has the most photos allowed, or the activity has no track to put it on
+          content:
+            text/plain:
+              schema: { type: string }
+        "413": { $ref: "#/components/responses/PlainError" }
+        "415": { $ref: "#/components/responses/PlainError" }
+        "422":
+          description: >-
+            JSON photo_needs_place when nothing places the photo on the track (ask the user where
+            and send route_at); plain text when an image is larger on a side than allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhotoNeedsPlace" }
+            text/plain:
+              schema: { type: string }
+        "503": { $ref: "#/components/responses/DailyCapacity" }
+  /photos/place:
+    post:
+      summary: Where an upload with these fields would be placed, storing nothing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                activity_id: { type: string }
+                taken_at:
+                  type: string
+                  description: RFC 3339; missing or empty when unknown.
+                taken_local:
+                  type: string
+                  description: 2006-01-02T15:04:05; missing or empty when unknown.
+                lat: { type: number, nullable: true }
+                lon: { type: number, nullable: true }
+      responses:
+        "200":
+          description: The place
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [route_at, taken_at]
+                additionalProperties: false
+                properties:
+                  route_at: { type: string, format: date-time }
+                  taken_at: { type: string, format: date-time, nullable: true }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/PlainError" }
+        "409": { $ref: "#/components/responses/PlainError" }
+        "422": { $ref: "#/components/responses/PhotoNeedsPlace" }
+  /photos/{id}:
+    parameters:
+      - $ref: "#/components/parameters/PhotoID"
+    get:
+      summary: The photo's image; it never changes under its id
+      responses:
+        "200": { $ref: "#/components/responses/PhotoImage" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+        "404": { $ref: "#/components/responses/PlainError" }
+        "503": { $ref: "#/components/responses/DailyCapacity" }
+    patch:
+      summary: Change a photo's caption or its place on the track; only the fields sent change
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                caption:
+                  type: string
+                  nullable: true
+                  description: Trimmed; null or empty clears it. Longer than 500 characters is a 400.
+                route_at:
+                  type: string
+                  format: date-time
+                  description: The photo's new moment on the track, clamped to it. Null is a 400.
+      responses:
+        "200":
+          description: The photo as saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Photo" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/PlainError" }
+        "409": { $ref: "#/components/responses/PlainError" }
+    delete:
+      summary: Remove a photo
+      responses:
+        "204":
+          description: Removed
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/PlainError" }
+  /photos/{id}/thumb:
+    parameters:
+      - $ref: "#/components/parameters/PhotoID"
+    get:
+      summary: The photo's thumbnail; it never changes under its id
+      responses:
+        "200": { $ref: "#/components/responses/PhotoImage" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+        "404": { $ref: "#/components/responses/PlainError" }
+        "503": { $ref: "#/components/responses/DailyCapacity" }
   /private-locations:
     get:
       summary: The signed-in account's Private locations, oldest first
@@ -770,6 +957,12 @@ components:
       required: true
       # Not format: uuid — a malformed id is a 404 from the handler, not a request error.
       schema: { type: string }
+    PhotoID:
+      name: id
+      in: path
+      required: true
+      # Not format: uuid — a malformed id is a 404 from the handler, not a request error.
+      schema: { type: string }
     StoryID:
       name: id
       in: path
@@ -808,6 +1001,18 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/CodedError" }
+    PhotoNeedsPlace:
+      description: Nothing places the photo on the track; ask the user where and send route_at
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/PhotoNeedsPlace" }
+    PhotoImage:
+      description: The image, as the type it was sniffed as on upload
+      content:
+        image/jpeg:
+          schema: { type: string, format: binary }
+        image/webp:
+          schema: { type: string, format: binary }
     OverLimit:
       description: The account is at its activity or storage limit
       content:
@@ -1012,3 +1217,41 @@ components:
             minItems: 2
             maxItems: 2
             items: { type: number }
+    Photo:
+      type: object
+      required: [id, activity_id, taken_at, route_at, timezone, lon, lat, caption, width, height, url, thumb_url]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        activity_id: { type: string, format: uuid }
+        taken_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the camera says it was taken; null when it didn't say.
+        route_at:
+          type: string
+          format: date-time
+          description: Its moment on the track, which places it there.
+        timezone:
+          type: string
+          description: The activity's IANA zone; a client shows the photo's times in it.
+        lon:
+          type: number
+          nullable: true
+          description: Its position on the track at route_at; null when the activity has no track.
+        lat: { type: number, nullable: true }
+        caption: { type: string, nullable: true }
+        width: { type: integer }
+        height: { type: integer }
+        url:
+          type: string
+          description: The image, a path under the API.
+        thumb_url: { type: string }
+    PhotoNeedsPlace:
+      type: object
+      required: [error, message]
+      additionalProperties: false
+      properties:
+        error: { type: string, enum: [photo_needs_place] }
+        message: { type: string }
