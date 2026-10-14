@@ -14,36 +14,32 @@ This is the master checklist from "what exists today" to "the full product `VISI
 
 Checkboxes are the source of truth for progress; re-check them against the three docs above rather than trusting this file's memory of itself if it's been a while. A step that names a file or table already assumes the reader will open the referenced §/FR for the real detail. Once every checkbox in a subsection is checked, delete the subsection rather than leave it as a completed record — its design and rationale belong in `SPEC.md`/`IMPLEMENTATION.md` by the time it ships, not here. A partially-done section stays as-is until its own last checkbox is checked.
 
-## Milestones
+## Milestone 1 — MVP (Phases 1–3)
 
-The phases below sit inside three milestones (`VISION.md` §5, ADR-0031):
+Where HoldMyTrack is now (`VISION.md` §5, ADR-0031). Phases 2 and 3 have nothing left (the iOS app comes after launch, under Ongoing); what's left of Phase 1 is below.
 
-1. **MVP** — Phases 1–3. Where HoldMyTrack is now; what's left of it is below.
-2. **Release and community** — Phases 5–6. Its entry gate is Phase 1's pre-launch validation and Phase 6's DPIA and privacy policy, which any public launch needs. Its exit gate is a measured answer to what community funding can carry: cost per active user (`IMPLEMENTATION.md` §4.32 keeps the active counts), set against monthly donations and the share of active users who give, over several months.
-3. **Social graph** — Phase 7. Decided from Milestone 2's numbers, including whether to start it at all.
-
----
-
-## Phase 1 — Upload + Map
+### Phase 1 — Upload + Map
 
 **Shipped and deployable** — `SPEC.md` FR-1 through FR-16 describe it. What's left before the public launch:
 
-### Pre-launch validation — gates any public launch (Milestone 2), regardless of which paths are live
+#### Pre-launch validation — gates any public launch, regardless of which paths are live
 
 - [ ] Stand up the funding page (Open Collective, public ledger — `VISION.md` §6.1) before any public launch, not retrofitted after. The app side is built (`IMPLEMENTATION.md` §4.16), and the `holdmytrack` collective applied to Open Source Collective as fiscal host on 2026-09-24; what's left: once approved, set the slug — `services/server/internal/web/web.go`'s `OpenCollectiveSlug` — and replace the About page template's "donations are not open yet" line with a link to it.
 - [ ] Post concept renders to r/running, r/cycling, r/Garmin, r/Strava, r/FogOfWorld (`VISION.md` §5.1, §8.1) — validate "free, funded by its users" as credible before the public launch.
 
 ---
 
-## Phase 5 — Cost control
+## Milestone 2 — Release and community (Phases 5–6)
 
-An engineering requirement, can land alongside any of the above (`IMPLEMENTATION.md` §5.7).
+Its entry gate is Phase 1's pre-launch validation and Phase 6's DPIA and privacy policy, which any public launch needs. Its exit gate is a measured answer to what community funding can carry: cost per active user (`IMPLEMENTATION.md` §4.32 keeps the active counts), set against monthly donations and the share of active users who give, over several months.
+
+### Phase 5 — Cost control
+
+An engineering requirement, can land alongside any other work (`IMPLEMENTATION.md` §5.7).
 
 - [ ] Serve the basemap as `/{z}/{x}/{y}` tiles Cloudflare can cache, `pmtiles serve` on the droplet first: today every range read into the archive reaches R2, since the free plan caches files only up to 512 MB (`IMPLEMENTATION.md` §5.4). Worth it once traffic grows; the zone saw about 97,000 basemap requests in the 30 days to 2026-10-14, under 1% of R2's free reads. The web style (`apps/web/src/map/style.ts`) and the style the server builds for Android (`mapstyle.go`) move from `pmtiles://` to the tile URL.
 
----
-
-## Phase 6 — Compliance
+### Phase 6 — Compliance
 
 Gates any public launch: a precise location history is sensitive personal data under GDPR (`VISION.md` §7).
 
@@ -55,7 +51,7 @@ Gates any public launch: a precise location history is sensitive personal data u
 
 ---
 
-## Phase 7 — Social graph (Milestone 3, deliberately not committed)
+## Milestone 3 — Social graph (Phase 7, deliberately not committed)
 
 Public pages, followers and the rest (`VISION.md` §5.7, §5.8). No steps are listed on purpose: the first step is the Milestone 3 decision, made from Milestone 2's numbers, and not building it is one of its outcomes.
 
