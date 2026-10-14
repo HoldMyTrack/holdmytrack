@@ -1,5 +1,6 @@
 import { t } from './i18n';
 import { parseErrorBody } from './apiError';
+import type { components, paths } from './apiSchema';
 import type { SpotCategory, SpotInArea } from './map/spots';
 
 /**
@@ -18,6 +19,21 @@ export const API_BASE_URL: string =
  */
 export const API_V1 = '/v1';
 export const TILES_V1 = '/tiles/v1';
+
+/** A shape the API contract (services/server/api/) names, as `apiSchema.ts` generates it from the
+ *  contract (`npm run gen:api-types`). */
+type Schema<N extends keyof components['schemas']> = components['schemas'][N];
+
+/** The JSON a `/v1` operation answers `status` with, as the contract states it — what a response
+ *  body is read as, in place of a hand-written copy of its shape. */
+type ResponseJson<P extends keyof paths, M extends 'get' | 'post' | 'patch' | 'delete', S extends number = 200> =
+  NonNullable<paths[P][M]> extends { responses: infer R }
+    ? S extends keyof R
+      ? R[S] extends { content: { 'application/json': infer B } }
+        ? B
+        : never
+      : never
+    : never;
 
 /** An error response's message, worth putting in front of a person (`parseErrorBody`), for the
  *  `fetch`-based functions below, which all throw through this rather than reading `res.text()`
@@ -73,17 +89,7 @@ export interface DemoUser extends UserProfile {}
 /** What `getCurrentUser` can resolve to: a signed-in account or the demo. */
 export type SessionUser = AuthUser | DemoUser;
 
-interface AuthResponseBody {
-  email: string;
-  isDemo: boolean;
-  email_verified: boolean;
-  display_name: string;
-  country: string;
-  avatar_url: string;
-  timezone: string;
-}
-
-function toProfile(body: AuthResponseBody): UserProfile {
+function toProfile(body: Schema<'Account'>): UserProfile {
   return {
     displayName: body.display_name,
     country: body.country,
@@ -92,11 +98,11 @@ function toProfile(body: AuthResponseBody): UserProfile {
   };
 }
 
-function toAuthUser(body: AuthResponseBody): AuthUser {
+function toAuthUser(body: Schema<'Account'>): AuthUser {
   return { email: body.email, emailVerified: body.email_verified, ...toProfile(body) };
 }
 
-function toSessionUser(body: AuthResponseBody): SessionUser {
+function toSessionUser(body: Schema<'Account'>): SessionUser {
   return body.isDemo ? toProfile(body) : toAuthUser(body);
 }
 
@@ -109,7 +115,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
-  const body = (await res.json()) as AuthResponseBody;
+  const body = (await res.json()) as ResponseJson<'/auth/me', 'get'>;
   return toSessionUser(body);
 }
 
@@ -161,26 +167,6 @@ export interface ActivityQuery {
   story?: string;
 }
 
-interface ActivityRowBody {
-  id: string;
-  started_at: string;
-  timezone: string;
-  activity_type: string;
-  name: string | null;
-  distance_meters: number | null;
-  duration_seconds: number | null;
-  description: string | null;
-  bbox: number[] | null;
-  pending: boolean;
-  edited: boolean;
-  private: boolean;
-  stories: { id: string; name: string }[];
-}
-
-interface ActivitiesBody {
-  activities: ActivityRowBody[];
-}
-
 function activityQueryString(query: ActivityQuery): string {
   const params = new URLSearchParams();
   if (query.from) params.set('from', query.from);
@@ -193,7 +179,7 @@ function activityQueryString(query: ActivityQuery): string {
 
 /** Shared by listActivities and updateActivity below — both endpoints return the same row
  *  shape (activityByIDQuery/listActivitiesQuery share one Scan in the backend too). */
-function toActivity(a: ActivityRowBody): Activity {
+function toActivity(a: Schema<'ActivityRow'>): Activity {
   return {
     id: a.id,
     startedAt: a.started_at,
@@ -203,11 +189,11 @@ function toActivity(a: ActivityRowBody): Activity {
     distanceMeters: a.distance_meters,
     durationSeconds: a.duration_seconds,
     description: a.description,
-    bbox: a.bbox && a.bbox.length === 4 ? ([...a.bbox] as BBox) : null,
+    bbox: a.bbox ? [...a.bbox] : null,
     pending: a.pending,
     edited: a.edited,
-    private: a.private ?? false,
-    stories: a.stories ?? [],
+    private: a.private,
+    stories: a.stories,
   };
 }
 
@@ -226,7 +212,7 @@ export async function listActivities(query: ActivityQuery = {}, signal?: AbortSi
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
-  const body = (await res.json()) as ActivitiesBody;
+  const body = (await res.json()) as ResponseJson<'/activities', 'get'>;
   return body.activities.map(toActivity);
 }
 
@@ -251,7 +237,7 @@ export async function updateActivity(
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
-  const body = (await res.json()) as ActivityRowBody;
+  const body = (await res.json()) as ResponseJson<'/activities/{id}', 'patch'>;
   return toActivity(body);
 }
 
@@ -296,14 +282,6 @@ export interface ActivityDayPage {
   earliest: string | null;
 }
 
-interface HistogramBody {
-  bucket: string;
-  from: string;
-  to: string;
-  buckets: { date: string; count: number; distance_meters: number }[];
-  earliest?: string;
-}
-
 export interface DayPageQuery {
   /** How many days-with-activity to return. */
   limit: number;
@@ -331,7 +309,7 @@ export async function getActivityDayPage(query: DayPageQuery, signal?: AbortSign
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
-  const body = (await res.json()) as HistogramBody;
+  const body = (await res.json()) as ResponseJson<'/activities/histogram', 'get'>;
   return {
     bucket: body.bucket,
     from: body.from,
@@ -354,18 +332,6 @@ export interface ActivityTrackMetrics {
   points: TrackMetricPoint[];
 }
 
-interface TrackMetricPointBody {
-  lon: number;
-  lat: number;
-  speed_mps: number;
-  time_s: number;
-}
-
-interface ActivityTrackMetricsBody {
-  activity_id: string;
-  points: TrackMetricPointBody[];
-}
-
 /**
  * `GET /v1/activities/track-metrics/{id}` — per-simplified-vertex speed for one activity's own
  * track, matching the exact vertex sequence its display trajectory already renders. Backs
@@ -383,7 +349,7 @@ export async function getActivityTrackMetrics(
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
-  const body = (await res.json()) as ActivityTrackMetricsBody;
+  const body = (await res.json()) as ResponseJson<'/activities/track-metrics/{id}', 'get'>;
   return {
     activityId: body.activity_id,
     points: body.points.map((p) => ({ lon: p.lon, lat: p.lat, speedMps: p.speed_mps, timeS: p.time_s })),
@@ -396,12 +362,7 @@ export async function getActivityTrackMetrics(
  * outside every `remove` range (inclusive), and not in `drop`; a survivor whose timestamp is a
  * key of `move` is drawn at that [lon, lat] instead. Mirrors `ingest.TrackEdit`.
  */
-export interface TrackEdit {
-  keep?: [number, number];
-  remove?: [number, number][];
-  drop?: number[];
-  move?: Record<string, [number, number]>;
-}
+export type TrackEdit = Schema<'TrackEdit'>;
 
 /** One recorded point: [lon, lat, unix ms]. */
 export type TrackPoint = [number, number, number];
@@ -422,7 +383,7 @@ export async function getActivityTrackPoints(activityId: string, signal?: AbortS
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
-  return (await res.json()) as ActivityTrackPoints;
+  return (await res.json()) as ResponseJson<'/activities/track-points/{id}', 'get'>;
 }
 
 /** A split would leave one part entirely inside a Private location (`split_hides_part`,
@@ -470,15 +431,7 @@ export interface PrivateLocation {
 /** What POST and PATCH send — the whole circle, never a partial update. */
 export type PrivateLocationInput = Omit<PrivateLocation, 'id'>;
 
-interface PrivateLocationBody {
-  id: string;
-  name: string;
-  lon: number;
-  lat: number;
-  radius_m: number;
-}
-
-function toPrivateLocation(body: PrivateLocationBody): PrivateLocation {
+function toPrivateLocation(body: Schema<'PrivateLocation'>): PrivateLocation {
   return { id: body.id, name: body.name, lon: body.lon, lat: body.lat, radiusM: body.radius_m };
 }
 
@@ -493,7 +446,7 @@ export async function listPrivateLocations(signal?: AbortSignal): Promise<Privat
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
-  return ((await res.json()) as PrivateLocationBody[]).map(toPrivateLocation);
+  return ((await res.json()) as ResponseJson<'/private-locations', 'get'>).map(toPrivateLocation);
 }
 
 /**
@@ -511,7 +464,7 @@ export async function savePrivateLocation(input: PrivateLocationInput, id?: stri
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
-  return toPrivateLocation((await res.json()) as PrivateLocationBody);
+  return toPrivateLocation((await res.json()) as Schema<'PrivateLocation'>);
 }
 
 export async function deletePrivateLocation(id: string): Promise<void> {
@@ -543,23 +496,7 @@ export interface Story {
   stats: StoryTotals & { byType: (StoryTotals & { activityType: string })[] };
 }
 
-interface StoryTotalsBody {
-  count: number;
-  distance_meters: number;
-  moving_seconds: number;
-  elapsed_seconds: number;
-}
-
-interface StoryBody {
-  id: string;
-  name: string;
-  description: string | null;
-  from: string | null;
-  activity_ids: string[];
-  stats: StoryTotalsBody & { by_type: (StoryTotalsBody & { activity_type: string })[] };
-}
-
-function toStoryTotals(body: StoryTotalsBody): StoryTotals {
+function toStoryTotals(body: Omit<Schema<'Story'>['stats'], 'by_type'>): StoryTotals {
   return {
     count: body.count,
     distanceMeters: body.distance_meters,
@@ -568,7 +505,7 @@ function toStoryTotals(body: StoryTotalsBody): StoryTotals {
   };
 }
 
-function toStory(body: StoryBody): Story {
+function toStory(body: Schema<'Story'>): Story {
   return {
     id: body.id,
     name: body.name,
@@ -601,7 +538,7 @@ export async function getStory(id: string, signal?: AbortSignal): Promise<Story>
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
-  return toStory((await res.json()) as StoryBody);
+  return toStory((await res.json()) as Schema<'Story'>);
 }
 
 /** `PATCH /v1/stories/{id}` — name and description, both every time. */
@@ -615,7 +552,7 @@ export async function updateStory(id: string, input: { name: string; description
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
-  return toStory((await res.json()) as StoryBody);
+  return toStory((await res.json()) as Schema<'Story'>);
 }
 
 /** `GET /v1/stories` — every Story of the account, newest first. */
@@ -627,7 +564,7 @@ export async function listStories(signal?: AbortSignal): Promise<Story[]> {
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
-  return ((await res.json()) as { stories: StoryBody[] }).stories.map(toStory);
+  return ((await res.json()) as ResponseJson<'/stories', 'get'>).stories.map(toStory);
 }
 
 /** `DELETE /v1/stories/{id}` — the Story only; its activities stay. */
@@ -652,7 +589,7 @@ export async function addStoryActivities(id: string, activityIds: string[]): Pro
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
-  return toStory((await res.json()) as StoryBody);
+  return toStory((await res.json()) as Schema<'Story'>);
 }
 
 /** `DELETE /v1/stories/{id}/activities` — takes them out of the Story; the activities stay. */
@@ -666,7 +603,7 @@ export async function removeStoryActivities(id: string, activityIds: string[]): 
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
-  return toStory((await res.json()) as StoryBody);
+  return toStory((await res.json()) as Schema<'Story'>);
 }
 
 /** `POST /v1/stories/{id}/send` — a copy of the Story to `email` (FR-14.7). Succeeds whether or
@@ -713,10 +650,7 @@ export async function listStorySends(signal?: AbortSignal): Promise<StoryInbox> 
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
-  const body = (await res.json()) as {
-    sends: { id: string; story_name: string; from: string; activity_count: number }[];
-    copying: { story_name: string; from: string }[];
-  };
+  const body = (await res.json()) as ResponseJson<'/story-sends', 'get'>;
   return {
     sends: body.sends.map((s) => ({ id: s.id, storyName: s.story_name, from: s.from, activityCount: s.activity_count })),
     copying: body.copying.map((c) => ({ storyName: c.story_name, from: c.from })),
@@ -745,7 +679,7 @@ export async function createStory(input: { name: string; description: string; ac
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
-  return toStory((await res.json()) as StoryBody);
+  return toStory((await res.json()) as Schema<'Story'>);
 }
 
 /**
@@ -754,15 +688,7 @@ export async function createStory(input: { name: string; description: string; ac
  * upload or delete by `useCoverageRefresh.ts`, which refetches both layers once this reports
  * nothing left.
  */
-export interface CoverageStatus {
-  rendering: boolean;
-  /** The account's map version — changes whenever any of its map tiles may have, mid-job
-   *  too, e.g. when a Pending activity drops out of coverage. */
-  version: number;
-  /** `version` as the opaque key tile URLs carry as `cv`, so the browser can keep each tile
-   *  (coverageVersion.ts). */
-  tile_version: string;
-}
+export type CoverageStatus = ResponseJson<'/coverage/status', 'get'>;
 
 export async function getCoverageStatus(signal?: AbortSignal): Promise<CoverageStatus> {
   const res = await fetch(`${API_BASE_URL}${API_V1}/coverage/status`, {
@@ -772,7 +698,7 @@ export async function getCoverageStatus(signal?: AbortSignal): Promise<CoverageS
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
-  return (await res.json()) as CoverageStatus;
+  return (await res.json()) as ResponseJson<'/coverage/status', 'get'>;
 }
 
 /** `GET /v1/spots` — "Show in this area" (FR-15.5): the places in a box, in the chosen
@@ -796,14 +722,11 @@ export async function getSpotsInArea(
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
-  return (await res.json()) as SpotsInArea;
+  return (await res.json()) as ResponseJson<'/spots', 'get'>;
 }
 
 /** One place the account has captured with the Android app (FR-15.6). */
-export interface SpotCapture {
-  spot_id: number;
-  captured_at: string;
-}
+export type SpotCapture = Schema<'SpotCapture'>;
 
 /** `GET /v1/spots/captures` — the account's captured places, newest first; with [since] (a
  *  `captured_at` as the server wrote it), only those captured at or after it. */
@@ -816,7 +739,7 @@ export async function getSpotCaptures(signal?: AbortSignal, since?: string): Pro
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
-  return ((await res.json()) as { captures: SpotCapture[] }).captures;
+  return ((await res.json()) as ResponseJson<'/spots/captures', 'get'>).captures;
 }
 
 /** One photo on an activity (FR-16), always with a place on its track (`routeAt`, a moment on
@@ -838,22 +761,7 @@ export interface Photo {
   thumbUrl: string;
 }
 
-interface PhotoBody {
-  id: string;
-  activity_id: string;
-  taken_at: string | null;
-  route_at: string;
-  timezone: string;
-  lon: number | null;
-  lat: number | null;
-  caption: string | null;
-  width: number;
-  height: number;
-  url: string;
-  thumb_url: string;
-}
-
-function toPhoto(b: PhotoBody): Photo {
+function toPhoto(b: Schema<'Photo'>): Photo {
   return {
     id: b.id,
     activityId: b.activity_id,
@@ -881,7 +789,7 @@ export async function listPhotos(of: { activity: string } | { story: string }, s
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
-  return ((await res.json()) as { photos: PhotoBody[] }).photos.map(toPhoto);
+  return ((await res.json()) as ResponseJson<'/photos', 'get'>).photos.map(toPhoto);
 }
 
 /** The server couldn't tell where on the track a photo was taken (`photo_needs_place`, FR-16.1):
@@ -911,7 +819,7 @@ export async function checkPhotoPlace(activityId: string, exif: PhotoExifFields)
     if (code === 'photo_needs_place') throw new PhotoNeedsPlaceError(message);
     throw new Error(message);
   }
-  return { routeAt: ((await res.json()) as { route_at: string }).route_at };
+  return { routeAt: ((await res.json()) as ResponseJson<'/photos/place', 'post'>).route_at };
 }
 
 /** `POST /v1/photos` — a photo already resized by `photoPrep.ts`, with what its EXIF said, where
@@ -943,7 +851,7 @@ export async function uploadPhoto(
     if (code === 'photo_needs_place') throw new PhotoNeedsPlaceError(message);
     throw new Error(message);
   }
-  return toPhoto((await res.json()) as PhotoBody);
+  return toPhoto((await res.json()) as Schema<'Photo'>);
 }
 
 /** `PATCH /v1/photos/{id}` — a field present changes. `routeAt` (RFC 3339) is the photo's new
@@ -958,7 +866,7 @@ export async function updatePhoto(id: string, change: { caption?: string | undef
   if (!res.ok) {
     throw new Error(await errorMessageFromResponse(res, t('common.request_failed', { status: res.status })));
   }
-  return toPhoto((await res.json()) as PhotoBody);
+  return toPhoto((await res.json()) as Schema<'Photo'>);
 }
 
 /** `DELETE /v1/photos/{id}`. */
