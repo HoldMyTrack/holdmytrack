@@ -4,9 +4,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -56,6 +61,70 @@ func loadContract() (routers.Router, error) {
 func TestContractIsValid(t *testing.T) {
 	if _, err := loadContract(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestContractCoversEveryRoute fails when a /v1 route the server registers isn't in
+// api/openapi.yaml, or the file describes one it doesn't register: an undescribed route would
+// otherwise go unchecked without anyone noticing. The routes are read from the package's
+// source, every route(method, path) call, so each needs literal arguments.
+func TestContractCoversEveryRoute(t *testing.T) {
+	registered := map[string]bool{}
+	fset := token.NewFileSet()
+	pkgs, err := parser.ParseDir(fset, ".", func(fi fs.FileInfo) bool {
+		return !strings.HasSuffix(fi.Name(), "_test.go")
+	}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, pkg := range pkgs {
+		for _, file := range pkg.Files {
+			ast.Inspect(file, func(n ast.Node) bool {
+				call, ok := n.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				if fn, ok := call.Fun.(*ast.Ident); !ok || fn.Name != "route" || len(call.Args) != 2 {
+					return true
+				}
+				var args [2]string
+				for i, arg := range call.Args {
+					lit, ok := arg.(*ast.BasicLit)
+					if !ok || lit.Kind != token.STRING {
+						t.Errorf("%s: route needs literal arguments to be checked against the contract", fset.Position(call.Pos()))
+						return true
+					}
+					args[i], _ = strconv.Unquote(lit.Value)
+				}
+				registered[args[0]+" "+args[1]] = true
+				return true
+			})
+		}
+	}
+	if len(registered) == 0 {
+		t.Fatal("found no route calls")
+	}
+
+	doc, err := openapi3.NewLoader().LoadFromFile(contractPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	described := map[string]bool{}
+	for path, item := range doc.Paths.Map() {
+		for method := range item.Operations() {
+			described[method+" "+path] = true
+		}
+	}
+
+	for r := range registered {
+		if !described[r] {
+			t.Errorf("%s %s is registered but not described in %s", strings.Fields(r)[0], apiPrefix+strings.Fields(r)[1], contractPath)
+		}
+	}
+	for d := range described {
+		if !registered[d] {
+			t.Errorf("%s %s is described in %s but not registered", strings.Fields(d)[0], apiPrefix+strings.Fields(d)[1], contractPath)
+		}
 	}
 }
 
