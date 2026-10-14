@@ -63,6 +63,17 @@ Moving to a newer build repeats steps 3–5 under a new prefix. The old prefix s
 
 A deployment without R2 can serve the archive same-origin instead: leave `VITE_BASEMAP_ORIGIN` empty and uncomment `compose.prod.yml`'s `web` volume line, pointing it at the archive on the host. That needs the whole archive on the VPS's own disk.
 
+**Protect it at the edge.** Anyone who can read the archive can run up its request bill, and the app never sees those requests, so the limits live on the domain's zone, under **Domains → <your-domain> → Security → Security rules** (the zone's own rules on the free plan, not the account-level WAF, which is an Enterprise add-on):
+
+1. A **custom rule** that refuses every caller but the site and the apps. Name it, choose **Edit expression**, paste the rule below, set the action to **Block**, place it first and deploy. A request with no `Origin` is refused too: browsers send one on every basemap request, being cross-origin, and so does the Android app (`OriginInterceptor`, `apps/android/docs/IMPLEMENTATION.md`), so a missing one is a script or a pasted URL. Leave out `http://localhost:5173` if local dev shouldn't read this archive.
+   ```
+   (http.host eq "tiles.<your-domain>" and not any(http.request.headers["origin"][*] in {"https://<your-domain>" "http://localhost:5173"}))
+   ```
+2. A **rate limiting rule** on `(http.request.uri.path contains "/basemap/")`, counted per IP: 300 requests per 10 seconds, then **Block** for 10 seconds. The free plan's one rate limiting rule can match only a path, which is enough because `tiles.<your-domain>` is the only host on the zone proxied through Cloudflare. The ceiling is far above one person panning, or a household behind one address; it stops a script's bursts, not a steady trickle.
+3. **Budget alerts** under **Manage account → Billing → Billable Usage** (or **Notifications → Add → Budget Alert**), say at $5 and $20 for the month. They only send an email: nothing caps R2 spend.
+
+The response header rule's `*` (step 2 above) can stay: every other origin is refused before it gets a response. Check it from any machine with `curl -s -o /dev/null -w '%{http_code}\n' -H 'Range: bytes=0-126' https://tiles.<your-domain>/<YYYYMMDD>/basemap/basemap.pmtiles`, which should print `403`, then again with `-H 'Origin: https://<your-domain>'`, which should print `206`.
+
 **Satellite imagery (optional).** Leave `VITE_SATELLITE_TILES` empty to run without it; the map then has no Satellite choice (`docs/SPEC.md` FR-4.14). holdmytrack.com uses MapTiler Satellite on MapTiler's Free plan: 100k tile requests a month, non-commercial, and past that the imagery pauses until the next month instead of billing (`IMPLEMENTATION.md` §4.26). To turn it on:
 
 1. Create a MapTiler Cloud account (cloud.maptiler.com) on the Free plan, with no payment method, so nothing can be billed.
@@ -446,4 +457,4 @@ The two backup alerts read the files the scripts write after a successful run (�
 
 ## What this doesn't cover
 
-Per `docs/ROADMAP.md`, still open beyond this minimal setup: per-user quotas and rate limits with a spend cap (Phase 5), and the compliance work (DPIA, EU-region hosting — Phase 6) a genuine public launch needs regardless of how small the deployment is. This document gets you to "it's live," not to "it's ready for the public."
+Per `docs/ROADMAP.md`, still open beyond this minimal setup: per-user quotas, the app's own rate limits and an R2 budget (Phase 5), and the compliance work (DPIA, EU-region hosting — Phase 6) a genuine public launch needs regardless of how small the deployment is. This document gets you to "it's live," not to "it's ready for the public."
