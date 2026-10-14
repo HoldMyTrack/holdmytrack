@@ -56,7 +56,7 @@ uploads:
                       timezone: { type: string }
                       distance_meters: { type: number }
                       activity_id: { type: string, format: uuid }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/NotVerified" }
 uploads_active:

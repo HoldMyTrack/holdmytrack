@@ -19,7 +19,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	_ "golang.org/x/image/webp" // image.DecodeConfig for an uploaded WebP
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 )
 
@@ -166,7 +165,7 @@ func (s *Server) handleListPhotos(w http.ResponseWriter, r *http.Request) {
 		id, owns = q.Get("story"), s.ownsStory
 		where = `p.activity_id IN (SELECT activity_id FROM story_activities WHERE story_id = $2)`
 	default:
-		http.Error(w, `missing "activity" or "story"`, http.StatusBadRequest)
+		writeAPIError(w, `missing "activity" or "story"`, http.StatusBadRequest)
 		return
 	}
 	if ok, err := owns(ctx, userID, id); err != nil {
@@ -174,10 +173,10 @@ func (s *Server) handleListPhotos(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.log.Error("photo list: owner lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	} else if !ok {
-		http.Error(w, "not found", http.StatusNotFound)
+		writeAPIError(w, "not found", http.StatusNotFound)
 		return
 	}
 	photos, err := s.loadPhotos(ctx, where, userID, id)
@@ -186,7 +185,7 @@ func (s *Server) handleListPhotos(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.log.Error("photo list failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
@@ -272,17 +271,17 @@ func (s *Server) handleUploadPhoto(w http.ResponseWriter, r *http.Request) {
 	activityID := r.FormValue("activity_id")
 	if ok, err := s.ownsActivity(ctx, userID, activityID); err != nil {
 		s.log.Error("photo upload: activity lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	} else if !ok {
-		http.Error(w, "activity not found", http.StatusNotFound)
+		writeAPIError(w, "activity not found", http.StatusNotFound)
 		return
 	}
 
 	var count int
 	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM activity_photos WHERE user_id = $1`, userID).Scan(&count); err != nil {
 		s.log.Error("photo upload: count failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if count >= maxPhotosPerAccount {
@@ -315,7 +314,7 @@ func (s *Server) handleUploadPhoto(w http.ResponseWriter, r *http.Request) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		s.log.Error("photo upload: begin failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	defer tx.Rollback(ctx)
@@ -325,12 +324,12 @@ func (s *Server) handleUploadPhoto(w http.ResponseWriter, r *http.Request) {
 	// version bump also writes.
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('activity_photos:' || $1))`, userID); err != nil {
 		s.log.Error("photo upload: lock failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if err := tx.QueryRow(ctx, `SELECT count(*) FROM activity_photos WHERE user_id = $1`, userID).Scan(&count); err != nil {
 		s.log.Error("photo upload: count failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if count >= maxPhotosPerAccount {
@@ -346,31 +345,31 @@ func (s *Server) handleUploadPhoto(w http.ResponseWriter, r *http.Request) {
 	`, userID, activityID, takenAt, routeAt, caption, photo.contentType, thumb.contentType, photo.width, photo.height,
 		len(photo.data)+len(thumb.data)).Scan(&photoID, &imageKey); err != nil {
 		s.log.Error("photo upload: insert failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if err := s.store.Put(ctx, imageKey, bytes.NewReader(photo.data), int64(len(photo.data))); err != nil {
 		s.log.Error("photo upload: store failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if err := s.store.Put(ctx, photoThumbKey(imageKey), bytes.NewReader(thumb.data), int64(len(thumb.data))); err != nil {
 		s.log.Error("photo upload: thumbnail store failed", "err", err)
 		s.removePhotoFiles(ctx, imageKey)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if err := tx.Commit(ctx); err != nil {
 		s.log.Error("photo upload: commit failed", "err", err)
 		s.removePhotoFiles(ctx, imageKey)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	p, err := s.loadPhoto(ctx, userID, photoID)
 	if err != nil {
 		s.log.Error("photo upload: read back failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusCreated, p)
@@ -385,19 +384,19 @@ func (s *Server) placeFromFields(w http.ResponseWriter, r *http.Request, activit
 	ctx := r.Context()
 	clock, err := parsePhotoClock(get("taken_at"), get("taken_local"))
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeAPIError(w, err.Error(), http.StatusBadRequest)
 		return nil, nil, false
 	}
 	at, err := parsePhotoPosition(get("lon"), get("lat"))
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeAPIError(w, err.Error(), http.StatusBadRequest)
 		return nil, nil, false
 	}
 	var chosen *time.Time
 	if v := get("route_at"); v != "" {
 		t, err := time.Parse(time.RFC3339, v)
 		if err != nil {
-			http.Error(w, `invalid "route_at", want RFC 3339`, http.StatusBadRequest)
+			writeAPIError(w, `invalid "route_at", want RFC 3339`, http.StatusBadRequest)
 			return nil, nil, false
 		}
 		chosen = &t
@@ -409,14 +408,11 @@ func (s *Server) placeFromFields(w http.ResponseWriter, r *http.Request, activit
 	}
 	if err != nil {
 		s.log.Error("photo placement failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return nil, nil, false
 	}
 	if routeAt == nil {
-		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{
-			"error":   photoNeedsPlaceCode,
-			"message": i18n.Get(requestLang(r)).T("error.photo_needs_place"),
-		})
+		httpErrorT(w, r, http.StatusUnprocessableEntity, "error.photo_needs_place")
 		return nil, nil, false
 	}
 	return takenAt, routeAt, true
@@ -458,15 +454,15 @@ func (s *Server) handlePlacePhoto(w http.ResponseWriter, r *http.Request) {
 	userID := userIDFromContext(r.Context())
 	var req placeRequest
 	if err := json.NewDecoder(io.LimitReader(r.Body, 16<<10)).Decode(&req); err != nil {
-		http.Error(w, errPhotoInvalidJSON.Error(), http.StatusBadRequest)
+		writeAPIError(w, errPhotoInvalidJSON.Error(), http.StatusBadRequest)
 		return
 	}
 	if ok, err := s.ownsActivity(r.Context(), userID, req.ActivityID); err != nil {
 		s.log.Error("photo place: activity lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	} else if !ok {
-		http.Error(w, "activity not found", http.StatusNotFound)
+		writeAPIError(w, "activity not found", http.StatusNotFound)
 		return
 	}
 	coord := func(v *float64) string {
@@ -655,7 +651,7 @@ func (s *Server) servePhotoImage(w http.ResponseWriter, r *http.Request, thumb b
 	ctx := r.Context()
 	photoID := r.PathValue("id")
 	if !uuidPattern.MatchString(photoID) {
-		http.Error(w, "photo not found", http.StatusNotFound)
+		writeAPIError(w, "photo not found", http.StatusNotFound)
 		return
 	}
 	var contentType, thumbContentType, key string
@@ -663,12 +659,12 @@ func (s *Server) servePhotoImage(w http.ResponseWriter, r *http.Request, thumb b
 		`SELECT content_type, thumb_content_type, image_key FROM activity_photos WHERE id = $1 AND user_id = $2`, photoID, userID,
 	).Scan(&contentType, &thumbContentType, &key)
 	if errors.Is(err, pgx.ErrNoRows) {
-		http.Error(w, "photo not found", http.StatusNotFound)
+		writeAPIError(w, "photo not found", http.StatusNotFound)
 		return
 	}
 	if err != nil {
 		s.log.Error("photo lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if thumb {
@@ -677,7 +673,7 @@ func (s *Server) servePhotoImage(w http.ResponseWriter, r *http.Request, thumb b
 	obj, err := s.store.Get(ctx, key)
 	if err != nil {
 		s.log.Error("photo read failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	defer obj.Close()
@@ -697,12 +693,12 @@ func (s *Server) handleUpdatePhoto(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	photoID := r.PathValue("id")
 	if !uuidPattern.MatchString(photoID) {
-		http.Error(w, "photo not found", http.StatusNotFound)
+		writeAPIError(w, "photo not found", http.StatusNotFound)
 		return
 	}
 	var req map[string]json.RawMessage
 	if err := json.NewDecoder(io.LimitReader(r.Body, 64<<10)).Decode(&req); err != nil {
-		http.Error(w, errPhotoInvalidJSON.Error(), http.StatusBadRequest)
+		writeAPIError(w, errPhotoInvalidJSON.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -711,12 +707,12 @@ func (s *Server) handleUpdatePhoto(w http.ResponseWriter, r *http.Request) {
 		`SELECT activity_id FROM activity_photos WHERE id = $1 AND user_id = $2`, photoID, userID,
 	).Scan(&activityID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		http.Error(w, "photo not found", http.StatusNotFound)
+		writeAPIError(w, "photo not found", http.StatusNotFound)
 		return
 	}
 	if err != nil {
 		s.log.Error("photo update: lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
@@ -728,7 +724,7 @@ func (s *Server) handleUpdatePhoto(w http.ResponseWriter, r *http.Request) {
 	if raw, ok := req["caption"]; ok {
 		var in *string
 		if err := json.Unmarshal(raw, &in); err != nil {
-			http.Error(w, errPhotoInvalidJSON.Error(), http.StatusBadRequest)
+			writeAPIError(w, errPhotoInvalidJSON.Error(), http.StatusBadRequest)
 			return
 		}
 		value, ok := photoCaption(w, r, deref(in))
@@ -741,13 +737,13 @@ func (s *Server) handleUpdatePhoto(w http.ResponseWriter, r *http.Request) {
 	if raw, ok := req["route_at"]; ok {
 		var at *time.Time
 		if err := json.Unmarshal(raw, &at); err != nil || at == nil {
-			http.Error(w, `invalid "route_at", want an RFC 3339 time`, http.StatusBadRequest)
+			writeAPIError(w, `invalid "route_at", want an RFC 3339 time`, http.StatusBadRequest)
 			return
 		}
 		start, end, hasTrack, err := s.trackSpan(ctx, activityID)
 		if err != nil {
 			s.log.Error("photo update: track lookup failed", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			writeAPIError(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		if !hasTrack {
@@ -765,7 +761,7 @@ func (s *Server) handleUpdatePhoto(w http.ResponseWriter, r *http.Request) {
 			WHERE id = $1
 		`, photoID, setCaption, caption, setRouteAt, routeAt); err != nil {
 			s.log.Error("photo update failed", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			writeAPIError(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 	}
@@ -773,7 +769,7 @@ func (s *Server) handleUpdatePhoto(w http.ResponseWriter, r *http.Request) {
 	p, err := s.loadPhoto(ctx, userID, photoID)
 	if err != nil {
 		s.log.Error("photo update: read back failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusOK, p)
@@ -787,19 +783,19 @@ func (s *Server) handleDeletePhoto(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	photoID := r.PathValue("id")
 	if !uuidPattern.MatchString(photoID) {
-		http.Error(w, "photo not found", http.StatusNotFound)
+		writeAPIError(w, "photo not found", http.StatusNotFound)
 		return
 	}
 	var imageKey string
 	err := s.pool.QueryRow(ctx, `DELETE FROM activity_photos WHERE id = $1 AND user_id = $2 RETURNING image_key`,
 		photoID, userID).Scan(&imageKey)
 	if errors.Is(err, pgx.ErrNoRows) {
-		http.Error(w, "photo not found", http.StatusNotFound)
+		writeAPIError(w, "photo not found", http.StatusNotFound)
 		return
 	}
 	if err != nil {
 		s.log.Error("photo delete failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	s.removeUnreferencedPhotoFiles(ctx, []string{imageKey})

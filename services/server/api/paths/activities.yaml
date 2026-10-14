@@ -19,7 +19,7 @@ activities:
                 activities:
                   type: array
                   items: { $ref: "../components/schemas.yaml#/ActivityRow" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/NotVerified" }
 activities_upload:
@@ -48,13 +48,13 @@ activities_upload:
         content:
           application/json:
             schema: { $ref: "../components/schemas.yaml#/UploadResult" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
       "409": { $ref: "../components/responses.yaml#/OverLimit" }
-      "413": { $ref: "../components/responses.yaml#/PlainError" }
-      "415": { $ref: "../components/responses.yaml#/PlainError" }
-      "429": { $ref: "../components/responses.yaml#/PlainError" }
+      "413": { $ref: "../components/responses.yaml#/Error" }
+      "415": { $ref: "../components/responses.yaml#/Error" }
+      "429": { $ref: "../components/responses.yaml#/Error" }
       "503": { $ref: "../components/responses.yaml#/DailyCapacity" }
 activities_id:
   parameters:
@@ -84,10 +84,10 @@ activities_id:
         content:
           application/json:
             schema: { $ref: "../components/schemas.yaml#/ActivityRow" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
   delete:
     summary: Delete an activity, its photos and its stored file
     responses:
@@ -95,7 +95,7 @@ activities_id:
         description: Deleted
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
 activities_overlaps:
   post:
     summary: Which of these time spans the account already has an activity overlapping
@@ -145,7 +145,7 @@ activities_overlaps:
                       activity_type: { type: string }
                       started_at: { type: string, format: date-time }
                       timezone: { type: string, nullable: true }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/NotVerified" }
 activities_summary:
@@ -170,7 +170,7 @@ activities_summary:
                 distance_meters: { type: number }
                 duration_seconds: { type: integer }
                 elevation_gain_m: { type: number }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/NotVerified" }
 activities_histogram:
@@ -223,7 +223,7 @@ activities_histogram:
                   type: string
                   format: date
                   description: The local day of the first activity at all (in the Story, with story); missing when there is none.
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/NotVerified" }
 activities_graph-stats:
@@ -247,7 +247,7 @@ activities_graph-stats:
                 year: { type: integer }
                 year_stats: { $ref: "../components/schemas.yaml#/ActivityStatsBlock" }
                 all_time: { $ref: "../components/schemas.yaml#/ActivityStatsBlock" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/NotVerified" }
 activities_trends:
@@ -290,7 +290,7 @@ activities_trends:
                       distance_meters: { type: number }
                       moving_seconds: { type: integer }
                       elevation_gain_m: { type: number }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/NotVerified" }
 activities_status_external_id:
@@ -351,7 +351,7 @@ activities_track-metrics_id:
                         description: Unix seconds.
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/NotVerified" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
 activities_track-points_id:
   parameters:
     - $ref: "../components/parameters.yaml#/ActivityID"
@@ -381,9 +381,9 @@ activities_track-points_id:
                   nullable: true
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/NotVerified" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
-      "409": { $ref: "../components/responses.yaml#/PlainError" }
-      "429": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
+      "409": { $ref: "../components/responses.yaml#/Error" }
+      "429": { $ref: "../components/responses.yaml#/Error" }
       "503": { $ref: "../components/responses.yaml#/DailyCapacity" }
 activities_track-edit_id:
   parameters:
@@ -412,22 +412,20 @@ activities_track-edit_id:
     responses:
       "202":
         description: Queued; the activity reads pending until it's done
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
-      "409": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
+      "409": { $ref: "../components/responses.yaml#/Error" }
       "422":
         description: The split would leave a piece with no track; resend with allow_hidden once the user agrees
         content:
           application/json:
             schema:
-              type: object
-              required: [error, message]
-              additionalProperties: false
-              properties:
-                error: { type: string, enum: [split_hides_part] }
-                message: { type: string }
+              allOf:
+                - { $ref: "../components/schemas.yaml#/Error" }
+                - properties:
+                    error: { enum: [split_hides_part] }
 activities_track-merge:
   post:
     summary: Join adjacent pieces of one split back into one activity
@@ -457,7 +455,7 @@ activities_track-merge:
                 removed:
                   type: array
                   items: { type: string, format: uuid }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
-      "409": { $ref: "../components/responses.yaml#/PlainError" }
+      "409": { $ref: "../components/responses.yaml#/Error" }

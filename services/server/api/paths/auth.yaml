@@ -9,9 +9,9 @@ auth_signup:
           schema: { $ref: "../components/schemas.yaml#/Credentials" }
     responses:
       "201": { $ref: "../components/responses.yaml#/Session" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
-      "409": { $ref: "../components/responses.yaml#/PlainError" }
-      "429": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
+      "409": { $ref: "../components/responses.yaml#/Error" }
+      "429": { $ref: "../components/responses.yaml#/Error" }
 auth_login:
   post:
     summary: Sign in with email and password
@@ -23,9 +23,9 @@ auth_login:
           schema: { $ref: "../components/schemas.yaml#/Credentials" }
     responses:
       "200": { $ref: "../components/responses.yaml#/Session" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
-      "401": { $ref: "../components/responses.yaml#/PlainError" }
-      "429": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
+      "401": { $ref: "../components/responses.yaml#/Error" }
+      "429": { $ref: "../components/responses.yaml#/Error" }
 auth_logout:
   post:
     summary: End the current session, if any, and clear its cookie
@@ -50,7 +50,7 @@ auth_demo:
     security: []
     responses:
       "201": { $ref: "../components/responses.yaml#/Session" }
-      "429": { $ref: "../components/responses.yaml#/PlainError" }
+      "429": { $ref: "../components/responses.yaml#/Error" }
 auth_forgot-password:
   post:
     summary: Email a password reset link, if the address has an account
@@ -66,8 +66,8 @@ auth_forgot-password:
               email: { type: string }
     responses:
       "200": { $ref: "../components/responses.yaml#/Message" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
-      "429": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
+      "429": { $ref: "../components/responses.yaml#/Error" }
 auth_reset-password:
   post:
     summary: Set a new password with a reset link's token, ending every other session, and sign in
@@ -83,7 +83,7 @@ auth_reset-password:
               password: { type: string }
     responses:
       "200": { $ref: "../components/responses.yaml#/Session" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
 auth_verify-email:
   post:
     summary: Verify an address with a verification link's token, and sign in
@@ -98,8 +98,8 @@ auth_verify-email:
               token: { type: string }
     responses:
       "200": { $ref: "../components/responses.yaml#/Session" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
-      "409": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
+      "409": { $ref: "../components/responses.yaml#/Error" }
 auth_providers:
   get:
     summary: Which sign-in providers this server has configured
@@ -129,8 +129,8 @@ auth_google_start:
       - $ref: "../components/parameters.yaml#/OAuthAppChallenge"
     responses:
       "302": { $ref: "../components/responses.yaml#/Redirect" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
 auth_google_callback:
   get:
     summary: Where Google sends the browser back
@@ -140,7 +140,7 @@ auth_google_callback:
     security: []
     responses:
       "302": { $ref: "../components/responses.yaml#/Redirect" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
 auth_facebook_start:
   get:
     summary: Start Sign in with Facebook in a browser
@@ -151,15 +151,15 @@ auth_facebook_start:
       - $ref: "../components/parameters.yaml#/OAuthAppChallenge"
     responses:
       "302": { $ref: "../components/responses.yaml#/Redirect" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
 auth_facebook_callback:
   get:
     summary: Where Facebook sends the browser back; redirects as Google's callback does
     security: []
     responses:
       "302": { $ref: "../components/responses.yaml#/Redirect" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
 auth_google_token:
   post:
     summary: Sign in with a Google id_token a native app got from the platform
@@ -177,9 +177,9 @@ auth_google_token:
                 description: The device's IANA zone, for a new account.
     responses:
       "200": { $ref: "../components/responses.yaml#/Session" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
-      "401": { $ref: "../components/responses.yaml#/PlainError" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
+      "401": { $ref: "../components/responses.yaml#/Error" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
 auth_handoff:
   post:
     summary: Redeem the one-time code a browser-tab sign-in handed an app, with the app's PKCE verifier
@@ -195,16 +195,16 @@ auth_handoff:
               verifier: { type: string }
     responses:
       "200": { $ref: "../components/responses.yaml#/Session" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
-      "401": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
+      "401": { $ref: "../components/responses.yaml#/Error" }
 auth_resend-verification:
   post:
     summary: Email the verification link again; works before the account is verified
     responses:
       "200": { $ref: "../components/responses.yaml#/Message" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
-      "429": { $ref: "../components/responses.yaml#/PlainError" }
+      "429": { $ref: "../components/responses.yaml#/Error" }
 auth_email:
   patch:
     summary: Change the address of an account that isn't verified yet, and send it a new link
@@ -222,7 +222,7 @@ auth_email:
         content:
           application/json:
             schema: { $ref: "../components/schemas.yaml#/Account" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
-      "409": { $ref: "../components/responses.yaml#/PlainError" }
-      "429": { $ref: "../components/responses.yaml#/PlainError" }
+      "409": { $ref: "../components/responses.yaml#/Error" }
+      "429": { $ref: "../components/responses.yaml#/Error" }

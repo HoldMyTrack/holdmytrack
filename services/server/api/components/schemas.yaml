@@ -1,12 +1,18 @@
-CodedError:
+Error:
   type: object
-  required: [error]
+  description: Every error the API sends (ADR-0045). A client branches on error, never on message.
+  required: [error, message]
   additionalProperties: false
   properties:
     error:
       type: string
-      enum: [email_not_verified, demo_read_only]
-    message: { type: string }
+      description: >-
+        A stable code: a failure's own (photo_no_track), or its status's generic one
+        (invalid_request, unauthenticated, forbidden, not_found, conflict, gone, payload_too_large,
+        unsupported_type, unprocessable, rate_limited, unavailable, internal).
+    message:
+      type: string
+      description: For a person, in the request's language when the server has it translated.
 ActivityRow:
   type: object
   required: [id, started_at, timezone, activity_type, name, distance_meters, duration_seconds, description, bbox, pending, edited, private, split, stories]
@@ -219,13 +225,6 @@ Photo:
       type: string
       description: The image, a path under the API.
     thumb_url: { type: string }
-PhotoNeedsPlace:
-  type: object
-  required: [error, message]
-  additionalProperties: false
-  properties:
-    error: { type: string, enum: [photo_needs_place] }
-    message: { type: string }
 Credentials:
   type: object
   properties:

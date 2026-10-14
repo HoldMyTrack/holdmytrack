@@ -52,7 +52,7 @@ type spotCaptureRequest struct {
 func spotIDFromPath(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id <= 0 {
-		http.Error(w, "spot not found", http.StatusNotFound)
+		writeAPIError(w, "spot not found", http.StatusNotFound)
 		return 0, false
 	}
 	return id, true
@@ -70,12 +70,12 @@ func (s *Server) handleSpotDetail(w http.ResponseWriter, r *http.Request) {
 		&sp.ID, &sp.Category, &sp.Name, &sp.Address, &sp.Description, &sp.Inscription, &sp.Memorial,
 		&sp.StartDate, &sp.Wikipedia, &sp.Lon, &sp.Lat, &area, &sp.CapturedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
-		http.Error(w, "spot not found", http.StatusNotFound)
+		writeAPIError(w, "spot not found", http.StatusNotFound)
 		return
 	}
 	if err != nil {
 		s.log.Error("spot detail query failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	sp.Area = json.RawMessage(area)
@@ -106,7 +106,7 @@ func capturesSince(q string) (*time.Time, error) {
 func (s *Server) handleListSpotCaptures(w http.ResponseWriter, r *http.Request) {
 	since, err := capturesSince(r.URL.Query().Get("since"))
 	if err != nil {
-		http.Error(w, "since must be an RFC 3339 time", http.StatusBadRequest)
+		writeAPIError(w, "since must be an RFC 3339 time", http.StatusBadRequest)
 		return
 	}
 	rows, err := s.pool.Query(r.Context(), `
@@ -116,7 +116,7 @@ func (s *Server) handleListSpotCaptures(w http.ResponseWriter, r *http.Request) 
 		userIDFromContext(r.Context()), since)
 	if err != nil {
 		s.log.Error("spot captures query failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	resp := spotCapturesResponse{Captures: []spotCaptureJSON{}}
@@ -127,7 +127,7 @@ func (s *Server) handleListSpotCaptures(w http.ResponseWriter, r *http.Request) 
 	})
 	if err != nil {
 		s.log.Error("spot captures scan failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	resp.Captures = append(resp.Captures, captures...)
@@ -148,7 +148,7 @@ func (s *Server) handleCaptureSpot(w http.ResponseWriter, r *http.Request) {
 	var req spotCaptureRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Lat == nil || req.Lon == nil ||
 		math.Abs(*req.Lat) > 90 || math.Abs(*req.Lon) > 180 {
-		http.Error(w, "lat and lon must be a position in degrees", http.StatusBadRequest)
+		writeAPIError(w, "lat and lon must be a position in degrees", http.StatusBadRequest)
 		return
 	}
 	ctx := r.Context()
@@ -158,20 +158,20 @@ func (s *Server) handleCaptureSpot(w http.ResponseWriter, r *http.Request) {
 		 FROM spots WHERE id = $1`,
 		id, *req.Lon, *req.Lat, spotCaptureSlackM).Scan(&inside, &retired)
 	if errors.Is(err, pgx.ErrNoRows) {
-		http.Error(w, "spot not found", http.StatusNotFound)
+		writeAPIError(w, "spot not found", http.StatusNotFound)
 		return
 	}
 	if err != nil {
 		s.log.Error("spot capture check failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if retired {
-		http.Error(w, "the spot is no longer on the map", http.StatusGone)
+		writeAPIError(w, "the spot is no longer on the map", http.StatusGone)
 		return
 	}
 	if !inside {
-		http.Error(w, "the position is outside the spot", http.StatusUnprocessableEntity)
+		writeAPIError(w, "the position is outside the spot", http.StatusUnprocessableEntity)
 		return
 	}
 	userID := userIDFromContext(ctx)
@@ -187,7 +187,7 @@ func (s *Server) handleCaptureSpot(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		s.log.Error("spot capture failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, status, capture)

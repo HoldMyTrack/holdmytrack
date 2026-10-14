@@ -78,7 +78,7 @@ func (f facebookOAuth) enabled() bool { return f.AppID != "" }
 // without Meta's SDK (docs/IMPLEMENTATION.md §4.22).
 func (s *Server) handleFacebookStart(w http.ResponseWriter, r *http.Request) {
 	if !s.facebook.enabled() {
-		http.NotFound(w, r)
+		writeAPIError(w, "not found", http.StatusNotFound)
 		return
 	}
 	state, _, ok := s.beginOAuth(w, r, facebookCookiePath, false)
@@ -104,7 +104,7 @@ func (s *Server) handleFacebookStart(w http.ResponseWriter, r *http.Request) {
 // has an account), which get their own error codes.
 func (s *Server) handleFacebookCallback(w http.ResponseWriter, r *http.Request) {
 	if !s.facebook.enabled() {
-		http.NotFound(w, r)
+		writeAPIError(w, "not found", http.StatusNotFound)
 		return
 	}
 	rt, err := s.readOAuthCallback(w, r, facebookCookiePath)

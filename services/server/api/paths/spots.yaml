@@ -28,7 +28,7 @@ spots:
                 total:
                   type: integer
                   description: How many the area holds; more than the spots returned when they were cut off.
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/NotVerified" }
 spots_captures:
@@ -52,7 +52,7 @@ spots_captures:
                 captures:
                   type: array
                   items: { $ref: "../components/schemas.yaml#/SpotCapture" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/NotVerified" }
 spots_id:
@@ -90,7 +90,7 @@ spots_id:
                   description: Missing when the account hasn't captured it.
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/NotVerified" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
 spots_id_captures:
   parameters:
     - $ref: "../components/parameters.yaml#/SpotID"
@@ -117,17 +117,17 @@ spots_id_captures:
         content:
           application/json:
             schema: { $ref: "../components/schemas.yaml#/SpotCapture" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
       "410":
         description: The place is no longer on the map
         content:
-          text/plain:
-            schema: { type: string }
+          application/json:
+            schema: { $ref: "../components/schemas.yaml#/Error" }
       "422":
         description: The position is outside the place
         content:
-          text/plain:
-            schema: { type: string }
+          application/json:
+            schema: { $ref: "../components/schemas.yaml#/Error" }

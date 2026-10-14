@@ -57,7 +57,7 @@ func tileCoords(w http.ResponseWriter, r *http.Request, ext string) (z, x, y int
 	y, errY := strconv.Atoi(strings.TrimSuffix(r.PathValue("y"), ext))
 	if errZ != nil || errX != nil || errY != nil || z < 0 || z > maxTileZoom ||
 		x < 0 || y < 0 || x >= 1<<z || y >= 1<<z {
-		http.Error(w, "invalid tile coordinates", http.StatusBadRequest)
+		writeAPIError(w, "invalid tile coordinates", http.StatusBadRequest)
 		return 0, 0, 0, false
 	}
 	return z, x, y, true
@@ -81,7 +81,7 @@ func (s *Server) handleTracksTile(w http.ResponseWriter, r *http.Request) {
 	// "absent means no restriction" convention can't drift between the map and the list.
 	filter, err := parseActivityFilter(r.URL.Query())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeAPIError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -92,7 +92,7 @@ func (s *Server) handleTracksTile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.log.Error("tracks tile query failed", "err", err, "z", z, "x", x, "y", y)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 

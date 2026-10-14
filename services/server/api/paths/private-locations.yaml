@@ -24,14 +24,14 @@ private-locations:
         content:
           application/json:
             schema: { $ref: "../components/schemas.yaml#/PrivateLocation" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
       "409":
         description: The account already has the most Private locations allowed
         content:
-          text/plain:
-            schema: { type: string }
+          application/json:
+            schema: { $ref: "../components/schemas.yaml#/Error" }
 private-locations_id:
   parameters:
     - name: id
@@ -52,10 +52,10 @@ private-locations_id:
         content:
           application/json:
             schema: { $ref: "../components/schemas.yaml#/PrivateLocation" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
   delete:
     summary: Remove a Private location
     responses:
@@ -63,4 +63,4 @@ private-locations_id:
         description: Removed
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }

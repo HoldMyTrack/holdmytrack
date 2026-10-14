@@ -38,7 +38,7 @@ func (s *Server) handleSendStory(w http.ResponseWriter, r *http.Request) {
 	}
 	var req storySendRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeAPIError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 	email, err := normalizeEmail(req.Email)
@@ -51,11 +51,11 @@ func (s *Server) handleSendStory(w http.ResponseWriter, r *http.Request) {
 	owns, err := s.ownsStory(ctx, userID, storyID)
 	if err != nil {
 		s.log.Error("story send: story lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if !owns {
-		http.Error(w, errStoryNotFound.Error(), http.StatusNotFound)
+		writeAPIError(w, errStoryNotFound.Error(), http.StatusNotFound)
 		return
 	}
 	if !storySendLimiter.allow(userID) {
@@ -72,7 +72,7 @@ func (s *Server) handleSendStory(w http.ResponseWriter, r *http.Request) {
 	`, storyID, email, userID, DemoCustomerUserID).Scan(&lang)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		s.log.Error("story send failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if err == nil {
@@ -152,7 +152,7 @@ func (s *Server) handleListStorySends(w http.ResponseWriter, r *http.Request) {
 	`, userID)
 	if err != nil {
 		s.log.Error("story sends list failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	sends, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (storySendJSON, error) {
@@ -162,7 +162,7 @@ func (s *Server) handleListStorySends(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.log.Error("story sends list failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if sends == nil {
@@ -178,7 +178,7 @@ func (s *Server) handleListStorySends(w http.ResponseWriter, r *http.Request) {
 	`, userID)
 	if err != nil {
 		s.log.Error("story copies list failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	copying, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (storyCopyingJSON, error) {
@@ -188,7 +188,7 @@ func (s *Server) handleListStorySends(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.log.Error("story copies list failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if copying == nil {
@@ -234,7 +234,7 @@ func (s *Server) answerStorySend(w http.ResponseWriter, r *http.Request,
 	then func(ctx context.Context, tx pgx.Tx, userID, storyID string) error, status int) {
 	sendID := r.PathValue("id")
 	if !uuidPattern.MatchString(sendID) {
-		http.Error(w, errStorySendNotFound.Error(), http.StatusNotFound)
+		writeAPIError(w, errStorySendNotFound.Error(), http.StatusNotFound)
 		return
 	}
 	ctx := r.Context()
@@ -247,12 +247,12 @@ func (s *Server) answerStorySend(w http.ResponseWriter, r *http.Request,
 		return then(ctx, tx, userID, storyID)
 	})
 	if errors.Is(err, errStorySendNotFound) {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		writeAPIError(w, err.Error(), http.StatusNotFound)
 		return
 	}
 	if err != nil {
 		s.log.Error("story send answer failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(status)

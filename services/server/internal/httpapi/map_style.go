@@ -44,12 +44,12 @@ func (s *Server) handleMapStyle(w http.ResponseWriter, r *http.Request) {
 	if errors.Is(err, mapstyle.ErrUnknownFlavor) {
 		// Name the valid set rather than a bare 404 — the caller is a client developer
 		// wiring this up, and the flavor list is not discoverable from anywhere else.
-		http.Error(w, "unknown flavor; expected one of "+strings.Join(mapstyle.Flavors(), ", "), http.StatusNotFound)
+		writeAPIError(w, "unknown flavor; expected one of "+strings.Join(mapstyle.Flavors(), ", "), http.StatusNotFound)
 		return
 	}
 	if err != nil {
 		s.log.Error("map style", "err", err)
-		http.Error(w, "failed to build style", http.StatusInternalServerError)
+		writeAPIError(w, "failed to build style", http.StatusInternalServerError)
 		return
 	}
 

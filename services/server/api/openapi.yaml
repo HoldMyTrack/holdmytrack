@@ -6,8 +6,9 @@ info:
     The JSON contract between the Go server and its clients: this file indexes every path, each
     area's operations are in paths/, and the shapes they share in components/. The httpapi
     package's tests check every request and response they make against it, so a handler that
-    stops matching it fails CI. A browser's write from another site is
-    refused with a plain-text 403 before any operation runs; the operations don't repeat it.
+    stops matching it fails CI. Every error is components/schemas.yaml's Error (ADR-0045). A
+    browser's write from another site is refused with a 403 forbidden before any operation
+    runs; the operations don't repeat it.
 servers:
   - url: /v1
 security:

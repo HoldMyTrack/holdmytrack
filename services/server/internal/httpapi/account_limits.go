@@ -85,7 +85,7 @@ func (s *Server) refuseOverLimit(w http.ResponseWriter, r *http.Request, userID 
 	u, err := readUsage(r.Context(), s.pool, userID)
 	if err != nil {
 		s.log.Error("account limits: read usage failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return true
 	}
 	if _, refused := fitWithinLimits(u, []int64{size}); refused != "" {
@@ -96,7 +96,7 @@ func (s *Server) refuseOverLimit(w http.ResponseWriter, r *http.Request, userID 
 }
 
 func writeLimitError(w http.ResponseWriter, r *http.Request, refused string) {
-	http.Error(w, limitMessage(i18n.Get(requestLang(r)), refused), http.StatusConflict)
+	writeError(w, http.StatusConflict, "account_limit", limitMessage(i18n.Get(requestLang(r)), refused))
 }
 
 // usageLine is Settings' "1,240 of 50,000 activities · 310 MB of 5 GB of original files".

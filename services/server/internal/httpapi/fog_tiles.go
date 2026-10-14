@@ -39,7 +39,7 @@ func (s *Server) handleFogTile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.log.Error("fog tile query failed", "err", err, "z", z, "x", x, "y", y)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	mask, err := loadMaskPNG(ctx, s.store, objectKey)
@@ -48,14 +48,14 @@ func (s *Server) handleFogTile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.log.Error("fog tile fetch failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	tile, err := fog.FogTile(mask, fog.VeilForTheme(r.URL.Query().Get("theme")))
 	if err != nil {
 		s.log.Error("fog tile tint failed", "err", err, "z", z, "x", x, "y", y)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "image/png")

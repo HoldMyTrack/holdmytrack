@@ -38,7 +38,7 @@ type updateSettingsRequest struct {
 func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	var req updateSettingsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeAPIError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 	s.writeProfile(w, r, "update settings", s.saveSettings(r.Context(), userIDFromContext(r.Context()), req.DisplayName, req.Country, req.Timezone, req.Locale))
@@ -95,7 +95,7 @@ func (s *Server) writeProfile(w http.ResponseWriter, r *http.Request, op string,
 	resp, err := s.loadAuthResponse(r.Context(), userIDFromContext(r.Context()))
 	if err != nil {
 		s.log.Error(op+" response lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusOK, resp)
@@ -197,18 +197,18 @@ func (s *Server) handleGetAvatar(w http.ResponseWriter, r *http.Request) {
 		`SELECT avatar_key, avatar_content_type FROM users WHERE id = $1`, userID,
 	).Scan(&avatarKeyVal, &contentType); err != nil {
 		s.log.Error("avatar lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if avatarKeyVal == nil {
-		http.Error(w, "no avatar set", http.StatusNotFound)
+		writeAPIError(w, "no avatar set", http.StatusNotFound)
 		return
 	}
 
 	obj, err := s.store.Get(ctx, *avatarKeyVal)
 	if err != nil {
 		s.log.Error("avatar read failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	defer obj.Close()

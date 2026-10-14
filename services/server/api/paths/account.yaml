@@ -15,9 +15,9 @@ account:
     responses:
       "204":
         description: Deleted, and signed out
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
-      "403": { $ref: "../components/responses.yaml#/PlainError" }
+      "403": { $ref: "../components/responses.yaml#/Error" }
 account_settings:
   patch:
     summary: Save the Settings page (a full replace, but locale)
@@ -47,7 +47,7 @@ account_settings:
         content:
           application/json:
             schema: { $ref: "../components/schemas.yaml#/Account" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
 account_settings_options:
@@ -98,7 +98,7 @@ account_avatar:
             schema: { type: string, format: binary }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/NotVerified" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
       "503": { $ref: "../components/responses.yaml#/DailyCapacity" }
   post:
     summary: Set the avatar
@@ -120,12 +120,12 @@ account_avatar:
         content:
           application/json:
             schema: { $ref: "../components/schemas.yaml#/Account" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
-      "413": { $ref: "../components/responses.yaml#/PlainError" }
-      "415": { $ref: "../components/responses.yaml#/PlainError" }
-      "503": { $ref: "../components/responses.yaml#/PlainError" }
+      "413": { $ref: "../components/responses.yaml#/Error" }
+      "415": { $ref: "../components/responses.yaml#/Error" }
+      "503": { $ref: "../components/responses.yaml#/Error" }
   delete:
     summary: Remove the avatar
     responses:
@@ -158,8 +158,8 @@ account_export:
             schema: { $ref: "../components/schemas.yaml#/ExportStatus" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
-      "429": { $ref: "../components/responses.yaml#/PlainError" }
-      "503": { $ref: "../components/responses.yaml#/PlainError" }
+      "429": { $ref: "../components/responses.yaml#/Error" }
+      "503": { $ref: "../components/responses.yaml#/Error" }
 account_exports_id_parts_n:
   parameters:
     - name: id
@@ -187,5 +187,5 @@ account_exports_id_parts_n:
             schema: { type: string, format: binary }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/NotVerified" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
       "503": { $ref: "../components/responses.yaml#/DailyCapacity" }

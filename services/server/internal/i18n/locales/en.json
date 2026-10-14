@@ -279,6 +279,7 @@
   "export.readme": "Your HoldMyTrack data, as of {date}\n\nIf this download came in several zip archives, extract them all into the same folder: together they make one set of folders.\n\noriginals/  Every file you uploaded or synced, exactly as it arrived (GPX, FIT, TCX, or JSON for activities synced from a phone). These are complete: Private locations haven't been applied to them.\ntracks/     Every activity as a GPX file, as your map shows it: with your Private locations cut away and your track edits applied.\nphotos/     The copy of each photo you added, as HoldMyTrack keeps it.\naccount.json  Your account and settings, every activity's details and which files are its, your Stories, Private locations and captured places.\n\nHoldMyTrack keeps no health data, so there is none here.",
   "error.delete_confirm_mismatch": "That isn't this account's email address. Type it exactly as you sign in with it.",
   "error.demo_read_only": "Demo accounts can't add, edit, or delete activities — create an account to save your own data.",
+  "error.email_not_verified": "Confirm your email address first, with the link we sent you.",
   "error.upload_too_large": "File too large or malformed multipart body.",
   "error.upload_empty": "Empty file.",
   "error.upload_zip": "A .zip archive can't be imported. Upload the GPX, FIT or TCX files inside it instead, up to 20 at a time.",

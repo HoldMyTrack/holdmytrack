@@ -152,11 +152,11 @@ func legacyLanding(r *http.Request) string {
 	return ""
 }
 
-// notFound answers every path nothing else claims: an HTML page for a browser, a plain 404
-// under the API's own prefixes, where a client expects no page.
+// notFound answers every path nothing else claims: an HTML page for a browser, the API's error
+// shape under its own prefixes, where a client expects no page.
 func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
-	if strings.HasPrefix(r.URL.Path, apiPrefix+"/") || strings.HasPrefix(r.URL.Path, "/tiles/") {
-		http.NotFound(w, r)
+	if isAPIPath(r.URL.Path) || strings.HasPrefix(r.URL.Path, "/tiles/") {
+		writeAPIError(w, "not found", http.StatusNotFound)
 		return
 	}
 	acct := s.pageAccount(r)

@@ -21,7 +21,7 @@ type deleteAccountRequest struct {
 func (s *Server) handleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 	var req deleteAccountRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeAPIError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 	info := authInfoFromContext(r.Context())

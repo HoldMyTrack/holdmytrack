@@ -34,7 +34,7 @@ map_style_flavor:
                   items: { type: object }
       "304":
         description: Unchanged since the If-None-Match ETag
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
 coverage_status:
   get:
     summary: Whether the account's map is being rendered, and its tile version

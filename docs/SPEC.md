@@ -4,7 +4,7 @@
 | :-- | :-- |
 | **Version** | 1.0 |
 | **Status** | Current — describes Milestone 1 (MVP) functionality as built |
-| **Last updated** | 2026-10-03 |
+| **Last updated** | 2026-10-14 |
 | **Related documents** | `VISION.md` (product scope, market rationale, milestones — the authority on *what ships and why*); `ARCHITECTURE.md` (system-level shape, key decisions, the stack); `IMPLEMENTATION.md` (schema, each feature's own implementation — the authority on *how it's built*); `AGENTS.md` (repository orientation) |
 
 ## 1. Introduction
@@ -35,6 +35,10 @@ Engineers implementing against or modifying this system, QA deriving test cases,
 | **Fog of War** | A map mode that shows a dark veil over everywhere the signed-in user has *not* recorded an activity, so recorded routes appear as "cleared" ground. |
 | **Heatmap** | A map mode that shades every recorded location by how many times it's been crossed, brightest where crossed most. |
 | **Ingest** | The server-side process of turning an uploaded file into a persisted `Activity` — parsing, clipping against Private locations (FR-8.1), simplification, and storage. |
+
+### 1.5 API errors
+
+Every error the JSON API (`/v1`) and the tiles (`/tiles/v1`) answer with is `application/json` `{"error": code, "message": text}` (ADR-0045). `error` is a stable code: a failure's own (`photo_needs_place`, `demo_read_only`, `account_limit`) or its status's generic one (`invalid_request`, `unauthenticated`, `forbidden`, `not_found`, `conflict`, `gone`, `payload_too_large`, `unsupported_type`, `unprocessable`, `rate_limited`, `unavailable`, `internal`). `message` is text for a person (FR-13.1). Where this document gives a status with a code — `403` `demo_read_only` — the code is the `error` field. The exceptions are the `405` for a known path asked with the wrong method, and `/healthz`, which answers the deployment's health check in plain text.
 
 ## 2. Actors
 
@@ -1189,7 +1193,7 @@ A read-only view of every account and every account's activities, for the people
 3. Numbers and dates follow the language: `1,234.5 km` and `Sep 8` in English, `1 234,5 км` and `8 сент.` in Russian. Units are unchanged by language — they follow Country (FR-1.7).
 4. Counts take the language's plural forms (`1 занятие`, `2 занятия`, `5 занятий`).
 5. The verification and password-reset emails (FR-1.8, FR-1.5) are in the account's language, or when it has none set, the language of the request that sent them.
-6. Error messages a person can see (a wrong password, a taken email, a rejected upload or track edit) are full sentences in the request's language, in page forms and in the JSON API's plain-text and `message` bodies alike. Machine-readable codes (`email_not_verified`, `demo_read_only`) never change with language. An import's failure reason, in the upload history, and the Android app's per-activity sync rejections are in the language of the request reading them, however long ago the import failed.
+6. Error messages a person can see (a wrong password, a taken email, a rejected upload or track edit) are full sentences in the request's language, in page forms and in the JSON API's error `message`s alike (§1.5). Their codes (`email_not_verified`, `demo_read_only`) never change with language. An import's failure reason, in the upload history, and the Android app's per-activity sync rejections are in the language of the request reading them, however long ago the import failed.
 7. A language chosen in the header's menu (FR-13.2) takes effect from that choice's own reload onward; other open pages change on their next load. Saved from the Android app, it applies to the web from each page's next load.
 8. The map's place labels (countries, cities, streets), on the web and in the Android app, are in that language where OpenStreetMap has the place's name in it, else in English, with the place's own name beneath when that is written in another script (`Париж` over `Paris`); a place with neither shows its own name. An export (FR-4.10) carries the labels as the map shows them.
 9. The Android app follows its own per-app language (Android's Settings → Apps → HoldMyTrack → Language), else the phone's. Its Language, on Settings or the You tab, sets that per-app language and the account's setting together, and signing in applies the account's language when it is English or Русский (`apps/android/docs/SPEC.md` FR-1.5). It sends its language as `Accept-Language`, so the server's messages match it.

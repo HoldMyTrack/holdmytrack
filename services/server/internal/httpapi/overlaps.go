@@ -45,17 +45,17 @@ func (s *Server) handleActivityOverlaps(w http.ResponseWriter, r *http.Request) 
 	r.Body = http.MaxBytesReader(w, r.Body, maxSyncBodyBytes)
 	var req overlapsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeAPIError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 	if len(req.Spans) > maxOverlapSpans {
-		http.Error(w, fmt.Sprintf("too many spans (%d), want %d or fewer", len(req.Spans), maxOverlapSpans), http.StatusBadRequest)
+		writeAPIError(w, fmt.Sprintf("too many spans (%d), want %d or fewer", len(req.Spans), maxOverlapSpans), http.StatusBadRequest)
 		return
 	}
 	spans := make([]ingest.Span, 0, len(req.Spans))
 	for _, sp := range req.Spans {
 		if sp.Key == "" || len(sp.Key) > maxOverlapKeyLen {
-			http.Error(w, fmt.Sprintf(`invalid "key", want 1 to %d characters`, maxOverlapKeyLen), http.StatusBadRequest)
+			writeAPIError(w, fmt.Sprintf(`invalid "key", want 1 to %d characters`, maxOverlapKeyLen), http.StatusBadRequest)
 			return
 		}
 		spans = append(spans, ingest.Span{Key: sp.Key, Start: sp.Start, End: sp.End})
@@ -64,7 +64,7 @@ func (s *Server) handleActivityOverlaps(w http.ResponseWriter, r *http.Request) 
 	found, err := ingest.Overlaps(ctx, s.pool, userIDFromContext(ctx), spans)
 	if err != nil {
 		s.log.Error("activity overlaps failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	resp := overlapsResponse{Overlaps: make([]overlapJSON, 0, len(found))}

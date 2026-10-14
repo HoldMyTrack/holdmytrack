@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Accepted. Built: `internal/httpapi/api_errors.go` writes every API and tile error, the contract's `Error` schema describes it (`IMPLEMENTATION.md` §4.31), and the web's `parseErrorBody` and Android's `ApiException` read it (`SPEC.md` §1.5).
 
 ## Context
 
