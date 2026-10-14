@@ -15,7 +15,7 @@ What HoldMyTrack's performance has been measured to be, session by session: when
 
 Production requires a verified email (`SPEC.md` FR-1.8), so test accounts are created while `api` runs with `SKIP_EMAIL_VERIFICATION=true` from a throwaway Compose override, which `compose.prod.yml` doesn't pass through on its own:
 
-1. On the server: write `/tmp/lt-override.yml` adding `SKIP_EMAIL_VERIFICATION: "true"` to `api`'s environment, and recreate `api` with `-f compose.prod.yml -f /tmp/lt-override.yml … up -d --no-deps api`.
+1. On the server: write `/tmp/lt-override.yml` adding `SKIP_EMAIL_VERIFICATION: "true"` and `SIGNUPS_PER_HOUR: "100"` to `api`'s environment, and recreate `api` with `-f compose.prod.yml -f /tmp/lt-override.yml … up -d --no-deps api`.
 2. `loadtest signup 21` (20 load accounts, the last one for `probe`). Each returns a verified session.
 3. Recreate `api` without the override straight away and delete the file. Check that no account other than the test ones was created in that window; the bypass has been on for 8–30 s.
 

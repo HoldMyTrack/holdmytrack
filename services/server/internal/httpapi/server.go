@@ -85,6 +85,8 @@ type Server struct {
 	tileLimiter           *fixedWindowLimiter
 	syncLimiter           *fixedWindowLimiter
 	trackPointsLimiter    *fixedWindowLimiter
+	syncActivityLimiter   *fixedWindowLimiter
+	signupLimiter         *fixedWindowLimiter
 }
 
 // defaultUploadsPerHour is how many files one account may send to `POST /v1/activities/upload`
@@ -105,6 +107,8 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 		tileLimiter:           newFixedWindowLimiter(defaultTilesPerMinute, time.Minute),
 		syncLimiter:           newFixedWindowLimiter(syncRequestsPerHour, time.Hour),
 		trackPointsLimiter:    newFixedWindowLimiter(trackPointsPerHour, time.Hour),
+		syncActivityLimiter:   newFixedWindowLimiter(syncActivitiesPerHour, time.Hour),
+		signupLimiter:         newFixedWindowLimiter(defaultSignupsPerHour, time.Hour),
 	}
 	s.registerPages()
 	s.mux.HandleFunc(route("POST", "/auth/signup"), s.handleSignup)

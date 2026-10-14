@@ -147,6 +147,8 @@ services:
       UPLOADS_PER_HOUR: ${UPLOADS_PER_HOUR:-100}
       # Tile requests one account may make a minute (docs/DEPLOY.md §4); raise it for a load test.
       TILES_PER_MINUTE: ${TILES_PER_MINUTE:-1200}
+      # Accounts one address may create an hour (docs/DEPLOY.md §4); raise it for a load test.
+      SIGNUPS_PER_HOUR: ${SIGNUPS_PER_HOUR:-5}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-}

@@ -18,6 +18,21 @@ const defaultTilesPerMinute = 1200
 // thousands an hour; the upload limit (defaultUploadsPerHour) doesn't reach this path.
 const syncRequestsPerHour = 60
 
+// syncActivitiesPerHour bounds the activities `POST /v1/sync/activities` takes from one account
+// in an hour, beside syncRequestsPerHour's count of requests: at 100 a batch, that one alone
+// would take 6,000 an hour. A phone lists three months of Health Connect sessions and its own
+// recordings, a few hundred at most, so this only slows an account syncing, deleting and
+// syncing again, which costs a render each time and stores nothing (IMPLEMENTATION.md §5.7).
+const syncActivitiesPerHour = 1000
+
+// defaultSignupsPerHour bounds the accounts one address creates with an email and password in
+// an hour. Each sends a verification email to whatever address was typed, and every
+// per-account limit counts one account. Only an account created counts, so a mistyped
+// password or a taken address costs nothing; Google and Facebook sign-in, whose providers
+// gate account creation themselves, aren't counted. SIGNUPS_PER_HOUR overrides it, for a load
+// test creating its accounts.
+const defaultSignupsPerHour = 5
+
 // trackPointsPerHour bounds `GET /v1/activities/track-points/{id}` per account: each request
 // reads an original upload from object storage and parses it, and a person opens the track
 // editor a few times an hour at most.
@@ -55,6 +70,12 @@ func (s *Server) tile(path string, h http.HandlerFunc) {
 		}
 		h(w, r)
 	}))
+}
+
+// SetSignupsPerHour replaces the per-address signup limit (defaultSignupsPerHour), starting
+// every address's count afresh.
+func (s *Server) SetSignupsPerHour(n int) {
+	s.signupLimiter = newFixedWindowLimiter(n, time.Hour)
 }
 
 // SetTilesPerMinute replaces the per-account tile limit (defaultTilesPerMinute), starting

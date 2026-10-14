@@ -94,6 +94,10 @@ type Config struct {
 	// (internal/httpapi's defaultTilesPerMinute). Raised only on a load test's target. Only
 	// read by `serve`.
 	TilesPerMinute int
+	// SignupsPerHour is how many accounts one address may create with an email and password
+	// in an hour (internal/httpapi's defaultSignupsPerHour). Raised only while a load test
+	// creates its accounts. Only read by `serve`.
+	SignupsPerHour int
 }
 
 func Load() (Config, error) {
@@ -139,6 +143,9 @@ func Load() (Config, error) {
 		return c, err
 	}
 	if c.TilesPerMinute, err = positiveInt("TILES_PER_MINUTE", 1200); err != nil {
+		return c, err
+	}
+	if c.SignupsPerHour, err = positiveInt("SIGNUPS_PER_HOUR", 5); err != nil {
 		return c, err
 	}
 	c.WebDevDir = env("WEB_DEV_DIR", "")
