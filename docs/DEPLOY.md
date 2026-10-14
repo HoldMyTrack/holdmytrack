@@ -137,6 +137,8 @@ A deploy that changes how Fog/Heatmap tiles are drawn (`services/server/internal
 
 The deploy that brings migration 0033 needs `docker compose -f compose.prod.yml --env-file .env.prod run --rm api backfill-recorded-spans` once, after `up -d`: it fills each older activity's time as recorded (`IMPLEMENTATION.md` §4.6), re-reading every upload, which takes a few minutes. Until it has run, the Sync tab's overlap hint misses activities whose ends a Private location cut away. It's idempotent.
 
+The deploy that brings migration 0039 needs `docker compose -f compose.prod.yml --env-file .env.prod run --rm api backfill-object-bytes` once, after `up -d`: it fills the sizes of originals and Fog/Heatmap tiles stored before they were recorded (`IMPLEMENTATION.md` §4.32), from listings of the bucket, a thousand objects per request. Until it has run, the storage statistics count only what was written since, and the next snapshot's `storage_bytes_unmeasured_rows` says how many rows are missing; after it, that should read 0. It's idempotent, and safe beside a running worker.
+
 The demo history is picked from real activities on a deployment. To copy some out, with their ids from the admin panel's activity list:
 
 ```
