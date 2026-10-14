@@ -215,7 +215,7 @@ func (s *Server) handleSignUpPage(w http.ResponseWriter, r *http.Request) {
 // browser; without it the account starts on UTC, as the JSON endpoint's would.
 func (s *Server) handleSignUpForm(w http.ResponseWriter, r *http.Request) {
 	email := r.PostFormValue("email")
-	userID, err := s.createAccount(r.Context(), email, r.PostFormValue("password"), r.PostFormValue("timezone"), pageLang(s.pageAccount(r), r))
+	userID, err := s.createAccountLimited(r, email, r.PostFormValue("password"), r.PostFormValue("timezone"), pageLang(s.pageAccount(r), r))
 	if err != nil {
 		acct := s.pageAccount(r)
 		s.renderAuthError(w, r, "sign up", "signup", "signup.title", true, authForm{Email: email, Google: s.google.enabled(), Facebook: s.facebook.enabled(), Upgrading: acct != nil && acct.info.isDemo}, err)

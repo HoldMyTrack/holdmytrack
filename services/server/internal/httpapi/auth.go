@@ -299,12 +299,26 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	userID, err := s.createAccount(r.Context(), req.Email, req.Password, req.Timezone, requestLang(r))
+	userID, err := s.createAccountLimited(r, req.Email, req.Password, req.Timezone, requestLang(r))
 	if err != nil {
 		s.writeAccountError(w, r, "signup", err)
 		return
 	}
 	s.writeSession(w, r, userID, sessionTTL, http.StatusCreated)
+}
+
+// createAccountLimited is createAccount within the address's signup limit
+// (defaultSignupsPerHour), which only an account created counts.
+func (s *Server) createAccountLimited(r *http.Request, email, password, timezone, lang string) (string, error) {
+	ip := clientIP(r)
+	if s.signupLimiter.exceeded(ip) {
+		return "", accountFailure(http.StatusTooManyRequests, "error.signup_rate_limited")
+	}
+	userID, err := s.createAccount(r.Context(), email, password, timezone, lang)
+	if err == nil {
+		s.signupLimiter.hit(ip)
+	}
+	return userID, err
 }
 
 // createAccount is signup's shared core — handleSignup (JSON) and the /signup page
@@ -860,6 +874,19 @@ func (l *fixedWindowLimiter) allow(key string) bool {
 		return false
 	}
 	c.count++
+	return true
+}
+
+// allowN is allow for n at once: it counts all n and reports true when they fit in what's left
+// of key's window, and counts nothing and reports false when they don't.
+func (l *fixedWindowLimiter) allowN(key string, n int) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	c := l.current(key)
+	if c.count+n > l.limit {
+		return false
+	}
+	c.count += n
 	return true
 }
 

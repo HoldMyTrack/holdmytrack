@@ -30,6 +30,8 @@ Fill in every value — see that file's own comments for what each one means and
 
 **Tiles per minute.** `TILES_PER_MINUTE` (default 1200) is how many tile requests one account may make in a minute, across every map layer (`docs/SPEC.md` FR-4.11). Leave it at 1200. A load test's `browse` runs several visitors on each test account, so raise it for its run (`docs/PERFORMANCE.md`). A change needs only `up -d` for `api`.
 
+**Signups per hour.** `SIGNUPS_PER_HOUR` (default 5) is how many accounts one address may create with an email and password in an hour (`docs/SPEC.md` FR-1.1). Leave it at 5. A load test's `signup` creates more than that from one machine, so raise it for that step (`docs/PERFORMANCE.md`). A change needs only `up -d` for `api`.
+
 **Sign in with Google (optional).** Leave `GOOGLE_CLIENT_ID` empty to run without it; the sign-in screen then shows only email and password. To turn it on:
 
 1. In the Google Cloud console, create a project (or reuse one) and set up the OAuth consent screen: user type External, app name HoldMyTrack, the domain from step 3 as an authorized domain, and only the `openid`, `email` and `profile` scopes — none of them needs Google's app verification. Publish it ("In production"); in "Testing" only listed test users can sign in.

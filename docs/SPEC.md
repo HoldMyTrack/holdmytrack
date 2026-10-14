@@ -87,6 +87,7 @@ The JSON endpoints in this section are refused (`403`) the same way when a brows
 - Invalid email format → `400 Bad Request`. Only a bare address is accepted: a display name or comment (`Name <a@b.c>`, `a@b.c (x)`) is invalid.
 - Password shorter than 8 characters, or longer than 72 bytes (bcrypt's limit) → `400 Bad Request`.
 - Email already registered to a different, real account → `409 Conflict`.
+- More than 5 accounts created from one address in an hour → `429 Too Many Requests` with a message saying so; a signup that failed doesn't count, and Google and Facebook sign-in (FR-1.9, FR-1.10) aren't counted. The count restarts when the server does.
 
 ### FR-1.2 Sign in
 
@@ -453,7 +454,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Outputs**: One new `Activity` per ticked candidate the server takes; a line on the sheet with how many were added and how many the account already had, and each refusal with its reason; and a persistent history via the same `GET /v1/uploads` FR-3.4 already describes — a Health Connect sync and a file upload are the same kind of ingest job, not two separate histories.
 
-**Error cases**: What doesn't fit under the account's limits (FR-1.13), in the order sent, is rejected one by one with a message naming the limit, and stays on the phone; what fits is taken. More than 60 sync requests from one account in an hour → `429 Too Many Requests` before the request is read, with a message naming the limit, which the run stops on and shows like any other refusal; the count restarts when the server does. Server unreachable while sending — the run stops and says so, and whatever wasn't confirmed stays listed and ticked; anything sent before the failure is known to the server at the next Load. Server unreachable while asking what it has — the read keeps what the last one found, with the reason shown. A session kept from an earlier read that's gone from Health Connect by the time it's sent is refused, with the reason.
+**Error cases**: What doesn't fit under the account's limits (FR-1.13), in the order sent, is rejected one by one with a message naming the limit, and stays on the phone; what fits is taken. More than 60 sync requests from one account in an hour → `429 Too Many Requests` before the request is read, with a message naming the limit, which the run stops on and shows like any other refusal; so is a request whose activities would take the account past 1,000 sent in the hour (every activity sent counts, taken or not, and a refused request counts none). The counts restart when the server does. Server unreachable while sending — the run stops and says so, and whatever wasn't confirmed stays listed and ticked; anything sent before the failure is known to the server at the next Load. Server unreachable while asking what it has — the read keeps what the last one found, with the reason shown. A session kept from an earlier read that's gone from Health Connect by the time it's sent is refused, with the reason.
 
 **Not yet built**: the iOS/HealthKit half of Path 2 — no iOS app exists yet (`apps/ios` is a placeholder). `apps/android/docs/ROADMAP.md` is the authority on Android's own remaining work (UI design, Play Store compliance).
 
