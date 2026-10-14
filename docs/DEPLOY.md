@@ -32,6 +32,8 @@ Fill in every value — see that file's own comments for what each one means and
 
 **Signups per hour.** `SIGNUPS_PER_HOUR` (default 5) is how many accounts one address may create with an email and password in an hour (`docs/SPEC.md` FR-1.1). Leave it at 5. A load test's `signup` creates more than that from one machine, so raise it for that step (`docs/PERFORMANCE.md`). A change needs only `up -d` for `api`.
 
+**Daily R2 budget.** `R2_DAILY_BUDGET_USD` (default 2) is what every account together may spend on requests to the app's bucket in a UTC day, at R2's list prices, before the service starts giving things up: renders at 70%, anything that adds at 85%, the map's reads of stored files at 100% (`docs/SPEC.md` FR-17, ADR-0044). The basemap's requests aren't counted. If the alerts below show a day's real use nearing it, raise it; a change needs `up -d` for `api` and `worker`, and lifts the stages at once when the day's spend is under the new figure. A load test raises it for its run, like the limits above.
+
 **Sign in with Google (optional).** Leave `GOOGLE_CLIENT_ID` empty to run without it; the sign-in screen then shows only email and password. To turn it on:
 
 1. In the Google Cloud console, create a project (or reuse one) and set up the OAuth consent screen: user type External, app name HoldMyTrack, the domain from step 3 as an authorized domain, and only the `openid`, `email` and `profile` scopes — none of them needs Google's app verification. Publish it ("In production"); in "Testing" only listed test users can sign in.
@@ -410,7 +412,7 @@ apt-config dump | grep Automatic-Reboot
 Grafana Cloud's free tier holds the deployment's logs and metrics, with dashboards and alerts on them. One collector on the server, the `alloy` service (`ops/alloy/config.alloy`), feeds it:
 
 - **Logs** from every container in the stack, labeled `service` (`api`, `worker`, `db`, `web`, …), plus `level` for `api`'s and `worker`'s JSON lines. Before anything leaves the server, `internal/mail`'s lines (which name the recipient) and Postgres's `DETAIL` lines (which can quote an email address) are dropped, and every IP address in Caddy's logs is replaced with `redacted`.
-- **The app's metrics** from `api` and `worker` (`GET /metrics` on port 9100, on the Docker network only): requests by route and status class with their timings, recovered panics, finished jobs by kind, outcome and failure code, and the queue's runnable jobs and the oldest one's age, by kind. `api` also reports the newest daily statistics snapshot as `holdmytrack_stat{key=…}`, one series per key (`IMPLEMENTATION.md` §4.32), which the dashboard's **Service** row shows; Postgres's `daily_stats` is the lasting record of those numbers.
+- **The app's metrics** from `api` and `worker` (`GET /metrics` on port 9100, on the Docker network only): requests by route and status class with their timings, recovered panics, finished jobs by kind, outcome and failure code, and the queue's runnable jobs and the oldest one's age, by kind. Both report their requests to the app's bucket by R2 billing class (`holdmytrack_r2_operations_total`), and `api` today's share of the daily R2 budget spent (`holdmytrack_r2_budget_used_ratio`). `api` also reports the newest daily statistics snapshot as `holdmytrack_stat{key=…}`, one series per key (`IMPLEMENTATION.md` §4.32), which the dashboard's **Service** row shows; Postgres's `daily_stats` is the lasting record of those numbers.
 - **The host's metrics**: CPU, memory, swap, disk, network and OOM kills (`node_vmstat_oom_kill`).
 - **Postgres's metrics**, database-wide: connections, size, locks, transactions.
 - **Backup freshness**: `backup.sh --nightly` and `restore-drill.sh` write the time of their last successful run to `BACKUP_DIR/metrics/` (`holdmytrack_backup_last_success_timestamp_seconds`, `holdmytrack_restore_drill_last_success_timestamp_seconds`), and every `backup.sh` run the time its reference dump in the bucket was taken (`holdmytrack_backup_reference_timestamp_seconds`), which the dashboard's Last backup tile shows beside the nightly one.
@@ -450,6 +452,8 @@ It creates the `holdmytrack` contact point, a **HoldMyTrack** folder holding the
 | Restore drill overdue | `restore-drill.sh` last succeeded over 33 days ago, or never |
 | An account holds half the activity limit | the daily statistics' heaviest account holds over 25,000 activities (`IMPLEMENTATION.md` §5.7) |
 | An account holds half the storage limit | its original files take up over 2.5 GB |
+| Half the daily R2 budget spent | today's object store requests have cost over half of `R2_DAILY_BUDGET_USD` |
+| Renders paused by the daily R2 budget | over 70%: Fog and Heatmap wait for midnight UTC, and adding stops at 85% |
 
 The two backup alerts read the files the scripts write after a successful run (§11), so on a server whose scripts haven't run since that was added, they fire until each script has run once. Run `./scripts/backup.sh` and `./scripts/restore-drill.sh` by hand to start them off.
 
@@ -465,4 +469,4 @@ The two backup alerts read the files the scripts write after a successful run (�
 
 ## What this doesn't cover
 
-Per `docs/ROADMAP.md`, still open beyond this minimal setup: an R2 budget (Phase 5), and the compliance work (DPIA, EU-region hosting — Phase 6) a genuine public launch needs regardless of how small the deployment is. This document gets you to "it's live," not to "it's ready for the public."
+Per `docs/ROADMAP.md`, still open beyond this minimal setup: the compliance work (DPIA, EU-region hosting — Phase 6) a genuine public launch needs regardless of how small the deployment is. This document gets you to "it's live," not to "it's ready for the public."

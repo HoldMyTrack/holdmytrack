@@ -143,6 +143,8 @@ func TestTake(t *testing.T) {
 	exec(`INSERT INTO activity_tile_masks (activity_id, zoom, tile_x, tile_y) VALUES ($1, 14, 1, 1)`, a1)
 	exec(`INSERT INTO activity_tile_mask_data (activity_id, zoom, tile_x, tile_y, png) VALUES ($1, 14, 1, 1, $2)`, a1, make([]byte, 50))
 
+	exec(`INSERT INTO r2_ops (day, class, count) VALUES ($1, 'A', 70), ($1, 'B', 900)`, day)
+
 	after, err := compute(ctx, tx, day)
 	if err != nil {
 		t.Fatal(err)
@@ -170,6 +172,8 @@ func TestTake(t *testing.T) {
 		"activity_accounts_by_country.other": 2, // its one account, counted under each country
 		"activities_by_country.other":        2,
 		"storage_bytes.originals":            2000,
+		"r2_ops.class_a":                     70,
+		"r2_ops.class_b":                     900,
 		"storage_bytes.fog":                  300,
 		"storage_bytes.heatmap":              400,
 		"storage_bytes_unmeasured_rows":      3, // raw-b, and the second tile's two objects

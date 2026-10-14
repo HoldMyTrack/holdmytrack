@@ -307,6 +307,7 @@
   "error.upload_rate_limit": "Too many files uploaded in the last hour (at most {max}). Try again later.",
   "error.story_send_limit": "Too many copies sent in the last hour. Try again later.",
   "error.tile_rate_limit": "Too many map requests in the last minute. Try again in a moment.",
+  "error.daily_capacity": "HoldMyTrack has reached what it can spend today, so this is paused until midnight UTC. Everything you already have is safe; please try again then.",
   "error.sync_rate_limit": "Too many syncs in the last hour (at most {max}). Try again later.",
   "error.sync_activity_rate_limit": "Too many activities synced in the last hour (at most {max}). Try the rest later.",
   "error.track_points_rate_limit": "Too many tracks opened for editing in the last hour (at most {max}). Try again later.",

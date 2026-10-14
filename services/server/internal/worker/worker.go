@@ -10,12 +10,14 @@ import (
 	"fmt"
 	"log/slog"
 	"runtime/debug"
+	"slices"
 	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/budget"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/metrics"
@@ -82,7 +84,10 @@ const statsInterval = time.Hour
 // owner when it's ready (export_job.go). The periodic sweeps (runSweeps) have a goroutine of
 // their own, so a busy queue never holds them back. A deleted account's jobs are never
 // claimed: its purge drops them within accountPurgeInterval.
-func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, n *Notifier, concurrency, renderConcurrency int) error {
+//
+// The daily R2 budget (internal/budget) holds back lanes as the day's spend nears it
+// (lanePaused): their jobs stay pending and run once the day turns.
+func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, n *Notifier, gate *budget.Gate, concurrency, renderConcurrency int) error {
 	notifier = n
 	var lanes sync.WaitGroup
 	defer lanes.Wait() // a long job cut off by shutdown is released before Run returns
@@ -96,6 +101,9 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 			case <-ctx.Done():
 				return
 			case <-t.C:
+				if lanePaused(laneLong, gate.Stage(ctx)) {
+					continue
+				}
 				if _, err := claimAndRun(ctx, pool, store, log, laneLong); err != nil {
 					log.Error("export job processing error", "err", err)
 				}
@@ -113,14 +121,14 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 		lanes.Add(1)
 		go func() {
 			defer lanes.Done()
-			runLane(ctx, pool, store, log, laneMain)
+			runLane(ctx, pool, store, log, gate, laneMain)
 		}()
 	}
 	for range renderConcurrency {
 		lanes.Add(1)
 		go func() {
 			defer lanes.Done()
-			runLane(ctx, pool, store, log, laneRender)
+			runLane(ctx, pool, store, log, gate, laneRender)
 		}()
 	}
 	<-ctx.Done()
@@ -130,7 +138,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slo
 // runLane is one of Run's main-lane or render-lane loops: claim and run the lane's jobs until
 // the queue has nothing this loop may take (claimQuery: one job per account at a time), then
 // wait for the next tick.
-func runLane(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, l lane) {
+func runLane(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, gate *budget.Gate, l lane) {
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 	for {
@@ -138,7 +146,7 @@ func runLane(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, log 
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			for {
+			for !lanePaused(l, gate.Stage(ctx)) {
 				processed, err := claimAndRun(ctx, pool, store, log, l)
 				if err != nil {
 					log.Error("job processing error", "err", err)
@@ -218,6 +226,20 @@ func takeStats(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger) {
 	if n > 0 {
 		log.Info("stats snapshot taken", "day", day.Format(time.DateOnly), "values", n)
 	}
+}
+
+// lanePaused reports whether the budget's stage holds l's jobs back: renders at the first stage,
+// since a Fog or Heatmap render can wait a day and is the most requests a job makes; exports
+// with everything else that adds, since building one reads every original and writes the
+// archive. The main lane runs on: an ingest or an edit already accepted is finished.
+func lanePaused(l lane, s budget.Stage) bool {
+	switch {
+	case slices.Equal(l.kinds, renderKinds) && !l.rest:
+		return s >= budget.RendersPaused
+	case slices.Equal(l.kinds, longKinds) && !l.rest:
+		return s >= budget.AddingPaused
+	}
+	return false
 }
 
 // lane is one of the queues Run claims from: the job kinds it takes, or, for the main lane,

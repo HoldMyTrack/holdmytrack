@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/budget"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/export"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
@@ -102,6 +103,9 @@ func exportAvailableFrom(lastReady *time.Time) time.Time {
 func (s *Server) requestExport(ctx context.Context, userID string, isDemo bool, lang string) (exportStatus, error) {
 	if isDemo {
 		return exportStatus{}, accountFailure(http.StatusForbidden, "error.demo_read_only")
+	}
+	if err := s.overBudget(ctx, budget.AddingPaused); err != nil {
+		return exportStatus{}, err
 	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {

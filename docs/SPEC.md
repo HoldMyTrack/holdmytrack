@@ -1566,3 +1566,16 @@ What is planned but not yet built is in `docs/ROADMAP.md`.
 2. Zooming: the mouse wheel or a trackpad pinch zooms about the pointer, a two-finger pinch about the point between the fingers, and a double-click zooms in to 3× about the clicked point (or back to fitted, if zoomed in). Zoom in and Zoom out (and the `+`/`=` and `-` keys) zoom by 1.5× about the center, and Fit to screen (and `0`) goes back to fitted. Zoom runs from fitted to 8× fitted.
 3. Zoomed in, the picture is dragged with the mouse or a finger. It can't be dragged past its edges, and a side that still fits the screen stays centered. A step to another photo starts it fitted. The ← and → keys step through a group.
 4. A Full size link opens the stored copy in a new browser tab, as the popup's does. The × button or Escape closes the viewer and leaves the popup open. A demo session sees the same.
+
+## 22. FR-17 — Daily capacity
+
+### FR-17.1 What the day's spend stops
+
+**Description**: The service can spend up to a set amount a day on requests to its object store, `R2_DAILY_BUDGET_USD` ($2 by default), counted across every account and reset at midnight UTC. As the day's spend nears it, the service gives things up in stages, keeping what everyone sees for last (ADR-0044).
+
+**Behavior**:
+1. **At 70% of the budget**, Fog of War and Heatmap stop being redrawn: a new or edited activity reaches the map's tracks as usual, and its coverage follows after midnight UTC, the map meanwhile saying coverage is updating (FR-4.2).
+2. **At 85%**, anything that adds to what's stored is refused: an upload (FR-3.1), a phone sync (FR-3.6), a photo (FR-16.1), an avatar (FR-1.7), accepting a copy of a Story (FR-14.7) and asking for a data download (FR-1.12); a download already asked for is built after midnight UTC. Each is refused with `503 Service Unavailable`, a `Retry-After` of the seconds left until midnight UTC, and a message saying it's paused until then and that nothing already stored is affected. The Android app's sync shows that message and keeps what it didn't send.
+3. **At 100%**, the reads of stored files are refused the same way: Fog and Heatmap tiles, photo images, avatars, data download archives, and the track editor's points (FR-5.14). The map's tracks, the Activities list, Stories, totals, Spots and every page keep working.
+4. The stages lift at midnight UTC, or as soon as the budget is raised past the day's spend.
+5. A stage can start up to about a minute after the spend that crosses it, the time the count takes to reach every server process.

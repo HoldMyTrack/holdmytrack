@@ -26,6 +26,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/bikepaths"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/budget"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/config"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/db"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/geo"
@@ -138,6 +139,9 @@ func main() {
 		}
 		metrics.RegisterQueue(pool, log)
 		metrics.RegisterStats(pool, log)
+		budget.RegisterCollector(pool, cfg.R2DailyBudgetUSD, log)
+		go budget.RunFlusher(ctx, pool, log)
+		srv.SetBudget(budget.NewGate(pool, cfg.R2DailyBudgetUSD, log))
 		metrics.Serve(ctx, cfg.MetricsAddr, log)
 		log.Info("serve: listening", "addr", cfg.ListenAddr)
 		ln, err := net.Listen("tcp", cfg.ListenAddr)
@@ -159,7 +163,9 @@ func main() {
 		metrics.Serve(ctx, cfg.MetricsAddr, log)
 		log.Info("work: polling", "concurrency", cfg.WorkerConcurrency)
 		notifier := &worker.Notifier{Mailer: newMailer(cfg, log, "work"), BaseURL: cfg.AppBaseURL}
-		if err := worker.Run(ctx, pool, store, log, notifier, cfg.WorkerConcurrency, cfg.WorkerRenderConcurrency); err != nil {
+		go budget.RunFlusher(ctx, pool, log)
+		gate := budget.NewGate(pool, cfg.R2DailyBudgetUSD, log)
+		if err := worker.Run(ctx, pool, store, log, notifier, gate, cfg.WorkerConcurrency, cfg.WorkerRenderConcurrency); err != nil {
 			log.Error("work", "err", err)
 			os.Exit(1)
 		}
@@ -457,6 +463,11 @@ func main() {
 	default:
 		fmt.Fprintf(os.Stderr, "unknown subcommand %q; want serve, work, migrate, seed-demo-customer, export-demo-activities, seed-admin-boundaries, import-spots, or set-admin\n", os.Args[1])
 		os.Exit(2)
+	}
+	// What a one-off subcommand asked of the object store counts toward the day's R2 budget
+	// too; serve and work have flushed theirs as they stopped.
+	if err := budget.Flush(context.Background(), pool); err != nil {
+		log.Error("budget flush", "err", err)
 	}
 }
 
