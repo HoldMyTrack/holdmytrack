@@ -73,7 +73,7 @@ The app's whole HTTP surface in one object: one shared `OkHttpClient`, its inter
 - **Everything except `syncActivities` is callback-based**, posted back to the main thread — a deliberate rejection of coroutines-everywhere for this file: a handful of call sites don't amortize a coroutines layer over OkHttp's own async API.
 - **`syncActivities` is the one `suspend` function, wrapping a blocking call on `Dispatchers.IO`**: its caller must not send its next batch until this one is answered, and Health Connect's own API already puts that caller on coroutines.
 - **The Type picker's counts come from the same unpaginated activity list** the web's Type facet is built from; there is no dedicated facets endpoint.
-- **`ApiException` carries the server's own response text as its message, unreworded**: the server's plain-text errors are written for people, and rewriting them risks saying something the server didn't mean. Refusals a client branches on come as `{error, message}`; those show their `message` and keep the code.
+- **`ApiException` carries the server's own message, unreworded**: every API error is `{error, message}` (ADR-0045), and its `message` is written for people; rewriting it risks saying something the server didn't mean. The code is kept as `errorCode`, which is what a caller branches on. A body that isn't that shape, a proxy's error page in front of the server, is shown as its text, with no code.
 - **`image()` fetches any API image with the bearer token** and samples it down off the main thread. A browser tab or an image library would have no token to send, which is also why Full size opens in the app (§3.4).
 
 ### 2.3 `SignInActivity`

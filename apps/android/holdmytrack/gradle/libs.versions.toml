@@ -40,6 +40,7 @@ recyclerview = "1.2.1"
 fragment = "1.8.9"
 # Unit tests for the panel's pure logic (src/test).
 junit = "4.13.2"
+json = "20240303"
 
 [libraries]
 maplibre = { module = "org.maplibre.gl:android-sdk", version.ref = "maplibre" }
@@ -56,6 +57,7 @@ browser = { module = "androidx.browser:browser", version.ref = "browser" }
 recyclerview = { module = "androidx.recyclerview:recyclerview", version.ref = "recyclerview" }
 fragment = { module = "androidx.fragment:fragment", version.ref = "fragment" }
 junit = { module = "junit:junit", version.ref = "junit" }
+json = { module = "org.json:json", version.ref = "json" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
