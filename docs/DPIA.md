@@ -147,7 +147,7 @@ After the measures already in place, R1 and R3–R6 drop to low. R7 and R8 stay 
 | R4 | bcrypt password hashes. HttpOnly, SameSite=Lax session cookie for up to 30 days. Sign-in rate limits. Email verification. Google and Facebook sign-in. | Optional second factor; not needed for launch | Low |
 | R5 | The admin panel shows activity lists, never tracks. Admin rights can be set only from the server's own command line. The daily statistics hold no account-level rows, and a country group under 5 accounts is folded into one, so no stored number points at one person. | An audit log, needed once an admin can see or change a track | Low |
 | R6 | Exports leave out Private locations and draw only clipped tracks. A Story copy needs the recipient to accept it and carries the sender's Private locations. The policy warns that a copy is the recipient's. | — | Low |
-| R7 | Transfers rely on the processors' Standard Contractual Clauses or EU–US Data Privacy Framework certification, stated in the privacy policy. | EU-region hosting for EU users (`docs/ROADMAP.md` Phase 6), or a transfer impact assessment that justifies staying in the US | Medium |
+| R7 | Transfers rely on the processors' Standard Contractual Clauses or EU–US Data Privacy Framework certification, stated in the privacy policy. | EU-region hosting for EU users (`docs/ROADMAP.md`, "Before launch"), or a transfer impact assessment that justifies staying in the US | Medium |
 | R8 | Processors are named in the privacy policy. Logs are scrubbed of tracks, places, names, emails and IP addresses before they reach Grafana. | Signed or accepted DPAs with DigitalOcean, Cloudflare and Grafana Labs on file; the email provider chosen, named and under a DPA | Medium |
 | R9 | Deletion is complete within minutes and reaches backups within 8 weeks. Download archives expire after 7 days. Grafana logs expire after 14 days. | — (no dormancy policy: an account's data is kept until its owner deletes it, `VISION.md` §4.3) | Medium |
 
@@ -167,7 +167,7 @@ Five actions gate the public launch; the rest can follow it.
 
 **Soon after:**
 
-- [ ] Review how long original uploads are kept (R2; `docs/ROADMAP.md`, "Ongoing").
+- [ ] Review how long original uploads are kept (R2; `docs/ROADMAP.md`, "After launch").
 - [ ] Add or confirm a test that one account cannot read another's activities, tiles or photos (R3).
 - [ ] Re-check that the cookies and browser storage the site sets still match the Cookies list on `/privacy`.
 - [ ] Align `VISION.md` §7 with the privacy policy's lawful basis (section 3).

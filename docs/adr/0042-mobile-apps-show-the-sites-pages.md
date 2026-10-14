@@ -16,7 +16,7 @@ The parts that have to be native are few and known. Health Connect and HealthKit
 - **The site's own page for the rest.** A screen the server already renders as a page is that page in a WebView (`WKWebView` on iOS), not a native copy. A new feature of that kind is built once, as a page.
 - **The server renders a page for an app** when the request carries the `hmt_app` cookie: no site header, footer or Back to map, and none of what the app keeps as screens of its own (`IMPLEMENTATION.md` §4.19). The app signs the WebView in with the session as the site's own session cookie, in the WebView's own cookie store (`apps/android/docs/IMPLEMENTATION.md` §2.5).
 - **Links between the two halves**: a link to the map opens the native map; a link within the page stays in the WebView; anything else opens in the browser.
-- **The map stays native for now.** Whether the map page itself could be the WebView too is decided by measuring it on a mid-range phone, not assumed (`ROADMAP.md`).
+- **The map stays native for now.** Whether the map page itself could be the WebView too is decided by measuring it on a mid-range phone, not assumed; it hasn't been measured.
 
 ## Alternatives considered
 

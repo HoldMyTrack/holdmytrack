@@ -3,9 +3,9 @@
 | | |
 | :-- | :-- |
 | **Version** | 1.0 |
-| **Status** | Current — describes the app as built: sign-in, map, Health Connect sync and sync status (FR-1–FR-4), plus in-app GPS recording (FR-5, built ahead of the design and compliance phases — §1.2, §7 below) |
+| **Status** | Current — describes the app as built: sign-in, map, Health Connect sync and sync status (FR-1–FR-4), plus in-app GPS recording (FR-5, built ahead of the finalized design and the compliance work — §1.2, §7 below) |
 | **Last updated** | 2026-10-06 (touch targets, large text and landscape, §8) |
-| **Related documents** | `apps/android/docs/ROADMAP.md` (remaining work and the platform-constraint findings; completed phases, with the verification record this document's behavior claims are drawn from, are removed from it once done and survive in its git history); `apps/android/docs/ARCHITECTURE.md` (this app's shape, stack, and key decisions); `apps/android/docs/IMPLEMENTATION.md` (file-by-file "how it's built" detail); `docs/SPEC.md`/`docs/IMPLEMENTATION.md` (the server behavior and schema this app is a client of); `docs/VISION.md` (why Path 2 exists at all, §4.1 and §5.4) |
+| **Related documents** | `apps/android/docs/ROADMAP.md` (open work; completed sections, with the verification record this document's behavior claims are drawn from, are removed from it once done and survive in its git history); `apps/android/docs/ARCHITECTURE.md` (this app's shape, stack, and key decisions); `apps/android/docs/IMPLEMENTATION.md` (file-by-file "how it's built" detail); `docs/SPEC.md`/`docs/IMPLEMENTATION.md` (the server behavior and schema this app is a client of); `docs/VISION.md` (why Path 2 exists at all, §4.1) |
 
 ## 1. Introduction
 
@@ -445,6 +445,6 @@ Named here rather than left implicit, the way `docs/SPEC.md` §20 does for the w
 - **A picked photo's position rarely arrives.** Android's photo picker removes location from the copies it hands an app, so a photo is placed on its route by its capture time (FR-2.10 item 4), which the picker keeps, or by the user's slider — the position only counts for a file that still carries one. The web reads it from any JPEG with GPS tags.
 - **Samsung Galaxy Watch is unsupported**, not degraded — Samsung does not expose route geometry to Health Connect at all, so every Samsung-sourced session is rejected for having no route, indistinguishable at sync time from an ordinary indoor workout.
 - **Background sync will never be built for Health Connect routes** — a platform constraint (`ConsentRequired` regardless of grant state when backgrounded), not a sequencing gap.
-- **In-app GPS recording's iOS half is unbuilt** — FR-5 above is Android-only; the iOS half is in `docs/ROADMAP.md`, "Ongoing, not phase-bound".
+- **In-app GPS recording's iOS half is unbuilt** — FR-5 above is Android-only; the iOS half is in `docs/ROADMAP.md`, "After launch".
 - **Few automated tests.** Only the Activities panel's filter and selection rules, the track band rules, the track editor's rules and the Private location circle (FR-2.7), a spot popup's text (FR-2.8), the photo logic — EXIF capture times, the slider's walk along a track, the Photos tab's draft, the markers' grouping (FR-2.10) and Profile's stats, grid layout, shading and Trends bars (FR-1.6), the zone an activity's times are shown in, and how a group of activities across the antimeridian is framed, have unit tests (`app/src/test`). Every behavior in this document has been verified manually against a live server stack — a physical device for FR-1 through FR-4, an emulator for FR-3.6 and FR-5 (§7, noted inline where it matters); see `apps/android/docs/IMPLEMENTATION.md` §9 for the verification record.
 - **iOS does not exist.** Path 2's HealthKit half is unbuilt; this app defines the sync contract iOS will inherit (`apps/android/docs/ROADMAP.md`).

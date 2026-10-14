@@ -5,7 +5,7 @@
 | **Version** | 1.0 |
 | **Status** | Current — describes Milestone 1 (MVP) functionality as built |
 | **Last updated** | 2026-10-03 |
-| **Related documents** | `VISION.md` (product scope, market rationale, phase roadmap — the authority on *what ships and why*); `ARCHITECTURE.md` (system-level shape, key decisions, the stack); `IMPLEMENTATION.md` (schema, each feature's own implementation — the authority on *how it's built*); `AGENTS.md` (repository orientation) |
+| **Related documents** | `VISION.md` (product scope, market rationale, milestones — the authority on *what ships and why*); `ARCHITECTURE.md` (system-level shape, key decisions, the stack); `IMPLEMENTATION.md` (schema, each feature's own implementation — the authority on *how it's built*); `AGENTS.md` (repository orientation) |
 
 ## 1. Introduction
 
@@ -456,7 +456,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Error cases**: What doesn't fit under the account's limits (FR-1.13), in the order sent, is rejected one by one with a message naming the limit, and stays on the phone; what fits is taken. More than 60 sync requests from one account in an hour → `429 Too Many Requests` before the request is read, with a message naming the limit, which the run stops on and shows like any other refusal; so is a request whose activities would take the account past 1,000 sent in the hour (every activity sent counts, taken or not, and a refused request counts none). The counts restart when the server does. Server unreachable while sending — the run stops and says so, and whatever wasn't confirmed stays listed and ticked; anything sent before the failure is known to the server at the next Load. Server unreachable while asking what it has — the read keeps what the last one found, with the reason shown. A session kept from an earlier read that's gone from Health Connect by the time it's sent is refused, with the reason.
 
-**Not yet built**: the iOS/HealthKit half of Path 2 — no iOS app exists yet (`apps/ios` is a placeholder). `apps/android/docs/ROADMAP.md` is the authority on Android's own remaining work (UI design, Play Store compliance).
+**Not yet built**: the iOS/HealthKit half of Path 2 — no iOS app exists yet (`apps/ios` is a placeholder). `apps/android/docs/ROADMAP.md` is the authority on Android's own remaining work (the Play release).
 
 ### FR-3.7 Overlap hint
 
@@ -496,7 +496,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Error cases**: A too-long custom activity type (over 50 characters, the column's own bound) is rejected by the sync endpoint with a clear reason rather than failing as a raw database error at insert time. So is an `external_id` that isn't 1–200 letters, digits, `.`, `_` or `-` (not starting with `.`). A row that fails to sync (network error, server rejection) is left on the device, listed and still ticked, to be sent again.
 
-**Not yet built**: a discard confirmation before Stop finalizes a save; the iOS half (`docs/ROADMAP.md`, "Ongoing, not phase-bound").
+**Not yet built**: a discard confirmation before Stop finalizes a save; the iOS half (`docs/ROADMAP.md`, "After launch").
 
 ### FR-3.9 The Sync page
 

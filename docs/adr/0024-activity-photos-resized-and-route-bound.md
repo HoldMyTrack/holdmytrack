@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Built for the server and the web (`SPEC.md` FR-16, `IMPLEMENTATION.md` §4.27); the Android app is a `ROADMAP.md` item. Amends the "only the geographical data you trust us with" line of ADR-0017, which it otherwise leaves as it is.
+Accepted. Built for the server and the web (`SPEC.md` FR-16, `IMPLEMENTATION.md` §4.27) and for Android (`apps/android/docs/SPEC.md` FR-2.10). Amends the "only the geographical data you trust us with" line of ADR-0017, which it otherwise leaves as it is.
 
 ## Context
 

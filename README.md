@@ -42,7 +42,7 @@ holdmytrack/
 ├── .env.prod.example            # compose.prod.yml's own env template
 ├── .editorconfig
 ├── docs/
-│   ├── VISION.md                # product, market, funding, milestones and phases
+│   ├── VISION.md                # product, market, funding, milestones
 │   ├── ARCHITECTURE.md          # system architecture, key decisions, stack
 │   ├── IMPLEMENTATION.md        # schema, workflows, each feature's own detail
 │   ├── SPEC.md                  # observable behavior, FR-N.M, independent of the above
@@ -85,7 +85,7 @@ This tree is the canonical one; do not let a second tree exist anywhere else to 
 
 | Document | Read it when |
 | :-- | :-- |
-| [`docs/VISION.md`](docs/VISION.md) | Product scope, market rationale, funding model, milestones and phases. |
+| [`docs/VISION.md`](docs/VISION.md) | Product scope, market rationale, funding model, milestones. |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System-level shape: the key decisions, the target architecture, the stack, and what's deliberately deferred. |
 | [`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md) | Database schema, and each feature's own implementation detail — ingest, tile/fog workflows, accounts, deployment, engineering risks. |
 | [`docs/SPEC.md`](docs/SPEC.md) | A precise, testable statement of what the system currently does, independent of both the business rationale and the implementation. |

@@ -32,7 +32,7 @@ Spots is a map of outdoor places worth going to — a playground or a dog park n
 
 - Places exist wherever OSM has them, from day one, and cost no curation. Their quality is OSM's: a school's private playground or a misplaced viewpoint shows up as mapped.
 - One fixed-size table of several million places (roughly 1 GB with its spatial index) and one table of visits, which cascades away with an activity or a place. Matching is an indexed intersection per activity plus a dwell sum over the points that fell inside.
-- The import has to run off-box: filtering the planet file needs more than the 1 vCPU / 2 GB server has (`ROADMAP.md`).
+- The import has to run off-box: filtering the planet file needs more than the 1 vCPU / 2 GB server has (`docs/DEPLOY.md` §6).
 - Visits need timestamped points: a track with none can't visit anything. A spot inside a Private location is never visited, since the points there are clipped before matching.
 - Spots tiles carry a per-user visited flag, so they're per-account tiles like the track tiles, cached by the same tile version.
 - Many OSM places have no address; Copy address then copies coordinates, which every navigator accepts. Reverse-geocoding millions of places isn't an option under Nominatim's usage policy.

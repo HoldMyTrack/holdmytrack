@@ -25,7 +25,7 @@ Every request to the app's bucket goes through one client (`internal/storage`), 
 - **A budget per month.** A bad day would use up the month, and stop everything for the rest of it; a day's budget bounds the damage to a day.
 - **One switch at 100%: everything that touches the bucket stops.** Simpler, but the map's Fog and Heatmap would go blank to save renders that could simply wait.
 - **Counting at each call site** (each Put and Get). Misses what the client library does underneath — a listing's pages, a multipart upload's parts, a resumed download's range reads — which the bill counts. The transport sees each request.
-- **Counting the basemap through a proxy in the app.** Would put every map tile of every visitor through the droplet, the cost the basemap's public bucket and Cloudflare's cache are there to avoid. The basemap is protected at the edge instead (`docs/DEPLOY.md`'s Cloudflare rules) and by serving it as cacheable tiles (`ROADMAP.md`).
+- **Counting the basemap through a proxy in the app.** Would put every map tile of every visitor through the droplet, the cost the basemap's public bucket and Cloudflare's cache are there to avoid. The basemap is protected at the edge instead (`docs/DEPLOY.md`'s Cloudflare rules) and by serving it as cacheable tiles (`ROADMAP.md`, Milestone 2's Cost control).
 
 ## Consequences
 
