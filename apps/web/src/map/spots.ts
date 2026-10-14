@@ -5,6 +5,7 @@ import type { ExpressionSpecification, FilterSpecification, GeoJSONSource, Map a
 import type { FeatureCollection, Point } from 'geojson';
 import { Binoculars, Castle, createLucideIcon, Dog, Landmark, type LucideProps } from 'lucide-react';
 import { API_BASE_URL, TILES_V1 } from '../api';
+import type { components } from '../apiSchema';
 import { versionedTileURL } from './coverageVersion';
 
 /**
@@ -52,7 +53,7 @@ const SPOTS_MAX_ZOOM = 14;
 
 const SPOTS_TILE_URL = `${API_BASE_URL}${TILES_V1}/spots/{z}/{x}/{y}.mvt`;
 
-export type SpotCategory = 'playground' | 'dog_park' | 'monument' | 'viewpoint' | 'history';
+export type SpotCategory = components['schemas']['Spot']['category'];
 
 /** Every category, in the order the Layers menu lists them. */
 export const SPOT_CATEGORIES: readonly SpotCategory[] = ['playground', 'dog_park', 'monument', 'viewpoint', 'history'];
@@ -76,19 +77,7 @@ const CATEGORY_ICONS: Record<SpotCategory, ComponentType<LucideProps>> = {
 };
 
 /** One place as `GET /v1/spots` returns it (api.ts), text fields absent when OSM has none. */
-export interface SpotInArea {
-  id: number;
-  category: SpotCategory;
-  name?: string;
-  address?: string;
-  description?: string;
-  inscription?: string;
-  memorial?: string;
-  start_date?: string;
-  wikipedia?: string;
-  lon: number;
-  lat: number;
-}
+export type SpotInArea = components['schemas']['Spot'];
 
 /** One spot as the popup needs it — a tile feature's properties, typed. */
 export interface Spot {
