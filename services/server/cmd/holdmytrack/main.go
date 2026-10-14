@@ -134,6 +134,7 @@ func main() {
 			IdleTimeout:       2 * time.Minute,
 		}
 		metrics.RegisterQueue(pool, log)
+		metrics.RegisterStats(pool, log)
 		metrics.Serve(ctx, cfg.MetricsAddr, log)
 		log.Info("serve: listening", "addr", cfg.ListenAddr)
 		ln, err := net.Listen("tcp", cfg.ListenAddr)

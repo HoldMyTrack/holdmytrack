@@ -785,6 +785,292 @@
         "wrapLogMessage": true,
         "sortOrder": "Descending"
       }
+    },
+    {
+      "id": 15,
+      "type": "row",
+      "title": "Service",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 38,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [],
+      "description": "The newest daily statistics snapshot (IMPLEMENTATION.md §4.32), one value per UTC day. Postgres's daily_stats is the record; this shows about 14 days."
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Active accounts",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${PROM}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 39,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${PROM}"
+          },
+          "expr": "holdmytrack_stat{deployment=\"${DEPLOYMENT}\", key=~\"active_(1d|7d|30d)\"}",
+          "legendFormat": "{{key}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "Accounts with an authenticated request in the last 1, 7 and 30 days, as of the snapshot's day."
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "Accounts and signups",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${PROM}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 39,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${PROM}"
+          },
+          "expr": "holdmytrack_stat{deployment=\"${DEPLOYMENT}\", key=~\"accounts|signups\"}",
+          "legendFormat": "{{key}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "Accounts that exist, and accounts created on the day."
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "Activities by source",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${PROM}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 39,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${PROM}"
+          },
+          "expr": "holdmytrack_stat{deployment=\"${DEPLOYMENT}\", key=~\"activities_by_source\\\\..+\"}",
+          "legendFormat": "{{key}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 19,
+      "type": "timeseries",
+      "title": "Activities per account",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${PROM}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 47,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${PROM}"
+          },
+          "expr": "holdmytrack_stat{deployment=\"${DEPLOYMENT}\", key=~\"activities_per_account\\\\..+\"}",
+          "legendFormat": "{{key}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "Over accounts with at least one activity."
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "Photo storage",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${PROM}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 47,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${PROM}"
+          },
+          "expr": "holdmytrack_stat{deployment=\"${DEPLOYMENT}\", key=\"storage_bytes.photos\"}",
+          "legendFormat": "{{key}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 21,
+      "type": "table",
+      "title": "Accounts by country",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${PROM}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 47,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${PROM}"
+          },
+          "expr": "holdmytrack_stat{deployment=\"${DEPLOYMENT}\", key=~\"accounts_by_country\\\\..+\"}",
+          "legendFormat": "{{key}}",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "deployment": true,
+              "instance": true,
+              "job": true
+            },
+            "renameByName": {
+              "key": "Country",
+              "Value": "Accounts"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Accounts",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "description": "Countries with fewer than 5 accounts are counted in other."
     }
   ]
 }
