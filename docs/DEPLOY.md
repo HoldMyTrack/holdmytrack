@@ -446,6 +446,8 @@ It creates the `holdmytrack` contact point, a **HoldMyTrack** folder holding the
 | Site down from outside | under half the uptime checks of `/healthz` succeeded over 5 minutes, or the check reports nothing |
 | Backup overdue | The nightly `backup.sh` last succeeded over 26 hours ago, or never |
 | Restore drill overdue | `restore-drill.sh` last succeeded over 33 days ago, or never |
+| An account holds half the activity limit | the daily statistics' heaviest account holds over 25,000 activities (`IMPLEMENTATION.md` §5.7) |
+| An account holds half the storage limit | its original files take up over 2.5 GB |
 
 The two backup alerts read the files the scripts write after a successful run (§11), so on a server whose scripts haven't run since that was added, they fire until each script has run once. Run `./scripts/backup.sh` and `./scripts/restore-drill.sh` by hand to start them off.
 

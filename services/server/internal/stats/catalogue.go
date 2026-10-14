@@ -152,6 +152,15 @@ var catalogue = []stat{
 			FROM per
 		)
 		SELECT g, x FROM v, LATERAL (VALUES ('p50', v.p50), ('p90', v.p90), ('max', v.mx)) AS t(g, x)`},
+	// The most originals one account keeps, what its storage limit (ADR-0043) bounds, for the
+	// alert at half of it.
+	{key: "original_bytes_per_account.max", kind: state, query: `
+		SELECT coalesce(max(b), 0) FROM (
+			SELECT sum(o) AS b FROM (
+				SELECT a.user_id, max(a.raw_bytes) AS o FROM activities a JOIN acct u ON u.id = a.user_id
+				WHERE a.raw_payload_key IS NOT NULL GROUP BY a.user_id, a.raw_payload_key
+			) k GROUP BY user_id
+		) per`},
 	// Rows naming an object whose size isn't recorded yet; 0 once backfill-object-bytes has
 	// run (docs/DEPLOY.md).
 	{key: "storage_bytes_unmeasured_rows", kind: state, query: `
