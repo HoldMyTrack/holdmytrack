@@ -82,7 +82,7 @@ func (s *Server) handleActiveUploads(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.pool.Query(ctx, activeImportsQuery, userID)
 	if err != nil {
 		s.log.Error("active imports query failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -92,7 +92,7 @@ func (s *Server) handleActiveUploads(w http.ResponseWriter, r *http.Request) {
 		var filename string
 		if err := rows.Scan(&a.Source, &filename, &a.Done, &a.Total, &a.SubmittedAt); err != nil {
 			s.log.Error("active imports scan failed", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			writeAPIError(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		a.Title = importTitle(l, a.Source, filename)
@@ -100,12 +100,12 @@ func (s *Server) handleActiveUploads(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := rows.Err(); err != nil {
 		s.log.Error("active imports read failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if err := s.pool.QueryRow(ctx, unseenImportFailuresQuery, userID).Scan(&resp.UnseenFailures); err != nil {
 		s.log.Error("unseen import failures query failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")

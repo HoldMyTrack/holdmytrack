@@ -49,12 +49,12 @@ func (s *Server) handleActivityTrackPoints(w http.ResponseWriter, r *http.Reques
 		FROM activities WHERE id = $1 AND user_id = $2
 	`, activityID, userID).Scan(&sourceDetail, &rawKey, &editJSON, &rng.From, &rng.To)
 	if errors.Is(err, pgx.ErrNoRows) {
-		http.Error(w, "activity not found", http.StatusNotFound)
+		writeAPIError(w, "activity not found", http.StatusNotFound)
 		return
 	}
 	if err != nil {
 		s.log.Error("track points lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if rawKey == nil {
@@ -73,7 +73,7 @@ func (s *Server) handleActivityTrackPoints(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if err := ingest.EditableTimestamps(points); err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
+		writeAPIError(w, err.Error(), http.StatusConflict)
 		return
 	}
 
@@ -127,12 +127,12 @@ func (s *Server) handleActivityTrackEdit(w http.ResponseWriter, r *http.Request)
 
 	var req trackEditRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeAPIError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 	if req.Edit != nil {
 		if err := req.Edit.Validate(); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			writeAPIError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		if len(req.Edit.Remove)+len(req.Edit.Drop)+len(req.Edit.Move) > maxTrackEditEntries {
@@ -148,10 +148,7 @@ func (s *Server) handleActivityTrackEdit(w http.ResponseWriter, r *http.Request)
 		status, key := s.checkSplit(r, userID, activityID, req.Edit, *req.SplitAt)
 		if key == "error.split_in_private" {
 			if !req.AllowHidden {
-				writeJSON(w, http.StatusUnprocessableEntity, map[string]string{
-					"error":   splitHidesPartCode,
-					"message": i18n.Get(requestLang(r)).T(key),
-				})
+				writeError(w, http.StatusUnprocessableEntity, splitHidesPartCode, i18n.Get(requestLang(r)).T(key))
 				return
 			}
 		} else if status != 0 {
@@ -167,7 +164,7 @@ func (s *Server) handleActivityTrackEdit(w http.ResponseWriter, r *http.Request)
 	}
 	if err != nil {
 		s.log.Error("track edit enqueue failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if !ok {
@@ -239,12 +236,12 @@ func (s *Server) handleActivityTrackMerge(w http.ResponseWriter, r *http.Request
 
 	var req trackMergeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.IDs) > maxMergeIDs {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeAPIError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 	for i, id := range req.IDs {
 		if !uuidPattern.MatchString(id) {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
+			writeAPIError(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
 		req.IDs[i] = strings.ToLower(id)
@@ -257,7 +254,7 @@ func (s *Server) handleActivityTrackMerge(w http.ResponseWriter, r *http.Request
 	}
 	if err != nil {
 		s.log.Error("track merge failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusOK, trackMergeResponse{ID: survivor, Removed: removed})

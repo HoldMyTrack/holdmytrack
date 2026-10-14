@@ -245,14 +245,14 @@ type activitiesResponse struct {
 func (s *Server) handleListActivities(w http.ResponseWriter, r *http.Request) {
 	filter, err := parseActivityFilter(r.URL.Query())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeAPIError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	rows, err := s.pool.Query(r.Context(), listActivitiesQuery, userIDFromContext(r.Context()), filter.From, filter.To, filter.Types, filter.Story)
 	if err != nil {
 		s.log.Error("activity list query failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -263,14 +263,14 @@ func (s *Server) handleListActivities(w http.ResponseWriter, r *http.Request) {
 		a, err := scanActivityRow(rows)
 		if err != nil {
 			s.log.Error("activity list scan failed", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			writeAPIError(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		list = append(list, a)
 	}
 	if err := rows.Err(); err != nil {
 		s.log.Error("activity list read failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
@@ -316,7 +316,7 @@ type updateActivityRequest struct {
 func activityIDFromPath(w http.ResponseWriter, r *http.Request) (string, bool) {
 	id := r.PathValue("id")
 	if !uuidPattern.MatchString(id) {
-		http.Error(w, "activity not found", http.StatusNotFound)
+		writeAPIError(w, "activity not found", http.StatusNotFound)
 		return "", false
 	}
 	return strings.ToLower(id), true
@@ -343,7 +343,7 @@ func (s *Server) handleUpdateActivity(w http.ResponseWriter, r *http.Request) {
 
 	var req updateActivityRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeAPIError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 	req.ActivityType = strings.TrimSpace(req.ActivityType)
@@ -373,11 +373,11 @@ func (s *Server) handleUpdateActivity(w http.ResponseWriter, r *http.Request) {
 	`, activityID, userID, req.ActivityType, req.Name, req.Description)
 	if err != nil {
 		s.log.Error("activity update failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if tag.RowsAffected() == 0 {
-		http.Error(w, "activity not found", http.StatusNotFound)
+		writeAPIError(w, "activity not found", http.StatusNotFound)
 		return
 	}
 	// activity_type is in every tracks tile this activity crosses, and no render follows.
@@ -388,7 +388,7 @@ func (s *Server) handleUpdateActivity(w http.ResponseWriter, r *http.Request) {
 	row, err := scanActivityRow(s.pool.QueryRow(ctx, activityByIDQuery, activityID, userID))
 	if err != nil {
 		s.log.Error("activity lookup after update failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusOK, row)
@@ -427,18 +427,18 @@ func (s *Server) handleDeleteActivity(w http.ResponseWriter, r *http.Request) {
 		`SELECT raw_payload_key FROM activities WHERE id = $1 AND user_id = $2`, activityID, userID,
 	).Scan(&rawKey); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			http.Error(w, "activity not found", http.StatusNotFound)
+			writeAPIError(w, "activity not found", http.StatusNotFound)
 			return
 		}
 		s.log.Error("activity lookup before delete failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	tiles, err := ingest.ActivityTiles(ctx, s.pool, activityID)
 	if err != nil {
 		s.log.Error("activity tile lookup before delete failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
@@ -470,11 +470,11 @@ func (s *Server) handleDeleteActivity(w http.ResponseWriter, r *http.Request) {
 	tag, err := s.pool.Exec(ctx, `DELETE FROM activities WHERE id = $1 AND user_id = $2`, activityID, userID)
 	if err != nil {
 		s.log.Error("activity delete failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if tag.RowsAffected() == 0 {
-		http.Error(w, "activity not found", http.StatusNotFound)
+		writeAPIError(w, "activity not found", http.StatusNotFound)
 		return
 	}
 	s.removeUnreferencedPhotoFiles(ctx, photoKeys)
@@ -533,7 +533,7 @@ type activitySummaryResponse struct {
 func (s *Server) handleActivitySummary(w http.ResponseWriter, r *http.Request) {
 	filter, err := parseActivityFilter(r.URL.Query())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeAPIError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -542,7 +542,7 @@ func (s *Server) handleActivitySummary(w http.ResponseWriter, r *http.Request) {
 		userIDFromContext(r.Context()), filter.From, filter.To, filter.Types, filter.Story,
 	).Scan(&resp.Count, &resp.DistanceMeters, &resp.DurationSeconds, &resp.ElevationGainM); err != nil {
 		s.log.Error("activity summary query failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
@@ -656,7 +656,7 @@ func (s *Server) handleActivityHistogram(w http.ResponseWriter, r *http.Request)
 	loc := locationFromContext(r.Context())
 	story, err := parseStoryParam(q)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeAPIError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -681,7 +681,7 @@ func (s *Server) handleActivityHistogram(w http.ResponseWriter, r *http.Request)
 	earliest, err := s.earliestActivity(r.Context(), userIDFromContext(r.Context()), story)
 	if err != nil {
 		s.log.Error("activity earliest-date query failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
@@ -722,11 +722,11 @@ type badRequest struct{ error }
 func (s *Server) writeHistogramError(w http.ResponseWriter, err error) {
 	var bad badRequest
 	if errors.As(err, &bad) {
-		http.Error(w, bad.Error(), http.StatusBadRequest)
+		writeAPIError(w, bad.Error(), http.StatusBadRequest)
 		return
 	}
 	s.log.Error("activity histogram query failed", "err", err)
-	http.Error(w, "internal error", http.StatusInternalServerError)
+	writeAPIError(w, "internal error", http.StatusInternalServerError)
 }
 
 // activityDayPage is the `?days=N&before=` mode. Buckets come back newest-first from the
@@ -907,7 +907,7 @@ func (s *Server) handleActivityGraphStats(w http.ResponseWriter, r *http.Request
 	if v := r.URL.Query().Get("year"); v != "" {
 		y, err := strconv.Atoi(v)
 		if err != nil || y < 1 {
-			http.Error(w, `invalid "year", want a 4-digit year`, http.StatusBadRequest)
+			writeAPIError(w, `invalid "year", want a 4-digit year`, http.StatusBadRequest)
 			return
 		}
 		year = y
@@ -920,13 +920,13 @@ func (s *Server) handleActivityGraphStats(w http.ResponseWriter, r *http.Request
 	yearStats, err := s.activityStats(r.Context(), userID, &yearStart, &yearEnd)
 	if err != nil {
 		s.log.Error("activity year-stats query failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	allTime, err := s.activityStats(r.Context(), userID, nil, nil)
 	if err != nil {
 		s.log.Error("activity all-time-stats query failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
@@ -1017,7 +1017,7 @@ func (s *Server) handleActivityTrends(w http.ResponseWriter, r *http.Request) {
 		bucket = "week"
 	}
 	if bucket != "week" && bucket != "month" {
-		http.Error(w, `invalid "bucket", want "week" or "month"`, http.StatusBadRequest)
+		writeAPIError(w, `invalid "bucket", want "week" or "month"`, http.StatusBadRequest)
 		return
 	}
 
@@ -1029,7 +1029,7 @@ func (s *Server) handleActivityTrends(w http.ResponseWriter, r *http.Request) {
 	if v := q.Get("to"); v != "" {
 		t, err := time.ParseInLocation(dateLayout, v, loc)
 		if err != nil {
-			http.Error(w, `invalid "to" date, want YYYY-MM-DD`, http.StatusBadRequest)
+			writeAPIError(w, `invalid "to" date, want YYYY-MM-DD`, http.StatusBadRequest)
 			return
 		}
 		last = t
@@ -1038,13 +1038,13 @@ func (s *Server) handleActivityTrends(w http.ResponseWriter, r *http.Request) {
 	if v := q.Get("from"); v != "" {
 		t, err := time.ParseInLocation(dateLayout, v, loc)
 		if err != nil {
-			http.Error(w, `invalid "from" date, want YYYY-MM-DD`, http.StatusBadRequest)
+			writeAPIError(w, `invalid "from" date, want YYYY-MM-DD`, http.StatusBadRequest)
 			return
 		}
 		first = t
 	}
 	if first.After(last) {
-		http.Error(w, `"from" must not be after "to"`, http.StatusBadRequest)
+		writeAPIError(w, `"from" must not be after "to"`, http.StatusBadRequest)
 		return
 	}
 	end := last.AddDate(0, 0, 1) // exclusive upper bound, matching activityCalendarWindow
@@ -1052,7 +1052,7 @@ func (s *Server) handleActivityTrends(w http.ResponseWriter, r *http.Request) {
 	periods, err := s.activityTrends(r.Context(), userIDFromContext(r.Context()), bucket, first, end)
 	if err != nil {
 		s.log.Error("activity trends query failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
@@ -1109,11 +1109,11 @@ func (s *Server) handleActivityTrackMetrics(w http.ResponseWriter, r *http.Reque
 		Scan(&lons, &lats, &ms)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			http.Error(w, "activity not found", http.StatusNotFound)
+			writeAPIError(w, "activity not found", http.StatusNotFound)
 			return
 		}
 		s.log.Error("track metrics query failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 

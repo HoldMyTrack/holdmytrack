@@ -231,22 +231,16 @@ func requestLang(r *http.Request) string {
 	return i18n.Resolve(authInfoFromContext(r.Context()).locale, r)
 }
 
-// httpErrorT is http.Error with a catalog message, in the request's language (requestLang) —
-// for the plain-text errors a person can actually cause and the web app shows as they are.
-func httpErrorT(w http.ResponseWriter, r *http.Request, status int, key string, args ...any) {
-	http.Error(w, i18n.Get(requestLang(r)).T(key, args...), status)
-}
-
-// writeAccountError is the JSON side of an account core's error: its own status and message
-// (in the request's language) for an accountError, a logged 500 for anything else.
+// writeAccountError is the JSON side of an account core's error: its own status, code and
+// message (in the request's language) for an accountError, a logged 500 for anything else.
 func (s *Server) writeAccountError(w http.ResponseWriter, r *http.Request, op string, err error) {
 	var ae *accountError
 	if errors.As(err, &ae) {
-		http.Error(w, ae.message(requestLang(r)), ae.status)
+		writeAccountFailure(w, r, ae)
 		return
 	}
 	s.log.Error(op+" failed", "err", err)
-	http.Error(w, "internal error", http.StatusInternalServerError)
+	writeAPIError(w, "internal error", http.StatusInternalServerError)
 }
 
 // writeSession starts a session for userID and answers with the account plus its token —
@@ -255,13 +249,13 @@ func (s *Server) writeSession(w http.ResponseWriter, r *http.Request, userID str
 	sessionID, err := s.startSession(w, r.Context(), userID, ttl)
 	if err != nil {
 		s.log.Error("session start failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	resp, err := s.loadAuthResponse(r.Context(), userID)
 	if err != nil {
 		s.log.Error("session response lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, status, authResponseWithSession{authResponse: resp, SessionToken: sessionID})
@@ -296,7 +290,7 @@ var errEmailTaken = errors.New("email already registered")
 func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 	req, err := decodeAuthRequest(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeAPIError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	userID, err := s.createAccountLimited(r, req.Email, req.Password, req.Timezone, requestLang(r))
@@ -381,7 +375,7 @@ func (s *Server) sendVerificationEmail(ctx context.Context, userID, email, lang 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	req, err := decodeAuthRequest(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeAPIError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	userID, err := s.checkPassword(r.Context(), clientIP(r), req.Email, req.Password)
@@ -465,13 +459,13 @@ func (s *Server) endSession(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	userID, ok := s.currentUserID(r)
 	if !ok {
-		http.Error(w, "not signed in", http.StatusUnauthorized)
+		writeAPIError(w, "not signed in", http.StatusUnauthorized)
 		return
 	}
 	resp, err := s.loadAuthResponse(r.Context(), userID)
 	if err != nil {
 		s.log.Error("me lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusOK, resp)
@@ -524,7 +518,7 @@ type forgotPasswordRequest struct {
 func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 	var req forgotPasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeAPIError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 	if err := s.requestPasswordReset(r, req.Email); err != nil {
@@ -603,7 +597,7 @@ type resetPasswordRequest struct {
 func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	var req resetPasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeAPIError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 	userID, err := s.resetPassword(r.Context(), req.Token, req.Password)
@@ -666,7 +660,7 @@ type verifyEmailRequest struct {
 func (s *Server) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
 	var req verifyEmailRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeAPIError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 	userID, err := s.verifyEmail(r.Context(), req.Token)
@@ -792,7 +786,7 @@ func (s *Server) handleChangeEmail(w http.ResponseWriter, r *http.Request) {
 	info := authInfoFromContext(r.Context())
 	var req changeEmailRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeAPIError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 	if err := s.changeEmail(r.Context(), info, req.Email, requestLang(r)); err != nil {
@@ -802,7 +796,7 @@ func (s *Server) handleChangeEmail(w http.ResponseWriter, r *http.Request) {
 	resp, err := s.loadAuthResponse(r.Context(), info.userID)
 	if err != nil {
 		s.log.Error("change-email response lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusOK, resp)
@@ -1091,7 +1085,7 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sessionID, ok := sessionIDFromRequest(r)
 		if !ok {
-			http.Error(w, "authentication required", http.StatusUnauthorized)
+			writeAPIError(w, "authentication required", http.StatusUnauthorized)
 			return
 		}
 		var info authInfo
@@ -1102,7 +1096,7 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 			WHERE se.id = $1 AND se.expires_at > NOW()
 		`, sessionID).Scan(&info.userID, &info.emailVerified, &info.timezone, &info.locale, &lastSeen)
 		if err != nil {
-			http.Error(w, "authentication required", http.StatusUnauthorized)
+			writeAPIError(w, "authentication required", http.StatusUnauthorized)
 			return
 		}
 		info.isDemo = info.userID == DemoCustomerUserID
@@ -1140,7 +1134,7 @@ func (s *Server) requireVerified(next http.HandlerFunc) http.HandlerFunc {
 	return s.requireAuth(func(w http.ResponseWriter, r *http.Request) {
 		info := authInfoFromContext(r.Context())
 		if !info.isDemo && !info.emailVerified {
-			writeJSON(w, http.StatusForbidden, map[string]string{"error": "email_not_verified"})
+			httpErrorT(w, r, http.StatusForbidden, "error.email_not_verified")
 			return
 		}
 		next(w, r)
@@ -1155,10 +1149,7 @@ func (s *Server) requireVerified(next http.HandlerFunc) http.HandlerFunc {
 func (s *Server) requireNotDemo(next http.HandlerFunc) http.HandlerFunc {
 	return s.requireVerified(func(w http.ResponseWriter, r *http.Request) {
 		if authInfoFromContext(r.Context()).isDemo {
-			writeJSON(w, http.StatusForbidden, map[string]string{
-				"error":   "demo_read_only",
-				"message": i18n.Get(requestLang(r)).T("error.demo_read_only"),
-			})
+			httpErrorT(w, r, http.StatusForbidden, "error.demo_read_only")
 			return
 		}
 		next(w, r)

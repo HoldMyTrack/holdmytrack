@@ -1,4 +1,5 @@
 import { t } from './i18n';
+import { parseErrorBody } from './apiError';
 import type { SpotCategory, SpotInArea } from './map/spots';
 
 /**
@@ -18,33 +19,12 @@ export const API_BASE_URL: string =
 export const API_V1 = '/v1';
 export const TILES_V1 = '/tiles/v1';
 
-/**
- * An error response body is either plain text (`http.Error(w, "message", code)`, most
- * endpoints) or JSON shaped like `{"error": "machine_code", "message": "human text"}` (the
- * handful that need a distinguishable code alongside a human message for the frontend to
- * branch on — requireVerified's `email_not_verified`, requireNotDemo's `demo_read_only`).
- * Whichever it is, this pulls out the part actually worth putting in front of a person: the
- * JSON body's own `message` field when there is one, the plain text otherwise — never the raw
- * `{"error":...,"message":...}` blob itself.
- */
-function messageFromErrorBody(text: string, fallback: string): string {
-  if (!text) return fallback;
-  try {
-    const parsed: unknown = JSON.parse(text);
-    if (parsed && typeof parsed === 'object' && typeof (parsed as { message?: unknown }).message === 'string') {
-      return (parsed as { message: string }).message;
-    }
-  } catch {
-    // Not JSON — a plain-text http.Error body, which already is the message.
-  }
-  return text;
-}
-
-/** `messageFromErrorBody` for the `fetch`-based functions below, which all throw through this
- *  rather than reading `res.text()` and constructing an `Error` themselves. */
+/** An error response's message, worth putting in front of a person (`parseErrorBody`), for the
+ *  `fetch`-based functions below, which all throw through this rather than reading `res.text()`
+ *  and constructing an `Error` themselves. One that branches on the code reads the body itself. */
 async function errorMessageFromResponse(res: Response, fallback: string): Promise<string> {
   const text = await res.text().catch(() => '');
-  return messageFromErrorBody(text, fallback);
+  return parseErrorBody(text, fallback).message;
 }
 
 /**
@@ -471,8 +451,8 @@ export async function saveActivityTrackEdit(
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    const message = messageFromErrorBody(text, t('common.request_failed', { status: res.status }));
-    if (res.status === 422 && text.includes('"split_hides_part"')) throw new SplitHidesPartError(message);
+    const { code, message } = parseErrorBody(text, t('common.request_failed', { status: res.status }));
+    if (code === 'split_hides_part') throw new SplitHidesPartError(message);
     throw new Error(message);
   }
 }
@@ -927,8 +907,8 @@ export async function checkPhotoPlace(activityId: string, exif: PhotoExifFields)
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    const message = messageFromErrorBody(text, t('common.request_failed', { status: res.status }));
-    if (res.status === 422 && text.includes('"photo_needs_place"')) throw new PhotoNeedsPlaceError(message);
+    const { code, message } = parseErrorBody(text, t('common.request_failed', { status: res.status }));
+    if (code === 'photo_needs_place') throw new PhotoNeedsPlaceError(message);
     throw new Error(message);
   }
   return { routeAt: ((await res.json()) as { route_at: string }).route_at };
@@ -959,8 +939,8 @@ export async function uploadPhoto(
   const res = await fetch(`${API_BASE_URL}${API_V1}/photos`, { method: 'POST', credentials: 'include', body: form });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    const message = messageFromErrorBody(text, t('common.request_failed', { status: res.status }));
-    if (res.status === 422 && text.includes('"photo_needs_place"')) throw new PhotoNeedsPlaceError(message);
+    const { code, message } = parseErrorBody(text, t('common.request_failed', { status: res.status }));
+    if (code === 'photo_needs_place') throw new PhotoNeedsPlaceError(message);
     throw new Error(message);
   }
   return toPhoto((await res.json()) as PhotoBody);

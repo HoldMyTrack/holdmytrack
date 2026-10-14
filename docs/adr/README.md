@@ -30,6 +30,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0042](0042-mobile-apps-show-the-sites-pages.md) | The mobile apps are native where the platform is the point, and show the site's own pages for the rest |
 | [0043](0043-per-account-limits.md) | Every account can keep up to 50,000 activities and 5 GB of original files, the same limits for all |
 | [0044](0044-daily-r2-budget.md) | A daily R2 budget the app enforces itself, giving up renders, then adding, then the map's reads |
+| [0045](0045-one-json-error-shape.md) | Every API error is JSON `{"error": code, "message": text}` |
 
 ## Writing a new one
 

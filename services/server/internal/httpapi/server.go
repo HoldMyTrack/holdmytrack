@@ -285,7 +285,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			metrics.HTTPPanics.Inc()
 			s.log.Error("handler panicked", "method", r.Method, "route", r.Pattern, "panic", p, "stack", string(debug.Stack()))
 			if !rec.wroteHeader {
-				http.Error(rec, "internal error", http.StatusInternalServerError)
+				if isAPIPath(r.URL.Path) {
+					writeAPIError(rec, "internal error", http.StatusInternalServerError)
+				} else {
+					http.Error(rec, "internal error", http.StatusInternalServerError)
+				}
 			}
 			rec.status = http.StatusInternalServerError
 		}
@@ -358,7 +362,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.crossSiteAPIWrite(r) {
-		http.Error(w, "cross-origin request refused", http.StatusForbidden)
+		writeAPIError(w, "cross-origin request refused", http.StatusForbidden)
 		return
 	}
 	if strings.HasPrefix(r.URL.Path, apiPrefix+"/") && !setsOwnBodyLimit(r) {
@@ -496,7 +500,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.log.Error("upload enqueue failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if res[0].AlreadyProcessed {

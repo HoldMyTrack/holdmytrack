@@ -96,19 +96,19 @@ func (s *Server) handleSyncActivities(w http.ResponseWriter, r *http.Request) {
 
 	var req syncActivitiesRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeAPIError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 	if !syncSources[req.Source] {
-		http.Error(w, `invalid "source", want "healthconnect", "healthkit" or "recorded"`, http.StatusBadRequest)
+		writeAPIError(w, `invalid "source", want "healthconnect", "healthkit" or "recorded"`, http.StatusBadRequest)
 		return
 	}
 	if len(req.Activities) == 0 {
-		http.Error(w, "activities must not be empty", http.StatusBadRequest)
+		writeAPIError(w, "activities must not be empty", http.StatusBadRequest)
 		return
 	}
 	if len(req.Activities) > maxSyncBatchActivities {
-		http.Error(w, fmt.Sprintf("too many activities in one batch (%d), want %d or fewer", len(req.Activities), maxSyncBatchActivities), http.StatusBadRequest)
+		writeAPIError(w, fmt.Sprintf("too many activities in one batch (%d), want %d or fewer", len(req.Activities), maxSyncBatchActivities), http.StatusBadRequest)
 		return
 	}
 	// Every activity sent counts, taken or not; a batch that doesn't fit in what's left of
@@ -140,7 +140,7 @@ func (s *Server) handleSyncActivities(w http.ResponseWriter, r *http.Request) {
 	usage, err := readUsage(ctx, s.pool, userID)
 	if err != nil {
 		s.log.Error("sync: read usage failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	sizes := make([]int64, len(items))
@@ -195,20 +195,20 @@ type syncKnownResponse struct {
 func (s *Server) handleSyncKnown(w http.ResponseWriter, r *http.Request) {
 	var req syncKnownRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeAPIError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 	if !syncSources[req.Source] {
-		http.Error(w, `invalid "source", want "healthconnect", "healthkit" or "recorded"`, http.StatusBadRequest)
+		writeAPIError(w, `invalid "source", want "healthconnect", "healthkit" or "recorded"`, http.StatusBadRequest)
 		return
 	}
 	if len(req.ExternalIDs) > maxKnownIDs {
-		http.Error(w, fmt.Sprintf("too many external_ids (%d), want %d or fewer", len(req.ExternalIDs), maxKnownIDs), http.StatusBadRequest)
+		writeAPIError(w, fmt.Sprintf("too many external_ids (%d), want %d or fewer", len(req.ExternalIDs), maxKnownIDs), http.StatusBadRequest)
 		return
 	}
 	for _, id := range req.ExternalIDs {
 		if !syncExternalIDPattern.MatchString(id) {
-			http.Error(w, i18n.Get(requestLang(r)).T("error.sync_external_id_invalid"), http.StatusBadRequest)
+			httpErrorT(w, r, http.StatusBadRequest, "error.sync_external_id_invalid")
 			return
 		}
 	}
@@ -216,7 +216,7 @@ func (s *Server) handleSyncKnown(w http.ResponseWriter, r *http.Request) {
 	known, processing, err := ingest.KnownExternalIDs(ctx, s.pool, userIDFromContext(ctx), req.Source, req.ExternalIDs)
 	if err != nil {
 		s.log.Error("sync known failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if known == nil {

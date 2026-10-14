@@ -14,8 +14,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 )
 
 // The provider-independent half of the server-side sign-in flows — Google (google_auth.go,
@@ -59,19 +57,19 @@ type oauthRoundTrip struct {
 func (s *Server) beginOAuth(w http.ResponseWriter, r *http.Request, cookiePath string, withPKCE bool) (state, verifier string, ok bool) {
 	appChallenge := r.URL.Query().Get("app_challenge")
 	if appChallenge != "" && !validPKCEValue(appChallenge) {
-		http.Error(w, "invalid app_challenge", http.StatusBadRequest)
+		writeAPIError(w, "invalid app_challenge", http.StatusBadRequest)
 		return "", "", false
 	}
 	state, err := randomToken()
 	if err != nil {
 		s.log.Error("oauth state generation failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return "", "", false
 	}
 	if withPKCE {
 		if verifier, err = randomToken(); err != nil {
 			s.log.Error("pkce verifier generation failed", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			writeAPIError(w, "internal error", http.StatusInternalServerError)
 			return "", "", false
 		}
 	}
@@ -172,12 +170,12 @@ func (s *Server) handleAuthHandoff(w http.ResponseWriter, r *http.Request) {
 		Verifier string `json:"verifier"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		writeAPIError(w, "invalid JSON body", http.StatusBadRequest)
 		return
 	}
 	invalid := func(msg string) {
 		s.log.Warn("sign-in handoff refused: " + msg)
-		http.Error(w, i18n.Get(requestLang(r)).T("error.handoff_invalid"), http.StatusUnauthorized)
+		httpErrorT(w, r, http.StatusUnauthorized, "error.handoff_invalid")
 	}
 	if !uuidPattern.MatchString(req.Code) || !validPKCEValue(req.Verifier) {
 		invalid("malformed request")
@@ -194,7 +192,7 @@ func (s *Server) handleAuthHandoff(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		s.log.Error("handoff lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if time.Now().After(expiresAt) {

@@ -59,7 +59,7 @@ Public pages, followers and the rest (`VISION.md` §5.7, §5.8). No steps are li
 ## Ongoing
 
 - [x] Describe every `/v1` endpoint in the API contract, `services/server/api/` (`IMPLEMENTATION.md` §4.31), so every test that calls one checks it.
-- [ ] Decide one error shape for the JSON API — plain text from `http.Error`, or `{"error","message"}` everywhere — and describe it in the contract.
+- [x] One error shape for the JSON API, `{"error", "message"}` everywhere (ADR-0045), described in the contract.
 - [ ] Generate the web client's types from the contract (`openapi-typescript`) in place of `apps/web/src/api.ts`'s hand-written `*Body` interfaces.
 - [ ] Move the Android app's `net/HoldMyTrackApi.kt` from hand-parsed `org.json` to typed data classes, checked against the contract.
 - [ ] Check the Russian translation — run the Android app in Russian on a real device, and have a native speaker review the Russian across the web, the server's pages and emails, and the app (`IMPLEMENTATION.md` §4.21).

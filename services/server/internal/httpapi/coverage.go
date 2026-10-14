@@ -44,7 +44,7 @@ func (s *Server) handleCoverageStatus(w http.ResponseWriter, r *http.Request) {
 	userID := userIDFromContext(r.Context())
 	if err := s.pool.QueryRow(r.Context(), coverageRenderingQuery, userID).Scan(&resp.Rendering, &resp.Version); err != nil {
 		s.log.Error("coverage status query failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	resp.TileVersion = fog.TileVersion(userID, resp.Version)

@@ -114,7 +114,7 @@ func (s *Server) handleListUploads(w http.ResponseWriter, r *http.Request) {
 	if v := q.Get("limit"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 1 {
-			http.Error(w, `invalid "limit", want a positive integer`, http.StatusBadRequest)
+			writeAPIError(w, `invalid "limit", want a positive integer`, http.StatusBadRequest)
 			return
 		}
 		limit = n
@@ -126,7 +126,7 @@ func (s *Server) handleListUploads(w http.ResponseWriter, r *http.Request) {
 	if v := q.Get("offset"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 0 {
-			http.Error(w, `invalid "offset", want a non-negative integer`, http.StatusBadRequest)
+			writeAPIError(w, `invalid "offset", want a non-negative integer`, http.StatusBadRequest)
 			return
 		}
 		offset = n
@@ -145,7 +145,7 @@ func (s *Server) handleListUploads(w http.ResponseWriter, r *http.Request) {
 	var total, processing int64
 	if err := s.pool.QueryRow(ctx, uploadsCountQuery, userID, sources).Scan(&total); err != nil {
 		s.log.Error("uploads count query failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	// Deliberately unfiltered by `sources` — the header badge this feeds counts every
@@ -153,14 +153,14 @@ func (s *Server) handleListUploads(w http.ResponseWriter, r *http.Request) {
 	// just because the Sync tab happens to be the one on screen.
 	if err := s.pool.QueryRow(ctx, uploadsProcessingCountQuery, userID).Scan(&processing); err != nil {
 		s.log.Error("uploads processing-count query failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	rows, err := s.pool.Query(ctx, uploadsListQuery, userID, limit, offset, sources)
 	if err != nil {
 		s.log.Error("uploads list query failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -174,7 +174,7 @@ func (s *Server) handleListUploads(w http.ResponseWriter, r *http.Request) {
 		if err := rows.Scan(&u.Filename, &u.ExternalID, &u.Source, &state, &lastError, &errorCode, &u.SubmittedAt, &u.FinishedAt,
 			&u.StartedAt, &u.Timezone, &u.DistanceMeters, &u.ActivityID); err != nil {
 			s.log.Error("uploads scan failed", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			writeAPIError(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		// Same three-way mapping as handleActivityStatus, duplicated rather than shared:
@@ -195,7 +195,7 @@ func (s *Server) handleListUploads(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := rows.Err(); err != nil {
 		s.log.Error("uploads read failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 

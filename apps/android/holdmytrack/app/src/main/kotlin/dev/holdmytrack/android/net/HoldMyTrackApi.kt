@@ -352,27 +352,25 @@ data class ActivityDay(val date: String, val count: Int, val distanceMeters: Dou
 data class ActivityDayPage(val days: List<ActivityDay>, val earliest: String?)
 
 /**
- * A request the server answered with a non-2xx status. The API writes its errors as plain
- * text (`http.Error`), so `message` is the server's own wording, shown to the user as-is
- * rather than replaced with something vaguer — "invalid email or password" and "an account
- * with this email already exists" are exactly what someone needs to read.
+ * A request the server answered with a non-2xx status. Every API error is
+ * `{"error": code, "message": text}` (`docs/adr/0045-one-json-error-shape.md`): `message` is
+ * the server's own wording, shown to the user as-is rather than replaced with something vaguer —
+ * "invalid email or password" and "an account with this email already exists" are exactly what
+ * someone needs to read — and [errorCode] is what a caller branches on, never the message.
  */
 class ApiException(val code: Int, message: String, val errorCode: String? = null) :
     IOException(message.ifBlank { "request failed ($code)" }) {
     companion object {
         /**
-         * The refusal in a non-2xx [body]: plain text as it is, or — for the refusals a client
-         * branches on (`demo_read_only`, `photo_needs_place`) — `{error, message}`, its message
-         * shown and its code kept.
+         * The refusal in a non-2xx [body]: the API's `{error, message}`, its message shown and
+         * its code kept, or — from something in front of the server, a proxy's error page — the
+         * text as it is, with no code.
          */
         fun from(code: Int, body: String): ApiException {
             val text = body.trim()
-            if (text.startsWith("{")) {
-                val json = runCatching { JSONObject(text) }.getOrNull()
-                val message = json?.optString("message").orEmpty()
-                if (json != null && message.isNotEmpty()) {
-                    return ApiException(code, message, json.optString("error").takeIf { it.isNotEmpty() })
-                }
+            val json = if (text.startsWith("{")) runCatching { JSONObject(text) }.getOrNull() else null
+            if (json != null && (json.has("error") || json.has("message"))) {
+                return ApiException(code, json.optString("message"), json.optString("error").takeIf { it.isNotEmpty() })
             }
             return ApiException(code, text)
         }

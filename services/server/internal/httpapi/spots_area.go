@@ -74,13 +74,13 @@ func (s *Server) handleSpotsInArea(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	area, ok := parseBBox(q.Get("bbox"))
 	if !ok {
-		http.Error(w, "bbox must be west,south,east,north in degrees, south < north", http.StatusBadRequest)
+		writeAPIError(w, "bbox must be west,south,east,north in degrees, south < north", http.StatusBadRequest)
 		return
 	}
 	var categories []string
 	for c := range strings.SplitSeq(q.Get("categories"), ",") {
 		if !slices.Contains(spotCategories, c) {
-			http.Error(w, "categories must be one or more of "+strings.Join(spotCategories, ","), http.StatusBadRequest)
+			writeAPIError(w, "categories must be one or more of "+strings.Join(spotCategories, ","), http.StatusBadRequest)
 			return
 		}
 		categories = append(categories, c)
@@ -91,13 +91,13 @@ func (s *Server) handleSpotsInArea(w http.ResponseWriter, r *http.Request) {
 	userID := userIDFromContext(ctx)
 	if err := s.pool.QueryRow(ctx, spotsAreaCountQuery, area.south, area.north, area.west, area.east, categories, userID).Scan(&resp.Total); err != nil {
 		s.log.Error("spots area count failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	rows, err := s.pool.Query(ctx, spotsAreaQuery, area.south, area.north, area.west, area.east, categories, spotsAreaLimit, userID)
 	if err != nil {
 		s.log.Error("spots area query failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -106,14 +106,14 @@ func (s *Server) handleSpotsInArea(w http.ResponseWriter, r *http.Request) {
 		if err := rows.Scan(&sp.ID, &sp.Category, &sp.Name, &sp.Address, &sp.Description, &sp.Inscription,
 			&sp.Memorial, &sp.StartDate, &sp.Wikipedia, &sp.Lon, &sp.Lat); err != nil {
 			s.log.Error("spots area scan failed", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			writeAPIError(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		resp.Spots = append(resp.Spots, sp)
 	}
 	if err := rows.Err(); err != nil {
 		s.log.Error("spots area rows failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")

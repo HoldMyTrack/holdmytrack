@@ -35,10 +35,10 @@ stories:
         content:
           application/json:
             schema: { $ref: "../components/schemas.yaml#/Story" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
 stories_id:
   parameters:
     - $ref: "../components/parameters.yaml#/StoryID"
@@ -52,7 +52,7 @@ stories_id:
             schema: { $ref: "../components/schemas.yaml#/Story" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/NotVerified" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
   patch:
     summary: Rename a Story or change its description (a full replace)
     requestBody:
@@ -66,10 +66,10 @@ stories_id:
         content:
           application/json:
             schema: { $ref: "../components/schemas.yaml#/Story" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
   delete:
     summary: Delete a Story; its activities stay
     responses:
@@ -77,7 +77,7 @@ stories_id:
         description: Deleted
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
 stories_id_activities:
   parameters:
     - $ref: "../components/parameters.yaml#/StoryID"
@@ -95,10 +95,10 @@ stories_id_activities:
         content:
           application/json:
             schema: { $ref: "../components/schemas.yaml#/Story" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
   delete:
     summary: Take activities out of a Story; an id not in it is ignored, and the activities stay
     requestBody:
@@ -112,10 +112,10 @@ stories_id_activities:
         content:
           application/json:
             schema: { $ref: "../components/schemas.yaml#/Story" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
 stories_id_send:
   parameters:
     - $ref: "../components/parameters.yaml#/StoryID"
@@ -133,11 +133,11 @@ stories_id_send:
     responses:
       "204":
         description: Sent, or silently not
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
-      "429": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
+      "429": { $ref: "../components/responses.yaml#/Error" }
 story-sends:
   get:
     summary: Copies of Stories waiting for the signed-in account, newest first, and accepted ones still being copied
@@ -186,7 +186,7 @@ story-sends_id_accept:
         description: Accepted, copy queued
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
       "409": { $ref: "../components/responses.yaml#/OverLimit" }
       "503": { $ref: "../components/responses.yaml#/DailyCapacity" }
 story-sends_id:
@@ -199,4 +199,4 @@ story-sends_id:
         description: Declined
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }

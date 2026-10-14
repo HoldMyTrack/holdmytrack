@@ -1,23 +1,31 @@
-PlainError:
-  description: A message to show the user
+Error:
+  description: An error
   content:
-    text/plain:
-      schema: { type: string }
+    application/json:
+      schema: { $ref: "schemas.yaml#/Error" }
 Unauthenticated:
   description: No live session
   content:
-    text/plain:
-      schema: { type: string }
+    application/json:
+      schema: { $ref: "schemas.yaml#/Error" }
 NotVerified:
   description: The account's email isn't verified yet
   content:
     application/json:
-      schema: { $ref: "schemas.yaml#/CodedError" }
+      schema:
+        allOf:
+          - { $ref: "schemas.yaml#/Error" }
+          - properties:
+              error: { enum: [email_not_verified] }
 Forbidden:
   description: The account's email isn't verified yet, or it is the read-only demo
   content:
     application/json:
-      schema: { $ref: "schemas.yaml#/CodedError" }
+      schema:
+        allOf:
+          - { $ref: "schemas.yaml#/Error" }
+          - properties:
+              error: { enum: [email_not_verified, demo_read_only] }
 Session:
   description: Signed in; the session is also set as a cookie
   content:
@@ -42,7 +50,11 @@ PhotoNeedsPlace:
   description: Nothing places the photo on the track; ask the user where and send route_at
   content:
     application/json:
-      schema: { $ref: "schemas.yaml#/PhotoNeedsPlace" }
+      schema:
+        allOf:
+          - { $ref: "schemas.yaml#/Error" }
+          - properties:
+              error: { enum: [photo_needs_place] }
 PhotoImage:
   description: The image, as the type it was sniffed as on upload
   content:
@@ -53,13 +65,21 @@ PhotoImage:
 OverLimit:
   description: The account is at its activity or storage limit
   content:
-    text/plain:
-      schema: { type: string }
+    application/json:
+      schema:
+        allOf:
+          - { $ref: "schemas.yaml#/Error" }
+          - properties:
+              error: { enum: [account_limit] }
 DailyCapacity:
   description: The service has reached its daily capacity; try again after Retry-After
   headers:
     Retry-After:
       schema: { type: integer }
   content:
-    text/plain:
-      schema: { type: string }
+    application/json:
+      schema:
+        allOf:
+          - { $ref: "schemas.yaml#/Error" }
+          - properties:
+              error: { enum: [daily_capacity] }

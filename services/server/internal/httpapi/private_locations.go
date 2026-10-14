@@ -62,11 +62,11 @@ func (req *privateLocationRequest) validate() error {
 func decodePrivateLocation(w http.ResponseWriter, r *http.Request) (privateLocationRequest, bool) {
 	var req privateLocationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeAPIError(w, "invalid request body", http.StatusBadRequest)
 		return req, false
 	}
 	if err := req.validate(); err != nil {
-		http.Error(w, err.(*accountError).message(requestLang(r)), http.StatusBadRequest)
+		writeAccountFailure(w, r, err.(*accountError))
 		return req, false
 	}
 	return req, true
@@ -88,7 +88,7 @@ func (s *Server) handleListPrivateLocations(w http.ResponseWriter, r *http.Reque
 		userIDFromContext(r.Context()))
 	if err != nil {
 		s.log.Error("private locations query failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	locations, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (privateLocation, error) {
@@ -96,7 +96,7 @@ func (s *Server) handleListPrivateLocations(w http.ResponseWriter, r *http.Reque
 	})
 	if err != nil {
 		s.log.Error("private locations scan failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if locations == nil {
@@ -149,7 +149,7 @@ func (s *Server) handleCreatePrivateLocation(w http.ResponseWriter, r *http.Requ
 func (s *Server) handleUpdatePrivateLocation(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if !uuidPattern.MatchString(id) {
-		http.Error(w, "private location not found", http.StatusNotFound)
+		writeAPIError(w, "private location not found", http.StatusNotFound)
 		return
 	}
 	req, ok := decodePrivateLocation(w, r)
@@ -189,7 +189,7 @@ func (s *Server) handleUpdatePrivateLocation(w http.ResponseWriter, r *http.Requ
 func (s *Server) handleDeletePrivateLocation(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if !uuidPattern.MatchString(id) {
-		http.Error(w, "private location not found", http.StatusNotFound)
+		writeAPIError(w, "private location not found", http.StatusNotFound)
 		return
 	}
 	userID := userIDFromContext(r.Context())
@@ -265,12 +265,12 @@ func (s *Server) writeLocationError(w http.ResponseWriter, r *http.Request, err 
 	case err == nil:
 		return false
 	case errors.Is(err, pgx.ErrNoRows):
-		http.Error(w, "private location not found", http.StatusNotFound)
+		writeAPIError(w, "private location not found", http.StatusNotFound)
 	case errors.Is(err, errTooManyLocations):
-		http.Error(w, errTooManyLocations.(*accountError).message(requestLang(r)), http.StatusConflict)
+		writeAccountFailure(w, r, errTooManyLocations.(*accountError))
 	default:
 		s.log.Error("private location change failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 	}
 	return true
 }

@@ -48,7 +48,7 @@ func (s *Server) handleHeatmapTile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.log.Error("heatmap tile query failed", "err", err, "z", z, "x", x, "y", y)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	mask, err := loadMaskPNG(ctx, s.store, objectKey)
@@ -57,14 +57,14 @@ func (s *Server) handleHeatmapTile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.log.Error("heatmap tile fetch failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	tile, err := fog.HeatmapTile(mask)
 	if err != nil {
 		s.log.Error("heatmap tile tint failed", "err", err, "z", z, "x", x, "y", y)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "image/png")

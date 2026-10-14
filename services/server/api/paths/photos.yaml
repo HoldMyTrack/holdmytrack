@@ -22,10 +22,10 @@ photos:
                 photos:
                   type: array
                   items: { $ref: "../components/schemas.yaml#/Photo" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/NotVerified" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
   post:
     summary: Add a photo to an activity, placed on its track
     description: >-
@@ -69,26 +69,28 @@ photos:
         content:
           application/json:
             schema: { $ref: "../components/schemas.yaml#/Photo" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
       "409":
         description: The account has the most photos allowed, or the activity has no track to put it on
         content:
-          text/plain:
-            schema: { type: string }
-      "413": { $ref: "../components/responses.yaml#/PlainError" }
-      "415": { $ref: "../components/responses.yaml#/PlainError" }
+          application/json:
+            schema: { $ref: "../components/schemas.yaml#/Error" }
+      "413": { $ref: "../components/responses.yaml#/Error" }
+      "415": { $ref: "../components/responses.yaml#/Error" }
       "422":
         description: >-
-          JSON photo_needs_place when nothing places the photo on the track (ask the user where
-          and send route_at); plain text when an image is larger on a side than allowed
+          photo_needs_place when nothing places the photo on the track (ask the user where and
+          send route_at); photo_dimensions when an image is larger on a side than allowed
         content:
           application/json:
-            schema: { $ref: "../components/schemas.yaml#/PhotoNeedsPlace" }
-          text/plain:
-            schema: { type: string }
+            schema:
+              allOf:
+                - { $ref: "../components/schemas.yaml#/Error" }
+                - properties:
+                    error: { enum: [photo_needs_place, photo_dimensions] }
       "503": { $ref: "../components/responses.yaml#/DailyCapacity" }
 photos_place:
   post:
@@ -121,11 +123,11 @@ photos_place:
               properties:
                 route_at: { type: string, format: date-time }
                 taken_at: { type: string, format: date-time, nullable: true }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
-      "409": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
+      "409": { $ref: "../components/responses.yaml#/Error" }
       "422": { $ref: "../components/responses.yaml#/PhotoNeedsPlace" }
 photos_id:
   parameters:
@@ -136,7 +138,7 @@ photos_id:
       "200": { $ref: "../components/responses.yaml#/PhotoImage" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/NotVerified" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
       "503": { $ref: "../components/responses.yaml#/DailyCapacity" }
   patch:
     summary: Change a photo's caption or its place on the track; only the fields sent change
@@ -161,11 +163,11 @@ photos_id:
         content:
           application/json:
             schema: { $ref: "../components/schemas.yaml#/Photo" }
-      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "400": { $ref: "../components/responses.yaml#/Error" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
-      "409": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
+      "409": { $ref: "../components/responses.yaml#/Error" }
   delete:
     summary: Remove a photo
     responses:
@@ -173,7 +175,7 @@ photos_id:
         description: Removed
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/Forbidden" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
 photos_id_thumb:
   parameters:
     - $ref: "../components/parameters.yaml#/PhotoID"
@@ -183,5 +185,5 @@ photos_id_thumb:
       "200": { $ref: "../components/responses.yaml#/PhotoImage" }
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/NotVerified" }
-      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/Error" }
       "503": { $ref: "../components/responses.yaml#/DailyCapacity" }

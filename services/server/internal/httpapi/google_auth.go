@@ -83,7 +83,7 @@ func (s *Server) handleAuthProviders(w http.ResponseWriter, r *http.Request) {
 // here and falls back to UTC at account creation.
 func (s *Server) handleGoogleStart(w http.ResponseWriter, r *http.Request) {
 	if !s.google.enabled() {
-		http.NotFound(w, r)
+		writeAPIError(w, "not found", http.StatusNotFound)
 		return
 	}
 	state, verifier, ok := s.beginOAuth(w, r, googleCookiePath, true)
@@ -114,7 +114,7 @@ func (s *Server) handleGoogleStart(w http.ResponseWriter, r *http.Request) {
 // needs" reasoning.
 func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 	if !s.google.enabled() {
-		http.NotFound(w, r)
+		writeAPIError(w, "not found", http.StatusNotFound)
 		return
 	}
 	rt, err := s.readOAuthCallback(w, r, googleCookiePath)
@@ -150,7 +150,7 @@ func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 // "Couldn't sign in with Google" wording; the detail goes to the log.
 func (s *Server) handleGoogleToken(w http.ResponseWriter, r *http.Request) {
 	if !s.google.enabled() {
-		http.NotFound(w, r)
+		writeAPIError(w, "not found", http.StatusNotFound)
 		return
 	}
 	var req struct {
@@ -158,12 +158,12 @@ func (s *Server) handleGoogleToken(w http.ResponseWriter, r *http.Request) {
 		TZ      string `json:"tz"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		writeAPIError(w, "invalid JSON body", http.StatusBadRequest)
 		return
 	}
 	fail := func(msg string, err error) {
 		s.log.Warn("google sign-in failed: "+msg, "err", err)
-		http.Error(w, i18n.Get(requestLang(r)).T("signin.google_failed"), http.StatusUnauthorized)
+		writeError(w, http.StatusUnauthorized, "google_failed", i18n.Get(requestLang(r)).T("signin.google_failed"))
 	}
 	ctx := r.Context()
 	claims, err := s.verifyGoogleIDToken(ctx, req.IDToken, time.Now())

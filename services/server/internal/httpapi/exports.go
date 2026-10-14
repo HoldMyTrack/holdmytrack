@@ -168,7 +168,7 @@ func (s *Server) handleGetExport(w http.ResponseWriter, r *http.Request) {
 	st, err := s.latestExport(r.Context(), userIDFromContext(r.Context()))
 	if err != nil {
 		s.log.Error("get export failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusOK, st)
@@ -182,7 +182,7 @@ func (s *Server) handleDownloadExportPart(w http.ResponseWriter, r *http.Request
 	exportID := r.PathValue("id")
 	n, err := strconv.Atoi(r.PathValue("n"))
 	if !uuidPattern.MatchString(exportID) || err != nil || n < 1 {
-		http.Error(w, "not found", http.StatusNotFound)
+		writeAPIError(w, "not found", http.StatusNotFound)
 		return
 	}
 	var requested time.Time
@@ -192,18 +192,18 @@ func (s *Server) handleDownloadExportPart(w http.ResponseWriter, r *http.Request
 		WHERE id = $1 AND user_id = $2 AND ready_at IS NOT NULL AND expires_at > NOW()`, exportID, userID,
 	).Scan(&requested, &sizes)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && n > len(sizes)) {
-		http.Error(w, "not found", http.StatusNotFound)
+		writeAPIError(w, "not found", http.StatusNotFound)
 		return
 	}
 	if err != nil {
 		s.log.Error("export download lookup failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	obj, err := s.store.Open(ctx, export.PartKey(userID, exportID, n))
 	if err != nil {
 		s.log.Error("export download open failed", "export_id", exportID, "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	defer obj.Close()

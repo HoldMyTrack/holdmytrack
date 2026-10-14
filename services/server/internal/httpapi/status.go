@@ -29,7 +29,7 @@ type statusResponse struct {
 func (s *Server) handleActivityStatus(w http.ResponseWriter, r *http.Request) {
 	externalID := r.PathValue("external_id")
 	if externalID == "" {
-		http.Error(w, "missing external_id", http.StatusBadRequest)
+		writeAPIError(w, "missing external_id", http.StatusBadRequest)
 		return
 	}
 
@@ -47,7 +47,7 @@ func (s *Server) handleActivityStatus(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.log.Error("status query failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 

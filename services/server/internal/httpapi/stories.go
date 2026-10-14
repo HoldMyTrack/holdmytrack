@@ -110,18 +110,18 @@ func validateStoryFields(w http.ResponseWriter, r *http.Request, name, descripti
 // use for.
 func validateActivityIDs(w http.ResponseWriter, ids []string, required bool) ([]string, bool) {
 	if required && len(ids) == 0 {
-		http.Error(w, "activity_ids must not be empty", http.StatusBadRequest)
+		writeAPIError(w, "activity_ids must not be empty", http.StatusBadRequest)
 		return nil, false
 	}
 	if len(ids) > maxStoryActivityIDs {
-		http.Error(w, "too many activity_ids", http.StatusBadRequest)
+		writeAPIError(w, "too many activity_ids", http.StatusBadRequest)
 		return nil, false
 	}
 	seen := make(map[string]bool, len(ids))
 	out := make([]string, 0, len(ids))
 	for _, id := range ids {
 		if !uuidPattern.MatchString(id) {
-			http.Error(w, "invalid activity id", http.StatusBadRequest)
+			writeAPIError(w, "invalid activity id", http.StatusBadRequest)
 			return nil, false
 		}
 		id = strings.ToLower(id)
@@ -137,7 +137,7 @@ func validateActivityIDs(w http.ResponseWriter, ids []string, required bool) ([]
 func storyIDFromPath(w http.ResponseWriter, r *http.Request) (string, bool) {
 	id := r.PathValue("id")
 	if !uuidPattern.MatchString(id) {
-		http.Error(w, errStoryNotFound.Error(), http.StatusNotFound)
+		writeAPIError(w, errStoryNotFound.Error(), http.StatusNotFound)
 		return "", false
 	}
 	return id, true
@@ -174,7 +174,7 @@ func (s *Server) handleGetStory(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleCreateStory(w http.ResponseWriter, r *http.Request) {
 	var req storyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeAPIError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 	if !validateStoryFields(w, r, &req.Name, &req.Description) {
@@ -222,7 +222,7 @@ func (s *Server) handleUpdateStory(w http.ResponseWriter, r *http.Request) {
 	}
 	var req storyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeAPIError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 	if !validateStoryFields(w, r, &req.Name, &req.Description) {
@@ -311,7 +311,7 @@ func (s *Server) changeStoryActivities(w http.ResponseWriter, r *http.Request,
 	}
 	var req storyActivitiesRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeAPIError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 	ids, ok := validateActivityIDs(w, req.ActivityIDs, true)
@@ -507,10 +507,10 @@ func (s *Server) writeStoryError(w http.ResponseWriter, err error) bool {
 	case err == nil:
 		return false
 	case errors.Is(err, errStoryNotFound), errors.Is(err, errActivityNotFound):
-		http.Error(w, err.Error(), http.StatusNotFound)
+		writeAPIError(w, err.Error(), http.StatusNotFound)
 	default:
 		s.log.Error("story request failed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeAPIError(w, "internal error", http.StatusInternalServerError)
 	}
 	return true
 }

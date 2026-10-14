@@ -113,4 +113,6 @@ dependencies {
     implementation(libs.recyclerview)
     implementation(libs.fragment)
     testImplementation(libs.junit)
+    // Android's org.json is a stub off the device; the real one lets a unit test parse a body.
+    testImplementation(libs.json)
 }
