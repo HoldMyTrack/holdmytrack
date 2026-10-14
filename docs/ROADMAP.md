@@ -19,7 +19,7 @@ Checkboxes are the source of truth for progress; re-check them against the three
 The phases below sit inside three milestones (`VISION.md` §5, ADR-0031):
 
 1. **MVP** — Phases 1–3. Where HoldMyTrack is now; what's left of it is below.
-2. **Release and community** — Phases 4–6. Its entry gate is Phase 1's pre-launch validation and Phase 6's DPIA and privacy policy, which any public launch needs. Its exit gate is a measured answer to what community funding can carry: Phase 5's cost per active user, set against monthly donations and the share of active users who give, over several months.
+2. **Release and community** — Phases 4–6. Its entry gate is Phase 1's pre-launch validation and Phase 6's DPIA and privacy policy, which any public launch needs. Its exit gate is a measured answer to what community funding can carry: cost per active user (`IMPLEMENTATION.md` §4.32 keeps the active counts), set against monthly donations and the share of active users who give, over several months.
 3. **Social graph** — Phase 7. Decided from Milestone 2's numbers, including whether to start it at all.
 
 ---
@@ -66,7 +66,6 @@ Connecting the app to third-party services.
 An engineering requirement, can land alongside any of the above (`IMPLEMENTATION.md` §5.7).
 
 - [ ] Serve the basemap as `/{z}/{x}/{y}` tiles Cloudflare can cache, `pmtiles serve` on the droplet first: today every range read into the archive reaches R2, since the free plan caches files only up to 512 MB (`IMPLEMENTATION.md` §5.4). Worth it once traffic grows; the zone saw about 97,000 basemap requests in the 30 days to 2026-10-14, under 1% of R2's free reads. The web style (`apps/web/src/map/style.ts`) and the style the server builds for Android (`mapstyle.go`) move from `pmtiles://` to the tile URL.
-- [ ] Cost per active user, with monthly donations and the share of active users who give: the numbers Milestone 2's exit gate and the Milestone 3 decision are made from (`VISION.md` §5, §6). The daily active counts are kept (`IMPLEMENTATION.md` §4.32); what's left is entering each month's costs and donations and reading the ratio.
 
 ---
 
