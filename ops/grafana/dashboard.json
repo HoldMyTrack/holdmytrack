@@ -970,7 +970,7 @@
     {
       "id": 20,
       "type": "timeseries",
-      "title": "Photo storage",
+      "title": "Storage",
       "datasource": {
         "type": "prometheus",
         "uid": "${PROM}"
@@ -988,7 +988,7 @@
             "type": "prometheus",
             "uid": "${PROM}"
           },
-          "expr": "holdmytrack_stat{deployment=\"${DEPLOYMENT}\", key=\"storage_bytes.photos\"}",
+          "expr": "holdmytrack_stat{deployment=\"${DEPLOYMENT}\", key=~\"storage_bytes\\\\..+\"}",
           "legendFormat": "{{key}}"
         }
       ],
@@ -1006,7 +1006,8 @@
         "tooltip": {
           "mode": "multi"
         }
-      }
+      },
+      "description": "What each kind of stored object adds up to, as the newest snapshot recorded it."
     },
     {
       "id": 21,
