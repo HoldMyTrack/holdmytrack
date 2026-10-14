@@ -33,13 +33,6 @@ The phases below sit inside three milestones (`VISION.md` §5, ADR-0031):
 - [ ] Stand up the funding page (Open Collective, public ledger — `VISION.md` §6.1) before any public launch, not retrofitted after. The app side is built (`IMPLEMENTATION.md` §4.16), and the `holdmytrack` collective applied to Open Source Collective as fiscal host on 2026-09-24; what's left: once approved, set the slug — `services/server/internal/web/web.go`'s `OpenCollectiveSlug` — and replace the About page template's "donations are not open yet" line with a link to it.
 - [ ] Post concept renders to r/running, r/cycling, r/Garmin, r/Strava, r/FogOfWorld (`VISION.md` §5.1, §8.1) — validate "free, funded by its users" as credible before the public launch.
 
-### Sign in with Facebook — built, not live
-
-Sign in with Facebook is built (`SPEC.md` FR-1.10) and the Meta app exists, but Meta won't publish an app until its business portfolio passes Business Verification (`docs/DEPLOY.md` §4). Until then `holdmytrack.com` runs with `FACEBOOK_APP_ID` empty, so it shows no Facebook button. This isn't a launch gate: Google and email sign-in cover everyone.
-
-- [ ] Get a business document for the "Holdmytrack" business portfolio. Meta accepts one of: an IRS 147C letter (EIN confirmation), a business bank statement, a business tax document, or a "Doing Business As" (DBA) filing. The name on it must match the portfolio's. A sole-proprietor EIN with "HoldMyTrack" as its trade name, or a county/state DBA filing, are the cheapest routes; so may be whatever legal standing the Open Collective fiscal host above gives the project. Check the legal and tax implications before filing just for this.
-- [ ] Complete Business Verification with it, connect the Meta app to the verified portfolio and publish it (`docs/DEPLOY.md` §4 step 6), then set `FACEBOOK_APP_ID`/`FACEBOOK_APP_SECRET` in the server's `.env.prod` and recreate `api`.
-
 ---
 
 ## Phase 5 — Cost control
@@ -79,4 +72,5 @@ Public pages, followers and the rest (`VISION.md` §5.7, §5.8). No steps are li
 - [ ] Split the Android app's `MapFragment.kt` by feature when the next feature touches it, the part that feature needs first: the session and first-run check, Story mode, View on map, the notice panel, camera framing, photo markers — pure logic out first, with unit tests as `panel/PanelState` has, the UI wiring last.
 - [ ] Review how long original uploads are kept, soon after the public launch, once real accounts show what they cost: today they're kept until the activity is deleted. They're the most sensitive thing held (`DPIA.md` R2) and likely the largest per-activity storage line, and an expired one can no longer be re-clipped after a Private location change, rebuilt by a track edit, or exported as the original (`IMPLEMENTATION.md` §5.7).
 - [ ] Re-measure the funding-model assumptions (`VISION.md` §4.3, §6.3) against real usage once any real users exist, rather than assuming the estimates hold — they feed Milestone 2's exit gate.
+- [ ] Turn on Sign in with Facebook (`SPEC.md` FR-1.10): Meta publishes the app only after Business Verification, which needs a business document such as an EIN letter or a DBA filing (`docs/DEPLOY.md` §4). Not a launch gate.
 - [ ] The iOS app (`VISION.md` §5.3), likely after the public launch, with no date set: first confirm `HKWorkoutRoute` access with a throwaway app (`VISION.md` §4.1); then HealthKit sync, with `HKWorkoutRoute` for full GPS geometry, on the payload and the pick-what-to-send design Android settled (`SPEC.md` FR-3.6), and the site's own pages in a `WKWebView` for Settings, Profile, the Sync page and About (ADR-0042); then in-app GPS recording, on the Android build's wire shape and `source` convention (`SPEC.md` FR-3.8, ADR-0007).
