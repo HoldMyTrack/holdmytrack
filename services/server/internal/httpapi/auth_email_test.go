@@ -175,8 +175,7 @@ func TestSignInFailuresAreLimitedPerAddress(t *testing.T) {
 		body := fmt.Sprintf(`{"email":"nobody-%d-%d@holdmytrack.invalid","password":"wrong-password"}`, time.Now().UnixNano(), i)
 		req := httptest.NewRequest(http.MethodPost, "/v1/auth/login", strings.NewReader(body))
 		req.RemoteAddr = "198.51.100.77:4321"
-		rec := httptest.NewRecorder()
-		d.srv.ServeHTTP(rec, req)
+		rec := serveChecked(t, d.srv.ServeHTTP, req)
 		return rec.Code
 	}
 	for i := 0; i < 50; i++ {

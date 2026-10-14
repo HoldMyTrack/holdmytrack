@@ -32,12 +32,7 @@ func (d *dbTest) uploadRaw(as account, name string, data []byte) *httptest.Respo
 	part, _ := mw.CreateFormFile("file", name)
 	part.Write(data)
 	mw.Close()
-	req := httptest.NewRequest(http.MethodPost, "/v1/activities/upload", &body)
-	req.Header.Set("Content-Type", mw.FormDataContentType())
-	req.Header.Set("Authorization", bearerPrefix+as.session)
-	rec := httptest.NewRecorder()
-	d.srv.ServeHTTP(rec, req)
-	return rec
+	return d.send(as, http.MethodPost, "/v1/activities/upload", mw.FormDataContentType(), body.Bytes())
 }
 
 func (d *dbTest) uploadFile(as account, name string, data []byte) uploadResponse {
@@ -151,12 +146,7 @@ func TestOversizedFileUploadIsRefused(t *testing.T) {
 	part, _ := mw.CreateFormFile("file", "huge.gpx")
 	part.Write(make([]byte, maxUploadBytes+1))
 	mw.Close()
-	req := httptest.NewRequest(http.MethodPost, "/v1/activities/upload", &body)
-	req.Header.Set("Content-Type", mw.FormDataContentType())
-	req.Header.Set("Authorization", bearerPrefix+me.session)
-	rec := httptest.NewRecorder()
-	d.srv.ServeHTTP(rec, req)
-	if rec.Code != http.StatusRequestEntityTooLarge {
+	if rec := d.send(me, http.MethodPost, "/v1/activities/upload", mw.FormDataContentType(), body.Bytes()); rec.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("status %d, want 413", rec.Code)
 	}
 }

@@ -58,7 +58,7 @@ Public pages, followers and the rest (`VISION.md` §5.7, §5.8). No steps are li
 
 ## Ongoing
 
-- [ ] Describe the rest of the `/v1` JSON endpoints in `services/server/api/openapi.yaml` (`IMPLEMENTATION.md` §4.31), a few at a time: any test that already calls one checks it from then on.
+- [x] Describe every `/v1` endpoint in the API contract, `services/server/api/` (`IMPLEMENTATION.md` §4.31), so every test that calls one checks it.
 - [ ] Decide one error shape for the JSON API — plain text from `http.Error`, or `{"error","message"}` everywhere — and describe it in the contract.
 - [ ] Generate the web client's types from the contract (`openapi-typescript`) in place of `apps/web/src/api.ts`'s hand-written `*Body` interfaces.
 - [ ] Move the Android app's `net/HoldMyTrackApi.kt` from hand-parsed `org.json` to typed data classes, checked against the contract.

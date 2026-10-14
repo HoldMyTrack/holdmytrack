@@ -1,0 +1,191 @@
+account:
+  delete:
+    summary: Delete the account and everything in it
+    description: Works before the account is verified; refused for the demo.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              email:
+                type: string
+                description: The account's address, typed again to confirm.
+    responses:
+      "204":
+        description: Deleted, and signed out
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/PlainError" }
+account_settings:
+  patch:
+    summary: Save the Settings page (a full replace, but locale)
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              display_name:
+                type: string
+                description: Trimmed; empty clears it.
+              country:
+                type: string
+                description: ISO 3166-1 alpha-2; required.
+              timezone:
+                type: string
+                description: An IANA zone; required.
+              locale:
+                type: string
+                nullable: true
+                description: A supported language, or empty for automatic; missing or null keeps it.
+    responses:
+      "200":
+        description: The account as saved
+        content:
+          application/json:
+            schema: { $ref: "../components/schemas.yaml#/Account" }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/Forbidden" }
+account_settings_options:
+  get:
+    summary: The Settings page's choices, labelled in the request's language
+    responses:
+      "200":
+        description: The choices
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [countries, timezones, languages]
+              additionalProperties: false
+              properties:
+                countries:
+                  type: array
+                  items: { $ref: "../components/schemas.yaml#/SettingsOption" }
+                timezones:
+                  type: array
+                  items:
+                    type: object
+                    required: [region, label, options]
+                    additionalProperties: false
+                    properties:
+                      region: { type: string }
+                      label: { type: string }
+                      options:
+                        type: array
+                        items: { $ref: "../components/schemas.yaml#/SettingsOption" }
+                languages:
+                  type: array
+                  items: { $ref: "../components/schemas.yaml#/SettingsOption" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/NotVerified" }
+account_avatar:
+  get:
+    summary: The account's avatar image
+    responses:
+      "200":
+        description: The image, as the type it was sniffed as on upload
+        content:
+          image/png:
+            schema: { type: string, format: binary }
+          image/jpeg:
+            schema: { type: string, format: binary }
+          image/webp:
+            schema: { type: string, format: binary }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/NotVerified" }
+      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "503": { $ref: "../components/responses.yaml#/DailyCapacity" }
+  post:
+    summary: Set the avatar
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [file]
+            properties:
+              file:
+                type: string
+                format: binary
+                description: PNG, JPEG or WebP.
+    responses:
+      "200":
+        description: The account as saved
+        content:
+          application/json:
+            schema: { $ref: "../components/schemas.yaml#/Account" }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/Forbidden" }
+      "413": { $ref: "../components/responses.yaml#/PlainError" }
+      "415": { $ref: "../components/responses.yaml#/PlainError" }
+      "503": { $ref: "../components/responses.yaml#/PlainError" }
+  delete:
+    summary: Remove the avatar
+    responses:
+      "200":
+        description: The account as saved
+        content:
+          application/json:
+            schema: { $ref: "../components/schemas.yaml#/Account" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/Forbidden" }
+account_export:
+  get:
+    summary: The latest download of the account's data, if any
+    responses:
+      "200":
+        description: Its state
+        content:
+          application/json:
+            schema: { $ref: "../components/schemas.yaml#/ExportStatus" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/NotVerified" }
+  post:
+    summary: Prepare a download of the account's data
+    description: One already being prepared is answered as it stands rather than started again.
+    responses:
+      "202":
+        description: Being prepared
+        content:
+          application/json:
+            schema: { $ref: "../components/schemas.yaml#/ExportStatus" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/Forbidden" }
+      "429": { $ref: "../components/responses.yaml#/PlainError" }
+      "503": { $ref: "../components/responses.yaml#/PlainError" }
+account_exports_id_parts_n:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      # Not format: uuid — a malformed id is a 404 from the handler, not a request error.
+      schema: { type: string }
+    - name: n
+      in: path
+      required: true
+      description: The part, from 1.
+      schema: { type: string }
+  get:
+    summary: One part of a ready download, as a zip; Range requests are honoured
+    responses:
+      "200":
+        description: The part
+        content:
+          application/zip:
+            schema: { type: string, format: binary }
+      "206":
+        description: The requested range of it
+        content:
+          application/zip:
+            schema: { type: string, format: binary }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/NotVerified" }
+      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "503": { $ref: "../components/responses.yaml#/DailyCapacity" }

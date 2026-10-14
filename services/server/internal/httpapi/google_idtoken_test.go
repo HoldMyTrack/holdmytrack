@@ -163,8 +163,7 @@ func TestCacheMaxAge(t *testing.T) {
 
 func TestHandleGoogleToken(t *testing.T) {
 	disabled := &Server{google: newGoogleOAuth(GoogleOAuthConfig{})}
-	rec := httptest.NewRecorder()
-	disabled.handleGoogleToken(rec, httptest.NewRequest("POST", "/v1/auth/google/token", strings.NewReader(`{}`)))
+	rec := serveChecked(t, disabled.handleGoogleToken, httptest.NewRequest("POST", "/v1/auth/google/token", strings.NewReader(`{}`)))
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("disabled: status %d, want 404", rec.Code)
 	}
@@ -172,8 +171,7 @@ func TestHandleGoogleToken(t *testing.T) {
 	// A token that fails verification never reaches account resolution (no database here).
 	certs := &fakeCerts{keys: map[string]*rsa.PublicKey{"k1": &newRSAKey(t).PublicKey}}
 	s := testGoogleKeyServer(certs.serve(t).URL)
-	rec = httptest.NewRecorder()
-	s.handleGoogleToken(rec, httptest.NewRequest("POST", "/v1/auth/google/token", strings.NewReader(`{"id_token":"a.b.c","tz":"Europe/Berlin"}`)))
+	rec = serveChecked(t, s.handleGoogleToken, httptest.NewRequest("POST", "/v1/auth/google/token", strings.NewReader(`{"id_token":"a.b.c","tz":"Europe/Berlin"}`)))
 	if rec.Code != http.StatusUnauthorized || !strings.Contains(rec.Body.String(), "Google") {
 		t.Fatalf("bad token: %d %q", rec.Code, rec.Body.String())
 	}
@@ -187,8 +185,7 @@ func TestAuthProviders(t *testing.T) {
 		"both on":  {&Server{google: testGoogleServer("").google, facebook: testFacebookServer("").facebook}, `{"google":true,"facebook":true,"google_client_id":"` + testClientID + `"}`},
 		"both off": {&Server{google: newGoogleOAuth(GoogleOAuthConfig{}), facebook: newFacebookOAuth(FacebookOAuthConfig{})}, `{"google":false,"facebook":false}`},
 	} {
-		rec := httptest.NewRecorder()
-		tc.s.handleAuthProviders(rec, httptest.NewRequest("GET", "/v1/auth/providers", nil))
+		rec := serveChecked(t, tc.s.handleAuthProviders, httptest.NewRequest("GET", "/v1/auth/providers", nil))
 		if got := strings.TrimSpace(rec.Body.String()); got != tc.want {
 			t.Errorf("%s: got %s, want %s", name, got, tc.want)
 		}

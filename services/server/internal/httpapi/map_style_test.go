@@ -18,8 +18,7 @@ func TestMapStyleLanguage(t *testing.T) {
 		{"?lang=RU", "ru"},
 		{"?lang=de", "en"},
 	} {
-		rec := httptest.NewRecorder()
-		s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/map/style/light"+tc.query, nil))
+		rec := serveChecked(t, s.ServeHTTP, httptest.NewRequest(http.MethodGet, "/v1/map/style/light"+tc.query, nil))
 		if rec.Code != http.StatusOK {
 			t.Fatalf("%q: status %d", tc.query, rec.Code)
 		}

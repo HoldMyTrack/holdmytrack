@@ -4,9 +4,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -17,12 +22,21 @@ import (
 	"github.com/getkin/kin-openapi/routers/legacy"
 )
 
-// The API contract, api/openapi.yaml, is enforced here rather than by generating handlers from
-// it: dbTest.do checks every exchange a test makes on a path the file describes, so a handler
-// whose real JSON stops matching the contract fails its own tests. A path the file doesn't
-// describe yet goes unchecked.
+// The API contract, api/openapi.yaml with the paths/ and components/ files it refers to, is
+// enforced here rather than by generating handlers from it: dbTest.do, dbTest.send and
+// serveChecked check every exchange a test makes on a path it describes, so a handler whose real
+// JSON stops matching the contract fails its own tests, and TestContractCoversEveryRoute keeps
+// every route described.
 
 const contractPath = "../../api/openapi.yaml"
+
+// newContractLoader reads the contract across its files: openapi.yaml's paths and their shared
+// components live in files of their own.
+func newContractLoader() *openapi3.Loader {
+	loader := openapi3.NewLoader()
+	loader.IsExternalRefsAllowed = true
+	return loader
+}
 
 var (
 	contractOnce   sync.Once
@@ -34,7 +48,7 @@ func loadContract() (routers.Router, error) {
 	contractOnce.Do(func() {
 		// Lenient on version bits: ids are any hex UUID, not only RFC 4122 ones.
 		openapi3.DefineStringFormatValidator("uuid", openapi3.NewRegexpFormatValidator(uuidPattern.String()))
-		loader := openapi3.NewLoader()
+		loader := newContractLoader()
 		doc, err := loader.LoadFromFile(contractPath)
 		if err != nil {
 			contractErr = err
@@ -57,6 +71,88 @@ func TestContractIsValid(t *testing.T) {
 	if _, err := loadContract(); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// TestContractCoversEveryRoute fails when a /v1 route the server registers isn't in
+// api/openapi.yaml, or the file describes one it doesn't register: an undescribed route would
+// otherwise go unchecked without anyone noticing. The routes are read from the package's
+// source, every route(method, path) call, so each needs literal arguments.
+func TestContractCoversEveryRoute(t *testing.T) {
+	registered := map[string]bool{}
+	fset := token.NewFileSet()
+	pkgs, err := parser.ParseDir(fset, ".", func(fi fs.FileInfo) bool {
+		return !strings.HasSuffix(fi.Name(), "_test.go")
+	}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, pkg := range pkgs {
+		for _, file := range pkg.Files {
+			ast.Inspect(file, func(n ast.Node) bool {
+				call, ok := n.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				if fn, ok := call.Fun.(*ast.Ident); !ok || fn.Name != "route" || len(call.Args) != 2 {
+					return true
+				}
+				var args [2]string
+				for i, arg := range call.Args {
+					lit, ok := arg.(*ast.BasicLit)
+					if !ok || lit.Kind != token.STRING {
+						t.Errorf("%s: route needs literal arguments to be checked against the contract", fset.Position(call.Pos()))
+						return true
+					}
+					args[i], _ = strconv.Unquote(lit.Value)
+				}
+				registered[args[0]+" "+args[1]] = true
+				return true
+			})
+		}
+	}
+	if len(registered) == 0 {
+		t.Fatal("found no route calls")
+	}
+
+	doc, err := newContractLoader().LoadFromFile(contractPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	described := map[string]bool{}
+	for path, item := range doc.Paths.Map() {
+		for method := range item.Operations() {
+			described[method+" "+path] = true
+		}
+	}
+
+	for r := range registered {
+		if !described[r] {
+			t.Errorf("%s %s is registered but not described in %s", strings.Fields(r)[0], apiPrefix+strings.Fields(r)[1], contractPath)
+		}
+	}
+	for d := range described {
+		if !registered[d] {
+			t.Errorf("%s %s is described in %s but not registered", strings.Fields(d)[0], apiPrefix+strings.Fields(d)[1], contractPath)
+		}
+	}
+}
+
+// serveChecked runs h on req and checks the exchange against the contract, as dbTest.do does —
+// for a test that calls a handler directly, or the server without a dbTest.
+func serveChecked(t *testing.T, h http.HandlerFunc, req *http.Request) *httptest.ResponseRecorder {
+	t.Helper()
+	var body []byte
+	if req.Body != nil {
+		var err error
+		if body, err = io.ReadAll(req.Body); err != nil {
+			t.Fatalf("read request body: %v", err)
+		}
+		req.Body = io.NopCloser(bytes.NewReader(body))
+	}
+	rec := httptest.NewRecorder()
+	h(rec, req)
+	checkContract(t, req, body, rec)
+	return rec
 }
 
 // checkContract checks one exchange against the contract: the response always, the request

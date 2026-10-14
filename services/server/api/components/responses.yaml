@@ -1,0 +1,65 @@
+PlainError:
+  description: A message to show the user
+  content:
+    text/plain:
+      schema: { type: string }
+Unauthenticated:
+  description: No live session
+  content:
+    text/plain:
+      schema: { type: string }
+NotVerified:
+  description: The account's email isn't verified yet
+  content:
+    application/json:
+      schema: { $ref: "schemas.yaml#/CodedError" }
+Forbidden:
+  description: The account's email isn't verified yet, or it is the read-only demo
+  content:
+    application/json:
+      schema: { $ref: "schemas.yaml#/CodedError" }
+Session:
+  description: Signed in; the session is also set as a cookie
+  content:
+    application/json:
+      schema: { $ref: "schemas.yaml#/AccountWithSession" }
+Message:
+  description: A message to show the user
+  content:
+    application/json:
+      schema:
+        type: object
+        required: [message]
+        additionalProperties: false
+        properties:
+          message: { type: string }
+Redirect:
+  description: A redirect
+  headers:
+    Location:
+      schema: { type: string }
+PhotoNeedsPlace:
+  description: Nothing places the photo on the track; ask the user where and send route_at
+  content:
+    application/json:
+      schema: { $ref: "schemas.yaml#/PhotoNeedsPlace" }
+PhotoImage:
+  description: The image, as the type it was sniffed as on upload
+  content:
+    image/jpeg:
+      schema: { type: string, format: binary }
+    image/webp:
+      schema: { type: string, format: binary }
+OverLimit:
+  description: The account is at its activity or storage limit
+  content:
+    text/plain:
+      schema: { type: string }
+DailyCapacity:
+  description: The service has reached its daily capacity; try again after Retry-After
+  headers:
+    Retry-After:
+      schema: { type: integer }
+  content:
+    text/plain:
+      schema: { type: string }

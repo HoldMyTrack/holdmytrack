@@ -3,214 +3,137 @@ info:
   title: HoldMyTrack API
   version: v1
   description: >-
-    The JSON contract between the Go server and its clients. The httpapi package's database
-    tests check every request and response they make to a path described here against this
-    file, so a handler that stops matching it fails CI.
+    The JSON contract between the Go server and its clients: this file indexes every path, each
+    area's operations are in paths/, and the shapes they share in components/. The httpapi
+    package's tests check every request and response they make against it, so a handler that
+    stops matching it fails CI. A browser's write from another site is
+    refused with a plain-text 403 before any operation runs; the operations don't repeat it.
 servers:
   - url: /v1
 security:
   - session: []
 paths:
+  /auth/signup:
+    $ref: "paths/auth.yaml#/auth_signup"
+  /auth/login:
+    $ref: "paths/auth.yaml#/auth_login"
+  /auth/logout:
+    $ref: "paths/auth.yaml#/auth_logout"
+  /auth/me:
+    $ref: "paths/auth.yaml#/auth_me"
+  /auth/demo:
+    $ref: "paths/auth.yaml#/auth_demo"
+  /auth/forgot-password:
+    $ref: "paths/auth.yaml#/auth_forgot-password"
+  /auth/reset-password:
+    $ref: "paths/auth.yaml#/auth_reset-password"
+  /auth/verify-email:
+    $ref: "paths/auth.yaml#/auth_verify-email"
+  /auth/providers:
+    $ref: "paths/auth.yaml#/auth_providers"
+  /auth/google/start:
+    $ref: "paths/auth.yaml#/auth_google_start"
+  /auth/google/callback:
+    $ref: "paths/auth.yaml#/auth_google_callback"
+  /auth/facebook/start:
+    $ref: "paths/auth.yaml#/auth_facebook_start"
+  /auth/facebook/callback:
+    $ref: "paths/auth.yaml#/auth_facebook_callback"
+  /auth/google/token:
+    $ref: "paths/auth.yaml#/auth_google_token"
+  /auth/handoff:
+    $ref: "paths/auth.yaml#/auth_handoff"
+  /auth/resend-verification:
+    $ref: "paths/auth.yaml#/auth_resend-verification"
+  /auth/email:
+    $ref: "paths/auth.yaml#/auth_email"
+  /account:
+    $ref: "paths/account.yaml#/account"
+  /account/settings:
+    $ref: "paths/account.yaml#/account_settings"
+  /account/settings/options:
+    $ref: "paths/account.yaml#/account_settings_options"
+  /account/avatar:
+    $ref: "paths/account.yaml#/account_avatar"
+  /account/export:
+    $ref: "paths/account.yaml#/account_export"
+  /account/exports/{id}/parts/{n}:
+    $ref: "paths/account.yaml#/account_exports_id_parts_n"
   /activities:
-    get:
-      summary: The signed-in account's activities, newest first, unpaginated
-      parameters:
-        - name: from
-          in: query
-          description: Local start date, inclusive.
-          schema: { type: string, format: date }
-        - name: to
-          in: query
-          description: Local start date, inclusive.
-          schema: { type: string, format: date }
-        - name: types
-          in: query
-          description: Comma-separated activity types.
-          schema: { type: string }
-        - name: story
-          in: query
-          description: One Story's activities only.
-          schema: { type: string, format: uuid }
-      responses:
-        "200":
-          description: The activities
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [activities]
-                additionalProperties: false
-                properties:
-                  activities:
-                    type: array
-                    items: { $ref: "#/components/schemas/ActivityRow" }
-        "400": { $ref: "#/components/responses/PlainError" }
-        "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/NotVerified" }
+    $ref: "paths/activities.yaml#/activities"
+  /activities/upload:
+    $ref: "paths/activities.yaml#/activities_upload"
+  /activities/{id}:
+    $ref: "paths/activities.yaml#/activities_id"
+  /activities/overlaps:
+    $ref: "paths/activities.yaml#/activities_overlaps"
+  /activities/summary:
+    $ref: "paths/activities.yaml#/activities_summary"
+  /activities/histogram:
+    $ref: "paths/activities.yaml#/activities_histogram"
+  /activities/graph-stats:
+    $ref: "paths/activities.yaml#/activities_graph-stats"
+  /activities/trends:
+    $ref: "paths/activities.yaml#/activities_trends"
+  /activities/status/{external_id}:
+    $ref: "paths/activities.yaml#/activities_status_external_id"
+  /activities/track-metrics/{id}:
+    $ref: "paths/activities.yaml#/activities_track-metrics_id"
+  /activities/track-points/{id}:
+    $ref: "paths/activities.yaml#/activities_track-points_id"
+  /activities/track-edit/{id}:
+    $ref: "paths/activities.yaml#/activities_track-edit_id"
+  /activities/track-merge:
+    $ref: "paths/activities.yaml#/activities_track-merge"
+  /map/style/{flavor}:
+    $ref: "paths/map.yaml#/map_style_flavor"
+  /photos:
+    $ref: "paths/photos.yaml#/photos"
+  /photos/place:
+    $ref: "paths/photos.yaml#/photos_place"
+  /photos/{id}:
+    $ref: "paths/photos.yaml#/photos_id"
+  /photos/{id}/thumb:
+    $ref: "paths/photos.yaml#/photos_id_thumb"
   /private-locations:
-    get:
-      summary: The signed-in account's Private locations, oldest first
-      responses:
-        "200":
-          description: The Private locations
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/PrivateLocation" }
-        "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/NotVerified" }
-    post:
-      summary: Add a Private location
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/PrivateLocationInput" }
-      responses:
-        "201":
-          description: The new Private location
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/PrivateLocation" }
-        "400": { $ref: "#/components/responses/PlainError" }
-        "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "409":
-          description: The account already has the most Private locations allowed
-          content:
-            text/plain:
-              schema: { type: string }
+    $ref: "paths/private-locations.yaml#/private-locations"
   /private-locations/{id}:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        # Not format: uuid — a malformed id is a 404 from the handler, not a request error.
-        schema: { type: string }
-    patch:
-      summary: Move, resize or rename a Private location (a full replace)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/PrivateLocationInput" }
-      responses:
-        "200":
-          description: The Private location as saved
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/PrivateLocation" }
-        "400": { $ref: "#/components/responses/PlainError" }
-        "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/PlainError" }
-    delete:
-      summary: Remove a Private location
-      responses:
-        "204":
-          description: Removed
-        "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/PlainError" }
+    $ref: "paths/private-locations.yaml#/private-locations_id"
+  /stories:
+    $ref: "paths/stories.yaml#/stories"
+  /stories/{id}:
+    $ref: "paths/stories.yaml#/stories_id"
+  /stories/{id}/activities:
+    $ref: "paths/stories.yaml#/stories_id_activities"
+  /stories/{id}/send:
+    $ref: "paths/stories.yaml#/stories_id_send"
+  /story-sends:
+    $ref: "paths/stories.yaml#/story-sends"
+  /story-sends/{id}/accept:
+    $ref: "paths/stories.yaml#/story-sends_id_accept"
+  /story-sends/{id}:
+    $ref: "paths/stories.yaml#/story-sends_id"
+  /uploads:
+    $ref: "paths/uploads.yaml#/uploads"
+  /uploads/active:
+    $ref: "paths/uploads.yaml#/uploads_active"
+  /coverage/status:
+    $ref: "paths/map.yaml#/coverage_status"
+  /sync/activities:
+    $ref: "paths/sync.yaml#/sync_activities"
+  /sync/known:
+    $ref: "paths/sync.yaml#/sync_known"
+  /spots:
+    $ref: "paths/spots.yaml#/spots"
+  /spots/captures:
+    $ref: "paths/spots.yaml#/spots_captures"
+  /spots/{id}:
+    $ref: "paths/spots.yaml#/spots_id"
+  /spots/{id}/captures:
+    $ref: "paths/spots.yaml#/spots_id_captures"
 components:
   securitySchemes:
     session:
       type: http
       scheme: bearer
       description: A session id, as a bearer token or the session cookie.
-  responses:
-    PlainError:
-      description: A message to show the user
-      content:
-        text/plain:
-          schema: { type: string }
-    Unauthenticated:
-      description: No live session
-      content:
-        text/plain:
-          schema: { type: string }
-    NotVerified:
-      description: The account's email isn't verified yet
-      content:
-        application/json:
-          schema: { $ref: "#/components/schemas/CodedError" }
-    Forbidden:
-      description: The account's email isn't verified yet, or it is the read-only demo
-      content:
-        application/json:
-          schema: { $ref: "#/components/schemas/CodedError" }
-  schemas:
-    CodedError:
-      type: object
-      required: [error]
-      additionalProperties: false
-      properties:
-        error:
-          type: string
-          enum: [email_not_verified, demo_read_only]
-        message: { type: string }
-    ActivityRow:
-      type: object
-      required: [id, started_at, timezone, activity_type, name, distance_meters, duration_seconds, description, bbox, pending, edited, private, split, stories]
-      additionalProperties: false
-      properties:
-        id: { type: string, format: uuid }
-        started_at: { type: string, format: date-time }
-        timezone:
-          type: string
-          description: The IANA zone it was recorded in; a client shows its times in it.
-        activity_type: { type: string }
-        name: { type: string, nullable: true }
-        distance_meters: { type: number, nullable: true }
-        duration_seconds: { type: integer, nullable: true }
-        description: { type: string, nullable: true }
-        bbox:
-          type: array
-          nullable: true
-          description: "[minLon, minLat, maxLon, maxLat], or null when the activity has no track."
-          minItems: 4
-          maxItems: 4
-          items: { type: number }
-        pending: { type: boolean }
-        edited: { type: boolean }
-        private: { type: boolean }
-        split:
-          type: object
-          nullable: true
-          required: [group, from, to]
-          additionalProperties: false
-          properties:
-            group: { type: string, format: uuid }
-            from: { type: integer, format: int64, nullable: true }
-            to: { type: integer, format: int64, nullable: true }
-        stories:
-          type: array
-          items:
-            type: object
-            required: [id, name]
-            additionalProperties: false
-            properties:
-              id: { type: string, format: uuid }
-              name: { type: string }
-    PrivateLocationInput:
-      type: object
-      required: [lon, lat, radius_m]
-      properties:
-        name:
-          type: string
-          maxLength: 100
-          description: Missing or empty leaves the Private location unnamed.
-        lon: { type: number, minimum: -180, maximum: 180 }
-        lat: { type: number, minimum: -85, maximum: 85 }
-        radius_m: { type: integer, minimum: 50, maximum: 2000 }
-    PrivateLocation:
-      type: object
-      required: [id, name, lon, lat, radius_m]
-      additionalProperties: false
-      properties:
-        id: { type: string, format: uuid }
-        name: { type: string }
-        lon: { type: number }
-        lat: { type: number }
-        radius_m: { type: integer }
