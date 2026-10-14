@@ -20,10 +20,10 @@ Where HoldMyTrack is now (`VISION.md` §5, ADR-0031). The product is shipped and
 
 ### Before launch
 
-Gates any public launch, regardless of which paths are live: validation that "free, funded by its users" reads as credible (`VISION.md` §5.1), and compliance, since a precise location history is sensitive personal data under GDPR (`VISION.md` §7).
+Gates any public launch, regardless of which paths are live: validation that "free, funded by its users" reads as credible (`VISION.md` §8.3), and compliance, since a precise location history is sensitive personal data under GDPR (`VISION.md` §7).
 
 - [ ] Stand up the funding page (Open Collective, public ledger — `VISION.md` §6.1) before any public launch, not retrofitted after. The app side is built (`IMPLEMENTATION.md` §4.16), and the `holdmytrack` collective applied to Open Source Collective as fiscal host on 2026-09-24; what's left: once approved, set the slug — `services/server/internal/web/web.go`'s `OpenCollectiveSlug` — and replace the About page template's "donations are not open yet" line with a link to it.
-- [ ] Post concept renders to r/running, r/cycling, r/Garmin, r/Strava, r/FogOfWorld (`VISION.md` §5.1, §8.1) — validate "free, funded by its users" as credible before the public launch.
+- [ ] Post concept renders to r/running, r/cycling, r/Garmin, r/Strava, r/FogOfWorld (`VISION.md` §8.1, §8.3) — validate "free, funded by its users" as credible before the public launch.
 - [ ] DPIA before any public launch — drafted in `docs/DPIA.md`; what's left is its section 7 pre-launch actions and the controller's sign-off.
 - [ ] EU-region hosting for EU users.
 - [x] A privacy policy page — `/privacy` (`SPEC.md` FR-10.6). It names the email delivery provider only generically; name it there once settled, and update the policy when EU-region hosting moves the data.
@@ -46,7 +46,7 @@ An engineering requirement, can land alongside any other work (`IMPLEMENTATION.m
 ### After launch
 
 - [ ] Review how long original uploads are kept, soon after the public launch, once real accounts show what they cost: today they're kept until the activity is deleted. They're the most sensitive thing held (`DPIA.md` R2) and likely the largest per-activity storage line, and an expired one can no longer be re-clipped after a Private location change, rebuilt by a track edit, or exported as the original (`IMPLEMENTATION.md` §5.7).
-- [ ] The iOS app (`VISION.md` §5.3), likely after the public launch, with no date set: first confirm `HKWorkoutRoute` access with a throwaway app (`VISION.md` §4.1); then HealthKit sync, with `HKWorkoutRoute` for full GPS geometry, on the payload and the pick-what-to-send design Android settled (`SPEC.md` FR-3.6), and the site's own pages in a `WKWebView` for Settings, Profile, the Sync page and About (ADR-0042); then in-app GPS recording, on the Android build's wire shape and `source` convention (`SPEC.md` FR-3.8, ADR-0007).
+- [ ] The iOS app (`VISION.md` §4.1, Path 2; `ARCHITECTURE.md` §2), likely after the public launch, with no date set: first confirm `HKWorkoutRoute` access with a throwaway app (`VISION.md` §4.1); then HealthKit sync, with `HKWorkoutRoute` for full GPS geometry, on the payload and the pick-what-to-send design Android settled (`SPEC.md` FR-3.6), and the site's own pages in a `WKWebView` for Settings, Profile, the Sync page and About (ADR-0042); then in-app GPS recording, on the Android build's wire shape and `source` convention (`SPEC.md` FR-3.8, ADR-0007).
 
 ---
 

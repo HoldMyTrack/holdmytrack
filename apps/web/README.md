@@ -1,6 +1,6 @@
 # HoldMyTrack web client
 
-React + MapLibre GL JS on a self-hosted Protomaps basemap, described in `docs/ARCHITECTURE.md` (§1.2), `IMPLEMENTATION.md` (§5.4) and `VISION.md` (§5.2).
+React + MapLibre GL JS on a self-hosted Protomaps basemap, described in `docs/ARCHITECTURE.md` (§1.2) and `IMPLEMENTATION.md` (§5.4).
 
 ## Getting started
 

@@ -97,7 +97,7 @@ The central structural decision. Each path has a different failure mode, and no 
 
 #### Path 1 — Cloud-to-cloud integration
 
-Server-side OAuth connections to services that hold the user's history. None is planned before launch: which to build, if any, is decided from what the people using HoldMyTrack ask for (§5.5). The likeliest candidates:
+Server-side OAuth connections to services that hold the user's history. None is planned before launch: which to build, if any, is decided from what the people using HoldMyTrack ask for after launch (§5). The likeliest candidates:
 
 | Provider | What it gives | Constraint to verify before building |
 | :--- | :--- | :--- |
@@ -130,7 +130,7 @@ So Android on-device sync is foreground-only, and Samsung Galaxy Watch is unsupp
 
 #### Path 3 needs no one's permission
 
-Paths 1 and 2 depend on things HoldMyTrack doesn't control: a provider's partner approval, and what HealthKit and Health Connect actually expose. **Path 3 is unconditional.** If every one of those fails, file upload still delivers the entire product to every user willing to export once. That is what source independence buys, and it is why Path 3 comes first (§5.2).
+Paths 1 and 2 depend on things HoldMyTrack doesn't control: a provider's partner approval, and what HealthKit and Health Connect actually expose. **Path 3 is unconditional.** If every one of those fails, file upload still delivers the entire product to every user willing to export once. That is what source independence buys.
 
 #### Casual in-app GPS recording — mobile-only, and not a fourth path
 
@@ -161,7 +161,7 @@ This isn't a resilience decision the way Paths 1–3 are — §4.1's provider-in
 
 **Only what the user keeps comes in, and nothing is guessed for them.** Every source is a gate: it shows what it would bring in, nothing is ticked to start with, and what isn't ticked never reaches the server. Fog of War clears the places your kept journeys reached, and only those: there are no fog-only contributions from history left out, and deleting an activity takes its fog with it. When a candidate overlaps an activity already kept, it's marked as overlapping rather than merged or hidden automatically, and the user decides; tracks are fixed with the edit tools, not by rules applied on import. Bulk archives (`.zip`, Google Takeout) aren't imported: bulk history comes through cloud connectors with the same picker. See ADR-0039.
 
-**The activity graph is deliberately private, not a profile page.** It's the same genre of thing as Fog of War above — motivation through your own history, no comparison required — and since an account holds the journeys its owner chose to keep (ADR-0039), its grid counts how many a year held: trips, but also a new park, playground or district worth recording. It's not a step toward the social features §1.1 and §5.7 explicitly hold off on. It has no follows, no feed, and nothing another user can view; it's a personal dashboard, available once accounts exist (§5.2), not a public artifact. If a shareable version is ever worth building, that's a §5.7 social-phase decision to make deliberately, not a side effect of how this one ships.
+**The activity graph is deliberately private, not a profile page.** It's the same genre of thing as Fog of War above — motivation through your own history, no comparison required — and since an account holds the journeys its owner chose to keep (ADR-0039), its grid counts how many a year held: trips, but also a new park, playground or district worth recording. It's not a step toward the social features §1.1 and §5.7 explicitly hold off on. It has no follows, no feed, and nothing another user can view; it's a personal dashboard, not a public artifact. If a shareable version is ever worth building, that's a §5.7 social-phase decision to make deliberately, not a side effect of how this one ships.
 
 **Stories are for remembering a trip, and the user decides what belongs in one.** A multi-day hike, a holiday or a race weekend is several activities spread over several days, sometimes with a drive at each end, and after the fact it disappears into the rest of the history. A Story keeps it as one thing: a name, a description, its joint totals, and a map that shows only its own tracks. Its activities are hand-picked rather than matched by a date span or a rule, because only the person who went knows which drive was part of the trip and which was the commute that week. Stories are private, like the activity graph: a way of keeping your own memories, not a profile or a feed. Since a family trip is one trip for everyone who went, but usually only one device records it, a Story can be sent as a copy to someone with an account: once they accept it, the Story and its activities are theirs — on their Fog of War and Heatmap, in their totals and countries visited — and nothing the sender does afterwards can take it away. Sending it again later adds only what's new. Beyond that, sharing a Story means exporting an image of its map (`IMPLEMENTATION.md` §4.3.3); a link that opens a story for someone else is a §5.7 decision, for the same reason as above. A story view draws tracks only: Fog of War and Heatmap stay all-time, since a fog pyramid per story is a per-user storage cost that grows with every story made (§4.3). See ADR-0036.
 
@@ -205,33 +205,13 @@ That is a genuinely small number, and it is the whole argument for this model wo
 
 ---
 
-## 5. Product Roadmap
+## 5. Milestones
 
-The product moves through three milestones (ADR-0031):
+The product moves through three milestones (ADR-0031); `docs/ROADMAP.md` carries the work in each.
 
-1. **MVP** — where HoldMyTrack is now. Activities, the map modes, Spots, Stories and photos, on the web and Android (§5.1–5.4). Free for everyone, community-funded. It ends at the public launch, which validation (§5.1) and compliance (§5.6) gate.
-2. **Release and community** (§5.5–5.6). Open HoldMyTrack to the public and build a community around it: polish, fix, and shape the features around what the people using it ask for. Its other job is to find out what community funding can actually carry, and that answer is what Milestone 3 is decided from.
+1. **MVP** — where HoldMyTrack is now. Activities, the map modes, Spots, Stories and photos, on the web and Android. Free for everyone, community-funded. It ends at the public launch, which compliance (§7) and a funding page already standing (§6.1) gate.
+2. **Release and community** — open HoldMyTrack to the public and build a community around it: polish, fix, and shape the features and sources around what the people using it ask for. Its other job is to find out what community funding can actually carry, and that answer is what Milestone 3 is decided from.
 3. **Social graph** (§5.7). Public pages, followers and the rest — if at all. Whether to build it, and whether to pay for it with paid features, community funding or sponsors, is decided from Milestone 2's numbers. Staying a single-player product and never starting this milestone is one of the options.
-
-Within the milestones, the unconditional ingest path ships first and the ones that depend on other companies' permission come later. `docs/ROADMAP.md` carries each milestone's step-by-step detail.
-
-### 5.1 Validation — *no application code*
-Settle what the plan rests on before building on it: whether HealthKit's route access is what it appears to be, checked when the iOS app is built (§4.1, §5.3), and whether "free, funded by its users" reads as credible (§8.3). The funding page stands before launch, not after — the ask is much weaker retrofitted (§6.1).
-
-### 5.2 Upload + Map
-The product on the web, on the one ingest path that needs nobody's permission: file upload (Path 3, §4.1), the map in all its modes, the no-signup demo (§8.2), accounts, the activity graph, export, Stories and Spots (§4.2). Path 3 comes first so that the first usable version waits on no one's approval.
-
-### 5.3 Mobile
-Native apps for the on-device path (Path 2, §4.1) and for in-app GPS recording. Android goes first although it is the more constrained platform — foreground-only route reads, and no Samsung routes at all, which the app states plainly rather than quietly degrading — so the sync contract is designed against the harder case. iOS, on HealthKit and Apple Watch, the stronger of the two routes, inherits it, after the public launch rather than as part of the MVP. Picking what to sync belongs here too: the phone holds every walk, and only the ones the user ticks come in (ADR-0039).
-
-### 5.4 Finalized design + mobile browser support
-One visual language across desktop and phone browsers, then frozen: the `--fm-*` tokens, Inter and Fraunces (Source Serif 4 for Russian headings), and Lucide icons. The mobile apps inherit the freeze rather than inventing a second visual language: two clients that each chose their own would not read as one product.
-
-### 5.5 More sources
-Path 1 connectors (§4.1), not planned: which to build, if any, is decided after launch from what the people using HoldMyTrack ask for, as part of Milestone 2's shaping the product around them. They come last among the sources anyway, being the ones that depend on other companies' permission, and the work they'd need is in `BRAINSTORM.md`. Each lists what it would bring in, and only what the user ticks comes in (ADR-0039).
-
-### 5.6 Cost control and compliance
-Gates rather than features. Cost control keeps the cost per user bounded and measured (§4.3), can land alongside any other work, and is what keeps §6's funding model honest. Compliance (§7) gates any public launch, however small.
 
 ### 5.7 Social graph (Milestone 3, not committed)
 Public pages, followers and the rest of a social graph make up Milestone 3, and it is deliberately unscheduled. It doesn't start until Milestone 2 has shown what community funding can carry, because social features add moderation, abuse handling and safety obligations that are **staff costs, not server costs** — the one category donations scale to worst. The decision at that point is which way to pay for them — paid features, community funding or sponsors — or not to build them at all. See §5.8.
@@ -251,6 +231,8 @@ A product with no headcount should not ship a location-sharing social network. E
 **HoldMyTrack is free today: all features, all sources, all exports, for everyone, and user data is never sold.** Nothing is promised past Milestone 2 (§5) — not "free forever", not "no ads". The one standing commitment is that data is never sold (ADR-0031).
 
 Running costs are covered by **ongoing community funding** — recurring monthly support through a platform such as Open Collective, GitHub Sponsors or Patreon.
+
+The funding page stands before launch, not after: the ask is much weaker retrofitted.
 
 Open Collective is the strongest fit specifically because it makes spending public by default. For a project whose pitch is "free and not extracting from you", **verifiable accounting is part of the product**, not an administrative detail. The funding page should show the actual monthly infrastructure bill against actual monthly income.
 

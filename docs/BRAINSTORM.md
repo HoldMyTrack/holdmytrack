@@ -82,7 +82,7 @@ Garmin users come in through file upload (Path 3, `VISION.md` §4.1) and nothing
 
 ### Cloud connectors (Path 1)
 
-No connector is planned before launch (`VISION.md` §5.5): which services to connect, if any, is decided from what people ask for after it. Wahoo and COROS are the likeliest (`VISION.md` §4.1). What any of them would take:
+No connector is planned before launch (`VISION.md` §4.1): which services to connect, if any, is decided from what people ask for after it. Wahoo and COROS are the likeliest (`VISION.md` §4.1). What any of them would take:
 
 * A partner-API application per provider. Approval takes time, not money, so lead time is the risk: file it as soon as one is decided.
 * Generic OAuth scaffolding, built once and provider-agnostic before any provider: authorize, callback and token refresh on the existing `connections` table (`IMPLEMENTATION.md` §3.2), with a picker that lists what the connector would bring in and imports only what the user ticks (ADR-0039). That is how a connector's bulk history would arrive, since archives aren't imported.
