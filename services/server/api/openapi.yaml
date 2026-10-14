@@ -894,6 +894,43 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/PlainError" }
+  /map/style/{flavor}:
+    parameters:
+      - name: flavor
+        in: path
+        required: true
+        description: One of the styles embedded in internal/mapstyle (light, dark, …); a trailing .json is ignored.
+        schema: { type: string }
+    get:
+      summary: A MapLibre style document for the basemap
+      description: Public, so a client can draw a map before anyone signs in; it holds no account's data.
+      security: []
+      parameters:
+        - name: lang
+          in: query
+          description: The labels' language, by its primary subtag; an unsupported one, or none, is English.
+          schema: { type: string }
+      responses:
+        "200":
+          description: The style; revalidate with its ETag
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: object
+                description: A MapLibre style (its own specification), not one of this API's shapes.
+                required: [version, sources, layers]
+                properties:
+                  version: { type: integer, enum: [8] }
+                  sources: { type: object }
+                  layers:
+                    type: array
+                    items: { type: object }
+        "304":
+          description: Unchanged since the If-None-Match ETag
+        "404": { $ref: "#/components/responses/PlainError" }
   /photos:
     get:
       summary: One activity's photos, or those of every activity in a Story, in route order
