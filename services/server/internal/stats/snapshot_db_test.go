@@ -133,6 +133,16 @@ func TestTake(t *testing.T) {
 	photo(qq[0], a1, "stats-test/a", 1000)
 	photo(qq[0], a1, "stats-test/b", 500)
 
+	// Stored objects: two activities over one original (a split) count it once; one more
+	// original isn't measured yet. A Fog/Heatmap tile with both sizes, one rendered before they
+	// were recorded, and a mask.
+	exec(`UPDATE activities SET raw_payload_key = 'stats-test/raw-a', raw_bytes = 2000 WHERE user_id = $1 AND source = 'upload'`, qq[0])
+	exec(`UPDATE activities SET raw_payload_key = 'stats-test/raw-b' WHERE user_id = $1`, qq[1])
+	exec(`INSERT INTO fog_tiles (user_id, zoom, tile_x, tile_y, object_key, heatmap_object_key, bytes, heatmap_bytes, dirty)
+		VALUES ($1, 14, 1, 1, 'f', 'h', 300, 400, false), ($1, 14, 1, 2, 'f', 'h', NULL, NULL, false)`, qq[0])
+	exec(`INSERT INTO activity_tile_masks (activity_id, zoom, tile_x, tile_y) VALUES ($1, 14, 1, 1)`, a1)
+	exec(`INSERT INTO activity_tile_mask_data (activity_id, zoom, tile_x, tile_y, png) VALUES ($1, 14, 1, 1, $2)`, a1, make([]byte, 50))
+
 	after, err := compute(ctx, tx, day)
 	if err != nil {
 		t.Fatal(err)
@@ -159,10 +169,17 @@ func TestTake(t *testing.T) {
 		"activity_accounts_by_country.qq":    0, // one account: folded
 		"activity_accounts_by_country.other": 2, // its one account, counted under each country
 		"activities_by_country.other":        2,
+		"storage_bytes.originals":            2000,
+		"storage_bytes.fog":                  300,
+		"storage_bytes.heatmap":              400,
+		"storage_bytes_unmeasured_rows":      3, // raw-b, and the second tile's two objects
 	} {
 		if got := after[key] - before[key]; got != want {
 			t.Errorf("%s: went up by %v, want %v", key, got, want)
 		}
+	}
+	if got := after["storage_bytes.masks"] - before["storage_bytes.masks"]; got < 50 || got > 60 {
+		t.Errorf("storage_bytes.masks went up by %v, want a 50-byte mask's stored size", got)
 	}
 	if _, ok := after["accounts_by_country.qz"]; ok {
 		t.Errorf("accounts_by_country.qz written, want it folded")

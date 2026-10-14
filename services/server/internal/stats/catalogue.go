@@ -113,6 +113,53 @@ var catalogue = []stat{
 		SELECT coalesce(sum(s), 0)
 		FROM exports e JOIN acct u ON u.id = e.user_id, unnest(e.part_sizes) s
 		WHERE e.expires_at IS NULL OR e.expires_at > NOW()`},
+	// Originals, by the size recorded beside each key; split pieces share one, so each key
+	// counts once. Masks are in the database: pg_column_size reads each one's stored size.
+	{key: "storage_bytes.originals", kind: state, query: `
+		SELECT coalesce(sum(b), 0) FROM (
+			SELECT max(a.raw_bytes) AS b FROM activities a JOIN acct u ON u.id = a.user_id
+			WHERE a.raw_payload_key IS NOT NULL GROUP BY a.raw_payload_key
+		) f`},
+	{key: "storage_bytes.masks", kind: state, query: `
+		SELECT coalesce(sum(pg_column_size(d.png)), 0)
+		FROM activity_tile_mask_data d JOIN activities a ON a.id = d.activity_id JOIN acct u ON u.id = a.user_id`},
+	{key: "storage_bytes.fog", kind: state, query: `
+		SELECT coalesce(sum(f.bytes), 0) FROM fog_tiles f JOIN acct u ON u.id = f.user_id`},
+	{key: "storage_bytes.heatmap", kind: state, query: `
+		SELECT coalesce(sum(f.heatmap_bytes), 0) FROM fog_tiles f JOIN acct u ON u.id = f.user_id`},
+	// Everything an account stores, over accounts storing anything: what a quota would bound.
+	// A photo shared with a Story copy counts for each account holding it.
+	{prefix: "storage_bytes_per_account", kind: state, query: `
+		, per AS (
+			SELECT user_id, sum(b)::float8 AS b FROM (
+				SELECT a.user_id, max(a.raw_bytes) AS b FROM activities a
+				WHERE a.raw_payload_key IS NOT NULL GROUP BY a.user_id, a.raw_payload_key
+				UNION ALL
+				SELECT a.user_id, sum(pg_column_size(d.png)) FROM activity_tile_mask_data d
+				JOIN activities a ON a.id = d.activity_id GROUP BY a.user_id
+				UNION ALL
+				SELECT user_id, sum(coalesce(bytes, 0) + coalesce(heatmap_bytes, 0)) FROM fog_tiles GROUP BY user_id
+				UNION ALL
+				SELECT user_id, max(bytes) FROM activity_photos GROUP BY user_id, image_key
+			) x
+			WHERE user_id IN (SELECT id FROM acct)
+			GROUP BY user_id HAVING sum(b) > 0
+		),
+		v AS (
+			SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY b) AS p50,
+			       percentile_cont(0.9) WITHIN GROUP (ORDER BY b) AS p90,
+			       max(b) AS mx
+			FROM per
+		)
+		SELECT g, x FROM v, LATERAL (VALUES ('p50', v.p50), ('p90', v.p90), ('max', v.mx)) AS t(g, x)`},
+	// Rows naming an object whose size isn't recorded yet; 0 once backfill-object-bytes has
+	// run (docs/DEPLOY.md).
+	{key: "storage_bytes_unmeasured_rows", kind: state, query: `
+		SELECT (SELECT count(*) FROM activities a JOIN acct u ON u.id = a.user_id
+		        WHERE a.raw_payload_key IS NOT NULL AND a.raw_bytes IS NULL)
+		     + (SELECT count(*) FILTER (WHERE f.object_key IS NOT NULL AND f.bytes IS NULL)
+		             + count(*) FILTER (WHERE f.heatmap_object_key IS NOT NULL AND f.heatmap_bytes IS NULL)
+		        FROM fog_tiles f JOIN acct u ON u.id = f.user_id)`},
 
 	// Features.
 	{key: "stories", kind: state, query: `SELECT count(*) FROM stories s JOIN acct u ON u.id = s.user_id`},
