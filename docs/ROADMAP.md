@@ -65,7 +65,6 @@ Connecting the app to third-party services.
 
 An engineering requirement, can land alongside any of the above (`IMPLEMENTATION.md` §5.7).
 
-- [ ] Per-user quotas (activity count, total points) — bounds one pathological account's cost.
 - [ ] A daily R2 budget the app enforces from its own operation counts, once the cost measurement below counts them: over budget it gives up renders first, then uploads, and map tiles last.
 - [ ] Serve the basemap as `/{z}/{x}/{y}` tiles Cloudflare can cache, `pmtiles serve` on the droplet first: today every range read into the archive reaches R2, since the free plan caches files only up to 512 MB (`IMPLEMENTATION.md` §5.4). Worth it once traffic grows; the zone saw about 97,000 basemap requests in the 30 days to 2026-10-14, under 1% of R2's free reads. The web style (`apps/web/src/map/style.ts`) and the style the server builds for Android (`mapstyle.go`) move from `pmtiles://` to the tile URL.
 - [ ] Cost per active user, with monthly donations and the share of active users who give: the numbers Milestone 2's exit gate and the Milestone 3 decision are made from (`VISION.md` §5, §6). The daily active counts are kept (`IMPLEMENTATION.md` §4.32); what's left is entering each month's costs and donations and reading the ratio.

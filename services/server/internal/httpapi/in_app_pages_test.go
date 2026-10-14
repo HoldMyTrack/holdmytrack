@@ -70,10 +70,15 @@ func TestInAppAccountPages(t *testing.T) {
 		}
 	}
 
-	// Settings in an app is the account's fields only: the app has its own Theme, Download
-	// your data and Delete account.
+	// Settings in an app is the account's fields and its limits only: the app has its own
+	// Theme, Download your data and Delete account.
 	web := getPage(d.srv, "/settings", me.session, false).Body.String()
 	app := getPage(d.srv, "/settings", me.session, true).Body.String()
+	for _, page := range []string{web, app} {
+		if !strings.Contains(page, `id="account-limits"`) || !strings.Contains(page, "0 of 50,000 activities") {
+			t.Error("/settings: the account's limits missing")
+		}
+	}
 	for _, section := range []string{`class="settings__title"`, "data-theme-control", `id="download-data"`, `id="delete-account"`} {
 		if !strings.Contains(web, section) {
 			t.Errorf("/settings in a browser: %s missing", section)

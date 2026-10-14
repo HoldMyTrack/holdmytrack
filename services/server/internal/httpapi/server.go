@@ -481,6 +481,9 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		httpErrorT(w, r, http.StatusBadRequest, "error.upload_empty")
 		return
 	}
+	if s.refuseOverLimit(w, r, userIDFromContext(r.Context()), int64(len(data))) {
+		return
+	}
 
 	res, err := ingest.EnqueueRaw(r.Context(), s.pool, userIDFromContext(r.Context()), []ingest.RawItem{
 		{Source: "upload", Filename: header.Filename, Ext: ext, Data: data},

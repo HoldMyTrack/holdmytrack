@@ -461,4 +461,4 @@ The two backup alerts read the files the scripts write after a successful run (�
 
 ## What this doesn't cover
 
-Per `docs/ROADMAP.md`, still open beyond this minimal setup: per-user quotas and an R2 budget (Phase 5), and the compliance work (DPIA, EU-region hosting — Phase 6) a genuine public launch needs regardless of how small the deployment is. This document gets you to "it's live," not to "it's ready for the public."
+Per `docs/ROADMAP.md`, still open beyond this minimal setup: an R2 budget (Phase 5), and the compliance work (DPIA, EU-region hosting — Phase 6) a genuine public launch needs regardless of how small the deployment is. This document gets you to "it's live," not to "it's ready for the public."

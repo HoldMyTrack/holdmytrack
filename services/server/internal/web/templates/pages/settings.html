@@ -99,6 +99,14 @@
     </span>
     <p class="settings__hint">{{t "settings.theme_hint"}}</p>
   </section>{{end}}
+  {{/* FR-1.13. What the account holds against the limits every account has; in an app too. */}}
+  {{if and (not .IsDemo) .Usage}}
+  <section class="settings__section settings__usage" id="account-limits" aria-labelledby="settings-usage">
+    <h2 class="settings__label" id="settings-usage">{{t "settings.usage_title"}}</h2>
+    <p class="settings__usage-line">{{.Usage}}</p>
+    <p class="settings__hint">{{t "settings.usage_hint"}}</p>
+  </section>
+  {{end}}
   {{/* FR-1.12. Where the latest export stands; the email links here (#download-data). An
        app has its own screen for it, as for deleting the account below. */}}
   {{if not (or .IsDemo $.InApp)}}{{with .Export}}
