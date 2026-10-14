@@ -180,7 +180,7 @@ flowchart LR
     job --> parse["§4.1 step 2: parse<br/>(shared from here on)"] --> rest["steps 3–5<br/>clip · coverage · simplify"] --> persist[("§4.1 step 6: activities<br/>ON CONFLICT DO NOTHING")]
 ```
 
-**Path 1 — cloud-to-cloud. Not built yet** (`docs/ROADMAP.md`, "Path 1"); this is the design it is to follow, and only its `connections` table (§3.2) exists. OAuth connect, then webhook-driven where the provider supports it, never polling on a schedule: a webhook returns `200 OK` in milliseconds and enqueues a `provider_sync` job, fetching nothing inline. Providers deliver a file (such as `.FIT`) or structured JSON, so the parse step is per-provider and everything after it is shared. Backfill of history at connect time is a separate, rate-limited, resumable job — the largest single fetch the system ever performs.
+**Path 1 — cloud-to-cloud. Not built or planned** (`VISION.md` §5.5, `docs/BRAINSTORM.md`); this is the design a connector would follow, and only its `connections` table (§3.2) exists. OAuth connect, then webhook-driven where the provider supports it, never polling on a schedule: a webhook returns `200 OK` in milliseconds and enqueues a `provider_sync` job, fetching nothing inline. Providers deliver a file (such as `.FIT`) or structured JSON, so the parse step is per-provider and everything after it is shared. Backfill of history at connect time is a separate, rate-limited, resumable job — the largest single fetch the system ever performs.
 
 **Path 2 — on-device sync.** A native app reads the platform health store and uploads normalized points (§4.0.3).
 

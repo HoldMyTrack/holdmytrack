@@ -57,7 +57,7 @@ ADR-0024 keeps a resized copy of each photo on our own storage. If photos ever b
 
 * Roughly a fifteenth of today's storage per photo, at the cost of an OAuth integration per provider, a photo that only opens once the user shares it "with anyone with the link", and a broken link every time the user tidies their files.
 * Google Photos can't serve as one: its API hands out image URLs that expire within the hour.
-* Decide only once cost-per-user is measured (`ROADMAP.md` Phase 5) and photos show up in it.
+* Decide only once cost per active user is known (`IMPLEMENTATION.md` §4.32 keeps the active counts) and photos show up in it.
 
 ### Deploy on merge
 
@@ -79,3 +79,12 @@ Garmin users come in through file upload (Path 3, `VISION.md` §4.1) and nothing
   * In the browser, it can't work: a CORS preflight from `https://holdmytrack.org` to the login, token and activity-list addresses got `403` with no `Access-Control-Allow-Origin` (tested 2026-10-11), so it would need the server as a proxy, which is the server version again.
   * In the Android app, the credentials and tokens stay on the phone and requests go out over the user's own connection. Garmin activities with a route would join the Sync sheet's candidates, and only each ticked one's original FIT would be downloaded and sent, so the server needs no change and heart rate stays unread as in any FIT (ADR-0017).
 * Open for the Android version: it is unofficial and stands in for Garmin's app, so it breaks whenever Garmin changes its login (the library already works around tokens Garmin rejects, its issue #369); Google Play's review might object; and no clause in Garmin's current consumer terms on automated access was found to say whether it's allowed. Building it would want an ADR, and copy that says plainly it's unofficial and may stop working.
+
+### Cloud connectors (Path 1)
+
+No connector is planned before launch (`VISION.md` §5.5): which services to connect, if any, is decided from what people ask for after it. Wahoo and COROS are the likeliest (`VISION.md` §4.1). What any of them would take:
+
+* A partner-API application per provider. Approval takes time, not money, so lead time is the risk: file it as soon as one is decided.
+* Generic OAuth scaffolding, built once and provider-agnostic before any provider: authorize, callback and token refresh on the existing `connections` table (`IMPLEMENTATION.md` §3.2), with a picker that lists what the connector would bring in and imports only what the user ticks (ADR-0039). That is how a connector's bulk history would arrive, since archives aren't imported.
+* Deauthorization deletion shipped with each connector, not after; Wahoo and COROS require it contractually (`VISION.md` §7).
+* Connect and disconnect on the web's Sync page, `/sync` (`IMPLEMENTATION.md` §4.0.1), and, once token refresh runs on a schedule, a last-synced status beside Health Connect's and GPS Logger's rows.

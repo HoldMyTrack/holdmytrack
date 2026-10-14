@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-10-13.
+Last updated: 2026-10-14.
 
 ## How to read this document
 
@@ -19,7 +19,7 @@ Checkboxes are the source of truth for progress; re-check them against the three
 The phases below sit inside three milestones (`VISION.md` §5, ADR-0031):
 
 1. **MVP** — Phases 1–3. Where HoldMyTrack is now; what's left of it is below.
-2. **Release and community** — Phases 4–6. Its entry gate is Phase 1's pre-launch validation and Phase 6's DPIA and privacy policy, which any public launch needs. Its exit gate is a measured answer to what community funding can carry: cost per active user (`IMPLEMENTATION.md` §4.32 keeps the active counts), set against monthly donations and the share of active users who give, over several months.
+2. **Release and community** — Phases 5–6. Its entry gate is Phase 1's pre-launch validation and Phase 6's DPIA and privacy policy, which any public launch needs. Its exit gate is a measured answer to what community funding can carry: cost per active user (`IMPLEMENTATION.md` §4.32 keeps the active counts), set against monthly donations and the share of active users who give, over several months.
 3. **Social graph** — Phase 7. Decided from Milestone 2's numbers, including whether to start it at all.
 
 ---
@@ -39,25 +39,6 @@ Sign in with Facebook is built (`SPEC.md` FR-1.10) and the Meta app exists, but 
 
 - [ ] Get a business document for the "Holdmytrack" business portfolio. Meta accepts one of: an IRS 147C letter (EIN confirmation), a business bank statement, a business tax document, or a "Doing Business As" (DBA) filing. The name on it must match the portfolio's. A sole-proprietor EIN with "HoldMyTrack" as its trade name, or a county/state DBA filing, are the cheapest routes; so may be whatever legal standing the Open Collective fiscal host above gives the project. Check the legal and tax implications before filing just for this.
 - [ ] Complete Business Verification with it, connect the Meta app to the verified portfolio and publish it (`docs/DEPLOY.md` §4 step 6), then set `FACEBOOK_APP_ID`/`FACEBOOK_APP_SECRET` in the server's `.env.prod` and recreate `api`.
-
----
-
-## Phase 4 — More sources
-
-Connecting the app to third-party services.
-
-### Prerequisites — gate the specific connectors below
-
-- [ ] File the Wahoo partner-API application (lead time, not cost, is the risk).
-- [ ] File the COROS partner-API application.
-
-### Path 1 — cloud connectors (gated on the prerequisites above)
-
-- [ ] Generic OAuth connection scaffolding — `connections` table already exists (`migrations/0002_activities.sql`, `IMPLEMENTATION.md` §3.2); build the authorize/callback/token-refresh flow once, provider-agnostic, before any specific provider, with a picker: a connector lists what it would bring in and imports only what the user ticks (ADR-0039). That is how bulk history arrives, since archives aren't imported.
-- [ ] Wahoo connector (after partner approval).
-- [ ] COROS connector (after partner approval).
-- [ ] Deauthorization deletion for each connector as it ships, not after — Wahoo and COROS contractually require it (`VISION.md` §7).
-- [ ] Connect/disconnect for each connector on the web's Sync page, `/sync` (`docs/IMPLEMENTATION.md` §4.0.1), and (once token-refresh runs on a schedule) a last-synced/status summary beside Health Connect/GPS Logger's read-only rows.
 
 ---
 

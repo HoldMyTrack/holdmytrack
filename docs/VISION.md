@@ -97,7 +97,7 @@ The central structural decision. Each path has a different failure mode, and no 
 
 #### Path 1 — Cloud-to-cloud integration
 
-Server-side OAuth connections to services that hold the user's history. Target set: **Wahoo, COROS.**
+Server-side OAuth connections to services that hold the user's history. None is planned before launch: which to build, if any, is decided from what the people using HoldMyTrack ask for (§5.5). The likeliest candidates:
 
 | Provider | What it gives | Constraint to verify before building |
 | :--- | :--- | :--- |
@@ -130,7 +130,7 @@ So Android on-device sync is foreground-only, and Samsung Galaxy Watch is unsupp
 
 #### Path 3 needs no one's permission
 
-Paths 1 and 2 depend on things HoldMyTrack doesn't control: Wahoo's and COROS's partner approvals, and what HealthKit and Health Connect actually expose. **Path 3 is unconditional.** If every one of those fails, file upload still delivers the entire product to every user willing to export once. That is what source independence buys, and it is why Path 3 comes first (§5.2).
+Paths 1 and 2 depend on things HoldMyTrack doesn't control: a provider's partner approval, and what HealthKit and Health Connect actually expose. **Path 3 is unconditional.** If every one of those fails, file upload still delivers the entire product to every user willing to export once. That is what source independence buys, and it is why Path 3 comes first (§5.2).
 
 #### Casual in-app GPS recording — mobile-only, and not a fourth path
 
@@ -210,7 +210,7 @@ That is a genuinely small number, and it is the whole argument for this model wo
 The product moves through three milestones (ADR-0031):
 
 1. **MVP** — where HoldMyTrack is now. Activities, the map modes, Spots, Stories and photos, on the web and Android (Phases 0–3 below). Free for everyone, community-funded.
-2. **Release and community** (Phases 4–6). Open HoldMyTrack to the public and build a community around it: polish, fix, and shape the features around what the people using it ask for. Its other job is to find out what community funding can actually carry, and that answer is what Milestone 3 is decided from.
+2. **Release and community** (Phases 5–6). Open HoldMyTrack to the public and build a community around it: polish, fix, and shape the features around what the people using it ask for. Its other job is to find out what community funding can actually carry, and that answer is what Milestone 3 is decided from.
 3. **Social graph** (Phase 7). Public pages, followers and the rest — if at all. Whether to build it, and whether to pay for it with paid features, community funding or sponsors, is decided from Milestone 2's numbers. Staying a single-player product and never starting this milestone is one of the options.
 
 Within the milestones, phases are sequenced so the unconditional ingest path ships first and the ones that depend on other companies' permission come later. The phase numbers are the ones `docs/ROADMAP.md` uses, which carries each phase's step-by-step detail.
@@ -228,7 +228,7 @@ Native apps for the on-device path (Path 2, §4.1) and for in-app GPS recording.
 One visual language across desktop and phone browsers, then frozen: the `--fm-*` tokens, Inter and Fraunces (Source Serif 4 for Russian headings), and Lucide icons. The mobile apps inherit the freeze rather than inventing a second visual language: two clients that each chose their own would not read as one product.
 
 ### 5.5 Phase 4: More sources
-Path 1 connectors (§4.1), in whatever order their approvals land — last among the sources because they are the ones that depend on other companies' permission. Each lists what it would bring in, and only what the user ticks comes in (ADR-0039).
+Path 1 connectors (§4.1), not planned: which to build, if any, is decided after launch from what the people using HoldMyTrack ask for, as part of Milestone 2's shaping the product around them. They come last among the sources anyway, being the ones that depend on other companies' permission, and the work they'd need is in `BRAINSTORM.md`. Each lists what it would bring in, and only what the user ticks comes in (ADR-0039).
 
 ### 5.6 Phases 5–6: Cost control and compliance
 Gates rather than features. Cost control keeps the cost per user bounded and measured (§4.3), can land alongside any phase, and is what keeps §6's funding model honest. Compliance (§7) gates any public launch, however small.
@@ -278,7 +278,7 @@ Non-negotiable. A Fog of War map is a precise map of where a person lives — th
 * **Applied at ingest, server-side** — before anything is persisted or indexed, per `IMPLEMENTATION.md` §4.1. Privacy applied at render time leaks through any bug in the render path.
 * **Share scoping** — shared maps and exports must respect zones; an exported file is permanent and cannot be recalled.
 * **Legal basis** — HoldMyTrack processes no health data (§1.1): heart rate or other body data that happens to sit inside an original upload stays in that file and is never read out of it. A precise location history is sensitive personal data regardless: explicit consent, a DPIA before launch, a documented retention policy, working export and deletion, EU-region hosting for EU users. **Being free changes none of this.** There is no small-project exemption, and the compliance burden is one of the few fixed costs a donation model has to carry regardless of scale.
-* **Deauthorization deletion** — Wahoo and COROS require deletion of synced data when a user disconnects, so every connector deletes on disconnect.
+* **Deauthorization deletion** — partner APIs such as Wahoo's and COROS's require deletion of synced data when a user disconnects, so any connector deletes on disconnect.
 * **Health Connect declarations** — Android health data types must be declared in the Play Console with justified use. Requesting more types than the product demonstrably uses is a known rejection cause. HoldMyTrack requests exercise sessions and their routes (plus the history window over them) and no health measurement at all.
 * **Photos are stored stripped and placed after clipping** — the browser re-encodes a photo before upload, so no EXIF field (the position included) reaches the server inside the file; its place on the map is worked out from the clipped track on every read, so a photo taken inside a Private location — even one added afterwards — shows at the visible end of the track, never inside it (ADR-0024).
 * **Spot captures are private** — visible only to the account itself.
