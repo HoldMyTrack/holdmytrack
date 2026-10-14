@@ -138,27 +138,27 @@ func TestTake(t *testing.T) {
 		t.Fatal(err)
 	}
 	for key, want := range map[string]float64{
-		"accounts":                             9,
-		"signups":                              1,
-		"active_1d":                            1,
-		"active_7d":                            2,
-		"active_30d":                           3,
-		"activities":                           5,
-		"activities_added":                     3,
-		"activities_by_source.upload":          3,
-		"activities_by_source.healthconnect":   1,
-		"activities_by_source.recorded":        1,
-		"activities_by_source.healthkit":       0,
-		"activities_added_by_source.upload":    2,
-		"photos":                               3,
-		"storage_bytes.photos":                 1500,
-		"accounts_by_country.qq":               5,
-		"accounts_by_country.qz":               0,
-		"accounts_by_country.other":            4,
-		"accounts_with.photos":                 1,
-		"activity_accounts_by_country.qq":      0, // one account: folded
-		"activity_accounts_by_country.other":   2, // its one account, counted under each country
-		"activities_by_country.other":          2,
+		"accounts":                           9,
+		"signups":                            1,
+		"active_1d":                          1,
+		"active_7d":                          2,
+		"active_30d":                         3,
+		"activities":                         5,
+		"activities_added":                   3,
+		"activities_by_source.upload":        3,
+		"activities_by_source.healthconnect": 1,
+		"activities_by_source.recorded":      1,
+		"activities_by_source.healthkit":     0,
+		"activities_added_by_source.upload":  2,
+		"photos":                             3,
+		"storage_bytes.photos":               1500,
+		"accounts_by_country.qq":             5,
+		"accounts_by_country.qz":             0,
+		"accounts_by_country.other":          4,
+		"accounts_with.photos":               1,
+		"activity_accounts_by_country.qq":    0, // one account: folded
+		"activity_accounts_by_country.other": 2, // its one account, counted under each country
+		"activities_by_country.other":        2,
 	} {
 		if got := after[key] - before[key]; got != want {
 			t.Errorf("%s: went up by %v, want %v", key, got, want)
